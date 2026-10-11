@@ -27,7 +27,7 @@ entry const width_${width} = fn count => do:
   });
   await compileAndRun(functions.join("\n"), (guest) => {
     for (let width = 1; width <= 16; width++) {
-      const boundary = Math.floor(248 / width);
+      const boundary = Math.floor(244 / width);
       for (
         const count of new Set([
           0,
@@ -75,7 +75,7 @@ entry const tuple_${width} = fn count => do:
   });
   await compileAndRun(functions.join("\n"), (guest) => {
     for (let width = 2; width <= 16; width++) {
-      const boundary = Math.floor(248 / width);
+      const boundary = Math.floor(244 / width);
       for (const count of [0, 1, boundary, boundary + 1, 1000]) {
         assert.equal(
           guest.call(`tuple_${width}`, count),

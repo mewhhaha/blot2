@@ -17,6 +17,7 @@ const result = await new Deno.Command("zig", {
     "install",
     "compiler-identity",
     "arena-fixture",
+    "shared-rc-fixture",
     "list-runtime-fixture",
     "-Doptimize=fast",
   ],

@@ -49,6 +49,15 @@ pub fn build(b: *std.Build) void {
     const fixture_file = generate_fixture.addOutputFileArg("arena-fixture.wasm");
     const install_fixture = b.addInstallFile(fixture_file, "arena-fixture.wasm");
     b.step("arena-fixture", "Generate the memory/array ABI execution fixture").dependOn(&install_fixture.step);
+    const rc_fixture = b.addExecutable(.{ .name = "shared-rc-fixture", .root_module = b.createModule(.{
+        .root_source_file = b.path("src/shared_rc_fixture.zig"),
+        .target = target,
+        .optimize = optimize,
+    }), .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
+    const generate_rc = b.addRunArtifact(rc_fixture);
+    const rc_file = generate_rc.addOutputFileArg("shared-rc-fixture.wasm");
+    const install_rc = b.addInstallFile(rc_file, "shared-rc-fixture.wasm");
+    b.step("shared-rc-fixture", "Generate checked retain/release execution laws").dependOn(&install_rc.step);
     const list_fixture = b.addExecutable(.{ .name = "list-runtime-fixture", .root_module = b.createModule(.{
         .root_source_file = b.path("src/list_runtime_fixture.zig"),
         .target = target,

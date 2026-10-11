@@ -17,6 +17,7 @@ pub fn emit(module: *wasm.Module, arena: wasm.Arena) Error!void {
     try allocate(module, arena);
     try allocateScalar(module, arena);
     try recycle(module, arena);
+    try @import("shared_rc.zig").emit(module, arena);
     try mark(module, arena);
     try collect(module, arena);
 }
@@ -34,7 +35,7 @@ fn allocateScalar(module: *wasm.Module, arena: wasm.Arena) Error!void {
         .{ .op = .local_get, .operand = 0 },
         .{ .op = .if_ },
         .{ .op = .local_get, .operand = result },
-        .{ .op = .i32_const, .operand = 8 },
+        .{ .op = .i32_const, .operand = @sizeOf(heap.ArenaHeader) - heap.offset(heap.ArenaHeader, "flags") },
         .{ .op = .i32_sub },
         .{ .op = .i32_const, .operand = 2 },
         .{ .op = .i32_store },
@@ -49,10 +50,10 @@ fn allocateScalar(module: *wasm.Module, arena: wasm.Arena) Error!void {
 /// their own lifetimes, and shared objects remain under the collection policy.
 fn recycle(module: *wasm.Module, arena: wasm.Arena) Error!void {
     const pointer = 0;
-    const head = try module.addLocal(arena.recycle, .i32);
-    const size = try module.addLocal(arena.recycle, .i32);
-    const bin = try module.addLocal(arena.recycle, .i32);
-    try module.emitSlice(arena.recycle, &.{
+    const head = try module.addLocal(arena.free, .i32);
+    const size = try module.addLocal(arena.free, .i32);
+    const bin = try module.addLocal(arena.free, .i32);
+    try module.emitSlice(arena.free, &.{
         .{ .op = .local_get, .operand = pointer },
         .{ .op = .i32_const, .operand = @sizeOf(heap.ArenaHeader) },
         .{ .op = .i32_sub },
@@ -110,7 +111,7 @@ fn allocate(module: *wasm.Module, arena: wasm.Arena) Error!void {
         .{ .op = .return_ },
         .{ .op = .end },
         .{ .op = .local_get, .operand = bytes },
-        .{ .op = .i32_const, .operand = 0xffffffec },
+        .{ .op = .i32_const, .operand = std.math.maxInt(u32) - @sizeOf(heap.ArenaHeader) - 3 },
         .{ .op = .i32_gt_u },
         .{ .op = .if_ },
         .{ .op = .unreachable_ },
@@ -240,6 +241,18 @@ fn allocate(module: *wasm.Module, arena: wasm.Arena) Error!void {
         .{ .op = .local_get, .operand = head },
         .{ .op = .i32_const, .operand = 0 },
         .{ .op = .i32_store, .operand = heap.offset(heap.ArenaHeader, "next") },
+        .{ .op = .local_get, .operand = head },
+        .{ .op = .i32_const },
+        .{ .op = .i32_store, .operand = heap.offset(heap.ArenaHeader, "strong") },
+        .{ .op = .local_get, .operand = head },
+        .{ .op = .i32_const },
+        .{ .op = .i32_store, .operand = heap.offset(heap.ArenaHeader, "layout") },
+        .{ .op = .local_get, .operand = head },
+        .{ .op = .i32_const },
+        .{ .op = .i32_store, .operand = heap.offset(heap.ArenaHeader, "candidate_prev") },
+        .{ .op = .local_get, .operand = head },
+        .{ .op = .i32_const },
+        .{ .op = .i32_store, .operand = heap.offset(heap.ArenaHeader, "candidate_next") },
         // Count reuse as well as fresh arena growth. A wrapping counter lets
         // loop safepoints compare traffic since their own previous collection.
         .{ .op = .global_get, .operand = arena.allocated },
@@ -353,7 +366,6 @@ fn collect(module: *wasm.Module, arena: wasm.Arena) Error!void {
     const slot = try module.addLocal(arena.collect, .i32);
     const limit = try module.addLocal(arena.collect, .i32);
     const size = try module.addLocal(arena.collect, .i32);
-    const bin = try module.addLocal(arena.collect, .i32);
     const code = [_]wasm.Instruction{
         .{ .op = .local_get, .operand = floor },
         .{ .op = .global_get, .operand = arena.base },
@@ -546,12 +558,26 @@ fn collect(module: *wasm.Module, arena: wasm.Arena) Error!void {
         .{ .op = .local_get, .operand = limit },
         .{ .op = .i32_ge_u },
         .{ .op = .br_if, .operand = 1 },
+    };
+    try module.emitSlice(arena.collect, &code);
+    const trace_code: @import("runtime_code.zig").Code = .{ .module = module, .function = arena.collect };
+    try trace_code.value(.{ .i32_and, .{ .load, @import("runtime_code.zig").Local{ .id = head }, heap.offset(heap.ArenaHeader, "flags") }, @import("shared_rc.zig").counted });
+    try trace_code.op(.if_, 0x7f);
+    try @import("shared_rc.zig").referenceSlot(trace_code, .{ .id = head }, .{ .i32_sub, .{ .i32_sub, @import("runtime_code.zig").Local{ .id = slot }, @import("runtime_code.zig").Local{ .id = head } }, @sizeOf(heap.ArenaHeader) });
+    try trace_code.op(.else_, 0);
+    try trace_code.value(1);
+    try trace_code.end();
+    try trace_code.op(.if_, 0);
+    try module.emitSlice(arena.collect, &.{
         .{ .op = .local_get, .operand = slot },
         .{ .op = .i32_load },
         .{ .op = .local_get, .operand = index },
         .{ .op = .local_get, .operand = count },
         .{ .op = .call, .operand = arena.mark },
         .{ .op = .drop },
+    });
+    try trace_code.end();
+    try module.emitSlice(arena.collect, &.{
         .{ .op = .local_get, .operand = slot },
         .{ .op = .i32_const, .operand = 4 },
         .{ .op = .i32_add },
@@ -562,72 +588,35 @@ fn collect(module: *wasm.Module, arena: wasm.Arena) Error!void {
         .{ .op = .br, .operand = 0 },
         .{ .op = .end },
         .{ .op = .end },
-        .{ .op = .i32_const, .operand = 4 },
-        .{ .op = .i32_load },
-        .{ .op = .local_set, .operand = head },
-        .{ .op = .block },
-        .{ .op = .loop },
-        .{ .op = .local_get, .operand = head },
-        .{ .op = .local_get, .operand = end },
-        .{ .op = .i32_ge_u },
-        .{ .op = .br_if, .operand = 1 },
-        .{ .op = .local_get, .operand = head },
-        .{ .op = .i32_load, .operand = heap.offset(heap.ArenaHeader, "block_size") },
-        .{ .op = .local_set, .operand = size },
-        .{ .op = .local_get, .operand = head },
-        .{ .op = .local_get, .operand = floor },
-        .{ .op = .i32_ge_u },
-        .{ .op = .local_get, .operand = head },
-        .{ .op = .i32_load, .operand = heap.offset(heap.ArenaHeader, "flags") },
-        .{ .op = .i32_const, .operand = 1 },
-        .{ .op = .i32_and },
-        .{ .op = .i32_eqz },
-        .{ .op = .local_get, .operand = head },
-        .{ .op = .i32_load, .operand = heap.offset(heap.ArenaHeader, "requested") },
-        .{ .op = .i32_const, .operand = 0 },
-        .{ .op = .i32_ne },
-        .{ .op = .i32_and },
-        .{ .op = .i32_and },
-        .{ .op = .if_ },
-        .{ .op = .local_get, .operand = head },
-        .{ .op = .i32_const, .operand = 0 },
-        .{ .op = .i32_store, .operand = heap.offset(heap.ArenaHeader, "requested") },
-        .{ .op = .local_get, .operand = size },
-        .{ .op = .i32_const, .operand = 0x80000000 },
-        .{ .op = .i32_gt_u },
-        .{ .op = .if_, .operand = 0x7f },
-        .{ .op = .i32_const, .operand = 160 },
-        .{ .op = .else_ },
-        .{ .op = .i32_const, .operand = 32 },
-        .{ .op = .local_get, .operand = size },
-        .{ .op = .i32_ctz },
-        .{ .op = .i32_const, .operand = 2 },
-        .{ .op = .i32_shl },
-        .{ .op = .i32_add },
-        .{ .op = .end },
-        .{ .op = .local_set, .operand = bin },
-        .{ .op = .local_get, .operand = head },
-        .{ .op = .local_get, .operand = bin },
-        .{ .op = .i32_load },
-        .{ .op = .i32_store, .operand = heap.offset(heap.ArenaHeader, "next") },
-        .{ .op = .local_get, .operand = bin },
-        .{ .op = .local_get, .operand = head },
-        .{ .op = .i32_store },
-        .{ .op = .end },
-        .{ .op = .local_get, .operand = head },
-        .{ .op = .local_get, .operand = head },
-        .{ .op = .i32_load, .operand = heap.offset(heap.ArenaHeader, "flags") },
-        .{ .op = .i32_const, .operand = 2 },
-        .{ .op = .i32_and },
-        .{ .op = .i32_store, .operand = heap.offset(heap.ArenaHeader, "flags") },
-        .{ .op = .local_get, .operand = head },
-        .{ .op = .local_get, .operand = size },
-        .{ .op = .i32_add },
-        .{ .op = .local_set, .operand = head },
-        .{ .op = .br, .operand = 0 },
-        .{ .op = .end },
-        .{ .op = .end },
-        .{ .op = .local_get, .operand = root },
-    };
-    try module.emitSlice(arena.collect, &code);
+    });
+    const gen = @import("runtime_code.zig");
+    const c: gen.Code = .{ .module = module, .function = arena.collect };
+    const block: gen.Local = .{ .id = head };
+    const stop: gen.Local = .{ .id = end };
+    const block_size: gen.Local = .{ .id = size };
+    // Complete the dead set before removing any counted edge. Physical sizes
+    // remain available even after retirement; allocator links are never roots.
+    try c.set(block, .{ .load, 4, 0 });
+    try c.loop(.{ .i32_lt_u, block, stop });
+    try c.when(.{ .i32_and, .{ .i32_ge_u, block, gen.Local{ .id = floor } }, .{ .i32_and, .{ .i32_ne, .{ .load, block, heap.offset(heap.ArenaHeader, "requested") }, 0 }, .{ .i32_eqz, .{ .i32_and, .{ .load, block, heap.offset(heap.ArenaHeader, "flags") }, 1 } } } });
+    try c.store(block, heap.offset(heap.ArenaHeader, "flags"), .{ .i32_or, .{ .load, block, heap.offset(heap.ArenaHeader, "flags") }, @import("shared_rc.zig").dead });
+    try c.end();
+    try c.set(block, .{ .i32_add, block, .{ .load, block, heap.offset(heap.ArenaHeader, "block_size") } });
+    try c.again();
+    try c.set(block, .{ .load, 4, 0 });
+    try c.loop(.{ .i32_lt_u, block, stop });
+    try c.set(block_size, .{ .load, block, heap.offset(heap.ArenaHeader, "block_size") });
+    try c.when(.{ .i32_and, .{ .load, block, heap.offset(heap.ArenaHeader, "flags") }, @import("shared_rc.zig").dead });
+    try c.when(.{ .i32_and, .{ .load, block, heap.offset(heap.ArenaHeader, "flags") }, @import("shared_rc.zig").counted });
+    try c.value(.{ .call, arena.retire, .{ .i32_add, block, @sizeOf(heap.ArenaHeader) } });
+    try c.op(.else_, 0);
+    try c.value(.{ .call, arena.free, .{ .i32_add, block, @sizeOf(heap.ArenaHeader) } });
+    try c.end();
+    try c.op(.else_, 0);
+    try c.store(block, heap.offset(heap.ArenaHeader, "flags"), .{ .i32_and, .{ .load, block, heap.offset(heap.ArenaHeader, "flags") }, ~@as(u32, 1) });
+    try c.end();
+    try c.set(block, .{ .i32_add, block, block_size });
+    try c.again();
+    try c.value(.{ .call, arena.release, 0 });
+    try c.value(gen.Local{ .id = root });
 }

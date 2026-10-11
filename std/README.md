@@ -345,21 +345,21 @@ remain the collection type accepted by the host ABI.
 
 Import [list.blot](list.blot) for `generate`, `fill`, `map`, `filter`,
 `fold_left`, `any`, `all`, `append`, `prepend`, `concat`, `slice`, `split_at`,
-`take`, `drop`, `splice` and `splice_many`, plus length and conversion helpers. `fold_left`, `filter`,
-`any`, and `all` propagate callback effects; `any`/`all` stop early and return
-false/true respectively on an empty list. `generate` and `map` require pure
-callbacks. Spreads express prepend (`[value, ...values]`) and append
-(`[...values, value]`); use `#[...]` to construct an array instead.
+`take`, `drop`, `splice` and `splice_many`, plus length and conversion helpers.
+`fold_left`, `filter`, `any`, and `all` propagate callback effects; `any`/`all`
+stop early and return false/true respectively on an empty list. `generate` and
+`map` require pure callbacks. Spreads express prepend (`[value, ...values]`) and
+append (`[...values, value]`); use `#[...]` to construct an array instead.
 Comprehensions and `for` loops traverse either input collection. The opening
 bracket selects a comprehension's output type: `[x * x | x <- values, x > 0]` is
 a list. Convert a list to an array when indexed access is needed.
 
 `list.splice start delete_count replacement values` replaces one checked range.
 `list.splice_many edits values` accepts a list of
-`{start, delete_count, replacement}` records in original-list coordinates.
-Edits must be ordered, nonoverlapping and in bounds; insertions at the same
-position retain their written order. Both are ordinary source functions that
-share unchanged subtrees and preserve snapshots. For example:
+`{start, delete_count, replacement}` records in original-list coordinates. Edits
+must be ordered, nonoverlapping and in bounds; insertions at the same position
+retain their written order. Both are ordinary source functions that share
+unchanged subtrees and preserve snapshots. For example:
 
 ```blot
 list.splice 1 2 [20, 30, 40] [1, 2, 3, 4] // [1, 20, 30, 40, 4]
@@ -370,7 +370,7 @@ list.splice_many [
 ```
 
 Lists use balanced trees of dense leaves, growing from small allocations to
-248-element leaves. Exclusive append/prepend reuses available storage; shared
+244-element leaves. Exclusive append/prepend reuses available storage; shared
 edits detach one leaf and its tree path, preserving earlier versions. Direct
 `list.append`/`list.prepend` calls and their aliases preserve this optimization,
 as do ordinary wrappers whose body directly calls the intrinsic. Traversal
@@ -471,12 +471,12 @@ See [the executable array example](../examples/arrays.blot).
 ## Current boundary
 
 This prelude is a useful executable core, not the complete standard library. It
-does not yet provide collection patterns, general text values, F64,
-general type-valued programming, or resumable handlers. The generic core
-supports closed source-declared operations, scoped providers, and compile-time
-effect descriptors. Libraries provide application behavior through explicit
-entrypoint IO capabilities. Literal strings are accepted as panic messages, not
-as general runtime `Text` values or privileged asset/window operations.
+does not yet provide collection patterns, general text values, F64, general
+type-valued programming, or resumable handlers. The generic core supports closed
+source-declared operations, scoped providers, and compile-time effect
+descriptors. Libraries provide application behavior through explicit entrypoint
+IO capabilities. Literal strings are accepted as panic messages, not as general
+runtime `Text` values or privileged asset/window operations.
 
 For a complete small program, see
 [examples/prelude.blot](../examples/prelude.blot).

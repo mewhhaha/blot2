@@ -226,3 +226,34 @@ fn emitResolvedBody(allocator: std.mem.Allocator, module: *const core.Module) !v
     try std.testing.expect(result.counters.resolved_plan_reads > 0);
     try std.testing.expect(result.bytes.len > 8);
 }
+
+test "shared RC source collection construction and publication preserve frozen Core through every allocation failure" {
+    const source =
+        \\entry const answer = fn (value: U32) => do:
+        \\  let child = #[value, @u32.add value 1]
+        \\  let values = @list.fill 500 child
+        \\  let before = values
+        \\  values := [child, ...self]
+        \\  let copied = @array.from_list values
+        \\  let old = @array.from_list before
+        \\  copied[0] := #[value, value]
+        \\  return @u32.add (@array.get (@array.get old 0) 1) (@array.get (@array.get copied 500) 0)
+    ;
+    var module = try lower(a, source);
+    defer module.deinit(a);
+    const nodes = try a.dupe(core.Node, module.nodes);
+    defer a.free(nodes);
+    const type_nodes = try a.dupe(types.Node, module.types.nodes);
+    defer a.free(type_nodes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitTypedCollections, .{&module});
+    try std.testing.expectEqualDeep(nodes, module.nodes);
+    try std.testing.expectEqualDeep(type_nodes, module.types.nodes);
+}
+fn emitTypedCollections(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var result = try backend.compile(allocator, &.{module.*}, 1);
+    defer result.deinit(allocator);
+    try std.testing.expectEqual(@as(?backend.Diagnostic, null), result.diagnostic);
+    const marker = "blot:ownership";
+    const offset = std.mem.find(u8, result.bytes, marker) orelse return error.TestExpectedOwnershipManifest;
+    try std.testing.expectEqual(@as(u8, 1), result.bytes[offset + marker.len + 1]);
+}

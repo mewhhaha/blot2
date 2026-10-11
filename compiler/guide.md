@@ -414,7 +414,7 @@ to a function expecting the other is a type error. `List.from_array values` and
 `Array.from_list values` explicitly copy between representations.
 
 The Zig runtime backs lists with balanced trees of dense leaves. Small leaves
-grow with demand, up to 248 words. Exclusive end edits reuse storage; shared
+grow with demand, up to 244 words. Exclusive end edits reuse storage; shared
 edits copy one leaf and its tree path, preserving earlier versions. Traversal
 caches the current leaf; word-element loops traverse a whole leaf before
 resolving the next one. Arrays stay contiguous with constant-time indexing;
@@ -569,10 +569,11 @@ replacement limit, branches, early returns and loop exits. Direct calls can
 borrow storage or transfer a proven fresh result to their caller. Escapes,
 unknown addresses, recursive calls without a usable summary and opaque calls
 keep the existing reclamation policy. When references stay within a proven group
-of allocations, shared children and cycles are released together after the
-group's final use. This needs no reference counting or tracing for that group.
-Numeric array payloads and numeric list leaves are marked as having no child
-pointers; integer bits do not become references in these payloads.
+of allocations, each member's temporary owner is released after the group's
+final use. Other owners remain valid; tracing still reclaims cycles during the
+ownership transition. Numeric array payloads and numeric list leaves are marked
+as having no child pointers; integer bits do not become references in these
+payloads.
 
 Dynamic sharing and otherwise unproved lifetimes still use an arena and a
 nonmoving tracing collector in linear memory, without the Wasm GC extension.

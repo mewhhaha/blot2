@@ -5,7 +5,6 @@ const std = @import("std");
 const queries = @import("semantic_query_table.zig");
 const artifacts = @import("code_artifacts.zig");
 const core = @import("core.zig");
-const wasm = @import("wasm.zig");
 const lifetime = @import("wasm_lifetimes.zig");
 const A = std.mem.Allocator;
 
@@ -72,7 +71,8 @@ pub const OptimizerKey = struct {
     source: u32,
     local_fingerprint: u64,
     tier: @import("compilation_tier.zig").Tier,
-    arena: ?wasm.Arena,
+    // Capture owns the exact Arena shared by every record. Matcher compares
+    // that context before consulting this table.
     pub fn deinit(_: *OptimizerKey, _: A) void {}
 };
 pub const OptimizerDependencies = struct {

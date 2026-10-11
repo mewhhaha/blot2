@@ -31,7 +31,7 @@ entry const width_${width} = fn count => do:
   });
   await compileAndRun(functions.join("\n"), (guest) => {
     for (let width = 1; width <= 16; width++) {
-      const boundary = Math.floor(248 / width);
+      const boundary = Math.floor(244 / width);
       for (
         const count of new Set([
           0,

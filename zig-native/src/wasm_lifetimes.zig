@@ -33,6 +33,7 @@ const Allocation = struct {
     /// The ownership annotation run giving this allocation's word roles.
     annotations: u32 = absent,
     annotation_count: u32 = 0,
+    rc_mask: ?u32 = null,
 };
 const Use = struct { at: u32, previous: u32 };
 const Reference = struct {
@@ -209,6 +210,8 @@ const Analysis = struct {
     at: u32 = 0,
     valid: bool = true,
     invalidates: bool = false,
+    rc_valid: bool = true,
+    rc_writes: std.ArrayList(RcWrite) = .empty,
     result_owner: u32 = 0,
 
     fn init(a: A, summaries: *Summaries, function: *const w.Function, mode: @FieldType(Analysis, "mode")) A.Error!Analysis {
@@ -238,6 +241,7 @@ const Analysis = struct {
         self.references.deinit(self.a);
         self.fields.deinit(self.a);
         self.accesses.deinit(self.a);
+        self.rc_writes.deinit(self.a);
     }
     fn dominates(self: *const Analysis, scope: u32) bool {
         if (scope == 0) return true;
@@ -321,7 +325,7 @@ const Analysis = struct {
         const parent = &self.allocations.items[address.owner - 1];
         // A word the checked layout makes scalar cannot keep a reference the
         // analysis could follow: the stored allocation escapes instead.
-        if (parent.annotations != absent and (start % 4 != 0 or ir.Ownership.wordRole(self.instructions[parent.annotations..][0..parent.annotation_count], start / 4) == .scalar)) {
+        if ((parent.rc_mask != null and !@import("runtime_layout.zig").referenceWord(parent.rc_mask.?, start / 4)) or (parent.annotations != absent and (start % 4 != 0 or ir.Ownership.wordRole(self.instructions[parent.annotations..][0..parent.annotation_count], start / 4) == .scalar))) {
             if (self.mode == .parameters) self.summaries.role_conflicts += 1;
             try self.escape(value);
             return;
@@ -422,6 +426,7 @@ const Analysis = struct {
                         try self.escape(value);
                         try self.escape(self.locals[inst.operand]);
                         value.constant = null;
+                        value.owner = 0;
                     }
                     value.region = self.region;
                     value.scope = if (self.controls.items.len == 0) 0 else self.controls.items[self.controls.items.len - 1].identity;
@@ -449,8 +454,15 @@ const Analysis = struct {
                     } else {
                         try self.escape(left);
                         try self.escape(right);
-                        try self.push(.{});
+                        try self.push(.{ .owner = if (right.owner == 0) left.owner else 0, .offset = absent });
                     }
+                },
+                .i32_mul => {
+                    const right = self.pop();
+                    const left = self.pop();
+                    try self.escape(left);
+                    try self.escape(right);
+                    if (left.constant != null and right.constant != null) try self.push(.{ .constant = left.constant.? *% right.constant.? }) else try self.push(.{});
                 },
                 .i32_load, .f32_load, .v128_load => {
                     const address = self.pop();
@@ -462,6 +474,11 @@ const Analysis = struct {
                     const value = self.pop();
                     const address = self.pop();
                     try self.memory(address, inst.operand, ir.fixed(inst.op).bytes, .write, absent);
+                    if (address.owner == 0) {
+                        self.rc_valid = false;
+                    } else if (inst.op == .v128_store) {
+                        if (self.allocations.items[address.owner - 1].rc_mask != 0) self.rc_valid = false;
+                    } else try self.rc_writes.append(self.a, .{ .at = self.at, .owner = address.owner, .kind = if (inst.op == .f32_store) .float_word else .word });
                     if (inst.op == .i32_store) try self.storeReference(address, inst.operand, value) else try self.escape(value);
                 },
                 .memory_copy, .memory_fill => {
@@ -469,15 +486,27 @@ const Analysis = struct {
                     const source = self.pop();
                     try self.escape(bytes);
                     if (inst.op == .memory_copy) try self.memory(source, 0, bytes.constant, .read, absent) else try self.escape(source);
-                    try self.memory(self.pop(), 0, bytes.constant, .write, absent);
+                    const target = self.pop();
+                    if (inst.op == .memory_copy and target.owner != 0) {
+                        try self.rc_writes.append(self.a, .{ .at = self.at, .owner = target.owner, .kind = .copy });
+                    } else self.rc_valid = false;
+                    try self.memory(target, 0, bytes.constant, .write, absent);
                 },
                 .call => {
                     const callee = ir.call(module, inst);
-                    if (callee.ownership == .allocate or callee.ownership == .allocate_scalar) {
+                    if (callee.ownership == .allocate or callee.ownership == .allocate_scalar or callee.ownership == .allocate_typed) {
+                        var mask: ?u32 = if (callee.ownership == .allocate_scalar) 0 else null;
+                        if (callee.ownership == .allocate_typed) {
+                            const value = self.pop();
+                            mask = value.constant;
+                            try self.escape(value);
+                            if (mask == null) self.rc_valid = false;
+                        }
                         const bytes = self.pop();
                         try self.escape(bytes);
                         if (bytes.constant != null and bytes.constant.? > 0) {
                             try self.allocation(bytes.constant.?);
+                            self.allocations.items[self.allocations.items.len - 1].rc_mask = mask;
                             // The run ends just before the size constant.
                             const roles = ir.allocationAnnotations(function.instructions.items, index);
                             if (roles.len != 0) {
@@ -485,7 +514,14 @@ const Analysis = struct {
                                 owner.annotations = @intCast(index - 1 - roles.len);
                                 owner.annotation_count = @intCast(roles.len);
                             }
-                        } else try self.push(.{});
+                        } else if (callee.ownership == .allocate_scalar or callee.ownership == .allocate_typed) {
+                            try self.allocation(std.math.maxInt(u32));
+                            self.allocations.items[self.allocations.items.len - 1].escaped = true;
+                            self.allocations.items[self.allocations.items.len - 1].rc_mask = mask;
+                        } else {
+                            self.rc_valid = false;
+                            try self.push(.{});
+                        }
                     } else {
                         const summary = try self.summaries.get(inst.operand);
                         for (0..callee.parameters.len) |argument| {
@@ -580,7 +616,7 @@ fn analyzeWithSummaries(a: A, module: *const w.Module, function: *const w.Functi
     if (module.arena == null) return plan;
     var has_allocations = false;
     for (function.instructions.items) |inst| if (inst.op == .call) {
-        if (module.arena.?.isAllocation(inst.operand) or (try summaries.get(inst.operand)).owned_result_bytes != null) {
+        if (module.arena.?.isAllocation(inst.operand) or inst.operand == module.arena.?.allocate_typed or (try summaries.get(inst.operand)).owned_result_bytes != null) {
             has_allocations = true;
             break;
         }
@@ -1115,14 +1151,145 @@ test "ownership annotations are not encoded" {
     for (0..2) |annotated| {
         var module = w.Module.init(a);
         defer module.deinit();
-        const arena = try module.ensureArena();
         const f = try module.addFunction(&.{}, .i32);
         var buffer: [ir.max_annotations]ir.Instruction = undefined;
         if (annotated == 1) try module.emitSlice(f, ir.annotations(&.{ .scalar, .reference }, .unknown, &buffer));
-        try module.emitSlice(f, &.{ .{ .op = .i32_const, .operand = 8 }, .{ .op = .call, .operand = arena.allocate } });
+        try module.emitSlice(f, &.{ .{ .op = .i32_const, .operand = 8 }, .{ .op = .return_ } });
         try std.testing.expectEqual(@as(usize, 2), module.functions.items[f].codeLength());
         bytes[annotated] = try module.assemble();
     }
     defer for (bytes) |item| a.free(item);
     try std.testing.expectEqualSlices(u8, bytes[0], bytes[1]);
+}
+
+test "typed allocation annotations authorize counted ownership and unknown roles preserve tracing" {
+    const a = std.testing.allocator;
+    var bytes: [2][]u8 = .{ &.{}, &.{} };
+    defer for (bytes) |item| a.free(item);
+    for (0..2) |annotated| {
+        var module = w.Module.init(a);
+        defer module.deinit();
+        const arena = try module.ensureArena();
+        const function = try module.addFunction(&.{}, .i32);
+        var buffer: [ir.max_annotations]ir.Instruction = undefined;
+        if (annotated == 1) try module.emitSlice(function, ir.annotations(&.{ .scalar, .reference }, .unknown, &buffer));
+        try module.emitSlice(function, &.{ .{ .op = .i32_const, .operand = 8 }, .{ .op = .call, .operand = arena.allocate } });
+        try std.testing.expectEqual(@as(usize, 2), module.functions.items[function].codeLength());
+        bytes[annotated] = try module.assemble();
+        const offset = std.mem.find(u8, bytes[annotated], "blot:ownership") orelse return error.TestExpectedOwnershipManifest;
+        try std.testing.expectEqual(@as(u8, 1), bytes[annotated][offset + "blot:ownership".len]);
+        try std.testing.expectEqual(@as(u8, @intCast(annotated)), bytes[annotated][offset + "blot:ownership".len + 1]);
+        var fallback = w.OwnershipFallback.unproven_body;
+        if (annotated == 1) fallback = .none;
+        try std.testing.expectEqual(@backingInt(fallback), bytes[annotated][offset + "blot:ownership".len + 2]);
+    }
+    try std.testing.expect(!std.mem.eql(u8, bytes[0], bytes[1]));
+}
+
+const RcWrite = struct { at: u32, owner: u32, kind: enum { word, float_word, copy } };
+pub const RcPlan = struct {
+    admitted: bool = true,
+    allocations: std.ArrayList(struct { at: u32, mask: u32 }) = .empty,
+    writes: std.ArrayList(struct { at: u32, local: u32, kind: @FieldType(RcWrite, "kind") }) = .empty,
+    pub fn deinit(self: *RcPlan, a: A) void {
+        self.allocations.deinit(a);
+        self.writes.deinit(a);
+    }
+};
+pub fn rcPlan(a: A, module: *const w.Module, function: *const w.Function, summaries: *Summaries) A.Error!RcPlan {
+    var plan: RcPlan = .{};
+    errdefer plan.deinit(a);
+    if (module.arena == null) return plan;
+    // A body without raw allocation or publication cannot introduce an
+    // uncounted field. Its callees are qualified separately for this module.
+    var publishes = false;
+    for (function.instructions.items) |inst| switch (inst.op) {
+        .i32_store, .f32_store, .v128_store, .memory_copy, .memory_fill => {
+            publishes = true;
+            break;
+        },
+        .call => if (module.arena.?.isAllocation(inst.operand)) {
+            publishes = true;
+            break;
+        },
+        else => {},
+    };
+    if (!publishes) return plan;
+    var state = try Analysis.init(a, summaries, function, .temporaries);
+    defer state.deinit();
+    try state.scan(module, function);
+    plan.admitted = state.valid and state.rc_valid;
+    for (state.allocations.items) |owner| {
+        const inst = function.instructions.items[owner.definition];
+        if (inst.op != .call or !module.arena.?.isAllocation(inst.operand)) continue;
+        var mask: u32 = 0;
+        if (inst.operand != module.arena.?.allocate_scalar) {
+            if (owner.annotations == absent or owner.size % 4 != 0) {
+                plan.admitted = false;
+                continue;
+            }
+            const role_run = function.instructions.items[owner.annotations..][0..owner.annotation_count];
+            var tail: ir.Role = .scalar;
+            for (0..owner.size / 4) |word| {
+                const role_ = ir.Ownership.wordRole(role_run, word);
+                if (role_ != .scalar and role_ != .reference) {
+                    plan.admitted = false;
+                    break;
+                }
+                if (word < 31) {
+                    if (role_ == .reference) mask |= @as(u32, 1) << @intCast(word);
+                } else if (word == 31) {
+                    tail = role_;
+                    if (role_ == .reference) mask |= 0x80000000;
+                } else if (role_ != tail) {
+                    plan.admitted = false;
+                    break;
+                }
+            }
+        }
+        try plan.allocations.append(a, .{ .at = owner.definition, .mask = mask });
+    }
+    // Every raw allocation is accounted for, including unknown dynamic sizes.
+    var calls: usize = 0;
+    for (function.instructions.items) |inst| if (inst.op == .call and module.arena.?.isAllocation(inst.operand)) {
+        calls += 1;
+    };
+    if (calls != plan.allocations.items.len) plan.admitted = false;
+    for (state.rc_writes.items) |write| {
+        const local = state.allocations.items[write.owner - 1].local;
+        if (local == absent) {
+            plan.admitted = false;
+            continue;
+        }
+        try plan.writes.append(a, .{ .at = write.at, .local = local, .kind = write.kind });
+    }
+    return plan;
+}
+pub fn runRc(a: A, module: *const w.Module, function: *const w.Function, summaries: *Summaries) A.Error!?Output {
+    var plan = try rcPlan(a, module, function, summaries);
+    defer plan.deinit(a);
+    if (!plan.admitted or (plan.allocations.items.len == 0 and plan.writes.items.len == 0)) return null;
+    var out: Output = .{};
+    errdefer out.deinit(a);
+    try out.locals.appendSlice(a, function.locals.items);
+    const scratch: u32 = @intCast(function.parameters.len + out.locals.items.len);
+    try out.locals.appendNTimes(a, .i32, 3);
+    var allocation: usize = 0;
+    var write: usize = 0;
+    for (function.instructions.items, 0..) |inst, at| {
+        if (allocation < plan.allocations.items.len and plan.allocations.items[allocation].at == at) {
+            try out.instructions.appendSlice(a, &.{ .{ .op = .i32_const, .operand = plan.allocations.items[allocation].mask }, .{ .op = .call, .operand = module.arena.?.allocate_typed } });
+            allocation += 1;
+        } else if (write < plan.writes.items.len and plan.writes.items[write].at == at) {
+            const site = plan.writes.items[write];
+            if (site.kind == .word or site.kind == .float_word) {
+                if (site.kind == .float_word) try out.instructions.append(a, .{ .op = .i32_reinterpret_f32 });
+                try out.instructions.appendSlice(a, &.{ .{ .op = .local_set, .operand = scratch }, .{ .op = .local_set, .operand = scratch + 1 }, .{ .op = .local_get, .operand = site.local }, .{ .op = .local_get, .operand = scratch + 1 }, .{ .op = .i32_const, .operand = inst.operand }, .{ .op = .i32_add }, .{ .op = .local_get, .operand = scratch }, .{ .op = .call, .operand = module.arena.?.store_word } });
+            } else {
+                try out.instructions.appendSlice(a, &.{ .{ .op = .local_set, .operand = scratch }, .{ .op = .local_set, .operand = scratch + 1 }, .{ .op = .local_set, .operand = scratch + 2 }, .{ .op = .local_get, .operand = site.local }, .{ .op = .local_get, .operand = scratch + 2 }, .{ .op = .local_get, .operand = scratch + 1 }, .{ .op = .local_get, .operand = scratch }, .{ .op = .call, .operand = module.arena.?.copy_words } });
+            }
+            write += 1;
+        } else try out.instructions.append(a, inst);
+    }
+    return out;
 }

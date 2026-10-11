@@ -1,18 +1,26 @@
 import { deepStrictEqual, ok } from "node:assert/strict";
 import { equal } from "./compile_helpers.ts";
 
-const compiler = Deno.args[0] ?? new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const fixture = new URL("../list-runtime-fixture.wasm", new URL(compiler, `file://${Deno.cwd()}/`));
+const compiler = Deno.args[0] ??
+  new URL("../zig-out/bin/blotc", import.meta.url).pathname;
+const fixture = new URL(
+  "../list-runtime-fixture.wasm",
+  new URL(compiler, `file://${Deno.cwd()}/`),
+);
 async function runtime() {
   const bytes = await Deno.readFile(fixture);
   ok(WebAssembly.validate(bytes));
   const { instance } = await WebAssembly.instantiate(bytes);
   const exports = instance.exports;
   const memory = exports["blot:memory"] as WebAssembly.Memory;
-  const call = (name: string, ...args: number[]) => Number((exports[name] as CallableFunction)(...args)) >>> 0;
-  const word = (address: number) => new DataView(memory.buffer).getUint32(address, true);
-  const put = (address: number, value: number) => new DataView(memory.buffer).setUint32(address, value, true);
-  const get = (list: number, index: number) => word(call("address", list, index));
+  const call = (name: string, ...args: number[]) =>
+    Number((exports[name] as CallableFunction)(...args)) >>> 0;
+  const word = (address: number) =>
+    new DataView(memory.buffer).getUint32(address, true);
+  const put = (address: number, value: number) =>
+    new DataView(memory.buffer).setUint32(address, value, true);
+  const get = (list: number, index: number) =>
+    word(call("address", list, index));
   const create = (count: number) => {
     const list = call("new", count);
     for (let i = 0; i < count; i++) put(call("address", list, i), i);
@@ -22,13 +30,16 @@ async function runtime() {
     const chunks: number[] = [];
     const nodes = new Set<number>();
     const visit = (node: number): { size: number; height: number } => {
-      ok(!nodes.has(node), "Tree nodes cannot cycle or repeat within one version");
+      ok(
+        !nodes.has(node),
+        "Tree nodes cannot cycle or repeat within one version",
+      );
       nodes.add(node);
       const height = word(node + 4), size = word(node + 8);
       if (height === 0) {
         chunks.push(node);
         const capacity = word(node + 12);
-        ok(size > 0 && size <= capacity && capacity <= 248);
+        ok(size > 0 && size <= capacity && capacity <= 244);
         for (let i = size; i < capacity; i++) equal(word(node + 16 + i * 4), 0);
       } else {
         const left = visit(word(node + 16)), right = visit(word(node + 20));
@@ -47,11 +58,34 @@ async function runtime() {
 
 Deno.test("list growth preserves balanced trees and dense leaves at boundaries", async () => {
   const r = await runtime();
-  for (const size of [0, 1, 8, 9, 24, 25, 247, 248, 249, 255, 256, 257, 8191, 8192, 8193, 262143, 262144, 262145]) {
+  for (
+    const size of [
+      0,
+      1,
+      8,
+      9,
+      24,
+      25,
+      243,
+      244,
+      245,
+      255,
+      256,
+      257,
+      8191,
+      8192,
+      8193,
+      262143,
+      262144,
+      262145,
+    ]
+  ) {
     const original = r.create(size);
     const appended = r.call("push", original, 0xfffffffe, 0, 0);
     const prepended = r.call("push", original, 0xffffffff, 1, 0);
-    r.inspect(original); r.inspect(appended); r.inspect(prepended);
+    r.inspect(original);
+    r.inspect(appended);
+    r.inspect(prepended);
     equal(r.get(appended, size), 0xfffffffe);
     equal(r.get(prepended, 0), 0xffffffff);
     for (let i = 0; i < size; i++) {
@@ -69,9 +103,15 @@ Deno.test("shared list edits detach a logarithmic spine before exclusive mutatio
   const before = r.call("heap");
   const changed = r.call("set", original, 123456, 42, 0);
   const copiedBytes = r.call("heap") - before;
-  ok(copiedBytes > 0 && copiedBytes < 4096, `Shared copy allocated ${copiedBytes} bytes`);
+  ok(
+    copiedBytes > 0 && copiedBytes < 4096,
+    `Shared copy allocated ${copiedBytes} bytes`,
+  );
   const changedTree = r.inspect(changed);
-  equal(changedTree.chunks.filter(p => tree.nodes.has(p)).length, tree.chunks.length - 1);
+  equal(
+    changedTree.chunks.filter((p) => tree.nodes.has(p)).length,
+    tree.chunks.length - 1,
+  );
   equal(r.get(original, 123456), 123456);
   equal(r.get(changed, 123456), 42);
   // Either tree can subsequently be consumed without affecting the other.
@@ -113,7 +153,13 @@ Deno.test("chunk copies and owned edits retain every observed version", async ()
   snapshots.push({ list, values });
   for (const snapshot of snapshots) {
     r.inspect(snapshot.list);
-    deepStrictEqual(Array.from({ length: snapshot.values.length }, (_, i) => r.get(snapshot.list, i)), snapshot.values);
+    deepStrictEqual(
+      Array.from(
+        { length: snapshot.values.length },
+        (_, i) => r.get(snapshot.list, i),
+      ),
+      snapshot.values,
+    );
   }
 });
 
@@ -151,9 +197,18 @@ Deno.test("chunk static values conversions empty values and private bounds prese
       equal(r.word(array + 4), 0);
     }
   }
-  for (const [name, args] of [["new", [0xffffffff]], ["address", [empty, 0]], ["set", [empty, 0, 42, 0]], ["copy", [tiny, 0]]] as const) {
+  for (
+    const [name, args] of [["new", [0xffffffff]], ["address", [empty, 0]], [
+      "set",
+      [empty, 0, 42, 0],
+    ], ["copy", [tiny, 0]]] as const
+  ) {
     let trapped = false;
-    try { r.call(name, ...args); } catch (e) { trapped = e instanceof WebAssembly.RuntimeError; }
+    try {
+      r.call(name, ...args);
+    } catch (e) {
+      trapped = e instanceof WebAssembly.RuntimeError;
+    }
     ok(trapped, name);
   }
 });
@@ -190,7 +245,8 @@ Deno.test("unchanged shared list edits allocate nothing and preserve subsequent 
   equal(r.get(changed, 5000), 42);
   equal(r.get(extended, 5001), 5000);
   equal(r.word(original), 10000);
-  r.inspect(changed); r.inspect(extended);
+  r.inspect(changed);
+  r.inspect(extended);
 });
 
 Deno.test("list element layouts distinguish scalar bits from owned references during reclamation", async () => {
@@ -205,10 +261,10 @@ Deno.test("list element layouts distinguish scalar bits from owned references du
     r.call("collect", changed);
     equal(r.get(changed, 0), child);
     equal(r.get(changed, 250), child);
-    equal(r.word(child - 12), scalar ? 0 : 64);
+    equal(r.word(child - 28), scalar ? 0 : 64);
     // A second pass must preserve the leaf's layout flag and reference values.
     r.call("collect", changed);
-    equal(r.word(child - 12), scalar ? 0 : 64);
+    equal(r.word(child - 28), scalar ? 0 : 64);
     if (!scalar) equal(r.word(r.get(changed, 100)), 123456);
   }
 });
@@ -218,7 +274,8 @@ Deno.test("whole slices and concatenation with empty lists share without allocat
   const original = r.create(5000), empty = r.call("new", 0);
   const before = r.call("heap");
   const full = r.call("slice", original, 0, 5000);
-  const left = r.call("concat", empty, full), right = r.call("concat", full, empty);
+  const left = r.call("concat", empty, full),
+    right = r.call("concat", full, empty);
   equal(r.call("heap"), before);
   const changed = r.call("set", left, 42, 99, 1);
   const appended = r.call("push", right, 77, 0, 1);
@@ -254,15 +311,24 @@ Deno.test("structural slices share interior subtrees and detach boundary leaves"
   const sliced = r.call("slice", original, 123456, 100000);
   ok(r.call("heap") - heap < 8192, "A slice rebuilds only its boundary spines");
   const cut = r.inspect(sliced);
-  ok(cut.chunks.some(node => tree.nodes.has(node)), "Covered leaves remain shared");
+  ok(
+    cut.chunks.some((node) => tree.nodes.has(node)),
+    "Covered leaves remain shared",
+  );
   equal(r.get(sliced, 0), 123456);
   equal(r.get(sliced, 99999), 223455);
   heap = r.call("heap");
   const tiny = r.call("slice", original, 123456, 1);
-  ok(r.call("heap") - heap < 256, "A tiny slice owns a descriptor and small leaf");
+  ok(
+    r.call("heap") - heap < 256,
+    "A tiny slice owns a descriptor and small leaf",
+  );
   const tinyTree = r.inspect(tiny);
   equal(tinyTree.nodes.size, 1);
-  ok(!tree.nodes.has(tinyTree.chunks[0]), "A partial leaf must not retain discarded neighbors");
+  ok(
+    !tree.nodes.has(tinyTree.chunks[0]),
+    "A partial leaf must not retain discarded neighbors",
+  );
   r.call("set", original, 125000, 77, 1);
   equal(r.get(sliced, 1544), 125000);
   r.call("set", sliced, 5000, 99, 1);
@@ -279,8 +345,12 @@ Deno.test("structural concat balances unequal trees and preserves both operands"
   ok(r.call("heap") - heap < 4096, "Concat must not flatten either tree");
   r.inspect(joined);
   equal(r.word(joined), 201000);
-  for (const index of [0, 1, 247, 248, 99999, 199999]) equal(r.get(joined, index), index);
-  for (const index of [0, 247, 248, 999]) equal(r.get(joined, 200000 + index), index);
+  for (const index of [0, 1, 247, 248, 99999, 199999]) {
+    equal(r.get(joined, index), index);
+  }
+  for (const index of [0, 247, 248, 999]) {
+    equal(r.get(joined, 200000 + index), index);
+  }
   r.call("set", left, 500, 17, 1);
   r.call("set", right, 500, 18, 1);
   equal(r.get(joined, 500), 500);
@@ -296,7 +366,7 @@ Deno.test("structural concat balances unequal trees and preserves both operands"
 Deno.test("slicing and concatenating adversarial boundaries match flat sequence values", async () => {
   const r = await runtime();
   let list = r.create(8193);
-  let values = Array.from({length: 8193}, (_, index) => index);
+  let values = Array.from({ length: 8193 }, (_, index) => index);
   let seed = 123;
   for (let step = 0; step < 400; step++) {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -305,8 +375,10 @@ Deno.test("slicing and concatenating adversarial boundaries match flat sequence 
     list = r.call("slice", list, start, count);
     values = values.slice(start, start + count);
     const extra = r.create(seed % 260);
-    list = step % 2 ? r.call("concat", list, extra) : r.call("concat", extra, list);
-    const added = Array.from({length: seed % 260}, (_, index) => index);
+    list = step % 2
+      ? r.call("concat", list, extra)
+      : r.call("concat", extra, list);
+    const added = Array.from({ length: seed % 260 }, (_, index) => index);
     values = step % 2 ? [...values, ...added] : [...added, ...values];
     r.inspect(list);
     equal(r.word(list), values.length);

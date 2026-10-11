@@ -16,8 +16,11 @@ pub const Function = ir.Function;
 const Global = struct { scalar: Scalar, bits: u32, mutable: bool = false };
 const Import = struct { module: []u8, name: []u8, signature: u32 };
 pub const Callback = struct { parameter: Scalar, result: Scalar };
+pub const OwnershipFallback = enum(u8) { none, no_arena, public_arena, host_references, imports, initializer, static_sequence_cache, unproven_body };
 const Export = struct { name: []u8, index: u32, parameter: Scalar, result: Scalar, global: bool, callback: ?Callback = null };
 pub const Arena = struct {
+    pub const function_fields = .{ "allocate", "allocate_scalar", "recycle", "reset", "mark", "collect", "allocate_typed", "retain", "release", "release_lease", "retire", "free", "store_word", "copy_words", "decrement" };
+    pub const global_fields = .{ "heap", "base", "static_end", "allocated", "rc_enabled", "rc_leases", "rc_retains", "rc_releases", "rc_destroyed" };
     allocate: u32,
     allocate_scalar: u32,
     recycle: u32,
@@ -28,6 +31,20 @@ pub const Arena = struct {
     base: u32,
     static_end: u32,
     allocated: u32,
+    rc_enabled: u32,
+    rc_leases: u32,
+    rc_retains: u32,
+    rc_releases: u32,
+    rc_destroyed: u32,
+    allocate_typed: u32,
+    retain: u32,
+    release: u32,
+    release_lease: u32,
+    retire: u32,
+    free: u32,
+    store_word: u32,
+    copy_words: u32,
+    decrement: u32,
 
     pub fn isAllocation(self: Arena, function: u32) bool {
         return function == self.allocate or function == self.allocate_scalar;
@@ -42,6 +59,8 @@ pub const AssemblyOptions = struct {
     /// by an element segment; the host publishes replacements after validation.
     import_function_table: ?u32 = null,
     export_function_table: bool = false,
+    /// Private execution laws inspect counted headers without the Array ABI.
+    export_memory: bool = false,
     previous: ?*const @import("optimized_bodies.zig").Capture = null,
     current: ?*@import("optimized_bodies.zig").Capture = null,
     stats: ?*@import("optimized_bodies.zig").Stats = null,
@@ -304,29 +323,49 @@ pub const Module = struct {
         const base = try self.addGlobal(.u32, 256, true);
         const static_end = try self.addGlobal(.u32, 256, false);
         const allocated = try self.addGlobal(.u32, 0, true);
+        const rc_enabled = try self.addGlobal(.u32, 0, false);
+        const rc_leases = try self.addGlobal(.u32, 0, true);
+        const rc_retains = try self.addGlobal(.u32, 0, true);
+        const rc_releases = try self.addGlobal(.u32, 0, true);
+        const rc_destroyed = try self.addGlobal(.u32, 0, true);
         const allocate = try self.addFunction(&.{.i32}, .i32);
         const allocate_scalar = try self.addFunction(&.{.i32}, .i32);
         const recycle = try self.addFunction(&.{.i32}, .none);
         const reset = try self.addFunction(&.{.i32}, .i32);
         const mark = try self.addFunction(&.{ .i32, .i32, .i32 }, .i32);
         const collect = try self.addFunction(&.{ .i32, .i32, .i32 }, .i32);
-        const arena: Arena = .{ .heap = heap, .base = base, .static_end = static_end, .allocated = allocated, .allocate = allocate, .allocate_scalar = allocate_scalar, .recycle = recycle, .reset = reset, .mark = mark, .collect = collect };
+        const allocate_typed = try self.addFunction(&.{ .i32, .i32 }, .i32);
+        const retain = try self.addFunction(&.{.i32}, .none);
+        const release = try self.addFunction(&.{.i32}, .none);
+        const release_lease = try self.addFunction(&.{.i32}, .none);
+        const retire = try self.addFunction(&.{.i32}, .none);
+        const free = try self.addFunction(&.{.i32}, .none);
+        const store_word = try self.addFunction(&.{ .i32, .i32, .i32 }, .none);
+        const copy_words = try self.addFunction(&.{ .i32, .i32, .i32, .i32 }, .none);
+        const decrement = try self.addFunction(&.{.i32}, .none);
+        const arena: Arena = .{ .rc_enabled = rc_enabled, .rc_leases = rc_leases, .rc_retains = rc_retains, .rc_releases = rc_releases, .rc_destroyed = rc_destroyed, .allocate_typed = allocate_typed, .retain = retain, .release = release, .release_lease = release_lease, .retire = retire, .free = free, .store_word = store_word, .copy_words = copy_words, .decrement = decrement, .heap = heap, .base = base, .static_end = static_end, .allocated = allocated, .allocate = allocate, .allocate_scalar = allocate_scalar, .recycle = recycle, .reset = reset, .mark = mark, .collect = collect };
         try arena_runtime.emit(self, arena);
         // Reset discards post-base blocks and every free-list link into them.
         // Pre-base runtime initializers remain in the physical block chain.
         try self.emitSlice(reset, &.{
-            .{ .op = .global_get, .operand = base }, .{ .op = .global_set, .operand = heap },
-            .{ .op = .i32_const, .operand = 32 },    .{ .op = .i32_const },
-            .{ .op = .i32_const, .operand = 132 },   .{ .op = .memory_fill },
-            .{ .op = .i32_const, .operand = 12 },    .{ .op = .i32_const },
-            .{ .op = .i32_store },                   .{ .op = .i32_const, .operand = 4 },
-            .{ .op = .i32_load },                    .{ .op = .global_get, .operand = base },
-            .{ .op = .i32_ge_u },                    .{ .op = .if_ },
-            .{ .op = .i32_const, .operand = 4 },     .{ .op = .i32_const },
-            .{ .op = .i32_store },                   .{ .op = .end },
-            .{ .op = .i32_const },
+            // Counted tracer leases retire through the same dead-set path.
+            .{ .op = .global_get, .operand = rc_enabled }, .{ .op = .if_ },
+            .{ .op = .i32_const },                         .{ .op = .global_get, .operand = base },
+            .{ .op = .i32_const },                         .{ .op = .call, .operand = collect },
+            .{ .op = .drop },                              .{ .op = .end },
+            .{ .op = .global_get, .operand = base },       .{ .op = .global_set, .operand = heap },
+            .{ .op = .i32_const, .operand = 32 },          .{ .op = .i32_const },
+            .{ .op = .i32_const, .operand = 132 },         .{ .op = .memory_fill },
+            .{ .op = .i32_const, .operand = 12 },          .{ .op = .i32_const },
+            .{ .op = .i32_store },                         .{ .op = .i32_const, .operand = 4 },
+            .{ .op = .i32_load },                          .{ .op = .global_get, .operand = base },
+            .{ .op = .i32_ge_u },                          .{ .op = .if_ },
+            .{ .op = .i32_const, .operand = 4 },           .{ .op = .i32_const },
+            .{ .op = .i32_store },                         .{ .op = .end },
+            .{ .op = .i32_const, .operand = 16 },          .{ .op = .i32_const },
+            .{ .op = .i32_store },                         .{ .op = .i32_const },
         });
-        if (self.artifacts) |journal| try journal.append(.{ .arena = arena });
+        if (self.artifacts) |journal| try journal.recordArena(arena);
         self.arena = arena;
         try self.demandResource(.arena, 0, false);
         return arena;
@@ -400,6 +439,56 @@ pub const Module = struct {
         if (options.current) |current| current.tier = options.tier;
         var code = try @import("machine_code_sharing.zig").Index.init(self.allocator, self, options.share_machine_code);
         defer code.deinit();
+        var passes = try @import("runtime_pipeline.zig").Session.init(self.allocator, self);
+        defer passes.deinit();
+        passes.tier = options.tier;
+        if (options.stats) |stats| stats.role_conflicts = passes.summaries.role_conflicts;
+        if (options.current) |current| try current.recordInputs(self, &passes.summaries);
+        var matcher: ?@import("optimized_bodies.zig").Matcher = if (options.previous != null and options.current != null) try .init(self.allocator, options.previous.?, options.current.?) else null;
+        defer if (matcher) |*matches| matches.deinit();
+        var parallel = try @import("runtime_parallel.zig").Batch.run(self.allocator, options.io, &passes, code, if (matcher) |*matches| matches else null, options.workers);
+        defer if (parallel) |*batch| batch.deinit();
+        if (options.stats) |stats| if (parallel) |batch| {
+            stats.workers = batch.workers;
+            stats.parallel_jobs = batch.jobs;
+        };
+        const Prepared = struct { body: ?ir.Body = null, borrowed: bool = false };
+        const bodies = try self.allocator.alloc(Prepared, self.functions.items.len);
+        defer self.allocator.free(bodies);
+        @memset(bodies, .{});
+        defer for (bodies) |*prepared| if (!prepared.borrowed) {
+            if (prepared.body) |*body| body.deinit(self.allocator);
+        };
+        var ownership_fallback: OwnershipFallback = .none;
+        if (self.arena == null) ownership_fallback = .no_arena else if (self.public_arena) ownership_fallback = .public_arena else if (self.host_references != null) ownership_fallback = .host_references else if (self.imports.items.len != 0) ownership_fallback = .imports else if (self.start != null) ownership_fallback = .initializer;
+        // Static sequence caches are persistent mutable roots, owned by 032.
+        if (ownership_fallback == .none and self.lists != null and self.data.items.len > 256) ownership_fallback = .static_sequence_cache;
+        for (self.functions.items, 0..) |*function, id| {
+            if (options.stats) |stats| stats.functions += 1;
+            if (!code.emits(id)) {
+                if (options.stats) |stats| stats.shared += 1;
+                continue;
+            }
+            const reused = if (matcher) |*matches| matches.matches(id) else false;
+            bodies[id] = .{ .body = if (reused) matcher.?.output(id) else if (parallel) |*batch| batch.take(id) else try passes.optimize(function), .borrowed = reused };
+            if (options.current) |current| try current.recordOutput(id, bodies[id].body);
+            if (options.stats) |stats| {
+                if (reused) stats.reused += 1 else stats.optimized += 1;
+            }
+            if (ownership_fallback == .none and !passes.runtimeHelper(function)) {
+                var view = function.*;
+                if (bodies[id].body) |body| {
+                    view.locals = body.locals;
+                    view.instructions = body.instructions;
+                }
+                var proof = try @import("wasm_lifetimes.zig").rcPlan(self.allocator, self, &view, &passes.summaries);
+                defer proof.deinit(self.allocator);
+                if (!proof.admitted or proof.allocations.items.len != 0) {
+                    ownership_fallback = .unproven_body;
+                }
+            }
+        }
+        const rc_admitted = ownership_fallback == .none;
         var output = Bytes.init(self.allocator);
         defer output.deinit();
         try output.raw(&.{ 0, 97, 115, 109, 1, 0, 0, 0 });
@@ -467,26 +556,28 @@ pub const Module = struct {
         }
         if (self.globals.items.len != 0) {
             try payload.uleb(@intCast(self.globals.items.len));
-            for (self.globals.items) |global| {
+            for (self.globals.items, 0..) |global, id| {
                 try payload.byte(@backingInt(global.scalar.machine()));
                 try payload.byte(@intFromBool(global.mutable));
-                try encodeInstruction(&payload, .{ .op = if (global.scalar == .f32) .f32_const else .i32_const, .operand = global.bits }, self.functions.items.len, self.globals.items.len, self.signatures.items.len, import_count);
+                try encodeInstruction(&payload, .{ .op = if (global.scalar == .f32) .f32_const else .i32_const, .operand = if (self.arena != null and id == self.arena.?.rc_enabled) @intFromBool(rc_admitted) else global.bits }, self.functions.items.len, self.globals.items.len, self.signatures.items.len, import_count);
                 try payload.byte(0x0b);
             }
             try output.section(6, payload.items());
             payload.clear();
         }
-        try payload.uleb(@intCast(self.exports.items.len + @as(usize, if (self.public_arena) 3 else 0) + @intFromBool(options.export_function_table)));
+        try payload.uleb(@intCast(self.exports.items.len + @as(usize, if (self.public_arena) 2 else 0) + @intFromBool(self.public_arena or options.export_memory) + @intFromBool(options.export_function_table) + @as(usize, if (self.arena != null) 4 else 0)));
         for (self.exports.items) |item| {
             try payload.name(item.name);
             try payload.byte(if (item.global) 3 else 0);
             if (!item.global and item.index >= self.functions.items.len) return error.InvalidFunctionReference;
             try payload.uleb(if (item.global) item.index else code.function(item.index) + import_count);
         }
-        if (self.public_arena) {
+        if (self.public_arena or options.export_memory) {
             try payload.name("blot:memory");
             try payload.byte(2);
             try payload.uleb(0);
+        }
+        if (self.public_arena) {
             try payload.name("blot:allocate");
             try payload.byte(0);
             try payload.uleb(code.function(self.arena.?.allocate) + import_count);
@@ -494,6 +585,11 @@ pub const Module = struct {
             try payload.byte(0);
             try payload.uleb(code.function(self.arena.?.reset) + import_count);
         }
+        if (self.arena) |arena| inline for (.{ "rc_leases", "rc_retains", "rc_releases", "rc_destroyed" }) |field| {
+            try payload.name("blot:" ++ field);
+            try payload.byte(3);
+            try payload.uleb(@field(arena, field));
+        };
         if (options.export_function_table) {
             try payload.name("blot:patch:table");
             try payload.byte(1);
@@ -520,35 +616,10 @@ pub const Module = struct {
             try payload.uleb(@intCast(code.unique));
             var body = Bytes.init(self.allocator);
             defer body.deinit();
-            var passes = try @import("runtime_pipeline.zig").Session.init(self.allocator, self);
-            defer passes.deinit();
-            passes.tier = options.tier;
-            if (options.stats) |stats| stats.role_conflicts = passes.summaries.role_conflicts;
-            if (options.current) |current| try current.recordInputs(self, &passes.summaries);
-            var matcher: ?@import("optimized_bodies.zig").Matcher = if (options.previous != null and options.current != null) try .init(self.allocator, options.previous.?, options.current.?) else null;
-            defer if (matcher) |*matches| matches.deinit();
-            var parallel = try @import("runtime_parallel.zig").Batch.run(self.allocator, options.io, &passes, code, if (matcher) |*matches| matches else null, options.workers);
-            defer if (parallel) |*batch| batch.deinit();
-            if (options.stats) |stats| if (parallel) |batch| {
-                stats.workers = batch.workers;
-                stats.parallel_jobs = batch.jobs;
-            };
             for (self.functions.items, 0..) |function, id| {
-                if (options.stats) |stats| stats.functions += 1;
-                if (!code.emits(id)) {
-                    if (options.stats) |stats| stats.shared += 1;
-                    continue;
-                }
+                if (!code.emits(id)) continue;
                 body.clear();
-                const reused = if (matcher) |*matches| matches.matches(id) else false;
-                var optimized = if (reused) matcher.?.output(id) else if (parallel) |*batch| batch.take(id) else try passes.optimize(&function);
-                defer if (!reused) {
-                    if (optimized) |*owned| owned.deinit(self.allocator);
-                };
-                if (options.current) |current| try current.recordOutput(id, optimized);
-                if (options.stats) |stats| {
-                    if (reused) stats.reused += 1 else stats.optimized += 1;
-                }
+                const optimized = bodies[id].body;
                 const locals = if (optimized) |owned| owned.locals.items else function.locals.items;
                 const instructions = if (optimized) |owned| owned.instructions.items else function.instructions.items;
                 try body.uleb(@intCast(locals.len));
@@ -586,6 +657,12 @@ pub const Module = struct {
             try output.section(11, payload.items());
             payload.clear();
         }
+        try payload.name("blot:ownership");
+        try payload.byte(1);
+        try payload.byte(@intFromBool(rc_admitted));
+        try payload.byte(@backingInt(ownership_fallback));
+        try output.section(0, payload.items());
+        payload.clear();
         try payload.name("blot:abi");
         try payload.byte(2);
         var function_count: u32 = 0;

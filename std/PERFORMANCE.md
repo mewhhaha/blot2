@@ -15,7 +15,7 @@ indexing. Collection transformations take their collection argument last for
 pipelines. Numeric arrays cross the guest ABI by copying, so host mutation
 cannot change a retained guest value.
 
-Lists use persistent balanced trees with right-sized leaves of at most 248
+Lists use persistent balanced trees with right-sized leaves of at most 244
 storage words. An exclusive end edit can reuse slack and tree nodes. A shared
 edit copies one path and leaf, preserving both snapshots. Arrays are contiguous;
 runtime append still copies. Repeated growth therefore has different costs from

@@ -226,6 +226,22 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     declare("blot:reset", "function");
   }
   const actualExports = WebAssembly.Module.exports(module);
+  const ownership = WebAssembly.Module.customSections(module, "blot:ownership");
+  if (ownership.length > 1) {
+    throw new GuestError("invalid_abi", "Duplicate ownership section");
+  }
+  if (ownership.length === 1) {
+    const state = new Uint8Array(ownership[0]);
+    if (
+      state.length !== 3 || state[0] !== 1 || state[1] > 1 || state[2] > 7 ||
+      (state[1] === 1) !== (state[2] === 0)
+    ) throw new GuestError("invalid_abi", "Invalid ownership section");
+    if (state[2] !== 1) {
+      for (const counter of ["leases", "retains", "releases", "destroyed"]) {
+        declare(`blot:rc_${counter}`, "global");
+      }
+    }
+  }
   if (
     actualExports.length !== exports.size ||
     actualExports.some((entry) => exports.get(entry.name) !== entry.kind)

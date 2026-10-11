@@ -156,7 +156,7 @@ pub const Ownership = packed struct(u32) {
     roles: u26 = 0,
 
     pub fn role(self: Ownership, index: usize) Role {
-        return @enumFromInt(@as(u2, @truncate(self.roles >> @intCast(index * 2))));
+        return @fromBackingInt(@intCast(@as(u2, @truncate(self.roles >> @intCast(index * 2)))));
     }
     /// Words a `rest` annotation's run describes explicitly.
     pub fn explicitWords(self: Ownership) usize {
@@ -268,7 +268,7 @@ pub const Function = struct {
     }
     pub fn parameterRole(self: *const Function, index: usize) Role {
         if (index >= 32) return .unknown;
-        return @enumFromInt(@as(u2, @truncate(self.parameter_roles >> @intCast(index * 2))));
+        return @fromBackingInt(@intCast(@as(u2, @truncate(self.parameter_roles >> @intCast(index * 2)))));
     }
 };
 /// Packs parameter roles for `Function.parameter_roles`; parameters past the
@@ -360,7 +360,7 @@ pub const Call = struct {
     parameters: []const ValueType,
     result: ValueType,
     selector: bool = false,
-    ownership: enum { unknown, allocate, allocate_scalar, release, collect } = .unknown,
+    ownership: enum { unknown, allocate, allocate_scalar, allocate_typed, release, collect } = .unknown,
 };
 pub fn call(module: *const @import("wasm.zig").Module, inst: Instruction) Call {
     switch (inst.op) {
@@ -370,6 +370,7 @@ pub fn call(module: *const @import("wasm.zig").Module, inst: Instruction) Call {
             if (module.arena) |arena| {
                 if (inst.operand == arena.allocate) result.ownership = .allocate;
                 if (inst.operand == arena.allocate_scalar) result.ownership = .allocate_scalar;
+                if (inst.operand == arena.allocate_typed) result.ownership = .allocate_typed;
                 if (inst.operand == arena.recycle) result.ownership = .release;
                 if (inst.operand == arena.collect or inst.operand == arena.reset) result.ownership = .collect;
             }

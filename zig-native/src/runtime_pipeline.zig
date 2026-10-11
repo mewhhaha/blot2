@@ -22,12 +22,22 @@ pub const Session = struct {
     pub fn deinit(self: *Session) void {
         self.summaries.deinit();
     }
+    pub fn runtimeHelper(self: *const Session, function: *const ir.Function) bool {
+        const id = (@intFromPtr(function) - @intFromPtr(self.module.functions.items.ptr)) / @sizeOf(ir.Function);
+        if (self.module.arena) |arena| inline for (wasm.Arena.function_fields) |field| {
+            if (id == @field(arena, field)) return true;
+        };
+        if (self.module.lists) |lists| inline for (@typeInfo(@TypeOf(lists)).@"struct".field_names) |field| {
+            if (id == @field(lists, field)) return true;
+        };
+        return false;
+    }
     pub fn optimize(self: *Session, source: *const ir.Function) A.Error!?ir.Body {
         var owned: ?ir.Body = null;
         errdefer if (owned) |*body| body.deinit(self.allocator);
         var view = source.*;
-        inline for (.{ "inline", "scalar", "vector", "lifetime", "reduce" }) |pass| {
-            const next: ?ir.Body = if (self.tier == .development and !std.mem.eql(u8, pass, "lifetime"))
+        inline for (.{ "inline", "scalar", "vector", "lifetime", "reduce", "rc" }) |pass| {
+            const next: ?ir.Body = if (self.tier == .development and !std.mem.eql(u8, pass, "lifetime") and !std.mem.eql(u8, pass, "rc"))
                 null
             else if (comptime std.mem.eql(u8, pass, "inline"))
                 try @import("wasm_inline.zig").run(self.allocator, self.module, &view)
@@ -35,6 +45,8 @@ pub const Session = struct {
                 try @import("wasm_sroa.zig").run(self.allocator, self.module, &view)
             else if (comptime std.mem.eql(u8, pass, "vector"))
                 try @import("wasm_vectorize.zig").run(self.allocator, self.module, &view)
+            else if (comptime std.mem.eql(u8, pass, "rc"))
+                if (self.runtimeHelper(source)) null else try lifetimes.runRc(self.allocator, self.module, &view, &self.summaries)
             else if (comptime std.mem.eql(u8, pass, "reduce"))
                 try @import("wasm_row_reduce.zig").run(self.allocator, &view)
             else

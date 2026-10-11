@@ -293,18 +293,15 @@ Known private pointer stores and dominating exact field loads form closed
 allocation groups. Shared children and cycles may belong to one group; liveness
 is the union of its members' uses. Every member must be constructed in the same
 straight-line segment, with its own valid allocation-base local. An exit
-releases each member once, without runtime graph traversal or reference
-counting. Each individual recycle still frees only its own storage. Escaping a
-parent also escapes its reachable children. Unknown field reads/copies,
-overlapping writes, conditional field provenance, cross-segment construction and
+releases each member's temporary owner once. In tracing modules each recycle
+frees only its own storage; in counted modules it drops that member's counted
+tracer lease and zero-count destruction follows typed edges. Escaping a parent
+also escapes its reachable children. Unknown field reads/copies, overlapping
+writes, conditional field provenance, cross-segment construction and
 invalidating calls reject the proof. Reference-overlap checking has a bounded
 work budget and conservatively declines wider proofs. Dynamic shared/cyclic
 ownership and reclamation of escaping effect payloads remain required before
 tracing can be removed.
-
-[Shared and cyclic ownership](SHARED_OWNERSHIP.md) specifies typed counting,
-roots, suspension, iterative destruction, cycle reclamation and the measured
-transition gates for replacing this tracing path.
 
 [Ragged builders](RAGGED_BUILDERS.md) specifies bounded count/fill admission,
 direct final storage, ownership and ordinary fallback for dependent or filtered
@@ -400,8 +397,10 @@ allocation failure to its caller.
 
 Checked scalar element layouts select pointer-free array allocation and list
 leaves. The descriptor carries this fact through cloning, structural operations
-and conversion. Reference-valued elements keep tracing; machine i32 alone is
-never evidence that a word is scalar. Runtime list branches remain pointerful.
+and conversion. Reference-valued elements use typed owning fields when the whole
+module is admitted, with tracing available during transition; machine i32 alone
+is never evidence that a word is scalar. Runtime list branches remain
+pointerful.
 
 Collection elements that are flat products or structural records with 1–16
 checked scalar fields use consecutive payload words. Source lengths count rows;
@@ -428,6 +427,12 @@ the State cell must not clear the cached result. The cycle-reclamation law in
 cycles in a long-running loop. RC without cyclic ownership handling is not a
 valid collector replacement. In particular, do not weaken memo fields, clear
 memoized results on State writes, or assume closure graphs are always acyclic.
+
+[Shared and cyclic ownership](SHARED_OWNERSHIP.md) specifies typed
+strong/borrowed roots, iterative destruction, suspension ownership and localized
+trial deletion for tasks 030–035. The tracing runtime remains until replacement
+qualification. [Typed RC transition](SHARED_RC.md) describes current admission,
+counted tracer leases and the shared retirement path.
 
 Wasm values live in linear memory, with a nonmoving tracing arena collector and
 free lists. This does not use the Wasm GC extension. Ownership analysis permits
@@ -464,17 +469,17 @@ declaration names and source modules.
 
 Word-element cursors own a leaf base and its logical start, separate from the
 collection's lookup cache. Forks only consult that shared cache on a leaf
-crossing. The four-word cursor stays in the previous 32-byte allocation class.
-Serialized cursors start without a cached leaf. Every stored pointer remains an
-allocation base and published cursors are initialized once, never mutated.
-Packed-row cursors keep logical positions with a private leaf cache whose base
-counts words. Direct loops retain their own leaf span and a bounded stack of
-pending right subtrees. The private stack roots the original collection and is
-cleared before use; its references are allocation bases. Each tree edge is
-visited at most once, independently of descriptor-cache changes. Each request
-consumes the immediately next leaf: direct loops read every word in order,
-including fragments of crossing rows. Stack-position locals may contain private
-interior addresses; the stored collection and subtree references remain
+crossing. The four-word cursor uses a 64-byte allocation class with the 32-byte
+ownership header. Serialized cursors start without a cached leaf. Every stored
+pointer remains an allocation base and published cursors are initialized once,
+never mutated. Packed-row cursors keep logical positions with a private leaf
+cache whose base counts words. Direct loops retain their own leaf span and a
+bounded stack of pending right subtrees. The private stack roots the original
+collection and is cleared before use; its references are allocation bases. Each
+tree edge is visited at most once, independently of descriptor-cache changes.
+Each request consumes the immediately next leaf: direct loops read every word in
+order, including fragments of crossing rows. Stack-position locals may contain
+private interior addresses; the stored collection and subtree references remain
 allocation bases. The balanced tree's word bound fits within 64 stack entries,
 and a checked overflow traps instead of writing past the private storage.
 

@@ -4051,7 +4051,7 @@ const Emitter = struct {
         try self.emit(if (floating) .f32_store else .i32_store, 4);
         try self.emit(.local_get, address);
     }
-    const Location = struct { owner: u32, container: u32, offset: u32, size: ?u32, wrapped: bool, list_index: ?u32 = null, row_words: u32 = 0 };
+    const Location = struct { owner: u32, container: u32, offset: u32, size: ?u32, wrapped: bool, list_index: ?u32 = null, row_words: u32 = 0, array_scalar: ?bool = null };
     fn payloadLayout(self: *Emitter, projection: core.Projection, tag: u32, id: core.Id) Error!layout.Id {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
@@ -4441,18 +4441,19 @@ const Emitter = struct {
             if (!reuse) {
                 const arena = try g.module.ensureArena();
                 try self.emit(.local_get, place.size.?);
-                try self.emit(.call, if (place.row_words != 0) arena.allocate_scalar else arena.allocate);
+                if (place.array_scalar) |scalar_elements| try self.allocateArray(scalar_elements) else try self.emit(.call, if (place.row_words != 0) arena.allocate_scalar else arena.allocate);
                 try self.emit(.local_set, container);
+                if (place.array_scalar != null) try self.emit(.local_get, container);
                 try self.emit(.local_get, container);
                 try self.emit(.local_get, place.container);
                 try self.emit(.local_get, place.size.?);
-                try self.emit(.memory_copy, 0);
+                if (place.array_scalar != null) try self.emit(.call, arena.copy_words) else try self.emit(.memory_copy, 0);
             }
             try self.emit(.local_get, container);
             try self.emit(.local_get, place.offset);
             try self.emit(.i32_add, 0);
             try self.emit(.local_get, changed);
-            try self.storeElement(changed_scalar.machine(), 0, place.row_words);
+            if (place.array_scalar != null and place.row_words == 0) try self.storeCollectionWord(container, false, changed_scalar.machine(), 0) else try self.storeElement(changed_scalar.machine(), 0, place.row_words);
             if (place.wrapped) {
                 // A copy of a constructor cell: its tag, then its payload.
                 const wrapper = if (reuse) place.owner else try self.allocate(8, .{ .words = &.{ .scalar, .value } });
@@ -4504,7 +4505,8 @@ const Emitter = struct {
         try self.emit(.i32_const, 4);
         try self.emit(.i32_add, 0);
         try self.emit(.local_set, offset);
-        return .{ .owner = array_, .container = array_, .offset = offset, .size = size, .wrapped = false, .row_words = row_words };
+        const scalar_elements = row_words != 0 or self.generator.layouts.scalar(self.generator.layouts.node(collection).a) != null;
+        return .{ .owner = array_, .container = array_, .offset = offset, .size = size, .wrapped = false, .row_words = row_words, .array_scalar = scalar_elements };
     }
     fn smallCollectionCandidate(self: *const Emitter, id: core.Id) bool {
         const source = self.generator.unit(self.unit_id);
@@ -4709,22 +4711,46 @@ const Emitter = struct {
         try self.emit(.local_set, size);
         return size;
     }
+    /// A numeric Array has no children; other elements are owning references.
+    fn allocateArray(self: *Emitter, scalar_elements: bool) Error!void {
+        const arena = try self.generator.module.ensureArena();
+        if (scalar_elements) return self.emit(.call, arena.allocate_scalar);
+        try self.emit(.i32_const, 0xfffffffe);
+        try self.emit(.call, arena.allocate_typed);
+    }
+    /// The address/value stack pair targets an explicitly known allocation.
+    /// List element addresses borrow the descriptor's current leaf base.
+    fn storeCollectionWord(self: *Emitter, owner: u32, is_list: bool, machine: wasm.ValueType, offset: u32) Error!void {
+        const value = try self.temporary(.i32);
+        const address = try self.temporary(.i32);
+        if (machine == .f32) try self.emit(.i32_reinterpret_f32, 0);
+        try self.emit(.local_set, value);
+        try self.emit(.local_set, address);
+        try self.emit(.local_get, owner);
+        if (is_list) try self.emit(.i32_load, heap.offset(heap.ListDescriptor, "cached_leaf"));
+        try self.emit(.local_get, address);
+        if (offset != 0) {
+            try self.emit(.i32_const, offset);
+            try self.emit(.i32_add, 0);
+        }
+        try self.emit(.local_get, value);
+        try self.emit(.call, (try self.generator.module.ensureArena()).store_word);
+    }
     fn arrayFill(self: *Emitter, count: u32, value: u32, machine: wasm.ValueType, is_generated: bool, is_list: bool, known: ?u32, element: layout.Id) Error!void {
         const row_words = packed_layout.rowWords(&self.generator.layouts, element);
         const stride = packed_layout.stride(row_words);
         const scalar_elements = row_words != 0 or self.generator.layouts.scalar(element) != null;
         const size = try self.arraySize(count, stride);
-        const arena = try self.generator.module.ensureArena();
         const array_ = try self.temporary(.i32);
         const index = try self.temporary(.i32);
         const physical = if (is_list and row_words > 1) try self.listWordCount(count, row_words) else count;
         try self.emit(.local_get, if (is_list) physical else size);
         if (is_list) try self.emit(.i32_const, @intFromBool(scalar_elements));
-        try self.emit(.call, if (is_list) (try self.generator.module.ensureLists()).new else if (scalar_elements) arena.allocate_scalar else arena.allocate);
+        if (is_list) try self.emit(.call, (try self.generator.module.ensureLists()).new) else try self.allocateArray(scalar_elements);
         try self.emit(.local_set, array_);
         try self.emit(.local_get, array_);
         try self.emit(.local_get, if (is_list) physical else count);
-        try self.emit(.i32_store, 0);
+        if (is_list) try self.storeCollectionWord(array_, false, .i32, 0) else try self.emit(.i32_store, 0);
         try self.emit(.i32_const, 0);
         try self.emit(.local_set, index);
         try self.emit(.block, 0);
@@ -4758,7 +4784,7 @@ const Emitter = struct {
             const row = try self.temporary(.i32);
             try self.emit(.local_set, row);
             try self.storeListRow(array_, index, row, row_words);
-        } else try self.storeElement(machine, if (is_list) 0 else 4, row_words);
+        } else if (is_list) try self.storeCollectionWord(array_, true, machine, 0) else if (!scalar_elements) try self.storeCollectionWord(array_, false, machine, 4) else try self.storeElement(machine, 4, row_words);
         try self.emit(.local_get, index);
         try self.emit(.i32_const, 1);
         try self.emit(.i32_add, 0);
@@ -4895,8 +4921,7 @@ const Emitter = struct {
         const storage = try self.temporary(.i32);
         try self.emit(.local_get, size);
         if (is_list) try self.emit(.i32_const, @intFromBool(scalar_elements));
-        const arena = try g.module.ensureArena();
-        try self.emit(.call, if (is_list) (try g.module.ensureLists()).new else if (scalar_elements) arena.allocate_scalar else arena.allocate);
+        if (is_list) try self.emit(.call, (try g.module.ensureLists()).new) else try self.allocateArray(scalar_elements);
         try self.emit(.local_set, storage);
         if (!is_list) {
             if (!scalar_elements) {
@@ -5059,18 +5084,18 @@ const Emitter = struct {
                     try self.emit(.i32_load, 0);
                     try self.emit(.local_set, count);
                     const size = try self.arraySize(count, stride);
-                    const arena = try g.module.ensureArena();
                     try self.emit(.local_get, size);
-                    try self.emit(.call, if (row_words != 0 or g.layouts.scalar(g.layouts.node(result_layout).a) != null) arena.allocate_scalar else arena.allocate);
+                    try self.allocateArray(row_words != 0 or g.layouts.scalar(g.layouts.node(result_layout).a) != null);
                     try self.emit(.local_set, changed);
+                    try self.emit(.local_get, changed);
                     try self.emit(.local_get, changed);
                     try self.emit(.local_get, locals[0]);
                     try self.emit(.local_get, size);
-                    try self.emit(.memory_copy, 0);
+                    try self.emit(.call, (try g.module.ensureArena()).copy_words);
                 }
                 try self.arrayAddress(changed, locals[1], stride);
                 try self.emit(.local_get, locals[2]);
-                try self.storeElement(machines[2], 4, row_words);
+                if (row_words == 0) try self.storeCollectionWord(changed, false, machines[2], 4) else try self.storeElement(machines[2], 4, row_words);
                 try self.emit(.local_get, changed);
             },
             .fill => try self.arrayFill(locals[0], locals[1], machines[1], false, g.layouts.node(result_layout).tag == .list, null, g.layouts.node(result_layout).a),
@@ -5688,8 +5713,7 @@ const Emitter = struct {
         const stride = packed_layout.stride(row_words);
         const size = try self.arraySize(count, stride);
         try self.emit(.local_get, size);
-        const arena = try self.generator.module.ensureArena();
-        try self.emit(.call, if (scalar_elements) arena.allocate_scalar else arena.allocate);
+        try self.allocateArray(scalar_elements);
         try self.emit(.local_set, result);
         try self.emit(.local_get, result);
         try self.emit(.local_get, count);
@@ -5772,8 +5796,7 @@ const Emitter = struct {
         const bytes = try self.arraySize(count, stride);
         const address = try self.temporary(.i32);
         try self.emit(.local_get, bytes);
-        const arena = try self.generator.module.ensureArena();
-        try self.emit(.call, if (scalar_elements) arena.allocate_scalar else arena.allocate);
+        try self.allocateArray(scalar_elements);
         try self.emit(.local_set, address);
         try self.emit(.local_get, address);
         try self.emit(.local_get, count);
@@ -7603,8 +7626,14 @@ const Emitter = struct {
         try self.emit(.i32_ge_u, 0);
         try self.emit(.if_, 0);
         self.labels += 1;
-        // Collection roots: each carried word may be a reference.
-        const root = try self.allocate(@intCast((carries.len + 1) * 4), .{ .rest = .value });
+        // Carried scalars must not become references merely because their bits
+        // resemble addresses. The dynamic provider head is a reference slot.
+        const roles = try g.allocator.alloc(ir.Role, carries.len + 1);
+        defer g.allocator.free(roles);
+        const source = g.unit(self.unit_id);
+        for (carries, 0..) |carry, index| roles[index] = g.layoutRole(try self.codeLayout(source.binding(carry.iteration).ty, source.span(id)));
+        roles[carries.len] = .reference;
+        const root = try self.allocate(@intCast(roles.len * 4), .{ .words = roles });
         for (carries, 0..) |carry, index| {
             const value = self.locals.get(carry.iteration) orelse return g.fail(self.unit_id, id, .unsupported);
             const function_ = &g.module.functions.items[self.function_id];

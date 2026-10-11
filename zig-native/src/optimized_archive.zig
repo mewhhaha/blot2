@@ -25,7 +25,7 @@ pub const Entry = struct {
 };
 /// Entry ordinals name `Snapshot.entries`. Bucket fingerprints are
 /// recomputed from the decoded machine input, never trusted from the wire.
-pub const Key = struct { source: u32, tier: Tier, arena: ?wasm.Arena };
+pub const Key = struct { source: u32, tier: Tier };
 pub const Dependencies = struct {
     callees: []u32,
     parameters: []lifetime.Parameter,
@@ -68,7 +68,7 @@ pub fn encode(a: A, compiler: format.Digest, capture: *const bodies.Capture) for
     const records = try a.alloc(Record, if (sealed) capture.queries.records.items.len else 0);
     defer a.free(records);
     for (records, capture.queries.records.items[0..records.len]) |*wire, record| wire.* = .{
-        .key = .{ .source = record.key.source, .tier = record.key.tier, .arena = record.key.arena },
+        .key = .{ .source = record.key.source, .tier = record.key.tier },
         .dependencies = .{ .callees = record.dependencies.callees, .parameters = record.dependencies.parameters, .invalidates = record.dependencies.invalidates, .owned_result_bytes = record.dependencies.owned_result_bytes },
         .result = .{ .function = record.value.function },
     };
@@ -110,7 +110,7 @@ pub fn decode(a: A, compiler: format.Digest, bytes: []const u8) format.Error!bod
 fn seal(capture: *bodies.Capture, records: []Record) A.Error!void {
     const a = capture.allocator;
     for (records) |*record| {
-        var builder = executable.OptimizerTable.begin(a, .{ .source = record.key.source, .local_fingerprint = @import("runtime_body_relocation.zig").hash(capture.entries.items[record.key.source].source), .tier = record.key.tier, .arena = record.key.arena });
+        var builder = executable.OptimizerTable.begin(a, .{ .source = record.key.source, .local_fingerprint = @import("runtime_body_relocation.zig").hash(capture.entries.items[record.key.source].source), .tier = record.key.tier });
         defer builder.abort();
         builder.read(.{ .callees = record.dependencies.callees, .parameters = record.dependencies.parameters, .invalidates = record.dependencies.invalidates, .owned_result_bytes = record.dependencies.owned_result_bytes, .context_complete = true });
         record.dependencies.callees = &.{};
@@ -138,8 +138,8 @@ pub fn validate(a: A, snapshot: *const Snapshot) format.Error!void {
     for (snapshot.imports) |signature| if (signature >= snapshot.signatures.len) return error.InvalidArtifact;
     if (!validTypes(snapshot.globals)) return error.InvalidArtifact;
     if (snapshot.arena) |arena| {
-        for ([_]u32{ arena.allocate, arena.allocate_scalar, arena.recycle, arena.reset, arena.mark, arena.collect }) |function| if (function >= resources.functions) return error.InvalidArtifact;
-        for ([_]u32{ arena.heap, arena.base, arena.static_end, arena.allocated }) |global| if (global >= resources.globals) return error.InvalidArtifact;
+        inline for (wasm.Arena.function_fields) |field| if (@field(arena, field) >= resources.functions) return error.InvalidArtifact;
+        inline for (wasm.Arena.global_fields) |field| if (@field(arena, field) >= resources.globals) return error.InvalidArtifact;
     }
     for (snapshot.entries) |entry| {
         if (entry.source.signature >= snapshot.signatures.len or entry.parameters.len != entry.source.parameters.len or (!entry.output_ready and entry.output != null)) return error.InvalidArtifact;
@@ -165,7 +165,7 @@ pub fn validate(a: A, snapshot: *const Snapshot) format.Error!void {
 }
 fn recordMatches(record: Record, snapshot: *const Snapshot, id: usize) bool {
     const entry = snapshot.entries[id];
-    if (record.key.source != id or record.result.function != id or record.key.tier != snapshot.tier or !std.meta.eql(record.key.arena, snapshot.arena)) return false;
+    if (record.key.source != id or record.result.function != id or record.key.tier != snapshot.tier) return false;
     const observed = record.dependencies;
     if (observed.invalidates != entry.invalidates or observed.owned_result_bytes != entry.owned_result_bytes or observed.parameters.len != entry.parameters.len) return false;
     for (observed.parameters, entry.parameters) |left, right| if (!std.meta.eql(left, right)) return false;

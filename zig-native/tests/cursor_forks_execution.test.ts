@@ -8,7 +8,7 @@ const skip = fn count => fn cursor => do:
   for index in 0..count:
     cursor := @cursor.advance self
   return cursor
-const frozen = skip 247 (@list.generate 800 identity).iter
+const frozen = skip 243 (@list.generate 800 identity).iter
 entry const run = fn count => do:
   let values = @list.generate 800 identity
   let original = values.iter
@@ -46,12 +46,12 @@ entry const past_advance = fn count => @cursor.has (@cursor.advance (skip count 
 entry const empty = fn (count: U32) => @cursor.has (@list.generate count identity).iter
 `,
     (guest) => {
-      for (const count of [0, 1, 247, 248, 249, 499, 500]) {
+      for (const count of [0, 1, 243, 244, 245, 499, 500]) {
         equal(guest.call("run", count), count * (count - 1) + 300 * count);
       }
       deepStrictEqual(
         guest.call("static_boundary", null),
-        Uint32Array.of(247, 248, 249),
+        Uint32Array.of(243, 244, 245),
       );
       equal(guest.call("collected", 500), 399500);
       deepStrictEqual(

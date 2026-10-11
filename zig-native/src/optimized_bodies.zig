@@ -123,7 +123,7 @@ pub const Capture = struct {
                 self.queries.saturated +|= 1;
                 return;
             }
-            var builder = executable.OptimizerTable.begin(self.allocator, .{ .source = @intCast(id), .local_fingerprint = @import("runtime_body_relocation.zig").hash(entry.source), .tier = self.tier, .arena = self.arena });
+            var builder = executable.OptimizerTable.begin(self.allocator, .{ .source = @intCast(id), .local_fingerprint = @import("runtime_body_relocation.zig").hash(entry.source), .tier = self.tier });
             defer builder.abort();
             const callees = try self.allocator.alloc(u32, call_count);
             var transferred = false;
@@ -195,7 +195,7 @@ pub const Matcher = struct {
     fn matchesPosition(self: *const Matcher, id: usize) bool {
         if (!self.arena_same or !self.same[id] or !self.old.entries.items[id].output_ready) return false;
         const record = self.old.queryAt(id) orelse return false;
-        if (record.key.tier != self.current.tier or !std.meta.eql(record.key.arena, self.current.arena)) return false;
+        if (record.key.tier != self.current.tier) return false;
         if (!self.summarySame(record.dependencies, self.current.entries.items[id])) return false;
         for (self.current.entries.items[id].source.instructions.items) |inst| switch (inst.op) {
             .call => {
@@ -270,7 +270,7 @@ pub const Matcher = struct {
             candidates.remaining = @min(candidates.remaining, 64);
             while (candidates.next()) |position| {
                 const record = self.old.queries.records.items[position];
-                if (record.key.tier != self.current.tier or !std.meta.eql(record.key.arena, self.current.arena)) continue;
+                if (record.key.tier != self.current.tier) continue;
                 if (!self.summarySame(record.dependencies, entry)) continue;
                 const before = record.value.function;
                 if (!try self.graphSame(&walk, before, id)) continue;

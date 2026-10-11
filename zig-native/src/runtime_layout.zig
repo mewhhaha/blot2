@@ -111,7 +111,11 @@ pub const ArenaHeader = extern struct {
     requested: u32,
     flags: u32,
     next: u32,
-    pub const roles = [_]Role{ .scalar, .scalar, .scalar, .reference };
+    strong: u32,
+    layout: u32,
+    candidate_prev: u32,
+    candidate_next: u32,
+    pub const roles = [_]Role{ .scalar, .scalar, .scalar, .scalar, .scalar, .scalar, .scalar, .scalar };
 };
 
 pub fn offset(comptime T: type, comptime name: []const u8) u32 {
@@ -136,4 +140,30 @@ comptime {
         std.debug.assert(offset(Closure, name) == offset(Demand, name));
     for (@typeInfo(ProviderFrame).@"struct".field_names) |name|
         std.debug.assert(offset(ProviderFrame, name) == offset(RequestFrame, name));
+}
+
+/// Exact reference bitmap. Bit 31 describes every word from 31 onward.
+/// Large homogeneous Array/List tails need no separately allocated descriptor.
+pub fn referenceMask(roles: []const @import("runtime_ir.zig").Role, rest: @import("runtime_ir.zig").Role) ?u32 {
+    var mask: u32 = 0;
+    var tail = rest;
+    if (roles.len > 31) tail = roles[31];
+    if (tail != .scalar and tail != .reference) return null;
+    for (roles, 0..) |role, i| {
+        if (role != .scalar and role != .reference) return null;
+        if (i >= 31) {
+            if (role != tail) return null;
+        } else if (role == .reference) mask |= @as(u32, 1) << @intCast(i);
+    }
+    if (roles.len > 31 and rest != tail) return null;
+    if (rest == .reference) {
+        var i = roles.len;
+        while (i < 31) : (i += 1) mask |= @as(u32, 1) << @intCast(i);
+    }
+    if (tail == .reference) mask |= 0x80000000;
+    return mask;
+}
+
+pub fn referenceWord(mask: u32, word: u32) bool {
+    return (mask >> @intCast(@min(word, 31))) & 1 != 0;
 }

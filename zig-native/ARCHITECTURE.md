@@ -164,7 +164,7 @@ populate another owner's pool. Checker pending obligations and imported-scheme
 scratch use independent leases; Checked and frozen-Core tables remain durable.
 
 Arrays are contiguous. Lists use persistent AVL trees with right-sized leaves of
-up to 248 words. Exclusive end edits reuse slack and tree nodes; shared edits
+up to 244 words. Exclusive end edits reuse slack and tree nodes; shared edits
 detach one path and leaf. Branch copies freeze their children so both versions
 remain independently editable. Ownership tokens are descriptor addresses plus
 one, never tracing pointers to obsolete descriptors. Static data is immutable,

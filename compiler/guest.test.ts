@@ -366,6 +366,49 @@ function manifest(bytes: number[]): number[] {
   return section(0, [...name("blot:abi"), ...bytes]);
 }
 
+Deno.test("ownership manifests admit only complete declared counter globals", () => {
+  const counters = ["leases", "retains", "releases", "destroyed"];
+  const globals = section(6, [
+    4,
+    ...counters.flatMap(() => [127, 1, 65, 0, 11]),
+  ]);
+  const exports = section(7, [
+    4,
+    ...counters.flatMap((
+      name_,
+      index,
+    ) => [...name(`blot:rc_${name_}`), 3, index]),
+  ]);
+  const ownership = (state: number[]) =>
+    section(0, [...name("blot:ownership"), ...state]);
+  const counted = ownership([1, 1, 0]);
+  equal(
+    readGuestAbi(wasm(globals, exports, manifest([2, 0, 0]), counted))
+      .functions,
+    [],
+  );
+  for (const state of [[1, 1], [1, 0, 0], [1, 1, 7], [1, 0, 8], [1, 0, 1]]) {
+    throws(
+      () =>
+        readGuestAbi(
+          wasm(globals, exports, manifest([2, 0, 0]), ownership(state)),
+        ),
+      errorCode("invalid_abi"),
+    );
+  }
+  throws(
+    () => readGuestAbi(wasm(manifest([2, 0, 0]), counted)),
+    errorCode("invalid_abi"),
+  );
+  throws(
+    () =>
+      readGuestAbi(
+        wasm(globals, exports, manifest([2, 0, 0]), counted, counted),
+      ),
+    errorCode("invalid_abi"),
+  );
+});
+
 Deno.test("ABI decoder rejects ambiguous, malformed, and unsupported manifests", async () => {
   equal(readGuestAbi(wasm(manifest([2, 0, 0]))), {
     version: 2,

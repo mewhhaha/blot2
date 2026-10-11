@@ -198,7 +198,7 @@ test "portable optimizer archives reject forged ordinals control structure and r
     {
         const before = owner.arena;
         defer owner.arena = before;
-        owner.arena = .{ .allocate = 0, .allocate_scalar = 0, .recycle = 0, .reset = 0, .mark = 0, .collect = 2, .heap = 0, .base = 0, .static_end = 0, .allocated = 0 };
+        owner.arena = .{ .allocate = 0, .allocate_scalar = 0, .recycle = 0, .reset = 0, .mark = 0, .collect = 2, .heap = 0, .base = 0, .static_end = 0, .allocated = 0, .rc_enabled = 0, .rc_leases = 0, .rc_retains = 0, .rc_releases = 0, .rc_destroyed = 0, .allocate_typed = 0, .retain = 0, .release = 0, .release_lease = 0, .retire = 0, .free = 0, .store_word = 0, .copy_words = 0, .decrement = 0 };
         try rejects(error.InvalidArtifact, owner);
     }
     const records = owner.queries.records;

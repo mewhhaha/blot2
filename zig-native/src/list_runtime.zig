@@ -34,7 +34,7 @@ pub const Runtime = struct {
 // Tokens are not GC pointers: sharing never retains an obsolete descriptor.
 // Leaves store elements after the header; branches store left/right pointers.
 pub const header = @sizeOf(heap.ListNode);
-pub const capacity = 248; // Leaf + arena headers fit exactly in 1024 bytes.
+pub const capacity = (1024 - @sizeOf(heap.ArenaHeader) - header) / 4; // Leaf + arena headers fit exactly in 1024 bytes.
 const d = struct {
     const length = heap.offset(heap.ListDescriptor, "length");
     const root = heap.offset(heap.ListDescriptor, "root");
@@ -53,98 +53,28 @@ const n = struct {
 };
 const descriptor_bytes = @sizeOf(heap.ListDescriptor);
 const limit = 0x10000000;
-const Local = struct { id: u32 };
+const Local = @import("runtime_code.zig").Local;
+const Code = @import("runtime_code.zig").Code;
 
-// Tuple expressions are expanded while emitting instructions. They create no
-// temporary expression graph or allocator traffic in the compiler.
-const Code = struct {
-    module: *wasm.Module,
-    function: u32,
-    fn op(c: Code, opcode: wasm.Op, operand: u32) Error!void {
-        try c.module.emit(c.function, .{ .op = opcode, .operand = operand });
+// Tuple addresses keep their allocation base; List.address returns a borrow.
+fn store(c: Code, address: anytype, offset: u32, value: anytype) Error!void {
+    const T = @TypeOf(address);
+    const arena = c.module.arena.?;
+    if (T != Local and @typeInfo(T) != .int and @typeInfo(T) != .comptime_int and (address[0] == .cell or address[0] == .i32_add)) {
+        try c.value(.{ .call, arena.store_word, address[1], .{ .i32_add, address, offset }, value });
+    } else {
+        try c.value(.{ .call, arena.store_word, address, .{ .i32_add, address, offset }, value });
     }
-    fn value(c: Code, x: anytype) Error!void {
-        const T = @TypeOf(x);
-        if (T == Local) {
-            try c.op(.local_get, x.id);
-        } else if (@typeInfo(T) == .int or @typeInfo(T) == .comptime_int) {
-            try c.op(.i32_const, @intCast(x));
-        } else switch (x[0]) {
-            .global => try c.op(.global_get, x[1]),
-            .load => {
-                try c.value(x[1]);
-                try c.op(.i32_load, x[2]);
-            },
-            .cell => {
-                try c.value(.{ .i32_add, x[1], .{ .i32_mul, x[2], 4 } });
-                try c.value(x[3]);
-                try c.op(.i32_add, 0);
-            },
-            .call => {
-                inline for (2..x.len) |i| try c.value(x[i]);
-                try c.op(.call, x[1]);
-            },
-            else => {
-                inline for (1..x.len) |i| try c.value(x[i]);
-                try c.op(x[0], 0);
-            },
-        }
-    }
-    fn temp(c: Code) Error!Local {
-        return .{ .id = try c.module.addLocal(c.function, .i32) };
-    }
-    fn set(c: Code, local: Local, x: anytype) Error!void {
-        try c.value(x);
-        try c.op(.local_set, local.id);
-    }
-    fn store(c: Code, address: anytype, offset: u32, x: anytype) Error!void {
-        try c.value(address);
-        try c.value(x);
-        try c.op(.i32_store, offset);
-    }
-    fn copy(c: Code, target: anytype, source: anytype, bytes: anytype) Error!void {
-        try c.value(target);
-        try c.value(source);
-        try c.value(bytes);
-        try c.op(.memory_copy, 0);
-    }
-    fn zero(c: Code, address: anytype, bytes: anytype) Error!void {
-        try c.value(address);
-        try c.value(0);
-        try c.value(bytes);
-        try c.op(.memory_fill, 0);
-    }
-    fn when(c: Code, condition: anytype) Error!void {
-        try c.value(condition);
-        try c.op(.if_, 0);
-    }
-    fn end(c: Code) Error!void {
-        try c.op(.end, 0);
-    }
-    fn ret(c: Code, x: anytype) Error!void {
-        try c.value(x);
-        try c.op(.return_, 0);
-    }
-    fn trap(c: Code, condition: anytype) Error!void {
-        try c.when(condition);
-        try c.op(.unreachable_, 0);
-        try c.end();
-    }
-    fn loop(c: Code, condition: anytype) Error!void {
-        try c.op(.block, 0);
-        try c.op(.loop, 0);
-        try c.value(.{ .i32_eqz, condition });
-        try c.op(.br_if, 1);
-    }
-    fn again(c: Code) Error!void {
-        try c.op(.br, 0);
-        try c.end();
-        try c.end();
-    }
-    fn next(c: Code, local: Local) Error!void {
-        try c.set(local, .{ .i32_add, local, 1 });
-    }
-};
+}
+fn copy(c: Code, target: anytype, source: anytype, bytes: anytype) Error!void {
+    const T = @TypeOf(target);
+    if (T != Local and (target[0] == .cell or target[0] == .i32_add)) {
+        try copyInto(c, target[1], target, source, bytes);
+    } else try copyInto(c, target, target, source, bytes);
+}
+fn copyInto(c: Code, parent: anytype, target: anytype, source: anytype, bytes: anytype) Error!void {
+    try c.value(.{ .call, c.module.arena.?.copy_words, parent, target, source, bytes });
+}
 fn code(module: *wasm.Module, index: u32) Code {
     return .{ .module = module, .function = index };
 }
@@ -215,15 +145,14 @@ fn emitNode(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.ret(.{ .call, r.branch, left, .{ .call, r.chunk_new, .{ .i32_sub, count, split }, owner }, owner });
     try c.end();
     try c.set(bucket, 64);
-    try c.loop(.{ .i32_lt_u, bucket, .{ .i32_add, 32, .{ .i32_mul, count, 4 } } });
+    try c.loop(.{ .i32_lt_u, bucket, .{ .i32_add, @sizeOf(heap.ArenaHeader) + header, .{ .i32_mul, count, 4 } } });
     try c.set(bucket, .{ .i32_mul, bucket, 2 });
     try c.again();
-    try c.set(node, .{ .call, arena.allocate, .{ .i32_sub, bucket, 16 } });
-    try c.store(.{ .i32_sub, node, @sizeOf(heap.ArenaHeader) - heap.offset(heap.ArenaHeader, "flags") }, 0, .{ .load, owner, d.scalar_elements });
-    try c.zero(node, .{ .i32_sub, bucket, 16 });
-    try c.store(node, n.owner_token, .{ .i32_add, owner, 1 });
-    try c.store(node, n.length, count);
-    try c.store(node, n.capacity, .{ .i32_div_u, .{ .i32_sub, bucket, 32 }, 4 });
+    try c.set(node, .{ .call, arena.allocate_typed, .{ .i32_sub, bucket, @sizeOf(heap.ArenaHeader) }, .{ .i32_mul, .{ .i32_eqz, .{ .load, owner, d.scalar_elements } }, 0xfffffff0 } });
+    try c.zero(node, .{ .i32_sub, bucket, @sizeOf(heap.ArenaHeader) });
+    try store(c, node, n.owner_token, .{ .i32_add, owner, 1 });
+    try store(c, node, n.length, count);
+    try store(c, node, n.capacity, .{ .i32_div_u, .{ .i32_sub, bucket, @sizeOf(heap.ArenaHeader) + header }, 4 });
     try c.value(node);
 }
 fn emitBranch(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
@@ -231,11 +160,11 @@ fn emitBranch(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     const right: Local = .{ .id = 1 };
     const owner: Local = .{ .id = 2 };
     const node = try c.temp();
-    try c.set(node, .{ .call, arena.allocate, 24 });
-    try c.store(node, n.owner_token, .{ .i32_add, owner, 1 });
-    try c.store(node, n.capacity, 0);
-    try c.store(node, n.left, left);
-    try c.store(node, n.right, right);
+    try c.set(node, .{ .call, arena.allocate_typed, 24, 0x30 });
+    try store(c, node, n.owner_token, .{ .i32_add, owner, 1 });
+    try store(c, node, n.capacity, 0);
+    try store(c, node, n.left, left);
+    try store(c, node, n.right, right);
     try c.value(.{ .call, r.refresh, node });
 }
 fn emitRefresh(c: Code) Error!void {
@@ -245,12 +174,12 @@ fn emitRefresh(c: Code) Error!void {
     const height = try c.temp();
     try c.set(left, .{ .load, node, n.left });
     try c.set(right, .{ .load, node, n.right });
-    try c.store(node, n.length, .{ .i32_add, .{ .load, left, n.length }, .{ .load, right, n.length } });
+    try store(c, node, n.length, .{ .i32_add, .{ .load, left, n.length }, .{ .load, right, n.length } });
     try c.set(height, .{ .load, left, n.height });
     try c.when(.{ .i32_gt_u, .{ .load, right, n.height }, height });
     try c.set(height, .{ .load, right, n.height });
     try c.end();
-    try c.store(node, n.height, .{ .i32_add, height, 1 });
+    try store(c, node, n.height, .{ .i32_add, height, 1 });
     try c.value(node);
 }
 fn emitOwn(c: Code, arena: wasm.Arena) Error!void {
@@ -264,15 +193,17 @@ fn emitOwn(c: Code, arena: wasm.Arena) Error!void {
     try c.set(bytes, .{ .i32_add, header, .{ .i32_mul, .{ .load, node, n.capacity }, 4 } });
     try c.when(.{ .load, node, n.height });
     try c.set(bytes, 24);
-    try c.store(.{ .load, node, n.left }, n.owner_token, 0);
-    try c.store(.{ .load, node, n.right }, n.owner_token, 0);
+    try store(c, .{ .load, node, n.left }, n.owner_token, 0);
+    try store(c, .{ .load, node, n.right }, n.owner_token, 0);
     try c.end();
-    try c.set(result, .{ .call, arena.allocate, bytes });
+    const mask = try c.temp();
+    try c.set(mask, 0x30);
     try c.when(.{ .i32_eqz, .{ .load, node, n.height } });
-    try c.store(.{ .i32_sub, result, @sizeOf(heap.ArenaHeader) - heap.offset(heap.ArenaHeader, "flags") }, 0, .{ .load, owner, d.scalar_elements });
+    try c.set(mask, .{ .i32_mul, .{ .i32_eqz, .{ .load, owner, d.scalar_elements } }, 0xfffffff0 });
     try c.end();
-    try c.copy(result, node, bytes);
-    try c.store(result, n.owner_token, .{ .i32_add, owner, 1 });
+    try c.set(result, .{ .call, arena.allocate_typed, bytes, mask });
+    try copy(c, result, node, bytes);
+    try store(c, result, n.owner_token, .{ .i32_add, owner, 1 });
     try c.value(result);
 }
 fn emitRotate(c: Code, r: Runtime, comptime leftward: bool) Error!void {
@@ -283,8 +214,8 @@ fn emitRotate(c: Code, r: Runtime, comptime leftward: bool) Error!void {
     const opposite = if (leftward) n.left else n.right;
     try c.set(node, .{ .call, r.own, node, owner });
     try c.set(pivot, .{ .call, r.own, .{ .load, node, side }, owner });
-    try c.store(node, side, .{ .load, pivot, opposite });
-    try c.store(pivot, opposite, .{ .call, r.refresh, node });
+    try store(c, node, side, .{ .load, pivot, opposite });
+    try store(c, pivot, opposite, .{ .call, r.refresh, node });
     try c.value(.{ .call, r.refresh, pivot });
 }
 fn emitBalance(c: Code, r: Runtime) Error!void {
@@ -298,7 +229,7 @@ fn emitBalance(c: Code, r: Runtime) Error!void {
         try c.when(.{ .i32_gt_u, .{ .load, .{ .load, node, side }, n.height }, .{ .i32_add, .{ .load, .{ .load, node, other }, n.height }, 1 } });
         try c.set(child, .{ .load, node, side });
         try c.when(.{ .i32_lt_u, .{ .load, .{ .load, child, side }, n.height }, .{ .load, .{ .load, child, other }, n.height } });
-        try c.store(node, side, .{ .call, if (left_heavy) r.rotate_left else r.rotate_right, child, owner });
+        try store(c, node, side, .{ .call, if (left_heavy) r.rotate_left else r.rotate_right, child, owner });
         try c.end();
         try c.ret(.{ .call, if (left_heavy) r.rotate_right else r.rotate_left, node, owner });
         try c.end();
@@ -315,14 +246,14 @@ fn emitInsert(c: Code, r: Runtime) Error!void {
     const child_height = try c.temp();
     try c.when(.{ .i32_eqz, node });
     try c.set(added, .{ .call, r.chunk_new, 1, owner });
-    try c.store(added, header, value);
+    try store(c, added, header, value);
     try c.ret(added);
     try c.end();
     try c.when(.{ .i32_eqz, .{ .load, node, n.height } });
     try c.set(count, .{ .load, node, n.length });
     try c.when(.{ .i32_eq, count, capacity });
     try c.set(added, .{ .call, r.chunk_new, 1, owner });
-    try c.store(added, header, value);
+    try store(c, added, header, value);
     try c.when(front);
     try c.ret(.{ .call, r.branch, added, node, owner });
     try c.end();
@@ -330,7 +261,7 @@ fn emitInsert(c: Code, r: Runtime) Error!void {
     try c.end();
     try c.when(.{ .i32_eq, count, .{ .load, node, n.capacity } });
     try c.set(added, .{ .call, r.chunk_new, .{ .i32_add, count, 1 }, owner });
-    try c.copy(.{ .i32_add, added, header }, .{ .i32_add, node, header }, .{ .i32_mul, count, 4 });
+    try copy(c, .{ .i32_add, added, header }, .{ .i32_add, node, header }, .{ .i32_mul, count, 4 });
     try c.set(node, added);
     try c.op(.else_, 0);
     try c.when(.{ .i32_ne, .{ .load, node, n.owner_token }, .{ .i32_add, owner, 1 } });
@@ -338,12 +269,12 @@ fn emitInsert(c: Code, r: Runtime) Error!void {
     try c.end();
     try c.end();
     try c.when(front);
-    try c.copy(.{ .i32_add, node, header + 4 }, .{ .i32_add, node, header }, .{ .i32_mul, count, 4 });
-    try c.store(node, header, value);
+    try copy(c, .{ .i32_add, node, header + 4 }, .{ .i32_add, node, header }, .{ .i32_mul, count, 4 });
+    try store(c, node, header, value);
     try c.op(.else_, 0);
-    try c.store(.{ .cell, node, count, header }, 0, value);
+    try store(c, .{ .cell, node, count, header }, 0, value);
     try c.end();
-    try c.store(node, n.length, .{ .i32_add, count, 1 });
+    try store(c, node, n.length, .{ .i32_add, count, 1 });
     try c.ret(node);
     try c.end();
     try c.when(.{ .i32_ne, .{ .load, node, n.owner_token }, .{ .i32_add, owner, 1 } });
@@ -353,14 +284,14 @@ fn emitInsert(c: Code, r: Runtime) Error!void {
     inline for (.{ 16, 20 }) |side| {
         try c.set(child_height, .{ .load, .{ .load, node, side }, n.height });
         try c.set(added, .{ .call, r.insert, .{ .load, node, side }, value, front, owner });
-        try c.store(node, side, added);
+        try store(c, node, side, added);
         if (side == 16) try c.op(.else_, 0);
     }
     try c.end();
     // Inserting into an existing leaf does not change subtree height. Update
     // the path counts without recomputing heights or checking rotations.
     try c.when(.{ .i32_eq, .{ .load, added, n.height }, child_height });
-    try c.store(node, n.length, .{ .i32_add, .{ .load, node, n.length }, 1 });
+    try store(c, node, n.length, .{ .i32_add, .{ .load, node, n.length }, 1 });
     try c.ret(node);
     try c.end();
     try c.value(.{ .call, r.balance, node, owner });
@@ -373,14 +304,14 @@ fn emitReplace(c: Code, r: Runtime) Error!void {
     const left_count = try c.temp();
     try c.set(node, .{ .call, r.own, node, owner });
     try c.when(.{ .i32_eqz, .{ .load, node, n.height } });
-    try c.store(.{ .cell, node, index, header }, 0, value);
+    try store(c, .{ .cell, node, index, header }, 0, value);
     try c.ret(node);
     try c.end();
     try c.set(left_count, .{ .load, .{ .load, node, n.left }, n.length });
     try c.when(.{ .i32_lt_u, index, left_count });
-    try c.store(node, n.left, .{ .call, r.replace, .{ .load, node, n.left }, index, value, owner });
+    try store(c, node, n.left, .{ .call, r.replace, .{ .load, node, n.left }, index, value, owner });
     try c.op(.else_, 0);
-    try c.store(node, n.right, .{ .call, r.replace, .{ .load, node, n.right }, .{ .i32_sub, index, left_count }, value, owner });
+    try store(c, node, n.right, .{ .call, r.replace, .{ .load, node, n.right }, .{ .i32_sub, index, left_count }, value, owner });
     try c.end();
     try c.value(node);
 }
@@ -402,11 +333,11 @@ fn emitNew(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.module.emitReference(c.function, .{ .op = .i32_const, .operand = empty }, .static_address);
     try c.op(.return_, 0);
     try c.end();
-    try c.set(result, .{ .call, arena.allocate, descriptor_bytes });
+    try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 6 });
     try c.zero(result, descriptor_bytes);
-    try c.store(result, d.length, count);
-    try c.store(result, d.scalar_elements, .{ .i32_mul, scalar_elements, 2 });
-    try c.store(result, d.root, .{ .call, r.chunk_new, count, result });
+    try store(c, result, d.length, count);
+    try store(c, result, d.scalar_elements, .{ .i32_mul, scalar_elements, 2 });
+    try store(c, result, d.root, .{ .call, r.chunk_new, count, result });
     try c.value(result);
 }
 fn emitAddress(c: Code) Error!void {
@@ -436,8 +367,8 @@ fn emitAddress(c: Code) Error!void {
     try c.set(base, split);
     try c.end();
     try c.again();
-    try c.store(sequence, d.cached_leaf, node);
-    try c.store(sequence, d.cached_base, base);
+    try store(c, sequence, d.cached_leaf, node);
+    try store(c, sequence, d.cached_base, base);
     try c.value(.{ .cell, node, .{ .i32_sub, index, base }, header });
 }
 fn emitCopy(c: Code, r: Runtime) Error!void {
@@ -459,7 +390,7 @@ fn emitCopy(c: Code, r: Runtime) Error!void {
     try c.when(.{ .i32_lt_u, available, span });
     try c.set(span, available);
     try c.end();
-    try c.copy(to, from, .{ .i32_mul, span, 4 });
+    try copyInto(c, .{ .load, result, d.cached_leaf }, to, from, .{ .i32_mul, span, 4 });
     try c.set(index, .{ .i32_add, index, span });
     try c.again();
     try c.value(result);
@@ -471,13 +402,13 @@ fn emitEdit(c: Code, arena: wasm.Arena) Error!void {
     try c.when(.{ .i32_and, owned, .{ .i32_eqz, .{ .load, sequence, d.immutable } } });
     try c.ret(sequence);
     try c.end();
-    try c.set(result, .{ .call, arena.allocate, descriptor_bytes });
-    try c.copy(result, sequence, descriptor_bytes);
-    try c.store(result, d.cached_leaf, 0);
-    try c.store(result, d.immutable, 0);
+    try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 6 });
+    try copy(c, result, sequence, descriptor_bytes);
+    try store(c, result, d.cached_leaf, 0);
+    try store(c, result, d.immutable, 0);
     try c.when(.{ .load, sequence, d.root });
     // This write is metadata only: both versions retain identical contents.
-    try c.store(.{ .load, sequence, d.root }, n.owner_token, 0);
+    try store(c, .{ .load, sequence, d.root }, n.owner_token, 0);
     try c.end();
     try c.value(result);
 }
@@ -488,9 +419,9 @@ fn emitPush(c: Code, r: Runtime) Error!void {
     const owned: Local = .{ .id = 3 };
     try c.trap(.{ .i32_ge_u, .{ .load, sequence, d.length }, limit });
     try c.set(sequence, .{ .call, r.edit, sequence, owned });
-    try c.store(sequence, d.root, .{ .call, r.insert, .{ .load, sequence, d.root }, value, front, sequence });
-    try c.store(sequence, d.length, .{ .i32_add, .{ .load, sequence, d.length }, 1 });
-    try c.store(sequence, d.cached_leaf, 0);
+    try store(c, sequence, d.root, .{ .call, r.insert, .{ .load, sequence, d.root }, value, front, sequence });
+    try store(c, sequence, d.length, .{ .i32_add, .{ .load, sequence, d.length }, 1 });
+    try store(c, sequence, d.cached_leaf, 0);
     try c.value(sequence);
 }
 fn emitSet(c: Code, r: Runtime) Error!void {
@@ -504,13 +435,13 @@ fn emitSet(c: Code, r: Runtime) Error!void {
     // a second owner of this very descriptor; freeze it before returning it.
     try c.when(.{ .i32_eq, .{ .load, .{ .call, r.address, sequence, index }, 0 }, value });
     try c.when(.{ .i32_eqz, owned });
-    try c.store(sequence, d.immutable, 1);
+    try store(c, sequence, d.immutable, 1);
     try c.end();
     try c.ret(sequence);
     try c.end();
     try c.set(sequence, .{ .call, r.edit, sequence, owned });
-    try c.store(sequence, d.root, .{ .call, r.replace, .{ .load, sequence, d.root }, index, value, sequence });
-    try c.store(sequence, d.cached_leaf, 0);
+    try store(c, sequence, d.root, .{ .call, r.replace, .{ .load, sequence, d.root }, index, value, sequence });
+    try store(c, sequence, d.cached_leaf, 0);
     try c.value(sequence);
 }
 fn emitConversion(c: Code, r: Runtime, arena: wasm.Arena, to_list: bool) Error!void {
@@ -531,18 +462,17 @@ fn emitConversion(c: Code, r: Runtime, arena: wasm.Arena, to_list: bool) Error!v
         try c.end();
         try c.set(result, .{ .call, r.new, count, .{ .i32_ne, width, 0 } });
     } else {
-        try c.set(result, .{ .call, arena.allocate, .{ .cell, 4, count, 0 } });
-        try c.store(.{ .i32_sub, result, @sizeOf(heap.ArenaHeader) - heap.offset(heap.ArenaHeader, "flags") }, 0, .{ .load, source, d.scalar_elements });
-        try c.store(result, heap.offset(heap.Array, "length"), count);
+        try c.set(result, .{ .call, arena.allocate_typed, .{ .cell, 4, count, 0 }, .{ .i32_mul, .{ .i32_eqz, .{ .load, source, d.scalar_elements } }, 0xfffffffe } });
+        try store(c, result, heap.offset(heap.Array, "length"), count);
     }
     try c.loop(.{ .i32_lt_u, index, count });
     const list = if (to_list) result else source;
     try c.set(address, .{ .call, r.address, list, index });
     try c.set(span, .{ .i32_sub, .{ .load, .{ .load, list, d.cached_leaf }, n.length }, .{ .i32_sub, index, .{ .load, list, d.cached_base } } });
     if (to_list) {
-        try c.copy(address, .{ .cell, source, index, 4 }, .{ .i32_mul, span, 4 });
+        try copyInto(c, .{ .load, result, d.cached_leaf }, address, .{ .cell, source, index, 4 }, .{ .i32_mul, span, 4 });
     } else {
-        try c.copy(.{ .cell, result, index, 4 }, address, .{ .i32_mul, span, 4 });
+        try copy(c, .{ .cell, result, index, 4 }, address, .{ .i32_mul, span, 4 });
     }
     try c.set(index, .{ .i32_add, index, span });
     try c.again();
@@ -557,10 +487,10 @@ fn emitJoin(c: Code, r: Runtime) Error!void {
     const node = try c.temp();
     const count = try c.temp();
     try c.when(left);
-    try c.store(left, n.owner_token, 0);
+    try store(c, left, n.owner_token, 0);
     try c.end();
     try c.when(right);
-    try c.store(right, n.owner_token, 0);
+    try store(c, right, n.owner_token, 0);
     try c.end();
     try c.when(.{ .i32_eqz, left });
     try c.ret(right);
@@ -574,19 +504,19 @@ fn emitJoin(c: Code, r: Runtime) Error!void {
     // the same structural path instead of unbounded recursive flattening.
     try c.when(.{ .i32_eqz, .{ .i32_or, .{ .load, left, n.height }, .{ .load, right, n.height } } });
     try c.set(node, .{ .call, r.chunk_new, count, owner });
-    try c.copy(.{ .i32_add, node, header }, .{ .i32_add, left, header }, .{ .i32_mul, .{ .load, left, n.length }, 4 });
-    try c.copy(.{ .cell, node, .{ .load, left, n.length }, header }, .{ .i32_add, right, header }, .{ .i32_mul, .{ .load, right, n.length }, 4 });
+    try copy(c, .{ .i32_add, node, header }, .{ .i32_add, left, header }, .{ .i32_mul, .{ .load, left, n.length }, 4 });
+    try copy(c, .{ .cell, node, .{ .load, left, n.length }, header }, .{ .i32_add, right, header }, .{ .i32_mul, .{ .load, right, n.length }, 4 });
     try c.ret(node);
     try c.end();
     try c.end();
     try c.when(.{ .i32_gt_u, .{ .load, left, n.height }, .{ .i32_add, .{ .load, right, n.height }, 1 } });
     try c.set(node, .{ .call, r.own, left, owner });
-    try c.store(node, n.right, .{ .call, r.join, .{ .load, node, n.right }, right, owner });
+    try store(c, node, n.right, .{ .call, r.join, .{ .load, node, n.right }, right, owner });
     try c.ret(.{ .call, r.balance, node, owner });
     try c.end();
     try c.when(.{ .i32_gt_u, .{ .load, right, n.height }, .{ .i32_add, .{ .load, left, n.height }, 1 } });
     try c.set(node, .{ .call, r.own, right, owner });
-    try c.store(node, n.left, .{ .call, r.join, left, .{ .load, node, n.left }, owner });
+    try store(c, node, n.left, .{ .call, r.join, left, .{ .load, node, n.left }, owner });
     try c.ret(.{ .call, r.balance, node, owner });
     try c.end();
     try c.value(.{ .call, r.branch, left, right, owner });
@@ -603,12 +533,12 @@ fn emitCut(c: Code, r: Runtime) Error!void {
     try c.ret(0);
     try c.end();
     try c.when(.{ .i32_eq, count, .{ .load, node, n.length } });
-    try c.store(node, n.owner_token, 0);
+    try store(c, node, n.owner_token, 0);
     try c.ret(node);
     try c.end();
     try c.when(.{ .i32_eqz, .{ .load, node, n.height } });
     try c.set(result, .{ .call, r.chunk_new, count, owner });
-    try c.copy(.{ .i32_add, result, header }, .{ .cell, node, start, header }, .{ .i32_mul, count, 4 });
+    try copy(c, .{ .i32_add, result, header }, .{ .cell, node, start, header }, .{ .i32_mul, count, 4 });
     try c.ret(result);
     try c.end();
     try c.set(left, .{ .load, node, n.left });
@@ -634,15 +564,15 @@ fn emitConcat(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.end();
     inline for (.{ .{ left, right }, .{ right, left } }) |pair| {
         try c.when(.{ .i32_eqz, .{ .load, pair[0], d.length } });
-        try c.store(pair[1], d.immutable, 1);
+        try store(c, pair[1], d.immutable, 1);
         try c.ret(pair[1]);
         try c.end();
     }
-    try c.set(result, .{ .call, arena.allocate, descriptor_bytes });
+    try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 6 });
     try c.zero(result, descriptor_bytes);
-    try c.store(result, d.scalar_elements, .{ .i32_and, .{ .load, left, d.scalar_elements }, .{ .load, right, d.scalar_elements } });
-    try c.store(result, d.length, count);
-    try c.store(result, d.root, .{ .call, r.join, .{ .load, left, d.root }, .{ .load, right, d.root }, result });
+    try store(c, result, d.scalar_elements, .{ .i32_and, .{ .load, left, d.scalar_elements }, .{ .load, right, d.scalar_elements } });
+    try store(c, result, d.length, count);
+    try store(c, result, d.root, .{ .call, r.join, .{ .load, left, d.root }, .{ .load, right, d.root }, result });
     try c.value(result);
 }
 fn emitSlice(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
@@ -656,14 +586,14 @@ fn emitSlice(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.ret(.{ .call, r.new, 0, .{ .i32_ne, .{ .load, source, d.scalar_elements }, 0 } });
     try c.end();
     try c.when(.{ .i32_eq, count, .{ .load, source, d.length } });
-    try c.store(source, d.immutable, 1);
+    try store(c, source, d.immutable, 1);
     try c.ret(source);
     try c.end();
-    try c.set(result, .{ .call, arena.allocate, descriptor_bytes });
+    try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 6 });
     try c.zero(result, descriptor_bytes);
-    try c.store(result, d.scalar_elements, .{ .load, source, d.scalar_elements });
-    try c.store(result, d.length, count);
-    try c.store(result, d.root, .{ .call, r.cut, .{ .load, source, d.root }, start, count, result });
+    try store(c, result, d.scalar_elements, .{ .load, source, d.scalar_elements });
+    try store(c, result, d.length, count);
+    try store(c, result, d.root, .{ .call, r.cut, .{ .load, source, d.root }, start, count, result });
     try c.value(result);
 }
 pub fn staticChunk(module: *wasm.Module, words: []const u32) Error!u32 {
