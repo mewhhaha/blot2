@@ -599,8 +599,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [028] — Make emission consume resolved bodies           | Complete    | [027]                                  |
 | [029] — Remove function indices from reuse keys         | Ready       | [018], [028]                           |
 | [030] — Specify shared and cyclic ownership             | Complete    | [027]                                  |
-| [031] — Implement shared reference counting             | In progress | [030]                                  |
-| [032] — Own escaping values and persistent roots        | Pending     | [031]                                  |
+| [031] — Implement shared reference counting             | Complete    | [030]                                  |
+| [032] — Own escaping values and persistent roots        | In progress | [031]                                  |
 | [033] — Own suspended effects and cancellation          | Pending     | [032]                                  |
 | [034] — Reclaim cyclic ownership                        | Pending     | [033]                                  |
 | [035] — Remove the tracing runtime                      | Pending     | [034]                                  |

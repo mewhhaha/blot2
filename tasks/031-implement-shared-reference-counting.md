@@ -2,8 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — isolated implementation and qualification; no
-  completion is claimed.
+- **Status:** Complete — qualified locally; nothing pushed.
 - **Dependencies:** [030](030-specify-shared-and-cyclic-ownership.md)
 - **Originating requirements:** PLAN: Earlier programs / shared RC. Sources:
   [PLAN.md](../PLAN.md).
@@ -24,11 +23,11 @@ allocation groups. Task 030 defines the new shared ownership contract.
 
 ## Implementation checklist
 
-- [ ] Implement reference metadata, checked typed operations and destructors
+- [x] Implement reference metadata, checked typed operations and destructors
       from the agreed layout roles.
-- [ ] Retain/release aggregate fields, closure captures and collection nodes
+- [x] Retain/release aggregate fields, closure captures and collection nodes
       without treating scalar bit patterns as references.
-- [ ] Integrate exceptional exits and prevent double release when local lifetime
+- [x] Integrate exceptional exits and prevent double release when local lifetime
       optimizations consume ownership. Keep tracing available for uncovered
       graphs.
 
@@ -49,20 +48,27 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Typed RC operations account for every supported shared object and preserve
+- [x] Typed RC operations account for every supported shared object and preserve
       alias/snapshot behavior.
-- [ ] Destruction has no leaks or duplicate cleanup in the covered cases;
+- [x] Destruction has no leaks or duplicate cleanup in the covered cases;
       tracing remains until later gates pass.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Implementation: `cb41a6d`.
+- Validation: Zig 0.17.0, Deno 2.9.7; `deno task test:compiler` passes the
+  release build, native suite and 771 guest/client laws, including all eight
+  unchanged allocation budgets. `deno task lint:zig` reports zero findings
+  across 327 files. Joint integration source matches the isolated qualified tree
+  exactly; compiler input fingerprint matches too.
+- Comparison: twenty alternating compiler/runtime pairs, header geometry and
+  checked-operation costs are recorded in
+  [SHARED_RC](../zig-native/SHARED_RC.md). Fresh/edit CPU increases 3.9%/13.2%;
+  the covered Array/List workload costs 4.2/11.4 times tracing CPU. No
+  performance improvement is claimed.
+- Remaining limitations: tracing remains for uncovered graphs. Persistent and
+  suspended roots belong to 032–033; complete cycle reclamation/removal to
+  034–035. The nested discarded-Array memory counterexample remains open.
+- Durable record: [SHARED_RC](../zig-native/SHARED_RC.md).

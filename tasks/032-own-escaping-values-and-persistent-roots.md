@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — isolated implementation; no completion is claimed.
 - **Dependencies:** [031](031-implement-shared-reference-counting.md)
 - **Originating requirements:** PLAN: Earlier programs / escaping ownership;
   DEMANDS: Effects and lifetime. Sources: [PLAN.md](../PLAN.md),

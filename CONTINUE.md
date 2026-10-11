@@ -11,7 +11,7 @@ pushed; keep it that way unless the owner authorizes it.
 
 ## State on 11 October 2026
 
-Latest compiler implementation on local `main`: `b068dc9`. Qualified today, each
+Latest compiler implementation on local `main`: `cb41a6d`. Qualified today, each
 with a durable record:
 
 | Task                                           | Implementation       | Record                                                       |
@@ -70,19 +70,24 @@ The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
    RESOLVED_BODIES. Current captured gdev: 55 modules, 482 fixture cases and
    1,460 assertions; split hauling: 12 exports and 25 assertions.
 6. **030 and 042 are complete at `d021c57` and `a1df44d`** (SHARED_OWNERSHIP and
-   RAGGED_BUILDERS). Their implementations are under qualification in
-   `/var/tmp/blot2-shared-rc` (031) and `/var/tmp/blot2-ragged-builders` (043).
-   Root's private editor probes, generic evidence fitting and shared
-   project-query budget are in `/var/tmp/blot2-editor-completion` (050);
-   protocol/client/LSP remain unfinished. None is qualified or complete. The
-   current gdev corpus has moved to pen settings with native asset roots `src`
-   and `devtools`; the ignored fixture harness now matches those roots. Its
+   RAGGED_BUILDERS). 031 is complete at `cb41a6d`: native suite, 771
+   guest/client laws, all eight unchanged allocation budgets and zero analyzer
+   findings across 327 files. Its costs and remaining memory counterexample are
+   recorded in SHARED_RC. Persistent-root work (032) continues in
+   `/var/tmp/blot2-shared-rc`; 043 remains under final qualification in
+   `/var/tmp/blot2-ragged-builders`. Root's private editor probes, generic
+   evidence fitting and shared project-query budget are in
+   `/var/tmp/blot2-editor-completion` (050); protocol/client/LSP and actual
+   Helix acceptance pass; its final full gate and measurements remain
+   unfinished. 043/050 are not yet qualified or complete. The current gdev
+   corpus has moved to pen settings with native asset roots `src` and
+   `devtools`; the ignored fixture harness now matches those roots. Its
    captured-input sweep passes; early attempts with the obsolete one-root
    harness are failures, not compiler regressions.
 
 ## Next work
 
-Continue 031, 043, 050, 029, 037 and the remaining ready tasks. 028's read-only
+Continue 032, 043, 050, 029, 037 and the remaining ready tasks. 028's read-only
 architecture map is `build/bench/resolved-bodies/design.md`. Still open: 024 and
 093; 002's current traversal gates; 086's value-template boundary. The full
 inventory is in ignored `build/bench/program/remaining.md`.

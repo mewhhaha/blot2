@@ -147,7 +147,13 @@ Ownership directives still erase from scalar/no-allocation Wasm; a separate law
 checks that typed allocations select counted metadata while unknown roles retain
 the tracing fallback. Guest laws include seven counted RC laws and all current
 244-word boundaries. These checks qualify the 031 transition, not complete root
-coverage or tracing removal. Joint integration still requires the project gate.
-Raw paired distributions, exact Wasm/compiler hashes, load samples and geometry
-reports are kept in the ignored `build/bench/shared-rc/` qualification
-directory.
+coverage or tracing removal. Joint integration at `cb41a6d` passes the same full
+gate and all eight unchanged allocation budgets, with zero analyzer findings
+across 327 files. The main release SHA-256 is
+`1ea2d0594b5dcbd183d807844867f07a02af6172a9c0ffff8dfb604414201a19`; its source
+fingerprint is
+`5f77e785613b0d595ce91247a4a3877fbd337ae4e49d5228df73f34aacf715f6`, identical to
+the isolated qualified compiler. Binary differences include build paths; source
+changes were compared exactly before integration. Raw paired distributions,
+exact Wasm/compiler hashes, load samples and geometry reports are kept in the
+ignored `build/bench/shared-rc/` qualification directory.
