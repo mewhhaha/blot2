@@ -472,3 +472,11 @@ fresh/retained query distributions and extra inference work against the
 language-evolution targets before claiming performance. Completion must work
 without a successful build, even for a module with no entry declaration;
 revision 0 is a required acceptance case.
+
+## Specification qualification
+
+Implementation: `d7e2b89`. Deno formatting, seven local links/anchors and the
+JSON/TOML examples pass review. Incomplete call/member/hole, imported/shadowed
+names, generic evidence, Unicode edits, revisions, cancellation and rapid
+overlay changes have explicit acceptance transcripts. This documentation adds no
+executable feature or demonstrated latency; task 050 owns those gates.

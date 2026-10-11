@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — specification qualified; no completion is claimed.
 - **Dependencies:** [049](049-specify-editor-completion.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 1 / editor
   completion. Sources:

@@ -311,7 +311,7 @@ rejected, or that it was selected and its result conflicted. The CLI, project
 server and client schema carry it with bounds and defensive decoding. It was
 taken ahead of [026] as the smaller step. Specialization failures are still
 located inside the callee, often `std/prelude`; task [094] moves them to the
-caller's use. [049] is ready. See
+caller's use. [049] specifies the completion contract; [050] is ready. See
 [dispatch explanations](../zig-native/DISPATCH_EXPLANATIONS.md).
 
 The owner decided on 11 October 2026, relayed by the gdev session (gdev's
@@ -602,8 +602,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [046] — Implement composable summary trees              | Pending     | [045]                                  |
 | [047] — Eliminate generic iterator state                | Pending     | [040], [027]                           |
 | [048] — Explain dispatch and evidence                   | Complete    | —                                      |
-| [049] — Specify editor completion                       | Ready       | [048]                                  |
-| [050] — Implement editor completion                     | Pending     | [049]                                  |
+| [049] — Specify editor completion                       | Complete    | [048]                                  |
+| [050] — Implement editor completion                     | Ready       | [049]                                  |
 | [051] — Specify module abstraction                      | Pending     | [020]                                  |
 | [052] — Implement opaque types and privacy              | Pending     | [051]                                  |
 | [053] — Qualify module cutoffs and wrapper erasure      | Pending     | [052], [024]                           |

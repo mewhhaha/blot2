@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** Complete.
 - **Dependencies:** [048](048-explain-dispatch-and-evidence.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 1 / editor
   completion. Sources:
@@ -26,13 +26,13 @@ and tree-sitter integration currently provide editor syntax support.
 
 ## Implementation checklist
 
-- [ ] Define protocol request/response schemas, source positions,
+- [x] Define protocol request/response schemas, source positions,
       revision/overlay identities and ownership of completion results.
-- [ ] Specify expected types, lexical shadowing/import visibility, ranking,
+- [x] Specify expected types, lexical shadowing/import visibility, ranking,
       incomplete syntax behavior and bounded work/results.
-- [ ] Define cancellation, stale-response handling and malformed-message
+- [x] Define cancellation, stale-response handling and malformed-message
       diagnostics, plus the concrete Helix integration path.
-- [ ] Save durable API documentation and acceptance transcripts for compiler,
+- [x] Save durable API documentation and acceptance transcripts for compiler,
       client and editor.
 
 ## Validation
@@ -49,20 +49,22 @@ change.
 
 ## Acceptance criteria
 
-- [ ] The completion API, ranking, limits, diagnostics and editor integration
+- [x] The completion API, ranking, limits, diagnostics and editor integration
       are unambiguous and documented.
-- [ ] Task 050 has end-to-end acceptance examples without assuming an editor
+- [x] Task 050 has end-to-end acceptance examples without assuming an editor
       feature already exists.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Implementation: `d7e2b89`; durable API and acceptance transcripts.
+- Validation: Deno formatting and seven local links/anchors pass; JSON/TOML
+  examples and incomplete calls/members/holes, imports, shadowing, generic
+  obligations, cancellation and stale replies were reviewed against the guide,
+  ownership contract, project protocol and current Helix setup.
+- Comparison: documentation only; performance measurement does not apply.
+- Remaining limitations: task 050 implements and qualifies the query, client,
+  bounded recovery/ranking and actual Helix bridge. The proposed 250 ms deadline
+  is editor policy, not measured latency.
+- Durable record: [editor completion](../zig-native/EDITOR_COMPLETION.md).
