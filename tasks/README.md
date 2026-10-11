@@ -314,6 +314,11 @@ located inside the callee, often `std/prelude`; task [094] moves them to the
 caller's use. [049] is ready. See
 [dispatch explanations](../zig-native/DISPATCH_EXPLANATIONS.md).
 
+The owner decided on 11 October 2026, relayed by the gdev session (gdev's
+`PEN_MIGRATION.md`), that pen drives `blotc serve-project` from Rust and that
+typed asset imports move into `blotc`: tasks [095] (a written, versioned project
+protocol) and [096] (native asset imports) record that work.
+
 Task [026] prepares structured flow before its instructions at `ae908fa`: exits
 name their target, label, cleanup scope, values and carries; joins, matches,
 loops and request loops (yield arms, exited, broken and completion edges) are
@@ -621,7 +626,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [081] — Finalize durable documentation                  | Pending     | [080]                                  |
 | [082] — Qualify the remote analyzer workflow            | Pending     | [081]                                  |
 | [083] — Review and clean old build artifacts            | Pending     | [081]                                  |
-| [084] — Qualify the complete program                    | Pending     | [082], [083], [085]–[094]              |
+| [084] — Qualify the complete program                    | Pending     | [082], [083], [085]–[096]              |
 | [085] — Gate principal-graph sharing on payoff          | Complete    | —                                      |
 | [086] — Retain constant evaluation across revisions     | Ready       | [023]                                  |
 | [087] — Skip rebuilds for trivia-only edits             | Complete    | —                                      |
@@ -632,7 +637,9 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [092] — Format current Blot syntax                      | Complete    | —                                      |
 | [093] — Close the gdev edit gap                         | In progress | [088]                                  |
 | [094] — Locate specialization failures at their use     | Ready       | [048]                                  |
-| [999] — Remove tasks and plan                           | Pending     | All [001]–[094], plus every added task |
+| [095] — Specify and version the project protocol        | Ready       | None                                   |
+| [096] — Compile typed asset imports natively            | Pending     | [095]                                  |
+| [999] — Remove tasks and plan                           | Pending     | All [001]–[096], plus every added task |
 
 ## Coverage matrix
 
@@ -704,6 +711,7 @@ obligations remain part of applicable tasks and final qualification.
 | Demand acceptance: request yield/return/break, cancellation retry, trap/host exception and recursive force    | [033], [037], [039]                                    |
 | Demand reuse: body changes with unchanged types, exact captures/effects, failed revisions and recovery        | [018], [024], [036], [039]                             |
 | Reported from gdev: positioned budget diagnostics, evaluation depth by calls, current-syntax formatting       | [089], [091], [092]                                    |
+| Owner decision (pen migration): versioned public project protocol and native typed asset imports              | [095], [096]                                           |
 | Shared gates: no name recognition; chronological semantics, diagnostic order and immutable atomic publication | [084]                                                  |
 | Final performance: cold ~500 ms; literal <30 ms; body <100 ms; largest region <50 ms; allocation <100 MB      | [084]                                                  |
 | Final qualification: every semantic/runtime/language/tooling and external gate, follow-ups before cleanup     | [082], [083], [084]                                    |
@@ -730,7 +738,7 @@ follow-up work before [999].
 
 ## Planning-directory validation
 
-For this documentation change, verify exactly 001–094 plus 999, unique numbered
+For this documentation change, verify exactly 001–096 plus 999, unique numbered
 filenames, all seven required sections, concrete unchecked acceptance criteria,
 existing relative links/anchors, and exact manifest dependencies forming an
 acyclic graph. Check that every task is indexed and every open source
@@ -838,4 +846,6 @@ external gate or durable-documentation obligation remains open.
 [092]: 092-format-current-syntax.md
 [093]: 093-close-the-gdev-edit-gap.md
 [094]: 094-locate-specialization-failures-at-their-use.md
+[095]: 095-specify-and-version-the-project-protocol.md
+[096]: 096-compile-typed-asset-imports-natively.md
 [999]: 999-remove-tasks-and-plan.md

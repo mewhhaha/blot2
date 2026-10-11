@@ -13,7 +13,9 @@
   [090](090-make-pending-check-solving-incremental.md),
   [091](091-bound-evaluation-by-call-depth.md),
   [092](092-format-current-syntax.md), [093](093-close-the-gdev-edit-gap.md),
-  [094](094-locate-specialization-failures-at-their-use.md)
+  [094](094-locate-specialization-failures-at-their-use.md),
+  [095](095-specify-and-version-the-project-protocol.md),
+  [096](096-compile-typed-asset-imports-natively.md)
 - **Originating requirements:** PLAN: All open programs and final performance
   gates. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
