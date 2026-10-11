@@ -109,8 +109,11 @@ pub const Options = struct {
     reuse_validated_calls: bool = true,
     reuse_lexical_summaries: bool = true,
     max_steps: usize = 1_000_000,
-    /// Executed compile-time expressions and patterns only.
-    max_depth: usize = 256,
+    /// Nested executed compile-time expressions and patterns, across calls.
+    /// A structural bound on native recursion, sized to the compile thread.
+    max_depth: usize = 65_536,
+    /// Nested compile-time function calls; the limit programs meet first.
+    max_call_depth: usize = 4096,
     /// Structural evidence depth, independent of the call graph and execution.
     max_type_depth: usize = 256,
     /// Speculative graph discovery and scheduling, per top-level type inquiry.
@@ -1299,6 +1302,7 @@ pub const Session = struct {
     request_owner: u32 = 0,
     demanded: usize = 0,
     depth: usize = 0,
+    call_depth: usize = 0,
 
     fn summaryLimit(self: *const Session) usize {
         return @min(self.options.max_summary_transitions, self.semantic_job_budget orelse self.options.max_summary_transitions);
@@ -4042,9 +4046,26 @@ pub const Session = struct {
             if (parameter.binding != 0) try callee.values.put(self.allocator, parameter.binding, typed);
         }
         try self.validateBody(resolved.unit, body, &callee);
+        try self.enterCall(owner, source);
+        defer self.call_depth -= 1;
+        errdefer self.anchorRecursion(owner, source);
         const outcome = try self.expression(resolved.unit, body.root, &callee);
         if (outcome != .value) return self.fail(resolved.unit, body.span, .unsupported);
         return outcome;
+    }
+    /// Each compile-time function body entered counts once, however deeply
+    /// its expressions nest.
+    fn enterCall(self: *Session, owner: usize, source: core.Id) Error!void {
+        if (self.call_depth >= self.options.max_call_depth) return self.failNode(owner, source, .constant_recursion);
+        self.call_depth += 1;
+    }
+    /// Unwinding frames move a call-depth failure to their own call site, so
+    /// it ends at the outermost call of the evaluation, in the caller's code.
+    fn anchorRecursion(self: *Session, owner: usize, source: core.Id) void {
+        const issue = if (self.diagnostic) |*diagnostic| diagnostic else return;
+        if (issue.code != .constant_recursion or owner >= self.units.len) return;
+        issue.unit = self.unitId(owner);
+        issue.span = self.units[owner].span(source);
     }
     fn applyValue(self: *Session, owner: usize, source: core.Id, function: ValueId, argument: ValueId, head: provider_chain.Head) Error!Flow {
         const actual = self.valueEvidence(function);
@@ -4440,6 +4461,9 @@ pub const Session = struct {
                 const typed = try self.typedView(owner, source, argument, try self.projectType(producer, template.body, template.parameter.ty, callee.mappings.items, callee.row_mappings.items));
                 if (template.parameter.binding != 0) try callee.values.put(self.allocator, template.parameter.binding, typed);
                 if (template.qualifier != 0) try self.validateScheme(producer, template.body, module.binding(template.qualifier).scheme, &callee, false);
+                try self.enterCall(owner, source);
+                defer self.call_depth -= 1;
+                errdefer self.anchorRecursion(owner, source);
                 const outcome = try self.expression(producer, template.body, &callee);
                 if (outcome != .value) return self.failNode(owner, source, .unsupported);
                 return outcome;

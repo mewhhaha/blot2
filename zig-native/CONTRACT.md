@@ -231,8 +231,12 @@ components and portable canonical keys remain tasks 007–008.
 
 Summary jobs own their solver and scratch until completion or session teardown.
 Evidence copied into the session may outlive a job; solver IDs and source
-borrows may not. The execution depth budget applies only to executed expressions
-and patterns. Structural type-depth and storage limits remain separate.
+borrows may not. Compile-time evaluation counts nested function calls against
+`Options.max_call_depth` (4,096) and reports `constant_recursion` at the
+outermost call of the failing evaluation. `Options.max_depth` (65,536) bounds
+nested executed expressions and patterns across calls; it guards the native
+stack, which `main` reserves at 1 GiB for the compile thread. Structural
+type-depth and storage limits remain separate.
 
 The extension contract is [General call summaries](CALL_SUMMARIES.md). It keeps
 principal summaries separate from caller-selected judgments, requires explicit

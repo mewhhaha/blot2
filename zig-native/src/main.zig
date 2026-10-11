@@ -608,8 +608,23 @@ fn run(init: std.process.Init) !bool {
     try output.interface.flush();
     return success;
 }
+/// Compile-time evaluation recurses natively. Its depth limits assume this
+/// reserved stack; pages are committed only as deep evaluation touches them.
+const compile_stack_size = 1 << 30;
 pub fn main(init: std.process.Init) void {
-    const success = run(init) catch |err| {
+    const Outcome = struct {
+        result: anyerror!bool = false,
+        fn execute(self: *@This(), started: std.process.Init) void {
+            self.result = run(started);
+        }
+    };
+    var outcome: Outcome = .{};
+    // A host that cannot reserve the stack still compiles ordinary programs
+    // on the main thread; only near-limit evaluation needs the reservation.
+    if (std.Thread.spawn(.{ .stack_size = compile_stack_size }, Outcome.execute, .{ &outcome, init })) |thread| {
+        thread.join();
+    } else |_| outcome.execute(init);
+    const success = outcome.result catch |err| {
         std.debug.print("blotc: {s}\n", .{@errorName(err)});
         std.process.exit(1);
     };

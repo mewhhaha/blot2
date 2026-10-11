@@ -2380,6 +2380,37 @@ test "recursive pure calls are traced once and execute under fuel and depth limi
     try std.testing.expectEqual(evaluator.Code.constant_fuel, depth.diagnostic.?.code);
 }
 
+// Compile-time recursion is bounded by nested function calls, not by how
+// deeply each body's expressions nest. The failure is reported at the
+// outermost call of the evaluation, in the constant that started it.
+test "constant evaluation bounds recursion by call depth at the outermost call" {
+    const source =
+        \\const down = fn (n: U32) -> U32 => if @u32.eq n 0 then 0 else @u32.add 1 (down (@u32.sub n 1))
+        \\const nested = fn (n: U32) -> U32 => @u32.add n (@u32.add n (@u32.add n (@u32.add n (@u32.add n (@u32.add n n)))))
+        \\entry const shallow: U32 = down 15
+        \\entry const deep: U32 = down 16
+        \\entry const wide: U32 = nested 1
+    ;
+    var module = try lower(source);
+    defer module.deinit(a);
+    const options: evaluator.Options = .{ .max_call_depth = 16 };
+    const shallow = try evaluator.evaluate(a, &.{module}, target(&module, "shallow"), options);
+    try std.testing.expect(shallow.diagnostic == null);
+    try std.testing.expectEqual(@as(u32, 15), shallow.value.?.bits);
+    const deep = try evaluator.evaluate(a, &.{module}, target(&module, "deep"), options);
+    const issue = deep.diagnostic orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(evaluator.Code.constant_recursion, issue.code);
+    const call = std.mem.find(u8, source, "down 16").?;
+    try std.testing.expectEqual(@as(u32, @intCast(call)), issue.span.start);
+    try std.testing.expectEqual(@as(u32, @intCast(call + "down 16".len)), issue.span.end);
+    // One call whose body nests seven expressions deep is one call.
+    const wide = try evaluator.evaluate(a, &.{module}, target(&module, "wide"), .{ .max_call_depth = 1 });
+    try std.testing.expect(wide.diagnostic == null);
+    try std.testing.expectEqual(@as(u32, 7), wide.value.?.bits);
+    const none = try evaluator.evaluate(a, &.{module}, target(&module, "wide"), .{ .max_call_depth = 0 });
+    try std.testing.expectEqual(evaluator.Code.constant_recursion, none.diagnostic.?.code);
+}
+
 test "constant cycles and impure runtime globals decline with distinct diagnostics" {
     var cyclic = try lower("const first = second\nconst second = first\nentry const answer: U32 = first\n");
     defer cyclic.deinit(a);

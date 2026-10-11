@@ -8,6 +8,7 @@ pub const Code = enum {
     // Constant evaluation.
     cycle,
     constant_fuel,
+    constant_recursion,
     integer_divide_by_zero,
     array_bounds,
     backend_limit,
@@ -47,6 +48,7 @@ pub const Code = enum {
             .const_panic => detail,
             .cycle => "Compile-time constant dependencies contain a cycle",
             .constant_fuel => "Constant evaluation exceeded its operation or nesting budget",
+            .constant_recursion => "Constant evaluation exceeded its function call depth limit",
             .integer_divide_by_zero => "Compile-time integer division or remainder has a zero divisor",
             .array_bounds => "Array index is outside the element range",
             .backend_limit => if (detail.len != 0) detail else "Array length exceeds the 16 MiB bootstrap arena",
