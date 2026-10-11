@@ -273,6 +273,10 @@ drop from 780 to 570 ms CPU (inference 448 → 240 ms); the remaining gap to
 formatter). See
 [summary-job cost](../zig-native/CALL_SUMMARIES.md#summary-job-cost-11-october-2026).
 
+Task [089] reports inference budget exhaustion at `c5cb9ac` as one positioned
+`inference_budget` diagnostic naming the declaration and the budget, instead of
+an unpositioned operation failure.
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -578,7 +582,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [086] — Retain constant evaluation across revisions     | Ready       | [023]                                  |
 | [087] — Skip rebuilds for trivia-only edits             | Complete    | —                                      |
 | [088] — Restore summary-job inference cost              | Complete    | —                                      |
-| [089] — Report inference budget exhaustion              | Ready       | None                                   |
+| [089] — Report inference budget exhaustion              | Complete    | —                                      |
 | [090] — Make pending-check solving incremental          | Ready       | None                                   |
 | [091] — Bound compile-time evaluation by call depth     | Ready       | None                                   |
 | [092] — Format current Blot syntax                      | Ready       | None                                   |

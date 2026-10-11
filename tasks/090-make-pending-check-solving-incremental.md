@@ -31,6 +31,11 @@ steps; walking saved types as plain data cut it to about 350). Task 010 made
 `core_eval` solving incremental in the same way. This is probably also part of
 the inference cost on gdev literal edits.
 
+A public shape reproduces the growth: a module whose global record holds N
+closures performing an unhandled effect operation, with N helpers each binding
+that record and invoking one closure, checks in 22 ms at N = 40, 272 ms at 120
+and 3.8 s at 300 (`blotc check` on 11 October 2026, after `86db5b1`).
+
 ## Implementation checklist
 
 - [ ] Index pending checks by the variables and rows that can settle them, and
