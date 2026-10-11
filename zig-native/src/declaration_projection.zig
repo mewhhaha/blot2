@@ -30,6 +30,7 @@ const Scan = struct {
     patterns: []bool,
     projections: []bool,
     work: std.ArrayList(Work) = .empty,
+    closures: ?*std.ArrayList(u32) = null,
 
     fn enqueue(self: *Scan, item: Work) Error!void {
         const seen = switch (item) {
@@ -165,6 +166,7 @@ const Scan = struct {
             .construct => try self.node(n.b),
             .closure, .suspend_ => {
                 const value = try equalItem(core.ClosureInfo, self.old.closures, self.current.closures, n.a);
+                if (self.closures) |list| try list.append(self.allocator, n.a);
                 try self.binding(value.qualifier);
                 try self.binding(value.parameter.binding);
                 try self.bindingList(value.captures);
@@ -288,6 +290,12 @@ const Scan = struct {
 
 /// Does not by itself certify the transitive producers or a callable use.
 pub fn definitionEqual(a: Allocator, old: *const core.Module, current: *const core.Module, binding: u32) Allocator.Error!bool {
+    return definitionEqualCollecting(a, old, current, binding, null);
+}
+/// Also appends every closure catalog entry reached from the declaration. The
+/// list is meaningful only when the result is true; each entry is then equal at
+/// the same catalog index in both modules.
+pub fn definitionEqualCollecting(a: Allocator, old: *const core.Module, current: *const core.Module, binding: u32, closures: ?*std.ArrayList(u32)) Allocator.Error!bool {
     if (binding == 0) return false;
     const nodes = try a.alloc(bool, old.nodes.len);
     defer a.free(nodes);
@@ -301,7 +309,7 @@ pub fn definitionEqual(a: Allocator, old: *const core.Module, current: *const co
     @memset(bindings, false);
     @memset(patterns, false);
     @memset(projections, false);
-    var scan: Scan = .{ .allocator = a, .old = old, .current = current, .nodes = nodes, .bindings = bindings, .patterns = patterns, .projections = projections };
+    var scan: Scan = .{ .allocator = a, .old = old, .current = current, .nodes = nodes, .bindings = bindings, .patterns = patterns, .projections = projections, .closures = closures };
     defer scan.work.deinit(a);
     scan.run(binding) catch |err| switch (err) {
         error.Changed => return false,

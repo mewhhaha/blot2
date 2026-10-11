@@ -722,3 +722,14 @@ image of a unit only when that image exactly matched the old pin and the
 current module is proven stream-equal to it; every other unit is re-imaged.
 Matching still walks every byte of the shared image. See
 [literal edits](LITERAL_EDITS.md).
+
+A refinement receipt rooted in an edited module may replay when its root is
+admitted by its own declaration: a body root by the declaration's exact
+projection and identity, and a closure root when the gate recorded that such an
+admitted declaration's exact projection reaches that closure catalog entry. The
+receipt's facts still carry the interface cutoff: collected sources must be
+exact, consumed call judgments need only unchanged identities and must already
+hold in the new session. Retained executable fragments keep the transitive
+dirty set, so executable callers of a changed body always regenerate. Hygienic
+loop names are numbered within their top-level declaration. See
+[body interface cutoff](BODY_CUTOFF.md).

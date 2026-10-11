@@ -344,7 +344,13 @@ pub fn lookup(g: anytype, root: Root, shape: expectation.View, expected: u32, se
             .body => |body| body.unit,
             .closure => |closure| closure.unit,
         };
-        if (root_unit == 0 or root_unit > gate.structural_units.len or !gate.structural_units[root_unit - 1] or (root == .body and !gate.admitsLocalSource(root.body))) {
+        // Roots in an edited module are admitted by their declaration's exact
+        // projection and identity; the facts below carry the interface cutoff.
+        const admitted = switch (root) {
+            .body => |body| gate.admitsLocalSource(body),
+            .closure => |closure| gate.admitsClosure(closure.unit, closure.catalog),
+        };
+        if (root_unit == 0 or root_unit > gate.structural_units.len or !admitted) {
             decline(g, .root);
             continue;
         }

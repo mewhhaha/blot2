@@ -1199,3 +1199,81 @@ test "published certificates share exactly proven unchanged images and recapture
     try std.testing.expectEqual(@as(usize, 0), recaptured.reused_images);
     for (current_pins.pools.modules, 0..) |pin, unit| try std.testing.expect(recaptured.admits(unit, pin));
 }
+
+fn closureIn(module: *const core.Module, text: []const u8, declaration: []const u8, next: ?[]const u8) u32 {
+    const start: u32 = @intCast(std.mem.find(u8, text, declaration).?);
+    const end: u32 = if (next) |name| @intCast(std.mem.find(u8, text, name).?) else @intCast(text.len);
+    for (module.closures, 0..) |closure, index| {
+        const at = module.spans[closure.body].start;
+        if (at >= start and at < end) return @intCast(index);
+    }
+    unreachable;
+}
+
+test "closure roots in an edited module follow their owner's exact projection" {
+    const source =
+        \\entry const helper = fn (x: U32) -> U32 => @u32.add x 1
+        \\entry const apply = fn (x: U32) -> U32 => do:
+        \\  let inner = fn (y: U32) => helper y
+        \\  return inner x
+        \\entry const other = fn (x: U32) -> U32 => do:
+        \\  let inner = fn (y: U32) => @u32.add y 3
+        \\  return inner x
+        \\entry const edited = fn (x: U32) -> U32 => @u32.add x 2
+    ;
+    var before = try Fixture.init(a, &.{source});
+    defer before.deinit(a);
+    var pinned = try Pinned.init(a, &before);
+    defer pinned.deinit(a);
+    const edits = [_]struct { from: []const u8, to: []const u8, apply: bool, other: bool }{
+        // An unrelated declaration changes: both closures keep their roots.
+        .{ .from = "@u32.add x 2", .to = "@u32.add 2 x", .apply = true, .other = true },
+        // The closure body itself changes.
+        .{ .from = "@u32.add y 3", .to = "@u32.add 3 y", .apply = true, .other = false },
+        // The callee body changes; the owner reads only its interface.
+        .{ .from = "@u32.add x 1", .to = "@u32.add 1 x", .apply = true, .other = true },
+    };
+    for (edits) |edit| {
+        const text = try std.mem.replaceOwned(u8, a, source, edit.from, edit.to);
+        defer a.free(text);
+        var after = try Fixture.init(a, &.{text});
+        defer after.deinit(a);
+        var gate = try Gate.init(a, &pinned.pools, after.units, after.names.view());
+        defer gate.deinit();
+        try std.testing.expect(gate.enabled and !gate.structural_units[0]);
+        const module = &after.units[0];
+        const apply = closureIn(module, text, "entry const apply", "entry const other");
+        const other = closureIn(module, text, "entry const other", "entry const edited");
+        try std.testing.expectEqual(edit.apply, gate.admitsClosure(1, apply));
+        try std.testing.expectEqual(edit.other, gate.admitsClosure(1, other));
+        try std.testing.expect(!gate.admitsClosure(1, @intCast(module.closures.len)));
+        try std.testing.expect(!gate.admitsClosure(2, 0));
+    }
+    // A referenced declaration's binding record, which carries its
+    // interface, is part of every referencing projection. Editing the last
+    // declaration's annotation leaves every earlier ID in place, yet revokes
+    // the referencing owner's closures but not an unrelated owner's.
+    const reordered =
+        \\entry const apply = fn (x: U32) -> U32 => do:
+        \\  let inner = fn (y: U32) => helper y
+        \\  return inner x
+        \\entry const other = fn (x: U32) -> U32 => do:
+        \\  let inner = fn (y: U32) => @u32.add y 3
+        \\  return inner x
+        \\entry const helper = fn (x: U32) -> U32 => @u32.add x 1
+    ;
+    var first = try Fixture.init(a, &.{reordered});
+    defer first.deinit(a);
+    var first_pins = try Pinned.init(a, &first);
+    defer first_pins.deinit(a);
+    const changed = try std.mem.replaceOwned(u8, a, reordered, "fn (x: U32) -> U32 => @u32.add x 1", "fn x => @u32.add x 1");
+    defer a.free(changed);
+    var after = try Fixture.init(a, &.{changed});
+    defer after.deinit(a);
+    var gate = try Gate.init(a, &first_pins.pools, after.units, after.names.view());
+    defer gate.deinit();
+    try std.testing.expect(gate.enabled and !gate.structural_units[0]);
+    try std.testing.expect(!gate.admitsLocalSource(target(&after.units[0], "helper")));
+    try std.testing.expect(!gate.admitsClosure(1, closureIn(&after.units[0], changed, "entry const apply", "entry const other")));
+    try std.testing.expect(gate.admitsClosure(1, closureIn(&after.units[0], changed, "entry const other", "entry const helper")));
+}

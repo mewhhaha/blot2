@@ -56,6 +56,9 @@ const Parser = struct {
     depth: usize = 0,
     declaration_origin: ast.Span = .{ .start = 0, .end = 0 },
     fixities: std.ArrayList(Fixity) = .empty,
+    /// Hygienic collection names are numbered within each top-level
+    /// declaration, so edits elsewhere never rename them.
+    collection_names: u32 = 0,
     fn current(self: *const Parser) token.Token {
         if (self.index >= self.expression_end) return .{ .tag = .eof, .start = self.tokens[self.index].start, .end = self.tokens[self.index].start };
         return if (self.index < self.tokens.len) self.tokens[self.index] else .{ .tag = .eof, .start = @intCast(self.source.len), .end = @intCast(self.source.len) };
@@ -231,6 +234,7 @@ const Parser = struct {
     fn declaration(self: *Parser, declarations_seen: bool, body_declarations_seen: bool) Error!Id {
         _ = body_declarations_seen;
         self.declaration_origin = .{ .start = self.current().start, .end = self.current().end };
+        self.collection_names = 0;
         const start = self.current().start;
         if (self.at(.kw_import)) {
             if (declarations_seen) return self.fail(.unexpected_token);
@@ -827,8 +831,10 @@ const Parser = struct {
         return result;
     }
     fn collectionName(self: *Parser, start: u32) Error!symbols.Symbol {
+        _ = start;
         var buffer: [80]u8 = undefined;
-        const text_ = std.mem.print(&buffer, "$collection.{d}.{d}", .{ start, self.tree.nodes.items.len }) catch unreachable;
+        const text_ = std.mem.print(&buffer, "$collection.{d}", .{self.collection_names}) catch unreachable;
+        self.collection_names += 1;
         return self.intern(text_);
     }
     fn collectionBinding(self: *Parser, name: symbols.Symbol, value: Id, start: u32) Error!Id {

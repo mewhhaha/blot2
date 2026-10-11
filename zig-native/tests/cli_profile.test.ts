@@ -26,8 +26,11 @@ interface Backend {
   prepare_us: number;
   work?: { regions: unknown[]; inference_us: number; lookup_us: number };
 }
-async function build(command: string, ...extra: string[]) {
-  const directory = await Deno.makeTempDir({ prefix: "blot-profile-" });
+// Metadata counters include the canonical path, and temporary names vary in
+// length, so compared builds use equal-length sibling directories.
+async function build(command: string, label: string, ...extra: string[]) {
+  const directory = `${root}/${label}`;
+  await Deno.mkdir(directory);
   try {
     const input = `${directory}/main.blot`;
     const output = `${directory}/main.wasm`;
@@ -51,9 +54,10 @@ async function build(command: string, ...extra: string[]) {
   }
 }
 
+const root = await Deno.makeTempDir({ prefix: "blot-profile-" });
 for (const command of ["build", "build-project"]) {
   Deno.test(`${command} omits detailed timing unless --profile is given`, async () => {
-    const plain = await build(command);
+    const plain = await build(command, `${command}-a`);
     assert(plain.success, plain.text);
     const timing: Backend = plain.metrics.backend_timing;
     assert(timing.prepare_us >= 0);
@@ -68,7 +72,7 @@ for (const command of ["build", "build-project"]) {
     assert(plain.metrics.work_counters.inference_regions > 0);
     assert(plain.metrics.work_counters.solver_passes > 0);
 
-    const profiled = await build(command, "--profile");
+    const profiled = await build(command, `${command}-b`, "--profile");
     assert(profiled.success, profiled.text);
     const detail: Backend = profiled.metrics.backend_timing;
     assert(Array.isArray(detail.work?.regions));
@@ -131,4 +135,8 @@ Deno.test("project API reports counters always and clocks only when profiled", a
     await profiled.dispose();
     await Deno.remove(directory, { recursive: true });
   }
+});
+
+Deno.test("profile scratch directory is removed", async () => {
+  await Deno.remove(root, { recursive: true });
 });

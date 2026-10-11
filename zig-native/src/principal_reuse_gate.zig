@@ -34,6 +34,10 @@ pub const Gate = struct {
     /// current module is exactly stream-equal to that pin (`proveSame`). The
     /// old image bytes therefore equal the current module's image.
     certified_images: []const bool,
+    /// For each closure catalog entry of a non-structural unit, the global
+    /// declaration whose exact projection reached it, or zero.
+    closure_owners: []const u32,
+    closure_offsets: []const usize,
     offsets: []const usize,
     dirty: []const bool,
     local_dirty: []const bool,
@@ -69,6 +73,13 @@ pub const Gate = struct {
         const certified_images = try allocator.alloc(bool, units.len);
         errdefer allocator.free(certified_images);
         @memset(certified_images, false);
+        const closure_offsets = try allocator.alloc(usize, units.len + 1);
+        errdefer allocator.free(closure_offsets);
+        closure_offsets[0] = 0;
+        for (units, 0..) |module, i| closure_offsets[i + 1] = std.math.add(usize, closure_offsets[i], module.closures.len) catch return error.OutOfMemory;
+        const closure_owners = try allocator.alloc(u32, closure_offsets[units.len]);
+        errdefer allocator.free(closure_owners);
+        @memset(closure_owners, 0);
         const offsets = try allocator.alloc(usize, units.len + 1);
         errdefer allocator.free(offsets);
         offsets[0] = 0;
@@ -82,7 +93,7 @@ pub const Gate = struct {
         const storage = try allocator.create(Storage);
         errdefer allocator.destroy(storage);
         storage.* = .{};
-        var result: Gate = .{ .storage = storage, .allocator = allocator, .source_pools = old, .units = units, .structural_units = structural_units, .certified_images = certified_images, .offsets = offsets, .dirty = dirty, .local_dirty = local_dirty };
+        var result: Gate = .{ .storage = storage, .allocator = allocator, .source_pools = old, .units = units, .structural_units = structural_units, .certified_images = certified_images, .closure_owners = closure_owners, .closure_offsets = closure_offsets, .offsets = offsets, .dirty = dirty, .local_dirty = local_dirty };
 
         if (!old.project_identity or old.identity == null or names == null or old.modules.len != units.len or units.len == 0 or units.len >= std.math.maxInt(u32)) return result;
         // Artifact/query records below use one-based catalog positions. The
@@ -173,18 +184,24 @@ pub const Gate = struct {
             }
         }
 
+        var reached: std.ArrayList(u32) = .empty;
+        defer reached.deinit(allocator);
         for (units, old.modules, 0..) |module, pin, unit| {
             if (!structural_units[unit]) {
                 // Whole-module executable reuse stays disabled. An exact
                 // declaration projection may retain only its principal proof.
                 @memset(dirty[offsets[unit]..offsets[unit + 1]], true);
                 for (module.bindings[1..], 1..) |binding, id| {
+                    reached.clearRetainingCapacity();
                     const same = switch (binding.kind) {
-                        .global => try projection.definitionEqual(allocator, pin.module, &module, @intCast(id)),
+                        .global => try projection.definitionEqualCollecting(allocator, pin.module, &module, @intCast(id), &reached),
                         .external => id < pin.module.bindings.len and std.meta.eql(pin.module.bindings[id], binding),
                         .local, .parameter => false,
                     };
                     dirty[offsets[unit] + id] = !same;
+                    if (same) for (reached.items) |closure| {
+                        closure_owners[closure_offsets[unit] + closure] = @intCast(id);
+                    };
                 }
                 continue;
             }
@@ -282,6 +299,16 @@ pub const Gate = struct {
         return !self.local_dirty[self.offsets[unit] + target.binding];
     }
 
+    /// A closure root of a structural unit, or one reached by the exact
+    /// projection of a declaration whose own source and identity are admitted.
+    /// The same catalog index then names the same lexical closure.
+    pub fn admitsClosure(self: *const Gate, unit: u32, catalog: u32) bool {
+        if (!self.enabled or unit == 0 or unit > self.units.len or catalog >= self.units[unit - 1].closures.len) return false;
+        if (self.structural_units[unit - 1]) return true;
+        const owner = self.closure_owners[self.closure_offsets[unit - 1] + catalog];
+        return owner != 0 and self.admitsLocalSource(.{ .unit = unit, .binding = owner });
+    }
+
     /// Identity alone permits comparing a freshly established closed judgment.
     /// It never admits an old body, call proof, value or executable fragment.
     pub fn admitsCallIdentity(self: *const Gate, target: core.BindingRef) bool {
@@ -316,6 +343,8 @@ pub const Gate = struct {
         if (self.storage.references == 0) {
             self.allocator.free(self.structural_units);
             self.allocator.free(self.certified_images);
+            self.allocator.free(self.closure_owners);
+            self.allocator.free(self.closure_offsets);
             self.allocator.free(self.offsets);
             self.allocator.free(self.dirty);
             self.allocator.free(self.local_dirty);

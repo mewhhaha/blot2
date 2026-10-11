@@ -76,6 +76,7 @@ pub fn main(init: std.process.Init) !void {
                 std.crypto.hash.sha2.Sha256.hash(compiled.bytes, &digest, .{});
                 const counters = compiled.counters;
                 const reuse = compiled.reuse;
+                const refinements = compiled.refinements;
                 const reused = candidate.stats.reused_output;
                 if (!session.commit(candidate)) return error.CommitFailed;
                 candidate.deinit();
@@ -101,6 +102,8 @@ pub fn main(init: std.process.Init) !void {
                     .fresh_closures = reuse.fresh_closures,
                     .reused_scalar_constants = reuse.reused_scalar_constants,
                     .reused_aggregate_constants = if (@hasField(@TypeOf(reuse), "reused_aggregate_constants")) reuse.reused_aggregate_constants else 0,
+                    .refinement_requests = refinements.requests,
+                    .refinement_hits = refinements.hits,
                 }, .{}, &writer.interface);
                 try writer.interface.writeByte('\n');
             }

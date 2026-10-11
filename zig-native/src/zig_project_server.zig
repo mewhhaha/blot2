@@ -213,6 +213,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                     .backendTiming = result.result.compiled.timing,
                     .workCounters = result.result.compiled.counters,
                     .principals = result.result.compiled.principal,
+                    .refinements = result.result.compiled.refinements,
                     .selectedQueries = result.result.compiled.completed_queries,
                     .restartCacheLoaded = opened.cache_loaded,
                     .sourceBytes = result.source_bytes,

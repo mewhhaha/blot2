@@ -1,4 +1,4 @@
-// Paired retained-revision measurements (tasks 021–023).
+// Paired retained-revision measurements (tasks 021–024).
 //
 //   deno run --allow-all zig-native/qualification/revision_deltas.ts \
 //     BASELINE_PROBE CANDIDATE_PROBE OUT_DIR [REPETITIONS] [ROUNDS]
@@ -101,6 +101,10 @@ const workloads = [
   { name: "tags-constant", file: "tags", search: "entry const answer: U32 = 20", replace: "entry const answer: U32 = 21" },
   { name: "monads-literal", file: "monads", search: "#Some 40", replace: "#Some 41" },
   { name: "lists-literal", file: "lists", search: "[1, 2, 3]", replace: "[1, 2, 4]" },
+  { name: "ecs-body-swap", file: "ecs", search: "total := self + x + y", replace: "total := self + y + x" },
+  { name: "ecs-body-grow", file: "ecs", search: "x: x + vx * seconds", replace: "x: x + vx * seconds + 0.0" },
+  { name: "lists-body-grow", file: "lists", search: "[1, 2, 3]", replace: "[1, 2, 3, 4]" },
+  { name: "syntax-body-grow", file: "syntax", search: "if left then @demand right else #False", replace: "if left then (@demand right) && left else #False" },
   { name: "generic-effects-literal", file: "generic_effects", search: "reader 40", replace: "reader 41" },
   { name: "requests-body", file: "requests", search: "if value == 0", replace: "if value == 1" },
   { name: "arrays-import", file: "arrays", search: 'import * as array from "std/array"', replace: 'import * as array from "std/array"\nimport * as path from "std/path"' },
@@ -147,7 +151,7 @@ function median(values: number[]): number {
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
-const csv = ["workload,phase,variant,samples,cpu_ns,requested_bytes,allocations,peak_bytes,retained_live_bytes,snapshot_copy_bytes,metadata_shared_fields,metadata_shared_bytes,metadata_copied_fields,metadata_copied_bytes,reused_named,reused_aggregate_constants,reused_closures,fresh_named,fresh_closures"];
+const csv = ["workload,phase,variant,samples,cpu_ns,requested_bytes,allocations,peak_bytes,retained_live_bytes,snapshot_copy_bytes,metadata_shared_fields,metadata_shared_bytes,metadata_copied_fields,metadata_copied_bytes,reused_named,reused_aggregate_constants,reused_closures,fresh_named,fresh_closures,refinement_requests,refinement_hits"];
 const summary: Record<string, unknown>[] = [];
 for (const workload of workloads) {
   for (const phase of allPhases) {
@@ -162,8 +166,8 @@ for (const workload of workloads) {
         return values[0];
       };
       const cpu = group.map((row) => row.cpu_ns as number).sort((a, b) => a - b);
-      csv.push([workload.name, phase, variant.name, group.length, `"${JSON.stringify(cpu)}"`, unique("requested_bytes"), unique("allocations"), unique("peak_bytes"), unique("retained_live_bytes"), unique("snapshot_copy_bytes"), unique("metadata_shared_fields"), unique("metadata_shared_bytes"), unique("metadata_copied_fields"), unique("metadata_copied_bytes"), unique("reused_named") ?? 0, unique("reused_aggregate_constants") ?? 0, unique("reused_closures") ?? 0, unique("fresh_named") ?? 0, unique("fresh_closures") ?? 0].join(","));
-      medians[variant.name] = { cpu_ns: median(cpu), requested_bytes: group[0].requested_bytes as number, peak_bytes: group[0].peak_bytes as number, retained_live_bytes: group[0].retained_live_bytes as number, metadata_shared_bytes: group[0].metadata_shared_bytes as number, metadata_copied_bytes: group[0].metadata_copied_bytes as number, reused_named: (group[0].reused_named ?? 0) as number, reused_aggregate_constants: (group[0].reused_aggregate_constants ?? 0) as number, reused_closures: (group[0].reused_closures ?? 0) as number, fresh_named: (group[0].fresh_named ?? 0) as number, fresh_closures: (group[0].fresh_closures ?? 0) as number };
+      csv.push([workload.name, phase, variant.name, group.length, `"${JSON.stringify(cpu)}"`, unique("requested_bytes"), unique("allocations"), unique("peak_bytes"), unique("retained_live_bytes"), unique("snapshot_copy_bytes"), unique("metadata_shared_fields"), unique("metadata_shared_bytes"), unique("metadata_copied_fields"), unique("metadata_copied_bytes"), unique("reused_named") ?? 0, unique("reused_aggregate_constants") ?? 0, unique("reused_closures") ?? 0, unique("fresh_named") ?? 0, unique("fresh_closures") ?? 0, unique("refinement_requests") ?? 0, unique("refinement_hits") ?? 0].join(","));
+      medians[variant.name] = { cpu_ns: median(cpu), requested_bytes: group[0].requested_bytes as number, peak_bytes: group[0].peak_bytes as number, retained_live_bytes: group[0].retained_live_bytes as number, metadata_shared_bytes: group[0].metadata_shared_bytes as number, metadata_copied_bytes: group[0].metadata_copied_bytes as number, reused_named: (group[0].reused_named ?? 0) as number, reused_aggregate_constants: (group[0].reused_aggregate_constants ?? 0) as number, reused_closures: (group[0].reused_closures ?? 0) as number, fresh_named: (group[0].fresh_named ?? 0) as number, fresh_closures: (group[0].fresh_closures ?? 0) as number, refinement_requests: (group[0].refinement_requests ?? 0) as number, refinement_hits: (group[0].refinement_hits ?? 0) as number };
     }
     summary.push({ workload: workload.name, phase, ...medians, cpu_ratio: medians.candidate.cpu_ns / medians.baseline.cpu_ns });
   }

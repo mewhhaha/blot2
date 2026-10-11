@@ -7,6 +7,7 @@ comptime {
     _ = @import("pool_lease_tests.zig");
     _ = @import("aggregate_constant_tests.zig");
     _ = @import("literal_edit_tests.zig");
+    _ = @import("body_cutoff_tests.zig");
     _ = @import("refinement_receipt.zig");
     _ = @import("selected_query.zig");
     _ = @import("principal_query.zig");
