@@ -65,6 +65,14 @@ pub const Counters = struct {
     principal_graph_deferred: u64 = 0,
     /// Capture scopes projected while selecting interfaces for lexical keys.
     lexical_interface_projections: u64 = 0,
+    /// Calls selected before emission, by shape, and the closures applied to
+    /// arguments past a selected callee's parameters.
+    prepared_named_calls: u64 = 0,
+    prepared_dispatch_calls: u64 = 0,
+    prepared_resolver_calls: u64 = 0,
+    prepared_indirect_calls: u64 = 0,
+    prepared_static_closures: u64 = 0,
+    prepared_extra_applications: u64 = 0,
     pub fn merge(self: *Counters, other: Counters) void {
         inline for (@typeInfo(Counters).@"struct".field_names) |name| {
             if (comptime @import("std").mem.startsWith(u8, name, "max_")) {

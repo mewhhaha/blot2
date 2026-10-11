@@ -5839,50 +5839,62 @@ const Emitter = struct {
     // header. Keep the actual closure/captures in this Session and prove its
     // body against the selected code shape instead of materializing that row.
     // Inlining limits select emission strategy, never source admission.
-    fn staticApply(self: *Emitter, id: core.Id, depth: usize) Error!bool {
+    /// A statically known anonymous closure applied to one argument: its
+    /// captured values, interface and specialization, selected before any of
+    /// the application's instructions.
+    const StaticClosurePlan = struct {
+        header: core_eval.ClosureValue,
+        ty: layout.Id,
+        captured: []core_eval.ValueId,
+        mappings: std.ArrayList(Mapping) = .empty,
+        rows: std.ArrayList(RowMapping) = .empty,
+        fn deinit(self: *StaticClosurePlan, a: Allocator) void {
+            a.free(self.captured);
+            self.mappings.deinit(a);
+            self.rows.deinit(a);
+            self.* = undefined;
+        }
+    };
+    fn prepareStaticClosure(self: *Emitter, id: core.Id) Error!?StaticClosurePlan {
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const node = source.node(id);
-        if (self.static_values.count() == 0) return false;
-        const value = try self.staticReference(node.a) orelse return false;
-        if (g.evaluator.valueInfo(value).kind != .closure) return false;
+        if (self.static_values.count() == 0) return null;
+        const value = try self.staticReference(node.a) orelse return null;
+        if (g.evaluator.valueInfo(value).kind != .closure) return null;
         const header = g.evaluator.closureInfo(value);
-        if (header.origin != .anonymous) return false;
+        if (header.origin != .anonymous) return null;
         const ty = try self.codeLayout(source.typeOf(node.a), source.span(id));
         const arrow = g.layouts.node(ty);
-        if (arrow.tag != .function or arrow.c == layout.unknown_row) return false;
-        if (g.toEvidence(ty)) |_| return false else |err| switch (err) {
+        if (arrow.tag != .function or arrow.c == layout.unknown_row) return null;
+        if (g.toEvidence(ty)) |_| return null else |err| switch (err) {
             error.UnresolvedType => {},
             error.OutOfMemory => return error.OutOfMemory,
-            else => return false,
+            else => return null,
         }
-        if (self.hasErasedType(ty, 0)) return false;
+        if (self.hasErasedType(ty, 0)) return null;
         const producer = g.unit(header.unit);
         const metadata = producer.closures[header.identity];
         const bindings = producer.extra[metadata.captures.start..][0..metadata.captures.len];
-        const captured = try g.allocator.dupe(core_eval.ValueId, g.evaluator.valueChildren(value));
-        defer g.allocator.free(captured);
-        if (bindings.len != captured.len) return g.fail(header.unit, metadata.body, .unsupported);
+        var plan: StaticClosurePlan = .{ .header = header, .ty = ty, .captured = try g.allocator.dupe(core_eval.ValueId, g.evaluator.valueChildren(value)) };
+        errdefer plan.deinit(g.allocator);
+        if (bindings.len != plan.captured.len) return g.fail(header.unit, metadata.body, .unsupported);
         if (g.artifacts) |artifacts| artifacts.requireFreshCode();
-        var mappings: std.ArrayList(Mapping) = .empty;
-        defer mappings.deinit(g.allocator);
-        var rows: std.ArrayList(RowMapping) = .empty;
-        defer rows.deinit(g.allocator);
         for (g.evaluator.type_mappings.items[header.mappings.start..][0..header.mappings.len]) |mapping| {
             const concrete = g.fromEvidence(mapping.evidence) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(header.unit, metadata.body, .unresolved_type);
-            try g.mapType(header.unit, &mappings, mapping.variable, concrete, producer.span(metadata.body));
+            try g.mapType(header.unit, &plan.mappings, mapping.variable, concrete, producer.span(metadata.body));
         }
-        try g.loadSemanticRows(g.evaluator.row_mappings.items[header.row_mappings.start..][0..header.row_mappings.len], &rows);
+        try g.loadSemanticRows(g.evaluator.row_mappings.items[header.row_mappings.start..][0..header.row_mappings.len], &plan.rows);
         if (metadata.function_type != 0) {
-            try g.mapCapturedFunction(header.unit, metadata.function_type, ty, &mappings, &rows, producer.span(metadata.body));
+            try g.mapCapturedFunction(header.unit, metadata.function_type, ty, &plan.mappings, &plan.rows, producer.span(metadata.body));
         } else {
-            try g.mapType(header.unit, &mappings, metadata.parameter.ty, arrow.a, metadata.parameter.span);
-            try g.mapType(header.unit, &mappings, producer.typeOf(metadata.body), arrow.b, producer.span(metadata.body));
+            try g.mapType(header.unit, &plan.mappings, metadata.parameter.ty, arrow.a, metadata.parameter.span);
+            try g.mapType(header.unit, &plan.mappings, producer.typeOf(metadata.body), arrow.b, producer.span(metadata.body));
         }
-        const hints_len = std.math.add(usize, captured.len, @intFromBool(metadata.parameter.binding != 0)) catch return g.fail(header.unit, metadata.body, .complexity);
+        const hints_len = std.math.add(usize, plan.captured.len, @intFromBool(metadata.parameter.binding != 0)) catch return g.fail(header.unit, metadata.body, .complexity);
         const hints = try g.allocator.alloc(core_eval.RetainedCapture, hints_len);
         defer g.allocator.free(hints);
-        for (bindings, captured, hints[0..captured.len]) |binding, actual, *hint| {
+        for (bindings, plan.captured, hints[0..plan.captured.len]) |binding, actual, *hint| {
             hint.* = .{ .binding = binding, .unit = header.unit, .node = 0, .value = actual };
         }
         var argument_rows: std.ArrayList(type_evidence.RowMapping) = .empty;
@@ -5892,7 +5904,7 @@ const Emitter = struct {
             const evidence = g.rowToEvidence(mapping.row) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .unresolved_type);
             try argument_rows.append(g.allocator, .{ .variable = mapping.variable, .evidence = evidence });
         }
-        if (metadata.parameter.binding != 0) hints[captured.len] = .{
+        if (metadata.parameter.binding != 0) hints[plan.captured.len] = .{
             .binding = metadata.parameter.binding,
             .unit = self.unit_id,
             .node = node.b,
@@ -5902,11 +5914,24 @@ const Emitter = struct {
         };
         // The caller's frozen argument signature retains known effect labels
         // beside its open tails. These live hints disable semantic receipts.
-        try g.refineAccessorMappings(header.unit, header.identity, ty, &mappings, &rows, producer.span(metadata.body), hints);
+        try g.refineAccessorMappings(header.unit, header.identity, ty, &plan.mappings, &plan.rows, producer.span(metadata.body), hints);
+        g.evaluator.counters.prepared_static_closures += 1;
+        return plan;
+    }
+    fn staticApply(self: *Emitter, id: core.Id, depth: usize) Error!bool {
+        const g = self.generator;
+        const node = g.unit(self.unit_id).node(id);
+        var plan = try self.prepareStaticClosure(id) orelse return false;
+        defer plan.deinit(g.allocator);
+        const header = plan.header;
+        const producer = g.unit(header.unit);
+        const metadata = producer.closures[header.identity];
+        const bindings = producer.extra[metadata.captures.start..][0..metadata.captures.len];
         const argument = try self.capture(node.b, depth);
+        // Inlining depends on the code emitted so far, so emission decides it.
         const inline_body = self.inline_depth < 6 and g.module.functions.items[self.function_id].instructions.items.len <= 4096 and @import("inline_body.zig").cost(producer, metadata.body) != null;
         if (!inline_body) {
-            const function_id = try g.capturedClosureFunction(header, ty, captured, mappings.items, rows.items);
+            const function_id = try g.capturedClosureFunction(header, plan.ty, plan.captured, plan.mappings.items, plan.rows.items);
             try self.emit(.i32_const, 0);
             try self.emit(.local_get, argument);
             try self.providerHead();
@@ -5918,15 +5943,15 @@ const Emitter = struct {
             .unit_id = header.unit,
             .function_id = self.function_id,
             .provider_local = self.provider_local,
-            .mappings = mappings.items,
-            .row_mappings = rows.items,
+            .mappings = plan.mappings.items,
+            .row_mappings = plan.rows.items,
             .cleanups = .{ .parent = &self.cleanups },
             .labels = self.labels,
             .inline_depth = self.inline_depth + 1,
         };
         defer emitter.deinit();
         if (metadata.parameter.binding != 0) try emitter.locals.put(g.allocator, metadata.parameter.binding, argument);
-        for (bindings, captured) |binding, actual| try emitter.static_values.put(g.allocator, binding, actual);
+        for (bindings, plan.captured) |binding, actual| try emitter.static_values.put(g.allocator, binding, actual);
         try emitter.expression(metadata.body, depth + 1);
         return true;
     }
@@ -6107,6 +6132,8 @@ const Emitter = struct {
             error.OutOfMemory => return error.OutOfMemory,
             error.NotFunction => return g.fail(self.unit_id, id, .unresolved_type),
         };
+        g.evaluator.counters.prepared_resolver_calls += 1;
+        g.evaluator.counters.prepared_extra_applications += plan.extra.items.len;
         return plan;
     }
     fn resolverOperation(self: *Emitter, id: core.Id, depth: usize) Error!void {
@@ -6235,6 +6262,8 @@ const Emitter = struct {
             error.OutOfMemory => return error.OutOfMemory,
             error.NotFunction => return g.fail(self.unit_id, id, .unresolved_type),
         };
+        g.evaluator.counters.prepared_named_calls += 1;
+        g.evaluator.counters.prepared_extra_applications += plan.extra.items.len;
         return plan;
     }
     /// A closure applied through its table entry, typed by the callee.
@@ -6243,6 +6272,7 @@ const Emitter = struct {
         const unit_ = g.unit(self.unit_id);
         const node = g.layouts.node(try self.codeLayout(unit_.typeOf(callee), unit_.span(id)));
         if (node.tag != .function) return g.fail(self.unit_id, id, .unresolved_type);
+        g.evaluator.counters.prepared_indirect_calls += 1;
         return .{ .parameter = node.a, .result = node.b, .row = node.c };
     }
     fn emitNamedCall(self: *Emitter, id: core.Id, depth: usize) Error!void {
@@ -6985,6 +7015,8 @@ const Emitter = struct {
             error.OutOfMemory => return error.OutOfMemory,
             error.NotFunction => return g.fail(self.unit_id, id, .unresolved_type),
         };
+        g.evaluator.counters.prepared_dispatch_calls += 1;
+        g.evaluator.counters.prepared_extra_applications += plan.extra.items.len;
         return plan;
     }
     fn dispatchCall(self: *Emitter, id: core.Id, key: Key, depth: usize) Error!void {
