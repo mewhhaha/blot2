@@ -361,3 +361,11 @@ RC/header allocation cost and worst cycle pause, with at least 20 measured runs
 after warm-up. Behavioral and memory bounds are mandatory even if CPU improves.
 A failed budget keeps 035 open; this document makes no measured performance or
 current tracing-removal claim.
+
+## Design qualification (11 October 2026)
+
+Specification implementation `d021c57` settles task 030. Deno 2.9.7 formatting,
+local paths/heading links and the graph/cancellation traces pass review. The
+29-link integration check covers this specification, the builder specification
+and CONTRACT. Only Markdown changed; no compiler batch was needed. Proposed
+memory and CPU gates qualify future implementations, not this design.

@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — isolated implementation and qualification; no
+  completion is claimed.
 - **Dependencies:** [030](030-specify-shared-and-cyclic-ownership.md)
 - **Originating requirements:** PLAN: Earlier programs / shared RC. Sources:
   [PLAN.md](../PLAN.md).

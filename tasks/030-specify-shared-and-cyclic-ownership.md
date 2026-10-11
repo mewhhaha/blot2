@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete.
 - **Dependencies:** [027](027-represent-ownership-in-resolved-ir.md)
 - **Originating requirements:** PLAN: Earlier programs / runtime ownership;
   DEMANDS: Effects and lifetime. Sources: [PLAN.md](../PLAN.md),
@@ -26,13 +26,13 @@ are the current layout, allocator and counterexample boundaries.
 
 ## Implementation checklist
 
-- [ ] Define strong/borrowed references, root ownership, typed retain/release,
+- [x] Define strong/borrowed references, root ownership, typed retain/release,
       destruction order, reentrancy and host-call boundaries.
-- [ ] Choose and specify a cycle strategy covering reachable and discarded
+- [x] Choose and specify a cycle strategy covering reachable and discarded
       cycles, including suspended frames and long-lived memo results.
-- [ ] Preserve strong demand memo fields: clearing State must not erase a
+- [x] Preserve strong demand memo fields: clearing State must not erase a
       completed result or weaken a live edge.
-- [ ] Document the transition with tracing retained until replacement
+- [x] Document the transition with tracing retained until replacement
       qualification, including failure cleanup and observable acceptance
       examples.
 
@@ -50,20 +50,26 @@ change.
 
 ## Acceptance criteria
 
-- [ ] Durable ownership documentation settles representations, APIs, lifecycle,
+- [x] Durable ownership documentation settles representations, APIs, lifecycle,
       cycle algorithm and compatibility.
-- [ ] Tasks 031–035 have measurable memory and behavioral gates that preserve
+- [x] Tasks 031–035 have measurable memory and behavioral gates that preserve
       the existing cycle counterexample.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Implementation: `d021c57`.
+- Validation: Deno 2.9.7;
+  `deno fmt --no-config --check
+  zig-native/SHARED_OWNERSHIP.md zig-native/CONTRACT.md`
+  passes. Local path and heading validation passes (29 links across the
+  ownership, builder and contract documents). Graph traces cover shared
+  children, strong memo cycles, suspension, exceptional cleanup and iterative
+  destruction.
+- Comparison: documentation only; no compiler source or executable fixture
+  changed. Runtime/header/collection-pause measurements belong to 031–035.
+- Remaining limitations: counting, root journals, suspension cleanup and trial
+  deletion are specified, not completed. Tracing remains until all replacement
+  behavior, memory and CPU gates pass; a restricted prototype cannot close 035.
+- Durable record: [SHARED_OWNERSHIP](../zig-native/SHARED_OWNERSHIP.md).

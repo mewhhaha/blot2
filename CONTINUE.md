@@ -69,11 +69,11 @@ The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
    SHA-256 starts `8a7dd393`; durable pins and medians are linked from
    RESOLVED_BODIES. Current captured gdev: 55 modules, 482 fixture cases and
    1,460 assertions; split hauling: 12 exports and 25 assertions.
-6. Reviewed specifications 030 and 042 are isolated in
-   `/var/tmp/blot2-ownership-design` and `/var/tmp/blot2-ragged-design`. Their
-   implementations are under qualification in `/var/tmp/blot2-shared-rc` (031)
-   and `/var/tmp/blot2-ragged-builders` (043). Root's private editor probes,
-   generic evidence fitting and shared project-query budget are in
+6. **030 is complete at `d021c57`** (SHARED_OWNERSHIP); reviewed 042 remains
+   isolated in `/var/tmp/blot2-ragged-design`. Their implementations are under
+   qualification in `/var/tmp/blot2-shared-rc` (031) and
+   `/var/tmp/blot2-ragged-builders` (043). Root's private editor probes, generic
+   evidence fitting and shared project-query budget are in
    `/var/tmp/blot2-editor-completion` (050); protocol/client/LSP remain
    unfinished. None is qualified or complete. The current gdev corpus has moved
    to pen settings with native asset roots `src` and `devtools`; the ignored
