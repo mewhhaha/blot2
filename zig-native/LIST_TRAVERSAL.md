@@ -674,3 +674,16 @@ Raw reports, the patch, source and binaries remain in `build/bench/cloud-list/`;
 `word-position-release/`, the full passing gate is
 `word-position-compiler-gate-retry.log`, and analyzer output is
 `word-position-analyzer.log`. Tasks 002 and 047 retain their existing gates.
+
+### Current qualification scope, 11 October 2026
+
+The owner waived restoring the missing legacy boxed/prewalk binaries and the
+historical gdev snapshot: "you can skip that if it's legacy." The local audit
+found no complete matching copy. Restoration is no longer a completion
+prerequisite. The historical results above remain historical; this decision does
+not independently reproduce them or establish an all-width speedup.
+
+Continue with reproducible current traversal inputs, explicit scalar reference
+results, pinned compiler/library/workload hashes, and paired fold/cursor CPU and
+guest-memory measurements. Task 002's current all-width correctness and
+performance checks remain open. Task 047 still owns the explicit cursor work.

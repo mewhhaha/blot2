@@ -12,7 +12,10 @@
 ## Outcome
 
 Close the read-only packed List fold regression and investigate the related
-cursor regression against the preserved pre-packed boxed baseline.
+cursor regression on reproducible current workloads. On 11 October 2026 the
+owner waived restoring the missing legacy benchmark binaries and historical gdev
+snapshot. Historical results remain evidence of the original problem; current
+qualification must pin its own inputs and reference implementation.
 
 ## Starting point
 
@@ -143,6 +146,10 @@ development and the scenarios below.
   design/prototype success nor a partial-width improvement completes this task.
 - Durable record: [LIST_TRAVERSAL.md](../zig-native/LIST_TRAVERSAL.md) records
   the ownership boundary, experiments and remaining qualification gates.
+- Owner decision, 11 October 2026: skip restoration of legacy artifacts. This
+  removes that prerequisite, not the current correctness and all-width
+  performance checks. See
+  [current qualification scope](../zig-native/LIST_TRAVERSAL.md#current-qualification-scope-11-october-2026).
 - Current independent candidate: exact contiguous U32 sums use vector lanes
   after ownership lowering and retain scalar tails. It preserves the original
   List layout. All 31 U32 row shapes beat the boxed fold baseline in its
