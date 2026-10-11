@@ -419,13 +419,13 @@ const Engine = struct {
             if (binding.kind != .global) continue;
             try exports.append(self.allocator, .{ .name = binding.name, .target = .{ .unit = unit, .binding = @intCast(index) } });
         }
-        for (catalog.nominals[1..], 1..) |nominal, index| if (nominal.identity.unit == unit) {
+        for (catalog.nominals, 0..) |nominal, index| if (index != 0 and nominal.identity.unit == unit) {
             try exports.append(self.allocator, .{ .name = nominal.name, .kind = .nominal, .catalog = @intCast(index) });
         };
-        for (catalog.constructors[1..], 1..) |constructor, index| if (constructor.identity.unit == unit) {
+        for (catalog.constructors, 0..) |constructor, index| if (index != 0 and constructor.identity.unit == unit) {
             try exports.append(self.allocator, .{ .name = constructor.name, .kind = .constructor, .catalog = @intCast(index) });
         };
-        for (catalog.effect_families[1..], 1..) |family, index| if (family.identity.unit == unit) {
+        for (catalog.effect_families, 0..) |family, index| if (index != 0 and family.identity.unit == unit) {
             try exports.append(self.allocator, .{ .name = family.name, .kind = .effect_family, .catalog = @intCast(index) });
         };
         for (catalog.contracts, 0..) |contract, index| if (contract.identity.unit == unit) {
@@ -517,4 +517,37 @@ fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: c
     }
     engine.result.diagnostics = try engine.diagnostics.toOwnedSlice(allocator);
     return engine.result;
+}
+
+test "project exports preserve positioned inference budget rejection with empty catalogs" {
+    const allocator = std.testing.allocator;
+    const text = "const exhausted = fn x => x\n";
+    var tokens = try @import("lexer.zig").lex(allocator, text);
+    defer tokens.deinit(allocator);
+    var source: project.Project = .{};
+    defer source.deinit(allocator);
+    var tree = try @import("parser.zig").parse(allocator, text, tokens.tokens.items, &source.symbols);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var checked = try check.checkModuleWithOptions(allocator, &tree, &source.symbols, &.{}, &.{}, 1, .{ .max_inference_transitions = 0 });
+    defer checked.deinit(allocator);
+    try std.testing.expectEqual(check.Code.inference_budget, checked.diagnostics[0].code);
+    try std.testing.expectEqual(@as(usize, 0), checked.nominals.len);
+    try std.testing.expectEqual(@as(usize, 0), checked.constructors.len);
+    try std.testing.expectEqual(@as(usize, 0), checked.effect_families.len);
+    var engine: Engine = .{ .allocator = allocator, .source = &source, .result = .{} };
+    defer {
+        for (engine.diagnostics.items) |diagnostic| if (diagnostic.detail) |detail| allocator.free(detail);
+        engine.diagnostics.deinit(allocator);
+    }
+    const exports = try engine.moduleExports(1, check.declarationCatalog(&checked), checked.bindings, checked.diagnostics);
+    defer engine.allocator.free(exports);
+    try std.testing.expectEqual(@as(usize, 0), exports.len);
+    try std.testing.expectEqual(@as(usize, 1), engine.diagnostics.items.len);
+    const diagnostic = engine.diagnostics.items[0];
+    try std.testing.expectEqual(@as(u32, 1), diagnostic.unit);
+    try std.testing.expectEqual(check.Code.inference_budget, diagnostic.semantic.?);
+    try std.testing.expectEqual(checked.diagnostics[0].span, diagnostic.span);
+    try std.testing.expect(diagnostic.span.end > diagnostic.span.start);
+    try std.testing.expectEqualStrings(checked.diagnostics[0].detail.?, diagnostic.detail.?);
 }
