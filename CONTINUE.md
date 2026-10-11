@@ -138,6 +138,16 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   unchanged, and certificates share unchanged module images. Effectful edits at
   example size are CPU-neutral to 14% slower; the gdev target stays open. See
   [the record](zig-native/LITERAL_EDITS.md).
+- Task 024 (body interface cutoff) is in progress at `a686304`. Refinement
+  receipts in edited modules replay per declaration; loop names are numbered per
+  declaration. Remaining: per-body frontend rechecking and stable Core node/type
+  IDs and symbol order for size-changing edits. See
+  [the record](zig-native/BODY_CUTOFF.md).
+- gdev findings from a separate session (current gdev checkout, `fbe28c8`
+  compiler): a retained literal edit costs about 1.1 s CPU, about 60% of it in
+  re-evaluating entry constants (task 086); `099e700` doubled it versus
+  `632b461` through principal-graph sharing (task 085). Per-commit binaries and
+  `meas.sh` are in `/var/tmp/bisect-bins/` on the owner's machine.
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -173,19 +183,21 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 024
+## Next steps
 
-Continue with
-[general body interface cutoff](tasks/024-apply-general-body-interface-cutoff.md).
-Invalidation is still per declaration:
-[literal edits](zig-native/LITERAL_EDITS.md) records why ecs consumers of
-`simulation` rebuild, and that verification plus fragment replay currently cost
-about what small functions cost to specialize. The retained probe
+Task [024](tasks/024-apply-general-body-interface-cutoff.md) stays in progress:
+the remaining work is per-body frontend rechecking and stable Core IDs, which
+needs its own design before implementation. Ready tasks in numeric order are
+[025](tasks/025-resolve-calls-before-emission.md), 036, 048,
+[085](tasks/085-gate-principal-graph-sharing-on-payoff.md) and
+[086](tasks/086-retain-constant-evaluation-across-revisions.md); 085 and 086
+carry the largest measured costs on gdev. The retained probe
 `zig-native/qualification/revision_deltas_probe.zig` and its driver measure
-edit/revert/rejected/no-op phases against an earlier tree; task-023 binaries are
-in ignored `build/bench/literal-edits/`. Tasks 036 and 048 are also ready. Tasks
-002, 040–047 and 075 onward stay blocked on owner-local artifacts (task 002),
-and 084 on private gdev.
+edit/revert/rejected/no-op phases against an earlier tree; task-024 binaries are
+in ignored `build/bench/body-cutoff/`, and the pinned analyzer is built in
+ignored `build/tools/zig-analyzer` (CI pin `756bfd5`). Tasks 002, 040–047 and
+075 onward stay blocked on owner-local artifacts (task 002), and 084 on private
+gdev.
 
 ## Notes
 

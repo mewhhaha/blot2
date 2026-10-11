@@ -240,6 +240,15 @@ reuse unaffected code but at public-example size are CPU-neutral to 14% slower.
 The under-30-ms gdev target stays open for task 084. Task [024] is ready. See
 [literal edits](../zig-native/LITERAL_EDITS.md).
 
+Task [024] is in progress at `a686304`: refinement receipts rooted in an edited
+module replay per declaration behind the existing interface cutoff, and loop
+names no longer depend on source offsets. ecs body edits are 15% faster with 58
+of 82 receipts replayed. Per-body frontend rechecking and stable Core IDs for
+size-changing edits remain. Profiling the current gdev checkout added task [085]
+(a 2.3× slowdown bisected to `099e700`) and task [086] (entry constants
+re-evaluated every revision, about 60% of a literal edit). See
+[body interface cutoff](../zig-native/BODY_CUTOFF.md).
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -480,8 +489,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [021] — Publish transactional revision deltas           | Complete    | [017], [020]                           |
 | [022] — Retain constants and relocatable data           | Complete    | [020], [021]                           |
 | [023] — Narrow literal edit invalidation                | Complete    | [022]                                  |
-| [024] — Apply general body interface cutoff             | Ready       | [023]                                  |
-| [025] — Resolve calls before emission                   | Pending     | [008], [020]                           |
+| [024] — Apply general body interface cutoff             | In progress | [023]                                  |
+| [025] — Resolve calls before emission                   | Ready       | [008], [020]                           |
 | [026] — Resolve structured control flow                 | Pending     | [025]                                  |
 | [027] — Represent ownership in resolved ir              | Pending     | [026]                                  |
 | [028] — Make emission consume resolved bodies           | Pending     | [027]                                  |
@@ -540,8 +549,10 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [081] — Finalize durable documentation                  | Pending     | [080]                                  |
 | [082] — Qualify the remote analyzer workflow            | Pending     | [081]                                  |
 | [083] — Review and clean old build artifacts            | Pending     | [081]                                  |
-| [084] — Qualify the complete program                    | Pending     | [082], [083]                           |
-| [999] — Remove tasks and plan                           | Pending     | All [001]–[084], plus every added task |
+| [084] — Qualify the complete program                    | Pending     | [082], [083], [085], [086]             |
+| [085] — Gate principal-graph sharing on payoff          | Ready       | —                                      |
+| [086] — Retain constant evaluation across revisions     | Ready       | [023]                                  |
+| [999] — Remove tasks and plan                           | Pending     | All [001]–[086], plus every added task |
 
 ## Coverage matrix
 
@@ -556,8 +567,8 @@ obligations remain part of applicable tasks and final qualification.
 | PLAN hill 4: canonical body/evidence keys including captures and value-dependent inputs                       | [008]                                                  |
 | PLAN hill 5: composite resolution across unrelated writes, history, rollback and physical edits               | [009]                                                  |
 | PLAN hill 5: variable-indexed constraints and alias fixed-point worklists                                     | [010]                                                  |
-| PLAN hill 6: changed-only metadata, retained constants, literal invalidation and body/interface cutoff        | [020], [021], [022], [023], [024]                      |
-| PLAN hill 7: semantic graph sharing and under-100-MB cumulative requested allocation                          | [011], [084]                                           |
+| PLAN hill 6: changed-only metadata, retained constants, literal invalidation and body/interface cutoff        | [020], [021], [022], [023], [024], [086]               |
+| PLAN hill 7: semantic graph sharing and under-100-MB cumulative requested allocation                          | [011], [085], [084]                                    |
 | PLAN hill 9: isolated workers, deterministic publication and CPU/wall-qualified default                       | [012], [013]                                           |
 | PLAN hill 12: typed query design, dependency recording and exact fingerprints/early cutoff                    | [014]                                                  |
 | PLAN hill 12: refinement, specialization and principal migration                                              | [015], [016]                                           |
@@ -637,7 +648,7 @@ follow-up work before [999].
 
 ## Planning-directory validation
 
-For this documentation change, verify exactly 001–084 plus 999, unique numbered
+For this documentation change, verify exactly 001–086 plus 999, unique numbered
 filenames, all seven required sections, concrete unchecked acceptance criteria,
 existing relative links/anchors, and exact manifest dependencies forming an
 acyclic graph. Check that every task is indexed and every open source
@@ -735,4 +746,6 @@ external gate or durable-documentation obligation remains open.
 [082]: 082-qualify-the-remote-analyzer-workflow.md
 [083]: 083-review-and-clean-old-build-artifacts.md
 [084]: 084-qualify-the-complete-program.md
+[085]: 085-gate-principal-graph-sharing-on-payoff.md
+[086]: 086-retain-constant-evaluation-across-revisions.md
 [999]: 999-remove-tasks-and-plan.md

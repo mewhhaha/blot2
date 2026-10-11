@@ -4,7 +4,9 @@
 
 - **Status:** Pending — no completion is claimed.
 - **Dependencies:** [082](082-qualify-the-remote-analyzer-workflow.md),
-  [083](083-review-and-clean-old-build-artifacts.md)
+  [083](083-review-and-clean-old-build-artifacts.md),
+  [085](085-gate-principal-graph-sharing-on-payoff.md),
+  [086](086-retain-constant-evaluation-across-revisions.md)
 - **Originating requirements:** PLAN: All open programs and final performance
   gates. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the

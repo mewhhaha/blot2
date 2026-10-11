@@ -85,7 +85,9 @@
   [081](081-finalize-durable-documentation.md),
   [082](082-qualify-the-remote-analyzer-workflow.md),
   [083](083-review-and-clean-old-build-artifacts.md),
-  [084](084-qualify-the-complete-program.md)
+  [084](084-qualify-the-complete-program.md),
+  [085](085-gate-principal-graph-sharing-on-payoff.md),
+  [086](086-retain-constant-evaluation-across-revisions.md)
 - **Originating requirements:** Approved task manifest / final conditional
   cleanup. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the

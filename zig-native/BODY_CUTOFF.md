@@ -13,7 +13,7 @@ Before it, two things defeated this for edits inside a module:
   every later loop variable, changed the project namespace, and so disabled the
   reuse gate for the whole program.
 
-The compiler milestone is recorded below.
+The compiler milestone is `a686304a31d49fe18f9f252e654995de7f10a951`.
 
 ## Receipt roots in edited modules
 

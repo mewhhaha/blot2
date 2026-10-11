@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** In progress — partial milestone `a686304`; no completion is
+  claimed.
 - **Dependencies:** [023](023-narrow-literal-edit-invalidation.md)
 - **Originating requirements:** PLAN: Hill 6 / general body edits under 100 ms.
   Sources: [PLAN.md](../PLAN.md).
@@ -24,10 +25,10 @@ semantic dependencies from executable and staging reads.
 
 - [ ] Compare complete public body interfaces after individual rechecking,
       including residual predicates, effects, captures and identities.
-- [ ] Stop semantic propagation only on exact interface equality; rebuild
+- [x] Stop semantic propagation only on exact interface equality; rebuild
       executable consumers of changed bodies, selected evidence, captures or
       staged inputs.
-- [ ] Preserve failed-revision rollback and dependencies across imports,
+- [x] Preserve failed-revision rollback and dependencies across imports,
       namespaces and serialized artifacts.
 
 ## Validation
@@ -49,18 +50,40 @@ development and the scenarios below.
 
 - [ ] Unchanged interfaces stop semantic propagation without hiding executable
       or staged changes.
-- [ ] The under-100-ms body-edit target is measured or remains an explicit
+- [x] The under-100-ms body-edit target is measured or remains an explicit
       unfinished performance gate.
 - [ ] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `a686304a31d49fe18f9f252e654995de7f10a951` (partial compiler
+  milestone; the task stays open).
+- Implementation: refinement receipts rooted in an edited module are admitted
+  per declaration (body roots by exact projection and identity, closure roots by
+  the exact projection of the declaration that reaches them), so unchanged
+  declarations and consumers that read only an unchanged interface keep their
+  semantic inference; executable fragments still rebuild every transitive
+  caller. Hygienic loop names are numbered per top-level declaration, so
+  size-changing edits no longer change the namespace.
+- Validation: Zig 0.17.0 before every build batch. `deno task test:compiler`
+  passes the full LLVM native suite and 632 guest/client tests;
+  `deno task
+  lint:zig` reports zero findings across 310 files. Native, gate
+  and process-level laws cover replay, interface cutoff, revoked closures,
+  demand and effect-trace changes with executed results, failed edits and
+  recovery. `cli_profile.test.ts` no longer flakes on temporary path lengths.
+- Comparison: 21 alternating repetitions over seventeen workloads at load 40–49:
+  ecs edits 0.84–0.85 × CPU with refinement hits 10 → 58 of 82, monads 0.85 ×; a
+  size-changing lists edit now keeps its gate but is 1.13 × slower;
+  size-changing ecs and syntax edits are unchanged. Steady geomeans 0.972 (edit)
+  and 0.969 (revert). Baseline `5bfae5b` (sources of `fbe28c8`).
+- Remaining work (why the task is open): the frontend still rechecks every body
+  of an edited module rather than the changed bodies individually; Core node and
+  type IDs are module-global, so edits that add nodes or types renumber later
+  declarations or change the type catalog and disable the gate; the symbol table
+  is ordered by first use, so a new identifier spelling disables the gate. The
+  under-100-ms target stays an unfinished gate for task 084.
+- Durable record: [body interface cutoff](../zig-native/BODY_CUTOFF.md),
+  [distributions](../zig-native/qualification/body-cutoff.csv) and
+  [pins](../zig-native/qualification/body-cutoff-pins.json).

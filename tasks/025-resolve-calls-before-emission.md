@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — no completion is claimed.
 - **Dependencies:** [008](008-canonicalize-specialization-keys.md),
   [020](020-persist-complete-semantic-artifacts.md)
 - **Originating requirements:** PLAN: Earlier semantic compilation / resolved

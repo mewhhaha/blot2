@@ -78,11 +78,12 @@ development and the scenarios below.
   fresh/retained/restart workloads with strict per-variant output consistency.
   All binary/identity pins remain unchanged.
 - Remaining limitations: incomplete, staged, cyclic or actively observed
-  environments use ordinary checking. Some demand/provider controls add CPU
-  and allocation overhead. The largest recorded candidate region is 35.776 ms;
+  environments use ordinary checking. Some demand/provider controls add CPU and
+  allocation overhead. The largest recorded candidate region is 35.776 ms;
   missing profiles establish no program-wide bound. General principal lexical
-  graphs, joint components and portable keys remain later work. Private gdev
-  and historical task 002 evidence are unavailable.
+  graphs, joint components and portable keys remain later work. Private gdev and
+  historical task 002 evidence are unavailable.
 - Durable record:
   [owned lexical inputs and qualification](../zig-native/CALL_SUMMARIES.md#owned-lexical-inputs-10-october-2026)
-  preserves ownership rules, exact pins, commands, distributions and limitations.
+  preserves ownership rules, exact pins, commands, distributions and
+  limitations.
