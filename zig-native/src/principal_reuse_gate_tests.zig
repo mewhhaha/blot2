@@ -1277,3 +1277,30 @@ test "closure roots in an edited module follow their owner's exact projection" {
     try std.testing.expect(!gate.admitsClosure(1, closureIn(&after.units[0], changed, "entry const apply", "entry const other")));
     try std.testing.expect(gate.admitsClosure(1, closureIn(&after.units[0], changed, "entry const other", "entry const helper")));
 }
+
+test "shifted source positions keep the catalog while shifted declarations are revoked" {
+    const source =
+        \\// a short comment
+        \\entry const early: U32 = 1
+        \\entry const doubled: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
+        \\entry const late = fn (x: U32) -> U32 => doubled x
+    ;
+    var before = try Fixture.init(a, &.{source});
+    defer before.deinit(a);
+    try std.testing.expect(before.units[0].obligations.len != 0);
+    var pinned = try Pinned.init(a, &before);
+    defer pinned.deinit(a);
+    // A longer comment shifts every later span; `early` also changes.
+    const changed = try std.mem.replaceOwned(u8, a, source, "// a short comment\nentry const early: U32 = 1", "// a much longer leading comment\nentry const early: U32 = 2");
+    defer a.free(changed);
+    var after = try Fixture.init(a, &.{changed});
+    defer after.deinit(a);
+    try std.testing.expectEqual(before.units[0].obligations.len, after.units[0].obligations.len);
+    try std.testing.expect(before.units[0].obligations[0].span.start != after.units[0].obligations[0].span.start);
+    var gate = try Gate.init(a, &pinned.pools, after.units, after.names.view());
+    defer gate.deinit();
+    try std.testing.expect(gate.enabled and !gate.structural_units[0]);
+    try std.testing.expect(!gate.admitsLocalSource(target(&after.units[0], "early")));
+    try std.testing.expect(!gate.admitsLocalSource(target(&after.units[0], "doubled")));
+    try std.testing.expect(!gate.admitsLocalSource(target(&after.units[0], "late")));
+}

@@ -80,7 +80,7 @@ pub const FallbackStats = struct {
     module_cutoff: @import("entry_frontend_cutoff.zig").Stats = .{},
     dependency_storage: retained_dependency.Stats = .{},
 };
-pub const Stats = struct { rebuilt_seed: bool = false, reused_output: bool = false, inputs: inputs.Counts = .{}, fallback: FallbackStats = .{} };
+pub const Stats = struct { rebuilt_seed: bool = false, reused_output: bool = false, trivia_only: bool = false, inputs: inputs.Counts = .{}, fallback: FallbackStats = .{} };
 
 // A live Candidate keeps this lease allocated even after Session teardown or
 // reinitialization at the same address. It grants no semantic cache admission.
@@ -440,12 +440,18 @@ pub const Session = struct {
         defer if (candidate_seed) |*seed| seed.deinit(a);
         const settings_key = settings(snapshot.options);
         const admitted = std.mem.eql(u8, &self.seed_settings, &settings_key) and try snapshot.admits(io, &self.seed);
-        if (admitted) if (self.current) |*current| if (current.output) |output| {
-            if (output.matches(entry_path, output_identity, self.policy) and try snapshot.entryEqualsPrevious(io, entry_path, current.prepared.paths[current.prepared.entry - 1], current.snapshot.view()) and try snapshot.equalsPrevious(io, current.snapshot.view())) {
+        if (self.current) |*current| if (current.output) |output| {
+            // A trivia-only edit (comments, or spacing that keeps the same
+            // tokens and adjacency) parses to the same program, so the last
+            // output stands and the retained state is kept; later edits diff
+            // against the last compiled sources. Settings must be unchanged.
+            const reusable = std.mem.eql(u8, &self.seed_settings, &settings_key) and output.matches(entry_path, output_identity, self.policy) and try snapshot.entryPathEqualsPrevious(io, entry_path, current.prepared.paths[current.prepared.entry - 1]);
+            const exact = reusable and admitted and try snapshot.entryEqualsPrevious(io, entry_path, current.prepared.paths[current.prepared.entry - 1], current.snapshot.view()) and try snapshot.equalsPrevious(io, current.snapshot.view());
+            if (exact or (reusable and try snapshot.triviaEqualsPrevious(io, current.snapshot.view()))) {
                 var emission = try output.emission(a);
                 errdefer emission.deinit(a);
                 const candidate = try a.create(Candidate);
-                candidate.* = .{ .allocator = a, .epoch = epoch, .token = epoch.token + 1, .base_revision = self.revisions, .settings_key = settings_key, .stats = .{ .reused_output = true, .inputs = snapshot.counts }, .pending = null, .seed = null, .emission = emission, .kind = .unchanged };
+                candidate.* = .{ .allocator = a, .epoch = epoch, .token = epoch.token + 1, .base_revision = self.revisions, .settings_key = settings_key, .stats = .{ .reused_output = true, .trivia_only = !exact, .inputs = snapshot.counts }, .pending = null, .seed = null, .emission = emission, .kind = .unchanged };
                 epoch.token = candidate.token;
                 epoch.references += 1;
                 epoch.active = candidate;

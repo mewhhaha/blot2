@@ -396,6 +396,19 @@ pub const Gate = struct {
 /// executable reuse stays disabled. Individual principal proofs require a
 /// separate exact declaration projection and transitive dependency validation.
 /// A new Core field must explicitly choose one of these domains.
+fn obligationsEqual(previous: []const core.Obligation, current: []const core.Obligation) bool {
+    if (previous.len != current.len) return false;
+    for (previous, current) |before, after| {
+        var left = before;
+        var right = after;
+        left.span = .{ .start = 0, .end = 0 };
+        right.span = left.span;
+        left.qualification_span = if (left.qualification_span != null) left.span else null;
+        right.qualification_span = if (right.qualification_span != null) right.span else null;
+        if (!equal(left, right)) return false;
+    }
+    return true;
+}
 fn catalogEqual(previous: *const core.Module, current: *const core.Module) bool {
     inline for (@typeInfo(core.Module).@"struct".field_names) |name| {
         const field = @field(ModuleField, name);
@@ -404,9 +417,12 @@ fn catalogEqual(previous: *const core.Module, current: *const core.Module) bool 
             // identical. Their witness expressions are projected by every
             // referencing declaration's definition equality and dependency
             // walk, so a changed witness dirties exactly its consumers.
-            .unit, .types, .nominals, .constructors, .associated, .operation_names, .names, .field_names, .obligations, .operation_values => {
+            .unit, .types, .nominals, .constructors, .associated, .operation_names, .names, .field_names, .operation_values => {
                 if (!equal(@field(previous, name), @field(current, name))) return false;
             },
+            // Obligation spans locate diagnostics only. A shifted source
+            // position keeps the catalog; declarations still compare spans.
+            .obligations => if (!obligationsEqual(previous.obligations, current.obligations)) return false,
             .diagnostics => {
                 if (@field(previous, name).len != 0 or @field(current, name).len != 0) return false;
             },

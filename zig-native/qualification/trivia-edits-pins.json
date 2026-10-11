@@ -1,0 +1,34 @@
+{
+  "zig": "0.17.0",
+  "baseline": {
+    "revision": "b822ccf (task 085 record; compiler sources of 7d64435)",
+    "sha256": "4397b60bfb80641650882748eb112f99e83686d97ef679a26c9c77e963720051"
+  },
+  "candidate": {
+    "base_revision": "b822ccfc789f89952350400690019a9d02beb03f",
+    "sha256": "6fb5ac2bbd7105c065c7ae687e6a3958da1b7d8524e119130c3e4ff64c7427fc",
+    "input_files": 431,
+    "input_map_sha256": "cd12458ea7b96760fb974b734cc58537cb69ca8642ea71f84089c74b6c1275f0"
+  },
+  "gdev": {
+    "workload": "frozen gdev copy; cold build then four retained edits of one top-level scalar line: trivia (comment changes), after (comment, then literal edits keeping it), plain (literal edits)",
+    "harness": "local, not committed (it names private gdev source)",
+    "pairs": 3,
+    "loads": [
+      [
+        "2.22",
+        "3.05",
+        "8.55"
+      ],
+      [
+        "3.91",
+        "3.36",
+        "8.20"
+      ]
+    ]
+  },
+  "machine": {
+    "cpu": "AMD Ryzen 7 3800X, 8 cores / 16 threads",
+    "contention": "quiet; one-minute load 2.2-3.9"
+  }
+}

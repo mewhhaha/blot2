@@ -6,6 +6,7 @@ const project = @import("project.zig");
 const D = @import("frozen_dependency.zig");
 const closure = @import("dependency_closure.zig");
 const queries = @import("semantic_query_table.zig");
+const lexer = @import("lexer.zig");
 const Allocator = std.mem.Allocator;
 pub const overlays = @import("source_overlays.zig");
 comptime {
@@ -298,12 +299,18 @@ pub const Snapshot = struct {
             .failure => null,
         };
     }
-    pub fn entryEqualsPrevious(self: *Snapshot, io: std.Io, requested: []const u8, old_canonical: []const u8, previous: View) Allocator.Error!bool {
+    /// The requested entry resolves to the previous canonical entry path; its
+    /// contents are compared with the other sources.
+    pub fn entryPathEqualsPrevious(self: *Snapshot, io: std.Io, requested: []const u8, old_canonical: []const u8) Allocator.Error!bool {
         const actual_path = self.canonical(io, requested) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
             return false;
         };
-        if (!std.mem.eql(u8, actual_path, old_canonical)) return false;
+        return std.mem.eql(u8, actual_path, old_canonical);
+    }
+    pub fn entryEqualsPrevious(self: *Snapshot, io: std.Io, requested: []const u8, old_canonical: []const u8, previous: View) Allocator.Error!bool {
+        if (!try self.entryPathEqualsPrevious(io, requested, old_canonical)) return false;
+        const actual_path = old_canonical;
         const expected = switch (get(previous.files, old_canonical) orelse return false) {
             .bytes => |bytes| bytes,
             .failure => return false,
@@ -319,6 +326,14 @@ pub const Snapshot = struct {
     /// reads. Exact source bytes and resolution outcomes are required. Unknown
     /// or failed old observations decline; this is not timestamp admission.
     pub fn equalsPrevious(self: *Snapshot, io: std.Io, previous: View) Allocator.Error!bool {
+        return self.matchesPrevious(io, previous, false);
+    }
+    /// Like `equalsPrevious`, but a source may also differ only in trivia
+    /// (`sameTokens`): it then parses to the same program at other positions.
+    pub fn triviaEqualsPrevious(self: *Snapshot, io: std.Io, previous: View) Allocator.Error!bool {
+        return self.matchesPrevious(io, previous, true);
+    }
+    fn matchesPrevious(self: *Snapshot, io: std.Io, previous: View, trivia: bool) Allocator.Error!bool {
         const left = self.options;
         const right = previous.options;
         if (left.input_mode != right.input_mode or left.max_source_bytes != right.max_source_bytes or left.max_total_source_bytes != right.max_total_source_bytes or left.max_files != right.max_files or !optionalTextEqual(left.prelude_path, right.prelude_path) or !optionalTextEqual(left.std_root, right.std_root) or left.aliases.len != right.aliases.len) return false;
@@ -326,6 +341,7 @@ pub const Snapshot = struct {
             if (!std.mem.eql(u8, actual.prefix, old.prefix) or !std.mem.eql(u8, actual.root, old.root)) return false;
         }
         if (previous.files.len == 0) return false;
+        var total: usize = 0;
         for (previous.paths) |entry| {
             const expected = switch (entry.result) {
                 .bytes => |bytes| bytes,
@@ -346,8 +362,14 @@ pub const Snapshot = struct {
                 if (err == error.OutOfMemory) return error.OutOfMemory;
                 return false;
             };
-            if (!std.mem.eql(u8, expected, actual)) return false;
+            if (!std.mem.eql(u8, expected, actual)) {
+                // Trivia can change sizes; the source limits still apply.
+                if (!trivia or actual.len > self.options.max_source_bytes) return false;
+                if (!try sameTokens(self.allocator, expected, actual)) return false;
+            }
+            total +|= actual.len;
         }
+        if (total > self.options.max_total_source_bytes) return false;
         for (previous.imports) |entry| {
             const expected = switch (entry.result) {
                 .bytes => |bytes| bytes,
@@ -358,6 +380,23 @@ pub const Snapshot = struct {
                 return false;
             };
             if (!std.mem.eql(u8, expected, actual)) return false;
+        }
+        return true;
+    }
+
+    /// Both sources lex cleanly to the same token tags and spellings, with the
+    /// same adjacency between consecutive tokens. The parser reads only those
+    /// facts and the relative order of positions, so the parse is identical
+    /// except for source positions; comments and other spacing are trivia.
+    pub fn sameTokens(a: Allocator, left: []const u8, right: []const u8) Allocator.Error!bool {
+        var before = lexer.lex(a, left) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+        defer before.deinit(a);
+        var after = lexer.lex(a, right) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+        defer after.deinit(a);
+        if (before.diagnostics.items.len != 0 or after.diagnostics.items.len != 0 or before.tokens.items.len != after.tokens.items.len) return false;
+        for (before.tokens.items, after.tokens.items, 0..) |old, new, index| {
+            if (old.tag != new.tag or !std.mem.eql(u8, old.text(left), new.text(right))) return false;
+            if (index != 0 and (before.tokens.items[index - 1].end == old.start) != (after.tokens.items[index - 1].end == new.start)) return false;
         }
         return true;
     }

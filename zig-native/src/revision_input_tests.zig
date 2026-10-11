@@ -485,3 +485,46 @@ test "revision input removed dependencies use fresh byte limits before returning
     try std.testing.expect(session.last.rebuilt_seed);
     try std.testing.expectEqual(@as(usize, 0), session.seed.modules.len);
 }
+
+test "trivia-only source changes keep tokens and adjacency; layout and adjacency changes do not" {
+    const same = inputs.Snapshot.sameTokens;
+    const base =
+        \\// a leading comment
+        \\const helper = fn (x: U32) -> U32 => x
+        \\entry const answer = fn () => do:
+        \\  let values: Array U32 = #[1, 2]
+        \\  return helper values[0]
+        \\
+    ;
+    const cases = [_]struct { from: []const u8, to: []const u8, trivia: bool }{
+        .{ .from = "// a leading comment", .to = "// another comment, longer", .trivia = true },
+        .{ .from = "=> x\n", .to = "=> x // trailing note\n", .trivia = true },
+        .{ .from = "fn (x: U32)", .to = "fn (x:   U32)", .trivia = true },
+        // A space between a value and `[` turns indexing into an argument.
+        .{ .from = "values[0]", .to = "values [0]", .trivia = false },
+        // Adjacent parentheses call; spaced ones group an argument.
+        .{ .from = "helper values[0]", .to = "helper(values[0])", .trivia = false },
+        // Moving a statement out of the suite changes layout tokens.
+        .{ .from = "  return helper", .to = "return helper", .trivia = false },
+        .{ .from = "#[1, 2]", .to = "#[1, 3]", .trivia = false },
+    };
+    for (cases) |case| {
+        const changed = try std.mem.replaceOwned(u8, a, base, case.from, case.to);
+        defer a.free(changed);
+        try std.testing.expect(!std.mem.eql(u8, base, changed));
+        try std.testing.expectEqual(case.trivia, try same(a, base, changed));
+    }
+    try std.testing.expect(try same(a, base, base));
+    // A source with lexer diagnostics is never trivia-equal, even to itself;
+    // its exact bytes may still match.
+    const tabbed = "const answer = do:\n\treturn 1\n";
+    try std.testing.expect(!try same(a, tabbed, tabbed));
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, triviaScenario, .{base});
+}
+
+fn triviaScenario(allocator: std.mem.Allocator, base: []const u8) !void {
+    const same = inputs.Snapshot.sameTokens;
+    const changed = try std.mem.replaceOwned(u8, allocator, base, "// a leading comment", "// changed");
+    defer allocator.free(changed);
+    try std.testing.expect(try same(allocator, base, changed));
+}

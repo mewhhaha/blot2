@@ -736,3 +736,11 @@ hold in the new session. Retained executable fragments keep the transitive dirty
 set, so executable callers of a changed body always regenerate. Hygienic loop
 names are numbered within their top-level declaration. See
 [body interface cutoff](BODY_CUTOFF.md).
+
+A retained revision whose inputs equal the last compiled revision's except for
+trivia (each changed source lexes cleanly to the same tokens and adjacency, and
+size limits hold) publishes the last successful output and keeps the retained
+state; the next real edit diffs against the last compiled sources. The reuse
+gate compares obligations without their diagnostic spans, so shifted positions
+revoke only the declarations whose node spans moved. See
+[trivia-only edits](TRIVIA_EDITS.md).

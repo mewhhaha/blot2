@@ -185,3 +185,30 @@ test "source overlays allocation failures leave the retained revision reusable" 
     try success(next);
     try std.testing.expect(session.commit(next.ready));
 }
+
+test "trivia-only overlay edits reuse the last output and later edits compile" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    var first = try session.prepareRevisionWithSources(io, fixture.entry, null, .{}, &fixture.sources(original));
+    defer first.deinit();
+    try success(first);
+    try std.testing.expect(session.commit(first.ready));
+    const commented = "// a note\nconst value: U32 =   41 // trailing\n";
+    {
+        var next = try session.prepareRevisionWithSources(io, fixture.entry, null, .{}, &fixture.sources(commented));
+        defer next.deinit();
+        try success(next);
+        try std.testing.expect(next.ready.stats.reused_output and next.ready.stats.trivia_only);
+        try std.testing.expectEqualSlices(u8, first.ready.result().?.result.compiled.bytes, next.ready.result().?.result.compiled.bytes);
+        try std.testing.expect(session.commit(next.ready));
+    }
+    {
+        var next = try session.prepareRevisionWithSources(io, fixture.entry, null, .{}, &fixture.sources(edited));
+        defer next.deinit();
+        try success(next);
+        try std.testing.expect(!next.ready.stats.reused_output and !next.ready.stats.trivia_only);
+        try std.testing.expect(session.commit(next.ready));
+    }
+}
