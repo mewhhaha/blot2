@@ -280,6 +280,36 @@ test "pending effect operations wait for their types instead of rescanning" {
     }
 }
 
+// Private callback operators remain open when stages select another record
+// field. Their unknown receiver cannot change while unrelated stages settle.
+test "pending callback selections wait for their unknown receivers" {
+    for ([_]usize{ 8, 24 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a,
+            \\infixl 60 (+) = add
+            \\infixl 70 (*) = mul
+            \\infixl 70 (/) = div
+            \\const add = fn left => fn right => @type.call "add" left right
+            \\const mul = fn left => fn right => @type.call "mul" left right
+            \\const div = fn left => fn right => @type.call "div" left right
+            \\const U32.add = fn left => fn right => @u32.add left right
+            \\const holder = fn () => #{
+            \\
+        );
+        for (0..16) |index| try text.print(a, "f{d}: fn x => x * 2.0 + x / 3.0,\n", .{index});
+        try text.appendSlice(a, "g: 4\n}\nconst s0 = fn () => (holder ()).g\n");
+        for (1..depth) |index| try text.print(a, "const s{d} = fn () => (holder ()).g + s{d} ()\n", .{ index, index - 1 });
+        try text.print(a, "entry const answer = fn () => s{d} ()\n", .{depth - 1});
+        var fixture = try Fixture.init(text.items);
+        defer fixture.deinit();
+        try fixture.valid();
+        const counters = fixture.checked.counters;
+        if (counters.inference_steps > 2 * counters.obligations_appended) std.debug.print("depth={d}: {any}\n", .{ depth, counters });
+        try std.testing.expect(counters.inference_steps <= 2 * counters.obligations_appended);
+    }
+}
+
 const header =
     \\infixl 60 (+) = _fixity_add
     \\const _fixity_add = fn left => fn right => @type.call "add" left right

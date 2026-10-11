@@ -6795,9 +6795,10 @@ const Engine = struct {
     fn solveFieldsFrom(self: *Engine, start: usize) T.Error!void {
         // Ready work runs in index order. A write wakes later work in this pass
         // and earlier work in the next, as a full scan would retry it. An
-        // effect operation sleeps on its argument and signature types, and an
-        // open use of a settled callee on its instance types; every other
-        // kind is retried each pass, as before.
+        // effect operation sleeps on its argument and signature types, an
+        // open use of a settled callee on its instance types, and a member or
+        // operator on the unknown type that blocks selection. Other checks
+        // are retried each pass.
         var progress = true;
         while (progress) {
             progress = false;
@@ -6841,9 +6842,23 @@ const Engine = struct {
                     // An open use waits only on its instance types once the
                     // callee's summary can no longer change.
                     try self.pending_queue.watch(self.allocator, &self.types, i, &.{after.value.ty}, false, false);
+                } else if (try self.pendingSelectionInput(after)) |input| {
+                    try self.pending_queue.watch(self.allocator, &self.types, i, &.{input}, false, false);
                 } else self.pending_queue.requeue(i);
             }
         }
+    }
+    fn pendingSelectionInput(self: *Engine, pending: PendingObligation) T.Error!?T.Id {
+        if (pending.suspended) return null;
+        const input = switch (pending.value.kind) {
+            .field, .writable_field, .dispatch => pending.value.ty,
+            .result_dispatch => pending.value.result,
+            else => return null,
+        };
+        // attemptPending returns before selecting any body while this head
+        // is unknown. Only a write to this variable can make it proceed.
+        if (self.types.node(try self.types.resolve(input, 0)).tag != .variable) return null;
+        return input;
     }
     fn calleeSettled(self: *const Engine, binding: BindingId) bool {
         if (binding >= self.bindings.items.len) return false;

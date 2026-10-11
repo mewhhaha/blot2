@@ -9,8 +9,9 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 
-// The 51-link chain reaches 974,824 inference steps. The next link exhausts
-// the default budget; rejection must survive empty catalogs in export handling.
+// Unknown callback selections wait for their receivers. The 100-link chain
+// reaches 994,808 inference steps; the next link still exhausts the fixed budget.
+// Rejection must survive empty catalogs in export handling.
 function chain(length: number): string {
   const fields = Array.from(
     { length: 64 },
@@ -37,7 +38,7 @@ Deno.test("CLI rejects stage chains at and beyond the inference budget without p
   const entry = `${directory}/main.blot`;
   const output = `${directory}/main.wasm`;
   try {
-    for (const length of [52, 64]) {
+    for (const length of [101]) {
       const source = chain(length);
       await Deno.writeTextFile(entry, source);
       const result = await new Deno.Command(executable, {
@@ -73,12 +74,12 @@ Deno.test("fresh and retained stage-chain rejection agrees and the server recove
   const retained = await createZigProjectCompiler(options);
   let original: Uint8Array<ArrayBuffer> | undefined;
   try {
-    for (const length of [51, 52, 64, 51]) {
+    for (const length of [51, 101, 51]) {
       const source = chain(length);
       const sources = { [entry]: source };
       const result = await retained.build({ sources });
       if (!result.success) {
-        assert(length >= 52, JSON.stringify(result));
+        assert.equal(length, 101, JSON.stringify(result));
         assert.equal(result.diagnostics.length, 1);
         budget(result.diagnostics[0], entry, source);
         const fresh = await createZigProjectCompiler(options);
