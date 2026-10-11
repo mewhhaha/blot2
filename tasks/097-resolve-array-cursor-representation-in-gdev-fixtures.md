@@ -78,14 +78,15 @@ before the local milestone commit.
   included.
 - gdev: 472 passing checks/traps/expected rejections across 54 regular modules;
   duplicate blocked app/sandbox fixtures pass all ten checks. The split-hauling
-  module remains blocked by the distinct budget-exhaustion crash in [099]. These
-  results do not claim all originally reported fixtures compile.
+  module now reports `inference_budget` after [099] (`5340ef2`) and remains
+  uncompiled. These results do not claim all originally reported fixtures
+  compile.
 - Comparison: all 13 public examples, four synthetic workloads and frozen gdev
   preserve Wasm bytes. Three paired gdev runs show no established CPU
   improvement.
-- Remaining limitation: complete the outstanding fixture qualification after
-  [099]; retain this task's open acceptance criterion until that evidence
-  exists.
+- Remaining limitation: complete the outstanding fixture compilation
+  qualification; retain this task's open acceptance criterion until that
+  evidence exists.
 - Durable record:
   [partial collection layouts](../zig-native/PARTIAL_COLLECTIONS.md), including
   binary pins and paired samples.

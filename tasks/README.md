@@ -652,7 +652,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [096] — Compile typed asset imports natively            | Pending     | [095]                                  |
 | [097] — Resolve array cursor representation in gdev     | In progress | None                                   |
 | [098] — Type-check recursive demand forwarding          | Ready       | None                                   |
-| [099] — Survive long stage chains without crashing      | Ready       | None                                   |
+| [099] — Survive long stage chains without crashing      | Complete    | None                                   |
 | [999] — Remove tasks and plan                           | Pending     | All [001]–[099], plus every added task |
 
 ## Coverage matrix

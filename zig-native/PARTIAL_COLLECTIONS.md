@@ -49,7 +49,8 @@ and
 | Rejected              | 270 / 280 / 280             | 270 / 280 / 290              |
 | No-op after rejection | 0 / 10 / 10                 | 0 / 10 / 10                  |
 
-The separate task 099 split-hauling fixture still exits with signal 11. Gdb
-locates that failure in export handling of empty catalogs after inference budget
-exhaustion, before code emission. It is not covered by the passing regular
-suite.
+At this representation milestone, the separate task 099 split-hauling fixture
+still exited with signal 11, before emission. Task 099's `5340ef2` fixes export
+handling of empty catalogs after inference budget exhaustion. The fixture now
+reports `inference_budget` and remains uncompiled; task 097 retains that open
+compilation qualification.

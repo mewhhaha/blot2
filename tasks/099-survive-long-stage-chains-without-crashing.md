@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** Complete.
 - **Dependencies:** None.
 - **Originating requirements:** reported on 11 October 2026 by the gdev session
   while porting gdev's tests to Blot. Sources: that session's report.
@@ -28,11 +28,11 @@ recursion.
 
 ## Implementation checklist
 
-- [ ] Reduce the crash to a public repro and find the faulting recursion or
+- [x] Reduce the crash to a public repro and find the faulting recursion or
       memory error.
-- [ ] Bound it or make it iterative, with a positioned diagnostic where a limit
+- [x] Bound it or make it iterative, with a positioned diagnostic where a limit
       is reached.
-- [ ] Add a regression law at the reduced program's size and beyond.
+- [x] Add a regression law at the reduced program's size and beyond.
 
 ## Validation
 
@@ -44,18 +44,34 @@ before the local milestone commit.
 
 ## Acceptance criteria
 
-- [ ] Long stage chains compile or report a positioned diagnostic; the compiler
+- [x] Long stage chains compile or report a positioned diagnostic; the compiler
       process never crashes on them.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Implementation: `5340ef2`. The fault was an unchecked slice of empty checker
+  catalogs after budget exhaustion. Export handling safely skips sentinel
+  indices, preserving the existing owned, positioned `inference_budget`.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes the full native suite
+  and 653 guest/client tests.
+  `ZIG_ANALYZER=build/tools/zig-analyzer/zig-out/bin/zig-analyzer deno task lint:zig`
+  reports zero findings across 315 files. The focused native rejection law and
+  both executed CLI/server laws pass.
+- Public reduction: 64 callbacks with 51 links compiles at 974,824 inference
+  steps; 52 and 64 links report positioned diagnostics. CLI publishes no output
+  and reports zero live requested bytes. Retained rejection agrees with fresh
+  sessions and recovery preserves Wasm plus the executed result, 204.
+- Comparison: the successful 51-link control preserves complete checker counters
+  and 13,077-byte Wasm. Binary pins and one control pair are recorded;
+  uncontrolled load and concurrent builds prevent any CPU speedup claim.
+- Remaining limitations: large unresolved callback chains still exceed the
+  existing inference budget. The original gdev split-hauling fixture now exits 1
+  with `inference_budget` instead of signal 11; it remains uncompiled. Task
+  [097] retains that separate compilation qualification.
+- Durable record:
+  [stage-chain rejection](../zig-native/STAGE_CHAIN_REJECTION.md) and
+  [binary pins](../zig-native/qualification/stage-chain-rejection-pins.json).
+
+[097]: 097-resolve-array-cursor-representation-in-gdev-fixtures.md
