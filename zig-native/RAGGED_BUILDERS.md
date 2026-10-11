@@ -412,3 +412,8 @@ triangle, filtered-square values and the U32 wrapping/division counterexample;
 they are trace review evidence, not compiler execution. No compiler source or
 executable fixture changed, so no build or compiler test batch was run for this
 documentation task.
+
+The local implementation milestone is `a1df44d`. Integration preserves the
+caller-origin and ownership contract additions; the shared path/heading check
+validates 29 links before the final contract link is added. Formatting passes
+again on the integrated files. Task 043 remains separately under qualification.

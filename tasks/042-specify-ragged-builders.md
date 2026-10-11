@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete.
 - **Dependencies:** [011](011-reduce-semantic-allocation-traffic.md),
   [027](027-represent-ownership-in-resolved-ir.md)
 - **Originating requirements:** PLAN: Earlier programs / ragged builders.
@@ -25,13 +25,13 @@ ordinary builders.
 
 ## Implementation checklist
 
-- [ ] Define source-shape admission, representation, counting/filling APIs and
+- [x] Define source-shape admission, representation, counting/filling APIs and
       ownership of scratch/final storage.
-- [ ] Specify purity, termination, traps, repeated evaluation, filters,
+- [x] Specify purity, termination, traps, repeated evaluation, filters,
       dependent dimensions, integer overflow and empty dimensions.
-- [ ] Require identical observable order and exceptions; define conservative
+- [x] Require identical observable order and exceptions; define conservative
       fallback where a sizing pass would duplicate work observably.
-- [ ] Document durable examples and performance metrics for runtime and constant
+- [x] Document durable examples and performance metrics for runtime and constant
       evaluation.
 
 ## Validation
@@ -48,20 +48,26 @@ change.
 
 ## Acceptance criteria
 
-- [ ] A durable specification unambiguously admits or rejects each
+- [x] A durable specification unambiguously admits or rejects each
       counting/sizing scenario.
-- [ ] Task 043 has defined APIs, semantics, layouts, diagnostics and executable
+- [x] Task 043 has defined APIs, semantics, layouts, diagnostics and executable
       acceptance examples.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Implementation: `a1df44d`.
+- Validation: Deno 2.9.7;
+  `deno fmt --no-config --check
+  zig-native/RAGGED_BUILDERS.md zig-native/CONTRACT.md`
+  passes. The shared local path/heading check validates 29
+  specification/contract links before adding the final contract link to this
+  file. Triangle/filter arithmetic and trapping guard/bound traces agree with
+  the current guide.
+- Comparison: documentation only; no compiler source or executable fixture
+  changed. Task 043 owns executed parity and runtime/compiler measurements.
+- Remaining limitations: initial admission has four finite generators and
+  bounded pure/total controls and payloads. Unknown, effectful, trapping,
+  allocating or observably intermediate construction remains ordinary.
+- Durable record: [RAGGED_BUILDERS](../zig-native/RAGGED_BUILDERS.md).

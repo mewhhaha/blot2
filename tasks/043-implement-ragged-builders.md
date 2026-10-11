@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — isolated implementation and qualification; no
+  completion is claimed.
 - **Dependencies:** [042](042-specify-ragged-builders.md)
 - **Originating requirements:** PLAN: Earlier programs / direct ragged
   construction. Sources: [PLAN.md](../PLAN.md).

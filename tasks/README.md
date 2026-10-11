@@ -610,8 +610,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [039] — Guarantee and explain demand lowering           | Pending     | [038], [033]                           |
 | [040] — Fuse packed row producers and consumers         | Pending     | [002], [027]                           |
 | [041] — Broaden numeric simd                            | Pending     | [040]                                  |
-| [042] — Specify ragged builders                         | Pending     | [011], [027]                           |
-| [043] — Implement ragged builders                       | Pending     | [042]                                  |
+| [042] — Specify ragged builders                         | Complete    | [011], [027]                           |
+| [043] — Implement ragged builders                       | In progress | [042]                                  |
 | [044] — Specify rolling and summary operations          | Pending     | [040]                                  |
 | [045] — Implement rolling reductions                    | Pending     | [044]                                  |
 | [046] — Implement composable summary trees              | Pending     | [045]                                  |
