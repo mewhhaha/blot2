@@ -282,6 +282,10 @@ a compile thread with a 1 GiB reserved stack; a 3,000-entry registry walk now
 evaluates, and runaway recursion reports `constant_recursion` at its outermost
 call.
 
+Task [092] makes the formatter accept nominal record patterns at `f6098a8`: the
+grammar no longer derives `#Vec2 { x, y }` twice. Every public example, std
+module and frozen gdev source formats idempotently to identical Wasm.
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -590,7 +594,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [089] — Report inference budget exhaustion              | Complete    | —                                      |
 | [090] — Make pending-check solving incremental          | Ready       | None                                   |
 | [091] — Bound compile-time evaluation by call depth     | Complete    | —                                      |
-| [092] — Format current Blot syntax                      | Ready       | None                                   |
+| [092] — Format current Blot syntax                      | Complete    | —                                      |
 | [093] — Close the gdev edit gap                         | Ready       | [088]                                  |
 | [999] — Remove tasks and plan                           | Pending     | All [001]–[093], plus every added task |
 
