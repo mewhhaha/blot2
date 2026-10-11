@@ -277,6 +277,11 @@ Task [089] reports inference budget exhaustion at `c5cb9ac` as one positioned
 `inference_budget` diagnostic naming the declaration and the budget, instead of
 an unpositioned operation failure.
 
+Task [091] bounds compile-time recursion by 4,096 nested calls at `915b7e1`, on
+a compile thread with a 1 GiB reserved stack; a 3,000-entry registry walk now
+evaluates, and runaway recursion reports `constant_recursion` at its outermost
+call.
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -584,7 +589,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [088] — Restore summary-job inference cost              | Complete    | —                                      |
 | [089] — Report inference budget exhaustion              | Complete    | —                                      |
 | [090] — Make pending-check solving incremental          | Ready       | None                                   |
-| [091] — Bound compile-time evaluation by call depth     | Ready       | None                                   |
+| [091] — Bound compile-time evaluation by call depth     | Complete    | —                                      |
 | [092] — Format current Blot syntax                      | Ready       | None                                   |
 | [093] — Close the gdev edit gap                         | Ready       | [088]                                  |
 | [999] — Remove tasks and plan                           | Pending     | All [001]–[093], plus every added task |

@@ -182,6 +182,9 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   inference budget reports one positioned `inference_budget` diagnostic naming
   the declaration. A public shape for task 090 (N closures in a global record, N
   helpers) checks in 3.8 s at N = 300.
+- Task 091 (evaluation depth) is complete at `915b7e1`: compile-time recursion
+  is bounded by 4,096 nested calls on a 1 GiB reserved compile thread, with a
+  `constant_recursion` diagnostic at the outermost call.
 - A separate session (bun-desktop) offered an unapplied wasm name-section patch
   at `/var/tmp/blot2-names.patch` (14 files, always on, +5% Wasm, gate green on
   `a488ba2`); applying it is the owner's decision.
@@ -226,8 +229,8 @@ Task [024](tasks/024-apply-general-body-interface-cutoff.md) stays in progress:
 the remaining work is per-body frontend rechecking and stable Core IDs, which
 needs its own design before implementation. Ready tasks in numeric order are
 [025](tasks/025-resolve-calls-before-emission.md), 036, 048,
-[086](tasks/086-retain-constant-evaluation-across-revisions.md) and 090–093; 086
-needs a fresh gdev profile and then a design decision (see above), and
+[086](tasks/086-retain-constant-evaluation-across-revisions.md) 090, 092 and
+093; 086 needs a fresh gdev profile and then a design decision (see above), and
 [093](tasks/093-close-the-gdev-edit-gap.md) carries the remaining measured gdev
 edit gap. The retained probe
 `zig-native/qualification/revision_deltas_probe.zig` and its driver measure
