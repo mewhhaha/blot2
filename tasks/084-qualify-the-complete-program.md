@@ -6,7 +6,9 @@
 - **Dependencies:** [082](082-qualify-the-remote-analyzer-workflow.md),
   [083](083-review-and-clean-old-build-artifacts.md),
   [085](085-gate-principal-graph-sharing-on-payoff.md),
-  [086](086-retain-constant-evaluation-across-revisions.md)
+  [086](086-retain-constant-evaluation-across-revisions.md),
+  [087](087-skip-rebuilds-for-trivia-only-edits.md),
+  [088](088-restore-summary-job-inference-cost.md)
 - **Originating requirements:** PLAN: All open programs and final performance
   gates. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the

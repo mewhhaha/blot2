@@ -21,11 +21,12 @@ Task 023 keeps code and metadata of unaffected bodies, but every revision still
 evaluates all constants in a new Session. A separate session profiled a
 top-level scalar literal edit on the current gdev checkout with the `fbe28c8`
 compiler at about 1.1 s CPU; about 60% was `core_eval.Session.prepare` →
-`Session.constant` re-evaluating entry constants, dominated by
-`const sandbox =
-game …` (213,919 region nodes, 3,638 scopes, 276 ms alone).
-Task 022 already replays graph-equal constant children of retained fragments but
-re-serializes them.
+`Session.constant` re-evaluating entry constants. The largest was the `sandbox`
+constant in gdev's main module (213,919 region nodes, 3,638 scopes, 276 ms
+alone). The same session later measured a flat `generate_us` of about 740 ms
+whether 0% or 90% of named functions were reused, consistent with evaluation
+rather than code generation dominating. Task 022 already replays graph-equal
+constant children of retained fragments but re-serializes them.
 
 ## Implementation checklist
 

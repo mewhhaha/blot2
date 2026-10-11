@@ -1550,7 +1550,8 @@ portable query validation or the unified table planned in task 014.
 ## Open-principal payoff (11 October 2026)
 
 Task 085 removes most of the retained-edit cost that `099e700` added to a large
-generic program while keeping its diamond benefit.
+generic program while keeping its diamond benefit. The compiler milestone is
+`7d644355573b7f4934a9b41348275ca9fc21f79e`.
 
 ### Finding
 

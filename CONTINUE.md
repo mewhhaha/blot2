@@ -148,6 +148,14 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   re-evaluating entry constants (task 086); `099e700` doubled it versus
   `632b461` through principal-graph sharing (task 085). Per-commit binaries and
   `meas.sh` are in `/var/tmp/bisect-bins/` on the owner's machine.
+- Task 085 (principal-graph payoff) is complete at `7d64435`: open principal
+  edges are retained only where call paths multiply; gdev retained edits match
+  the sharing-off cost and the diamond keeps its benefit. The gdev harness
+  (frozen copy in `/var/tmp/gdev-bench`, local harness in ignored
+  `build/bench/principal-graphs/meas.ts`) is local-only.
+- A separate session (bun-desktop) offered an unapplied wasm name-section patch
+  at `/var/tmp/blot2-names.patch` (14 files, always on, +5% Wasm, gate green on
+  `a488ba2`); applying it is the owner's decision.
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -189,15 +197,16 @@ Task [024](tasks/024-apply-general-body-interface-cutoff.md) stays in progress:
 the remaining work is per-body frontend rechecking and stable Core IDs, which
 needs its own design before implementation. Ready tasks in numeric order are
 [025](tasks/025-resolve-calls-before-emission.md), 036, 048,
-[085](tasks/085-gate-principal-graph-sharing-on-payoff.md) and
-[086](tasks/086-retain-constant-evaluation-across-revisions.md); 085 and 086
-carry the largest measured costs on gdev. The retained probe
-`zig-native/qualification/revision_deltas_probe.zig` and its driver measure
-edit/revert/rejected/no-op phases against an earlier tree; task-024 binaries are
-in ignored `build/bench/body-cutoff/`, and the pinned analyzer is built in
-ignored `build/tools/zig-analyzer` (CI pin `756bfd5`). Tasks 002, 040–047 and
-075 onward stay blocked on owner-local artifacts (task 002), and 084 on private
-gdev.
+[086](tasks/086-retain-constant-evaluation-across-revisions.md),
+[087](tasks/087-skip-rebuilds-for-trivia-only-edits.md) and
+[088](tasks/088-restore-summary-job-inference-cost.md); 086 carries the largest
+measured cost on gdev (entry-constant evaluation), then 088 and 087. The
+retained probe `zig-native/qualification/revision_deltas_probe.zig` and its
+driver measure edit/revert/rejected/no-op phases against an earlier tree;
+task-024 binaries are in ignored `build/bench/body-cutoff/`, and the pinned
+analyzer is built in ignored `build/tools/zig-analyzer` (CI pin `756bfd5`).
+Tasks 002, 040–047 and 075 onward stay blocked on owner-local artifacts (task
+002), and 084 on private gdev.
 
 ## Notes
 

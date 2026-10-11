@@ -249,6 +249,14 @@ size-changing edits remain. Profiling the current gdev checkout added task [085]
 re-evaluated every revision, about 60% of a literal edit). See
 [body interface cutoff](../zig-native/BODY_CUTOFF.md).
 
+Task [085] keeps open principal edges only where call paths multiply, at
+`7d64435`. On the frozen gdev copy, retained edits drop to the sharing-off cost
+(from 1.11× of the candidate) while the factory diamond keeps its 100× benefit;
+public examples are unchanged. gdev measurements also added task [087]
+(comment-only edits rebuild everything) and task [088] (summary-job inference
+growth since `f7be6e7`). See
+[open-principal payoff](../zig-native/CALL_SUMMARIES.md#open-principal-payoff-11-october-2026).
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -549,10 +557,12 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [081] — Finalize durable documentation                  | Pending     | [080]                                  |
 | [082] — Qualify the remote analyzer workflow            | Pending     | [081]                                  |
 | [083] — Review and clean old build artifacts            | Pending     | [081]                                  |
-| [084] — Qualify the complete program                    | Pending     | [082], [083], [085], [086]             |
-| [085] — Gate principal-graph sharing on payoff          | Ready       | —                                      |
+| [084] — Qualify the complete program                    | Pending     | [082], [083], [085]–[088]              |
+| [085] — Gate principal-graph sharing on payoff          | Complete    | —                                      |
 | [086] — Retain constant evaluation across revisions     | Ready       | [023]                                  |
-| [999] — Remove tasks and plan                           | Pending     | All [001]–[086], plus every added task |
+| [087] — Skip rebuilds for trivia-only edits             | Ready       | —                                      |
+| [088] — Restore summary-job inference cost              | Ready       | [085]                                  |
+| [999] — Remove tasks and plan                           | Pending     | All [001]–[088], plus every added task |
 
 ## Coverage matrix
 
@@ -567,7 +577,7 @@ obligations remain part of applicable tasks and final qualification.
 | PLAN hill 4: canonical body/evidence keys including captures and value-dependent inputs                       | [008]                                                  |
 | PLAN hill 5: composite resolution across unrelated writes, history, rollback and physical edits               | [009]                                                  |
 | PLAN hill 5: variable-indexed constraints and alias fixed-point worklists                                     | [010]                                                  |
-| PLAN hill 6: changed-only metadata, retained constants, literal invalidation and body/interface cutoff        | [020], [021], [022], [023], [024], [086]               |
+| PLAN hill 6: changed-only metadata, retained constants, literal invalidation and body/interface cutoff        | [020]–[024], [086], [087], [088]                       |
 | PLAN hill 7: semantic graph sharing and under-100-MB cumulative requested allocation                          | [011], [085], [084]                                    |
 | PLAN hill 9: isolated workers, deterministic publication and CPU/wall-qualified default                       | [012], [013]                                           |
 | PLAN hill 12: typed query design, dependency recording and exact fingerprints/early cutoff                    | [014]                                                  |
@@ -648,7 +658,7 @@ follow-up work before [999].
 
 ## Planning-directory validation
 
-For this documentation change, verify exactly 001–086 plus 999, unique numbered
+For this documentation change, verify exactly 001–088 plus 999, unique numbered
 filenames, all seven required sections, concrete unchecked acceptance criteria,
 existing relative links/anchors, and exact manifest dependencies forming an
 acyclic graph. Check that every task is indexed and every open source
@@ -748,4 +758,6 @@ external gate or durable-documentation obligation remains open.
 [084]: 084-qualify-the-complete-program.md
 [085]: 085-gate-principal-graph-sharing-on-payoff.md
 [086]: 086-retain-constant-evaluation-across-revisions.md
+[087]: 087-skip-rebuilds-for-trivia-only-edits.md
+[088]: 088-restore-summary-job-inference-cost.md
 [999]: 999-remove-tasks-and-plan.md
