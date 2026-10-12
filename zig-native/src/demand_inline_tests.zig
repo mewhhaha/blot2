@@ -25,6 +25,50 @@ fn emit(a: std.mem.Allocator, module: *const core.Module) !void {
     try std.testing.expect(result.bytes.len > 8);
 }
 
+fn explainedEmission(a: std.mem.Allocator, module: *const core.Module) !void {
+    var result = try backend.compileWithOptions(a, &.{module.*}, 1, .{ .explain_demands = true });
+    defer result.deinit(a);
+    try std.testing.expectEqual(@as(?backend.Diagnostic, null), result.diagnostic);
+    const snapshot = result.demand_lowering orelse return error.MissingExplanation;
+    var kinds: [4]bool = @splat(false);
+    for (snapshot.sites) |site| {
+        kinds[@backingInt(site.lowering)] = true;
+        try std.testing.expect(site.span.end >= site.span.start);
+        try std.testing.expectEqual(@as(u32, 1), site.unit);
+    }
+    try std.testing.expectEqualSlices(bool, &@as([4]bool, @splat(true)), &kinds);
+    try std.testing.expect(result.counters.demand_eliminated > 0);
+    try std.testing.expect(result.counters.demand_direct > 0);
+    try std.testing.expect(result.counters.demand_local_memo_slots >= 2);
+    try std.testing.expect(result.counters.demand_allocations > 0);
+    try std.testing.expect(result.counters.demand_indirect_calls > 0);
+}
+
+test "demand decisions report actual storage and preserve output through OOM" {
+    const allocator = std.testing.allocator;
+    var module = try lower(allocator,
+        \\const ignore = fn ~(value: U32) => 42
+        \\const once = fn ~(value: U32) => @demand value
+        \\const twice = fn ~(value: U32) => @u32.add (@demand value) (@demand value)
+        \\const stored = fn ~(value: U32) => fn () => @demand value
+        \\entry const eliminated = fn (value: U32) => ignore value
+        \\entry const direct = fn (value: U32) => once value
+        \\entry const memo = fn (value: U32) => twice value
+        \\entry const escape = fn (value: U32) => (stored value) ()
+    );
+    defer module.deinit(allocator);
+    const before = @import("core_snapshot_tests.zig").stamp(module);
+    var ordinary = try backend.compile(allocator, &.{module}, 1);
+    defer ordinary.deinit(allocator);
+    var explained = try backend.compileWithOptions(allocator, &.{module}, 1, .{ .explain_demands = true });
+    defer explained.deinit(allocator);
+    try std.testing.expectEqualSlices(u8, ordinary.bytes, explained.bytes);
+    try std.testing.expect(ordinary.demand_lowering == null);
+    try explainedEmission(allocator, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(allocator, explainedEmission, .{&module});
+    try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
+}
+
 test "known callback type and row specialization releases every allocation failure" {
     const a = std.testing.allocator;
     var module = try lower(a,

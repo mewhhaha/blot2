@@ -18,6 +18,9 @@ pub const Tag = enum(u32) {
     type_alias_decl,
     // contract_decl(a=name,b=where_clause body,c=[params start,len,attrs start,len]).
     contract_decl,
+    // Contract members: a=name,b=type equation or value signature (0 abstract).
+    contract_type_member,
+    contract_value_member,
     effect_decl,
     effect_type_decl,
     fixity_decl,

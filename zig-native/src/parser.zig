@@ -423,7 +423,7 @@ const Parser = struct {
             if (self.word("contract")) {
                 _ = self.advance();
                 _ = try self.expect(.equal);
-                const body = try self.predicateBody(self.current().start);
+                const body = try self.predicateBody(self.current().start, true);
                 const range = try self.list(params.items);
                 return self.add(.contract_decl, name, body.node, try self.extra(&.{ range.start, range.len, attrs.start, attrs.len }), start);
             }
@@ -475,28 +475,15 @@ const Parser = struct {
     fn whereClause(self: *Parser) Error!Where {
         const clause_start = self.current().start;
         if (!self.eat(.kw_where)) return .{};
-        return self.predicateBody(clause_start);
+        return self.predicateBody(clause_start, false);
     }
-    fn predicateBody(self: *Parser, clause_start: u32) Error!Where {
+    fn predicateBody(self: *Parser, clause_start: u32, members: bool) Error!Where {
         _ = try self.expect(.l_brace);
         self.newlines();
         var predicates: std.ArrayList(Id) = .empty;
         defer predicates.deinit(self.allocator);
         while (!self.at(.r_brace)) {
-            const start = self.current().start;
-            const kind = try self.qualified();
-            const member = if (self.at(.string)) try self.stringSymbol() else 0;
-            var args: std.ArrayList(Id) = .empty;
-            defer args.deinit(self.allocator);
-            while (typeAtomTag(self.current().tag)) {
-                const argument_start = self.current().start;
-                const grouped = self.at(.l_paren);
-                const argument = try self.typeAtom();
-                try args.append(self.allocator, if (grouped and self.tree.span(argument).start != argument_start) try self.add(.group, argument, 0, 0, argument_start) else argument);
-            }
-            const row = if (self.at(.bang)) try self.effectRow() else 0;
-            const range = try self.list(args.items);
-            try predicates.append(self.allocator, try self.add(.constraint, kind, member, try self.extra(&.{ range.start, range.len, row }), start));
+            try predicates.append(self.allocator, try self.contractItem(members));
             if (!self.eat(.comma)) break;
             self.newlines();
         }
@@ -504,6 +491,32 @@ const Parser = struct {
         _ = try self.expect(.r_brace);
         const range = try self.list(predicates.items);
         return .{ .predicates = range, .node = try self.add(.where_clause, range.start, range.len, 0, clause_start) };
+    }
+    fn contractItem(self: *Parser, members: bool) Error!Id {
+        const start = self.current().start;
+        if (members and self.eat(.kw_type)) {
+            const name = try self.typeIdentifier();
+            const value = if (self.eat(.equal)) try self.typeExpression() else 0;
+            return self.add(.contract_type_member, name, value, 0, start);
+        }
+        if (members and self.eat(.kw_const)) {
+            const name = try self.identifier();
+            _ = try self.expect(.colon);
+            return self.add(.contract_value_member, name, try self.typeExpression(), 0, start);
+        }
+        const kind = try self.qualified();
+        const member = if (self.at(.string)) try self.stringSymbol() else 0;
+        var args: std.ArrayList(Id) = .empty;
+        defer args.deinit(self.allocator);
+        while (typeAtomTag(self.current().tag)) {
+            const argument_start = self.current().start;
+            const grouped = self.at(.l_paren);
+            const argument = try self.typeAtom();
+            try args.append(self.allocator, if (grouped and self.tree.span(argument).start != argument_start) try self.add(.group, argument, 0, 0, argument_start) else argument);
+        }
+        const row = if (self.at(.bang)) try self.effectRow() else 0;
+        const range = try self.list(args.items);
+        return self.add(.constraint, kind, member, try self.extra(&.{ range.start, range.len, row }), start);
     }
     fn typeExpression(self: *Parser) Error!Id {
         try self.enter();

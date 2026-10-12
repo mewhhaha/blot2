@@ -23,7 +23,7 @@ import_binding = (name:(IDENT | TYPE_IDENT) alias:("as" (IDENT | TYPE_IDENT))?) 
 declaration = (visibility:"privatE"? (value:opaque_type | attributes:declaration_attribute* value:(value_declaration | data_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity)) LAYOUT_NEWLINE) ;
 opaque_type = ("opaquE" value:type_alias) ;
 type_alias = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "=" value:type_expression) ;
-contract_type = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "is" kind:IDENT "=" body:constraint_body) ;
+contract_type = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "is" kind:IDENT "=" body:contract_body) ;
 declaration_attribute = ("@" body:attribute_name LAYOUT_NEWLINE?) ;
 attribute_name = ("[" value:expression "]") ;
 value_declaration = (modifier:IDENT? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? where:where_clause? "=" value:expression) ;
@@ -50,6 +50,10 @@ effect_row = ("!" "{" (labels:type_application ("," labels:type_application)*)? 
 // The frontend promotes `where` to this same-width private marker only after
 // an annotation. Other uses remain ordinary IDENT, including type variables.
 where_clause = (marker:"wherE" body:constraint_body) ;
+contract_body = ("{" LAYOUT_NEWLINE? (members:contract_member ("," LAYOUT_NEWLINE? members:contract_member)* ","?)? LAYOUT_NEWLINE? "}") ;
+contract_member = (contract_type_member | contract_value_member | constraint_predicate) ;
+contract_type_member = ("type" name:TYPE_IDENT value:("=" type_expression)?) ;
+contract_value_member = ("const" name:(IDENT | TYPE_IDENT) ":" signature:type_expression) ;
 constraint_body = ("{" LAYOUT_NEWLINE? (predicates:constraint_predicate ("," LAYOUT_NEWLINE? predicates:constraint_predicate)* ","?)? LAYOUT_NEWLINE? "}") ;
 constraint_predicate = (kind:qualified_name member:STRING? arguments:type_atom* effects:effect_row?) ;
 type_application = (head:type_atom arguments:type_atom*) ;

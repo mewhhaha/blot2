@@ -125,3 +125,82 @@ const opaque = fn export => export
       (identifier)))
   (operator)
   (identifier))
+
+==================
+Associated type equations signatures and nested projections
+==================
+
+type Identity a is contract = { type Item = a }
+type Source s is contract = { type Item, const first: s -> (Source.Item s) }
+const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = fn value => value
+type Imported s = lib.Source.Item s
+
+---
+
+(source_file
+  (type_header
+    (type_identifier)
+    (type_parameter))
+  (contract_header)
+  (braced
+    (type_header
+      (type_identifier))
+    (operator)
+    (identifier))
+  (type_header
+    (type_identifier)
+    (type_parameter))
+  (contract_header)
+  (braced
+    (type_header
+      (type_identifier))
+    (separator)
+    (binding_keyword)
+    (record_field
+      (identifier))
+    (identifier)
+    (operator)
+    (parenthesized
+      (type_identifier)
+      (member
+        (type_identifier))
+      (identifier)))
+  (function_binding
+    (binding_keyword)
+    (identifier)
+    (binding_annotation
+      (separator)
+      (identifier)
+      (operator)
+      (parenthesized
+        (type_identifier)
+        (member
+          (type_identifier))
+        (identifier))
+      (identifier)
+      (braced
+        (type_identifier)
+        (identifier)
+        (separator)
+        (identifier)
+        (parenthesized
+          (type_identifier)
+          (member
+            (type_identifier))
+          (identifier))
+        (identifier)))
+    (operator)
+    (lambda_header
+      (identifier)))
+  (operator)
+  (identifier)
+  (type_header
+    (type_identifier)
+    (type_parameter))
+  (operator)
+  (identifier)
+  (member
+    (type_identifier))
+  (member
+    (type_identifier))
+  (identifier))

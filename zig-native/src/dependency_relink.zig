@@ -25,7 +25,7 @@ fn target(map: []const u32, value: anytype) void {
 }
 fn typeUnits(nodes: []T.Node, names: []const u32, units: []const u32) void {
     for (nodes) |*node| switch (node.tag) {
-        .nominal, .type_constructor => {
+        .nominal, .projection, .type_constructor => {
             node.a = unit(units, node.a);
             if (node.a != 0 and node.a != std.math.maxInt(u32) and node.b & T.opaque_name_bit != 0) node.b = T.opaque_name_bit | symbol(names, node.b & ~T.opaque_name_bit);
         },
@@ -53,6 +53,10 @@ pub fn interface(owner: *PI.Interface, names: []const u32, units: []const u32) v
     for (owner.contracts) |*contract| {
         identity(units, names, &contract.identity);
         contract.name = symbol(names, contract.name);
+    }
+    for (owner.contract_members) |*member| {
+        identity(units, names, &member.contract);
+        member.name = symbol(names, member.name);
     }
     for (owner.contract_predicates) |*predicate| {
         predicate.name = symbol(names, predicate.name);
@@ -102,6 +106,14 @@ pub fn module(owner: *core.Module, names: []const u32, units: []const u32) void 
         obligation.name = symbol(names, obligation.name);
         identity(units, names, &obligation.identity);
         obligation.qualification_unit = unit(units, obligation.qualification_unit);
+    }
+    for (owner.contracts) |*contract| {
+        identity(units, names, &contract.identity);
+        contract.name = symbol(names, contract.name);
+    }
+    for (owner.contract_members) |*member| {
+        identity(units, names, &member.contract);
+        member.name = symbol(names, member.name);
     }
     for (owner.nominals) |*nominal| identity(units, names, &nominal.identity);
     for (owner.operation_names) |*operation| identity(units, names, &operation.identity);

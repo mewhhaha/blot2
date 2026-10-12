@@ -4,7 +4,7 @@ const std = @import("std");
 const T = @import("types.zig");
 const ast = @import("ast.zig");
 const Allocator = std.mem.Allocator;
-pub const Kind = enum { truncated, absent, unit, boolean, u32, f32, never, variable, function, product, record, nominal, array, list, cursor, demand, type_constructor, resolver, provider, state_provider, effects, operation, row_variable, row_parameter };
+pub const Kind = enum { truncated, absent, unit, boolean, u32, f32, never, variable, function, product, record, nominal, projection, array, list, cursor, demand, type_constructor, resolver, provider, state_provider, effects, operation, row_variable, row_parameter };
 pub const Span = struct { start: u32 = 0, len: u32 = 0 };
 pub const Node = struct {
     kind: Kind,
@@ -131,13 +131,22 @@ const Builder = struct {
         errdefer for (children.items) |edge| if (edge.name) |text| self.allocator.free(text);
         switch (value.tag) {
             .variable => self.nodes.items[id].variable = value.a,
-            .nominal, .type_constructor => {
+            .nominal, .projection, .type_constructor => {
                 self.nodes.items[id].identity = .{ .unit = value.a, .decl = value.b };
                 for (engine.nominals.items) |nominal| if (nominal.identity.unit == value.a and nominal.identity.decl == value.b) {
                     self.nodes.items[id].name = try self.saveName(engine.pool.get(nominal.name));
                     break;
                 };
-                if (value.tag == .nominal) {
+                if (value.tag == .projection) {
+                    const member = engine.types.projectionMember(value);
+                    const contract_name = for (engine.contracts.items) |contract| {
+                        if (contract.identity.unit == value.a and contract.identity.decl == value.b) break contract.name;
+                    } else 0;
+                    const name = try self.allocator.print("{s}.{s}", .{ engine.pool.get(contract_name), engine.pool.get(member) });
+                    defer self.allocator.free(name);
+                    self.nodes.items[id].name = try self.saveName(name);
+                }
+                if (value.tag == .nominal or value.tag == .projection) {
                     const arguments = engine.types.nominalArguments(value);
                     // Recursion can relocate the store. Keep numeric list offsets.
                     const span: T.List = .{ .start = value.c + 1, .len = @intCast(arguments.len) };

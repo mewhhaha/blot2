@@ -129,7 +129,7 @@ fn earlier(_: void, left: Item, right: Item) bool {
 fn detailText(a: Allocator, loaded: *P.Project, checked: *C.Checked, name: C.EditorName, truncated: *bool) !?[]const u8 {
     if (name.ambiguous) return try a.dupe(u8, "ambiguous field/member");
     if (name.scheme.root == 0) return null;
-    var adapter = .{ .allocator = a, .pool = &loaded.symbols, .types = &checked.types, .nominals = .{ .items = checked.nominals }, .effect_templates = .{ .items = checked.effect_templates } };
+    var adapter = .{ .allocator = a, .pool = &loaded.symbols, .types = &checked.types, .nominals = .{ .items = checked.nominals }, .contracts = .{ .items = checked.contracts }, .effect_templates = .{ .items = checked.effect_templates } };
     var text: std.ArrayList(u8) = .empty;
     defer text.deinit(a);
     const display = @import("type_display.zig");

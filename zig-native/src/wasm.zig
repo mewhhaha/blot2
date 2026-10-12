@@ -485,6 +485,15 @@ pub const Module = struct {
         // Reset discards post-base blocks and every free-list link into them.
         // Pre-base runtime initializers remain in the physical block chain.
         try self.emitSlice(reset, &.{
+            // Complete journal admission retires every temporary owner through
+            // leave/scopes. Reset preserves allocator storage and strong roots;
+            // trial deletion alone handles any newly unreachable cycle.
+            .{ .op = .global_get, .operand = root_enabled }, .{ .op = .i32_const, .operand = @import("root_runtime.zig").complete },
+            .{ .op = .i32_and },                             .{ .op = .if_ },
+            .{ .op = .global_get, .operand = cycle_head },   .{ .op = .if_ },
+            .{ .op = .i32_const, .operand = 1 },             .{ .op = .call, .operand = cycle_safe },
+            .{ .op = .end },                                 .{ .op = .global_get, .operand = heap },
+            .{ .op = .return_ },                             .{ .op = .end },
             .{ .op = .global_get, .operand = root_enabled }, .{ .op = .if_ },
             .{ .op = .i32_const },                           .{ .op = .global_get, .operand = static_end },
             .{ .op = .i32_const },                           .{ .op = .call, .operand = collect },
@@ -662,6 +671,7 @@ pub const Module = struct {
         }
         if (options.current) |current| {
             current.roots = passes.roots;
+            current.needs_roots = passes.roots and passes.needs_roots;
             current.root_slots = root_slots;
         }
         if (options.stats) |stats| stats.role_conflicts = passes.summaries.role_conflicts;
@@ -711,6 +721,11 @@ pub const Module = struct {
         }
         const rc_admitted = ownership_fallback == .none;
         const roots_admitted = rc_admitted and passes.roots;
+        const root_mode = blk: {
+            const arena = self.arena orelse break :blk 0;
+            if (roots_admitted) break :blk @import("root_runtime.zig").enabled | @import("root_runtime.zig").complete;
+            break :blk self.globals.items[arena.root_enabled].bits & ~@import("root_runtime.zig").complete;
+        };
         var output = Bytes.init(self.allocator);
         defer output.deinit();
         try output.raw(&.{ 0, 97, 115, 109, 1, 0, 0, 0 });
@@ -784,7 +799,7 @@ pub const Module = struct {
                 var bits = global.bits;
                 if (self.arena) |arena| {
                     if (id == arena.rc_enabled) bits = @intFromBool(rc_admitted);
-                    if (id == arena.root_enabled and roots_admitted) bits = 1;
+                    if (id == arena.root_enabled) bits = root_mode;
                 }
                 try encodeInstruction(&payload, .{ .op = if (global.scalar == .f32) .f32_const else .i32_const, .operand = bits }, self.functions.items.len, self.globals.items.len, self.signatures.items.len, import_count);
                 try payload.byte(0x0b);
@@ -886,7 +901,7 @@ pub const Module = struct {
                             if (!global.mutable and global.scalar == .u32) {
                                 var bits = global.bits;
                                 if (flag == arena.rc_enabled) bits = @intFromBool(rc_admitted);
-                                if (flag == arena.root_enabled and roots_admitted) bits = 1;
+                                if (flag == arena.root_enabled) bits = root_mode;
                                 encoded = .{ .op = .i32_const, .operand = bits };
                             }
                         }
@@ -1212,6 +1227,8 @@ test "serialization folds exact immutable admission flags after deciding enabled
         module.mutable_static = !enabled;
         module.globals.items[arena.rc_enabled].mutable = mutable;
         module.globals.items[arena.root_enabled].mutable = mutable;
+        // A claimed proof bit does not enable an unadmitted graph.
+        module.globals.items[arena.root_enabled].bits = @import("root_runtime.zig").complete;
         const unrelated = try module.addGlobal(.u32, 73, false);
         const id = try module.addFunction(&.{}, .i32);
         module.functions.items[id].result_role = .scalar;
@@ -1230,8 +1247,11 @@ test "serialization folds exact immutable admission flags after deciding enabled
         defer expected.deinit();
         for (source) |instruction| {
             var encoded = instruction;
-            if (!mutable and instruction.op == .global_get and instruction.operand != unrelated)
-                encoded = .{ .op = .i32_const, .operand = @intFromBool(enabled) };
+            if (!mutable and instruction.op == .global_get and instruction.operand != unrelated) {
+                var bits: u32 = @intFromBool(enabled);
+                if (enabled and instruction.operand == arena.root_enabled) bits = @import("root_runtime.zig").enabled | @import("root_runtime.zig").complete;
+                encoded = .{ .op = .i32_const, .operand = bits };
+            }
             try encodeInstruction(&expected, encoded, module.functions.items.len, module.globals.items.len, module.signatures.items.len, 0);
         }
         try std.testing.expect(std.mem.find(u8, bytes, expected.items()) != null);

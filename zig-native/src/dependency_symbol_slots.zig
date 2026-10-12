@@ -42,11 +42,15 @@ fn graph(slots: []u8, nodes: []const T.Node, extra: []const u32, operations: []c
             }
         },
         .product => try mark(slots, node.a, node.b, 2),
-        .nominal => {
+        .nominal, .projection => {
             if (node.c >= extra.len) return error.InvalidArtifact;
             try mark(slots, node.c, 1, 2);
             const start = std.math.add(u32, node.c, 1) catch return error.InvalidArtifact;
             try mark(slots, start, extra[node.c], 2);
+            if (node.tag == .projection) {
+                const member = std.math.add(u32, start, extra[node.c]) catch return error.InvalidArtifact;
+                try mark(slots, member, 1, 1);
+            }
         },
         else => {},
     };
@@ -88,6 +92,8 @@ pub fn collect(allocator: Allocator, owner: *const D.Module) Error!Slots {
         try list(a, value.variables, 2);
         try list(a, value.parameter_names, 1);
         try list(a, value.row_variables, 2);
+        try list(a, value.row_parameter_names, 1);
+        try list(a, value.row_parameters, 2);
         try list(b, value.patterns, 2);
     }
     for (iface.patterns.nodes) |node| switch (node.kind) {
@@ -108,6 +114,13 @@ pub fn collect(allocator: Allocator, owner: *const D.Module) Error!Slots {
         try list(c, value.closed_rows, 2);
     }
     for (ir.constructors) |value| try scheme(c, value.scheme);
+    for (ir.contracts) |value| {
+        try list(c, value.parameters, 2);
+        try list(c, value.variables, 2);
+        try list(c, value.row_variables, 2);
+        try list(c, value.row_parameter_names, 1);
+        try list(c, value.row_parameters, 2);
+    }
     for (ir.nominals) |value| {
         try list(c, value.parameters, 2);
         try list(c, value.variables, 2);

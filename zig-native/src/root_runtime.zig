@@ -10,6 +10,8 @@ const Error = std.mem.Allocator.Error;
 const page_bytes = 4096;
 const first_slot = 4;
 const slot_bytes = 12;
+pub const enabled: u32 = 1;
+pub const complete: u32 = 2;
 const head_bytes = @sizeOf(h.ArenaHeader);
 const owner_slot = h.offset(h.ArenaHeader, "candidate_prev");
 fn code(m: *w.Module, id: u32) Code {

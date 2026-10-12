@@ -65,6 +65,7 @@ pub const Diagnostic = struct {
     }
 };
 pub const CheckedProject = struct {
+    body_caches: []@import("body_check_cache.zig").Cache = &.{},
     // Index is UnitId-1, independent of dependency-first evaluation order.
     modules: []?Module = &.{},
     diagnostics: []Diagnostic = &.{},
@@ -81,6 +82,8 @@ pub const CheckedProject = struct {
     }
 
     pub fn deinit(self: *CheckedProject, allocator: Allocator) void {
+        for (self.body_caches) |*cache| cache.deinit(allocator);
+        allocator.free(self.body_caches);
         for (self.modules) |*item| if (item.*) |*module_| module_.deinit(allocator);
         allocator.free(self.modules);
         allocator.free(self.reused_modules);
@@ -119,6 +122,8 @@ pub fn diagnosticModuleOrigin(context: ?*const anyopaque, allocator: Allocator, 
 }
 
 const Engine = struct {
+    previous_bodies: []const @import("body_check_cache.zig").Cache = &.{},
+    retain_bodies: bool = false,
     allocator: Allocator,
     source: *project.Project,
     result: CheckedProject,
@@ -126,6 +131,7 @@ const Engine = struct {
     source_validation: bool = false,
     execution: check.PrivateExecution = .{},
     resolution_remaining: usize = 1_000_000,
+    associated_remaining: usize = 1_000_000,
     editor: ?EditorQuery = null,
     source_modules: []?SourceModule = &.{},
     compiled_catalogs: []CompiledCatalog = &.{},
@@ -247,6 +253,28 @@ const Engine = struct {
             .contract => .contract,
             .value => unreachable,
         }, exported.catalog, origin);
+    }
+    fn originalBindingClosedRows(context: *const anyopaque, target: check.ExternalTarget) ?@import("body_check_cache.zig").Digest {
+        const self: *const Engine = @ptrCast(@alignCast(context));
+        const module = self.catalogModule(target.unit) orelse return null;
+        switch (module.owner) {
+            .typed => |typed| {
+                if (target.binding >= typed.bindings.len) return null;
+                const binding = typed.bindings[target.binding];
+                return @import("body_check_cache.zig").closedRowsDigest(.{ .store = &typed.types }, binding.ty, binding.scheme, &self.source.symbols);
+            },
+            .frozen => |frozen| {
+                if (target.binding >= frozen.bindings.len) return null;
+                const binding = frozen.bindings[target.binding];
+                return @import("body_check_cache.zig").closedRowsDigest(.{ .frozen = &frozen.graph }, binding.ty, binding.scheme, &self.source.symbols);
+            },
+            .source => return null,
+        }
+    }
+    fn originalBindingName(context: *const anyopaque, target: check.ExternalTarget) ?[]const u8 {
+        const self: *const Engine = @ptrCast(@alignCast(context));
+        const producer = self.catalogModule(target.unit) orelse return null;
+        return self.source.symbols.get(producer.declaration(target.binding).name);
     }
     fn checkModule(self: *Engine, unit: project.UnitId) !void {
         const diagnostics_before = self.diagnostics.items.len;
@@ -392,7 +420,11 @@ const Engine = struct {
                 }
             }
         }
-        var options: check.ModuleOptions = .{ .purity_origins = .{ .context = self.source, .lookup = moduleOrigin }, .builtin_catalog = unit == self.source.prelude_unit, .prelude_unit = self.source.prelude_unit, .inherited_fixities = inherited_fixities.items };
+        var options: check.ModuleOptions = .{ .associated_remaining = &self.associated_remaining, .purity_origins = .{ .context = self.source, .lookup = moduleOrigin }, .builtin_catalog = unit == self.source.prelude_unit, .prelude_unit = self.source.prelude_unit, .inherited_fixities = inherited_fixities.items };
+        if (self.retain_bodies and self.editor == null) options.retained_bodies = &self.result.body_caches[unit - 1];
+        options.body_source = self.source.unit(unit).source;
+        options.body_external_names = .{ .context = self, .lookup = originalBindingName, .closed_rows = originalBindingClosedRows };
+        if (unit <= self.previous_bodies.len) options.previous_bodies = &self.previous_bodies[unit - 1];
         if (self.editor) |query| {
             options.max_inference_transitions = query.budget.remaining;
             if (query.unit == unit) options.editor = query.marker;
@@ -409,6 +441,7 @@ const Engine = struct {
             var checked = try check.checkModuleWithPrivateExecution(self.allocator, tree, &self.source.symbols, imports.items, catalogs.items, unit, options, self.execution);
             var transferred = false;
             defer if (!transferred) checked.deinit(self.allocator);
+            if (self.retain_bodies and self.editor == null) try @import("body_check_cache.zig").captureInto(self.allocator, tree, &self.source.symbols, options.body_source, &checked, options.body_external_names, &self.result.body_caches[unit - 1]);
             if (self.editor) |query| {
                 _ = query.budget.spend(@intCast(checked.counters.inference_steps));
                 if (checked.initializer_rejected) query.budget.exhausted = true;
@@ -490,23 +523,37 @@ pub fn checkProject(allocator: Allocator, source: *project.Project) !CheckedProj
 /// PRIVATE execution-only project proof. Public callers remain default off;
 /// the loader, semantic options and artifact identities receive no new flags.
 pub fn checkProjectWithPrivateExecution(allocator: Allocator, source: *project.Project, execution: check.PrivateExecution) !CheckedProject {
-    return checkProjectMode(allocator, source, execution, null, null);
+    return checkProjectMode(allocator, source, execution, null, null, false);
 }
 
 /// One request-local checker graph, with a shared work budget across modules.
 /// No retained frontend or executable body is offered or published here.
 pub fn checkProjectForEditor(allocator: Allocator, source: *project.Project, query: EditorQuery) !CheckedProject {
-    return checkProjectMode(allocator, source, .{}, null, query);
+    return checkProjectMode(allocator, source, .{}, null, query, false);
 }
 
 /// PRIVATE final-entry proof. The caller owns the previous successful Core and
 /// the same seed named by this mixed Project throughout preparation.
 pub fn checkProjectWithEntryCutoff(allocator: Allocator, source: *project.Project, previous: entry_cutoff.Previous) !CheckedProject {
-    return checkProjectMode(allocator, source, .{}, previous, null);
+    return checkProjectMode(allocator, source, .{}, previous, null, true);
 }
 
-fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: check.PrivateExecution, previous: ?entry_cutoff.Previous, editor: ?EditorQuery) !CheckedProject {
-    var engine: Engine = .{ .allocator = allocator, .source = source, .result = .{}, .execution = execution, .editor = editor };
+pub fn checkProjectRetainingBodies(allocator: Allocator, source: *project.Project, previous: ?entry_cutoff.Previous) !CheckedProject {
+    return checkProjectMode(allocator, source, .{}, previous, null, true);
+}
+
+fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: check.PrivateExecution, previous: ?entry_cutoff.Previous, editor: ?EditorQuery, retain_bodies: bool) !CheckedProject {
+    var engine: Engine = .{ .allocator = allocator, .source = source, .result = .{}, .execution = execution, .editor = editor, .retain_bodies = retain_bodies };
+    if (previous) |old| {
+        var owners_match = old.names.owners.len == source.units.items.len;
+        if (owners_match) for (source.units.items, 1..) |_, unit| {
+            if (!std.mem.eql(u8, old.names.owner(@intCast(unit)) orelse "", source.filename(@intCast(unit)))) {
+                owners_match = false;
+                break;
+            }
+        };
+        if (owners_match) engine.previous_bodies = old.bodies;
+    }
     errdefer engine.result.deinit(allocator);
     defer {
         for (engine.diagnostics.items) |diagnostic| {
@@ -526,6 +573,10 @@ fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: c
             .source = diagnostic_,
         });
     } else {
+        if (retain_bodies) {
+            engine.result.body_caches = try allocator.alloc(@import("body_check_cache.zig").Cache, source.units.items.len);
+            @memset(engine.result.body_caches, .{});
+        }
         engine.result.modules = try allocator.alloc(?Module, source.units.items.len);
         @memset(engine.result.modules, null);
         engine.source_validation = source.input_mode == .source and check.sourceImportDiagnostic(&source.unit(source.entry).tree) != null;

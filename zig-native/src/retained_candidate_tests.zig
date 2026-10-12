@@ -1340,3 +1340,55 @@ test "failed leased revisions keep the published revision, its leases and its ch
     try std.testing.expect(session.commit(retry));
     for (session.current.?.artifacts.metadata.pools.?.leases.values) |lease| if (lease) |owned| try std.testing.expectEqual(@as(usize, 1), owned.references);
 }
+
+fn bodyFactsAllocationScenario(allocator: std.mem.Allocator, session: *retained.Session, fixture: *Fixture, expected: *const partial.Result) !void {
+    const previous_allocator = session.allocator;
+    session.allocator = allocator;
+    defer session.allocator = previous_allocator;
+    const old = Stamp.read(session);
+    const prior_cache = session.current.?.prepared.body_caches[0].bodies.items.ptr;
+    defer {
+        std.debug.assert(std.meta.eql(old, Stamp.read(session)));
+        std.debug.assert(prior_cache == session.current.?.prepared.body_caches[0].bodies.items.ptr);
+    }
+    const candidate = try ready(session, fixture, .{});
+    defer candidate.deinit();
+    try equal(candidate.result().?, expected);
+    try std.testing.expectEqual(@as(usize, 2), candidate.result().?.result.stats.body_elaborations);
+    candidate.discard();
+}
+
+fn bodyFactsSource(allocator: std.mem.Allocator) ![]u8 {
+    var argument = try allocator.dupe(u8, "value");
+    defer allocator.free(argument);
+    for (0..12) |_| {
+        const next = try allocator.print("@u32.add ({s}) 0", .{argument});
+        allocator.free(argument);
+        argument = next;
+    }
+    return allocator.print("const changed = 8\nconst fixed = 41\nconst read = fn (value: U32) => @u32.add ({s}) fixed\nentry const answer = fn (value: U32) => @u32.add (read ({s})) changed\n", .{ argument, argument });
+}
+
+test "body check cache revision allocation failures keep the successful checked owner" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    const source = try bodyFactsSource(a);
+    defer a.free(source);
+    try fixture.write("main.blot", source);
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    var initial = try session.revise(io, fixture.path, null, .{});
+    defer initial.deinit(a);
+    try std.testing.expectEqual(@as(usize, 2), session.current.?.prepared.body_caches[0].bodies.items.len);
+    const changed = try std.mem.replaceOwned(u8, a, source, "changed = 8", "changed = @u32.add 8 1");
+    defer a.free(changed);
+    try fixture.write("main.blot", changed);
+    var expected = try fresh(&fixture, .{});
+    defer expected.deinit(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, bodyFactsAllocationScenario, .{ &session, &fixture, &expected });
+    const retry = try ready(&session, &fixture, .{});
+    defer retry.deinit();
+    try equal(retry.result().?, &expected);
+    try std.testing.expect(session.commit(retry));
+    try std.testing.expectEqual(@as(usize, 2), session.revisions);
+}

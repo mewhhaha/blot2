@@ -61,11 +61,26 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
                 // canonicalize separately; validateGraph checks uniqueness.
             }
         },
-        .nominal => {
+        .nominal, .projection => {
             try identity(.{ .unit = node.a, .decl = node.b }, symbol_count, unit_count);
             try require(node.c < owner.graph.extra.len);
             const start = std.math.add(u32, node.c, 1) catch return error.InvalidArtifact;
             for (try list(owner, .{ .start = start, .len = owner.graph.extra[node.c] })) |child| try ty(owner, child);
+            if (node.tag == .projection) {
+                const slot = std.math.add(u32, start, owner.graph.extra[node.c]) catch return error.InvalidArtifact;
+                try require(slot < owner.graph.extra.len);
+                try require(owner.graph.extra[slot] != 0 and owner.graph.extra[slot] < symbol_count);
+                const member_name = owner.graph.extra[slot];
+                var declared = false;
+                for (owner.contract_members) |member| if (member.contract.unit == node.a and member.contract.decl == node.b and member.name == member_name and member.kind != .value) {
+                    declared = true;
+                };
+                try require(declared);
+                const contract = for (owner.contracts) |candidate| {
+                    if (candidate.identity.unit == node.a and candidate.identity.decl == node.b) break candidate;
+                } else return error.InvalidArtifact;
+                try require(owner.graph.extra[node.c] == contract.parameters.len);
+            }
         },
         .type_constructor => try identity(.{ .unit = node.a, .decl = node.b }, symbol_count, unit_count),
         .array, .list, .cursor, .resolver => try ty(owner, node.a),
@@ -156,10 +171,37 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
         }
         for (try list(owner, contract.row_variables)) |row| try require(row < owner.graph.row_variable_count);
         try names(try list(owner, contract.parameter_names), symbol_count);
+        try names(try list(owner, contract.row_parameter_names), symbol_count);
+        try require(contract.row_parameters.len == contract.row_parameter_names.len and contract.declaration == 0);
+        for (try list(owner, contract.row_parameters)) |row| {
+            try require(row < owner.graph.rows.len);
+            const value = owner.graph.rows[row];
+            try require(value.tail == .variable and value.labels.len == 0);
+            const bound = for (try list(owner, contract.row_variables)) |variable| {
+                if (variable == value.tail.variable) break true;
+            } else false;
+            try require(bound);
+        }
+        for (try list(owner, contract.row_parameter_names), 0..) |name, ordinal| {
+            try require(name != 0);
+            for ((try list(owner, contract.row_parameter_names))[0..ordinal]) |previous| try require(name != previous);
+        }
         try require(contract.parameter_names.len == contract.variables.len and contract.patterns.len == contract.parameters.len);
         try range(contract.patterns.start, contract.patterns.len, owner.patterns.extra.len);
         for (owner.patterns.extra[contract.patterns.start..][0..contract.patterns.len]) |id| try require(id < owner.patterns.nodes.len);
         try range(contract.predicates.start, contract.predicates.len, owner.contract_predicates.len);
+        try range(contract.members.start, contract.members.len, owner.contract_members.len);
+        var requires_implementation = false;
+        for (owner.contract_members[contract.members.start..][0..contract.members.len], 0..) |member, index| {
+            try require(std.meta.eql(member.contract, contract.identity));
+            try require(member.name != 0 and member.name < symbol_count);
+            try ty(owner, member.root);
+            try require((member.kind == .abstract_type) == (member.root == 0));
+            if (member.kind == .value) try require(owner.graph.nodes[member.root].tag == .function);
+            for (owner.contract_members[contract.members.start..][0..index]) |previous| try require(previous.name != member.name);
+            requires_implementation = requires_implementation or member.kind != .defined_type;
+        }
+        try require(contract.requires_implementation == requires_implementation);
     }
     for (owner.contract_predicates) |predicate| {
         inline for (.{ "ty", "other", "result", "signature" }) |field| try ty(owner, @field(predicate, field));
@@ -200,6 +242,11 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
 /// those identities rather than a pointer back into this graph. Bounds must be
 /// checked first, so this traversal never speculates about malformed indices.
 pub fn validateGraph(allocator: std.mem.Allocator, owner: *const PI.Interface) (Error || std.mem.Allocator.Error)!void {
+    var remaining: usize = 1_000_000;
+    return validateGraphWithBudget(allocator, owner, &remaining);
+}
+pub fn validateGraphWithBudget(allocator: std.mem.Allocator, owner: *const PI.Interface, remaining: *usize) (Error || std.mem.Allocator.Error)!void {
+    try @import("associated_admission.zig").interfaceWithBudget(allocator, owner, remaining);
     // Reuse one symbol-stamp lane across every source record. Arbitrary
     // declaration order is legal; duplicate fields reject in linear work.
     var symbol_limit: usize = 0;
@@ -276,6 +323,16 @@ const GraphEdges = struct {
                 .product => if (index < n.b) g.extra[n.a + index] else null,
                 .record => if (index < n.b) g.extra[n.a + index * 2 + 1] else null,
                 .nominal => if (index < g.extra[n.c]) g.extra[n.c + 1 + index] else null,
+                .projection => blk: {
+                    const count = g.extra[n.c];
+                    if (index < count) break :blk g.extra[n.c + 1 + index];
+                    if (index != count) break :blk null;
+                    const member_name = g.extra[n.c + 1 + count];
+                    for (self.owner.contract_members) |member| {
+                        if (member.contract.unit == n.a and member.contract.decl == n.b and member.name == member_name and member.kind == .defined_type) break :blk member.root;
+                    }
+                    break :blk null;
+                },
                 .array, .list, .cursor, .resolver => if (index == 0) n.a else null,
                 .demand, .provider => switch (index) {
                     0 => n.a,

@@ -13,6 +13,7 @@ comptime {
     _ = @import("aggregate_constant_tests.zig");
     _ = @import("literal_edit_tests.zig");
     _ = @import("body_cutoff_tests.zig");
+    _ = @import("body_check_cache_tests.zig");
     _ = @import("refinement_receipt.zig");
     _ = @import("selected_query.zig");
     _ = @import("principal_query.zig");
@@ -320,6 +321,8 @@ test {
     _ = @import("suspended_ownership_tests.zig");
     _ = @import("code_expectation.zig");
     _ = @import("demand_inline_tests.zig");
+    _ = @import("demand_lowering.zig");
+    _ = @import("retained_revision.zig");
     _ = @import("demand_summary_tests.zig");
     _ = @import("substitution_keys.zig");
     _ = @import("validation_image.zig");

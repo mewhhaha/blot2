@@ -25,6 +25,7 @@ const CachedOutput = struct {
     entry_request: []u8,
     output_identity: ?[]u8 = null,
     bytes: []u8 = &.{},
+    demand_lowering: ?@import("demand_lowering.zig").Snapshot = null,
     source_bytes: usize,
     modules: usize,
     policy: OutputPolicy,
@@ -33,14 +34,20 @@ const CachedOutput = struct {
         errdefer cached.deinit(a);
         if (identity) |text| cached.output_identity = try a.dupe(u8, text);
         cached.bytes = try a.dupe(u8, result.result.compiled.bytes);
+        if (result.result.compiled.demand_lowering) |report| {
+            const copied = try report.clone(a);
+            cached.demand_lowering = copied;
+        }
         return cached;
     }
     fn deinit(self: *CachedOutput, a: Allocator) void {
         a.free(self.entry_request);
         if (self.output_identity) |text| a.free(text);
         a.free(self.bytes);
+        if (self.demand_lowering) |*report| report.deinit(a);
     }
-    fn matches(self: CachedOutput, entry: []const u8, identity: ?[]const u8, policy: OutputPolicy) bool {
+    fn matches(self: CachedOutput, entry: []const u8, identity: ?[]const u8, policy: OutputPolicy, explain_demands: bool) bool {
+        if ((self.demand_lowering != null) != explain_demands) return false;
         if (!std.mem.eql(u8, self.entry_request, entry) or !std.meta.eql(self.policy, policy)) return false;
         if (self.output_identity) |text| return if (identity) |other| std.mem.eql(u8, text, other) else false;
         return identity == null;
@@ -48,9 +55,43 @@ const CachedOutput = struct {
     fn emission(self: CachedOutput, a: Allocator) Allocator.Error!partial.Result {
         // All counters describe work performed by this attempt. The prior
         // staging/evidence work is not reported as fresh native work.
-        return .{ .result = .{ .compiled = .{ .bytes = try a.dupe(u8, self.bytes) }, .stats = .{ .syntax_nodes = 0, .body_elaborations = 0, .body_lowerings = 0, .imported_schemes = 0 } }, .source_bytes = self.source_bytes, .fresh_modules = 0, .cached_modules = self.modules };
+        var result: partial.Result = .{ .result = .{ .compiled = .{ .bytes = try a.dupe(u8, self.bytes) }, .stats = .{ .syntax_nodes = 0, .body_elaborations = 0, .body_lowerings = 0, .imported_schemes = 0 } }, .source_bytes = self.source_bytes, .fresh_modules = 0, .cached_modules = self.modules };
+        errdefer result.deinit(a);
+        if (self.demand_lowering) |report| {
+            const copied = try report.clone(a);
+            result.result.compiled.demand_lowering = copied;
+        }
+        return result;
     }
 };
+
+test "unchanged output owns demand explanations through result teardown and allocation failures" {
+    const Law = struct {
+        fn run(a: Allocator) !void {
+            const Site = @import("demand_lowering.zig").Site;
+            var original: partial.Result = .{ .result = .{ .compiled = .{ .bytes = try a.dupe(u8, "wasm") }, .stats = .{ .syntax_nodes = 0, .body_elaborations = 0, .body_lowerings = 0, .imported_schemes = 0 } } };
+            var original_alive = true;
+            defer if (original_alive) original.deinit(a);
+            const sites = try a.dupe(Site, &.{.{ .unit = 1, .span = .{ .start = 7, .end = 9 }, .lowering = .direct, .reason = .proved_local }});
+            original.result.compiled.demand_lowering = .{ .sites = sites, .omitted = 3 };
+            var cached = try CachedOutput.init(a, "main.blot", null, &original, 1, .{});
+            defer cached.deinit(a);
+            original.deinit(a);
+            original_alive = false;
+            var output = try cached.emission(a);
+            defer output.deinit(a);
+            try std.testing.expectEqualStrings("wasm", output.result.compiled.bytes);
+            const report = output.result.compiled.demand_lowering.?;
+            try std.testing.expectEqual(@as(usize, 3), report.omitted);
+            try std.testing.expectEqual(@as(u32, 7), report.sites[0].span.start);
+            try std.testing.expectEqual(@as(u64, 0), output.result.compiled.counters.demand_direct);
+            try std.testing.expect(cached.matches("main.blot", null, .{}, true));
+            try std.testing.expect(!cached.matches("main.blot", null, .{}, false));
+        }
+    };
+    try Law.run(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, Law.run, .{});
+}
 
 const Current = struct {
     prepared: partial.Prepared,
@@ -199,6 +240,7 @@ pub const Session = struct {
     epoch: ?*Epoch = null,
     policy: Policy = .{},
     profile_backend: bool = false,
+    explain_demands: bool = false,
     checkpoint: ?@import("backend_checkpoint.zig").Checkpoint = null,
 
     /// Moves an already wire/semantic/compiler-admitted seed and pins its exact
@@ -419,7 +461,7 @@ pub const Session = struct {
         counts.dependency_storage = .{ .fresh_modules = frozen.modules.len, .core_checked = frozen.modules.len, .interface_checked = frozen.modules.len };
         counts.frozen_modules = frozen.modules.len;
         for (frozen.modules) |module| counts.reused_core_bodies += module.core.body_lowerings;
-        return partial.prepareReadOnly(a, io, entry_path, output_identity, snapshot.options, &candidate_seed.*.?.value, snapshot.provider());
+        return partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &candidate_seed.*.?.value, snapshot.provider(), null);
     }
     pub fn prepareRevision(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, options: project.Options) !Preparation {
         return self.prepareRevisionWithSources(io, entry_path, output_identity, options, &.{});
@@ -445,9 +487,11 @@ pub const Session = struct {
             // tokens and adjacency) parses to the same program, so the last
             // output stands and the retained state is kept; later edits diff
             // against the last compiled sources. Settings must be unchanged.
-            const reusable = std.mem.eql(u8, &self.seed_settings, &settings_key) and output.matches(entry_path, output_identity, self.policy) and try snapshot.entryPathEqualsPrevious(io, entry_path, current.prepared.paths[current.prepared.entry - 1]);
+            const reusable = std.mem.eql(u8, &self.seed_settings, &settings_key) and output.matches(entry_path, output_identity, self.policy, self.explain_demands) and try snapshot.entryPathEqualsPrevious(io, entry_path, current.prepared.paths[current.prepared.entry - 1]);
             const exact = reusable and admitted and try snapshot.entryEqualsPrevious(io, entry_path, current.prepared.paths[current.prepared.entry - 1], current.snapshot.view()) and try snapshot.equalsPrevious(io, current.snapshot.view());
-            if (exact or (reusable and try snapshot.triviaEqualsPrevious(io, current.snapshot.view()))) {
+            // Explained spans belong to the actual source bytes. Recompute
+            // them after trivia changes rather than publishing old offsets.
+            if (exact or (!self.explain_demands and reusable and try snapshot.triviaEqualsPrevious(io, current.snapshot.view()))) {
                 var emission = try output.emission(a);
                 errdefer emission.deinit(a);
                 const candidate = try a.create(Candidate);
@@ -462,7 +506,7 @@ pub const Session = struct {
         var preparation: partial.Preparation = undefined;
         if (admitted) {
             var fast_result = true;
-            preparation = partial.prepareReadOnly(a, io, entry_path, output_identity, snapshot.options, &self.seed, snapshot.provider()) catch |err| switch (err) {
+            preparation = partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &self.seed, snapshot.provider(), self.entryOffer()) catch |err| switch (err) {
                 error.DependencySetChanged => blk: {
                     fast_result = false;
                     break :blk try self.fallback(io, entry_path, output_identity, &snapshot, &candidate_seed, &fallback_counts);
@@ -498,6 +542,7 @@ pub const Session = struct {
                 var result = try prepared.emitWithOptions(a, .{
                     .io = io,
                     .profile_backend = self.profile_backend,
+                    .explain_demands = self.explain_demands,
                     .checkpoint = if (self.checkpoint) |*checkpoint| checkpoint else null,
                     .policy = self.policy,
                     .retain_artifacts = true,

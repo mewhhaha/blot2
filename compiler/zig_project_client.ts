@@ -98,6 +98,8 @@ export interface ZigProjectCompilerOptions {
   dependencies?: string | URL | null;
   /** Collect detailed backend phase and slow inference-region timings. */
   profileBackend?: boolean;
+  /** Collect bounded source-site demand lowering decisions. */
+  explainDemands?: boolean;
   /** Development skips optional scalar/vector passes; checking and cleanup remain. */
   codegenTier?: "optimized" | "development";
   /** Prototype: share identical internal machine bodies while keeping table slots. */
@@ -1028,6 +1030,7 @@ export async function createZigProjectCompiler(
     "imports",
     "dependencies",
     "profileBackend",
+    "explainDemands",
     "codegenTier",
     "shareMachineCode",
     "codegenWorkers",
@@ -1065,6 +1068,12 @@ export async function createZigProjectCompiler(
     typeof options.profileBackend !== "boolean"
   ) {
     throw new TypeError("profileBackend must be a boolean");
+  }
+  if (
+    options.explainDemands !== undefined &&
+    typeof options.explainDemands !== "boolean"
+  ) {
+    throw new TypeError("explainDemands must be a boolean");
   }
   if (
     options.codegenTier !== undefined &&
@@ -1113,6 +1122,7 @@ export async function createZigProjectCompiler(
     dependencies: nullablePath(options.dependencies, "dependencies"),
     ...(checkpoint ? { checkpoint: true } : {}),
     ...(options.profileBackend ? { profileBackend: true } : {}),
+    ...(options.explainDemands ? { explainDemands: true } : {}),
     ...(options.codegenTier ? { codegenTier: options.codegenTier } : {}),
     ...(options.shareMachineCode ? { shareMachineCode: true } : {}),
     ...(options.codegenWorkers

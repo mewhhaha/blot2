@@ -36,6 +36,7 @@ pub const Result = struct {
 /// must outlive Prepared. Backend work does not consult source files or PI.
 /// This owner grants no cross-revision staging/code-cache validity by itself.
 pub const Prepared = struct {
+    body_caches: []@import("body_check_cache.zig").Cache = &.{},
     units: []core.Module,
     identity: RuntimeIdentity.Metadata,
     unit_order: []u32,
@@ -50,6 +51,8 @@ pub const Prepared = struct {
     source_bytes: usize,
     stats: consumer.Stats,
     pub fn deinit(self: *Prepared, a: Allocator) void {
+        for (self.body_caches) |*cache| cache.deinit(a);
+        a.free(self.body_caches);
         self.identity.deinit(a);
         a.free(self.unit_order);
         for (self.units, 0..) |*unit, i| if (!self.isBorrowed(i)) {
@@ -204,18 +207,26 @@ pub fn prepare(a: Allocator, io: std.Io, entry_path: []const u8, output_identity
 }
 
 pub fn prepareReadOnly(a: Allocator, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, options: project.Options, dependency: *const D.FrozenDependency, inputs: ?project.InputProvider) !Preparation {
+    return prepareReadOnlyMode(a, io, entry_path, output_identity, options, dependency, inputs, null, false);
+}
+
+/// The successful previous owner stays pinned throughout this preparation.
+pub fn prepareReadOnlyWithBodies(a: Allocator, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, options: project.Options, dependency: *const D.FrozenDependency, inputs: ?project.InputProvider, previous: ?EntryPrevious) !Preparation {
+    return prepareReadOnlyMode(a, io, entry_path, output_identity, options, dependency, inputs, previous, true);
+}
+fn prepareReadOnlyMode(a: Allocator, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, options: project.Options, dependency: *const D.FrozenDependency, inputs: ?project.InputProvider, previous: ?EntryPrevious, retain_bodies: bool) !Preparation {
     var source = try project.loadCompiledReadOnly(a, io, entry_path, options, dependency, inputs);
     defer source.deinit(a);
     // Additional source producers change the catalog and must be checked in
     // the full fresh closure before any cached interfaces are consumed.
     if (source.units.items.len != dependency.modules.len + 1) return error.DependencySetChanged;
-    return prepareProject(a, &source, entry_path, output_identity, dependency);
+    return prepareProjectMode(a, &source, entry_path, output_identity, dependency, null, previous, retain_bodies);
 }
 
 /// Consumes no Project storage. Cached Core is borrowed from the dense prefix;
 /// passing an empty dependency prepares an entirely fresh checked Project.
 pub fn prepareProject(a: Allocator, source: *project.Project, entry_path: []const u8, output_identity: ?[]const u8, dependency: *const D.FrozenDependency) !Preparation {
-    return prepareProjectMode(a, source, entry_path, output_identity, dependency, null, null);
+    return prepareProjectMode(a, source, entry_path, output_identity, dependency, null, null, false);
 }
 
 /// Retain the exact successful checker owner for this already captured Project.
@@ -223,15 +234,15 @@ pub fn prepareProject(a: Allocator, source: *project.Project, entry_path: []cons
 /// the check before the source and must not use it with a different Project.
 pub fn prepareProjectKeepingCheck(a: Allocator, source: *project.Project, entry_path: []const u8, output_identity: ?[]const u8, dependency: *const D.FrozenDependency, kept: *?checker.CheckedProject) !Preparation {
     std.debug.assert(kept.* == null);
-    return prepareProjectMode(a, source, entry_path, output_identity, dependency, kept, null);
+    return prepareProjectMode(a, source, entry_path, output_identity, dependency, kept, null, true);
 }
 
 pub const EntryPrevious = struct { prepared: *const Prepared, source: []const u8, reuse_modules: bool = false };
 pub fn prepareProjectKeepingEntry(a: Allocator, source: *project.Project, entry_path: []const u8, output_identity: ?[]const u8, dependency: *const D.FrozenDependency, kept: *?checker.CheckedProject, previous: ?EntryPrevious) !Preparation {
     std.debug.assert(kept.* == null);
-    return prepareProjectMode(a, source, entry_path, output_identity, dependency, kept, previous);
+    return prepareProjectMode(a, source, entry_path, output_identity, dependency, kept, previous, true);
 }
-fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []const u8, output_identity: ?[]const u8, dependency: *const D.FrozenDependency, kept: ?*?checker.CheckedProject, previous: ?EntryPrevious) !Preparation {
+fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []const u8, output_identity: ?[]const u8, dependency: *const D.FrozenDependency, kept: ?*?checker.CheckedProject, previous: ?EntryPrevious, retain_bodies: bool) !Preparation {
     if (source.compiled_modules.len != dependency.modules.len) return error.InvalidArtifact;
     if (source.diagnostics.items.len != 0) {
         const issue = source.diagnostics.items[0];
@@ -249,7 +260,9 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
         if (std.mem.eql(u8, output, source.symbols.get(unit.filename))) return error.OutputIsSource;
     };
     var checked = if (previous) |old|
-        try checker.checkProjectWithEntryCutoff(a, source, .{ .entry = old.prepared.entry, .prelude = old.prepared.prelude, .implicit_prelude = old.prepared.entry_implicit_prelude, .names = old.prepared.identity.view(), .source = old.source, .imports = old.prepared.entry_imports, .reuse_modules = old.reuse_modules })
+        try checker.checkProjectWithEntryCutoff(a, source, .{ .entry = old.prepared.entry, .prelude = old.prepared.prelude, .implicit_prelude = old.prepared.entry_implicit_prelude, .names = old.prepared.identity.view(), .source = old.source, .imports = old.prepared.entry_imports, .reuse_modules = old.reuse_modules, .bodies = old.prepared.body_caches })
+    else if (retain_bodies)
+        try checker.checkProjectRetainingBodies(a, source, null)
     else
         try checker.checkProject(a, source);
     var check_transferred = false;
@@ -331,18 +344,30 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
     errdefer a.free(entry_imports);
     for (source.unitImports(source.entry), entry_imports) |from, *to| to.* = .{ .path = from.path, .target = from.target };
     const borrowed: []bool = if (source.compiled_reuse.len != 0) try a.alloc(bool, units.len) else &.{};
+    errdefer a.free(borrowed);
     for (borrowed, 1..) |*item, id| item.* = checked.compiledModule(source, id) != null;
+    const body_caches = checked.body_caches;
+    checked.body_caches = &.{};
+    errdefer {
+        for (body_caches) |*cache| cache.deinit(a);
+        a.free(body_caches);
+    }
+    for (body_caches, checked.modules[0..body_caches.len], 0..) |*cache, module_, index| {
+        if (module_ == null) if (previous) |old| {
+            if (index < old.prepared.body_caches.len) cache.* = try old.prepared.body_caches[index].clone(a);
+        };
+    }
     if (kept) |out| {
         out.* = checked;
         check_transferred = true;
     }
     transferred = true;
-    return .{ .ready = .{ .units = units, .identity = identity, .unit_order = unit_order, .paths = paths, .cached = dependency.modules.len, .borrowed = borrowed, .entry_imports = entry_imports, .entry_implicit_prelude = source.unit(source.entry).implicit_prelude, .entry = source.entry, .prelude = source.prelude_unit, .source_mode = source.input_mode == .source, .source_bytes = source.source_bytes, .stats = stats } };
+    return .{ .ready = .{ .body_caches = body_caches, .units = units, .identity = identity, .unit_order = unit_order, .paths = paths, .cached = dependency.modules.len, .borrowed = borrowed, .entry_imports = entry_imports, .entry_implicit_prelude = source.unit(source.entry).implicit_prelude, .entry = source.entry, .prelude = source.prelude_unit, .source_mode = source.input_mode == .source, .source_bytes = source.source_bytes, .stats = stats } };
 }
 
 /// Dependency owner is borrowed throughout. All new frontend/solver owners are
 /// destroyed before backend specialization and all fresh Core is freed afterward.
-fn compileMode(a: Allocator, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, options: project.Options, dependency: *D.FrozenDependency, consume_interfaces: bool) !Result {
+fn compileMode(a: Allocator, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, options: project.Options, dependency: *D.FrozenDependency, consume_interfaces: bool, backend_options: backend.CompileOptions) !Result {
     switch (try prepare(a, io, entry_path, output_identity, options, dependency)) {
         .rejected => |result| return result,
         .ready => |value| {
@@ -352,19 +377,24 @@ fn compileMode(a: Allocator, io: std.Io, entry_path: []const u8, output_identity
                 format.deinit(a, &module.interface);
                 module.interface = std.mem.zeroes(PI.Interface);
             };
-            return ready.emit(a);
+            return ready.emitWithOptions(a, backend_options);
         },
     }
 }
 
 /// Borrowing compilation preserves every admitted principal interface.
 pub fn compile(a: Allocator, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, options: project.Options, dependency: *D.FrozenDependency) !Result {
-    return compileMode(a, io, entry_path, output_identity, options, dependency, false);
+    return compileMode(a, io, entry_path, output_identity, options, dependency, false, .{});
 }
 
 /// Successful fresh lowering ends the dependency principal-interface lifetime
 /// before specialization. The bundle can then only be destroyed, not reused or
 /// encoded. Frontend rejection leaves all seed interfaces intact.
 pub fn compileOwned(a: Allocator, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, options: project.Options, dependency: *D.FrozenDependency) !Result {
-    return compileMode(a, io, entry_path, output_identity, options, dependency, true);
+    return compileMode(a, io, entry_path, output_identity, options, dependency, true, .{});
+}
+
+/// Consuming compilation with opt-in backend observation.
+pub fn compileOwnedWithOptions(a: Allocator, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, options: project.Options, dependency: *D.FrozenDependency, backend_options: backend.CompileOptions) !Result {
+    return compileMode(a, io, entry_path, output_identity, options, dependency, true, backend_options);
 }

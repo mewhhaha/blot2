@@ -23,6 +23,7 @@ pub fn publicView(allocator: std.mem.Allocator, owner: *const PI.Interface) Erro
         error.TypeLimit => return error.InvalidArtifact,
     };
     defer scan.deinit();
+    for (owner.contracts) |contract| if (contract.private) try scan.blocked.put(allocator, contract.identity, {});
     for (owner.bindings) |binding| {
         if (binding.private) {
             try require(binding.name == 0 and binding.ty == 0 and binding.scheme.root == 0 and binding.external == null);
@@ -73,6 +74,7 @@ pub fn publicView(allocator: std.mem.Allocator, owner: *const PI.Interface) Erro
             continue;
         }
         for (owner.graph.extra[contract.parameters.start..][0..contract.parameters.len]) |parameter| try allowed(&scan, parameter);
+        for (owner.contract_members[contract.members.start..][0..contract.members.len]) |member| try allowed(&scan, member.root);
         for (owner.contract_predicates[contract.predicates.start..][0..contract.predicates.len]) |predicate| try requirement(&scan, owner, predicate);
     }
     for (owner.associated) |member| try require(member.binding < owner.bindings.len and !owner.bindings[member.binding].private);
@@ -88,6 +90,7 @@ fn requirement(scan: *visibility.Scan, owner: *const PI.Interface, predicate: T.
     if (predicate.kind == .callee_use and predicate.identity.unit == owner.unit) {
         try require(predicate.identity.decl < owner.bindings.len and !owner.bindings[predicate.identity.decl].private);
     }
+    if (predicate.kind == .contract) try require(!scan.blocked.contains(predicate.identity));
     inline for (.{ "ty", "result", "other", "signature" }) |field| try allowed(scan, @field(predicate, field));
 }
 

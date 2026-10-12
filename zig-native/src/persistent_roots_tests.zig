@@ -310,3 +310,104 @@ test "retained caller cleanup rejects changed checked callee result roles" {
     try std.testing.expect(!matcher.matches(child));
     try std.testing.expect(!matcher.matches(caller));
 }
+
+test "unchanged variant descriptors preserve erased types through fresh retained checkpoint and OOM" {
+    var fixture = try Fixture.initSource(
+        \\type Choice [a, b] is data = #Left a | #Right b
+        \\const map = fn transform => fn candidate => case candidate of
+        \\  #Left value => #Left (transform value)
+        \\  #Right error => #Right error
+        \\entry const run = fn (value: U32) => do:
+        \\  let candidate = #Left #[value, @u32.add value 1]
+        \\  let mapped = map (fn array => array) candidate
+        \\  return case mapped of
+        \\    #Left array => array[0]
+        \\    #Right _ => 0
+    );
+    defer fixture.deinit();
+    const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
+    defer a.free(nodes);
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    try ownership(first.bytes);
+    var retained = try fixture.emit(a, &first.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
+    const compiler: [32]u8 = @splat(35);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    var portable = try fixture.emit(a, null, &checkpoint);
+    defer portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, portable.bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, null, first.bytes });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
+    try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
+}
+
+test "complete allocation-free modules omit frames without granting raw graphs admission" {
+    const w = @import("wasm.zig");
+    var module = w.Module.init(a);
+    defer module.deinit();
+    _ = try module.ensureArena();
+    const function = try module.addTypedFunction(&.{}, .i32, .scalar);
+    try module.emit(function, .{ .op = .i32_const, .operand = 42 });
+    try module.exportFunction(function, "run", .unit, .u32);
+    var session = try @import("runtime_pipeline.zig").Session.init(a, &module);
+    defer session.deinit();
+    try std.testing.expect(session.roots);
+    try std.testing.expect(!session.needs_roots);
+    var output = try session.optimize(&module.functions.items[function]);
+    defer if (output) |*body| body.deinit(a);
+    try std.testing.expect(output == null);
+    const bytes = try module.assemble();
+    defer a.free(bytes);
+    try ownership(bytes);
+    try module.exportFunction(module.arena.?.allocate_typed, "raw", .unit, .u32);
+    var partial = try @import("runtime_pipeline.zig").Session.init(a, &module);
+    defer partial.deinit();
+    try std.testing.expect(!partial.roots);
+}
+
+test "root frame demand changes reject retained rootless bodies and portable candidates" {
+    const w = @import("wasm.zig");
+    const bodies = @import("optimized_bodies.zig");
+    const portable = @import("optimized_archive.zig");
+    var module = w.Module.init(a);
+    defer module.deinit();
+    const arena = try module.ensureArena();
+    const borrowed = try module.addTypedFunction(&.{.i32}, .i32, .reference);
+    try module.setParameterRoles(borrowed, @import("runtime_ir.zig").packParameterRoles(&.{.reference}));
+    try module.emit(borrowed, .{ .op = .local_get });
+    var before: bodies.Capture = .{ .allocator = a };
+    defer before.deinit();
+    const original = try module.assembleWithOptions(.{ .current = &before });
+    defer a.free(original);
+    try std.testing.expect(before.roots);
+    try std.testing.expect(!before.needs_roots);
+    try std.testing.expect(before.entries.items[borrowed].output == null);
+    const compiler: [32]u8 = @splat(35);
+    const archived = try portable.encode(a, compiler, &before);
+    defer a.free(archived);
+    var checkpoint = try portable.decode(a, compiler, archived);
+    defer checkpoint.deinit();
+    const owning = try module.addTypedFunction(&.{}, .i32, .reference);
+    try module.emitSlice(owning, &.{ .{ .op = .i32_const, .operand = 4 }, .{ .op = .call, .operand = arena.allocate_scalar } });
+    const fresh = try module.assemble();
+    defer a.free(fresh);
+    for ([_]*const bodies.Capture{ &before, &checkpoint }) |previous| {
+        var current: bodies.Capture = .{ .allocator = a };
+        defer current.deinit();
+        const retained = try module.assembleWithOptions(.{ .previous = previous, .current = &current });
+        defer a.free(retained);
+        try std.testing.expectEqualSlices(u8, fresh, retained);
+        try std.testing.expect(current.roots);
+        try std.testing.expect(current.needs_roots);
+        try std.testing.expect(current.entries.items[borrowed].output != null);
+        var matcher = try bodies.Matcher.init(a, previous, &current);
+        defer matcher.deinit();
+        try std.testing.expect(!matcher.matches(borrowed));
+    }
+}

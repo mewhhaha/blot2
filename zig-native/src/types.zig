@@ -14,7 +14,7 @@ pub const boolean: Id = 2;
 pub const u32_type: Id = 3;
 pub const f32_type: Id = 4;
 pub const never: Id = 5;
-pub const Tag = enum(u8) { absent, unit, boolean, u32, f32, never, variable, function, product, record, nominal, array, list, cursor, demand, type_constructor, resolver, provider, state_provider };
+pub const Tag = enum(u8) { absent, unit, boolean, u32, f32, never, variable, function, product, record, nominal, array, list, cursor, demand, type_constructor, resolver, provider, state_provider, projection };
 pub const Node = struct {
     tag: Tag,
     // Owned structural certificate, kept in the existing three padding bytes.
@@ -50,7 +50,7 @@ pub const List = struct { start: u32 = 0, len: u32 = 0 };
 pub const Scheme = struct { root: Id = absent, variables: List = .{}, row_variables: List = .{}, closed_rows: List = .{}, obligations: List = .{} };
 pub const ClosedCovariant = struct { root: Id, closed_rows: List };
 pub const Operator = enum { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right };
-pub const ObligationKind = enum { arithmetic, ordered, equality, integer, field, writable_field, dispatch, result_dispatch, monad_factory, resolver_dispatch, resolver_shape, effect_operation, effect_handler, receiver, update, type_rep, effect_rep, type_head, collection, record_merge, callee_use };
+pub const ObligationKind = enum { arithmetic, ordered, equality, integer, field, writable_field, dispatch, result_dispatch, monad_factory, resolver_dispatch, resolver_shape, effect_operation, effect_handler, receiver, update, type_rep, effect_rep, type_head, collection, record_merge, callee_use, type_eq, contract };
 pub const Obligation = struct { ty: Id, kind: ObligationKind, source: u32, name: u32 = 0, result: Id = 0, other: Id = 0, signature: Id = 0, operator: Operator = .none, identity: NominalIdentity = .{ .unit = 0, .decl = 0 }, explicit: bool = false, qualification_span: ?@import("ast.zig").Span = null, qualification_unit: u32 = 0 };
 pub const Version = struct { variable: u32, replacement: Id, position: Cursor, previous: u32, next: u32 = none };
 const none = std.math.maxInt(u32);
@@ -66,8 +66,16 @@ pub fn effectError(err: Effects.Error) Error {
     };
 }
 
+const ProjectionResolution = struct { root: Id, at: Cursor, depth: u32 };
 pub const Store = struct {
     use_closed_graphs: bool = false,
+    has_projections: bool = false,
+    projection_limit: usize = 1_000_000,
+    projection_steps: usize = 0,
+    projection_exhausted: bool = false,
+    projection_resolution_types: u64 = 0,
+    projection_resolution_rows: u64 = 0,
+    projection_resolutions: std.AutoHashMapUnmanaged(ProjectionResolution, Id) = .empty,
     closed_generation: u16 = 1,
     closed_effect_physical_epoch: u64 = 0,
     // Writes and rollback advance this clock; recycled numeric IDs never make
@@ -118,6 +126,7 @@ pub const Store = struct {
         self.versions.deinit(self.allocator);
         self.variable_views.deinit(self.allocator);
         self.resolved.deinit(self.allocator);
+        self.projection_resolutions.deinit(self.allocator);
         self.composites.deinit(self.allocator);
         self.occurs_seen.deinit(self.allocator);
         self.effects.deinit();
@@ -217,6 +226,7 @@ pub const Store = struct {
                 if (child_height == 0) return 0;
                 height = @max(height, child_height);
             },
+            .projection => return 0,
             .nominal => for (self.nominalArguments(n)) |child| {
                 const child_height = self.closedHeight(child);
                 if (child_height == 0) return 0;
@@ -299,8 +309,29 @@ pub const Store = struct {
         self.extra.appendSliceAssumeCapacity(owned);
         return self.add(.{ .tag = .nominal, .a = identity.unit, .b = identity.decl, .c = start });
     }
+    /// Symbolic associated output. The tail word is the original member name;
+    /// arguments use the ordinary owned span so substitution shares the graph.
+    pub fn chargeProjection(self: *Store) Error!void {
+        if (self.projection_steps >= self.projection_limit) {
+            self.projection_exhausted = true;
+            return error.TypeLimit;
+        }
+        self.projection_steps += 1;
+    }
+    pub fn projection(self: *Store, identity: NominalIdentity, member: u32, arguments: []const Id) Error!Id {
+        self.has_projections = true;
+        const id = try self.nominal(identity, arguments);
+        try self.extra.append(self.allocator, member);
+        self.nodes.items[id].tag = .projection;
+        self.nodes.items[id].closed_height = 0;
+        return id;
+    }
+    pub fn projectionMember(self: *const Store, value: Node) u32 {
+        std.debug.assert(value.tag == .projection);
+        return self.extra.items[value.c + 1 + self.extra.items[value.c]];
+    }
     pub fn nominalArguments(self: *const Store, value: Node) []const Id {
-        std.debug.assert(value.tag == .nominal);
+        std.debug.assert(value.tag == .nominal or value.tag == .projection);
         return self.extra.items[value.c + 1 ..][0..self.extra.items[value.c]];
     }
     pub fn recordField(self: *const Store, value: Node, index: usize) Field {
@@ -453,7 +484,7 @@ pub const Store = struct {
                     break :blk &children;
                 },
                 .product => self.list(.{ .start = n.a, .len = n.b }),
-                .nominal => self.nominalArguments(n),
+                .nominal, .projection => self.nominalArguments(n),
                 .record => blk: {
                     if (n.b > pending.len - count) return null;
                     for (0..n.b) |i| pending[count + i] = self.recordField(n, i).ty;
@@ -522,6 +553,27 @@ pub const Store = struct {
         return result;
     }
     fn resolveDepth(self: *Store, root: Id, at: Cursor, depth: usize) Error!Id {
+        // Associated equations produce shared open DAGs. Keep exact recursive
+        // results in the same epoch as the root query; legacy stores retain
+        // their ordinary path and allocation policy.
+        if (self.has_projections and self.use_resolution_cache and depth != 0 and root > never) {
+            if (self.mutation_epoch == std.math.maxInt(u64) or self.effects.mutation_epoch == std.math.maxInt(u64)) return self.resolveNode(root, at, depth);
+            if (self.projection_resolution_types != self.mutation_epoch or self.projection_resolution_rows != self.effects.mutation_epoch) {
+                self.projection_resolutions.clearRetainingCapacity();
+                self.projection_resolution_types = self.mutation_epoch;
+                self.projection_resolution_rows = self.effects.mutation_epoch;
+            }
+            try self.chargeProjection();
+            const key: ProjectionResolution = .{ .root = root, .at = at, .depth = @as(u32, @intCast(depth)) };
+            if (self.projection_resolutions.get(key)) |result| return result;
+            const result = try self.resolveNode(root, at, depth);
+            if (self.projection_resolutions.count() < 65_536) try self.projection_resolutions.put(self.allocator, key, result);
+            return result;
+        }
+        return self.resolveNode(root, at, depth);
+    }
+    fn resolveNode(self: *Store, root: Id, at: Cursor, depth: usize) Error!Id {
+        if (self.has_projections) try self.chargeProjection();
         if (@import("builtin").is_test) self.resolution_steps += 1;
         if (depth >= 1024) return error.TypeLimit;
         const height = self.closedHeight(root);
@@ -604,7 +656,7 @@ pub const Store = struct {
                 }
                 return if (changed) self.record(fields.items) else id;
             },
-            .nominal => {
+            .nominal, .projection => {
                 var args: std.ArrayList(Id) = .empty;
                 defer args.deinit(self.allocator);
                 var changed = false;
@@ -619,7 +671,9 @@ pub const Store = struct {
                     }
                     if (changed) args.appendAssumeCapacity(next);
                 }
-                return if (changed) self.nominal(.{ .unit = value.a, .decl = value.b }, args.items) else id;
+                if (!changed) return id;
+                if (value.tag == .projection) return self.projection(.{ .unit = value.a, .decl = value.b }, self.projectionMember(value), args.items);
+                return self.nominal(.{ .unit = value.a, .decl = value.b }, args.items);
             },
             else => return id,
         }
@@ -664,7 +718,7 @@ pub const Store = struct {
                 .record => for (0..value.b) |i| {
                     try pending.append(scratch_allocator, self.recordField(value, i).ty);
                 },
-                .nominal => try pending.appendSlice(scratch_allocator, self.nominalArguments(value)),
+                .nominal, .projection => try pending.appendSlice(scratch_allocator, self.nominalArguments(value)),
                 else => {},
             }
         }
@@ -725,6 +779,12 @@ pub const Store = struct {
     /// Read-only exact comparison. A variable or open latent row is not closed,
     /// even when the two source IDs happen to be identical.
     pub fn equalClosed(self: *const Store, left: Id, right: Id) Error!bool {
+        return self.equalGraph(left, right, false);
+    }
+    pub fn equalSymbolic(self: *const Store, left: Id, right: Id) Error!bool {
+        return self.equalGraph(left, right, true);
+    }
+    fn equalGraph(self: *const Store, left: Id, right: Id, symbolic: bool) Error!bool {
         var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
         const scratch_allocator = scratch.allocator();
@@ -732,19 +792,33 @@ pub const Store = struct {
         var pending: std.ArrayList(Pair) = .empty;
         defer pending.deinit(scratch_allocator);
         try pending.append(scratch_allocator, .{ .a = left, .b = right });
+        var seen: std.AutoHashMapUnmanaged(Pair, void) = .empty;
+        defer seen.deinit(scratch_allocator);
         var budget: usize = 1_000_000;
         while (pending.pop()) |pair| {
+            if (self.has_projections) try @constCast(self).chargeProjection();
+            if (symbolic) {
+                if (pair.a == pair.b) continue;
+                const entry = try seen.getOrPut(scratch_allocator, pair);
+                if (entry.found_existing) continue;
+            }
             if (budget == 0) return error.TypeLimit;
             budget -= 1;
             const a = self.node(pair.a);
             const b = self.node(pair.b);
             if (a.tag != b.tag) return false;
             switch (a.tag) {
-                .variable, .absent => return false,
+                .absent => return false,
+                .variable => {
+                    if (!symbolic or a.a != b.a or a.b != b.b) return false;
+                },
                 .function, .demand, .provider => {
                     const ar = self.effects.node(a.c);
                     const br = self.effects.node(b.c);
-                    if (ar.tail != .closed or br.tail != .closed or ar.labels.len != br.labels.len) return false;
+                    if (symbolic) {
+                        if (!std.meta.eql(ar.tail, br.tail) or ar.cursor != br.cursor) return false;
+                    } else if (ar.tail != .closed or br.tail != .closed) return false;
+                    if (ar.labels.len != br.labels.len) return false;
                     for (self.effects.list(ar.labels)) |label| {
                         var ac: usize = 0;
                         var bc: usize = 0;
@@ -762,8 +836,9 @@ pub const Store = struct {
                     if (a.b != b.b) return false;
                     for (self.list(.{ .start = a.a, .len = a.b }), self.list(.{ .start = b.a, .len = b.b })) |av, bv| try pending.append(scratch_allocator, .{ .a = av, .b = bv });
                 },
-                .nominal => {
+                .nominal, .projection => {
                     if (a.a != b.a or a.b != b.b) return false;
+                    if (a.tag == .projection and self.projectionMember(a) != self.projectionMember(b)) return false;
                     const aa = self.nominalArguments(a);
                     const ba = self.nominalArguments(b);
                     if (aa.len != ba.len) return false;
@@ -856,6 +931,18 @@ pub const Store = struct {
                     try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a });
                 },
                 .type_constructor => if (an.a != bn.a or an.b != bn.b) return self.mismatch(reporter, a, b),
+                .projection => {
+                    if (an.a != bn.a or an.b != bn.b or self.projectionMember(an) != self.projectionMember(bn)) return self.mismatch(reporter, a, b);
+                    const aa = self.nominalArguments(an);
+                    const bb = self.nominalArguments(bn);
+                    if (aa.len != bb.len) return self.mismatch(reporter, a, b);
+                    for (aa, bb) |left_arg, right_arg| {
+                        const al = try self.resolve(left_arg, 0);
+                        const bl = try self.resolve(right_arg, 0);
+                        if (al == bl) continue;
+                        if (!try self.equalSymbolic(al, bl)) return self.mismatch(reporter, a, b);
+                    }
+                },
                 .nominal => {
                     if (an.a != bn.a or an.b != bn.b) return self.mismatch(reporter, a, b);
                     // Enqueue numeric child IDs before solving another pair.
@@ -912,6 +999,7 @@ pub const Store = struct {
         var seen: std.AutoHashMapUnmanaged(Id, void) = .empty;
         defer seen.deinit(temporary);
         while (pending.pop()) |id| {
+            if (self.has_projections) try self.chargeProjection();
             if (bounded and self.closedHeight(id) != 0) continue;
             const entry = try seen.getOrPut(temporary, id);
             if (entry.found_existing) continue;
@@ -925,11 +1013,47 @@ pub const Store = struct {
                 .record => for (0..value.b) |i| {
                     try pending.append(temporary, self.recordField(value, i).ty);
                 },
-                .nominal => try pending.appendSlice(temporary, self.nominalArguments(value)),
+                .nominal, .projection => try pending.appendSlice(temporary, self.nominalArguments(value)),
                 else => {},
             }
         }
         return values.toOwnedSlice(self.allocator);
+    }
+    pub fn containsProjection(self: *Store, root: Id) Error!bool {
+        if (!self.has_projections or root == 0) return false;
+        const Work = struct { root: Id, row: bool = false };
+        var pending: std.ArrayList(Work) = .empty;
+        defer pending.deinit(self.allocator);
+        var seen: std.AutoHashMapUnmanaged(Work, void) = .empty;
+        defer seen.deinit(self.allocator);
+        try pending.append(self.allocator, .{ .root = root });
+        var remaining: usize = 1_000_000;
+        while (pending.pop()) |item| {
+            if (self.has_projections) try self.chargeProjection();
+            if (remaining == 0) return error.TypeLimit;
+            remaining -= 1;
+            const entry = try seen.getOrPut(self.allocator, item);
+            if (entry.found_existing) continue;
+            if (item.row) {
+                for (self.rowLabels(item.root)) |label| for (self.operationArguments(label)) |argument| try pending.append(self.allocator, .{ .root = argument });
+                continue;
+            }
+            const id = self.head(item.root, 0);
+            if (self.closedHeight(id) != 0) continue;
+            const n = self.node(id);
+            switch (n.tag) {
+                .projection => return true,
+                .function => try pending.appendSlice(self.allocator, &.{ .{ .root = n.a }, .{ .root = n.b }, .{ .root = n.c, .row = true } }),
+                .demand, .provider => try pending.appendSlice(self.allocator, &.{ .{ .root = n.a }, .{ .root = n.c, .row = true } }),
+                .array, .list, .cursor, .resolver => try pending.append(self.allocator, .{ .root = n.a }),
+                .state_provider => for ([_]Id{ n.a, n.b, n.c }) |child| try pending.append(self.allocator, .{ .root = child }),
+                .product => for (self.list(.{ .start = n.a, .len = n.b })) |child| try pending.append(self.allocator, .{ .root = child }),
+                .record => for (0..n.b) |at| try pending.append(self.allocator, .{ .root = self.recordField(n, at).ty }),
+                .nominal => for (self.nominalArguments(n)) |child| try pending.append(self.allocator, .{ .root = child }),
+                else => {},
+            }
+        }
+        return false;
     }
     fn has(values: []const u32, value: u32) bool {
         for (values) |item| if (item == value) return true;
@@ -941,7 +1065,9 @@ pub const Store = struct {
     /// Covariant pure rows close in principal schemes; rows tied to callback
     /// parameters, returned values or retained predicates remain polymorphic.
     pub fn closeCovariant(self: *Store, root: Id, generalized: []const u32, protected: []const u32) Error!Id {
-        return self.closeCovariantDepth(root, generalized, protected, null, 0);
+        var memo: CovariantMemo = .{};
+        defer memo.deinit(self.allocator);
+        return self.closeCovariantDepth(root, generalized, protected, null, &memo, 0);
     }
     /// The returned raw tail indices certify only the decisions made by the
     /// covariance rule. They do not mutate inference history or authorize
@@ -949,10 +1075,40 @@ pub const Store = struct {
     pub fn closeCovariantCertified(self: *Store, root: Id, generalized: []const u32, protected: []const u32) Error!ClosedCovariant {
         var decisions: std.ArrayList(u32) = .empty;
         defer decisions.deinit(self.allocator);
-        const closed = try self.closeCovariantDepth(root, generalized, protected, &decisions, 0);
+        var memo: CovariantMemo = .{};
+        defer memo.deinit(self.allocator);
+        const closed = try self.closeCovariantDepth(root, generalized, protected, &decisions, &memo, 0);
         return .{ .root = closed, .closed_rows = try self.saveList(decisions.items) };
     }
-    fn closeCovariantDepth(self: *Store, root: Id, generalized: []const u32, protected: []const u32, decisions: ?*std.ArrayList(u32), depth: usize) Error!Id {
+    const CovariantMemo = struct {
+        entries: std.ArrayList(struct { root: Id, depth: usize, protected: []u32, result: Id }) = .empty,
+        fn deinit(self: *CovariantMemo, allocator: std.mem.Allocator) void {
+            for (self.entries.items) |entry| allocator.free(entry.protected);
+            self.entries.deinit(allocator);
+        }
+    };
+    fn closeCovariantDepth(self: *Store, root: Id, generalized: []const u32, protected: []const u32, decisions: ?*std.ArrayList(u32), memo: *CovariantMemo, depth: usize) Error!Id {
+        if (self.has_projections) try self.chargeProjection();
+        if (depth >= 1024) return error.TypeLimit;
+        if (self.has_projections) {
+            if (generalized.len == 0) return root;
+            for (memo.entries.items) |entry| if (entry.root == root and entry.depth == depth and std.mem.eql(u32, entry.protected, protected)) return entry.result;
+            const rows = try self.freeRowVariables(root);
+            defer self.allocator.free(rows);
+            const changes = for (rows) |row_id| {
+                if (has(generalized, row_id) and !has(protected, row_id)) break true;
+            } else false;
+            if (!changes) return root;
+        }
+        const result = try self.closeCovariantNode(root, generalized, protected, decisions, memo, depth);
+        if (self.has_projections and memo.entries.items.len < 65_536) {
+            const owned = try self.allocator.dupe(u32, protected);
+            errdefer self.allocator.free(owned);
+            try memo.entries.append(self.allocator, .{ .root = root, .depth = depth, .protected = owned, .result = result });
+        }
+        return result;
+    }
+    fn closeCovariantNode(self: *Store, root: Id, generalized: []const u32, protected: []const u32, decisions: ?*std.ArrayList(u32), memo: *CovariantMemo, depth: usize) Error!Id {
         if (depth >= 1024) return error.TypeLimit;
         const value = self.node(root);
         switch (value.tag) {
@@ -987,7 +1143,7 @@ pub const Store = struct {
                 try self.unionInto(&nested, parameter_free);
                 const closed_tail = self.effects.node(effect_row).tail;
                 if (closed_tail == .variable) try self.unionInto(&nested, &.{closed_tail.variable});
-                return self.functionWithEffects(value.a, try self.closeCovariantDepth(value.b, generalized, nested.items, decisions, depth + 1), effect_row);
+                return self.functionWithEffects(value.a, try self.closeCovariantDepth(value.b, generalized, nested.items, decisions, memo, depth + 1), effect_row);
             },
             .product, .record => {
                 var protected_siblings: std.ArrayList(u32) = .empty;
@@ -1003,25 +1159,37 @@ pub const Store = struct {
                 defer fields.deinit(self.allocator);
                 for (0..value.b) |i| {
                     const field = if (value.tag == .record) self.recordField(value, i) else Field{ .name = 0, .ty = self.extra.items[value.a + i] };
-                    const child = try self.closeCovariantDepth(field.ty, generalized, protected_siblings.items, decisions, depth + 1);
+                    const child = try self.closeCovariantDepth(field.ty, generalized, protected_siblings.items, decisions, memo, depth + 1);
                     if (value.tag == .record) try fields.append(self.allocator, .{ .name = field.name, .ty = child }) else try children.append(self.allocator, child);
                 }
                 return if (value.tag == .record) self.record(fields.items) else self.product(children.items);
             },
-            .array, .list, .cursor => return self.sequence(value.tag, try self.closeCovariantDepth(value.a, generalized, protected, decisions, depth + 1)),
+            .array, .list, .cursor => return self.sequence(value.tag, try self.closeCovariantDepth(value.a, generalized, protected, decisions, memo, depth + 1)),
             // Nominal arguments and Demand's latent computation are invariant.
             else => return root,
         }
     }
     fn covariantInputs(self: *Store, root: Id, out: *std.ArrayList(u32), depth: usize) Error!void {
+        var seen: CovariantSeen = .empty;
+        defer seen.deinit(self.allocator);
+        try self.covariantInputsSeen(root, out, depth, &seen);
+    }
+    const CovariantInput = struct { root: Id, depth: usize };
+    const CovariantSeen = std.AutoHashMapUnmanaged(CovariantInput, void);
+    fn covariantInputsSeen(self: *Store, root: Id, out: *std.ArrayList(u32), depth: usize, seen: *CovariantSeen) Error!void {
+        if (self.has_projections) try self.chargeProjection();
         if (depth >= 1024) return error.TypeLimit;
+        if (self.has_projections) {
+            const entry = try seen.getOrPut(self.allocator, .{ .root = root, .depth = depth });
+            if (entry.found_existing) return;
+        }
         const value = self.node(root);
         switch (value.tag) {
             .function => {
                 const free = try self.freeRowVariables(value.a);
                 defer self.allocator.free(free);
                 try self.unionInto(out, free);
-                try self.covariantInputs(value.b, out, depth + 1);
+                try self.covariantInputsSeen(value.b, out, depth + 1, seen);
             },
             .nominal, .demand, .state_provider => {
                 const free = try self.freeRowVariables(root);
@@ -1034,18 +1202,30 @@ pub const Store = struct {
                 try self.unionInto(out, free);
             },
             .product, .record => for (0..value.b) |i| {
-                try self.covariantInputs(if (value.tag == .record) self.recordField(value, i).ty else self.extra.items[value.a + i], out, depth + 1);
+                try self.covariantInputsSeen(if (value.tag == .record) self.recordField(value, i).ty else self.extra.items[value.a + i], out, depth + 1, seen);
             },
-            .array, .list, .cursor => try self.covariantInputs(value.a, out, depth + 1),
+            .array, .list, .cursor => try self.covariantInputsSeen(value.a, out, depth + 1, seen),
             else => {},
         }
     }
     /// Each use opens only covariant closed rows. A callback's parameter row
     /// remains the exact requirement checked by its producer.
     pub fn openCovariant(self: *Store, root: Id) Error!Id {
-        return self.openCovariantDepth(root, 0);
+        var memo: std.AutoHashMapUnmanaged(Id, Id) = .empty;
+        defer memo.deinit(self.allocator);
+        return self.openCovariantDepth(root, &memo, 0);
     }
-    fn openCovariantDepth(self: *Store, root: Id, depth: usize) Error!Id {
+    fn openCovariantDepth(self: *Store, root: Id, memo: *std.AutoHashMapUnmanaged(Id, Id), depth: usize) Error!Id {
+        if (self.has_projections) {
+            if (memo.get(root)) |result| return result;
+            const result = try self.openCovariantNode(root, memo, depth);
+            if (memo.count() < 65_536) try memo.put(self.allocator, root, result);
+            return result;
+        }
+        return self.openCovariantNode(root, memo, depth);
+    }
+    fn openCovariantNode(self: *Store, root: Id, memo: *std.AutoHashMapUnmanaged(Id, Id), depth: usize) Error!Id {
+        if (self.has_projections) try self.chargeProjection();
         if (depth >= 1024) return error.TypeLimit;
         const value = self.node(root);
         switch (value.tag) {
@@ -1058,7 +1238,7 @@ pub const Store = struct {
                 return self.provider(value.a, effect_row);
             },
             .function => {
-                const result = try self.openCovariantDepth(value.b, depth + 1);
+                const result = try self.openCovariantDepth(value.b, memo, depth + 1);
                 var effect_row = value.c;
                 if (self.effects.node(effect_row).tail == .closed) {
                     const opened_row = try self.freshEffects();
@@ -1073,12 +1253,12 @@ pub const Store = struct {
                 defer fields.deinit(self.allocator);
                 for (0..value.b) |i| {
                     const field = if (value.tag == .record) self.recordField(value, i) else Field{ .name = 0, .ty = self.extra.items[value.a + i] };
-                    const child = try self.openCovariantDepth(field.ty, depth + 1);
+                    const child = try self.openCovariantDepth(field.ty, memo, depth + 1);
                     if (value.tag == .record) try fields.append(self.allocator, .{ .name = field.name, .ty = child }) else try children.append(self.allocator, child);
                 }
                 return if (value.tag == .record) self.record(fields.items) else self.product(children.items);
             },
-            .array, .list, .cursor => return self.sequence(value.tag, try self.openCovariantDepth(value.a, depth + 1)),
+            .array, .list, .cursor => return self.sequence(value.tag, try self.openCovariantDepth(value.a, memo, depth + 1)),
             else => return root,
         }
     }
@@ -1110,6 +1290,7 @@ pub const Store = struct {
         defer seen.deinit(temporary);
         try pending.append(temporary, .{ .id = root, .at = 0 });
         while (pending.pop()) |work| {
+            if (self.has_projections) try self.chargeProjection();
             if (work.depth >= 1024) return error.TypeLimit;
             var id = work.id;
             var at = work.at;
@@ -1160,7 +1341,7 @@ pub const Store = struct {
                 .record => for (0..value.b) |i| {
                     try pending.append(temporary, .{ .id = self.recordField(value, i).ty, .at = at, .depth = work.depth + 1 });
                 },
-                .nominal => for (self.nominalArguments(value)) |child| {
+                .nominal, .projection => for (self.nominalArguments(value)) |child| {
                     try pending.append(temporary, .{ .id = child, .at = at, .depth = work.depth + 1 });
                 },
                 else => {},
@@ -1184,6 +1365,10 @@ pub const Store = struct {
         return self.substituteDepth(root, old, fresh_ids, old_rows, fresh_rows, &copied, scratch.allocator(), 0);
     }
     fn substitutedRow(self: *Store, effect_row: Effects.Id, old: []const u32, replacements: []const Effects.Id) Error!Effects.Id {
+        if (self.has_projections) {
+            try self.chargeProjection();
+            for (self.rowLabels(effect_row)) |_| try self.chargeProjection();
+        }
         var result = effect_row;
         for (old, replacements) |variable, replacement_id| result = self.effects.substitute(result, variable, replacement_id) catch |err| return effectError(err);
         return result;
@@ -1193,6 +1378,7 @@ pub const Store = struct {
     // linear graph into an exponential tree. The memo is local to this exact
     // substitution, so historical variable views and fresh identities stay exact.
     fn substituteDepth(self: *Store, root: Id, old: []const Id, fresh_ids: []const Id, old_rows: []const u32, fresh_rows: []const Effects.Id, copied: *std.AutoHashMapUnmanaged(Id, Id), scratch: std.mem.Allocator, depth: usize) Error!Id {
+        if (self.has_projections) try self.chargeProjection();
         if (depth >= 1024) return error.TypeLimit;
         for (old, fresh_ids) |before, after| if (root == before) return after;
         if (root <= never) return root;
@@ -1229,12 +1415,13 @@ pub const Store = struct {
                 }
                 return self.record(fields.items);
             },
-            .nominal => {
+            .nominal, .projection => {
                 const prior = try self.allocator.dupe(Id, self.nominalArguments(value));
                 defer self.allocator.free(prior);
                 var args: std.ArrayList(Id) = .empty;
                 defer args.deinit(self.allocator);
                 for (prior) |child| try args.append(self.allocator, try self.substituteDepth(child, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1));
+                if (value.tag == .projection) return self.projection(.{ .unit = value.a, .decl = value.b }, self.projectionMember(value), args.items);
                 return self.nominal(.{ .unit = value.a, .decl = value.b }, args.items);
             },
             else => return root,

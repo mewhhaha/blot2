@@ -40,6 +40,9 @@ pub const Source = union(enum) {
             .frozen => |graph| graph.extra[value.c + 1 ..][0..graph.extra[value.c]],
         };
     }
+    pub fn projectionMember(self: Source, value: T.Node) u32 {
+        return self.list(.{ .start = value.c + 1 + @as(u32, @intCast(self.nominalArguments(value).len)), .len = 1 })[0];
+    }
     pub fn recordField(self: Source, value: T.Node, index: usize) T.Field {
         return switch (self) {
             .store => |store| store.recordField(value, index),

@@ -22,6 +22,49 @@ fn clean(source: []const u8) !void {
     for (tree.spans.items) |span| try std.testing.expect(span.start <= span.end and span.end <= source.len);
 }
 
+fn contractMemberSyntax(allocator: std.mem.Allocator) !void {
+    const source =
+        \\type Source s is contract = {
+        \\  type Item,
+        \\  type Stored = (Source.Item s, s),
+        \\  const first: s -> (Source.Item s),
+        \\  Type_rep s,
+        \\}
+    ;
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parsed(allocator, source, &pool);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    const contract = tree.node(tree.roots.items[0]);
+    try std.testing.expectEqual(ast.Tag.contract_decl, contract.tag);
+    const body = tree.node(contract.b);
+    const members = tree.list(.{ .start = body.a, .len = body.b });
+    try std.testing.expectEqual(@as(usize, 4), members.len);
+    try std.testing.expectEqual(ast.Tag.contract_type_member, tree.node(members[0]).tag);
+    try std.testing.expectEqual(@as(u32, 0), tree.node(members[0]).b);
+    try std.testing.expectEqual(ast.Tag.type_product, tree.node(tree.node(members[1]).b).tag);
+    try std.testing.expectEqual(ast.Tag.contract_value_member, tree.node(members[2]).tag);
+    try std.testing.expectEqual(ast.Tag.type_function, tree.node(tree.node(members[2]).b).tag);
+    try std.testing.expectEqual(ast.Tag.constraint, tree.node(members[3]).tag);
+}
+
+test "contract members preserve abstract equations signatures and ordinary predicates through OOM" {
+    try contractMemberSyntax(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, contractMemberSyntax, .{});
+    for ([_][]const u8{
+        "const value: U32 where { type Item = U32 } = 42\n",
+        "type Source s is contract = { const first = fn value => value }\n",
+        "type Source s is contract = { type Item x = x }\n",
+    }) |source| {
+        var pool: symbols.Pool = .{};
+        defer pool.deinit(std.testing.allocator);
+        var tree = try parsed(std.testing.allocator, source, &pool);
+        defer tree.deinit(std.testing.allocator);
+        try std.testing.expect(tree.diagnostics.items.len != 0);
+    }
+}
+
 test "fixity precedence, named targets and source overrides retain their identity" {
     const source = "infixr 80 (**) = power\ninfixl 60 (+) = combine\nconst answer = 1 + 2 ** 3 ** 4\n";
     var pool: symbols.Pool = .{};

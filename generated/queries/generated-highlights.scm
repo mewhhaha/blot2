@@ -39,8 +39,10 @@
 (conditional "if" @keyword)
 (constructor_reference value: "False" @keyword)
 (constructor_reference value: "True" @keyword)
+(contract_type_member "type" @keyword)
 (contract_type "is" @keyword)
 (contract_type "type" @keyword)
+(contract_value_member "const" @keyword)
 (data_type "data" @keyword)
 (data_type "is" @keyword)
 (data_type "type" @keyword)
@@ -97,6 +99,9 @@
 (type_record) @type
 (type_field) @variable.other.member
 (type_expression) @type
+(contract_member) @variable.other.member
+(contract_type_member) @variable.other.member
+(contract_value_member) @variable.other.member
 (type_application) @type
 (demand_type) @type
 (type_atom) @type
@@ -116,7 +121,10 @@
 (INTRINSIC) @function.builtin
 (COMMENT) @comment
 (comprehension_binding name: (IDENT) @variable)
+(contract_type_member name: (TYPE_IDENT) @type)
 (contract_type name: (TYPE_IDENT) @type)
+(contract_value_member name: (IDENT) @variable.other.member)
+(contract_value_member name: (TYPE_IDENT) @variable.other.member)
 (data_type name: (TYPE_IDENT) @type)
 (effect_binding name: (IDENT) @variable)
 (effect_type name: (TYPE_IDENT) @type)

@@ -60,7 +60,7 @@ pub const Snapshot = struct {
     queries: Section,
 };
 pub fn wireKey(compiler: format.Digest) format.Key {
-    return .{ .compiler = compiler, .settings = format.digest("blot-semantic-archive-v1"), .source = @splat(0), .dependencies = @splat(0) };
+    return .{ .compiler = compiler, .settings = format.digest("blot-semantic-archive-v2:associated-types"), .source = @splat(0), .dependencies = @splat(0) };
 }
 pub const limits: format.Limits = .{ .elements = 64 * 1024 * 1024 };
 

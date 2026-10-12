@@ -259,7 +259,7 @@ pub const Store = struct {
             .u32 => return types.u32_type,
             .f32 => return types.f32_type,
             .never => return types.never,
-            .variable, .absent => return error.UnresolvedType,
+            .variable, .absent, .projection => return error.UnresolvedType,
             .array => return self.intern(.array, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, &.{}),
             .list => return self.intern(.list, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, &.{}),
             .cursor => return self.intern(.cursor, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, &.{}),
@@ -360,7 +360,7 @@ pub const Store = struct {
             return true;
         }
         const same = switch (n.tag) {
-            .absent => false,
+            .absent, .projection => false,
             .unit => concrete.tag == .unit,
             .boolean => concrete.tag == .boolean,
             .u32 => concrete.tag == .u32,

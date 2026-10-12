@@ -22,6 +22,13 @@ pub const Counters = struct {
     demand_summary_repeated: u64 = 0,
     demand_summary_unknown: u64 = 0,
     demand_summary_escaping: u64 = 0,
+    /// Structural sites/slots emitted this build, not dynamic runtime traffic.
+    demand_allocations: u64 = 0,
+    demand_local_memo_slots: u64 = 0,
+    demand_eliminated: u64 = 0,
+    demand_direct: u64 = 0,
+    demand_indirect_calls: u64 = 0,
+    demand_inline_nodes: u64 = 0,
 
     semantic_component_batches: u64 = 0,
     semantic_component_jobs: u64 = 0,

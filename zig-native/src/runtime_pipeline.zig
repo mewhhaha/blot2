@@ -12,6 +12,7 @@ pub const Session = struct {
     module: *const wasm.Module,
     summaries: lifetimes.Summaries,
     roots: bool = false,
+    needs_roots: bool = false,
     tier: @import("compilation_tier.zig").Tier = .optimized,
 
     pub fn init(a: A, module: *const wasm.Module) A.Error!Session {
@@ -24,7 +25,13 @@ pub const Session = struct {
             result.roots = false;
             break;
         };
-        var needs_roots = module.host_references != null or module.public_arena or module.static_fields.items.len != 0;
+        // Raw helper exports can acquire leases outside a journal. They belong
+        // to the explicit partial fixture contract, never complete admission.
+        for (module.exports.items) |item| if (!item.global and module.runtimeHelper(item.index)) {
+            result.roots = false;
+            break;
+        };
+        var needs_roots = module.host_references != null or module.public_arena or module.static_fields.items.len != 0 or module.start != null;
         if (result.roots) for (module.functions.items) |*function| {
             if (result.runtimeHelper(function)) continue;
             if (function.parameters.len >= 8192 or function.locals.items.len >= 8192 - function.parameters.len or (function.result_role != .scalar and function.result_role != .reference)) {
@@ -45,7 +52,7 @@ pub const Session = struct {
             }
             if (!result.roots) break;
         };
-        result.roots = result.roots and needs_roots;
+        result.needs_roots = needs_roots;
         return result;
     }
     pub fn deinit(self: *Session) void {
@@ -77,6 +84,30 @@ pub const Session = struct {
             else => return false,
         };
         return imports == 1;
+    }
+    // Source callees retire their private owners. Only a reference result or an
+    // allocating helper can acquire a caller slot; scalar calls cannot do so.
+    // Indirect calls need their checked result fact, not their machine type.
+    fn borrowsOnly(self: *const Session, function: *const ir.Function) bool {
+        if (function.result_role != .scalar) return false;
+        for (function.instructions.items, 0..) |inst, at| switch (inst.op) {
+            .ownership => {
+                const annotation: ir.Ownership = @bitCast(inst.operand);
+                if (annotation.kind == .scope) switch (annotation.chunk) {
+                    0, 1, 14 => {},
+                    else => return false,
+                };
+            },
+            .call => {
+                if (self.module.runtimeHelper(inst.operand)) return false;
+                if (self.module.functions.items[inst.operand].result_role != .scalar) return false;
+            },
+            .call_indirect => if (ir.indirectResult(function.instructions.items, at) != .scalar) return false,
+            .call_import => return false,
+            .global_set => if (self.module.globals.items[inst.operand].scalar.role() == .reference) return false,
+            else => {},
+        };
+        return true;
     }
     pub fn optimize(self: *Session, source: *const ir.Function) A.Error!?ir.Body {
         var owned: ?ir.Body = null;
@@ -115,7 +146,9 @@ pub const Session = struct {
             }
             if (!arena_helper) {
                 const entry = source.entry;
-                if (try @import("root_lowering.zig").run(self.allocator, self.module, &view, !self.runtimeHelper(source) and !self.borrowedHost(&view), entry, self.module.start != null and id == self.module.start.?)) |replacement| {
+                const start = self.module.start != null and id == self.module.start.?;
+                const framed = self.needs_roots and !self.runtimeHelper(source) and (entry or start or (!self.borrowedHost(&view) and !self.borrowsOnly(&view)));
+                if (try @import("root_lowering.zig").run(self.allocator, self.module, &view, framed, entry, start)) |replacement| {
                     if (owned) |*body| body.deinit(self.allocator);
                     owned = replacement;
                 }

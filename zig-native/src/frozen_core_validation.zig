@@ -247,11 +247,26 @@ const Bounds = struct {
                         try self.ty(self.m.types.extra[value.a + field * 2 + 1]);
                     }
                 },
-                .nominal => {
+                .nominal, .projection => {
                     try self.identity(.{ .unit = value.a, .decl = value.b }, false);
                     try index(self.m.types.extra.len, value.c);
                     const start = std.math.add(u32, value.c, 1) catch return error.InvalidArtifact;
                     try self.listTypes(.{ .start = start, .len = self.m.types.extra[value.c] });
+                    if (value.tag == .projection) {
+                        const slot = std.math.add(u32, start, self.m.types.extra[value.c]) catch return error.InvalidArtifact;
+                        try index(self.m.types.extra.len, slot);
+                        try self.symbol(self.m.types.extra[slot], false);
+                        var declared = false;
+                        for (self.m.contracts) |contract| {
+                            if (contract.identity.unit != value.a or contract.identity.decl != value.b) continue;
+                            try require(contract.parameters.len == self.m.types.extra[value.c]);
+                            try range(self.m.contract_members.len, contract.members.start, contract.members.len);
+                            for (self.m.contract_members[contract.members.start..][0..contract.members.len]) |member| if (member.name == self.m.types.extra[slot] and member.kind != .value) {
+                                declared = true;
+                            };
+                        }
+                        try require(declared);
+                    }
                 },
                 .type_constructor => try self.identity(.{ .unit = value.a, .decl = value.b }, false),
                 .array, .list, .cursor, .resolver => try self.ty(value.a),
@@ -372,6 +387,46 @@ const Bounds = struct {
                 if (value.qualification_unit == 0 or value.qualification_unit == self.m.unit) try self.span(s) else _ = try self.owner(value.qualification_unit);
             } else try require(value.qualification_unit == 0);
             try range(self.m.names.len, value.diagnostic_name.start, value.diagnostic_name.len);
+        }
+        for (self.m.contracts) |contract| {
+            try self.identity(contract.identity, false);
+            try self.symbol(contract.name, false);
+            try self.listTypes(contract.parameters);
+            try self.listTypes(contract.variables);
+            for (self.m.types.list(contract.variables)) |id| try require(self.m.types.node(id).tag == .variable);
+            try range(self.m.types.extra.len, contract.row_variables.start, contract.row_variables.len);
+            for (self.m.types.list(contract.row_variables)) |variable| try index(self.m.types.effects.variable_count, variable);
+            try range(self.m.types.extra.len, contract.row_parameters.start, contract.row_parameters.len);
+            try range(self.m.types.extra.len, contract.row_parameter_names.start, contract.row_parameter_names.len);
+            try require(contract.row_parameters.len == contract.row_parameter_names.len);
+            for (self.m.types.list(contract.row_parameters)) |row_id| {
+                try index(self.m.types.effects.rows.len, row_id);
+                const value = self.m.types.effects.rows[row_id];
+                try require(value.tail == .variable and value.labels.len == 0);
+                const bound = for (self.m.types.list(contract.row_variables)) |variable| {
+                    if (variable == value.tail.variable) break true;
+                } else false;
+                try require(bound);
+            }
+            for (self.m.types.list(contract.row_parameter_names), 0..) |name, ordinal| {
+                try self.symbol(name, false);
+                for (self.m.types.list(contract.row_parameter_names)[0..ordinal]) |previous| try require(name != previous);
+            }
+            try range(self.m.obligations.len, contract.predicates.start, contract.predicates.len);
+            try range(self.m.contract_members.len, contract.members.start, contract.members.len);
+            var requires_implementation = false;
+            for (self.m.contract_members[contract.members.start..][0..contract.members.len], 0..) |member, ordinal| {
+                try self.identity(member.contract, false);
+                try require(std.meta.eql(member.contract, contract.identity));
+                try self.symbol(member.name, false);
+                try self.ty(member.root);
+                try enumValue(@FieldType(@import("principal_interface.zig").ContractMember, "kind"), member.kind);
+                try require((member.kind == .abstract_type) == (member.root == 0));
+                if (member.kind == .value) try require(self.m.types.node(member.root).tag == .function);
+                for (self.m.contract_members[contract.members.start..][0..ordinal]) |old| try require(old.name != member.name);
+                requires_implementation = requires_implementation or member.kind != .defined_type;
+            }
+            try require(requires_implementation == contract.requires_implementation);
         }
         for (self.m.nominals, 0..) |value, id| {
             if (value.identity.unit != 0 and value.identity.unit != std.math.maxInt(u32)) try require(value.is_opaque == (value.identity.decl & T.opaque_name_bit != 0));
@@ -755,7 +810,7 @@ pub const Frame = struct { vertex: usize, edge: usize = 0 };
 pub const Scratch = struct { colors: []u8, path: []Frame };
 pub const Requirements = struct { colors: usize, path: usize };
 
-const Role = enum(u8) { unset, type_, symbol, row_variable, count, node, binding, pattern, constructor, projection, destination };
+const Role = enum(u8) { unset, type_, symbol, row_variable, row, count, node, binding, pattern, constructor, projection, destination };
 fn mark(roles: []u8, start: u32, len: u32, role: Role) BoundsError!void {
     for (roles[start..][0..len]) |*slot| {
         try require(slot.* == 0 or slot.* == @backingInt(role));
@@ -776,9 +831,10 @@ fn listRoles(m: *const core.Module, type_roles: []u8, core_roles: []u8) BoundsEr
             try mark(type_roles, @intCast(@as(usize, n.a) + i * 2), 1, .symbol);
             try mark(type_roles, @intCast(@as(usize, n.a) + i * 2 + 1), 1, .type_);
         },
-        .nominal => {
+        .nominal, .projection => {
             try mark(type_roles, n.c, 1, .count);
             try mark(type_roles, n.c + 1, m.types.extra[n.c], .type_);
+            if (n.tag == .projection) try mark(type_roles, n.c + 1 + m.types.extra[n.c], 1, .symbol);
         },
         else => {},
     };
@@ -793,6 +849,13 @@ fn listRoles(m: *const core.Module, type_roles: []u8, core_roles: []u8) BoundsEr
         try mark(type_roles, b.closed_rows.start, b.closed_rows.len, .row_variable);
     }
     for (m.constructors) |c| try markScheme(type_roles, c.scheme);
+    for (m.contracts) |contract| {
+        try mark(type_roles, contract.parameters.start, contract.parameters.len, .type_);
+        try mark(type_roles, contract.variables.start, contract.variables.len, .type_);
+        try mark(type_roles, contract.row_variables.start, contract.row_variables.len, .row_variable);
+        try mark(type_roles, contract.row_parameters.start, contract.row_parameters.len, .row);
+        try mark(type_roles, contract.row_parameter_names.start, contract.row_parameter_names.len, .symbol);
+    }
     for (m.nominals) |n| {
         try mark(type_roles, n.parameters.start, n.parameters.len, .type_);
         try mark(type_roles, n.variables.start, n.variables.len, .type_);
@@ -855,6 +918,14 @@ const Graph = struct {
                     .product => if (slot < v.b) self.vertex(.type_, m.types.extra[v.a + slot]) else null,
                     .record => if (slot < v.b) self.vertex(.type_, m.types.extra[v.a + slot * 2 + 1]) else null,
                     .nominal => if (slot < m.types.extra[v.c]) self.vertex(.type_, m.types.extra[v.c + 1 + slot]) else null,
+                    .projection => blk: {
+                        const argument_count = m.types.extra[v.c];
+                        if (slot < argument_count) break :blk self.vertex(.type_, m.types.extra[v.c + 1 + slot]);
+                        if (slot != argument_count) break :blk null;
+                        const name = m.types.extra[v.c + 1 + argument_count];
+                        for (m.contract_members) |member| if (member.contract.unit == v.a and member.contract.decl == v.b and member.name == name and member.kind == .defined_type) break :blk self.vertex(.type_, member.root);
+                        break :blk null;
+                    },
                     .array, .list, .cursor, .resolver => if (slot == 0) self.vertex(.type_, v.a) else null,
                     .demand, .provider => switch (slot) {
                         0 => self.vertex(.type_, v.a),
@@ -1042,6 +1113,87 @@ fn cycles(graph: Graph, scratch: Scratch) BoundsError!void {
     }
 }
 
+fn associatedCharge(remaining: *usize) BoundsError!void {
+    try require(remaining.* != 0);
+    remaining.* -= 1;
+}
+fn associatedScope(graph: Graph, contract: core.Contract, root: T.Id, member: bool, scratch: Scratch, remaining: *usize) BoundsError!void {
+    const type_count = graph.starts[@backingInt(Kind.row)];
+    const row_start = graph.starts[@backingInt(Kind.row)];
+    const operation_start = graph.starts[@backingInt(Kind.operation)];
+    const count = graph.starts[@backingInt(Kind.node)];
+    @memset(scratch.colors[0..count], 0);
+    var depth: usize = 1;
+    scratch.path[0] = .{ .vertex = root };
+    while (depth != 0) {
+        const top = &scratch.path[depth - 1];
+        if (scratch.colors[top.vertex] == 0) {
+            try associatedCharge(remaining);
+            try require(depth <= 256);
+            scratch.colors[top.vertex] = 1;
+            if (top.vertex < type_count) {
+                const node = graph.m.types.nodes[top.vertex];
+                if (node.tag == .variable) {
+                    const bound = for (graph.m.types.list(contract.variables)) |id| {
+                        if (graph.m.types.node(id).tag == .variable and graph.m.types.node(id).a == node.a) break true;
+                    } else false;
+                    try require(bound);
+                }
+            } else if (top.vertex < operation_start) {
+                const row = graph.m.types.effects.rows[top.vertex - row_start];
+                try require(row.tail != .parameter);
+                if (row.tail == .variable) {
+                    var bound = false;
+                    if (member) {
+                        for (graph.m.types.list(contract.row_parameters)) |id| {
+                            const declared = graph.m.types.effects.rows[id];
+                            if (declared.tail == .variable and declared.tail.variable == row.tail.variable) bound = true;
+                        }
+                    } else {
+                        for (graph.m.types.list(contract.row_variables)) |id| {
+                            if (row.tail.variable == id) bound = true;
+                        }
+                    }
+                    try require(bound);
+                }
+            }
+        }
+        // Scope follows application arguments, never the referenced recipe's
+        // separate binders. The preceding cycle check follows both edges.
+        const recipe_edge = top.vertex < type_count and graph.m.types.nodes[top.vertex].tag == .projection and top.edge == graph.m.types.extra[graph.m.types.nodes[top.vertex].c];
+        const child = if (recipe_edge) null else graph.edge(top.vertex, top.edge);
+        if (child) |vertex| {
+            top.edge += 1;
+            if (scratch.colors[vertex] == 0) {
+                scratch.path[depth] = .{ .vertex = vertex };
+                depth += 1;
+            }
+        } else depth -= 1;
+    }
+}
+fn associatedScopes(graph: Graph, scratch: Scratch, remaining: *usize) BoundsError!void {
+    const m = graph.m;
+    if (m.contract_members.len == 0) return;
+    for (m.contracts, 0..) |contract, ordinal| {
+        try associatedCharge(remaining);
+        try require(contract.identity.unit != 0 and contract.identity.decl == T.opaque_name_bit | contract.name);
+        for (m.contracts[0..ordinal]) |previous| {
+            try associatedCharge(remaining);
+            try require(!std.meta.eql(previous.identity, contract.identity));
+        }
+        for (m.contract_members[contract.members.start..][0..contract.members.len]) |member| try associatedScope(graph, contract, member.root, true, scratch, remaining);
+        for (m.obligations[contract.predicates.start..][0..contract.predicates.len]) |predicate| inline for (.{ "ty", "other", "result", "signature" }) |field| try associatedScope(graph, contract, @field(predicate, field), false, scratch, remaining);
+    }
+    for (0..m.contract_members.len) |index_| {
+        var claims: usize = 0;
+        for (m.contracts) |contract| {
+            try associatedCharge(remaining);
+            if (index_ >= contract.members.start and index_ - contract.members.start < contract.members.len) claims += 1;
+        }
+        try require(claims == 1);
+    }
+}
+
 /// Complete validation with explicit caller-owned linear workspace. An
 /// undersized workspace is an API error (InvalidArtifact), never a size policy.
 pub fn validateWithScratch(module: *const core.Module, context: Context, scratch: Scratch) BoundsError!void {
@@ -1052,9 +1204,15 @@ pub fn validateWithScratch(module: *const core.Module, context: Context, scratch
     const start = graph.count();
     try listRoles(module, scratch.colors[start..][0..module.types.extra.len], scratch.colors[start + module.types.extra.len ..][0..module.extra.len]);
     try cycles(graph, scratch);
+    var remaining: usize = 1_000_000;
+    try associatedScopes(graph, scratch, &remaining);
 }
 
 pub fn validate(allocator: std.mem.Allocator, module: *const core.Module, context: Context) Error!void {
+    var remaining: usize = 1_000_000;
+    return validateWithBudget(allocator, module, context, &remaining);
+}
+pub fn validateWithBudget(allocator: std.mem.Allocator, module: *const core.Module, context: Context, remaining: *usize) Error!void {
     try validateBounds(module, context);
     const graph = try Graph.init(module);
     const needed = try scratchRequirements(module);
@@ -1065,4 +1223,5 @@ pub fn validate(allocator: std.mem.Allocator, module: *const core.Module, contex
     const start = graph.count();
     try listRoles(module, colors[start..][0..module.types.extra.len], colors[start + module.types.extra.len ..][0..module.extra.len]);
     try cycles(graph, .{ .colors = colors, .path = path });
+    try associatedScopes(graph, .{ .colors = colors, .path = path }, remaining);
 }

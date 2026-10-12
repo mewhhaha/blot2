@@ -102,14 +102,15 @@ const Projector = struct {
                 const span = try self.saveTypes(fields.items);
                 break :blk .{ .tag = .record, .a = span.start, .b = original.b };
             },
-            .nominal => blk: {
+            .nominal, .projection => blk: {
                 var arguments: std.ArrayList(T.Id) = .empty;
                 defer arguments.deinit(self.allocator);
                 const source_arguments = self.checked.types.nominalArguments(original);
                 try arguments.append(self.allocator, @intCast(source_arguments.len));
                 for (source_arguments) |argument| try arguments.append(self.allocator, try self.projectType(argument, depth + 1));
+                if (original.tag == .projection) try arguments.append(self.allocator, self.checked.types.projectionMember(original));
                 const span = try self.saveTypes(arguments.items);
-                break :blk .{ .tag = .nominal, .a = original.a, .b = original.b, .c = span.start };
+                break :blk .{ .tag = original.tag, .a = original.a, .b = original.b, .c = span.start };
             },
             .array, .list, .cursor, .resolver => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1) },
             .demand, .provider => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1), .c = try self.projectRow(original.c, depth + 1) },
@@ -245,7 +246,7 @@ pub fn deinit(allocator: Allocator, owner: *PI.Interface) void {
     inline for (.{ "nodes", "extra", "rows", "labels", "operations" }) |field| allocator.free(@field(owner.graph, field));
     allocator.free(owner.patterns.nodes);
     allocator.free(owner.patterns.extra);
-    inline for (.{ "bindings", "obligations", "obligation_spans", "nominals", "constructors", "effect_families", "effect_templates", "associated", "contracts", "contract_predicates" }) |field| allocator.free(@field(owner, field));
+    inline for (.{ "bindings", "obligations", "obligation_spans", "nominals", "constructors", "effect_families", "effect_templates", "associated", "contracts", "contract_predicates", "contract_members" }) |field| allocator.free(@field(owner, field));
     owner.* = undefined;
 }
 
@@ -258,6 +259,28 @@ pub fn freeze(allocator: Allocator, tree: *const ast.Tree, checked: *const check
 /// numeric catalogs; executable locals remain fully represented in owned Core.
 pub fn freezePrincipal(allocator: Allocator, tree: *const ast.Tree, checked: *const check.Checked) Error!PI.Interface {
     return freezeMode(allocator, tree, checked, true);
+}
+
+/// Publish a shared immutable graph for checked body facts. The caller owns
+/// roots and the returned graph; no solver substitution or scratch view escapes.
+pub fn freezeRoots(allocator: Allocator, tree: *const ast.Tree, checked: *const check.Checked, roots: []T.Id, row_variables: []u32) Error!@import("frozen_types.zig").Graph {
+    var projector: Projector = .{ .allocator = allocator, .checked = checked, .tree = tree };
+    defer projector.deinit();
+    try projector.initialize();
+    for (roots) |*root| root.* = try projector.projectType(root.*, 0);
+    for (row_variables) |*variable| variable.* = try projector.projectRowVariable(variable.*);
+    var graph: @import("frozen_types.zig").Graph = .{ .nodes = &.{}, .extra = &.{}, .rows = &.{}, .labels = &.{}, .operations = &.{}, .row_variable_count = projector.effect_variable_count };
+    errdefer deinitGraph(allocator, &graph);
+    graph.nodes = try projector.type_nodes.toOwnedSlice(allocator);
+    graph.extra = try projector.type_extra.toOwnedSlice(allocator);
+    graph.rows = try projector.effect_rows.toOwnedSlice(allocator);
+    graph.labels = try projector.effect_labels.toOwnedSlice(allocator);
+    graph.operations = try projector.effect_operations.toOwnedSlice(allocator);
+    return graph;
+}
+
+pub fn deinitGraph(allocator: Allocator, graph: *@import("frozen_types.zig").Graph) void {
+    inline for (.{ "nodes", "extra", "rows", "labels", "operations" }) |field| allocator.free(@field(graph, field));
 }
 
 fn freezeMode(allocator: Allocator, tree: *const ast.Tree, checked: *const check.Checked, comptime principal_only: bool) Error!PI.Interface {
@@ -373,6 +396,7 @@ fn freezeMode(allocator: Allocator, tree: *const ast.Tree, checked: *const check
     result.contracts = try allocator.alloc(PI.Contract, checked.contracts.len);
     for (checked.contracts, result.contracts) |old, *value| {
         value.* = old;
+        value.declaration = 0;
         if (principal_only and old.private) {
             value.name = 0;
             value.parameters = .{};
@@ -380,7 +404,11 @@ fn freezeMode(allocator: Allocator, tree: *const ast.Tree, checked: *const check
             value.patterns = .{};
             value.parameter_names = .{};
             value.row_variables = .{};
+            value.row_parameter_names = .{};
+            value.row_parameters = .{};
             value.predicates = .{};
+            value.members = .{};
+            value.requires_implementation = false;
             continue;
         }
         value.parameters = try projector.projectedList(old.parameters);
@@ -391,6 +419,24 @@ fn freezeMode(allocator: Allocator, tree: *const ast.Tree, checked: *const check
         defer rows.deinit(allocator);
         for (checked.types.list(old.row_variables)) |row| try rows.append(allocator, try projector.projectRowVariable(row));
         value.row_variables = try projector.saveTypes(rows.items);
+        value.row_parameter_names = try projector.copiedList(old.row_parameter_names);
+        var row_parameters: std.ArrayList(T.Id) = .empty;
+        defer row_parameters.deinit(allocator);
+        for (checked.types.list(old.row_parameters)) |row| try row_parameters.append(allocator, try projector.projectRow(row, 0));
+        value.row_parameters = try projector.saveTypes(row_parameters.items);
+    }
+    result.contract_members = try allocator.alloc(PI.ContractMember, checked.contract_members.len);
+    for (checked.contract_members, result.contract_members) |old, *value| {
+        value.* = old;
+        const private = for (checked.contracts) |contract| {
+            if (std.meta.eql(contract.identity, old.contract)) break contract.private;
+        } else true;
+        if (principal_only and private) {
+            value.name = 0;
+            value.root = 0;
+            continue;
+        }
+        value.root = try projector.projectType(old.root, 0);
     }
     const public_predicates = try allocator.alloc(bool, checked.contract_predicates.len);
     defer allocator.free(public_predicates);

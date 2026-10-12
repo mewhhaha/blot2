@@ -298,7 +298,7 @@ pub const Store = struct {
         switch (n.tag) {
             .unit, .boolean, .u32, .f32, .never => return root,
             .variable => return erased,
-            .absent => return error.UnresolvedType,
+            .absent, .projection => return error.UnresolvedType,
             .type_constructor => return self.intern(.type_constructor, n.a, n.b, &.{}),
             .array, .list, .cursor, .resolver => return self.intern(switch (n.tag) {
                 .array => .array,
@@ -482,7 +482,7 @@ pub const Store = struct {
         switch (n.tag) {
             .unit, .boolean, .u32, .f32, .never => return ty,
             .variable => return if (allow_erased) erased else error.UnresolvedType,
-            .absent => return error.UnresolvedType,
+            .absent, .projection => return error.UnresolvedType,
             .array => return self.intern(.array, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),
             .list => return self.intern(.list, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),
             .cursor => return self.intern(.cursor, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),

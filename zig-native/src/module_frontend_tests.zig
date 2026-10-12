@@ -418,9 +418,53 @@ test "prepared entry Core retains generic List Array nominal and effect code acr
     try equal(&restored, &expected);
 }
 
+// Cache leases and map storage are ownership handles. Snapshot their immutable
+// contents and lookup relation while keeping generic structural hashing strict.
+fn preparedStamp(value: partial.Prepared) [32]u8 {
+    const structural = @import("structural.zig");
+    const cache_types = @import("body_check_cache.zig");
+    var hash = std.crypto.hash.Blake3.init(.{});
+    inline for (@typeInfo(partial.Prepared).@"struct".field_names) |name| {
+        if (comptime !std.mem.eql(u8, name, "body_caches")) {
+            structural.hash(&hash, @field(value, name));
+        } else {
+            structural.hash(&hash, value.body_caches.len);
+            for (value.body_caches) |cache| {
+                structural.hash(&hash, .{ cache.minimum_nodes, cache.bodies.items.len, cache.bodies.capacity, cache.index.count(), cache.index.capacity() });
+                for (cache.bodies.items) |lease| {
+                    structural.hash(&hash, .{ lease.index, cache.index.get(lease.body().name) });
+                    inline for (@typeInfo(cache_types.Chunk).@"struct".field_names) |field| {
+                        if (comptime !std.mem.eql(u8, field, "allocator") and !std.mem.eql(u8, field, "bodies")) structural.hash(&hash, @field(lease.owner.*, field));
+                    }
+                    structural.hash(&hash, lease.owner.bodies.len);
+                    for (lease.owner.bodies) |body| {
+                        structural.hash(&hash, body.owner == lease.owner);
+                        inline for (@typeInfo(cache_types.Body).@"struct".field_names) |field| {
+                            if (comptime !std.mem.eql(u8, field, "owner")) structural.hash(&hash, @field(body, field));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    var result: [32]u8 = undefined;
+    hash.final(&result);
+    return result;
+}
+
 test "prepared entry Core prefix guards reject incompatible ownership before any mutation" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
+    var expression = try a.dupe(u8, "value");
+    defer a.free(expression);
+    for (0..32) |_| {
+        const next = try a.print("@u32.add ({s}) 1", .{expression});
+        a.free(expression);
+        expression = next;
+    }
+    const populated = try a.print("{s}const substantial = fn (value: U32) -> U32 => {s}\n", .{ entry, expression });
+    defer a.free(populated);
+    try fixture.write("main.blot", populated);
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     try initialize(&session, &fixture);
@@ -431,25 +475,35 @@ test "prepared entry Core prefix guards reject incompatible ownership before any
     @memset(reuse, false);
     var source = try project.loadCompiledMixedReadOnly(a, io, fixture.path, .{}, &session.seed, null, reuse);
     defer source.deinit(a);
-    var result = try partial.prepareProject(a, &source, fixture.path, null, &session.seed);
+    var kept: ?@import("project_check.zig").CheckedProject = null;
+    defer if (kept) |*checked| checked.deinit(a);
+    var result = try partial.prepareProjectKeepingCheck(a, &source, fixture.path, null, &session.seed, &kept);
     defer result.deinit(a);
     try std.testing.expect(result == .ready);
-    const before = artifacts.stamp(result.ready);
+    const entry_cache = &result.ready.body_caches[result.ready.entry - 1];
+    try std.testing.expect(entry_cache.bodies.items.len > 0);
+    const before = preparedStamp(result.ready);
+    const body = entry_cache.bodies.items[0].body();
+    const saved_fact = body.owner.bodies[entry_cache.bodies.items[0].index].facts[0];
+    body.owner.bodies[entry_cache.bodies.items[0].index].facts[0].ty +%= 1;
+    try std.testing.expect(!std.mem.eql(u8, &before, &preparedStamp(result.ready)));
+    body.owner.bodies[entry_cache.bodies.items[0].index].facts[0] = saved_fact;
+    try std.testing.expectEqualSlices(u8, &before, &preparedStamp(result.ready));
     var wrong = session.seed;
     wrong.symbols = wrong.symbols[0 .. wrong.symbols.len - 1];
     try std.testing.expectError(error.InvalidArtifact, result.ready.rebindFrozenPrefix(a, &wrong));
-    try std.testing.expectEqualSlices(u8, &before, &artifacts.stamp(result.ready));
+    try std.testing.expectEqualSlices(u8, &before, &preparedStamp(result.ready));
     wrong = session.seed;
     wrong.modules = wrong.modules[0 .. wrong.modules.len - 1];
     try std.testing.expectError(error.InvalidArtifact, result.ready.rebindFrozenPrefix(a, &wrong));
-    try std.testing.expectEqualSlices(u8, &before, &artifacts.stamp(result.ready));
+    try std.testing.expectEqualSlices(u8, &before, &preparedStamp(result.ready));
     const owners = try a.dupe(dependency.Module, session.seed.modules);
     defer a.free(owners);
     wrong = session.seed;
     wrong.modules = owners;
     owners[owners.len - 1].core.unit = 0;
     try std.testing.expectError(error.InvalidArtifact, result.ready.rebindFrozenPrefix(a, &wrong));
-    try std.testing.expectEqualSlices(u8, &before, &artifacts.stamp(result.ready));
+    try std.testing.expectEqualSlices(u8, &before, &preparedStamp(result.ready));
     var emitted = try result.ready.emit(a);
     defer emitted.deinit(a);
     var expected = try fresh(&fixture);

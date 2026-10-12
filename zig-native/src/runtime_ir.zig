@@ -150,7 +150,7 @@ pub const Role = enum(u2) {
 /// pass removed the allocation, an annotation describes nothing.
 pub const Ownership = packed struct(u32) {
     pub const words_per_chunk = 13;
-    pub const Kind = enum(u2) { words, rest, scope, _ };
+    pub const Kind = enum(u2) { words, rest, scope, call_result };
     kind: Kind,
     chunk: u4 = 0,
     roles: u26 = 0,
@@ -189,6 +189,18 @@ pub const Ownership = packed struct(u32) {
         return .unknown;
     }
 };
+/// A checked indirect result keeps its ownership role before machine lowering.
+/// It describes only the immediately following indirect call, never an i32 type.
+pub fn callResult(role: Role) Instruction {
+    const annotation: Ownership = .{ .kind = .call_result, .roles = @backingInt(role) };
+    return .{ .op = .ownership, .operand = @bitCast(annotation) };
+}
+pub fn indirectResult(instructions: []const Instruction, at: usize) Role {
+    if (at == 0 or at >= instructions.len or instructions[at].op != .call_indirect or instructions[at - 1].op != .ownership) return .unknown;
+    const annotation: Ownership = @bitCast(instructions[at - 1].operand);
+    if (annotation.kind != .call_result or annotation.chunk != 0 or annotation.roles > @backingInt(Role.value)) return .unknown;
+    return @fromBackingInt(@as(u2, @intCast(annotation.roles)));
+}
 /// The most annotations one allocation's run needs.
 pub const max_annotations = 17;
 /// The annotation run for an allocation whose first words have `words` roles
@@ -497,4 +509,18 @@ test "parameter roles pack two bits per parameter" {
 
 test "symbolic table references retain the compact instruction footprint" {
     try std.testing.expectEqual(@as(usize, 8), @sizeOf(Instruction));
+}
+
+test "indirect ownership results require an adjacent checked annotation" {
+    var instructions = [_]Instruction{ callResult(.scalar), .{ .op = .call_indirect } };
+    try std.testing.expectEqual(Role.scalar, indirectResult(&instructions, 1));
+    instructions[0] = callResult(.reference);
+    try std.testing.expectEqual(Role.reference, indirectResult(&instructions, 1));
+    instructions[0] = .{ .op = .nop };
+    try std.testing.expectEqual(Role.unknown, indirectResult(&instructions, 1));
+    instructions[0] = .{ .op = .ownership, .operand = @bitCast(Ownership{ .kind = .call_result, .chunk = 1, .roles = 1 }) };
+    try std.testing.expectEqual(Role.unknown, indirectResult(&instructions, 1));
+    try std.testing.expectEqual(Role.unknown, indirectResult(&instructions, 2));
+    try std.testing.expectEqual(Role.unknown, indirectResult(&instructions, 0));
+    try std.testing.expectEqual(@as(usize, 1), codeLength(&instructions));
 }

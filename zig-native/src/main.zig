@@ -28,6 +28,7 @@ const usage =
     \\       blotc check|build also accepts explicit --prelude PATH|none (default: none).
     \\       Project options accept --input-mode project|source (default: project).
     \\       --profile (build, build-project) adds detailed backend clocks to the stats record.
+    \\       --explain-demands reports bounded source-site demand lowering decisions.
     \\       --semantic-workers 1..16 (build, build-project, serve-project) opts into private semantic jobs.
     \\
     \\Handwritten Zig source compiler. JSON-lines diagnostics and stage metrics
@@ -268,7 +269,7 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
     return ok;
 }
 
-fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, profile: bool, output_path: ?[]const u8, cache_root: ?[]const u8, policy: Policy) !bool {
+fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, profile: bool, explain_demands: bool, output_path: ?[]const u8, cache_root: ?[]const u8, policy: Policy) !bool {
     var tracked: memory.TrackedAllocator = .{ .backing = backing };
     const allocator = tracked.allocator();
     const start = now(io);
@@ -413,7 +414,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         var checkpoint = if (cache_file) |*file| file.load(io) else null;
         defer if (checkpoint) |*candidate| candidate.deinit();
         cache_loaded = checkpoint != null;
-        var compiled = try backend.compileWithOptions(allocator, units, loaded.entry, .{ .io = io, .policy = policy, .profile_backend = profile, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null });
+        var compiled = try backend.compileWithOptions(allocator, units, loaded.entry, .{ .io = io, .policy = policy, .profile_backend = profile, .explain_demands = explain_demands, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null });
         defer {
             const result_release_start = now(io);
             compiled.deinit(allocator);
@@ -433,6 +434,10 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
             try emitDiagnostic(writer, loaded.filename(item.unit), if (item.related) |location| loaded.filename(location.unit) else "", item, compiled.explanation);
             emit_us = elapsed(emit_start, io);
             break :compilation false;
+        }
+        if (compiled.demand_lowering) |snapshot| {
+            try std.json.Stringify.value(.{ .kind = "demand_lowering", .sites = snapshot.sites, .omitted = snapshot.omitted }, .{}, writer);
+            try writer.writeByte('\n');
         }
         wasm_bytes = compiled.bytes.len;
         emit_us = elapsed(emit_start, io);
@@ -544,13 +549,20 @@ fn run(init: std.process.Init) !bool {
         var options: project.Options = .{};
         var dependency_path: ?[]const u8 = null;
         var profile = false;
+        var explain_demands = false;
         var policy: Policy = .{};
         var at = first_option;
         while (at < args.len) {
-            // Every option takes one value except the --profile flag.
+            // Profiling and explanation flags take no value.
             if (std.mem.eql(u8, args[at], "--profile")) {
                 if (command != .build and command != .build_project) return false;
                 profile = true;
+                at += 1;
+                continue;
+            }
+            if (std.mem.eql(u8, args[at], "--explain-demands")) {
+                if (command != .build and command != .build_project) return false;
+                explain_demands = true;
                 at += 1;
                 continue;
             }
@@ -576,7 +588,7 @@ fn run(init: std.process.Init) !bool {
         options.aliases = aliases.items;
         if (command == .dependencies or dependency_path != null) {
             if (profile or policy.semantic_components) return false;
-            const success = try dependency_cli.process(init.io, backing, &output.interface, command == .dependencies, args[2], args[3], dependency_path, options, compiler_identity.digest);
+            const success = try dependency_cli.processWithOptions(init.io, backing, &output.interface, command == .dependencies, args[2], args[3], dependency_path, options, compiler_identity.digest, .{ .explain_demands = explain_demands });
             try output.interface.flush();
             return success;
         }
@@ -589,7 +601,7 @@ fn run(init: std.process.Init) !bool {
         const inputs = if (selected == .build_project or project_command) args[2..3] else args[2..first_option];
         var success = true;
         for (inputs) |filename| {
-            const ok = processProject(init.io, backing, &output.interface, selected, filename, options, profile, if (selected == .build_project) args[3] else null, cache_root, policy) catch |err| {
+            const ok = processProject(init.io, backing, &output.interface, selected, filename, options, profile, explain_demands, if (selected == .build_project) args[3] else null, cache_root, policy) catch |err| {
                 const stage = switch (selected) {
                     .parse_project => "parse-project",
                     .check_project => "check-project",

@@ -17,16 +17,18 @@ fn external(value: *const D.FrozenDependency, current: usize, target: PI.Externa
 }
 pub fn validatePrelude(allocator: std.mem.Allocator, value: *const D.FrozenDependency, source: []const u8, producer_identity: []const u8) (Error || std.mem.Allocator.Error)!void {
     try require(value.modules.len == 1 and value.symbols.len != 0 and value.symbols[0].text.len == 0);
+    var associated_remaining: usize = 1_000_000;
     const owner = &value.modules[0];
     try require(owner.identity.prelude and owner.imports.len == 0);
     try require(std.mem.eql(u8, owner.identity.normalized_path, producer_identity));
     try require(owner.identity.source_bytes == source.len and std.mem.eql(u8, &owner.identity.source_digest, &format.digest(source)));
     try require(owner.core.unit == 1 and owner.interface.unit == 1);
     try validation.validate(&owner.interface, value.symbols.len, value.modules.len);
-    try validation.validateGraph(allocator, &owner.interface);
-    try core_validation.validate(allocator, &owner.core, .{ .units = &.{&owner.core}, .symbol_count = value.symbols.len, .source_length = owner.identity.source_bytes });
+    try validation.validateGraphWithBudget(allocator, &owner.interface, &associated_remaining);
+    try core_validation.validateWithBudget(allocator, &owner.core, .{ .units = &.{&owner.core}, .symbol_count = value.symbols.len, .source_length = owner.identity.source_bytes }, &associated_remaining);
     try @import("module_abstraction_validation.zig").publicView(allocator, &owner.interface);
     try @import("module_abstraction_validation.zig").storageContracts(&owner.interface, &owner.core);
+    try @import("associated_admission.zig").publicCoreWithBudget(allocator, &owner.interface, &owner.core, &associated_remaining);
     for (owner.core.field_names) |field| try require(std.mem.eql(u8, owner.core.name(field.spelling), value.symbols[field.symbol].text));
     for (owner.interface.bindings) |binding| if (binding.external) |target| try external(value, 0, target);
     for (owner.exports) |entry| {

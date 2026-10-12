@@ -38,7 +38,7 @@ async function verified(directory: string): Promise<string> {
   const bytes = await Deno.readFile(bundle);
   ok(bytes.length >= 212);
   equal(new TextDecoder().decode(bytes.subarray(0, 8)), "BLOTDEP1");
-  equal(new DataView(bytes.buffer).getUint32(8, true), 2);
+  equal(new DataView(bytes.buffer).getUint32(8, true), 3);
   const identity = Array.from(
     bytes.subarray(44, 76),
     (byte) => byte.toString(16).padStart(2, "0"),

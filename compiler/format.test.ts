@@ -237,3 +237,15 @@ Deno.test("formatter keeps public examples and std modules compiling to identica
     }
   }
 });
+
+Deno.test("formatter preserves associated equations abstract signatures and projection rows", async () => {
+  const source = `type Identity a is contract={type Item=a}
+type Source s is contract={type Item,const first:s->(Source.Item s)}
+const keep:a->(Identity.Item a) where{Identity a,type_eq (Identity.Item a) a}=fn value=>value
+`;
+  const formatted = await formatSource(source);
+  equal(await formatSource(formatted), formatted);
+  equal(formatted.includes("type Item = a"), true);
+  equal(formatted.includes("const first: s -> (Source.Item s)"), true);
+  equal(formatted.includes("type_eq (Identity.Item a) a"), true);
+});

@@ -428,3 +428,44 @@ test "startup source edges and project component order survive borrowed and cons
         }
     }
 }
+
+test "associated type members preserve forwarding opaque identity and wire three source parity" {
+    const entry =
+        \\import {Same, Store, make, read, keep} from "./facade"
+        \\type Alias a = Same.Item a
+        \\const passthrough: (Alias U32) -> (Same.Item U32) = fn value => keep value
+        \\entry const answer: Unit -> U32 = fn () => passthrough (read (make 42))
+    ;
+    const producer =
+        \\opaque type Token = U32
+        \\type Identity a is contract = { type Item = a }
+        \\type Tokens is contract = { type Item = Token }
+        \\type Source s is contract = { type Item, const first: s -> (Source.Item s) }
+        \\const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = fn value => value
+        \\const make: U32 -> Tokens.Item = fn value => #Token value
+        \\const read: Tokens.Item -> U32 = fn (#Token value) => value
+    ;
+    const facade = "export {Identity as Same, Tokens as Store, Source, make, read, keep} from \"./producer\"\n";
+    var dir = std.testing.tmpDir(.{});
+    defer dir.cleanup();
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = entry });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "producer.blot", .data = producer });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "facade.blot", .data = facade });
+    const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
+    defer a.free(path);
+    var owned = try freezeEntry(path);
+    defer owned.deinit();
+    try std.testing.expectEqual(@as(u32, 3), std.mem.readInt(u32, owned.bytes[8..12], .little));
+    var loaded = try format.decode(D.FrozenDependency, a, owned.bytes, key);
+    defer format.deinit(a, &loaded);
+    try closure.validate(a, &loaded);
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(a);
+    try relink.relink(a, &loaded, &pool, &.{ 1, 2 });
+    var result = try consumer.compile(a, std.testing.io, path, entry, .{}, &pool, &loaded);
+    defer result.deinit(a);
+    if (result.diagnostic) |issue| std.debug.print("assoc dependency {s} {d}: {s}\n", .{ issue.code, issue.start, issue.message });
+    if (result.compiled.diagnostic) |issue| std.debug.print("assoc emit {s}\n", .{@tagName(issue.code)});
+    try std.testing.expect(result.diagnostic == null and result.compiled.diagnostic == null);
+    try std.testing.expectEqualSlices(u8, owned.expected, result.compiled.bytes);
+}

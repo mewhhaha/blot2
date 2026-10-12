@@ -12,6 +12,7 @@ export type DiagnosticTypeKind =
   | "product"
   | "record"
   | "nominal"
+  | "projection"
   | "array"
   | "list"
   | "cursor"
@@ -58,7 +59,9 @@ export type DiagnosticRequirementKind =
   | "effect_rep"
   | "type_head"
   | "collection"
-  | "record_merge";
+  | "record_merge"
+  | "type_eq"
+  | "contract";
 export interface DiagnosticRequirement {
   kind: DiagnosticRequirementKind;
   name: string | null;
@@ -92,6 +95,7 @@ const kinds = new Set<DiagnosticTypeKind>([
   "product",
   "record",
   "nominal",
+  "projection",
   "array",
   "list",
   "cursor",
@@ -126,6 +130,8 @@ const predicates = new Set<DiagnosticRequirementKind>([
   "type_head",
   "collection",
   "record_merge",
+  "type_eq",
+  "contract",
 ]);
 /** Validate graph bounds before exposing a compiler peer's structured payload. */
 export function readTypedHole(value: unknown): TypedHoleDiagnostic {

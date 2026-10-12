@@ -897,10 +897,37 @@ Contracts are erased requirements, not type aliases or type-constructor values.
 Their bodies are checked even when unused. Recursive bundles, undeclared type
 parameters, wrong argument shapes, and missing requirements are errors. Existing
 rules about written function effects remain in force: use `a -> b ! {| e}` when
-a wrapper propagates effects. Associated type members and implementation
-declarations are subsequent work; output type parameters express relationships
-with the existing predicates. Their specified syntax, coherence and portable
-evidence rules are in
+a wrapper propagates effects.
+
+Contracts also declare defined type equations, abstract types and complete
+abstract function signatures. Members share one name space. Contract parameters
+scope over each member; members cannot introduce additional type or row binders.
+
+```blot
+type Identity a is contract = { type Item = a }
+type Source s is contract = { type Item, const first: s -> (Source.Item s) }
+type View a = Identity.Item a
+const keep: a -> (Identity.Item a) where { Identity a } = fn value => value
+entry const answer = fn () => keep 42
+```
+
+A projection such as `Identity.Item U32` supplies the contract's complete
+argument shapes and normalizes by type and effect-row substitution. A namespace
+import uses `lib.Identity.Item U32`. Forwarding retains the original producer
+and member identity. Generic aliases retain the projection recipe and propagate
+its requirements at each use. Data and opaque payloads must discharge those
+requirements when declared. Public annotations cannot expose a private contract,
+even if its defined equation reduces to a public type.
+
+`type_eq T U` gives logical semantic equality within a qualified body and must
+be discharged at a concrete use. Equality includes nominal identity and exact
+function effect rows. It never infers a contract input from an abstract output.
+Abstract projections may remain in principal schemes under their contract
+requirement; concrete execution requires implementation evidence. Implementation
+declarations and member calls are task 056. Residual projections provide no
+backend layout. Direct, mutual and growing equation cycles reject after alias
+expansion; normalization shares exact graph work within the project budget. The
+complete rules are in
 [associated contracts](../zig-native/ASSOCIATED_CONTRACTS.md).
 
 In gdev, const resource/component registrations determine the nested world type;
@@ -1124,16 +1151,17 @@ again. Other entry calls remain usable.
 Known, fully applied small functions can use branches and local values without a
 heap cell. Admitted bodies include primitive scalar and collection operations,
 conditionals, local aliases and structured range, collection and forever loops.
-This includes the prelude's `&&` and `||`, equivalent user functions and acyclic
-forwarding through other small functions in the same module. A memo created
-outside a callee loop survives all its iterations; a call inside a loop creates
-fresh state on each execution. Aliases share the first normally completed
-result. Known lexical callbacks and local aliases can share those same memo
-locals when the complete bounded proof establishes every use and capture. Zero
-iterations and unchosen branches perform no demand. Escaping demands, provider
-changes, arbitrary callbacks and bodies outside the bounded proof retain the
-shared runtime cell. Evaluation order, capture versions and first-demand
-providers are the same in both cases.
+This includes the prelude's `&&` and `||`, aliases, custom operators and
+equivalent user functions, including acyclic forwarding through available
+imported or compiled bodies and immutable compile-time captures. Both codegen
+tiers use this proof. A memo created outside a callee loop survives all its
+iterations; a call inside a loop creates fresh state on each execution. Aliases
+share the first normally completed result. Known lexical callbacks and local
+aliases can share those same memo locals when the complete bounded proof
+establishes every use and capture. Zero iterations and unchosen branches perform
+no demand. Escaping demands, provider changes, arbitrary callbacks and bodies
+outside the bounded proof retain the shared runtime cell. Evaluation order,
+capture versions and first-demand providers are the same in both cases.
 
 ## Pattern alternatives and layout
 

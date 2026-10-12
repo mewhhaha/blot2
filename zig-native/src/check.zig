@@ -54,7 +54,7 @@ pub const EditorCapture = struct {
     namespace: symbols.Symbol = 0,
     context: ?@import("hole_diagnostics.zig").Snapshot = null,
 };
-pub const ModuleOptions = struct { editor: ?EditorMarker = null, purity_origins: ModuleOrigins = .{}, builtin_catalog: bool = false, prelude_unit: u32 = 0, inherited_fixities: []const ImportedFixity = &.{}, max_inference_transitions: usize = 1_000_000 };
+pub const ModuleOptions = struct { editor: ?EditorMarker = null, purity_origins: ModuleOrigins = .{}, builtin_catalog: bool = false, prelude_unit: u32 = 0, inherited_fixities: []const ImportedFixity = &.{}, max_inference_transitions: usize = 1_000_000, associated_remaining: ?*usize = null, body_source: []const u8 = &.{}, retained_bodies: ?*@import("body_check_cache.zig").Cache = null, previous_bodies: ?*const @import("body_check_cache.zig").Cache = null, body_external_names: ?@import("body_check_cache.zig").ExternalNames = null };
 /// Private differential control. This changes execution, never semantic module
 /// options or any retained-artifact key. Ordinary public entrypoints leave it off.
 pub const AliasGlobalStats = struct { attempts: usize = 0, admitted: usize = 0, declined: usize = 0, frames: usize = 0, peak_frames: usize = 0 };
@@ -86,6 +86,7 @@ pub const PrivateExecution = struct {
 pub const Identity = T.NominalIdentity;
 pub const Nominal = PI.Nominal;
 pub const Contract = PI.Contract;
+pub const ContractMember = PI.ContractMember;
 pub const Constructor = PI.Constructor;
 pub const Associated = PI.Associated;
 pub const EffectFamily = PI.EffectFamily;
@@ -108,7 +109,7 @@ pub const ImportedCatalog = struct {
     origin: ast.Id,
 
     pub fn catalog(self: ImportedCatalog) DeclarationCatalog {
-        if (self.frozen) |owner| return .{ .types = .{ .frozen = &owner.graph }, .parameter_patterns = .{ .frozen = &owner.patterns }, .nominals = owner.nominals, .constructors = owner.constructors, .effect_families = owner.effect_families, .effect_templates = owner.effect_templates, .associated = owner.associated, .unit = owner.unit, .contracts = owner.contracts, .contract_predicates = owner.contract_predicates };
+        if (self.frozen) |owner| return .{ .types = .{ .frozen = &owner.graph }, .parameter_patterns = .{ .frozen = &owner.patterns }, .nominals = owner.nominals, .constructors = owner.constructors, .effect_families = owner.effect_families, .effect_templates = owner.effect_templates, .associated = owner.associated, .unit = owner.unit, .contracts = owner.contracts, .contract_predicates = owner.contract_predicates, .contract_members = owner.contract_members };
         return declarationCatalog(self.producer.?);
     }
     pub fn bindingCount(self: ImportedCatalog) usize {
@@ -205,9 +206,9 @@ pub fn sourceDeclaration(binding: Binding) SourceDeclaration {
     return .{ .private = binding.private, .name = binding.name, .declaration = binding.declaration, .kind = binding.kind, .named_function = binding.named_function, .external = binding.external };
 }
 /// Shared borrowed declaration payloads. No value schemes, obligations or bodies.
-pub const DeclarationCatalog = struct { types: F.Source, parameter_patterns: F.Patterns, nominals: []const Nominal, constructors: []const Constructor, effect_families: []const EffectFamily, effect_templates: []const EffectTemplate, associated: []const Associated, unit: u32, contracts: []const Contract = &.{}, contract_predicates: []const T.Obligation = &.{} };
+pub const DeclarationCatalog = struct { types: F.Source, parameter_patterns: F.Patterns, nominals: []const Nominal, constructors: []const Constructor, effect_families: []const EffectFamily, effect_templates: []const EffectTemplate, associated: []const Associated, unit: u32, contracts: []const Contract = &.{}, contract_predicates: []const T.Obligation = &.{}, contract_members: []const ContractMember = &.{} };
 pub fn declarationCatalog(producer: anytype) DeclarationCatalog {
-    return .{ .types = .{ .store = &producer.types }, .parameter_patterns = .{ .store = &producer.parameter_patterns }, .nominals = producer.nominals, .constructors = producer.constructors, .effect_families = producer.effect_families, .effect_templates = producer.effect_templates, .associated = producer.associated, .unit = producer.unit, .contracts = producer.contracts, .contract_predicates = producer.contract_predicates };
+    return .{ .types = .{ .store = &producer.types }, .parameter_patterns = .{ .store = &producer.parameter_patterns }, .nominals = producer.nominals, .constructors = producer.constructors, .effect_families = producer.effect_families, .effect_templates = producer.effect_templates, .associated = producer.associated, .unit = producer.unit, .contracts = producer.contracts, .contract_predicates = producer.contract_predicates, .contract_members = producer.contract_members };
 }
 pub const ResolverKind = enum { monad, pure, bind, forward, iterate };
 pub const ResolverBlock = struct { node: ast.Id, resolver: BindingId, result: T.Id, fallthrough: u32 = 0 };
@@ -230,7 +231,7 @@ pub const LoopCarry = struct { node: ast.Id, incoming: BindingId, iteration: Bin
 pub const LoopExit = struct { node: ast.Id, loop: ast.Id, bindings: T.List };
 pub const ClosedRow = struct { owner: BindingId, variable: u32 };
 pub const Merge = struct { node: ast.Id, result: BindingId, then_binding: BindingId, else_binding: BindingId };
-pub const Code = enum { private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, unknown_rebinding, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget };
+pub const Code = enum { missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, unknown_rebinding, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget };
 pub const PurityWitness = @import("purity_diagnostics.zig").Witness;
 pub const Diagnostic = struct {
     pub const TypeApplication = enum { missing_array, missing_nominal, extra };
@@ -259,6 +260,11 @@ pub const Diagnostic = struct {
         };
         return switch (self.code) {
             .unbound_alias_row => "A data or effect declaration must carry an open alias row in an explicit type parameter",
+            .missing_type_member => "The contract has no associated type member with this name",
+            .associated_arity => "An associated projection requires the contract's complete argument shapes",
+            .recursive_associated_type => "Associated type equations cannot recurse",
+            .associated_limit => "Associated type normalization exceeded its work or depth limit",
+            .missing_implementation => "This contract application requires an explicit implementation",
             .recursive_contract => "Contracts cannot include themselves recursively",
             .contract_arity => "A contract requires its declared type argument shapes",
             .recursive_type_alias => "Type aliases cannot refer to themselves recursively",
@@ -429,6 +435,7 @@ pub const Checked = struct {
     nominals: []Nominal = &.{},
     contracts: []Contract = &.{},
     contract_predicates: []T.Obligation = &.{},
+    contract_members: []ContractMember = &.{},
     constructors: []Constructor = &.{},
     constructor_resolved: []u32 = &.{},
     projections: []u32 = &.{},
@@ -503,6 +510,7 @@ pub const Checked = struct {
         allocator.free(self.nominals);
         allocator.free(self.contracts);
         allocator.free(self.contract_predicates);
+        allocator.free(self.contract_members);
         allocator.free(self.constructors);
         allocator.free(self.constructor_resolved);
         allocator.free(self.projections);
@@ -545,6 +553,8 @@ pub const Counters = struct {
     memo_declined: u64 = 0,
     /// Budgeted inference steps (`ModuleOptions.max_inference_transitions`).
     inference_steps: u64 = 0,
+    associated_steps: u64 = 0,
+    projection_memo_hits: u64 = 0,
 
     pub fn add(self: *Counters, other: Counters) void {
         inline for (@typeInfo(Counters).@"struct".field_names) |name| {
@@ -569,6 +579,10 @@ const Qualified = struct { namespace: symbols.Symbol, member: symbols.Symbol };
 const QualifiedResolution = struct { namespace: symbols.Symbol, binding: BindingId };
 const OperatorOverride = struct { target: symbols.Symbol, named: bool, external: ?ExternalTarget = null };
 const Engine = struct {
+    body_external_names: ?@import("body_check_cache.zig").ExternalNames = null,
+    body_source: []const u8 = &.{},
+    retained_bodies: ?*@import("body_check_cache.zig").Cache = null,
+    previous_bodies: ?*const @import("body_check_cache.zig").Cache = null,
     editor_marker: ?EditorMarker = null,
     editor_capture: ?EditorCapture = null,
     scratch_pool: region_arena.Pool,
@@ -683,6 +697,13 @@ const Engine = struct {
     nominals: std.ArrayList(Nominal) = .empty,
     contracts: std.ArrayList(Contract) = .empty,
     contract_predicates: std.ArrayList(T.Obligation) = .empty,
+    contract_members: std.ArrayList(ContractMember) = .empty,
+    member_sources: std.AutoHashMapUnmanaged(u32, ast.Id) = .empty,
+    member_states: std.AutoHashMapUnmanaged(u32, enum { visiting, ready }) = .empty,
+
+    associated_depth: usize = 0,
+    defer_associated: bool = false,
+    has_associated_types: bool = false,
     contract_names: std.AutoHashMapUnmanaged(Qualified, u32) = .empty,
     contract_identities: std.AutoHashMapUnmanaged(Identity, u32) = .empty,
     contract_states: std.AutoHashMapUnmanaged(u32, enum { visiting, ready }) = .empty,
@@ -1111,7 +1132,16 @@ const Engine = struct {
         try self.diagnostics.append(self.allocator, .{ .code = code, .span = span, .node = source });
     }
     fn constrain(self: *Engine, a: T.Id, b: T.Id, id: ast.Id) T.Error!void {
-        self.types.unify(a, b) catch |err| switch (err) {
+        var left = a;
+        var right = b;
+        if (self.has_associated_types and self.qualifications.items.len != 0) {
+            left = try self.rewriteGiven(a, 0);
+            right = try self.rewriteGiven(b, 0);
+        }
+        try self.constrainRaw(left, right, id);
+    }
+    fn constrainRaw(self: *Engine, left: T.Id, right: T.Id, id: ast.Id) T.Error!void {
+        self.types.unify(left, right) catch |err| switch (err) {
             error.OutOfMemory => return err,
             error.InfiniteType => try self.diagnostic(.infinite_type, id),
             error.TypeMismatch => try self.diagnostic(.type_mismatch, id),
@@ -1119,6 +1149,161 @@ const Engine = struct {
             error.EffectMismatch => try self.diagnostic(.effect_mismatch, id),
             error.TypeLimit => try self.diagnostic(.nesting_limit, id),
         };
+    }
+    const GivenMemo = struct {
+        types: std.AutoHashMapUnmanaged(T.Id, T.Id) = .empty,
+        rows: std.AutoHashMapUnmanaged(T.Effects.Id, T.Effects.Id) = .empty,
+        fn deinit(self: *GivenMemo, allocator: Allocator) void {
+            self.types.deinit(allocator);
+            self.rows.deinit(allocator);
+        }
+    };
+    fn rewriteGiven(self: *Engine, root: T.Id, depth: usize) T.Error!T.Id {
+        var memo: GivenMemo = .{};
+        defer memo.deinit(self.allocator);
+        return self.rewriteGivenDepth(root, &memo, depth);
+    }
+    fn equationRank(self: *Engine, id: T.Id) u8 {
+        return switch (self.types.node(id).tag) {
+            .projection => 2,
+            .variable => 1,
+            else => 0,
+        };
+    }
+    fn rewriteGivenDepth(self: *Engine, root: T.Id, memo: *GivenMemo, depth: usize) T.Error!T.Id {
+        if (memo.types.get(root)) |known| return known;
+        if (depth >= 256 or !try self.associatedStep(0)) {
+            if (depth >= 256) try self.diagnostic(.associated_limit, 0);
+            return root;
+        }
+        const original = try self.types.resolve(root, 0);
+        try memo.types.put(self.allocator, root, original);
+        const Equation = struct { left: T.Id, right: T.Id };
+        var equations: std.ArrayList(Equation) = .empty;
+        defer equations.deinit(self.allocator);
+        for (self.qualifications.items) |boundary| {
+            if (boundary.owner != self.current) continue;
+            for (self.declared_obligations.items[boundary.clauses.start..][0..boundary.clauses.len]) |equation| {
+                if (equation.kind != .type_eq) continue;
+                try self.types.chargeProjection();
+                const left = try self.rewriteGivenNode(try self.types.resolve(equation.ty, 0), memo, depth + 1);
+                const right = try self.rewriteGivenNode(try self.types.resolve(equation.result, 0), memo, depth + 1);
+                try equations.append(self.allocator, .{ .left = left, .right = right });
+            }
+        }
+        var equivalent: std.ArrayList(T.Id) = .empty;
+        defer equivalent.deinit(self.allocator);
+        try equivalent.append(self.allocator, original);
+        var index: usize = 0;
+        var id = original;
+        while (index < equivalent.items.len) : (index += 1) {
+            const item = equivalent.items[index];
+            for (equations.items) |equation| {
+                try self.types.chargeProjection();
+                var next: T.Id = undefined;
+                if (try self.types.equalSymbolic(item, equation.left)) {
+                    next = equation.right;
+                } else if (try self.types.equalSymbolic(item, equation.right)) {
+                    next = equation.left;
+                } else continue;
+                var seen = false;
+                for (equivalent.items) |known| {
+                    if (try self.types.equalSymbolic(known, next)) seen = true;
+                }
+                if (seen) continue;
+                try equivalent.append(self.allocator, next);
+                if (self.equationRank(next) < self.equationRank(id) or (self.equationRank(next) == self.equationRank(id) and next < id)) id = next;
+            }
+        }
+        // The provisional entry breaks impossible recursive given equations.
+        // Concrete use still has to discharge every original equation.
+        try memo.types.put(self.allocator, root, id);
+        var result = try self.rewriteGivenNode(id, memo, depth);
+        if (result != id) result = try self.rewriteGivenDepth(result, memo, depth + 1);
+        try memo.types.put(self.allocator, root, result);
+        return result;
+    }
+    fn rewriteGivenNode(self: *Engine, id: T.Id, memo: *GivenMemo, depth: usize) T.Error!T.Id {
+        const n = self.types.node(id);
+        switch (n.tag) {
+            .function => {
+                const a = try self.rewriteGivenDepth(n.a, memo, depth + 1);
+                const b = try self.rewriteGivenDepth(n.b, memo, depth + 1);
+                const row = try self.rewriteGivenRow(n.c, memo, depth + 1);
+                if (a == n.a and b == n.b and row == n.c) return id;
+                return self.types.functionWithEffects(a, b, row);
+            },
+            .array, .list, .cursor, .resolver, .demand, .provider => {
+                const a = try self.rewriteGivenDepth(n.a, memo, depth + 1);
+                const row = if (n.tag == .demand or n.tag == .provider) try self.rewriteGivenRow(n.c, memo, depth + 1) else n.c;
+                if (a == n.a and row == n.c) return id;
+                return switch (n.tag) {
+                    .resolver => self.types.resolver(a),
+                    .demand => self.types.demandWithEffects(a, row),
+                    .provider => self.types.provider(a, row),
+                    else => self.types.sequence(n.tag, a),
+                };
+            },
+            .product, .nominal, .projection => {
+                const old = try self.allocator.dupe(T.Id, if (n.tag == .nominal or n.tag == .projection) self.types.nominalArguments(n) else self.types.list(.{ .start = n.a, .len = n.b }));
+                defer self.allocator.free(old);
+                var parts: std.ArrayList(T.Id) = .empty;
+                defer parts.deinit(self.allocator);
+                var changed = false;
+                for (old) |child| {
+                    const next = try self.rewriteGivenDepth(child, memo, depth + 1);
+                    changed = changed or next != child;
+                    try parts.append(self.allocator, next);
+                }
+                if (!changed) return id;
+                if (n.tag == .projection) return self.types.projection(.{ .unit = n.a, .decl = n.b }, self.types.projectionMember(n), parts.items);
+                if (n.tag == .nominal) return self.types.nominal(.{ .unit = n.a, .decl = n.b }, parts.items);
+                return self.types.product(parts.items);
+            },
+            .record => {
+                var parts: std.ArrayList(T.Field) = .empty;
+                defer parts.deinit(self.allocator);
+                var changed = false;
+                for (0..n.b) |at| {
+                    const field = self.types.recordField(n, at);
+                    const next = try self.rewriteGivenDepth(field.ty, memo, depth + 1);
+                    changed = changed or next != field.ty;
+                    try parts.append(self.allocator, .{ .name = field.name, .ty = next });
+                }
+                if (!changed) return id;
+                return self.types.record(parts.items);
+            },
+            .state_provider => {
+                const a = try self.rewriteGivenDepth(n.a, memo, depth + 1);
+                const b = try self.rewriteGivenDepth(n.b, memo, depth + 1);
+                const c = try self.rewriteGivenDepth(n.c, memo, depth + 1);
+                if (a == n.a and b == n.b and c == n.c) return id;
+                return self.types.stateProvider(a, b, c);
+            },
+            else => return id,
+        }
+    }
+    fn rewriteGivenRow(self: *Engine, root: T.Effects.Id, memo: *GivenMemo, depth: usize) T.Error!T.Effects.Id {
+        if (memo.rows.get(root)) |known| return known;
+        if (depth >= 256) return error.TypeLimit;
+        const id = try self.types.resolveEffects(root, 0);
+        const row = self.types.row(id);
+        const labels = try self.allocator.dupe(T.Effects.Label, self.types.rowLabels(id));
+        defer self.allocator.free(labels);
+        var changed = false;
+        for (labels) |*label| {
+            try self.types.chargeProjection();
+            const operation = self.types.operation(label.*);
+            const arguments = try self.allocator.dupe(T.Id, self.types.operationArguments(label.*));
+            defer self.allocator.free(arguments);
+            for (arguments) |*argument| argument.* = try self.rewriteGivenDepth(argument.*, memo, depth + 1);
+            const next = try self.types.internOperation(operation.identity, arguments);
+            changed = changed or next != label.*;
+            label.* = next;
+        }
+        const result = if (changed) self.types.effects.rowAt(labels, row.tail, row.cursor) catch |err| return T.effectError(err) else id;
+        try memo.rows.put(self.allocator, root, result);
+        return result;
     }
     fn constrainEffects(self: *Engine, left: T.Effects.Id, right: T.Effects.Id, source: ast.Id) T.Error!void {
         self.types.unifyEffects(left, right) catch |err| switch (err) {
@@ -1714,6 +1899,7 @@ const Engine = struct {
         const visibility = @import("module_visibility.zig");
         var scan = try visibility.Scan.init(self.allocator, .{ .store = &self.types }, self.nominals.items, self.effect_families.items, self.effect_templates.items);
         defer scan.deinit();
+        for (self.contracts.items) |contract| if (contract.private) try scan.blocked.put(self.allocator, contract.identity, {});
         for (self.bindings.items) |binding| {
             if (binding.kind != .global or binding.private) continue;
             var allowed = try scan.allowed(binding.scheme.root);
@@ -1754,13 +1940,16 @@ const Engine = struct {
                     if (!try scan.allowed(@field(requirement, field))) allowed = false;
                 }
             }
-            const body = self.tree.node(self.tree.node(contract.identity.decl).b);
+            for (self.contract_members.items[contract.members.start..][0..contract.members.len]) |member| if (!try scan.allowed(member.root)) {
+                allowed = false;
+            };
+            const body = self.tree.node(self.tree.node(contract.declaration).b);
             for (self.tree.list(.{ .start = body.a, .len = body.b })) |predicate| {
                 if (self.contract_names.get(self.catalogKey(self.tree.node(predicate).a))) |index| if (self.contracts.items[index].private) {
                     allowed = false;
                 };
             }
-            if (!allowed) try self.diagnostic(.private_identity_escape, contract.identity.decl);
+            if (!allowed) try self.diagnostic(.private_identity_escape, contract.declaration);
         }
         for (self.effect_families.items) |family| {
             if (family.identity.unit != self.unit or family.private) continue;
@@ -1783,12 +1972,13 @@ const Engine = struct {
     }
     fn copyContract(self: *Engine, producer: DeclarationCatalog, source_index: u32) T.Error!u32 {
         const source = producer.contracts[source_index];
+        self.has_associated_types = self.has_associated_types or source.members.len != 0;
         if (self.contract_identities.get(source.identity)) |known| return known;
         const copier_arena = try self.scratch_pool.take(self.allocator);
         defer self.scratch_pool.give(copier_arena);
         var copier_buffer: [4096]u8 align(@alignOf(usize)) = undefined;
         var copier_scratch: std.heap.BufferFirstAllocator = .init(&copier_buffer, copier_arena.allocator());
-        var copier: SchemeCopier = .{ .allocator = copier_scratch.allocator(), .source = producer.types, .destination = &self.types };
+        var copier: SchemeCopier = .{ .allocator = copier_scratch.allocator(), .source = producer.types, .destination = &self.types, .associated = source.members.len != 0 };
         defer copier.deinit();
         var variables: std.ArrayList(T.Id) = .empty;
         defer variables.deinit(self.allocator);
@@ -1808,9 +1998,18 @@ const Engine = struct {
             predicate.source = 0;
             try self.contract_predicates.append(self.allocator, predicate);
         }
+        var row_parameters: std.ArrayList(T.Id) = .empty;
+        defer row_parameters.deinit(self.allocator);
+        for (producer.types.list(source.row_parameters)) |old| try row_parameters.append(self.allocator, try copier.copyRow(old, 0));
+        const member_start: u32 = @intCast(self.contract_members.items.len);
+        for (producer.contract_members[source.members.start..][0..source.members.len]) |old| {
+            var member = old;
+            member.root = try copier.copy(old.root, 0);
+            try self.contract_members.append(self.allocator, member);
+        }
         const index: u32 = @intCast(self.contracts.items.len);
         const patterns = try self.copyParameterPatterns(producer.parameter_patterns, source.patterns, &copier);
-        try self.contracts.append(self.allocator, .{ .private = source.private, .identity = source.identity, .name = source.name, .variables = try self.types.saveList(variables.items), .parameters = try self.types.saveList(parameters.items), .patterns = patterns, .parameter_names = try self.types.saveList(producer.types.list(source.parameter_names)), .row_variables = rows, .predicates = .{ .start = start, .len = source.predicates.len } });
+        try self.contracts.append(self.allocator, .{ .private = source.private, .identity = source.identity, .name = source.name, .variables = try self.types.saveList(variables.items), .parameters = try self.types.saveList(parameters.items), .patterns = patterns, .parameter_names = try self.types.saveList(producer.types.list(source.parameter_names)), .row_variables = rows, .predicates = .{ .start = start, .len = source.predicates.len }, .members = .{ .start = member_start, .len = source.members.len }, .requires_implementation = source.requires_implementation, .row_parameter_names = try self.types.saveList(producer.types.list(source.row_parameter_names)), .row_parameters = try self.types.saveList(row_parameters.items) });
         try self.contract_identities.put(self.allocator, source.identity, index);
         return index;
     }
@@ -1845,8 +2044,41 @@ const Engine = struct {
                 try variables.append(self.allocator, entry.ty);
             }
             const index: u32 = @intCast(self.contracts.items.len);
-            const identity: Identity = .{ .unit = self.unit, .decl = id };
-            try self.contracts.append(self.allocator, .{ .private = self.tree.declarationTraits(id).private, .identity = identity, .name = node.a, .parameters = try self.types.saveList(parameters.items), .patterns = try self.parameter_patterns.saveList(self.allocator, patterns.items), .variables = try self.types.saveList(variables.items), .parameter_names = try self.types.saveList(names.items) });
+            const identity: Identity = .{ .unit = self.unit, .decl = T.opaque_name_bit | node.a };
+            var row_names: std.ArrayList(T.Id) = .empty;
+            defer row_names.deinit(self.allocator);
+            var row_parameters: std.ArrayList(T.Id) = .empty;
+            defer row_parameters.deinit(self.allocator);
+            for (self.row_env.items) |entry| {
+                try row_names.append(self.allocator, entry.name);
+                try row_parameters.append(self.allocator, entry.row);
+            }
+            const header_rows = try self.types.freeRowVariables(try self.types.product(parameters.items));
+            defer self.allocator.free(header_rows);
+            const body = self.tree.node(node.b);
+            const member_start: u32 = @intCast(self.contract_members.items.len);
+            var requires_implementation = false;
+            for (self.tree.list(.{ .start = body.a, .len = body.b })) |child| {
+                const item = self.tree.node(child);
+                if (item.tag != .contract_type_member and item.tag != .contract_value_member) continue;
+                if (!try self.associatedStep(child)) continue;
+                var duplicate = false;
+                for (self.contract_members.items[member_start..]) |member| if (member.name == item.a) {
+                    duplicate = true;
+                };
+                if (duplicate) {
+                    try self.diagnostic(.duplicate_name, child);
+                    continue;
+                }
+                const kind: @FieldType(ContractMember, "kind") = if (item.tag == .contract_value_member) .value else if (item.b == 0) .abstract_type else .defined_type;
+                requires_implementation = requires_implementation or kind != .defined_type;
+                const member_index: u32 = @intCast(self.contract_members.items.len);
+                try self.contract_members.append(self.allocator, .{ .contract = identity, .name = item.a, .kind = kind });
+                try self.member_sources.put(self.allocator, member_index, child);
+            }
+            const members: T.List = .{ .start = member_start, .len = @intCast(self.contract_members.items.len - member_start) };
+            self.has_associated_types = self.has_associated_types or members.len != 0;
+            try self.contracts.append(self.allocator, .{ .declaration = id, .private = self.tree.declarationTraits(id).private, .identity = identity, .name = node.a, .parameters = try self.types.saveList(parameters.items), .patterns = try self.parameter_patterns.saveList(self.allocator, patterns.items), .variables = try self.types.saveList(variables.items), .parameter_names = try self.types.saveList(names.items), .members = members, .requires_implementation = requires_implementation, .row_variables = try self.types.saveList(header_rows), .row_parameter_names = try self.types.saveList(row_names.items), .row_parameters = try self.types.saveList(row_parameters.items) });
             try self.contract_names.put(self.allocator, key, index);
             try self.contract_identities.put(self.allocator, identity, index);
         }
@@ -1857,7 +2089,7 @@ const Engine = struct {
         const contract = self.contracts.items[index];
         if (contract.identity.unit != self.unit) return;
         if (self.contract_states.get(index)) |state| {
-            if (state == .visiting) try self.diagnostic(.recursive_contract, contract.identity.decl);
+            if (state == .visiting) try self.diagnostic(.recursive_contract, contract.declaration);
             return;
         }
         if (self.contract_depth >= 256) return error.TypeLimit;
@@ -1881,11 +2113,15 @@ const Engine = struct {
             self.implicit_row_parameters = saved_alias_rows;
         }
         for (0..contract.variables.len) |parameter| try self.type_env.append(self.allocator, .{ .name = self.types.list(contract.parameter_names)[parameter], .ty = self.types.list(contract.variables)[parameter] });
-        const body = self.tree.node(contract.identity.decl).b;
+        for (self.types.list(contract.row_parameter_names), self.types.list(contract.row_parameters)) |name, row| try self.row_env.append(self.allocator, .{ .name = name, .row = row });
+        const body = self.tree.node(contract.declaration).b;
         var predicates: std.ArrayList(T.Obligation) = .empty;
         defer predicates.deinit(self.allocator);
         const node = self.tree.node(body);
-        for (self.tree.list(.{ .start = node.a, .len = node.b })) |child| try self.lowerPredicates(child, body, &predicates);
+        for (self.tree.list(.{ .start = node.a, .len = node.b })) |child| {
+            if (self.tree.node(child).tag == .constraint) try self.lowerPredicates(child, body, &predicates);
+        }
+        for (contract.members.start..contract.members.start + contract.members.len) |member| try self.resolveMember(@intCast(member));
         var roots: std.ArrayList(T.Id) = .empty;
         defer roots.deinit(self.allocator);
         for (predicates.items) |*predicate| inline for (.{ "ty", "other", "result", "signature" }) |field| {
@@ -1895,6 +2131,7 @@ const Engine = struct {
                 try roots.append(self.allocator, @field(predicate, field));
             }
         };
+        try roots.appendSlice(self.allocator, self.types.list(contract.parameters));
         const row_variables = try self.types.freeRowVariables(try self.types.product(roots.items));
         defer self.allocator.free(row_variables);
         const start: u32 = @intCast(self.contract_predicates.items.len);
@@ -1902,6 +2139,350 @@ const Engine = struct {
         self.contracts.items[index].predicates = .{ .start = start, .len = @intCast(predicates.items.len) };
         self.contracts.items[index].row_variables = try self.types.saveList(row_variables);
         try self.contract_states.put(self.allocator, index, .ready);
+    }
+    fn associatedStep(self: *Engine, source: ast.Id) T.Error!bool {
+        if (self.inference_transitions + self.types.projection_steps >= self.inference_limit) {
+            try self.diagnostic(.associated_limit, source);
+            return false;
+        }
+        self.types.chargeProjection() catch |err| switch (err) {
+            error.TypeLimit => {
+                try self.diagnostic(.associated_limit, source);
+                return false;
+            },
+            else => return err,
+        };
+        return true;
+    }
+
+    fn memberIndex(self: *const Engine, contract: Contract, name: u32) ?u32 {
+        for (contract.members.start..contract.members.start + contract.members.len) |index| if (self.contract_members.items[index].name == name) return @intCast(index);
+        return null;
+    }
+    fn resolveMember(self: *Engine, index: u32) T.Error!void {
+        const member = self.contract_members.items[index];
+        if (member.contract.unit != self.unit or member.kind == .abstract_type) return;
+        if (self.member_states.contains(index)) return;
+        try self.member_states.put(self.allocator, index, .visiting);
+        const contract = self.contracts.items[self.contract_identities.get(member.contract).?];
+        const source = self.member_sources.get(index).?;
+        const saved_types = self.type_env;
+        const saved_rows = self.row_env;
+        const saved_closed = self.closed_type_variables;
+        const saved_implicit = self.implicit_row_parameters;
+        const saved_defer = self.defer_associated;
+        self.type_env = .empty;
+        self.row_env = .empty;
+        self.closed_type_variables = true;
+        self.implicit_row_parameters = false;
+        self.defer_associated = true;
+        defer {
+            self.type_env.deinit(self.allocator);
+            self.row_env.deinit(self.allocator);
+            self.type_env = saved_types;
+            self.row_env = saved_rows;
+            self.closed_type_variables = saved_closed;
+            self.implicit_row_parameters = saved_implicit;
+            self.defer_associated = saved_defer;
+        }
+        for (self.types.list(contract.parameter_names), self.types.list(contract.variables)) |name, variable| try self.type_env.append(self.allocator, .{ .name = name, .ty = variable });
+        for (self.types.list(contract.row_parameter_names), self.types.list(contract.row_parameters)) |name, row| try self.row_env.append(self.allocator, .{ .name = name, .row = row });
+        const root = try self.annotation(self.tree.node(source).b);
+        self.contract_members.items[index].root = root;
+        try self.member_states.put(self.allocator, index, .ready);
+    }
+    fn projectionAnnotation(self: *Engine, symbol: u32, syntax: []const ast.Id, source: ast.Id) T.Error!?T.Id {
+        const name = self.pool.get(symbol);
+        const separator = std.mem.findScalarLast(u8, name, '.') orelse return null;
+        const path = name[0..separator];
+        const first_separator = std.mem.findScalar(u8, path, '.');
+        const first_name = self.pool.lookup(if (first_separator) |at| path[0..at] else path) orelse return null;
+        for (self.type_env.items) |entry| if (entry.name == first_name) {
+            try self.diagnostic(.unsupported_type, source);
+            return try self.types.fresh();
+        };
+        var key: Qualified = .{ .namespace = 0, .member = first_name };
+        if (first_separator) |at| key = .{ .namespace = first_name, .member = self.pool.lookup(path[at + 1 ..]) orelse return null };
+        const index = self.contract_names.get(key) orelse return null;
+        const contract = self.contracts.items[index];
+        if (contract.private) {
+            const span = self.tree.span(source);
+            for (self.tree.roots.items) |declaration| {
+                const enclosing = self.tree.span(declaration);
+                if (span.start < enclosing.start or span.end > enclosing.end or self.tree.declarationTraits(declaration).private) continue;
+                if (self.tree.node(declaration).tag == .value_decl) {
+                    const binding = self.tree.valueDecl(declaration);
+                    const annotation_span = self.tree.span(binding.annotation);
+                    const where_span = self.tree.span(binding.where_node);
+                    if ((binding.annotation != 0 and span.start >= annotation_span.start and span.end <= annotation_span.end) or (binding.where_node != 0 and span.start >= where_span.start and span.end <= where_span.end)) try self.diagnostic(.private_identity_escape, source);
+                } else try self.diagnostic(.private_identity_escape, source);
+            }
+        }
+        const member_name = self.pool.lookup(name[separator + 1 ..]) orelse 0;
+        const member_index = self.memberIndex(contract, member_name) orelse {
+            try self.diagnostic(.missing_type_member, source);
+            return try self.types.fresh();
+        };
+        if (self.contract_members.items[member_index].kind == .value) {
+            try self.diagnostic(.missing_type_member, source);
+            return try self.types.fresh();
+        }
+        if (syntax.len != contract.parameters.len) {
+            try self.diagnostic(.associated_arity, source);
+            return try self.types.fresh();
+        }
+        const old = try self.allocator.dupe(T.Id, self.types.list(contract.variables));
+        defer self.allocator.free(old);
+        const fresh = try self.allocator.alloc(T.Id, old.len);
+        defer self.allocator.free(fresh);
+        for (fresh) |*variable| variable.* = try self.types.fresh();
+        const old_rows = try self.allocator.dupe(u32, self.types.list(contract.row_variables));
+        defer self.allocator.free(old_rows);
+        const fresh_rows = try self.allocator.alloc(T.Effects.Id, old_rows.len);
+        defer self.allocator.free(fresh_rows);
+        for (fresh_rows) |*row| row.* = try self.types.freshEffects();
+        const shapes = try self.allocator.dupe(T.Id, self.types.list(contract.parameters));
+        defer self.allocator.free(shapes);
+        var arguments: std.ArrayList(T.Id) = .empty;
+        defer arguments.deinit(self.allocator);
+        for (shapes, self.parameter_patterns.list(contract.patterns), syntax) |shape, pattern_, origin| {
+            const actual = try self.parameterArgument(pattern_, origin, true, 0);
+            try self.constrain(try self.types.substituteWithRows(shape, old, fresh, old_rows, fresh_rows), actual, origin);
+            try arguments.append(self.allocator, actual);
+        }
+        const projection = try self.types.projection(contract.identity, member_name, arguments.items);
+        if (self.defer_associated) return projection;
+        return try self.normalizeAssociated(projection, source, true);
+    }
+    const AssociatedMemo = struct {
+        rows: std.AutoHashMapUnmanaged(T.Effects.Id, T.Effects.Id) = .empty,
+        types: std.AutoHashMapUnmanaged(T.Id, T.Id) = .empty,
+        projections: std.ArrayList(struct { member: u32, arguments: T.List, result: T.Id }) = .empty,
+        fn deinit(self: *AssociatedMemo, allocator: Allocator) void {
+            self.types.deinit(allocator);
+            self.rows.deinit(allocator);
+            self.projections.deinit(allocator);
+        }
+    };
+    fn normalizeAssociated(self: *Engine, root: T.Id, source: ast.Id, requirements: bool) T.Error!T.Id {
+        var memo: AssociatedMemo = .{};
+        defer memo.deinit(self.allocator);
+        var active: std.ArrayList(u32) = .empty;
+        defer active.deinit(self.allocator);
+        return self.normalizeAssociatedNode(root, source, requirements, &memo, &active, 0);
+    }
+    fn normalizeAssociatedNode(self: *Engine, root: T.Id, source: ast.Id, requirements: bool, memo: *AssociatedMemo, active: *std.ArrayList(u32), depth: usize) T.Error!T.Id {
+        const id = self.types.head(root, 0);
+        const n = self.types.node(id);
+        if (id <= T.never or n.tag == .variable or n.tag == .type_constructor) return id;
+        if (memo.types.get(id)) |known| return known;
+        if (depth >= 256 or !try self.associatedStep(source)) {
+            if (depth >= 256) try self.diagnostic(.associated_limit, source);
+            return id;
+        }
+        const result = switch (n.tag) {
+            .projection, .nominal => blk: {
+                const prior = try self.allocator.dupe(T.Id, self.types.nominalArguments(n));
+                defer self.allocator.free(prior);
+                var arguments: std.ArrayList(T.Id) = .empty;
+                defer arguments.deinit(self.allocator);
+                var changed = false;
+                for (prior) |child| {
+                    const next = try self.normalizeAssociatedNode(child, source, requirements, memo, active, depth + 1);
+                    changed = changed or next != child;
+                    try arguments.append(self.allocator, next);
+                }
+                if (n.tag == .nominal) {
+                    if (!changed) break :blk id;
+                    break :blk try self.types.nominal(.{ .unit = n.a, .decl = n.b }, arguments.items);
+                }
+                const identity: Identity = .{ .unit = n.a, .decl = n.b };
+                const contract_index = self.contract_identities.get(identity) orelse {
+                    try self.diagnostic(.missing_type_member, source);
+                    break :blk id;
+                };
+                const contract = self.contracts.items[contract_index];
+                const member_name = self.types.projectionMember(n);
+                const member_index = self.memberIndex(contract, member_name) orelse {
+                    try self.diagnostic(.missing_type_member, source);
+                    break :blk id;
+                };
+                if (inList(active.items, member_index)) {
+                    try self.diagnostic(.recursive_associated_type, source);
+                    break :blk id;
+                }
+                for (memo.projections.items) |cached| {
+                    if (!try self.associatedStep(source)) break :blk id;
+                    if (cached.member != member_index or cached.arguments.len != arguments.items.len) continue;
+                    var same = true;
+                    for (self.types.list(cached.arguments), arguments.items) |before, after| if (!try self.types.equalSymbolic(before, after)) {
+                        same = false;
+                        break;
+                    };
+                    if (same) {
+                        self.counters.projection_memo_hits += 1;
+                        break :blk cached.result;
+                    }
+                }
+                try self.resolveMember(member_index);
+                const member = self.contract_members.items[member_index];
+                const old = try self.allocator.dupe(T.Id, self.types.list(contract.variables));
+                defer self.allocator.free(old);
+                const fresh = try self.allocator.alloc(T.Id, old.len);
+                defer self.allocator.free(fresh);
+                for (fresh) |*variable| variable.* = try self.types.fresh();
+                const old_rows = try self.allocator.dupe(u32, self.types.list(contract.row_variables));
+                defer self.allocator.free(old_rows);
+                const fresh_rows = try self.allocator.alloc(T.Effects.Id, old_rows.len);
+                defer self.allocator.free(fresh_rows);
+                for (fresh_rows) |*row| row.* = try self.types.freshEffects();
+                const shapes = try self.allocator.dupe(T.Id, self.types.list(contract.parameters));
+                defer self.allocator.free(shapes);
+                for (shapes, arguments.items) |shape, actual| try self.constrain(try self.types.substituteWithRows(shape, old, fresh, old_rows, fresh_rows), actual, source);
+                if (requirements) {
+                    try self.resolveContract(contract_index);
+                    const resolved_contract = self.contracts.items[contract_index];
+                    for (self.contract_predicates.items[resolved_contract.predicates.start..][0..resolved_contract.predicates.len]) |predicate| {
+                        var instantiated = predicate;
+                        inline for (.{ "ty", "other", "result", "signature" }) |field| @field(instantiated, field) = try self.types.substituteWithRows(@field(predicate, field), old, fresh, old_rows, fresh_rows);
+                        instantiated.source = source;
+                        instantiated.explicit = true;
+                        instantiated.qualification_unit = self.unit;
+                        instantiated.qualification_span = self.tree.span(source);
+                        if (instantiated.kind == .type_eq and try self.types.equalSymbolic(instantiated.ty, instantiated.result)) continue;
+                        if (self.closed_type_variables and !self.implicit_row_parameters and self.current == 0 and try self.requirementOpen(instantiated)) try self.diagnostic(.missing_predicate, source);
+                        try self.appendPending(.{ .owner = self.current, .value = instantiated, .suspended = true });
+                    }
+                    if (contract.requires_implementation) {
+                        const requirement: T.Obligation = .{ .kind = .contract, .identity = identity, .ty = try self.types.product(arguments.items), .source = source, .explicit = true };
+                        if (self.closed_type_variables and !self.implicit_row_parameters and self.current == 0) {
+                            var code: Code = .missing_implementation;
+                            if (try self.requirementOpen(requirement)) code = .missing_predicate;
+                            try self.diagnostic(code, source);
+                        }
+                        try self.appendPending(.{ .owner = self.current, .value = requirement, .suspended = true });
+                    }
+                }
+                if (member.kind != .defined_type) {
+                    if (!changed) break :blk id;
+                    break :blk try self.types.projection(identity, member_name, arguments.items);
+                }
+                try active.append(self.allocator, member_index);
+                defer _ = active.pop();
+                const expanded = try self.types.substituteWithRows(member.root, old, fresh, old_rows, fresh_rows);
+                const normalized = try self.normalizeAssociatedNode(expanded, source, requirements, memo, active, depth + 1);
+                const argument_span = try self.types.saveList(arguments.items);
+                try memo.projections.append(self.allocator, .{ .member = member_index, .arguments = argument_span, .result = normalized });
+                break :blk normalized;
+            },
+            .function => blk: {
+                const a = try self.normalizeAssociatedNode(n.a, source, requirements, memo, active, depth + 1);
+                const b = try self.normalizeAssociatedNode(n.b, source, requirements, memo, active, depth + 1);
+                const row = try self.normalizeAssociatedRow(n.c, source, requirements, memo, active, depth + 1);
+                if (a == n.a and b == n.b and row == n.c) break :blk id;
+                break :blk try self.types.functionWithEffects(a, b, row);
+            },
+            .product => blk: {
+                const prior = try self.allocator.dupe(T.Id, self.types.list(.{ .start = n.a, .len = n.b }));
+                defer self.allocator.free(prior);
+                var fields: std.ArrayList(T.Id) = .empty;
+                defer fields.deinit(self.allocator);
+                var changed = false;
+                for (prior) |child| {
+                    const next = try self.normalizeAssociatedNode(child, source, requirements, memo, active, depth + 1);
+                    changed = changed or next != child;
+                    try fields.append(self.allocator, next);
+                }
+                if (!changed) break :blk id;
+                break :blk try self.types.product(fields.items);
+            },
+            .record => blk: {
+                var fields: std.ArrayList(T.Field) = .empty;
+                defer fields.deinit(self.allocator);
+                var changed = false;
+                for (0..n.b) |at| {
+                    const field = self.types.recordField(n, at);
+                    const next = try self.normalizeAssociatedNode(field.ty, source, requirements, memo, active, depth + 1);
+                    changed = changed or next != field.ty;
+                    try fields.append(self.allocator, .{ .name = field.name, .ty = next });
+                }
+                if (!changed) break :blk id;
+                break :blk try self.types.record(fields.items);
+            },
+            .array, .list, .cursor, .resolver, .demand, .provider => blk: {
+                const child = try self.normalizeAssociatedNode(n.a, source, requirements, memo, active, depth + 1);
+                const row = if (n.tag == .demand or n.tag == .provider) try self.normalizeAssociatedRow(n.c, source, requirements, memo, active, depth + 1) else n.c;
+                if (child == n.a and row == n.c) break :blk id;
+                break :blk switch (n.tag) {
+                    .resolver => try self.types.resolver(child),
+                    .demand => try self.types.demandWithEffects(child, row),
+                    .provider => try self.types.provider(child, row),
+                    else => try self.types.sequence(n.tag, child),
+                };
+            },
+            .state_provider => blk: {
+                const a = try self.normalizeAssociatedNode(n.a, source, requirements, memo, active, depth + 1);
+                const b = try self.normalizeAssociatedNode(n.b, source, requirements, memo, active, depth + 1);
+                const c = try self.normalizeAssociatedNode(n.c, source, requirements, memo, active, depth + 1);
+                if (a == n.a and b == n.b and c == n.c) break :blk id;
+                break :blk try self.types.stateProvider(a, b, c);
+            },
+            else => id,
+        };
+        try memo.types.put(self.allocator, id, result);
+        return result;
+    }
+    fn normalizeAssociatedRow(self: *Engine, root: T.Effects.Id, source: ast.Id, requirements: bool, memo: *AssociatedMemo, active: *std.ArrayList(u32), depth: usize) T.Error!T.Effects.Id {
+        if (memo.rows.get(root)) |known| return known;
+        if (depth >= 256) return error.TypeLimit;
+        const id = try self.types.resolveEffects(root, 0);
+        const row = self.types.row(id);
+        const labels = try self.allocator.dupe(T.Effects.Label, self.types.rowLabels(id));
+        defer self.allocator.free(labels);
+        var changed = false;
+        for (labels) |*label| {
+            try self.types.chargeProjection();
+            const operation = self.types.operation(label.*);
+            const arguments = try self.allocator.dupe(T.Id, self.types.operationArguments(label.*));
+            defer self.allocator.free(arguments);
+            for (arguments) |*argument| argument.* = try self.normalizeAssociatedNode(argument.*, source, requirements, memo, active, depth + 1);
+            const next = try self.types.internOperation(operation.identity, arguments);
+            changed = changed or next != label.*;
+            label.* = next;
+        }
+        const result = if (changed) self.types.effects.rowAt(labels, row.tail, row.cursor) catch |err| return T.effectError(err) else id;
+        try memo.rows.put(self.allocator, root, result);
+        return result;
+    }
+    fn validateMemberRequirements(self: *Engine, index: u32) T.Error!void {
+        const member = self.contract_members.items[index];
+        if (member.root == 0 or member.contract.unit != self.unit) return;
+        const contract = self.contracts.items[self.contract_identities.get(member.contract).?];
+        const source = self.member_sources.get(index).?;
+        const start = self.pending.items.len;
+        defer self.pending.shrinkRetainingCapacity(start);
+        _ = try self.normalizeAssociated(member.root, source, true);
+        var cursor = start;
+        while (cursor < self.pending.items.len) : (cursor += 1) {
+            const pending = self.pending.items[cursor];
+            const wanted = pending.value;
+            if (wanted.kind == .contract and std.meta.eql(wanted.identity, contract.identity)) continue;
+            var supplied = false;
+            for (self.contract_predicates.items[contract.predicates.start..][0..contract.predicates.len]) |given| {
+                if (try self.unifyRequirement(wanted, given)) {
+                    supplied = true;
+                    break;
+                }
+            }
+            if (supplied) continue;
+            if (try self.requirementOpen(wanted) or wanted.kind == .contract) {
+                try self.diagnostic(.missing_predicate, source);
+                continue;
+            }
+            self.pending.items[cursor].suspended = false;
+            _ = try self.attemptPending(cursor, self.pending.items[cursor]);
+            if (!self.pending.items[cursor].solved) try self.diagnostic(.missing_predicate, source);
+        }
     }
     fn constructorStorageType(self: *Engine, index: u32) T.Error!T.Id {
         return self.constructorUse(index, true);
@@ -1983,6 +2564,9 @@ const Engine = struct {
         if (self.active_aliases.count() >= 256) return error.TypeLimit;
         try self.active_aliases.put(self.allocator, index, {});
         defer _ = self.active_aliases.remove(index);
+        const saved_defer = self.defer_associated;
+        self.defer_associated = true;
+        defer self.defer_associated = saved_defer;
         const saved_types = self.type_env;
         const saved_rows = self.row_env;
         const saved_closed = self.closed_type_variables;
@@ -2024,7 +2608,9 @@ const Engine = struct {
         const fresh_rows = try self.allocator.alloc(T.Effects.Id, rows.len);
         defer self.allocator.free(fresh_rows);
         for (fresh_rows) |*row| row.* = try self.types.freshEffects();
-        return try self.types.substituteWithRows(alias, old, fresh, rows, fresh_rows);
+        const expanded = try self.types.substituteWithRows(alias, old, fresh, rows, fresh_rows);
+        if (self.defer_associated or !self.has_associated_types) return expanded;
+        return try self.normalizeAssociated(expanded, source, true);
     }
     fn dataBodies(self: *Engine) T.Error!void {
         self.closed_type_variables = true;
@@ -3056,6 +3642,7 @@ const Engine = struct {
             return result;
         }
         const name = self.tree.node(head).a;
+        if (try self.projectionAnnotation(name, arguments, source)) |projection| return projection;
         if (std.mem.eql(u8, self.pool.get(name), "Array") or std.mem.eql(u8, self.pool.get(name), "List") or std.mem.eql(u8, self.pool.get(name), "Cursor")) {
             if (arguments.len == 0) {
                 try self.typeArity(source, .missing_array);
@@ -3129,7 +3716,7 @@ const Engine = struct {
     fn projectField(self: *Engine, original: T.Id, name: symbols.Symbol, source: ast.Id, writable: bool, request: ?PendingObligation) T.Error!struct { ty: T.Id, projection: u32 } {
         const ty = try self.types.resolve(original, 0);
         const n = self.types.node(ty);
-        if (n.tag == .variable) {
+        if (n.tag == .variable or n.tag == .projection) {
             const result = try self.types.fresh();
             try self.appendPending(.{ .owner = self.current, .origin = try self.projectionOrigin(source, name, !writable), .value = .{ .ty = ty, .kind = if (writable) .writable_field else .field, .name = name, .result = result, .signature = if (writable) 0 else try self.invocation(ty, result), .source = source } });
             const projection: u32 = @intCast(self.projection_catalog.items.len);
@@ -3774,7 +4361,8 @@ const Engine = struct {
                 const selected = try self.types.substitute(shape, old, fresh);
                 try self.constrain(argument, selected, syntax);
                 const resolved = try self.types.resolve(selected, 0);
-                closed = closed and try self.types.equalClosed(resolved, resolved);
+                const closed_view = if (self.defer_associated and try self.types.containsProjection(resolved)) try self.normalizeAssociated(resolved, syntax, false) else resolved;
+                closed = closed and try self.types.equalClosed(closed_view, closed_view);
                 try arguments.append(self.allocator, resolved);
             }
             if (!closed) {
@@ -3934,6 +4522,12 @@ const Engine = struct {
         const fresh_rows = try self.allocator.alloc(T.Effects.Id, rows.len);
         defer self.allocator.free(fresh_rows);
         for (fresh_rows) |*row| row.* = try self.types.freshEffects();
+        if (contract.requires_implementation) {
+            var application: std.ArrayList(T.Id) = .empty;
+            defer application.deinit(self.allocator);
+            for (shapes) |shape| try application.append(self.allocator, try self.types.resolve(try self.types.substituteWithRows(shape, old, fresh, rows, fresh_rows), 0));
+            try output.append(self.allocator, .{ .kind = .contract, .identity = contract.identity, .ty = try self.types.product(application.items), .source = id, .explicit = true, .qualification_unit = self.unit, .qualification_span = self.tree.span(where_node) });
+        }
         if (contract.predicates.len > 65_536 - output.items.len) return error.TypeLimit;
         for (self.contract_predicates.items[contract.predicates.start..][0..contract.predicates.len]) |old_predicate| {
             var predicate = old_predicate;
@@ -3952,14 +4546,16 @@ const Engine = struct {
         const details = self.tree.extra.items[node.c..][0..3];
         const syntax = self.tree.list(.{ .start = details[0], .len = details[1] });
         const name = self.pool.get(node.a);
-        const kind: T.ObligationKind = if (std.mem.eql(u8, name, "associated")) .dispatch else if (std.mem.eql(u8, name, "receiver")) .receiver else if (std.mem.eql(u8, name, "merge")) .record_merge else if (std.mem.eql(u8, name, "field")) .field else if (std.mem.eql(u8, name, "update")) .update else if (std.mem.eql(u8, name, "operation")) .effect_operation else if (std.mem.eql(u8, name, "type_rep")) .type_rep else if (std.mem.eql(u8, name, "effect_rep")) .effect_rep else {
+        const kind: T.ObligationKind = if (std.mem.eql(u8, name, "type_eq")) .type_eq else if (std.mem.eql(u8, name, "associated")) .dispatch else if (std.mem.eql(u8, name, "receiver")) .receiver else if (std.mem.eql(u8, name, "merge")) .record_merge else if (std.mem.eql(u8, name, "field")) .field else if (std.mem.eql(u8, name, "update")) .update else if (std.mem.eql(u8, name, "operation")) .effect_operation else if (std.mem.eql(u8, name, "type_rep")) .type_rep else if (std.mem.eql(u8, name, "effect_rep")) .effect_rep else {
             try self.diagnostic(.invalid_constraint, id);
             return null;
         };
+        self.has_associated_types = self.has_associated_types or kind == .type_eq;
+        self.types.has_projections = self.types.has_projections or kind == .type_eq;
         const named = kind == .dispatch or kind == .receiver or kind == .field or kind == .update;
         const expected: usize = switch (kind) {
             .dispatch, .receiver, .update, .record_merge => 3,
-            .field => 2,
+            .field, .type_eq => 2,
             .type_rep => 1,
             .effect_rep => 0,
             else => syntax.len,
@@ -4018,7 +4614,7 @@ const Engine = struct {
             result.identity = template.identity;
         } else if (kind != .effect_rep) {
             result.ty = arguments.items[0];
-            if (kind == .field) result.result = arguments.items[1] else {
+            if (kind == .field or kind == .type_eq) result.result = arguments.items[1] else {
                 result.other = arguments.items[1];
                 result.result = arguments.items[2];
                 if (kind == .dispatch) result.operator = memberOperator(self.pool.get(node.b));
@@ -4056,6 +4652,7 @@ const Engine = struct {
         const include_signature = constraint.kind != .dispatch and constraint.kind != .receiver and constraint.kind != .update;
         for ([_]T.Id{ constraint.ty, constraint.other, constraint.result, if (include_signature) constraint.signature else 0 }) |part| {
             if (part == 0) continue;
+            if (try self.types.containsProjection(part)) return true;
             const values = try self.types.freeVariables(part);
             defer self.allocator.free(values);
             if (values.len != 0) return true;
@@ -4066,18 +4663,28 @@ const Engine = struct {
         return false;
     }
     fn sourceRequirement(kind: T.ObligationKind) bool {
-        return kind == .record_merge or kind == .dispatch or kind == .field or kind == .writable_field or kind == .receiver or kind == .update or kind == .effect_operation or kind == .type_rep or kind == .effect_rep;
+        return kind == .type_eq or kind == .contract or kind == .record_merge or kind == .dispatch or kind == .field or kind == .writable_field or kind == .receiver or kind == .update or kind == .effect_operation or kind == .type_rep or kind == .effect_rep;
     }
     fn requirementHead(self: *const Engine, wanted: T.Obligation, declared: T.Obligation) bool {
         if (wanted.kind == .dispatch and declared.kind == .dispatch) return if (wanted.name != 0) wanted.name == declared.name else wanted.operator != .none and wanted.operator == declared.operator;
         if (wanted.kind == .field and (declared.kind == .field or declared.kind == .receiver)) return wanted.name == declared.name and (declared.kind == .field or self.types.node(self.types.head(declared.other, 0)).tag == .unit);
         if (wanted.kind == .writable_field and declared.kind == .update) return wanted.name == declared.name;
         if (wanted.kind != declared.kind) return false;
-        if (wanted.kind == .effect_operation) return wanted.identity.unit == declared.identity.unit and wanted.identity.decl == declared.identity.decl;
+        if (wanted.kind == .effect_operation or wanted.kind == .contract) return wanted.identity.unit == declared.identity.unit and wanted.identity.decl == declared.identity.decl;
         return wanted.name == declared.name;
     }
     fn unifyRequirement(self: *Engine, wanted: T.Obligation, declared: T.Obligation) T.Error!bool {
         if (!self.requirementHead(wanted, declared)) return false;
+        if (wanted.kind == .contract) {
+            const left = try self.rewriteGiven(wanted.ty, 0);
+            const right = try self.rewriteGiven(declared.ty, 0);
+            return self.types.equalSymbolic(left, right);
+        }
+        if (wanted.kind == .type_eq) {
+            const left = try self.rewriteGiven(wanted.ty, 0);
+            const right = try self.rewriteGiven(wanted.result, 0);
+            return self.types.equalSymbolic(left, right);
+        }
         const point = self.types.mark();
         const matched = blk: {
             self.types.unify(wanted.ty, declared.ty) catch |err| switch (err) {
@@ -4894,7 +5501,7 @@ const Engine = struct {
         const required = frame.required;
         const initializer_diagnostics = frame.initializer_diagnostics;
         const declaration = self.tree.valueDecl(id);
-        if (required != 0) try self.constrain(self.bindings.items[binding].ty, required, if (declaration.attributes.len == 0) id else declaration.annotation);
+        if (required != 0) try self.constrainRaw(self.bindings.items[binding].ty, required, if (declaration.attributes.len == 0) id else declaration.annotation);
         try self.constrain(self.bindings.items[binding].ty, value, if (declaration.attributes.len != 0 and required != 0) declaration.annotation else id);
         if (self.diagnostics.items.len == initializer_diagnostics) {
             self.initializerPurity(id) catch |err| switch (err) {
@@ -4911,11 +5518,12 @@ const Engine = struct {
         self.traceGlobal(.finished, binding);
     }
     fn inferenceTransition(self: *Engine) T.Error!void {
-        if (self.inference_transitions >= self.inference_limit) {
+        if (self.inference_transitions + self.types.projection_steps >= self.inference_limit) {
             self.exhaustBudget();
             return error.TypeLimit;
         }
         self.inference_transitions += 1;
+        self.types.projection_limit = @min(self.types.projection_limit, self.inference_limit - self.inference_transitions);
     }
     /// Records the innermost declaration being inferred: a solved field's
     /// owner, else the active global, else the declaration being checked.
@@ -5056,6 +5664,117 @@ const Engine = struct {
         const value = try self.taggedExpression(self.tree.list(declaration.attributes), declaration.body, 0);
         try self.finishGlobal(&frame, value);
     }
+    /// Reconstruct owned live facts only after every direct interface read has
+    /// committed. Active SCC members and unsupported shapes remain ordinary.
+    fn reuseBody(self: *Engine, root: ast.Id) T.Error!?T.Id {
+        const cache = self.previous_bodies orelse return null;
+        if (self.editor_marker != null or self.diagnostics.items.len != 0) return null;
+        const C = @import("body_check_cache.zig");
+        const declaration = self.tree.valueDecl(root);
+        const body = cache.find(self.pool.get(declaration.name)) orelse return null;
+        const span = self.tree.span(root);
+        if (span.end > self.body_source.len or !std.mem.eql(u8, body.source, self.body_source[span.start..span.end])) return null;
+        const shape = try C.syntax(self.allocator, self.tree, self.pool, root) orelse return null;
+        defer self.allocator.free(shape.ids);
+        if (!std.mem.eql(u8, &shape.digest, &body.syntax) or shape.ids.len != body.facts.len) return null;
+        const catalog: C.Catalog = .{ .unit = self.unit, .pool = self.pool, .nominals = self.nominals.items, .constructors = self.constructors.items };
+        var identities: std.AutoHashMapUnmanaged(Identity, Identity) = .empty;
+        defer identities.deinit(self.allocator);
+        for (body.nominals) |index| {
+            const old = body.owner.nominals[index];
+            const current = catalog.named(old.unit, old.name) orelse return null;
+            const digest = C.nominalDigest(.{ .store = &self.types }, catalog, current) orelse return null;
+            if (!std.mem.eql(u8, &digest, &old.digest)) return null;
+            try identities.put(self.allocator, .{ .unit = index + 1, .decl = 0 }, self.nominals.items[current].identity);
+        }
+        for (body.type_reads) |read| {
+            const id = shape.ids[read.position];
+            const digest = C.annotationDigest(.{ .store = &self.types }, catalog, self.pool.get(self.tree.node(id).a)) orelse return null;
+            if (!std.mem.eql(u8, &digest, &read.digest)) return null;
+        }
+        const mapped = try self.allocator.alloc(BindingId, body.bindings.len);
+        defer self.allocator.free(mapped);
+        @memset(mapped, 0);
+        for (body.bindings, mapped) |old, *target| {
+            if (old.kind == .parameter) continue;
+            const name = self.pool.lookup(old.name) orelse return null;
+            const binding = try self.catalogBinding(name) orelse return null;
+            const current = self.bindings.items[binding];
+            if (current.kind != old.kind or current.private != old.private or current.named_function != old.named_function or !std.meta.eql(current.external, old.external)) return null;
+            if (current.kind == .global) {
+                const state = self.global_states.get(binding) orelse return null;
+                if (state.state != .complete or state.on_stack or self.tree.valueDecl(current.declaration).runtime != old.runtime) return null;
+            }
+            const digest = C.readDigest(.{ .store = &self.types }, current, self.obligations.items, self.body_external_names, .{ .unit = self.unit, .pool = self.pool, .nominals = self.nominals.items, .constructors = self.constructors.items }) orelse return null;
+            if (!std.mem.eql(u8, &digest, &old.interface)) return null;
+            target.* = binding;
+        }
+        for (shape.ids, body.facts) |id, fact| if (self.tree.node(id).tag == .binary) {
+            if (fact.binding == 0) return null;
+            const old = body.bindings[fact.binding - 1];
+            if (old.kind != .global and old.kind != .external) return null;
+            const target = try discoveryReference(self, .operator, self.tree.node(id).a, 0, &.{}) orelse return null;
+            if (target != mapped[fact.binding - 1]) return null;
+        };
+        if (body.selection_digest) |old_digest| {
+            for (self.associated.items) |entry| {
+                for (body.members) |member| if (std.mem.eql(u8, member, self.pool.get(entry.member)) and !self.calleeSettled(entry.binding)) return null;
+            }
+            const digest = C.associatedDigest(.{ .store = &self.types }, .{ .unit = self.unit, .pool = self.pool, .nominals = self.nominals.items, .constructors = self.constructors.items }, self.tree, self.associated.items, self.bindings.items, self.obligations.items, self.body_external_names, body.members) orelse return null;
+            if (!std.mem.eql(u8, &digest, &old_digest)) return null;
+        }
+        const fields = try self.allocator.alloc(symbols.Symbol, body.owner.field_names.len);
+        defer self.allocator.free(fields);
+        for (body.owner.field_names, fields) |name, *field| field.* = self.pool.lookup(name) orelse return null;
+        var copier: SchemeCopier = .{ .field_mapping = fields, .allocator = self.allocator, .source = .{ .frozen = &body.owner.graph }, .destination = &self.types, .fresh_rows = true, .fresh_variables = true, .nominal_mapping = &identities };
+        defer copier.deinit();
+        for (body.bindings, mapped) |old, *target| if (old.kind == .parameter) {
+            const ty = try copier.copy(old.ty, 0);
+            const name = self.pool.lookup(old.name) orelse 0;
+            var principal: T.Scheme = .{};
+            if (old.scheme) principal.root = ty;
+            target.* = try self.addBinding(.{ .name = name, .kind = .parameter, .ty = ty, .scheme = principal, .declaration = shape.ids[old.declaration], .owner = shape.ids[old.owner] });
+        };
+        for (shape.ids, body.facts) |id, fact| {
+            self.expr_types[id] = try copier.copy(fact.ty, 0);
+            if (fact.binding != 0) self.resolved[id] = mapped[fact.binding - 1];
+        }
+        for (body.projections) |projection| self.projections[shape.ids[projection.position]] = projection.index;
+        for (body.signatures) |signature| self.dispatch_signatures[shape.ids[signature.position]] = try copier.copy(signature.ty, 0);
+        // References to qualified schemes still instantiate their current
+        // predicates. The candidate receipt first proves that copying their
+        // already solved caller types cannot constrain a newly selected effect.
+        for (shape.ids, body.facts) |id, fact| if (fact.binding != 0 and (self.tree.node(id).tag == .name or self.tree.node(id).tag == .binary)) {
+            const target = mapped[fact.binding - 1];
+            if (self.bindings.items[target].scheme.obligations.len != 0) try self.constrain(try self.instantiate(target, id), self.expr_types[id], id);
+        };
+        for (shape.ids, body.facts) |id, fact| if (fact.closed_rows.len != 0) {
+            var rows: std.ArrayList(u32) = .empty;
+            defer rows.deinit(self.allocator);
+            for (body.closed_rows[fact.closed_rows.start..][0..fact.closed_rows.len]) |old| {
+                const entry = try copier.row_variables.getOrPut(self.allocator, old);
+                if (!entry.found_existing) entry.value_ptr.* = try self.types.freshEffects();
+                const variable = self.types.effects.node(entry.value_ptr.*).tail.variable;
+                try rows.append(self.allocator, variable);
+            }
+            self.lambda_closed_rows[id] = try self.types.saveList(rows.items);
+        };
+        for (body.predicates) |predicate| {
+            var value = predicate.value;
+            value.ty = try copier.copy(value.ty, 0);
+            value.other = try copier.copy(value.other, 0);
+            value.result = try copier.copy(value.result, 0);
+            value.signature = try copier.copy(value.signature, 0);
+            value.source = shape.ids[predicate.position];
+            value.name = self.pool.lookup(predicate.name) orelse return error.TypeLimit;
+            try self.appendPending(.{ .owner = self.current, .direct = true, .value = value });
+        }
+        const ty = self.expr_types[declaration.body];
+        if (ty == 0) return null;
+        if (self.retained_bodies) |retained| try retained.retain(self.allocator, body);
+        self.body_elaborations -= 1;
+        return ty;
+    }
     fn discoveryShadowed(self: *const Engine, locals: []const symbols.Symbol, name: symbols.Symbol) bool {
         if (std.mem.findScalar(symbols.Symbol, locals, name) != null) return true;
         const text = self.pool.get(name);
@@ -5150,7 +5869,11 @@ const Engine = struct {
             }
             if (frames.items[index].value == null) {
                 const declaration = self.tree.valueDecl(frames.items[index].frame.id);
-                frames.items[index].value = try self.taggedExpression(self.tree.list(declaration.attributes), declaration.body, 0);
+                if (try self.reuseBody(frames.items[index].frame.id)) |value| {
+                    frames.items[index].value = value;
+                } else {
+                    frames.items[index].value = try self.taggedExpression(self.tree.list(declaration.attributes), declaration.body, 0);
+                }
             }
             if (self.selected_globals.items.len != 0) {
                 const selected = self.selected_globals.orderedRemove(0);
@@ -6126,8 +6849,11 @@ const Engine = struct {
                 const qualification_index = self.qualifications.items.len;
                 const requirement_start = self.pending.items.len;
                 try self.beginQualification(id, value_.where_node, value_.annotation, value_.value);
-                const value = try self.pureExpression(value_.value);
-                if (required != 0) try self.constrain(value, required, id);
+                const inferred_value = try self.pureExpression(value_.value);
+                if (required != 0) try self.constrain(inferred_value, required, id);
+                // Preserve the written principal root while checking the RHS
+                // with equations from this binding's own qualification.
+                const value = if (required != 0) required else inferred_value;
                 if (value_.where_node != 0) try self.checkQualification(qualification_index);
                 // Frozen inference restores explicit RHS annotation names
                 // before generalization. Plain lets retain generated facts.
@@ -7114,9 +7840,16 @@ const Engine = struct {
             }
             return progress;
         }
+        if (constraint.kind == .type_eq) {
+            if (try self.requirementOpen(constraint)) return progress;
+            try self.constrain(constraint.ty, constraint.result, constraint.source);
+            self.pending.items[i].solved = true;
+            return true;
+        }
+        if (constraint.kind == .contract) return progress;
         if (constraint.kind == .collection) {
             const owner = self.types.node(try self.types.resolve(constraint.ty, 0));
-            if (owner.tag == .variable) return progress;
+            if (owner.tag == .variable or owner.tag == .projection) return progress;
             if (owner.tag == .array or owner.tag == .list) {
                 try self.constrain(owner.a, constraint.result, constraint.source);
             } else try self.diagnostic(.type_mismatch, constraint.source);
@@ -7182,7 +7915,7 @@ const Engine = struct {
         }
         if (constraint.kind == .resolver_shape) {
             const owner = self.types.node(try self.types.resolve(constraint.ty, 0));
-            if (owner.tag == .variable) return progress;
+            if (owner.tag == .variable or owner.tag == .projection) return progress;
             if (owner.tag != .resolver) {
                 try self.diagnostic(.invalid_provider, constraint.source);
             } else {
@@ -7218,7 +7951,7 @@ const Engine = struct {
         if (constraint.signature != 0) self.ambient = self.types.node(try self.types.resolve(constraint.signature, 0)).c;
         defer self.ambient = saved_ambient;
         const owner = try self.types.resolve(if (constraint.kind == .result_dispatch) constraint.result else constraint.ty, 0);
-        if (self.types.node(owner).tag == .variable) return progress;
+        if (self.types.node(owner).tag == .variable or self.types.node(owner).tag == .projection) return progress;
         // A candidate can demand another source body, whose scheme
         // construction recursively enters this solver. Hide only this
         // in-flight obligation, keeping all other chronological work.
@@ -7966,9 +8699,14 @@ const Engine = struct {
 };
 
 const SchemeCopier = struct {
+    field_mapping: ?[]const symbols.Symbol = null,
+    nominal_mapping: ?*const std.AutoHashMapUnmanaged(Identity, Identity) = null,
+    fresh_variables: bool = false,
+    fresh_rows: bool = false,
     allocator: Allocator,
     source: F.Source,
     destination: *T.Store,
+    associated: bool = false,
     mapping: std.AutoHashMapUnmanaged(T.Id, T.Id) = .empty,
     row_variables: std.AutoHashMapUnmanaged(u32, T.Effects.Id) = .empty,
     rows: std.AutoHashMapUnmanaged(T.Effects.Id, T.Effects.Id) = .empty,
@@ -7992,6 +8730,7 @@ const SchemeCopier = struct {
     fn copyLabel(self: *SchemeCopier, label: T.Effects.Label, depth: usize) T.Error!T.Effects.Label {
         if (depth >= 1024 or label == 0 or label >= self.source.operationCount()) return error.TypeLimit;
         if (self.labels.get(label)) |known| return known;
+        if (self.associated) try self.destination.chargeProjection();
         const operation = self.source.operation(label);
         var args: std.ArrayList(T.Id) = .empty;
         defer args.deinit(self.allocator);
@@ -8004,6 +8743,7 @@ const SchemeCopier = struct {
         if (depth >= 1024) return error.TypeLimit;
         if (source_row == 0) return 0;
         if (self.rows.get(source_row)) |known| return known;
+        if (self.associated) try self.destination.chargeProjection();
         const row = self.source.row(source_row);
         var labels: std.ArrayList(T.Effects.Label) = .empty;
         defer labels.deinit(self.allocator);
@@ -8011,7 +8751,14 @@ const SchemeCopier = struct {
         const tail: T.Effects.Tail = switch (row.tail) {
             .closed => .closed,
             .parameter => |index| .{ .parameter = index },
-            .variable => |index| self.destination.effects.node(self.row_variables.get(index) orelse return error.TypeLimit).tail,
+            .variable => |index| blk: {
+                var mapped = self.row_variables.get(index);
+                if (mapped == null and self.fresh_rows) {
+                    mapped = try self.destination.freshEffects();
+                    try self.row_variables.put(self.allocator, index, mapped.?);
+                }
+                break :blk self.destination.effects.node(mapped orelse return error.TypeLimit).tail;
+            },
         };
         const result = self.destination.effects.row(labels.items, tail) catch |err| return T.effectError(err);
         try self.rows.put(self.allocator, source_row, result);
@@ -8022,6 +8769,7 @@ const SchemeCopier = struct {
         if (depth >= 1024) return error.TypeLimit;
         const id = self.source.head(source_id, 0);
         if (self.mapping.get(id)) |known| return known;
+        if (self.associated) try self.destination.chargeProjection();
         const node = self.source.node(id);
         const result = switch (node.tag) {
             .absent, .unit, .boolean, .u32, .f32, .never => id,
@@ -8036,19 +8784,27 @@ const SchemeCopier = struct {
                 defer fields.deinit(self.allocator);
                 for (0..node.b) |i| {
                     const f = self.source.recordField(node, i);
-                    try fields.append(self.allocator, .{ .name = f.name, .ty = try self.copy(f.ty, depth + 1) });
+                    var name = f.name;
+                    if (self.field_mapping) |mapping| name = mapping[f.name];
+                    try fields.append(self.allocator, .{ .name = name, .ty = try self.copy(f.ty, depth + 1) });
                 }
                 break :blk try self.destination.record(fields.items);
             },
-            .nominal => blk: {
+            .nominal, .projection => blk: {
                 var args: std.ArrayList(T.Id) = .empty;
                 defer args.deinit(self.allocator);
                 for (self.source.nominalArguments(node)) |arg| try args.append(self.allocator, try self.copy(arg, depth + 1));
-                break :blk try self.destination.nominal(.{ .unit = node.a, .decl = node.b }, args.items);
+                var identity: Identity = .{ .unit = node.a, .decl = node.b };
+                if (self.nominal_mapping) |mapping| identity = mapping.get(identity) orelse return error.TypeLimit;
+                if (node.tag == .projection) break :blk try self.destination.projection(identity, self.source.projectionMember(node), args.items);
+                break :blk try self.destination.nominal(identity, args.items);
             },
             // Every external variable must have been quantified in the
             // producer's principal scheme. No caller solver state is imported.
-            .variable => return error.TypeLimit,
+            .variable => blk: {
+                if (!self.fresh_variables) return error.TypeLimit;
+                break :blk try self.destination.fresh();
+            },
             .function => try self.destination.functionWithEffects(try self.copy(node.a, depth + 1), try self.copy(node.b, depth + 1), try self.copyRow(node.c, depth + 1)),
             .product => blk: {
                 var fields: std.ArrayList(T.Id) = .empty;
@@ -8182,6 +8938,7 @@ pub const SourceValidation = struct {
     nominals: []Nominal,
     contracts: []Contract,
     contract_predicates: []T.Obligation,
+    contract_members: []ContractMember,
     constructors: []Constructor,
     effect_families: []EffectFamily,
     effect_templates: []EffectTemplate,
@@ -8196,6 +8953,7 @@ pub const SourceValidation = struct {
         allocator.free(self.nominals);
         allocator.free(self.contracts);
         allocator.free(self.contract_predicates);
+        allocator.free(self.contract_members);
         allocator.free(self.constructors);
         allocator.free(self.effect_families);
         allocator.free(self.effect_templates);
@@ -8220,6 +8978,7 @@ pub fn validateModuleSource(allocator: Allocator, tree: *const ast.Tree, pool: *
         .nominals = checked.nominals,
         .contracts = checked.contracts,
         .contract_predicates = checked.contract_predicates,
+        .contract_members = checked.contract_members,
         .constructors = checked.constructors,
         .effect_families = checked.effect_families,
         .effect_templates = checked.effect_templates,
@@ -8235,6 +8994,7 @@ pub fn validateModuleSource(allocator: Allocator, tree: *const ast.Tree, pool: *
     checked.nominals = &.{};
     checked.contracts = &.{};
     checked.contract_predicates = &.{};
+    checked.contract_members = &.{};
     checked.constructors = &.{};
     checked.effect_families = &.{};
     checked.effect_templates = &.{};
@@ -8246,7 +9006,7 @@ pub fn validateModuleSource(allocator: Allocator, tree: *const ast.Tree, pool: *
 fn checkInternal(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool, imports: []const ImportedBinding, headers: []const SourceHeader, catalogs: []const ImportedCatalog, source_catalogs: []const SourceCatalog, unit: u32, allow_imports: bool, options: ModuleOptions, source_validation: bool) !Checked {
     return checkInternalExecution(allocator, tree, pool, imports, headers, catalogs, source_catalogs, unit, allow_imports, options, source_validation, .{});
 }
-const BudgetExhaustion = struct { exhausted: bool = false, name: symbols.Symbol = 0, node: ast.Id = 0, span: ast.Span = .{ .start = 0, .end = 0 } };
+const BudgetExhaustion = struct { associated: bool = false, exhausted: bool = false, name: symbols.Symbol = 0, node: ast.Id = 0, span: ast.Span = .{ .start = 0, .end = 0 } };
 fn checkInternalExecution(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool, imports: []const ImportedBinding, headers: []const SourceHeader, catalogs: []const ImportedCatalog, source_catalogs: []const SourceCatalog, unit: u32, allow_imports: bool, options: ModuleOptions, source_validation: bool, execution: PrivateExecution) !Checked {
     var exhaustion: BudgetExhaustion = .{};
     return checkEngine(allocator, tree, pool, imports, headers, catalogs, source_catalogs, unit, allow_imports, options, source_validation, execution, &exhaustion) catch |err| {
@@ -8262,13 +9022,17 @@ fn rejectExhaustedBudget(allocator: Allocator, pool: *const symbols.Pool, unit: 
     else
         try allocator.print("Type inference exceeded this module's budget of {d} steps", .{limit});
     defer allocator.free(detail);
-    var rejected = try rejectedSource(allocator, &.{.{ .code = .inference_budget, .span = exhaustion.span, .node = exhaustion.node, .symbol = exhaustion.name, .detail = detail }});
+    var rejected = try rejectedSource(allocator, &.{.{ .code = if (exhaustion.associated) .associated_limit else .inference_budget, .span = exhaustion.span, .node = exhaustion.node, .symbol = exhaustion.name, .detail = detail }});
     rejected.unit = unit;
     return rejected;
 }
 fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool, imports: []const ImportedBinding, headers: []const SourceHeader, catalogs: []const ImportedCatalog, source_catalogs: []const SourceCatalog, unit: u32, allow_imports: bool, options: ModuleOptions, source_validation: bool, execution: PrivateExecution, exhaustion: *BudgetExhaustion) !Checked {
     if (!source_validation and hasNumericFailure(tree)) return rejectNumericSource(allocator, tree, pool, imports, catalogs, unit, options);
     var engine: Engine = .{
+        .body_source = options.body_source,
+        .body_external_names = options.body_external_names,
+        .previous_bodies = options.previous_bodies,
+        .retained_bodies = options.retained_bodies,
         .editor_marker = options.editor,
         .budget_exhaustion = exhaustion,
         .scratch_pool = .init(allocator),
@@ -8290,6 +9054,9 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     defer engine.scratch_pool.deinit();
     defer engine.pending_queue.deinit(allocator);
     errdefer engine.types.deinit();
+    engine.types.projection_limit = @min(1_000_000, options.max_inference_transitions);
+    if (options.associated_remaining) |remaining| engine.types.projection_limit = @min(engine.types.projection_limit, remaining.*);
+
     defer engine.holes.deinit(allocator);
     errdefer if (engine.editor_capture) |capture| {
         allocator.free(capture.names);
@@ -8427,6 +9194,9 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     errdefer engine.nominals.deinit(allocator);
     errdefer engine.contracts.deinit(allocator);
     errdefer engine.contract_predicates.deinit(allocator);
+    errdefer engine.contract_members.deinit(allocator);
+    defer engine.member_sources.deinit(allocator);
+    defer engine.member_states.deinit(allocator);
     defer engine.contract_names.deinit(allocator);
     defer engine.contract_identities.deinit(allocator);
     defer engine.contract_states.deinit(allocator);
@@ -8492,6 +9262,13 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     errdefer engine.merges.deinit(allocator);
     _ = try engine.addBinding(.{ .name = 0, .declaration = 0, .owner = 0, .kind = .local, .ty = 0 });
     for (tree.diagnostics.items) |diagnostic| try engine.diagnostics.append(allocator, .{ .code = .syntax, .span = .{ .start = diagnostic.start, .end = diagnostic.end }, .node = 0 });
+    defer {
+        if (options.associated_remaining) |remaining| remaining.* -= @min(remaining.*, engine.types.projection_steps);
+        if (engine.types.projection_exhausted) {
+            engine.exhaustBudget();
+            exhaustion.associated = true;
+        }
+    }
     try engine.dataHeaders();
     try engine.contractHeaders();
     var local_fixities: std.AutoHashMapUnmanaged(symbols.Symbol, void) = .empty;
@@ -8533,6 +9310,26 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     try engine.dataBodies();
     engine.prepareOpaqueStorage();
     for (0..engine.contracts.items.len) |index| try engine.resolveContract(@intCast(index));
+    for (engine.contract_members.items, 0..) |member, index| {
+        if (member.contract.unit != unit or member.root == 0) continue;
+        const source = engine.member_sources.get(@intCast(index)).?;
+        const normalized = try engine.normalizeAssociated(member.root, source, false);
+        try engine.validateMemberRequirements(@intCast(index));
+        if (member.kind == .value) {
+            if (engine.types.node(engine.types.head(normalized, 0)).tag != .function) {
+                try engine.diagnostic(.annotation_kind_mismatch, source);
+            } else engine.contract_members.items[index].root = normalized;
+        }
+    }
+    for (tree.roots.items) |id| if (tree.node(id).tag == .value_decl) {
+        const name = tree.valueDecl(id).name;
+        const text = pool.get(name);
+        const dot = std.mem.findScalarLast(u8, text, '.') orelse continue;
+        const path = engine.textCatalogKey(text[0..dot]) orelse continue;
+        const contract_index = engine.contract_names.get(path) orelse continue;
+        const member_name = pool.lookup(text[dot + 1 ..]) orelse continue;
+        if (engine.memberIndex(engine.contracts.items[contract_index], member_name) != null) try engine.diagnostic(.duplicate_name, id);
+    };
     try engine.indexAssociated();
     for (options.inherited_fixities) |fixity| {
         if (local_fixities.contains(fixity.operator)) continue;
@@ -8644,6 +9441,8 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     errdefer allocator.free(contracts);
     const contract_predicates = try engine.contract_predicates.toOwnedSlice(allocator);
     errdefer allocator.free(contract_predicates);
+    const contract_members = try engine.contract_members.toOwnedSlice(allocator);
+    errdefer allocator.free(contract_members);
     const constructors = try engine.constructors.toOwnedSlice(allocator);
     errdefer allocator.free(constructors);
     const projection_catalog = try engine.projection_catalog.toOwnedSlice(allocator);
@@ -8678,9 +9477,10 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     errdefer allocator.free(body_closed_rows);
     const merges = try engine.merges.toOwnedSlice(allocator);
     errdefer allocator.free(merges);
-    var checked: Checked = .{ .editor = engine.editor_capture, .iterator_bodies = engine.iterator_bodies, .computations = computations, .request_loops = request_loops, .request_arms = request_arms, .request_controls = request_controls, .reflections = reflections, .tag_origins = engine.tag_origins, .effect_runners = effect_runners, .effect_runner_ids = engine.effect_runner_ids, .provider_blocks = provider_blocks, .provider_block_ids = engine.provider_block_ids, .body_closed_rows = body_closed_rows, .lambda_closed_rows = engine.lambda_closed_rows, .dispatch_signatures = engine.dispatch_signatures, .effect_families = effect_families, .effect_templates = effect_templates, .operation_uses = operation_uses, .operation_refs = engine.operation_refs, .resolver_completions = resolver_completions, .resolver_loops = resolver_loops, .resolver_loop_ids = engine.resolver_loop_ids, .resolver_blocks = resolver_blocks, .resolver_ops = resolver_ops, .resolver_joins = resolver_joins, .resolver_block_ids = engine.resolver_block_ids, .resolver_op_ids = engine.resolver_op_ids, .resolver_join_ids = engine.resolver_join_ids, .demand_calls = engine.demand_calls, .demand_types = engine.demand_types, .demand_binary_left_types = engine.demand_binary_left_types, .demand_binary_left = engine.demand_binary_left, .loop_carries = loop_carries, .loop_ranges = engine.loop_ranges, .loop_exits = loop_exits, .unit = unit, .associated = associated, .nominals = nominals, .contracts = contracts, .contract_predicates = contract_predicates, .constructors = constructors, .constructor_resolved = engine.constructor_resolved, .projections = engine.projections, .access_paths = engine.access_paths, .access_nodes = engine.access_nodes, .access_types = engine.access_types, .projection_resolved = engine.projection_resolved, .projection_catalog = projection_catalog, .rebindings = engine.rebindings, .types = engine.types, .parameter_patterns = engine.parameter_patterns, .expr_types = engine.expr_types, .resolved = engine.resolved, .bindings = bindings, .merges = merges, .obligations = obligations, .diagnostics = diagnostics, .body_elaborations = engine.body_elaborations, .imported_schemes = if (source_validation) 0 else engine.external_targets.count(), .counters = counters: {
+    var checked: Checked = .{ .editor = engine.editor_capture, .iterator_bodies = engine.iterator_bodies, .computations = computations, .request_loops = request_loops, .request_arms = request_arms, .request_controls = request_controls, .reflections = reflections, .tag_origins = engine.tag_origins, .effect_runners = effect_runners, .effect_runner_ids = engine.effect_runner_ids, .provider_blocks = provider_blocks, .provider_block_ids = engine.provider_block_ids, .body_closed_rows = body_closed_rows, .lambda_closed_rows = engine.lambda_closed_rows, .dispatch_signatures = engine.dispatch_signatures, .effect_families = effect_families, .effect_templates = effect_templates, .operation_uses = operation_uses, .operation_refs = engine.operation_refs, .resolver_completions = resolver_completions, .resolver_loops = resolver_loops, .resolver_loop_ids = engine.resolver_loop_ids, .resolver_blocks = resolver_blocks, .resolver_ops = resolver_ops, .resolver_joins = resolver_joins, .resolver_block_ids = engine.resolver_block_ids, .resolver_op_ids = engine.resolver_op_ids, .resolver_join_ids = engine.resolver_join_ids, .demand_calls = engine.demand_calls, .demand_types = engine.demand_types, .demand_binary_left_types = engine.demand_binary_left_types, .demand_binary_left = engine.demand_binary_left, .loop_carries = loop_carries, .loop_ranges = engine.loop_ranges, .loop_exits = loop_exits, .unit = unit, .associated = associated, .nominals = nominals, .contracts = contracts, .contract_predicates = contract_predicates, .contract_members = contract_members, .constructors = constructors, .constructor_resolved = engine.constructor_resolved, .projections = engine.projections, .access_paths = engine.access_paths, .access_nodes = engine.access_nodes, .access_types = engine.access_types, .projection_resolved = engine.projection_resolved, .projection_catalog = projection_catalog, .rebindings = engine.rebindings, .types = engine.types, .parameter_patterns = engine.parameter_patterns, .expr_types = engine.expr_types, .resolved = engine.resolved, .bindings = bindings, .merges = merges, .obligations = obligations, .diagnostics = diagnostics, .body_elaborations = engine.body_elaborations, .imported_schemes = if (source_validation) 0 else engine.external_targets.count(), .counters = counters: {
         var counters = engine.counters;
-        counters.inference_steps = engine.inference_transitions;
+        counters.inference_steps = engine.inference_transitions + engine.types.projection_steps;
+        counters.associated_steps = engine.types.projection_steps;
         break :counters counters;
     } };
     if (!source_validation and engine.initializer_rejected) {

@@ -50,6 +50,7 @@ pub const Import = struct {
 pub const Capture = struct {
     allocator: A,
     roots: bool = false,
+    needs_roots: bool = false,
     root_slots: u32 = 0,
     tier: @import("compilation_tier.zig").Tier = .optimized,
     entries: std.ArrayList(Entry) = .empty,
@@ -191,7 +192,7 @@ pub const Matcher = struct {
         @memset(relocated, null);
         const prior_ids = try a.alloc(?usize, current.entries.items.len);
         @memset(prior_ids, null);
-        var self: Matcher = .{ .allocator = a, .old = old, .current = current, .same = same, .arena_same = old.tier == current.tier and old.roots == current.roots and old.root_slots == current.root_slots and (old.arena != null) == (current.arena != null), .relocated = relocated, .prior_ids = prior_ids };
+        var self: Matcher = .{ .allocator = a, .old = old, .current = current, .same = same, .arena_same = old.tier == current.tier and old.roots == current.roots and old.needs_roots == current.needs_roots and old.root_slots == current.root_slots and (old.arena != null) == (current.arena != null), .relocated = relocated, .prior_ids = prior_ids };
         errdefer {
             for (relocated) |*body| if (body.*) |*owned| owned.deinit(a);
             a.free(prior_ids);

@@ -3,6 +3,7 @@
 //! provider. Local reads may repeat across loops. Fully applied calls may forward
 //! it through another admitted body, within the same shared node budget.
 const core = @import("core.zig");
+const Reason = @import("demand_lowering.zig").Reason;
 pub const max_parameters = 16;
 /// A lexical callback is an immutable closure or a bounded chain of local
 /// aliases. Global/foreign values and computed callback choices stay ordinary.
@@ -30,6 +31,21 @@ pub const Plan = struct {
     call_count: usize = 0,
     multiplier: u8 = 1,
     local_callbacks: bool = false,
+    failure: Reason = .unresolved_control,
+    /// Borrowed only while the complete proof runs; prepared emission keeps
+    /// the resulting use counts, never this source graph.
+    units: []const core.Module = &.{},
+
+    pub const Analysis = struct { plan: ?Plan, reason: Reason, visited: u8 };
+    pub fn analyze(module: *const core.Module, body: *const core.Body) Analysis {
+        return analyzeGraph(&.{}, module, body);
+    }
+    pub fn analyzeGraph(units: []const core.Module, module: *const core.Module, body: *const core.Body) Analysis {
+        return analyzeBudget(units, module, body, 96);
+    }
+    pub fn initCalleeGraph(units: []const core.Module, module: *const core.Module, body: *const core.Body) ?Plan {
+        return analyzeGraph(units, module, body).plan;
+    }
 
     pub fn init(module: *const core.Module, body: *const core.Body) ?Plan {
         var has_demand = false;
@@ -43,24 +59,60 @@ pub const Plan = struct {
         return initBudget(module, body, 96);
     }
     fn initBudget(module: *const core.Module, body: *const core.Body, remaining: u8) ?Plan {
-        if (!body.is_function or body.parameters.len > max_parameters) return null;
-        var plan: Plan = .{ .remaining = remaining };
-        if (!plan.visit(module, body, body.root)) return null;
-        return plan;
+        return analyzeBudget(&.{}, module, body, remaining).plan;
+    }
+    fn analyzeBudget(units: []const core.Module, module: *const core.Module, body: *const core.Body, remaining: u8) Analysis {
+        if (!body.is_function) return .{ .plan = null, .reason = .unresolved_shape, .visited = 0 };
+        if (body.parameters.len > max_parameters) return .{ .plan = null, .reason = .inlining_limit, .visited = 0 };
+        var plan: Plan = .{ .remaining = remaining, .units = units };
+        if (!plan.visit(module, body, body.root)) return .{ .plan = null, .reason = plan.failure, .visited = remaining - plan.remaining };
+        return .{ .plan = plan, .reason = .proved_local, .visited = remaining - plan.remaining };
+    }
+    const Target = struct { module: *const core.Module, binding: core.BindingId };
+    fn target(self: *Plan, module: *const core.Module, reference: core.BindingRef) ?Target {
+        var ref = reference;
+        var producer = module;
+        for (0..256) |_| {
+            if (ref.unit != 0 and ref.unit != producer.unit) {
+                if (ref.unit > self.units.len) return null;
+                producer = &self.units[ref.unit - 1];
+                if (producer.unit != ref.unit) return null;
+            }
+            if (ref.binding == 0 or ref.binding >= producer.bindings.len) return null;
+            const binding = producer.binding(ref.binding);
+            if (binding.kind == .external) {
+                ref = binding.target;
+                continue;
+            }
+            if (producer.body(ref.binding)) |definition| {
+                if (producer.types.node(binding.ty).tag == .function and definition.parameters.len == 0 and producer.node(definition.root).tag == .reference) {
+                    ref = producer.reference(definition.root);
+                    continue;
+                }
+            }
+            return .{ .module = producer, .binding = ref.binding };
+        }
+        _ = self.reject(.inlining_limit);
+        return null;
     }
     fn call(self: *Plan, module: *const core.Module, body: *const core.Body, id: core.Id) bool {
-        const target = module.call(id);
-        if (target.target.unit != 0 and target.target.unit != module.unit) return false;
-        const callee = module.body(target.target.binding) orelse return false;
-        if (target.arguments.len != callee.parameters.len) return false;
-        const child = initBudget(module, callee, self.remaining) orelse return false;
-        self.remaining = child.remaining;
+        const call_ = module.call(id);
+        const resolved = self.target(module, call_.target) orelse {
+            if (self.failure == .inlining_limit) return false;
+            return self.reject(.unknown_callee);
+        };
+        const producer = resolved.module;
+        const callee = producer.body(resolved.binding) orelse return self.reject(.unavailable_body);
+        if (call_.arguments.len != callee.parameters.len) return false;
+        const analysis = analyzeBudget(self.units, producer, callee, self.remaining);
+        self.remaining -= analysis.visited;
+        const child = analysis.plan orelse return self.reject(analysis.reason);
         self.local_callbacks = self.local_callbacks or child.local_callbacks;
-        if (self.call_count == self.calls.len) return false;
+        if (self.call_count == self.calls.len) return self.reject(.inlining_limit);
         self.calls[self.call_count] = id;
         self.call_count += 1;
-        for (target.arguments, module.bodyParameters(callee), 0..) |argument, parameter_, index| {
-            if (module.types.node(parameter_.ty).tag != .demand) {
+        for (call_.arguments, producer.bodyParameters(callee), 0..) |argument, parameter_, index| {
+            if (producer.types.node(parameter_.ty).tag != .demand) {
                 if (!self.visit(module, body, argument)) return false;
                 continue;
             }
@@ -90,15 +142,15 @@ pub const Plan = struct {
     }
     fn addBinding(self: *Plan, module: *const core.Module, id: core.BindingId) bool {
         if (id == 0) return true;
-        if (module.types.node(module.binding(id).ty).tag == .demand) return false;
+        if (module.types.node(module.binding(id).ty).tag == .demand) return self.reject(.escaping_use);
         for (self.bindings[0..self.binding_count]) |known| if (known == id) return true;
-        if (self.binding_count == self.bindings.len) return false;
+        if (self.binding_count == self.bindings.len) return self.reject(.inlining_limit);
         self.bindings[self.binding_count] = id;
         self.binding_count += 1;
         return true;
     }
     fn pattern(self: *Plan, module: *const core.Module, body: *const core.Body, id: core.PatternId) bool {
-        if (self.remaining == 0) return false;
+        if (self.remaining == 0) return self.reject(.inlining_limit);
         self.remaining -= 1;
         const p = module.pattern(id);
         return switch (p.tag) {
@@ -122,17 +174,28 @@ pub const Plan = struct {
     }
     fn visit(self: *Plan, module: *const core.Module, body: *const core.Body, id: core.Id) bool {
         if (id == 0) return true;
-        if (self.remaining == 0) return false;
+        if (self.remaining == 0) return self.reject(.inlining_limit);
         self.remaining -= 1;
         const node = module.node(id);
         return switch (node.tag) {
             .constant, .panic => true,
-            .reference => if (localClosure(module, id) != null) false else if (parameter(module, body, id)) |index|
-                module.types.node(module.bodyParameters(body)[index].ty).tag != .demand
-            else blk: {
+            .reference => blk: {
+                if (localClosure(module, id) != null) break :blk self.reject(.escaping_use);
+                if (parameter(module, body, id)) |index| {
+                    if (module.types.node(module.bodyParameters(body)[index].ty).tag == .demand) break :blk self.reject(.escaping_use);
+                    break :blk true;
+                }
                 const ref = module.reference(id);
-                if (ref.unit != 0 and ref.unit != module.unit) break :blk false;
-                for (self.bindings[0..self.binding_count]) |binding| if (ref.binding == binding) break :blk true;
+                if (ref.unit == 0 or ref.unit == module.unit) {
+                    for (self.bindings[0..self.binding_count]) |binding| if (ref.binding == binding) break :blk true;
+                }
+                if (self.target(module, ref)) |resolved| {
+                    if (resolved.module.body(resolved.binding)) |captured| {
+                        // Ordinary emission reads the current compile-time value
+                        // and its dependencies. The proof does not evaluate it.
+                        if (!captured.is_function and !captured.runtime and resolved.module.types.node(resolved.module.binding(resolved.binding).ty).tag != .demand) break :blk true;
+                    }
+                }
                 break :blk false;
             },
             .project => self.visit(module, body, node.a),
@@ -205,7 +268,7 @@ pub const Plan = struct {
             },
             .call => self.call(module, body, id),
             .apply => blk: {
-                const closure_id = localClosure(module, node.a) orelse break :blk false;
+                const closure_id = localClosure(module, node.a) orelse break :blk self.reject(.unknown_callee);
                 const closure = module.closure(closure_id);
                 if (module.types.node(closure.parameter.ty).tag == .demand) break :blk false;
                 if (!self.visit(module, body, node.b)) break :blk false;
@@ -218,7 +281,12 @@ pub const Plan = struct {
             .if_value => self.visit(module, body, node.a) and self.visit(module, body, node.b) and self.visit(module, body, node.c),
             // Associated operations may execute an arbitrary source body.
             .scalar => node.c == 0 and self.visit(module, body, node.a) and (node.b == 0 or self.visit(module, body, node.b)),
+            .closure, .suspend_ => self.reject(.escaping_use),
             else => false,
         };
+    }
+    fn reject(self: *Plan, reason: Reason) bool {
+        self.failure = reason;
+        return false;
     }
 };

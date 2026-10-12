@@ -31,7 +31,7 @@ fn mapped(units: []const u32, id: u32) Error!u32 {
 }
 fn checkInterfaceUnits(owner: *const PI.Interface, units: []const u32) Error!void {
     _ = try mapped(units, owner.unit);
-    for (owner.graph.nodes) |n| if (n.tag == .nominal or n.tag == .type_constructor) {
+    for (owner.graph.nodes) |n| if (n.tag == .nominal or n.tag == .projection or n.tag == .type_constructor) {
         _ = try mapped(units, n.a);
     };
     for (owner.graph.operations) |o| _ = try mapped(units, o.identity.unit);
@@ -44,6 +44,7 @@ fn checkInterfaceUnits(owner: *const PI.Interface, units: []const u32) Error!voi
     }
     for (owner.nominals) |n| _ = try mapped(units, n.identity.unit);
     for (owner.contracts) |c| _ = try mapped(units, c.identity.unit);
+    for (owner.contract_members) |m| _ = try mapped(units, m.contract.unit);
     for (owner.contract_predicates) |p| {
         _ = try mapped(units, p.identity.unit);
         _ = try mapped(units, p.qualification_unit);
@@ -349,6 +350,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
         for (old.value.modules, previous_views) |*module, *view| view.* = &module.core;
     }
     var resolution_remaining: usize = 1_000_000;
+    var associated_remaining: usize = 1_000_000;
     for (value.modules, 0..) |*m, id| {
         const shared = if (saved) |old| if (current) |owner| owner.shares(old, id) else false else false;
         const same_interface_bounds = if (saved) |old| value.symbols.len == old.value.symbols.len and value.modules.len == old.value.modules.len else false;
@@ -361,7 +363,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
             stats.interface_reused += 1;
         } else {
             try principal_validation.validate(&m.interface, value.symbols.len, value.modules.len);
-            try principal_validation.validateGraph(a, &m.interface);
+            try principal_validation.validateGraphWithBudget(a, &m.interface, &associated_remaining);
             stats.interface_checked += 1;
         }
         const context: core_validation.Context = .{ .units = views, .symbol_count = value.symbols.len, .source_length = m.identity.source_bytes };
@@ -369,12 +371,13 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
         if (same_core_context) {
             stats.core_reused += 1;
         } else {
-            try core_validation.validate(a, &m.core, context);
+            try core_validation.validateWithBudget(a, &m.core, context, &associated_remaining);
             for (m.core.field_names) |field| try require(std.mem.eql(u8, m.core.name(field.spelling), value.symbols[field.symbol].text));
             stats.core_checked += 1;
         }
         try @import("module_abstraction_validation.zig").publicView(a, &m.interface);
         try @import("module_abstraction_validation.zig").storageContracts(&m.interface, &m.core);
+        try @import("associated_admission.zig").publicCoreWithBudget(a, &m.interface, &m.core, &associated_remaining);
         for (m.core.bodies) |body| try require(!body.exported);
         for (m.imports) |unit| try require(unit != 0 and unit <= value.modules.len and unit != id + 1);
         try require(m.imports.len == m.source_imports.len + @intFromBool(m.implicit_prelude));
@@ -418,6 +421,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
         }
     }
     try validateImportGraph(a, value);
+    try @import("associated_admission.zig").originalProducersWithBudget(a, value.modules, &associated_remaining);
 }
 
 fn forwardedOwners(a: std.mem.Allocator, value: *const D.FrozenDependency, current: usize, remaining: *usize) Error![]bool {

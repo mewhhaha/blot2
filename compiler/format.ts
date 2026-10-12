@@ -259,7 +259,7 @@ export async function formatSource(source: string): Promise<string> {
         else if (["(", "["].includes(previous.text)) space = false;
         else if (["(", "["].includes(value)) {
           space = !adjacent ||
-            ["=", ":=", "=>", "<-", ","].includes(previous.text);
+            ["=", ":=", "=>", "->", "<-", ","].includes(previous.text);
         } else if (value === ".") space = !adjacent;
         else if (
           previous.text === "." || previous.text === "~" ||

@@ -270,6 +270,10 @@ export type RuleName =
   | "type_expression"
   | "effect_row"
   | "where_clause"
+  | "contract_body"
+  | "contract_member"
+  | "contract_type_member"
+  | "contract_value_member"
   | "constraint_body"
   | "constraint_predicate"
   | "type_application"
@@ -440,7 +444,7 @@ export interface TypeAliasCursor extends RuleCursorBase<"type_alias"> {
 }
 
 export interface ContractTypeCursor extends RuleCursorBase<"contract_type"> {
-  field(name: "body"): ConstraintBodyCursor;
+  field(name: "body"): ContractBodyCursor;
   field(name: "kind"): TokenCursor<"named", "IDENT">;
   field(name: "name"): TokenCursor<"named", "TYPE_IDENT">;
   field(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
@@ -619,6 +623,30 @@ export interface EffectRowCursor extends RuleCursorBase<"effect_row"> {
 export interface WhereClauseCursor extends RuleCursorBase<"where_clause"> {
   field(name: "body"): ConstraintBodyCursor;
   field(name: "marker"): TokenCursor<"literal", "wherE">;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ContractBodyCursor extends RuleCursorBase<"contract_body"> {
+  field(name: "members"): ReadonlyArray<ContractMemberCursor>;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "members"): ReadonlyArray<ContractMemberCursor>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ContractMemberCursor extends RuleCursorBase<"contract_member"> {
+}
+
+export interface ContractTypeMemberCursor extends RuleCursorBase<"contract_type_member"> {
+  field(name: "name"): TokenCursor<"named", "TYPE_IDENT">;
+  field(name: "value"): readonly [TokenCursor<"literal", "=">, TypeExpressionCursor] | null;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ContractValueMemberCursor extends RuleCursorBase<"contract_value_member"> {
+  field(name: "name"): TokenCursor<"named", "IDENT"> | TokenCursor<"named", "TYPE_IDENT">;
+  field(name: "signature"): TypeExpressionCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -1141,6 +1169,10 @@ export type AnyRuleCursor =
   | TypeExpressionCursor
   | EffectRowCursor
   | WhereClauseCursor
+  | ContractBodyCursor
+  | ContractMemberCursor
+  | ContractTypeMemberCursor
+  | ContractValueMemberCursor
   | ConstraintBodyCursor
   | ConstraintPredicateCursor
   | TypeApplicationCursor

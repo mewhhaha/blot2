@@ -60,6 +60,7 @@ pub const Diagnostic = struct {
 };
 pub const ArtifactSummary = struct { demands: usize, jobs: usize, functions: usize, helpers: usize, emission_events: usize, metadata_events: usize, operation_symbols: usize, templates: usize, pinned_modules: usize };
 pub const Result = struct {
+    demand_lowering: ?@import("demand_lowering.zig").Snapshot = null,
     timing: @import("backend_timing.zig").Stats = .{},
     /// Deterministic work counters for budgets; unlike timing, always recorded.
     counters: @import("work_counters.zig").Counters = .{},
@@ -94,6 +95,7 @@ pub const Result = struct {
     explanation: ?dispatch_explanation.Explanation = null,
     startup_observation: ?startup_emission_facts.Snapshot = null,
     pub fn deinit(self: *Result, allocator: Allocator) void {
+        if (self.demand_lowering) |*snapshot| snapshot.deinit(allocator);
         allocator.free(self.bytes);
         allocator.free(self.owned_message);
         if (self.explanation) |explanation| explanation.deinit(allocator);
@@ -121,6 +123,7 @@ const EvidenceRoot = refinement_receipt.Root;
 // `active` retains the original recursive initializer emission guard.
 const RuntimeSlot = struct { global: u32, initializer: u32, active: bool = true };
 const Generator = struct {
+    demand_lowering: @import("demand_lowering.zig").Store = .{},
     ragged_probe_limit: u32 = ragged_builder.probe_limit,
     work_timing: @import("backend_timing.zig").Work = .{},
     allocator: Allocator,
@@ -288,6 +291,7 @@ const Generator = struct {
         return @backingInt(try (try self.representationBridge()).rowFromEvidence(@fromBackingInt(@intCast(id))));
     }
     fn deinit(self: *Generator) void {
+        self.demand_lowering.deinit(self.allocator);
         self.startup_facts.deinit(self.allocator);
         if (self.representation_bridge) |*bridge| bridge.deinit();
         self.module.deinit();
@@ -319,6 +323,11 @@ const Generator = struct {
         var discarded = self.discard_proofs.valueIterator();
         while (discarded.next()) |proof| proof.deinit(self.allocator);
         self.discard_proofs.deinit(self.allocator);
+    }
+    fn demandSite(self: *Generator, unit_id: u32, id: core.Id, lowering: @import("demand_lowering.zig").Kind, reason: @import("demand_lowering.zig").Reason) Allocator.Error!void {
+        if (!self.demand_lowering.enabled) return;
+        const path = if (self.evaluator.diagnostic_context.identity) |identity| identity.owner(unit_id) orelse "" else "";
+        try self.demand_lowering.add(self.allocator, path, unit_id, self.unit(unit_id).span(id), lowering, reason);
     }
     fn unusedAggregate(self: *Generator, unit_id: u32, binding: core.BindingId) Error!bool {
         if (self.discard_proofs.getPtr(unit_id)) |proof| return proof.admits(binding);
@@ -370,14 +379,14 @@ const Generator = struct {
         const n = self.layouts.node(id);
         if (n.tag == .nominal and self.layouts.scalar(id) != null) return .scalar;
         return switch (n.tag) {
-            .unit, .boolean, .u32, .f32, .never, .type_constructor => .scalar,
+            .unit, .boolean, .u32, .f32, .never, .type_constructor, .resolver => .scalar,
             .product, .record, .array, .list, .cursor, .function, .demand, .provider, .state_provider => .reference,
             // Compiler-defined nominals keep their own representations.
             .nominal => nominal: {
                 if (n.a != std.math.maxInt(u32) or n.b == 5 or n.b == 6) break :nominal .reference;
                 break :nominal .value;
             },
-            .invalid, .erased, .resolver => .value,
+            .invalid, .erased => .value,
         };
     }
     fn setParameterRoles(self: *Generator, function_id: u32, roles: u64) Error!void {
@@ -1275,6 +1284,7 @@ const Generator = struct {
                     .{ .op = .i32_load },
                     .{ .op = .call_indirect, .operand = try self.module.internType(&.{ .i32, self.layouts.machine(arrow.a), .i32 }, self.layouts.machine(arrow.b)) },
                 }) |instruction| {
+                    if (instruction.op == .call_indirect) try self.module.emit(function_id, ir.callResult(self.layoutRole(arrow.b)));
                     try self.module.emit(function_id, instruction);
                     if (instruction.op == .call_indirect) if (self.request_owner) |owner| try request_runtime.guard(&self.module, function_id, owner, &.{});
                 }
@@ -1603,6 +1613,7 @@ const Generator = struct {
                 .{ .op = .i32_load },
                 .{ .op = .call_indirect, .operand = try self.module.internType(&.{ .i32, self.layouts.machine(arrow.a), .i32 }, self.layouts.machine(arrow.b)) },
             }) |instruction| {
+                if (instruction.op == .call_indirect) try self.module.emit(function_id, ir.callResult(self.layoutRole(arrow.b)));
                 try self.module.emit(function_id, instruction);
                 if (instruction.op == .call_indirect) if (self.request_owner) |owner| try request_runtime.guard(&self.module, function_id, owner, &.{});
             }
@@ -2047,6 +2058,8 @@ pub fn compile(allocator: Allocator, units: []const core.Module, entry: u32) Err
 
 const default_artifact_replay = if (@hasDecl(@import("root"), "compiler_defaults")) @import("root").compiler_defaults.artifact_replay else false;
 pub const CompileOptions = struct {
+    /// Collect bounded explanations; code is regenerated to observe every site.
+    explain_demands: bool = false,
     /// Private differential/qualification controls, never source language limits.
     ragged_builders: bool = true,
     ragged_probe_limit: u32 = ragged_builder.probe_limit,
@@ -2110,6 +2123,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         journal.clock = &metadata.clock;
     }
     var generator = try Generator.init(allocator, units, if (recording) &journal else null);
+    generator.demand_lowering.enabled = options.explain_demands;
     generator.ragged_probe_limit = options.ragged_probe_limit;
     if (!options.ragged_builders) generator.ragged_probe_limit = 0;
     generator.evaluator.ragged_probe_limit = generator.ragged_probe_limit;
@@ -2127,7 +2141,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     if (recording) generator.runtime_operations.artifacts = &journal;
     var retained: ?artifact_fragment.State = null;
     defer if (retained) |*state| state.deinit();
-    if (options.previous) |previous| {
+    if (if (options.explain_demands) null else options.previous) |previous| {
         if (previous.emission.sealed and previous.metadata.pools != null) {
             retained = try artifact_fragment.State.initWithStamps(allocator, previous, units, options.identity, options.cached_units, stamps);
             generator.retained = &retained.?;
@@ -2241,6 +2255,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     result.optimization.split_declined = generator.evaluator.split_declined;
     result.counters = generator.evaluator.counters;
     errdefer result.deinit(allocator);
+    result.demand_lowering = try generator.demand_lowering.take(allocator);
     if (options.observe_startup) result.startup_observation = try generator.startup_facts.capture(allocator, &generator.module);
     result.principal = generator.principalStats();
     if (query_state) |state| result.completed_queries = state.stats;
@@ -2814,6 +2829,7 @@ const Emitter = struct {
         result: Template,
     };
     const DemandPlan = struct { uses: [max_parameters]u8 };
+    const DemandDecision = struct { plan: ?DemandPlan = null, reason: @import("demand_lowering.zig").Reason };
     const NamedPlan = struct {
         call: resolved_call.Named,
         demand: ?DemandPlan = null,
@@ -2849,6 +2865,7 @@ const Emitter = struct {
         resolver: ResolverPlan,
         dispatch: DispatchPlan,
         comparison: bool,
+        constructor_subject: core.Id,
         result_member: CallableKey,
         join: resolved_flow.Join,
         match: resolved_flow.Match,
@@ -3076,6 +3093,7 @@ const Emitter = struct {
                     for (source.armRows(arm)) |row| for (source.rowPatterns(row)) |pattern_id| try self.preparePattern(body, pattern_id, depth + 1);
                     try self.prepareNode(body, arm.guard, depth + 1, false);
                     try self.prepareNode(body, arm.body, depth + 1, false);
+                    try self.prepareConstructorSubject(body, id, arm);
                 }
             },
             .update => {
@@ -3113,6 +3131,32 @@ const Emitter = struct {
             const factory = try self.prepareFactory(body, id);
             if (n.tag == .call) body.getPtr(.named, id).factory = factory else body.getPtr(.application, id).factory = factory;
         }
+    }
+
+    // Reconstructing an unchanged immutable variant can share its cell. The
+    // existing descriptor retains exact erased-payload evidence; no new field
+    // is published and no unobserved type parameter needs a guessed role.
+    fn prepareConstructorSubject(self: *Emitter, body: *Body, match_id: core.Id, arm: core.MatchArm) Error!void {
+        const source = self.generator.unit(self.unit_id);
+        const inputs = source.matchInputs(match_id);
+        if (inputs.len != 1 or source.node(inputs[0]).tag != .reference) return;
+        const subject = source.reference(inputs[0]);
+        if (subject.unit != 0 and subject.unit != self.unit_id) return;
+        if (!self.locals.contains(subject.binding)) return;
+        const rows = source.armRows(arm);
+        if (rows.len != 1) return;
+        const patterns = source.rowPatterns(rows[0]);
+        if (patterns.len != 1) return;
+        const pattern = source.pattern(patterns[0]);
+        if (pattern.tag != .constructor or pattern.b == 0) return;
+        const payload = source.pattern(pattern.b);
+        if (payload.tag != .bind or payload.a == 0) return;
+        const constructed = source.node(arm.body);
+        if (constructed.tag != .construct or constructed.a != pattern.a or constructed.c != 0 or constructed.b == 0) return;
+        if (source.node(constructed.b).tag != .reference) return;
+        const reference = source.reference(constructed.b);
+        if ((reference.unit != 0 and reference.unit != self.unit_id) or reference.binding != payload.a) return;
+        try body.put(self.generator.allocator, arm.body, .{ .constructor_subject = inputs[0] });
     }
 
     fn preparePattern(self: *Emitter, body: *Body, id: core.PatternId, depth: usize) Error!void {
@@ -3311,7 +3355,9 @@ const Emitter = struct {
             const target = g.unit(key.target.unit);
             const body = target.body(key.target.binding) orelse return false;
             if (key.count != call.arguments.len or key.count != body.parameters.len) return false;
-            const child = @import("demand_inline.zig").Plan.initCallee(target, body) orelse return false;
+            const analysis = @import("demand_inline.zig").Plan.analyzeGraph(g.units, target, body);
+            g.evaluator.counters.demand_inline_nodes += analysis.visited;
+            const child = analysis.plan orelse return false;
             for (call.arguments, 0..) |argument, i| {
                 if (self.hasErasedType(key.parameters[i], 0)) return false;
                 if (g.layouts.node(key.parameters[i]).tag == .demand and source.node(argument).tag != .suspend_) return false;
@@ -3348,21 +3394,24 @@ const Emitter = struct {
         return &table.records.items[installed].value;
     }
 
-    fn prepareDemandCall(self: *Emitter, key: Key, arguments: []const core.Id) Error!?DemandPlan {
+    fn prepareDemandCall(self: *Emitter, key: Key, arguments: []const core.Id) Error!DemandDecision {
         std.debug.assert(self.preparing);
         const g = self.generator;
         const source = g.unit(key.target.unit);
-        const body = source.body(key.target.binding) orelse return null;
-        if (arguments.len != key.count or body.parameters.len != key.count) return null;
+        const body = source.body(key.target.binding) orelse return .{ .reason = .unavailable_body };
+        if (body.parameters.len != key.count) return .{ .reason = .unresolved_shape };
         var has_demand = false;
         for (source.bodyParameters(body)) |parameter| if (source.types.node(parameter.ty).tag == .demand) {
             has_demand = true;
         };
-        if (!has_demand) return null;
-        const shape = @import("demand_inline.zig").Plan.init(source, body) orelse {
+        if (!has_demand) return .{ .reason = .unresolved_shape };
+        const analysis = @import("demand_inline.zig").Plan.analyzeGraph(g.units, source, body);
+        g.evaluator.counters.demand_inline_nodes += analysis.visited;
+        const shape = analysis.plan orelse {
             _ = try self.demandSummary(key.target);
-            return null;
+            return .{ .reason = analysis.reason };
         };
+        if (arguments.len != key.count) return .{ .reason = .unresolved_shape };
         var uses = shape.uses;
         if (try self.demandSummary(key.target)) |facts| {
             var summary_uses: [max_parameters]u8 = @splat(0);
@@ -3373,7 +3422,7 @@ const Emitter = struct {
                 // The summary conservatively treats closure captures as an
                 // escape. A complete lexical-callback proof checks every use.
                 if (fact.outcome() == .escaping) {
-                    if (!shape.local_callbacks) return null;
+                    if (!shape.local_callbacks) return .{ .reason = .escaping_use };
                     known = false;
                 }
                 if (fact.outcome() == .unknown) known = false;
@@ -3383,8 +3432,8 @@ const Emitter = struct {
         }
         const caller = g.unit(self.unit_id);
         for (arguments, 0..) |argument, i| {
-            if (self.hasErasedType(key.parameters[i], 0)) return null;
-            if (g.layouts.node(key.parameters[i]).tag == .demand and caller.node(argument).tag != .suspend_) return null;
+            if (self.hasErasedType(key.parameters[i], 0)) return .{ .reason = .unresolved_shape };
+            if (g.layouts.node(key.parameters[i]).tag == .demand and caller.node(argument).tag != .suspend_) return .{ .reason = .unresolved_shape };
         }
         var mappings: std.ArrayList(Mapping) = .empty;
         var rows: std.ArrayList(RowMapping) = .empty;
@@ -3392,7 +3441,7 @@ const Emitter = struct {
         defer rows.deinit(g.allocator);
         for (source.bodyParameters(body), 0..) |parameter, i| try g.mapTypeDepth(key.target.unit, &mappings, &rows, parameter.ty, key.parameters[i], body.span, 0);
         try g.mapTypeDepth(key.target.unit, &mappings, &rows, source.typeOf(body.root), key.result, body.span, 0);
-        if (!try self.demandCallShapes(key.target.unit, &shape, mappings.items, rows.items, 0)) return null;
+        if (!try self.demandCallShapes(key.target.unit, &shape, mappings.items, rows.items, 0)) return .{ .reason = .unresolved_control };
         if (g.artifacts) |artifacts| {
             try artifacts.readInlineBody(key.target);
             if (g.demand_owner) |owner| {
@@ -3407,7 +3456,7 @@ const Emitter = struct {
                 }
             }
         }
-        return .{ .uses = uses };
+        return .{ .plan = .{ .uses = uses }, .reason = .proved_local };
     }
     fn inlineDemandCall(self: *Emitter, key: Key, arguments: []const core.Id, prepared: ?DemandPlan, depth: usize) Error!bool {
         const plan = prepared orelse return false;
@@ -3437,6 +3486,16 @@ const Emitter = struct {
                 continue;
             }
             const uses = plan.uses[i];
+            if (uses == 0) {
+                g.evaluator.counters.demand_eliminated += 1;
+                try g.demandSite(self.unit_id, argument, .eliminated, .unused);
+            } else if (uses == 1) {
+                g.evaluator.counters.demand_direct += 1;
+                try g.demandSite(self.unit_id, argument, .direct, .proved_local);
+            } else {
+                g.evaluator.counters.demand_local_memo_slots += 2;
+                try g.demandSite(self.unit_id, argument, .local_memo, .repeated_local);
+            }
             const machine = g.layouts.machine(ty.a);
             const memo = uses > 1;
             var memo_value: ?u32 = null;
@@ -3449,6 +3508,7 @@ const Emitter = struct {
                     // A first force inside a callee iteration must survive
                     // that iteration. Reserve its owner in the caller frame.
                     memo_root = try self.temporary(.i32);
+                    g.evaluator.counters.demand_local_memo_slots += 1;
                     try self.rootDirective(3, memo_root.?);
                 }
             }
@@ -3678,6 +3738,7 @@ const Emitter = struct {
             try self.providerHead();
             try self.emit(.local_get, callee);
             try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
+            try self.generator.module.emit(self.function_id, ir.callResult(g.layoutRole(arrow.b)));
             try self.emit(.call_indirect, try g.module.internType(&.{ .i32, g.layouts.machine(arrow.a), .i32 }, g.layouts.machine(arrow.b)));
             ty = arrow.b;
         }
@@ -4156,6 +4217,10 @@ const Emitter = struct {
         return address;
     }
     fn construct(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        if (self.body.?.entries.contains(id)) {
+            try self.expression(self.resolvedPlan(id).constructor_subject, depth + 1);
+            return;
+        }
         const unit_ = self.generator.unit(self.unit_id);
         const n = unit_.node(id);
         const constructor = unit_.constructor(n.a);
@@ -5951,6 +6016,7 @@ const Emitter = struct {
         try self.emit(.local_get, address);
     }
     fn demandDescriptor(self: *Emitter, function_id: u32, environment: ?u32) Error!void {
+        self.generator.evaluator.counters.demand_allocations += 1;
         const cached_role = self.generator.module.functions.items[function_id].result_role;
         const address = try self.allocate(@sizeOf(heap.Demand), .{ .words = &.{ .scalar, .reference, .scalar, cached_role } });
         try self.emit(.local_get, address);
@@ -6299,6 +6365,7 @@ const Emitter = struct {
         const unit_ = g.unit(owner);
         const n = unit_.node(template.node);
         if (n.tag == .suspend_) {
+            try g.demandSite(owner, template.node, .stored, .unresolved_control);
             const demanded = g.layouts.node(ty);
             if (demanded.tag != .demand) return g.fail(self.unit_id, template.node, .unresolved_type);
             const fn_type = try g.internLayoutWithEffects(.function, 1, demanded.a, demanded.c, &.{});
@@ -6338,6 +6405,11 @@ const Emitter = struct {
         const function_id = try g.closureFunction(key);
         const capture_roles = try self.layoutRoles(g.allocator, capture_types);
         defer g.allocator.free(capture_roles);
+        // Compile-time captures carry their evidence in the code key and store
+        // zero in the environment, regardless of the selected erased type.
+        for (captures, capture_roles) |binding, *role| if (self.static_values.contains(binding)) {
+            role.* = .scalar;
+        };
         const environment = try self.allocate(@intCast(captures.len * 4), .{ .words = capture_roles });
         for (captures, capture_types, 0..) |binding, concrete, index| {
             try self.emit(.local_get, environment);
@@ -6627,6 +6699,7 @@ const Emitter = struct {
     }
     fn forceDemand(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
+        g.evaluator.counters.demand_indirect_calls += 1;
         const n = g.unit(self.unit_id).node(id);
         const demand = try self.capture(n.a, depth);
         const arena = try g.module.ensureArena();
@@ -6904,6 +6977,7 @@ const Emitter = struct {
         try self.providerHead();
         try self.emit(.local_get, callee);
         try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
+        try g.module.emit(self.function_id, ir.callResult(g.layoutRole(arrow.result)));
         try self.emit(.call_indirect, signature);
     }
     fn prepareProvider(self: *Emitter, id: core.Id) Error!ProviderPlan {
@@ -7103,6 +7177,7 @@ const Emitter = struct {
                 try self.providerHead();
                 try self.emit(.local_get, action);
                 try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
+                try g.module.emit(self.function_id, ir.callResult(g.layoutRole(arrow.result)));
                 try self.emit(.call_indirect, signature);
             },
             .call => |plan| {
@@ -7218,13 +7293,30 @@ const Emitter = struct {
             error.OutOfMemory => return error.OutOfMemory,
             error.NotFunction => return g.fail(self.unit_id, id, .unresolved_type),
         };
-        return .{ .call = plan, .demand = try self.prepareDemandCall(plan.key, call.arguments) };
+        const decision = try self.prepareDemandCall(plan.key, call.arguments);
+        if (g.demand_lowering.enabled and decision.plan == null) for (call.arguments) |argument| {
+            if (unit_.node(argument).tag == .suspend_) try g.demandSite(self.unit_id, argument, .stored, decision.reason);
+        };
+        return .{ .call = plan, .demand = decision.plan };
     }
     /// A closure applied through its table entry, typed by the callee.
     fn prepareIndirect(self: *Emitter, callee: core.Id, id: core.Id) Error!resolved_call.Arrow {
         std.debug.assert(self.preparing);
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
+        const application = unit_.node(id);
+        if (g.demand_lowering.enabled and application.tag == .apply and unit_.node(application.b).tag == .suspend_) {
+            var reason: @import("demand_lowering.zig").Reason = .unknown_callee;
+            if (@import("known_call.zig").resolve(g.units, self.unit_id, id)) |known| {
+                // A known partial application transports the demand into its
+                // returned closure. Its pending state escapes this call stage.
+                const target = try g.normalize(self.unit_id, known.target);
+                if (g.unit(target.unit).body(target.binding)) |body| {
+                    if (known.count < body.parameters.len) reason = .escaping_use;
+                }
+            }
+            try g.demandSite(self.unit_id, application.b, .stored, reason);
+        }
         const node = g.layouts.node(try self.codeLayout(unit_.typeOf(callee), unit_.span(id)));
         if (node.tag != .function) return g.fail(self.unit_id, id, .unresolved_type);
         return .{ .parameter = node.a, .result = node.b, .row = node.c };
@@ -7900,7 +7992,21 @@ const Emitter = struct {
                 try self.save(carry.outgoing, id);
             }
             if (row_view == null) try self.cleanupTo(outer_cleanup);
-            if (floor) |local| try self.collectLoopCarries(id, carries, local, cadence.?, budget.?);
+            if (floor) |local| {
+                // Complete journals close this iteration's owners and run the
+                // independent cycle safe point. Only partial graphs need the
+                // legacy root packet and activation-floor scan.
+                const arena = try g.module.ensureArena();
+                try self.emit(.global_get, arena.root_enabled);
+                try self.emit(.i32_const, @import("root_runtime.zig").complete);
+                try self.emit(.i32_and, 0);
+                try self.emit(.i32_eqz, 0);
+                try self.emit(.if_, 0);
+                self.labels += 1;
+                try self.collectLoopCarries(id, carries, local, cadence.?, budget.?);
+                self.labels -= 1;
+                try self.emit(.end, 0);
+            }
             if (metadata.kind != .forever and row_view == null) {
                 try self.emit(.local_get, counter);
                 try self.emit(.i32_const, 1);
@@ -8332,6 +8438,7 @@ const Emitter = struct {
             try self.providerHead();
             try self.emit(.local_get, callee);
             try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
+            try self.generator.module.emit(self.function_id, ir.callResult(g.layoutRole(arrow.result)));
             try self.emit(.call_indirect, try g.module.internType(&.{ .i32, g.layouts.machine(arrow.parameter), .i32 }, g.layouts.machine(arrow.result)));
         }
     }

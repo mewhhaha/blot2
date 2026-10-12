@@ -137,6 +137,21 @@ fn render(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, depth: usize, bu
                 try render(engine, bytes, argument, depth + 1, budget);
             };
         },
+        .projection => {
+            var name: u32 = 0;
+            for (engine.contracts.items) |contract| if (contract.identity.unit == node.a and contract.identity.decl == node.b) {
+                name = contract.name;
+                break;
+            };
+            try text(engine, bytes, engine.pool.get(name));
+            try text(engine, bytes, ".");
+            try text(engine, bytes, engine.pool.get(engine.types.projectionMember(node)));
+            for (0..engine.types.nominalArguments(node).len) |index| {
+                const argument = engine.types.nominalArguments(node)[index];
+                try text(engine, bytes, " ");
+                try render(engine, bytes, argument, depth + 1, budget);
+            }
+        },
         .resolver, .provider, .state_provider => try text(engine, bytes, @tagName(node.tag)),
     }
 }

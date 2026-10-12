@@ -272,7 +272,10 @@ fn demandScenario(allocator: std.mem.Allocator, table: bool) !void {
     if (table) {
         try module.emit(function, .{ .op = .i32_const, .operand = lists.new, .table_reference = true });
     } else {
-        try module.emitSlice(function, &.{ .{ .op = .i32_const, .operand = 1 }, .{ .op = .i32_const }, .{ .op = .call, .operand = lists.new } });
+        const constructor = &module.functions.items[lists.new];
+        try std.testing.expectEqualSlices(w.ValueType, &.{ .i32, .i32, .i32 }, constructor.parameters);
+        try std.testing.expectEqual(w.ValueType.i32, constructor.result);
+        try module.emitSlice(function, &.{ .{ .op = .i32_const, .operand = 1 }, .{ .op = .i32_const }, .{ .op = .i32_const, .operand = @import("list_runtime.zig").capacity }, .{ .op = .call, .operand = lists.new } });
     }
     try module.emit(function, .{ .op = .drop });
     const count = module.functions.items.len;

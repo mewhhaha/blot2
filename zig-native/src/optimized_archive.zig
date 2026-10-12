@@ -38,6 +38,7 @@ pub const Section = portable.Section(.optimizer_output, Record);
 pub const Snapshot = struct {
     tier: Tier,
     roots: bool = false,
+    needs_roots: bool = false,
     root_slots: u32 = 0,
     arena: ?wasm.Arena,
     entries: []Entry,
@@ -52,7 +53,7 @@ pub const Snapshot = struct {
 pub fn wireKey(compiler: format.Digest) format.Key {
     // Source and dependency validity is deliberately not granted by this
     // header. Matcher compares complete machine inputs after loading.
-    return .{ .compiler = compiler, .settings = format.digest("blot-optimizer-capture-v3"), .source = @splat(0), .dependencies = @splat(0) };
+    return .{ .compiler = compiler, .settings = format.digest("blot-optimizer-capture-v6:associated-types+checked-call-results+root-frame-demand"), .source = @splat(0), .dependencies = @splat(0) };
 }
 pub fn encode(a: A, compiler: format.Digest, capture: *const bodies.Capture) format.Error![]u8 {
     const entries = try a.alloc(Entry, capture.entries.items.len);
@@ -74,14 +75,14 @@ pub fn encode(a: A, compiler: format.Digest, capture: *const bodies.Capture) for
         .dependencies = .{ .callees = record.dependencies.callees, .parameters = record.dependencies.parameters, .invalidates = record.dependencies.invalidates, .owned_result_bytes = record.dependencies.owned_result_bytes },
         .result = .{ .function = record.value.function },
     };
-    const snapshot: Snapshot = .{ .tier = capture.tier, .roots = capture.roots, .root_slots = capture.root_slots, .arena = capture.arena, .entries = entries, .signatures = capture.signatures.items, .imports = capture.imports.items, .globals = capture.globals.items, .sealed = sealed, .queries = .{ .header = portable.header(Section.claim), .records = records } };
+    const snapshot: Snapshot = .{ .tier = capture.tier, .roots = capture.roots, .needs_roots = capture.needs_roots, .root_slots = capture.root_slots, .arena = capture.arena, .entries = entries, .signatures = capture.signatures.items, .imports = capture.imports.items, .globals = capture.globals.items, .sealed = sealed, .queries = .{ .header = portable.header(Section.claim), .records = records } };
     return format.encode(a, wireKey(compiler), snapshot);
 }
 pub fn decode(a: A, compiler: format.Digest, bytes: []const u8) format.Error!bodies.Capture {
     var snapshot = try format.decode(Snapshot, a, bytes, wireKey(compiler));
     defer format.deinit(a, &snapshot);
     try validate(a, &snapshot);
-    var result: bodies.Capture = .{ .allocator = a, .tier = snapshot.tier, .roots = snapshot.roots, .root_slots = snapshot.root_slots, .arena = snapshot.arena };
+    var result: bodies.Capture = .{ .allocator = a, .tier = snapshot.tier, .roots = snapshot.roots, .needs_roots = snapshot.needs_roots, .root_slots = snapshot.root_slots, .arena = snapshot.arena };
     errdefer result.deinit();
     try result.entries.ensureTotalCapacity(a, snapshot.entries.len);
     for (snapshot.entries) |*entry| {
@@ -145,6 +146,7 @@ pub fn validate(a: A, snapshot: *const Snapshot) format.Error!void {
         inline for (wasm.Arena.global_fields) |field| if (@field(arena, field) >= resources.globals) return error.InvalidArtifact;
     }
     if (snapshot.roots and (snapshot.arena == null or snapshot.root_slots < snapshot.globals.len or snapshot.root_slots > std.math.maxInt(u32) / 4)) return error.InvalidArtifact;
+    if (!snapshot.roots and snapshot.needs_roots) return error.InvalidArtifact;
     if (!snapshot.roots and snapshot.root_slots != 0) return error.InvalidArtifact;
     for (snapshot.entries) |entry| {
         if (entry.source.signature >= snapshot.signatures.len or entry.parameters.len != entry.source.parameters.len or (!entry.output_ready and entry.output != null)) return error.InvalidArtifact;
@@ -198,7 +200,14 @@ const Resources = struct {
         const locals = parameters +| value.locals.len;
         const frames = self.frames;
         frames.clearRetainingCapacity();
-        for (value.instructions) |inst| {
+        for (value.instructions, 0..) |inst, at| {
+            if (inst.op == .ownership) {
+                const annotation: ir.Ownership = @bitCast(inst.operand);
+                if (annotation.kind == .call_result) {
+                    if (annotation.chunk != 0 or annotation.roles > @backingInt(ir.Role.value)) return false;
+                    if (at + 1 >= value.instructions.len or value.instructions[at + 1].op != .call_indirect) return false;
+                }
+            }
             if (inst.table_reference and (inst.op != .i32_const or inst.operand >= self.functions)) return false;
             const valid = switch (inst.op) {
                 .block, .loop, .if_ => opens: {

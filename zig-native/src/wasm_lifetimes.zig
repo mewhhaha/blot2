@@ -310,6 +310,16 @@ const Analysis = struct {
             }
         }
     }
+    fn scalarSlot(self: *const Analysis, address: Value, offset: u32) bool {
+        if (address.owner == 0) return false;
+        const start = std.math.add(u32, address.offset, offset) catch return false;
+        if (start % 4 != 0) return false;
+        const owner = self.allocations.items[address.owner - 1];
+        if (start > owner.size or 4 > owner.size - start) return false;
+        if (owner.rc_mask) |mask| return !@import("runtime_layout.zig").referenceWord(mask, start / 4);
+        if (owner.annotations == absent) return false;
+        return ir.Ownership.wordRole(self.instructions[owner.annotations..][0..owner.annotation_count], start / 4) == .scalar;
+    }
     fn fieldKey(owner: u32, offset: u32) u64 {
         return (@as(u64, owner) << 32) | offset;
     }
@@ -518,7 +528,7 @@ const Analysis = struct {
                         self.rc_valid = false;
                     } else if (inst.op == .v128_store) {
                         if (self.allocations.items[address.owner - 1].rc_mask != 0) self.rc_valid = false;
-                    } else try self.rc_writes.append(self.a, .{ .at = self.at, .owner = address.owner, .kind = if (inst.op == .f32_store) .float_word else .word });
+                    } else if (!self.scalarSlot(address, inst.operand)) try self.rc_writes.append(self.a, .{ .at = self.at, .owner = address.owner, .kind = if (inst.op == .f32_store) .float_word else .word });
                     if (inst.op == .i32_store) try self.storeReference(address, inst.operand, value) else try self.escape(value);
                 },
                 .memory_copy, .memory_fill => {
@@ -1409,4 +1419,44 @@ fn opaqueChild(a: A) !void {
 test "typed opaque child loads keep owning parents alive through consumption and OOM" {
     try opaqueChild(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, opaqueChild, .{});
+}
+
+test "checked scalar fields keep pointer-looking words outside reference publication" {
+    const a = std.testing.allocator;
+    var module = w.Module.init(a);
+    defer module.deinit();
+    const arena = try module.ensureArena();
+    const function = try module.addTypedFunction(&.{.i32}, .none, .scalar);
+    try module.setParameterRoles(function, ir.packParameterRoles(&.{.reference}));
+    const parent = try module.addLocal(function, .i32);
+    var roles: [ir.max_annotations]ir.Instruction = undefined;
+    try module.emitSlice(function, ir.annotations(&.{ .scalar, .reference, .scalar }, .unknown, &roles));
+    try module.emitSlice(function, &.{
+        .{ .op = .i32_const, .operand = 12 },
+        .{ .op = .call, .operand = arena.allocate },
+        .{ .op = .local_set, .operand = parent },
+    });
+    for ([_]u32{ 0, 4, 8 }) |offset| try module.emitSlice(function, &.{
+        .{ .op = .local_get, .operand = parent },
+        .{ .op = .local_get },
+        .{ .op = .i32_store, .operand = offset },
+    });
+    var summaries = try Summaries.init(a, &module);
+    defer summaries.deinit();
+    var plan = try rcPlan(a, &module, &module.functions.items[function], &summaries);
+    defer plan.deinit(a);
+    try std.testing.expect(plan.admitted);
+    try std.testing.expectEqual(@as(u32, 2), plan.allocations.items[0].mask);
+    try std.testing.expectEqual(@as(usize, 1), plan.writes.items.len);
+    try std.testing.expectEqual(@as(u32, 4), module.functions.items[function].instructions.items[plan.writes.items[0].at].operand);
+    var rewritten = (try runRc(a, &module, &module.functions.items[function], &summaries)).?;
+    defer rewritten.deinit(a);
+    var stores: usize = 0;
+    var publications: usize = 0;
+    for (rewritten.instructions.items) |inst| {
+        if (inst.op == .i32_store) stores += 1;
+        if (inst.op == .call and inst.operand == arena.store_word) publications += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 2), stores);
+    try std.testing.expectEqual(@as(usize, 1), publications);
 }

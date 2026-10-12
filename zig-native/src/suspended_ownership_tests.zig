@@ -154,3 +154,70 @@ test "suspended scalar host stubs borrow checked arguments while unknown and own
     try borrowedHostFrames(a);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, borrowedHostFrames, .{});
 }
+
+fn borrowedScalarFrames(allocator: std.mem.Allocator) !void {
+    const w = @import("wasm.zig");
+    const ir = @import("runtime_ir.zig");
+    for (0..5) |scenario_| {
+        var module = w.Module.init(allocator);
+        defer module.deinit();
+        const arena = try module.ensureArena();
+        const target = try module.addTypedFunction(&.{ .i32, .i32, .i32 }, .i32, .scalar);
+        try module.emit(target, .{ .op = .local_get, .operand = 1 });
+        // A separate owned body activates the complete module journal route.
+        const owner = try module.addTypedFunction(&.{}, .i32, .reference);
+        try module.emitSlice(owner, &.{ .{ .op = .i32_const, .operand = 4 }, .{ .op = .i32_const }, .{ .op = .call, .operand = arena.allocate_typed } });
+        const caller = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+        try module.setParameterRoles(caller, ir.packParameterRoles(&.{.reference}));
+        if (scenario_ == 4) {
+            const hold: ir.Ownership = .{ .kind = .scope, .chunk = 5 };
+            try module.emit(caller, .{ .op = .ownership, .operand = @bitCast(hold) });
+        }
+        if (scenario_ == 3) try module.emitSlice(caller, &.{ .{ .op = .i32_const, .operand = 4 }, .{ .op = .i32_const }, .{ .op = .call, .operand = arena.allocate_typed }, .{ .op = .drop } });
+        try module.emitSlice(caller, &.{ .{ .op = .local_get }, .{ .op = .i32_const, .operand = 42 }, .{ .op = .i32_const }, .{ .op = .i32_const, .operand = target, .table_reference = true } });
+        var role = ir.Role.scalar;
+        if (scenario_ == 1) role = .reference;
+        if (scenario_ != 2) try module.emit(caller, ir.callResult(role));
+        try module.emit(caller, .{ .op = .call_indirect, .operand = module.functions.items[target].signature });
+        var pipeline = try @import("runtime_pipeline.zig").Session.init(allocator, &module);
+        defer pipeline.deinit();
+        try std.testing.expect(pipeline.roots);
+        var transformed = try pipeline.optimize(&module.functions.items[caller]);
+        defer if (transformed) |*body| body.deinit(allocator);
+        var opened = false;
+        if (transformed) |body| for (body.instructions.items) |inst| {
+            if (inst.op == .call and inst.operand == arena.root_open) opened = true;
+        };
+        try std.testing.expectEqual(scenario_ != 0, opened);
+    }
+}
+test "checked scalar indirect results borrow caller roots while owning unknown and published shapes retain frames through OOM" {
+    try borrowedScalarFrames(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, borrowedScalarFrames, .{});
+}
+
+test "raw runtime exports remain partial instead of acquiring complete journal admission" {
+    const w = @import("wasm.zig");
+    var module = w.Module.init(a);
+    defer module.deinit();
+    const arena = try module.ensureArena();
+    module.globals.items[arena.root_enabled].bits = @import("root_runtime.zig").enabled | @import("root_runtime.zig").complete;
+    const owner = try module.addTypedFunction(&.{}, .i32, .reference);
+    try module.emitSlice(owner, &.{ .{ .op = .i32_const, .operand = 4 }, .{ .op = .i32_const }, .{ .op = .call, .operand = arena.allocate_typed } });
+    {
+        var complete = try @import("runtime_pipeline.zig").Session.init(a, &module);
+        defer complete.deinit();
+        try std.testing.expect(complete.roots);
+    }
+    try module.exportFunction(arena.allocate_typed, "raw", .u32, .u32);
+    var partial = try @import("runtime_pipeline.zig").Session.init(a, &module);
+    defer partial.deinit();
+    try std.testing.expect(!partial.roots);
+    // Retained optimizer context names the same proof; raw exports cannot
+    // borrow a previously admitted frame/flag encoding.
+    var capture: @import("optimized_bodies.zig").Capture = .{ .allocator = a };
+    defer capture.deinit();
+    const bytes = try module.assembleWithOptions(.{ .current = &capture });
+    defer a.free(bytes);
+    try std.testing.expect(!capture.roots);
+}

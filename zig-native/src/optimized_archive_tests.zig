@@ -374,3 +374,67 @@ test "portable optimizer preserves checked results without widening machine bodi
     try std.testing.expectEqualSlices(u8, fresh, revised);
     try std.testing.expectEqualSlices(u8, first, revised);
 }
+
+fn indirectOwner(a: std.mem.Allocator) !struct { module: wasm.Module, caller: u32, annotation: usize } {
+    var result = wasm.Module.init(a);
+    errdefer result.deinit();
+    const arena = try result.ensureArena();
+    const owner = try result.addTypedFunction(&.{}, .i32, .reference);
+    try result.emitSlice(owner, &.{ .{ .op = .i32_const, .operand = 4 }, .{ .op = .i32_const }, .{ .op = .call, .operand = arena.allocate_typed } });
+    const target = try result.addTypedFunction(&.{.i32}, .i32, .reference);
+    try result.setParameterRoles(target, ir.packParameterRoles(&.{.reference}));
+    try result.emit(target, .{ .op = .local_get });
+    const caller = try result.addTypedFunction(&.{.i32}, .i32, .scalar);
+    try result.setParameterRoles(caller, ir.packParameterRoles(&.{.reference}));
+    try result.emitSlice(caller, &.{ .{ .op = .local_get }, .{ .op = .i32_const, .operand = target, .table_reference = true }, ir.callResult(.reference), .{ .op = .call_indirect, .operand = result.functions.items[target].signature }, .{ .op = .i32_load } });
+    return .{ .module = result, .caller = caller, .annotation = 2 };
+}
+
+test "portable forged scalar indirect facts cannot suppress a fresh owning frame" {
+    const a = std.testing.allocator;
+    var fixture = try indirectOwner(a);
+    defer fixture.module.deinit();
+    var captured: bodies.Capture = .{ .allocator = a };
+    defer captured.deinit();
+    const fresh = try fixture.module.assembleWithOptions(.{ .current = &captured });
+    defer a.free(fresh);
+    try std.testing.expect(captured.roots);
+    const caller = &captured.entries.items[fixture.caller];
+    try std.testing.expect(caller.output != null);
+    // Forge a scalar fact and the corresponding omitted transformation. Wire
+    // structure is valid, but neither can substitute for the fresh checked role.
+    caller.source.instructions.items[fixture.annotation] = ir.callResult(.scalar);
+    caller.output.?.deinit(a);
+    caller.output = null;
+    const bytes = try archive.encode(a, compiler, &captured);
+    defer a.free(bytes);
+    var loaded = try archive.decode(a, compiler, bytes);
+    defer loaded.deinit();
+    var current: bodies.Capture = .{ .allocator = a };
+    defer current.deinit();
+    var stats: bodies.Stats = .{};
+    const checked = try fixture.module.assembleWithOptions(.{ .previous = &loaded, .current = &current, .stats = &stats });
+    defer a.free(checked);
+    try std.testing.expectEqualSlices(u8, fresh, checked);
+    try std.testing.expectEqual(fixture.module.functions.items.len - 1, stats.reused);
+    try std.testing.expect(current.entries.items[fixture.caller].output != null);
+}
+
+test "portable indirect result annotations reject malformed and orphan facts" {
+    const a = std.testing.allocator;
+    var fixture = try indirectOwner(a);
+    defer fixture.module.deinit();
+    var capture: bodies.Capture = .{ .allocator = a };
+    defer capture.deinit();
+    a.free(try fixture.module.assembleWithOptions(.{ .current = &capture }));
+    const bytes = try archive.encode(a, compiler, &capture);
+    defer a.free(bytes);
+    var snapshot = try format.decode(archive.Snapshot, a, bytes, archive.wireKey(compiler));
+    defer format.deinit(a, &snapshot);
+    const instructions = snapshot.entries[fixture.caller].source.body.instructions;
+    instructions[fixture.annotation] = .{ .op = .ownership, .operand = @bitCast(ir.Ownership{ .kind = .call_result, .chunk = 1, .roles = 1 }) };
+    try rejects(error.InvalidArtifact, snapshot);
+    instructions[fixture.annotation] = ir.callResult(.reference);
+    instructions[fixture.annotation + 1] = .{ .op = .nop };
+    try rejects(error.InvalidArtifact, snapshot);
+}

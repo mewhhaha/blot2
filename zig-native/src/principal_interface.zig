@@ -17,7 +17,8 @@ pub const EffectTemplate = struct { identity: Identity, family: u32, name: u32, 
 pub const Binding = struct { private: bool = false, name: u32, kind: Kind, named_function: bool, ty: T.Id, scheme: T.Scheme, external: ?ExternalTarget };
 /// A named, erased bundle of ordinary qualified predicates. Lists belong to
 /// the interface type/pattern tables; predicates index contract_predicates.
-pub const Contract = struct { private: bool = false, identity: Identity, name: u32, parameters: T.List = .{}, variables: T.List = .{}, patterns: T.List = .{}, parameter_names: T.List = .{}, row_variables: T.List = .{}, predicates: T.List = .{} };
+pub const ContractMember = struct { contract: Identity, name: u32, kind: enum { defined_type, abstract_type, value }, root: T.Id = 0 };
+pub const Contract = struct { declaration: u32 = 0, private: bool = false, identity: Identity, name: u32, parameters: T.List = .{}, variables: T.List = .{}, patterns: T.List = .{}, parameter_names: T.List = .{}, row_variables: T.List = .{}, row_parameter_names: T.List = .{}, row_parameters: T.List = .{}, predicates: T.List = .{}, members: T.List = .{}, requires_implementation: bool = false };
 pub const Interface = struct {
     unit: u32,
     graph: F.Graph,
@@ -32,4 +33,5 @@ pub const Interface = struct {
     associated: []Associated,
     contracts: []Contract = &.{},
     contract_predicates: []T.Obligation = &.{},
+    contract_members: []ContractMember = &.{},
 };

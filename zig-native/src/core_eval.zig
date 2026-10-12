@@ -5054,7 +5054,7 @@ const ClosureRegion = struct {
     };
     const DefinitionKey = struct { owner: usize, node: core.Id };
     const CandidateKey = struct { caller: u32, node: core.Id, target: Target };
-    const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge, call_summary, scheme_use, callback_use };
+    const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge, call_summary, scheme_use, callback_use, type_eq, contract };
     const Constraint = struct { use_node: core.Id = 0, origin: ?SourceLocation = null, lexical_key: u32 = 0, callback_slot: u32 = 0, callback_stage: u32 = 0, callback_interface: bool = false, target: Target = .{ .unit = 0, .binding = 0 }, arguments: core.List = .{}, explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, principal_only: bool = false, solved: bool = false };
     const Worklists = struct {
         constraints: @import("solver_worklist.zig").Queue = .{},
@@ -5304,6 +5304,8 @@ const ClosureRegion = struct {
                 .update => .update,
                 .record_merge => .record_merge,
                 .effect_operation => .effect_operation,
+                .type_eq => .type_eq,
+                .contract => .contract,
                 .type_rep => .type_rep,
                 .effect_rep => .effect_rep,
                 else => return error.UnresolvedType,
@@ -5972,14 +5974,15 @@ const ClosureRegion = struct {
                 }
                 break :blk try self.solver.record(fields);
             },
-            .product, .nominal => blk: {
-                const children = if (node.tag == .nominal) source.nominalArguments(node) else source.list(.{ .start = node.a, .len = node.b });
+            .product, .nominal, .projection => blk: {
+                const children = if (node.tag == .nominal or node.tag == .projection) source.nominalArguments(node) else source.list(.{ .start = node.a, .len = node.b });
                 var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
                 var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.scratch_allocator);
                 const allocator = scratch.allocator();
                 const values = try allocator.alloc(types.Id, children.len);
                 defer allocator.free(values);
                 for (children, values) |child, *value| value.* = try self.importType(scope, child, depth + 1);
+                if (node.tag == .projection) break :blk try self.solver.projection(.{ .unit = node.a, .decl = node.b }, source.projectionMember(node), values);
                 break :blk if (node.tag == .nominal) try self.solver.nominal(.{ .unit = node.a, .decl = node.b }, values) else try self.solver.product(values);
             },
         };
@@ -6580,7 +6583,7 @@ const ClosureRegion = struct {
             } else {
                 if (!requirement.explicit) return false;
                 switch (requirement.kind) {
-                    .dispatch, .field, .receiver, .update, .record_merge, .effect_operation, .type_rep, .effect_rep => {},
+                    .dispatch, .field, .receiver, .update, .record_merge, .effect_operation, .type_eq, .contract, .type_rep, .effect_rep => {},
                     else => return false,
                 }
             }
@@ -6690,7 +6693,7 @@ const ClosureRegion = struct {
                                 parts.mask[slot] = true;
                             } else parts.has_private = true;
                         },
-                        .absent => return false,
+                        .absent, .projection => return false,
                         .unit, .boolean, .u32, .f32, .never, .type_constructor => {},
                         .array, .list, .cursor, .resolver => try pending.append(self.scratch_allocator, .{ .ty = node.a }),
                         .function, .demand, .provider => {
@@ -6964,6 +6967,8 @@ const ClosureRegion = struct {
                     .update => .update,
                     .record_merge => .record_merge,
                     .effect_operation => .effect_operation,
+                    .type_eq => .type_eq,
+                    .contract => .contract,
                     .type_rep => .type_rep,
                     .effect_rep => .effect_rep,
                     else => return error.UnresolvedType,
@@ -9094,6 +9099,23 @@ const ClosureRegion = struct {
             try self.solver.unify(owner_type.a, constraint.result);
             self.scratch.constraints.items[index].solved = true;
             return .solved;
+        }
+        if (constraint.kind == .type_eq) {
+            if (try self.solver.equalSymbolic(constraint.left, constraint.result)) {
+                self.scratch.constraints.items[index].solved = true;
+                return .solved;
+            }
+            // Ordinary binders may be determined by equality. Residual
+            // projections cannot determine their inputs or a concrete layout.
+            if (try self.solver.containsProjection(constraint.left) or try self.solver.containsProjection(constraint.result)) return .open;
+            try self.solver.unify(constraint.left, constraint.result);
+            if (try self.project(constraint.left) == 0 or try self.project(constraint.result) == 0) return .open;
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        if (constraint.kind == .contract) {
+            if (try self.project(constraint.left) == 0) return .open;
+            return self.failConstraint(constraint, .missing_implementation);
         }
         if (constraint.kind == .type_rep or constraint.kind == .effect_rep) {
             const represented = if (constraint.kind == .type_rep) constraint.left else constraint.signature;

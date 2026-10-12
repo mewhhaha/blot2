@@ -428,3 +428,139 @@ test "module abstraction forged identities ABI and private constructor promotion
     constructor.* = original;
     try admission.validatePrelude(a, &owner, abstraction_producer, "std/prelude.blot");
 }
+
+const associated_producer =
+    \\type Identity a is contract = { type Item = a, type Pair = (Identity.Item a, a) }
+    \\type Source s is contract = { type Item, const first: s -> (Source.Item s) }
+    \\type Callable f is contract = { type Run = f }
+    \\type Signature s is contract = { const first: Callable.Run (s -> U32) }
+    \\type Alias b = Identity.Item b
+    \\const helper: b -> b = fn value => value
+    \\const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = fn value => value
+;
+fn associatedAdmissionLaw(allocator: std.mem.Allocator, bytes: []const u8) !void {
+    var frozen = try format.decode(D.FrozenDependency, allocator, bytes, key);
+    defer format.deinit(allocator, &frozen);
+    try admission.validatePrelude(allocator, &frozen, associated_producer, "std/prelude.blot");
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    _ = try pool.intern(allocator, "before");
+    try relink.relink(allocator, &frozen, &pool, &.{2});
+    try validation.validate(&frozen.modules[0].interface, pool.entries.items.len + 1, 2);
+    try validation.validateGraph(allocator, &frozen.modules[0].interface);
+    try @import("frozen_core_validation.zig").validate(allocator, &frozen.modules[0].core, .{ .symbol_count = pool.entries.items.len + 1 });
+}
+test "associated type member portable admission and relocation release every failed allocation" {
+    const bytes = try artifact(std.testing.allocator, associated_producer);
+    defer std.testing.allocator.free(bytes);
+    try associatedAdmissionLaw(std.testing.allocator, bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, associatedAdmissionLaw, .{bytes});
+}
+test "associated type member admission rejects forged equations escaped binders cycles and incomplete tables" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, associated_producer);
+    defer a.free(bytes);
+    var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &frozen);
+    const owner = &frozen.modules[0].interface;
+    try admission.validatePrelude(a, &frozen, associated_producer, "std/prelude.blot");
+    var exhausted: usize = 0;
+    try std.testing.expectError(error.InvalidArtifact, validation.validateGraphWithBudget(a, owner, &exhausted));
+    try std.testing.expectEqual(@as(usize, 0), exhausted);
+    const old = owner.contract_members[0];
+    owner.contract_members[0].root = @import("types.zig").u32_type;
+    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, associated_producer, "std/prelude.blot"));
+    owner.contract_members[0] = old;
+    const pair = owner.graph.nodes[owner.contract_members[1].root];
+    const self_projection = owner.graph.extra[pair.a];
+    try std.testing.expectEqual(@import("types.zig").Tag.projection, owner.graph.nodes[self_projection].tag);
+    owner.contract_members[0].root = self_projection;
+    try std.testing.expectError(error.InvalidArtifact, validation.validateGraph(a, owner));
+    owner.contract_members[0] = old;
+    const helper = owner.graph.nodes[owner.bindings[1].scheme.root];
+    owner.contract_members[0].root = helper.a;
+    try std.testing.expectError(error.InvalidArtifact, validation.validateGraph(a, owner));
+    owner.contract_members[0] = old;
+    owner.contract_members[0].name = owner.contract_members[1].name;
+    try std.testing.expectError(error.InvalidArtifact, validation.validate(owner, frozen.symbols.len, 1));
+    owner.contract_members[0] = old;
+    owner.contracts[0].members.len += 1;
+    try std.testing.expectError(error.InvalidArtifact, validation.validate(owner, frozen.symbols.len, 1));
+}
+
+const associated_rows_producer =
+    \\type Scoped a is contract = { type Item = a, effect_rep ! {| e}, effect_rep ! {| f} }
+;
+fn appendAssociatedRecipe(a: std.mem.Allocator, extra: *[]u32, words: []const u32) !@import("types.zig").List {
+    const result: @import("types.zig").List = .{ .start = @intCast(extra.len), .len = @intCast(words.len) };
+    const length = std.math.add(usize, extra.len, words.len) catch return error.InvalidArtifact;
+    const enlarged = try a.alloc(u32, length);
+    @memcpy(enlarged[0..extra.len], extra.*);
+    @memcpy(enlarged[extra.len..], words);
+    a.free(extra.*);
+    extra.* = enlarged;
+    return result;
+}
+fn associatedRowsAdmissionLaw(a: std.mem.Allocator, bytes: []const u8) !void {
+    var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &frozen);
+    const owner = &frozen.modules[0];
+    try admission.validatePrelude(a, &frozen, associated_rows_producer, "std/prelude.blot");
+    const named = owner.interface.contracts[0];
+    const executable = owner.core.contracts[0];
+    try std.testing.expectEqual(@as(u32, 2), named.row_variables.len);
+    try std.testing.expectEqual(@as(u32, 2), executable.row_variables.len);
+    var names: [2]u32 = undefined;
+    for ([_][]const u8{ "e", "f" }, &names) |name, *symbol| {
+        symbol.* = for (frozen.symbols, 0..) |candidate, index_| {
+            if (std.mem.eql(u8, candidate.text, name)) break @intCast(index_);
+        } else return error.InvalidArtifact;
+    }
+    var public_rows: [2]u32 = undefined;
+    var private_rows: [2]u32 = undefined;
+    for (owner.interface.graph.extra[named.row_variables.start..][0..named.row_variables.len], &public_rows) |variable, *row| {
+        row.* = for (owner.interface.graph.rows, 0..) |candidate, index_| {
+            if (candidate.tail == .variable and candidate.tail.variable == variable and candidate.labels.len == 0) break @intCast(index_);
+        } else return error.InvalidArtifact;
+    }
+    for (owner.core.types.list(executable.row_variables), &private_rows) |variable, *row| {
+        row.* = for (owner.core.types.effects.rows, 0..) |candidate, index_| {
+            if (candidate.tail == .variable and candidate.tail.variable == variable and candidate.labels.len == 0) break @intCast(index_);
+        } else return error.InvalidArtifact;
+    }
+    // Add corresponding complete row recipes to both immutable owners. The
+    // comparison must retain their named positions even when row IDs differ.
+    owner.interface.contracts[0].row_parameters = try appendAssociatedRecipe(a, &owner.interface.graph.extra, &public_rows);
+    owner.interface.contracts[0].row_parameter_names = try appendAssociatedRecipe(a, &owner.interface.graph.extra, &names);
+    owner.core.contracts[0].row_parameters = try appendAssociatedRecipe(a, &owner.core.types.extra, &private_rows);
+    owner.core.contracts[0].row_parameter_names = try appendAssociatedRecipe(a, &owner.core.types.extra, &names);
+    try admission.validatePrelude(a, &frozen, associated_rows_producer, "std/prelude.blot");
+    const start = owner.interface.contracts[0].row_parameters.start;
+    std.mem.swap(u32, &owner.interface.graph.extra[start], &owner.interface.graph.extra[start + 1]);
+    // Bounds, equation graphs and quantified row graphs still agree. Only the
+    // producer's declared row recipe has been changed by the forgery.
+    try validation.validate(&owner.interface, frozen.symbols.len, 1);
+    try validation.validateGraph(a, &owner.interface);
+    if (admission.validatePrelude(a, &frozen, associated_rows_producer, "std/prelude.blot")) |_| {
+        return error.TestExpectedError;
+    } else |err| {
+        if (err == error.OutOfMemory) return err;
+        try std.testing.expect(err == error.InvalidArtifact);
+    }
+    std.mem.swap(u32, &owner.interface.graph.extra[start], &owner.interface.graph.extra[start + 1]);
+    const names_start = owner.interface.contracts[0].row_parameter_names.start;
+    std.mem.swap(u32, &owner.interface.graph.extra[names_start], &owner.interface.graph.extra[names_start + 1]);
+    if (admission.validatePrelude(a, &frozen, associated_rows_producer, "std/prelude.blot")) |_| {
+        return error.TestExpectedError;
+    } else |err| {
+        if (err == error.OutOfMemory) return err;
+        try std.testing.expect(err == error.InvalidArtifact);
+    }
+}
+test "associated declared row recipe admission rejects shifted positions and names through OOM" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, associated_rows_producer);
+    defer a.free(bytes);
+    try associatedRowsAdmissionLaw(a, bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, associatedRowsAdmissionLaw, .{bytes});
+}

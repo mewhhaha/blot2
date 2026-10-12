@@ -52,9 +52,9 @@ pub const Scan = struct {
             }
             const n = self.source.node(self.source.head(item.id, 0));
             switch (n.tag) {
-                .nominal, .type_constructor => {
+                .nominal, .projection, .type_constructor => {
                     if (self.blocked.contains(.{ .unit = n.a, .decl = n.b })) return false;
-                    if (n.tag == .nominal) for (self.source.nominalArguments(n)) |argument| try self.enqueue(.{ .id = argument });
+                    if (n.tag == .nominal or n.tag == .projection) for (self.source.nominalArguments(n)) |argument| try self.enqueue(.{ .id = argument });
                 },
                 .function => {
                     try self.enqueue(.{ .id = n.a });

@@ -151,6 +151,10 @@ pub const EffectRows = struct {
         return self.labels[span.start..][0..span.len];
     }
 };
+/// Owned associated declaration recipes. Principal and selected types share
+/// these identities; runtime layout never interprets a residual projection.
+pub const Contract = struct { private: bool, identity: T.NominalIdentity, name: u32, parameters: T.List, variables: T.List, row_variables: T.List, predicates: T.List, members: T.List, requires_implementation: bool, row_parameter_names: T.List = .{}, row_parameters: T.List = .{} };
+pub const ContractMember = @import("principal_interface.zig").ContractMember;
 pub const Types = struct {
     nodes: []T.Node,
     extra: []T.Id,
@@ -165,8 +169,11 @@ pub const Types = struct {
     pub fn list(self: *const Types, span: T.List) []const T.Id {
         return self.extra[span.start..][0..span.len];
     }
+    pub fn projectionMember(self: *const Types, value: T.Node) u32 {
+        return self.extra[value.c + 1 + self.extra[value.c]];
+    }
     pub fn nominalArguments(self: *const Types, value: T.Node) []const T.Id {
-        std.debug.assert(value.tag == .nominal);
+        std.debug.assert(value.tag == .nominal or value.tag == .projection);
         return self.extra[value.c + 1 ..][0..self.extra[value.c]];
     }
     pub fn recordField(self: *const Types, value: T.Node, index: usize) T.Field {
@@ -224,6 +231,8 @@ pub const Module = struct {
     update_steps: []UpdateStep = &.{},
     closures: []ClosureInfo = &.{},
     associated: []Associated = &.{},
+    contracts: []Contract = &.{},
+    contract_members: []ContractMember = &.{},
     primitives: []Primitive = &.{},
     loops: []LoopInfo = &.{},
     loop_carries: []LoopCarry = &.{},
@@ -274,6 +283,8 @@ pub const Module = struct {
         allocator.free(self.update_steps);
         allocator.free(self.closures);
         allocator.free(self.associated);
+        allocator.free(self.contracts);
+        allocator.free(self.contract_members);
         allocator.free(self.primitives);
         allocator.free(self.loops);
         allocator.free(self.loop_carries);
@@ -559,6 +570,8 @@ const Builder = struct {
     closures: std.ArrayList(ClosureInfo) = .empty,
     visit_epochs: std.ArrayList(u32) = .empty,
     associated: std.ArrayList(Associated) = .empty,
+    contracts: std.ArrayList(Contract) = .empty,
+    contract_members: std.ArrayList(ContractMember) = .empty,
     primitives: std.ArrayList(Primitive) = .empty,
     loops: std.ArrayList(LoopInfo) = .empty,
     loop_carries: std.ArrayList(LoopCarry) = .empty,
@@ -589,7 +602,7 @@ const Builder = struct {
     fn deinit(self: *Builder) void {
         self.field_names.deinit(self.allocator);
         self.saved_fields.deinit(self.allocator);
-        inline for (.{ "request_loops", "request_arms", "request_callbacks", "runtime_names", "source_names", "erased_declaration_references", "tag_calls", "nodes", "spans", "extra", "type_nodes", "type_extra", "effect_rows", "effect_labels", "effect_operations", "bindings", "bodies", "parameters", "references", "calls", "merges", "merge_ranges", "name_bytes", "obligations", "diagnostics", "nominals", "operation_names", "constructors", "projections", "projection_variants", "patterns", "pattern_rows", "match_arms", "matches", "updates", "update_steps", "closures", "visit_epochs", "associated", "primitives", "loops", "loop_carries", "resolver_ops", "operation_values", "handle_effects", "dispatch_signatures", "resolver_loop_frames" }) |field| @field(self, field).deinit(self.allocator);
+        inline for (.{ "request_loops", "request_arms", "request_callbacks", "runtime_names", "source_names", "erased_declaration_references", "tag_calls", "nodes", "spans", "extra", "type_nodes", "type_extra", "effect_rows", "effect_labels", "effect_operations", "bindings", "bodies", "parameters", "references", "calls", "merges", "merge_ranges", "name_bytes", "obligations", "diagnostics", "nominals", "operation_names", "constructors", "projections", "projection_variants", "patterns", "pattern_rows", "match_arms", "matches", "updates", "update_steps", "closures", "visit_epochs", "associated", "contracts", "contract_members", "primitives", "loops", "loop_carries", "resolver_ops", "operation_values", "handle_effects", "dispatch_signatures", "resolver_loop_frames" }) |field| @field(self, field).deinit(self.allocator);
         self.allocator.free(self.type_map);
         self.allocator.free(self.variable_map);
         self.allocator.free(self.effect_row_map);
@@ -726,14 +739,15 @@ const Builder = struct {
                 const span = try self.saveTypes(fields.items);
                 break :blk .{ .tag = .record, .a = span.start, .b = original.b };
             },
-            .nominal => blk: {
+            .nominal, .projection => blk: {
                 var arguments: std.ArrayList(T.Id) = .empty;
                 defer arguments.deinit(allocator);
                 const source_arguments = self.checked.types.nominalArguments(original);
                 try arguments.append(allocator, @intCast(source_arguments.len));
                 for (source_arguments) |argument| try arguments.append(allocator, try self.projectType(argument, depth + 1));
+                if (original.tag == .projection) try arguments.append(allocator, self.checked.types.projectionMember(original));
                 const span = try self.saveTypes(arguments.items);
-                break :blk .{ .tag = .nominal, .a = original.a, .b = original.b, .c = span.start };
+                break :blk .{ .tag = original.tag, .a = original.a, .b = original.b, .c = span.start };
             },
             .array, .list, .cursor, .resolver => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1) },
             .demand, .provider => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1), .c = try self.projectRow(original.c, depth + 1) },
@@ -2583,6 +2597,12 @@ const Builder = struct {
         for (self.checked.types.list(source)) |id| try values.append(self.allocator, try self.projectType(id, 0));
         return self.saveTypes(values.items);
     }
+    fn projectedRows(self: *Builder, source: T.List) Error!T.List {
+        var values: std.ArrayList(u32) = .empty;
+        defer values.deinit(self.allocator);
+        for (self.checked.types.list(source)) |row| try values.append(self.allocator, try self.projectRow(row, 0));
+        return self.saveTypes(values.items);
+    }
     fn projectedRowVariables(self: *Builder, source: T.List) Error!T.List {
         var values: std.ArrayList(u32) = .empty;
         defer values.deinit(self.allocator);
@@ -2607,6 +2627,18 @@ const Builder = struct {
             const name = if (family.callable) try self.allocator.dupe(u8, self.names.get(family.name)) else try self.allocator.print("{s}.{s}", .{ self.names.get(family.name), self.names.get(metadata.name) });
             defer self.allocator.free(name);
             try self.operation_names.append(self.allocator, .{ .identity = metadata.identity, .diagnostic_name = try self.saveName(name), .diagnostic_origin = try self.saveName(origin) });
+        }
+        for (self.checked.contracts) |contract| {
+            if (contract.members.len == 0) continue;
+            const start: u32 = @intCast(self.contract_members.items.len);
+            for (self.checked.contract_members[contract.members.start..][0..contract.members.len]) |old| {
+                var member = old;
+                member.root = try self.projectType(old.root, 0);
+                try self.contract_members.append(self.allocator, member);
+            }
+            const predicate_start: u32 = @intCast(self.obligations.items.len);
+            for (self.checked.contract_predicates[contract.predicates.start..][0..contract.predicates.len]) |value| try self.obligations.append(self.allocator, .{ .ty = try self.projectType(value.ty, 0), .kind = value.kind, .span = self.checked.diagnosticSpan(self.tree, value.source), .name = value.name, .result = try self.projectType(value.result, 0), .other = try self.projectType(value.other, 0), .signature = try self.projectType(value.signature, 0), .operator = value.operator, .identity = value.identity, .explicit = value.explicit, .qualification_span = value.qualification_span, .qualification_unit = value.qualification_unit });
+            try self.contracts.append(self.allocator, .{ .private = contract.private, .identity = contract.identity, .name = contract.name, .parameters = try self.projectedTypeList(contract.parameters), .variables = try self.projectedTypeList(contract.variables), .row_variables = try self.projectedRowVariables(contract.row_variables), .predicates = .{ .start = predicate_start, .len = contract.predicates.len }, .members = .{ .start = start, .len = contract.members.len }, .requires_implementation = contract.requires_implementation, .row_parameter_names = try self.saveTypes(self.checked.types.list(contract.row_parameter_names)), .row_parameters = try self.projectedRows(contract.row_parameters) });
         }
         for (self.checked.constructors) |metadata| try self.constructors.append(self.allocator, .{ .identity = metadata.identity, .nominal = metadata.nominal, .tag = metadata.tag, .scheme = try self.projectScheme(metadata.scheme), .payload = try self.projectType(metadata.payload, 0) });
         for (self.checked.associated) |metadata| try self.associated.append(self.allocator, .{ .identity = metadata.identity, .member = metadata.member, .operator = metadata.operator, .target = self.target(metadata.binding) });
@@ -2691,7 +2723,7 @@ const Builder = struct {
         result.types.effects.labels = try self.effect_labels.toOwnedSlice(self.allocator);
         result.types.effects.variable_count = self.effect_variable_count;
         result.types.operations = try self.effect_operations.toOwnedSlice(self.allocator);
-        inline for (.{ "request_loops", "request_arms", "runtime_names", "source_names", "erased_declaration_references", "tag_calls", "nodes", "spans", "extra", "bindings", "bodies", "parameters", "references", "calls", "merges", "merge_ranges", "obligations", "diagnostics", "nominals", "operation_names", "constructors", "projections", "projection_variants", "patterns", "pattern_rows", "match_arms", "matches", "updates", "update_steps", "closures", "associated", "primitives", "loops", "loop_carries", "resolver_ops", "operation_values", "handle_effects", "dispatch_signatures" }) |field| @field(result, field) = try @field(self, field).toOwnedSlice(self.allocator);
+        inline for (.{ "request_loops", "request_arms", "runtime_names", "source_names", "erased_declaration_references", "tag_calls", "nodes", "spans", "extra", "bindings", "bodies", "parameters", "references", "calls", "merges", "merge_ranges", "obligations", "diagnostics", "nominals", "operation_names", "constructors", "projections", "projection_variants", "patterns", "pattern_rows", "match_arms", "matches", "updates", "update_steps", "closures", "associated", "contracts", "contract_members", "primitives", "loops", "loop_carries", "resolver_ops", "operation_values", "handle_effects", "dispatch_signatures" }) |field| @field(result, field) = try @field(self, field).toOwnedSlice(self.allocator);
         result.names = try self.name_bytes.toOwnedSlice(self.allocator);
         return result;
     }

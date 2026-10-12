@@ -328,11 +328,19 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
         destination: *T.Store,
         max_depth: usize,
         max_nodes: usize,
+        remaining: ?*usize = null,
         types: std.AutoHashMapUnmanaged(T.Id, T.Id) = .empty,
         variables: std.AutoHashMapUnmanaged(u32, T.Id) = .empty,
         rows: std.AutoHashMapUnmanaged(T.Effects.Id, T.Effects.Id) = .empty,
         row_variables: std.AutoHashMapUnmanaged(u32, T.Effects.Id) = .empty,
         labels: std.AutoHashMapUnmanaged(T.Effects.Label, T.Effects.Label) = .empty,
+
+        fn charge(self: *Self) T.Error!void {
+            if (self.remaining) |remaining| {
+                if (remaining.* == 0) return error.TypeLimit;
+                remaining.* -= 1;
+            }
+        }
 
         pub fn deinit(self: *Self) void {
             self.types.deinit(self.allocator);
@@ -348,6 +356,7 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
             if (original <= T.never) return original;
             if (depth >= self.max_depth or self.types.count() >= self.max_nodes) return error.TypeLimit;
             if (self.types.get(original)) |known| return known;
+            try self.charge();
             const root = self.source.head(original, 0);
             if (root != original) {
                 const result = try self.ty(root, depth + 1);
@@ -378,11 +387,12 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
                     }
                     break :blk try self.destination.record(fields);
                 },
-                .product, .nominal => blk: {
-                    const children = if (node.tag == .nominal) self.source.nominalArguments(node) else self.source.list(.{ .start = node.a, .len = node.b });
+                .product, .nominal, .projection => blk: {
+                    const children = if (node.tag == .nominal or node.tag == .projection) self.source.nominalArguments(node) else self.source.list(.{ .start = node.a, .len = node.b });
                     const copied = try self.allocator.alloc(T.Id, children.len);
                     defer self.allocator.free(copied);
                     for (children, copied) |child, *value| value.* = try self.ty(child, depth + 1);
+                    if (node.tag == .projection) break :blk try self.destination.projection(.{ .unit = node.a, .decl = node.b }, self.source.projectionMember(node), copied);
                     break :blk if (node.tag == .nominal) try self.destination.nominal(.{ .unit = node.a, .decl = node.b }, copied) else try self.destination.product(copied);
                 },
                 .absent, .unit, .boolean, .u32, .f32, .never => unreachable,
@@ -394,6 +404,7 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
         pub fn rowVariable(self: *Self, variable: u32) T.Error!T.Effects.Id {
             if (self.row_variables.get(variable)) |known| return known;
             if (self.row_variables.count() >= self.max_nodes) return error.TypeLimit;
+            try self.charge();
             const fresh = try self.destination.freshEffects();
             try self.row_variables.put(self.allocator, variable, fresh);
             return fresh;
@@ -403,6 +414,7 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
             if (original == 0) return 0;
             if (depth >= self.max_depth or self.rows.count() >= self.max_nodes) return error.TypeLimit;
             if (self.rows.get(original)) |known| return known;
+            try self.charge();
             const root = original;
             const source = self.source.row(root);
             const old_labels = self.source.rowLabels(root);
@@ -433,6 +445,7 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
         fn label(self: *Self, original: T.Effects.Label, depth: usize) T.Error!T.Effects.Label {
             if (depth >= self.max_depth or self.labels.count() >= self.max_nodes) return error.TypeLimit;
             if (self.labels.get(original)) |known| return known;
+            try self.charge();
             const operation = self.source.operation(original);
             const old = self.source.operationArguments(original);
             const arguments = try self.allocator.alloc(T.Id, old.len);

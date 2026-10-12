@@ -970,9 +970,13 @@ pub const Importer = struct {
         }.less);
         if (module.unit != 0) module.unit = try self.unit(module.unit, false);
         for (module.types.nodes) |*n| switch (n.tag) {
-            .nominal, .type_constructor => if (n.a != 0 and n.a != std.math.maxInt(u32)) {
+            .nominal, .projection, .type_constructor => if (n.a != 0 and n.a != std.math.maxInt(u32)) {
                 n.a = try self.unit(n.a, false);
                 n.b = try self.nominalDeclaration(n.b);
+                if (n.tag == .projection) {
+                    const member = n.c + 1 + module.types.extra[n.c];
+                    module.types.extra[member] = try self.symbol(module.types.extra[member]);
+                }
             },
             .record => {
                 const fields = try bounded(u32, module.types.extra, n.a, @as(usize, n.b) * 2);
@@ -994,6 +998,14 @@ pub const Importer = struct {
             if (value.qualification_unit != 0) value.qualification_unit = try self.unit(value.qualification_unit, false);
         }
         for (module.nominals) |*value| try self.remapIdentity(&value.identity);
+        for (module.contracts) |*value| {
+            try self.remapIdentity(&value.identity);
+            try self.optionalSymbol(&value.name);
+        }
+        for (module.contract_members) |*value| {
+            try self.remapIdentity(&value.contract);
+            try self.optionalSymbol(&value.name);
+        }
         for (module.operation_names) |*value| try self.remapIdentity(&value.identity);
         for (module.constructors) |*value| try self.remapIdentity(&value.identity);
         for (module.projections) |*value| {

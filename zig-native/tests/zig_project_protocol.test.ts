@@ -265,6 +265,7 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
     equal((wasm.instance.exports.answer as WebAssembly.Global).value, 42);
     fields(built.metadata.stats, [
       "nativeWorkSteps",
+      "demandLowering",
       "sourceBytes",
       "freshModules",
       "cachedModules",
@@ -281,6 +282,7 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
     ) natural(built.metadata.stats[key]);
     for (const key of statObjects) object(built.metadata.stats[key]);
     equal(built.metadata.stats.restartCacheLoaded, false);
+    equal(built.metadata.stats.demandLowering, null);
     let id = 3;
     for (
       const source of [
@@ -477,6 +479,84 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
     }
   } finally {
     await peer.cleanup();
+  }
+});
+
+Deno.test("wire contract demand reports are opt in and preserve executable bytes", async () => {
+  const source =
+    `const choose = fn (left: Bool) => fn ~(right: Bool) => if left then @demand right else #False
+entry const run = fn (value: Bool) => choose value #True
+`;
+  const payload = encoder.encode(source);
+  let plain: Uint8Array | undefined;
+  for (const explainDemands of [false, true]) {
+    const peer = await host();
+    try {
+      await Deno.writeTextFile(peer.entry, source);
+      await peer.open({ explainDemands });
+      const built = await peer.send({
+        kind: "build",
+        id: 2,
+        epoch: "1",
+        revision: 0,
+      });
+      equal(built.metadata.success, true);
+      const report = built.metadata.stats.demandLowering;
+      if (!explainDemands) {
+        equal(report, null);
+        plain = built.payload;
+      } else {
+        equal(built.payload, plain);
+        fields(report, ["sites", "omitted"]);
+        natural(report.omitted);
+        ok(
+          Array.isArray(report.sites) && report.sites.length > 0 &&
+            report.sites.length <= 256,
+        );
+        for (const site of report.sites) {
+          fields(site, [
+            "filename",
+            "filename_truncated",
+            "unit",
+            "start",
+            "end",
+            "offset_encoding",
+            "lowering",
+            "reason",
+          ]);
+          equal(site.filename, peer.entry);
+          equal(site.filename_truncated, false);
+          natural(site.unit);
+          natural(site.start);
+          natural(site.end);
+          ok(site.start <= site.end && site.end <= payload.length);
+          equal(site.offset_encoding, "utf8_bytes");
+          ok(
+            ["eliminated", "direct", "local_memo", "stored"].includes(
+              site.lowering,
+            ),
+          );
+          ok(
+            [
+              "unused",
+              "proved_local",
+              "repeated_local",
+              "unknown_callee",
+              "escaping_use",
+              "unresolved_control",
+              "inlining_limit",
+              "unavailable_body",
+              "unresolved_shape",
+            ].includes(site.reason),
+          );
+        }
+      }
+      const wasm = await WebAssembly.instantiate(built.payload);
+      equal((wasm.instance.exports.run as CallableFunction)(0), 0);
+      equal((wasm.instance.exports.run as CallableFunction)(1), 1);
+    } finally {
+      await peer.cleanup();
+    }
   }
 });
 
