@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — task 001 is qualified; no completion is claimed.
+- **Status:** Complete — current all-width fold closure qualified at `dd6a66a`;
+  cursor follow-up remains task 047.
 - **Dependencies:** [001](001-qualify-list-span-prototype.md)
 - **Originating requirements:** PLAN: Earlier programs still open / Collections.
   Sources: [PLAN.md](../PLAN.md).
@@ -59,7 +60,7 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Paired evidence demonstrates the read-only fold regression is closed over
+- [x] Paired evidence demonstrates the read-only fold regression is closed over
       the supported shapes; a partial-width improvement is not full completion.
 - [x] The related cursor regression is measured and explained. Any unresolved
       required behavior or performance work has a bounded follow-up before final
@@ -68,6 +69,24 @@ development and the scenarios below.
       limitations honestly.
 
 ## Completion evidence
+
+- Final local implementation: `dd6a66a`; separate record commit follows. Zig
+  0.17.0; `deno task test:compiler` passes the full native suite and 892
+  guest/client laws, including eight unchanged release allocation budgets.
+  Analyzer: 344 Zig files, zero findings. Three complete merged all-width F32
+  paired batches preserve source-ordered scalar results and close the boxed fold
+  gap (worst paired ratios 0.994328 records / 0.994013 tuples).
+- Seven cold public and seven synthetic fresh/retained/restart pairs preserve
+  declared counters, diagnostics, output parity and zero teardown ownership. The
+  [joint durable record](../zig-native/CYCLIC_OWNERSHIP_QUALIFICATION.md#integrated-qualification--12-october-2026)
+  pins exact source/binary/commands/distributions.
+  [List traversal](../zig-native/LIST_TRAVERSAL.md#integrated-fold-closure-12-october-2026)
+  preserves the lifecycle, cursor, memory and rejected-candidate limits.
+- Remaining scope: task 047 owns the measured cursor regression; localized
+  shared-append tails remain explicit. No memory/update win over boxed is
+  claimed. Missing legacy restoration was explicitly waived. Nothing is pushed.
+
+Earlier milestones and rejected attempts:
 
 - Commit: `bcff12b` records the tested intermediate implementation; the
   all-width performance acceptance criterion remains open. Dependency 001 was
@@ -191,3 +210,15 @@ development and the scenarios below.
   replace the missing gdev gate. Raw evidence is in `build/bench/cloud-list/`;
   identities, measurements and the rejection are preserved in
   [the durable record](../zig-native/LIST_TRAVERSAL.md#word-positions-at-leaf-boundaries-9-october-2026).
+
+- Current V13 handoff (12 October 2026): every F32 record width 1–16 and tuple
+  width 2–16 closes the reconstructed boxed fold gap in three complete paired
+  batches; U32 and corrected-current guards pass at every width.
+  Fast/development guest bytes match, eight unchanged allocation budgets pass,
+  92 focused guest laws and native OOM/replay laws pass, and all 343 Zig files
+  are analyzer clean.
+  [The durable record](../zig-native/LIST_TRAVERSAL.md#current-v13-release-handoff-12-october-2026)
+  pins the final source and Fast executables and reports init/first, memory,
+  updates, cursor costs and rejected probes. Task 047 owns measured cursor work;
+  localized shared-append tails remain explicit. The root batch must pass the
+  integrated compiler/analyzer gate before marking this task complete.

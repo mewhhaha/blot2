@@ -908,3 +908,24 @@ are `v13-source/`, `task002-review-final.patch`, `v13-final-pins.json` and
 The current all-width read-only fold criterion is met. The mandatory compiler
 and analyzer gate on the integrated patch still belongs to the root batch; this
 handoff does not claim that gate has run or task completion before it.
+
+### Integrated fold closure, 12 October 2026
+
+Task 002 is complete at local implementation `dd6a66a`, integrated with task
+034's cycle collector. The
+[joint qualification](CYCLIC_OWNERSHIP_QUALIFICATION.md#integrated-qualification--12-october-2026)
+pins the actual merged source and LLVM release, passing full native suite, 892
+guest/client laws, eight unchanged budgets and zero analyzer findings across 344
+Zig files. Three further complete F32 batches on that merged release retain
+every supported width and the same boxed reference/oracle. Largest
+median-of-three paired ratios are 0.994328 records and 0.994013 tuples, so cycle
+integration preserves the fold closure. Seven cold public and seven synthetic
+fresh/retained/restart compiler pairs retain declared counters, diagnostics,
+output parity and zero teardown bytes; no general compiler gain is claimed.
+
+The cursor investigation is complete for this task; its remaining material cost
+is explicitly assigned to task 047. Localized shared-append tails and the
+additional committed page for initialization/shared append remain measured
+limits. Neither task 002 nor this joint qualification claims a packed-memory,
+update or cursor speedup over boxed. Legacy restoration remains waived; all
+current pins and rejected probes above stay preserved. Nothing is pushed.

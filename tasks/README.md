@@ -372,6 +372,16 @@ for [035]. Broader body cutoffs [024]/[053] and cursor performance [047] remain
 open. Exact pins, failed attempts and distributions are in the
 [joint qualification](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026).
 
+Tasks [002] and [034] complete at `dd6a66a`. The integrated native suite, 892
+guest/client laws, eight unchanged allocation budgets and zero analyzer findings
+across 344 files pass. Three further complete F32 fold batches retain all widths
+and close the reconstructed boxed gap after cycle integration. Counted trial
+deletion reclaims the measured finite-loop cycle workload from 5,373,952 to
+131,072 committed bytes; cycle CPU rises about 14%. Cursor performance [047] and
+tracing/final CPU qualification [035] remain open.
+[The joint durable record](../zig-native/CYCLIC_OWNERSHIP_QUALIFICATION.md#integrated-qualification--12-october-2026)
+retains pins, commands, costs and limitations. Nothing is pushed.
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -590,7 +600,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | Task                                                    | Status      | Dependencies                           |
 | ------------------------------------------------------- | ----------- | -------------------------------------- |
 | [001] — Qualify list span prototype                     | Complete    | None                                   |
-| [002] — Close packed list traversal regression          | In progress | [001]                                  |
+| [002] — Close packed list traversal regression          | Complete    | [001]                                  |
 | [003] — Specify general call summaries                  | Complete    | None                                   |
 | [004] — Summarize predicate bearing callees             | Complete    | [003]                                  |
 | [005] — Summarize higher order callees                  | Complete    | [004]                                  |
@@ -622,13 +632,13 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [031] — Implement shared reference counting             | Complete    | [030]                                  |
 | [032] — Own escaping values and persistent roots        | Complete    | [031]                                  |
 | [033] — Own suspended effects and cancellation          | Complete    | [032]                                  |
-| [034] — Reclaim cyclic ownership                        | Ready       | [033]                                  |
-| [035] — Remove the tracing runtime                      | Pending     | [034]                                  |
+| [034] — Reclaim cyclic ownership                        | Complete    | [033]                                  |
+| [035] — Remove the tracing runtime                      | Ready       | [034]                                  |
 | [036] — Summarize demand control flow                   | Complete    | [007], [014]                           |
 | [037] — Lower loop aware local memos                    | Complete    | [036]                                  |
 | [038] — Eliminate demands through known callbacks       | Complete    | [037], [032]                           |
 | [039] — Guarantee and explain demand lowering           | Ready       | [038], [033]                           |
-| [040] — Fuse packed row producers and consumers         | Pending     | [002], [027]                           |
+| [040] — Fuse packed row producers and consumers         | Ready       | [002], [027]                           |
 | [041] — Broaden numeric simd                            | Pending     | [040]                                  |
 | [042] — Specify ragged builders                         | Complete    | [011], [027]                           |
 | [043] — Implement ragged builders                       | Complete    | [042]                                  |

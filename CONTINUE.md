@@ -11,7 +11,7 @@ pushed; keep it that way unless the owner authorizes it.
 
 ## Qualified state
 
-Latest compiler implementation on local `main`: `f184dde`. Qualified milestones,
+Latest compiler implementation on local `main`: `dd6a66a`. Qualified milestones,
 each with a durable record:
 
 | Task                                           | Implementation       | Record                                                       |
@@ -114,6 +114,21 @@ The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
    MODULE_ABSTRACTION_QUALIFICATION, KNOWN_CALLBACK_MEMOS, SUSPENDED_OWNERSHIP
    and ASSOCIATED_CONTRACTS. Nothing is pushed.
 
+10. **002/034 are complete at `dd6a66a`.** Qualified staged tree
+    `a70662ea5a3efa27e8ce3c4c03ad2b7484bb2ae3`, standard LLVM Fast release
+    `c0959e9a375b2ba8d2a2263278417fb917b434e733c9a13f80af1d372e80b060`, passes
+    the full native suite, 892 guest/client laws, eight unchanged budgets and
+    zero findings across 344 Zig files. Three additional complete merged F32
+    fold batches retain all 31 widths and close the boxed gap (worst paired
+    medians 0.994328 records / 0.994013 tuples). Seven cold public pairs have
+    CPU ratios 0.99685–1.01527 and zero peak deltas; synthetic fresh/retained/
+    restart bytes are identical. No general compiler speedup is claimed. Cyclic
+    ownership reclaims the measured finite-loop workload from 5,373,952 to
+    131,072 committed bytes, with about 14% additional cycle CPU. Cursor costs
+    remain assigned to 047; tracing and final CPU acceptance remain 035.
+    LIST_TRAVERSAL and CYCLIC_OWNERSHIP_QUALIFICATION preserve exact pins,
+    commands, lifecycle costs and limits. Nothing is pushed.
+
 ## bpm tangent
 
 The owner requested Git packages, caching, `blot.json`, package exports in
@@ -126,27 +141,46 @@ and the full compiler gate pass. No package is published. See
 
 ## Next work
 
-034's trial-deletion work is isolated in `/var/tmp/blot2-cycles-034` against
-incoming `f184dde`. Its final release must include collection barriers in
-runtime IR/lifetime analysis and rerun its CPU/memory gate; earlier costs are
-historical. 002 is fixed at V13 in `/var/tmp/blot2-traversal-002-joint`: all six
-current release all-width guards pass, including wide F32 folds. Final paired
-compiler costs and review handoff remain. Its narrow cursor costs and localized
-shared-append record tails remain explicit; task047 owns cursor elimination. The
-single-owner List journal restores allocation headroom (fanout −521,320
-requested bytes). 024's owned checked-body facts are isolated in
-`/var/tmp/blot2-body-reuse-024`; chunk leasing and compaction bound retained
-payload, and generic principals/callback rows now replay. Nominal/opaque
-receipts, broader coverage and measured cost admission remain. Cheap-body CPU
-regression is not admitted; deeper typed bodies show a development gain that
-still needs final release calibration. Next ready work includes039 and055; 053
-waits for024,035 waits for034. 093 and086 remain open. Nothing is pushed.
+035 is active in `/var/tmp/blot2-tracing-035` on the exact qualified 002/034
+production. Its borrowed-frame checkpoint uses checked non-encoded call-result
+ownership in existing instruction bits; forged/portable-negative, OOM and
+executed root/suspension/cycle laws pass. Matched costs, complete checked
+ownership coverage and tracing removal remain open. Root owns the shared full
+gate; no 035 release qualification is claimed.
 
-Task055 has an isolated incoming tree310d in `/var/tmp/blot2-associated-055`.
-Its uncommitted native parser recognizes type equations, abstract type members
-and value signatures only inside contract bodies; the focused parser/OOM law
-passes. Checked member/projection tables and all later semantics are still open.
-This partial syntax is not integrated or a task completion.
+024 is active in `/var/tmp/blot2-body-reuse-024`. Its immutable admitted-slice
+checkpoint is `build/bench/frontend-body-reuse/owned-facts-checkpoint.patch`,
+SHA `9e5442599309497a46ea6d5609f5a906a786b38b4066c6bad0f09fb3830bbe04`. Owned
+chunk leases/compaction, generic principals/callback rows, monomorphic
+nominals/opaque receipts and production 64-node capture admission pass focused
+native/OOM/source/compiled laws and eight budgets. Standard LLVM release
+`c733afe3…` measures edit CPU about 29–31% lower for substantial typed bodies;
+cheap-body medians tie. Population CPU and retained RSS rise; exact costs and
+scope limits are in its frozen checkpoint/report. No main integration or 024
+completion is claimed. The follow-up candidate is ported to `dd6a66a` and is
+broadening generic nominal, structural-field and residual/selected evidence
+facts;053 still waits for 024.
+
+039 is active in `/var/tmp/blot2-demand-guarantee-039`, based on7212656. Root
+added opt-in bounded source-span explanations, actual lowering counters and
+complete graph/local-capture proof work. A native/OOM explanation law passes;
+Boolean alias/import/checkpoint laws pass in both codegen tiers. An
+extra-argument returned-callback case exposed an inaccurate fallback reason;
+root is fixing that diagnostic before candidate qualification. Whole demand
+matrix, custom fixities, compiled imports, long-chain costs and final release
+remain open.
+
+055 is active in `/var/tmp/blot2-associated-055-qualified`. Owned
+contract-member tables, symbolic projections, defined normalization, type_eq,
+scope/cycle laws, wire3 and regenerated host grammar are implemented in
+isolation. Defined projection/forwarded opaque source-versus-compiled laws and
+native OOM pass. Admission, DAG bounds, broader execution and costs remain open;
+no release or 055 completion is claimed. Its owner will port qualified 002/034
+before the final candidate. The earlier parser-only prototype remains preserved
+separately.
+
+Next ready work includes040 (then 041/044/047), while039/055/024/035 continue.
+093 and086 remain open. Nothing is pushed.
 
 ## Waiting on the owner
 

@@ -125,3 +125,74 @@ Raw rounds, logs, exact programs and harnesses remain under the isolated
 | `compiler-cost.json`  | `073d921e2571d04e4459cd14f50ab12df5c5faeb8c3ac9fe6834f62394b5909f` |
 | `runtime-cost.json`   | `a265d9612f933930ae6dff843fc7810414b7b5b434214f9a5957a91497b3712b` |
 | `graph-cost.json`     | `2c41703f91e1d78a238465d2e899458d6ce20b210c1e087f4cd04681167b4099` |
+
+## Integrated qualification — 12 October 2026
+
+Tasks 002 and 034 complete at local implementation `dd6a66a`. The qualified
+staged tree is `a70662ea5a3efa27e8ce3c4c03ad2b7484bb2ae3`; the implementation
+commit moves only the task-progress Markdown into the separate record commit.
+Zig 0.17.0 standard LLVM Fast release SHA-256 is
+`c0959e9a375b2ba8d2a2263278417fb917b434e733c9a13f80af1d372e80b060`, size
+41,088,912 bytes, compiler identity
+`5377b20b121d61488c63ceb986efe45aabe27cec79f6744205b3b5aa407734a5`. It is
+immutable at `build/bench/joint-002-034/blotc-candidate`.
+
+`deno task test:compiler` passes the full native suite and all 892 guest/client
+laws, including all eight unchanged allocation budgets. The required analyzer
+checks 344 Zig files with zero findings. Source/compiled/checkpoint,
+failed-edit, ownership, cancellation, roots, original cycle, all-width boundary
+and OOM laws pass together. No generated output or budget expectation was
+patched.
+
+The integration preserves both the row-aligned directory/cache rules and the
+scalar-List cycle exclusion proof. It combines the three directory helper roles
+and five cycle roles without widening instructions or ownership headers. A
+native constructor fixture's reachability law still supplies the earlier
+two-word List call; task 035 corrects that test setup to include the leaf-limit
+word. Executed source and runtime fixtures already use the current API.
+
+Three predetermined complete F32 fold batches compare the actual merged
+release's 31 record/tuple widths against the same pinned reconstructed boxed
+guests. Each has 20 warmups and 31 alternating paired samples, 128 traversals
+per sample, source-order scalar result checks and pinned Deno/V8 on CPU 7. The
+largest median-of-three paired ratios are 0.994328 records and 0.994013 tuples.
+Every supported width closes the read-only fold regression; the merge does not
+invalidate task 002's acceptance. Cursor and localized shared-append costs
+remain in [List traversal](LIST_TRAVERSAL.md); task 047 owns the measured cursor
+follow-up. No update or packed-memory win over boxed is claimed.
+
+Seven alternating CPU-6 pairs across 13 public examples explicitly disable
+restart caching. Diagnostics and all compared semantic/prepared counters match;
+each variant's Wasm is stable. Twelve modules intentionally change ownership
+helpers, while the scalar example stays byte equal. Public median CPU ratios
+range 0.99685–1.01527, requested-byte deltas 0–84,927, peak deltas zero and
+teardown live bytes zero. These short examples establish no overall compiler
+speedup. Load stays 0.27.
+
+Seven further alternating pairs cover four synthetic graphs through fresh,
+population, edits/reverts, no-op and process restart. Cross-variant and
+fresh/retained/restart Wasm is identical, including edited output against fresh
+edited builds; the harness reports no problems. Fresh/restart median CPU is:
+
+| Workload         | Fresh baseline → candidate | Restart baseline → candidate |
+| ---------------- | -------------------------- | ---------------------------- |
+| Mono chain 128   | 11 → 11 ms                 | 11 → 11 ms                   |
+| Generic chain 64 | 11 → 10 ms                 | 10 → 10 ms                   |
+| Diamond 8        | 6 → 6 ms                   | 6 → 6 ms                     |
+| Fanout 128       | 20 → 20 ms                 | 20 → 20 ms                   |
+
+Retained process accounting has 10-ms ticks; tied/zero and single-tick changes
+do not establish small gains or losses. Synthetic load stays about 0.5. The List
+journal's focused default-cache allocation reduction and the isolated cycle
+memory/CPU costs above retain their separate workloads and pins. Task 035 still
+owns tracing removal and final CPU/memory qualification, including the material
+host-call and cycle regressions; safety completion does not close that
+performance task.
+
+Raw evidence is under ignored `build/bench/joint-002-034/`: `pins.json`,
+`incoming.patch`, `release-build.log`, `compiler-gate.log`, `analyzer.log`,
+`fold-artifacts.json`, `fold-{1,2,3}/report.json`, `fold-summary.json`,
+`public-cold/`, `public-summary.json` and `synthetic/`. The frozen incoming
+patch SHA-256 is
+`8e28207cd0f1c64a66bd822fd587ae80eed80cdb05e900fece5e3eafb9c8c000`. The
+implementation remains local; nothing is pushed.
