@@ -7,21 +7,21 @@ their separate owner decisions.
 
 ## Qualified main
 
-Latest compiler implementation:`4013b10`. Latest design:`07cbc62` (057). 045/046
-are complete: ordinary rolling fold/monoid/group windows and opaque persistent
-AVL summary build/get/query/set/concat. 057's scoped-effect design is complete;
-058–059 are not implemented. Earlier completed milestones remain in the task
-index and durable records.
+Latest compiler implementation: `cb3ebec`. Latest design: `07cbc62` (057).
+045/046 are complete: ordinary rolling fold/monoid/group windows and opaque
+persistent AVL summary build/get/query/set/concat. 057's scoped-effect design is
+complete; 058–059 are not implemented. Earlier completed milestones remain in
+the task index and durable records.
 
-- Qualified tree:`3688e1965213b06e36a1ad5118ab1c6f1c1de54b`; compiler source:
-  `48f7bf8cd3219535013dd8eb96b28e0c67702bcd`.
+- Qualified tree: `e8525b1d36c5c30bc81f971d59b296787a83f6cd`; compiler source:
+  `feefe32c716a268ece1c46171a44f8ad3cd6b6ed`.
 - LLVM/Fast SHA-256:
-  `44af80a95af5de58c521a7d520c5d8c6ea993e09aae1c06e9031f3d5dbd9ec2b`. Immutable
-  executable: `build/bench/joint-024-035-045-046/blotc-release-candidate`.
-- Full native/OOM and 961 guest/client tests pass, all eight unchanged budgets,
+  `7c5c3068284f423f0bdd341b1b3b17dc2ee812591146a362b67c3b6a87b9cc2f`. Immutable
+  executable: `build/bench/iterators-047/release/blotc-candidate`.
+- Full native/OOM and 965 guest/client tests pass, all eight unchanged budgets,
   351 analyzer files/zero, Zig 0.17.0.
 - Seven public compiler pairs preserve diagnostics/work and per-binary output;
-  CPU 0.9945–1.0234, peak deltas zero, teardown zero. Synthetic fresh/retained/
+  CPU 0.9624–1.0321, peak deltas zero, teardown zero. Synthetic fresh/retained/
   restart bytes are exact. No general compiler gain is claimed.
 - Widest scalar fast windows are about 11–12× faster. Summary build now scales
   linearly; exclusive Array updates remain cheaper. Current streams/updates are
@@ -33,37 +33,53 @@ index and durable records.
   See [BODY_CUTOFF](zig-native/BODY_CUTOFF.md),
   [TRACING_REPLACEMENT](zig-native/TRACING_REPLACEMENT.md) and
   `build/bench/joint-024-035-045-046/qualification-pins.json`.
+- The latest checkpoint removes scalar-only local state and direct named
+  reference environment boxes. Scalar record cursor allocations fall to zero;
+  merged cycle CPU falls about 13.7%. Generic adapters and packed cursors remain
+  open. See [ITERATOR_STATE](zig-native/ITERATOR_STATE.md) and
+  `build/bench/iterators-047/release/pins.json`.
 
 ## Active work
 
-Root owns the next 047 iterator/cursor hill. 058 is ready;053 still depends on
-024. Take ready tasks in index order and keep task/index status together. A
-successful subset never closes a broader gate.
+Root owns 047 generic adapters. 058 is ready; 053 still depends on 024. Take
+ready tasks in index order and keep task/index status together. A successful
+subset never closes a broader gate.
 
-- **035:** `/root/resolved_body_028` works in `/var/tmp/blot2-tracing-final-035`
-  over frozen acyclic tree `d408a6f4`. Frame-retirement batching was rejected
-  and preserved separately. A new exact direct named-reference environment
-  removes one hot allocation/frame and two slots per cycle. Focused
-  OOM/replay/static/multi-curry laws and old/new retirement controls pass;
-  development cycle CPU improves about 12%, with mixed small controls. Final
-  both-tier/compiler-cost checks and freeze remain. Do not port before handoff.
-  Physical tracing removal, whole-module coverage and the historical tracing CPU
-  gate remain open.
+- **035:** direct named reference environments are qualified at `cb3ebec`.
+  Frozen source/pins remain in `/var/tmp/blot2-tracing-final-035` and
+  `build/bench/tracing/direct-callable-environments.patch`. Frame-retirement
+  batching was rejected and preserved. Physical tracing removal, whole-module
+  coverage and the historical tracing CPU gate remain open.
+- **047 packed cursors:** `/root/resolved_body_028` now owns
+  `/var/tmp/blot2-packed-cursor-047`, based on `2f706e8`. Private cursor
+  versions use four locals in existing storage; the collection is their
+  canonical owning carrier. Width-three profiling removes 4,097 cursor
+  allocations. Native replay/OOM and first all-width F32/fork/pressure laws
+  pass. A plain-word control trapped; admission is being narrowed to checked
+  packed rows and cache timing restored before rerunning. No frozen
+  handoff/release qualification yet.
+- **047 generic:** `/var/tmp/blot2-owned-sroa-047` contains root's next
+  prototype: exact reference fields use reusable function-frame roots, only with
+  complete module ownership; small straight-line producers can expose up to four
+  allocations and acyclic markers. Initial roots-only matrix was neutral and
+  preserved. Producer exposure removes 4,096 pipeline objects and improves a
+  development screen about 8%, but broad native/OOM/lifetime and release
+  qualification remain. Keep it isolated; main is frozen/qualified separately.
 - **056:** `/root/associated_members_055` works in
-  `/var/tmp/blot2-implementations-056-qualified` on 46 bf 8 b 9. Explicit impls,
-  selected proof DAGs, methods/captures and transitive prerequisites have 52
-  focused native/OOM laws. Checkpoint 126 is immutable, not a final handoff.
-  Compatibility, diagnostic/source/compiled/restart parity and measured screens
-  remain. Port only its final delta onto current main; preserve the dotted
-  access guard.
+  `/var/tmp/blot2-implementations-056-qualified` on `46bf8b9`. Explicit impls,
+  selected proof DAGs, methods/captures and transitive prerequisites have 55
+  focused native/OOM laws plus further owned operation-row/diagnostic controls.
+  Checkpoint 126 is immutable, not a final handoff. Compatibility,
+  diagnostic/source/compiled/restart parity and measured screens remain. Port
+  only its final delta onto current main; preserve the dotted access guard.
 - **086 is approved:** the owner accepted
   [CONSTANT_REUSE](zig-native/CONSTANT_REUSE.md) on 12 October 2026.
   `/root/demand_summary_036` owns it. Latest immutable development slice: tree
   `9455eedc`/`literal-floor-checkpoint.patch` under
-  `build/bench/constant-receipts/`, based on 850793 f. Owned read/fuel/resource
+  `build/bench/constant-receipts/`, based on `850793f`. Owned read/fuel/resource
   receipts keep principal work ordinary and decline escaping view publications.
   Literal scalar collections skip recording; matched scalar/Array edits improve
-  about 1–2%, with explicit cold costs. Native/OOM,12 guests/eight budgets and
+  about 1–2%, with explicit cold costs. Native/OOM, 12 guests/eight budgets and
   353-file zero analyzer pass; no LLVM integration/final 086 claim.
 - **086 next:** a fresh-only diagnostic identified collection-buffer publication
   followed by a real solver inside the dominant value computation. A growth-only
@@ -72,6 +88,12 @@ successful subset never closes a broader gate.
   19645/compiler 2689 tree is historical; corrected work is in
   `/var/tmp/blot2-constant-reuse-current-086` and
   `/var/tmp/blot2-constant-inference-086`.
+- **086 member follow-up:** `/var/tmp/blot2-constant-member-086` records the
+  executed partial-member judgment with an exact already-ready method anchor. A
+  deep-body development edit/revert improves about 6.6%, while small bodies are
+  being excluded. Complete owned principal lookup observations are required;
+  equal aggregate budgets alone cannot certify ready-cache contents. No main
+  port, LLVM qualification or final task claim.
 - **024:** captures still elaborate 80 edited-module bodies in the 93-unit
   project. Dotted paths, local requirements, producer ordinal relocation and the
   under 100 ms target remain. Agent 036 prioritizes 086 before returning here.

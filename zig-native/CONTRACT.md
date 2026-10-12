@@ -908,11 +908,11 @@ new scans/proofs own their scratch, retain only plain descriptors and obey the
 existing transactional revision and allocation-failure laws. See
 [qualification and current conservative reuse limits](MODULE_ABSTRACTION_QUALIFICATION.md).
 
-[Rolling reductions and summaries](ROLLING_SUMMARIES.md) specifies the
-ordinary source APIs. Sequential folds preserve callback/F32 order; fast
-monoid/group APIs require explicit pure, total algebra and consistent reducer
-captures. Cached summaries retain checked reference roles and persistent
-versions. Their implementation is ordinary source library code.
+[Rolling reductions and summaries](ROLLING_SUMMARIES.md) specifies the ordinary
+source APIs. Sequential folds preserve callback/F32 order; fast monoid/group
+APIs require explicit pure, total algebra and consistent reducer captures.
+Cached summaries retain checked reference roles and persistent versions. Their
+implementation is ordinary source library code.
 
 The source emitter may mark a fresh record, product or algebraic node as
 immutable and acyclic only when its exact layout closes over scalar fields and
@@ -925,3 +925,19 @@ existing no-cycle flag. Its typed edges, counts and iterative destructor remain
 unchanged, and genuine trial closures still visit those edges. Copy/edit/static
 routes either preserve their own exact proof or leave the allocation eligible
 for candidates.
+
+A named callable with exactly one applied argument may use that argument's
+canonical reference as its environment when the checked first parameter layout
+is a reference. The descriptor owns that edge directly; invocation borrows it.
+Static serialization and later curry stages use the same selected layout rule.
+Scalar, erased and multi-argument environments keep their ordinary boxes.
+Machine signatures, typed descriptor edges and table relocation remain exact;
+portable optimizer meaning distinguishes the direct representation.
+
+A nonescaping scalar-only object may keep its fields in independent locals when
+all allocations in its version/copy group have exact scalar roles. Anonymous
+roots and acyclic flags for the removed object disappear; scope boundaries and
+carry-slot clearing retain their original order. Unknown/owning fields and
+demand-force markers decline. Source arithmetic, eager operands and F32 bits
+remain exact; this grants no semantic or value-cache validity. See
+[iterator state qualification](ITERATOR_STATE.md).

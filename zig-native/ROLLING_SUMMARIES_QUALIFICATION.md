@@ -146,7 +146,7 @@ collector pause. Reference summary payload graphs and explicitly saved versions
 add their real retained cost; an arbitrary combine's own work is not constant by
 assumption.
 
-Seven public compiler pairs against qualified 850793 f preserve diagnostics,
+Seven public compiler pairs against qualified `850793f` preserve diagnostics,
 semantic work and per-binary determinism. CPU ratios are 0.9945–1.0234,
 requested allocation deltas−31880..+12039 bytes, peak deltas zero and teardown
 zero. The new private acyclic helper intentionally changes 12 of 13 public Wasm

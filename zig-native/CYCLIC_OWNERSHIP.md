@@ -140,7 +140,7 @@ future descriptor directory must remain a typed scalar Array of borrowed leaf
 bases, with its descriptor/root retaining the leaves; borrowed directory entries
 must not become strong trial edges.
 
-## Exact immutable source layouts at 4013 b 10
+## Exact immutable source layouts at `4013b10`
 
 Fresh checked record/product/algebraic allocations may receive the existing
 no-cycle flag after a bounded exact immutable-layout proof. Nominal traversal

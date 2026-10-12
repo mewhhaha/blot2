@@ -92,3 +92,10 @@ avoid repeated trials. Joint sync/JSPI cycle CPU is about 13% below 850793 f,
 with mixed controls. Physical tracing, uncovered layouts and the historical CPU
 gate remain open. See
 [TRACING_REPLACEMENT](../zig-native/TRACING_REPLACEMENT.md).
+
+The direct named reference environment is qualified at `cb3ebec` with
+scalar-only local replacement: full native/OOM, 965 guest/client laws, eight
+unchanged budgets and 351 analyzer files/zero. Merged cycle CPU improves about
+13.7% with flat 128-KiB storage; ordinary controls remain within roughly 1.5%.
+This is another measured checkpoint, not physical tracing removal or the final
+task CPU gate. See [the integrated record](../zig-native/ITERATOR_STATE.md).

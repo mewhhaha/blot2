@@ -659,7 +659,7 @@ through sibling edits, earlier AST/type nodes and reversed field spellings,
 failed edits and recovery. This correction adds no cache representation and
 claims no admission or performance gain.
 
-## Integrated guarded scopes at 850793 f
+## Integrated guarded scopes at `850793f`
 
 The independent guard and scope/local-principal slices are jointly qualified at
 `850793f` with the full native suite,936 guest/client tests, eight unchanged
@@ -678,7 +678,7 @@ ignored `build/bench/joint-024-035-041/qualification-pins.json` for merged pins;
 isolated safety/scopes/local pins remain under
 `build/bench/frontend-body-reuse/`.
 
-## Integrated explicit fields at 4013 b 10
+## Integrated explicit fields at `4013b10`
 
 The frozen `concrete-fields-followup.patch` (`4ed0c57f…f5d8`) is now qualified
 with the full native suite,961 guest/client tests, eight unchanged budgets and

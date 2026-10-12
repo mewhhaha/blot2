@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — scalar-only local checkpoint at `cb3ebec`; generic
+  adapters and packed cursor qualification remain open.
 - **Dependencies:** [040](040-fuse-packed-row-producers-and-consumers.md),
   [027](027-represent-ownership-in-resolved-ir.md)
 - **Originating requirements:** PLAN: Earlier programs / iterator step and
@@ -67,6 +68,15 @@ development and the scenarios below.
       limitations honestly.
 
 ## Completion evidence
+
+The first checkpoint passes full native/OOM and 965 guest/client tests, all
+eight unchanged budgets and the 351-file zero-finding analyzer. Scalar record
+cursors lose their per-step objects while snapshots and fallback remain exact.
+Generic range/map/take allocation is unchanged, so none of the broader
+acceptance gates is marked complete. See
+[iterator state qualification](../zig-native/ITERATOR_STATE.md) and ignored
+`build/bench/iterators-047/release/pins.json` for exact release inputs, counts
+and paired compiler/runtime costs.
 
 - Commit: pending; record the local milestone revision.
 - Validation: not run for this task; record commands, versions, results and

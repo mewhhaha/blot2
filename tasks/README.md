@@ -645,7 +645,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [044] — Specify rolling and summary operations          | Complete    | [040]                                  |
 | [045] — Implement rolling reductions                    | Complete    | [044]                                  |
 | [046] — Implement composable summary trees              | Complete    | [045]                                  |
-| [047] — Eliminate generic iterator state                | Pending     | [040], [027]                           |
+| [047] — Eliminate generic iterator state                | In progress | [040], [027]                           |
 | [048] — Explain dispatch and evidence                   | Complete    | —                                      |
 | [049] — Specify editor completion                       | Complete    | [048]                                  |
 | [050] — Implement editor completion                     | Complete    | [049]                                  |

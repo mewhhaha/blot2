@@ -384,7 +384,7 @@ release qualification. Cycles still cost roughly three times historical tracing.
 Task 035 remains open for physical tracing removal, wide ownership coverage and
 the final CPU/memory gates.
 
-## Integrated descriptors, forwarding and State at 850793 f
+## Integrated descriptors, forwarding and State at `850793f`
 
 All three frozen slices above are in `850793f`, jointly qualified with scoped
 SIMD and guarded body receipts. Full native suite,936 guest/client tests, eight
@@ -418,7 +418,7 @@ rounds and compiler/fixture/harness pins are in
 recorded in [NUMERIC_SIMD](NUMERIC_SIMD.md). New conditional-frame work is
 isolated and absent from this milestone.
 
-## Integrated conditional and immutable storage at 4013 b 10
+## Integrated conditional and immutable storage at `4013b10`
 
 Five ordinary ownership follow-ups are qualified with 045/046 at `4013b10`:
 
@@ -469,7 +469,7 @@ files/zero. Private arena helper roles derive through the existing
 optimizer v 12 retains the numeric-scope/row-product domain alongside ownership
 facts.
 
-Twenty-five CPU 7 alternating merged/qualified 850793 f pairs discard the first
+Twenty-five CPU 7 alternating merged/qualified `850793f` pairs discard the first
 five and check results/flat warm storage in sync and JSPI modes. The mixed Wasm
 grows 11352→11650 bytes; both manifests remain `[2,2,0]`.
 
@@ -484,7 +484,7 @@ grows 11352→11650 bytes; both manifests remain `[2,2,0]`.
 | JSPI requests,2000 calls |          10.141 |        10.153 | 1.0012 |
 | JSPI cycles,20000 cycles |          18.719 |        16.319 |  .8718 |
 
-Merged cycles improve about 13% versus 850793 f; the other control costs are
+Merged cycles improve about 13% versus `850793f`; the other control costs are
 recorded above. Public compiler CPU ratios 0.9945–1.0234 and zero peak deltas
 establish no general compiler gain. Four synthetic workloads preserve exact
 fresh/retained/restart output. Exact pins/raw rounds are in
@@ -494,3 +494,65 @@ Task 035 remains open for physical tracing removal, general admission and the
 historical tracing CPU gate. A later frame-retirement batching experiment was
 rejected for neutral cycle CPU and a scalar regression. Further direct named
 reference-environment subtraction is isolated and absent from this milestone.
+
+### Direct named reference environments
+
+A named partial application with exactly one checked reference argument stores
+that canonical reference directly in its descriptor. The redundant environment
+cell disappears. Static serialized captures and a later transition to an
+ordinary multi-argument environment follow the same layout proof. Scalar U32/F32
+bits, erased layouts and other arities retain their boxes. No Emitter, header,
+ABI or instruction fields are added; optimizer interpretation v13 distinguishes
+the new representation.
+
+The unchanged strong cycle now allocates seven objects rather than eight, opens
+four frames rather than five and reserves fifteen slots rather than seventeen.
+Its typed retains/releases fall from eleven/fifteen to ten/fourteen. A callable
+retirement law checks zero remaining roots/leases, flat warm memory, positive
+destruction and exact acyclic retain/release balance, independently of the
+number of surviving boxes. The strengthened law passes the old control too.
+
+Focused development checks pass 21 native laws, another 16-law exact
+serialization/replay/changed-role/OOM batch, and 77 executed laws including all
+eight unchanged compiler budgets. The final LLVM/Fast build additionally passes
+43 callable, cycle, suspension and budget laws. Both codegen tiers and sync/JSPI
+invocations preserve pointer-looking scalar bits, persistent aliases, static
+captures and later curry stages. Analyzer results and exact pins accompany the
+frozen patch; the parent owns its mandatory combined full gate.
+
+The standard LLVM/Fast candidate is SHA-256
+`2e90a2329c62e72de8bbe5efe7daa50c60487fb9faeb4ebcca2f44e337a050cd`. The
+qualified 4013b10 control is
+`44af80a95af5de58c521a7d520c5d8c6ea993e09aae1c06e9031f3d5dbd9ec2b`. Both compile
+the same ordinary source and std tree. Thirty-one warm alternating pairs on CPU
+7 check exact values and flat 131072-byte memory; load averages span 0.72–0.74.
+
+| Guest batch               | Control CPU ms | Direct CPU ms | Change |
+| ------------------------- | -------------: | ------------: | -----: |
+| Sync scalar, 5000 calls   |          1.548 |         1.557 |  +0.6% |
+| Sync Arrays, 1000 calls   |          2.051 |         2.047 |  −0.2% |
+| Sync requests, 1000 calls |          3.615 |         3.518 |  −2.7% |
+| Sync cycles, 20000 cycles |         15.790 |        13.432 | −14.9% |
+| JSPI scalar, 5000 calls   |          8.931 |         8.829 |  −1.1% |
+| JSPI Arrays, 1000 calls   |          3.895 |         3.889 |  −0.2% |
+| JSPI requests, 1000 calls |          5.021 |         5.094 |  +1.5% |
+| JSPI cycles, 20000 cycles |         15.804 |        13.292 | −15.9% |
+
+Seven alternating fresh compiler pairs measure 8.769 to 8.790 ms CPU (+0.2%) and
+13.322 to 13.578 ms wall (+1.9%). Requested bytes grow 28, peak falls 225,
+allocation count falls three and code instances stay at twelve. The mixed Wasm
+grows 11650 to 11666 bytes. Removing its cycle workload produces byte-identical
+control artifacts. Historical Safe/noLLVM measurements and rejected batching
+prototypes remain separate. This removes a measured ownership cost; it does not
+qualify task 035's final relative tracing CPU gate or remove fallback tracing
+from uncovered shapes.
+
+### Integrated callable and scalar checkpoint
+
+Local implementation `cb3ebec` integrates the direct environment with
+scalar-only local replacement. Full native/OOM, 965 guest/client laws, eight
+unchanged budgets and 351 analyzer files/zero pass on the standard LLVM/Fast
+release. Merged cycle CPU falls about 13.7%; scalar/Array/request controls
+remain within roughly 1.5%. Exact pins and the separate merged costs are in
+[iterator state qualification](ITERATOR_STATE.md). Physical tracing removal,
+whole-module coverage and the historical relative CPU gate remain open.
