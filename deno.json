@@ -1,7 +1,7 @@
 {
   "tasks": {
     "build:compiler": "deno run --allow-read --allow-write --allow-run=zig scripts/build_compiler.ts",
-    "build:compiler:dev": "cd zig-native && zig build install -Doptimize=debug -fincremental --prefix zig-out-dev",
+    "build:compiler:dev": "cd zig-native && zig build install -Doptimize=safe -Dllvm=false -fincremental --prefix zig-out-dev",
     "blot": "deno run --allow-read --allow-write --allow-run --allow-env=HOME,XDG_CACHE_HOME,BPM_CACHE_DIR compiler/cli.ts",
     "bpm": "deno run --allow-read --allow-write --allow-run=git --allow-env=HOME,XDG_CACHE_HOME,BPM_CACHE_DIR compiler/bpm.ts",
     "test:bpm": "deno test --allow-read --allow-write --allow-run compiler/packages.test.ts compiler/cli_packages.test.ts compiler/bpm.test.ts -- zig-native/zig-out/bin/blotc",

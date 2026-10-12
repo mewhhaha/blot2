@@ -19,6 +19,10 @@ pub const Stats = struct {
     parallel_jobs: usize = 0,
     parallel_workers: usize = 1,
     recorded: usize = 0,
+    member_recorded: usize = 0,
+    /// Immutable table record and owned payload; excludes shared Snapshot/index capacity.
+    member_payload_bytes: usize = 0,
+    member_reused: usize = 0,
     complete_records: usize = 0,
     lookups: usize = 0,
     candidates: usize = 0,
@@ -110,6 +114,10 @@ pub const State = struct {
         var roots: std.ArrayList(u32) = .empty;
         defer roots.deinit(self.allocator);
         try roots.appendSlice(self.allocator, &.{ record.selected, record.input });
+        if (record.member) |member| {
+            try roots.append(self.allocator, member.function);
+            for (member.ready) |read| try roots.append(self.allocator, read.value);
+        }
         for (record.views) |view| try roots.appendSlice(self.allocator, &.{ view.value, view.selected });
         const inspection = try graph.Plan.inspectRootsWithRows(self.allocator, &self.old.metadata.pools.?, &self.gate, roots.items, .source_declared);
         self.stats.plan_inspections += 1;
@@ -144,11 +152,27 @@ pub const State = struct {
         return if (old == 0) @as(u32, 0) else try maps.importEvidence(g, old);
     }
     pub fn lookup(self: *State, g: anytype, input: u32, expected: u32) Allocator.Error!?u32 {
+        return self.lookupQuery(g, null, input, expected);
+    }
+    pub fn lookupMember(self: *State, g: anytype, target: core.BindingRef, input: u32, expected: u32) Allocator.Error!?u32 {
+        if (target.unit == 0 or target.unit > g.evaluator.units.len or target.binding >= g.evaluator.units[target.unit - 1].bindings.len or g.evaluator.inquiry_regions != 0 or g.evaluator.semantic_job_budget != null) return null;
+        const slot = g.evaluator.slots[g.evaluator.binding_offsets[target.unit - 1] + target.binding];
+        if (slot.state != .complete or !g.evaluator.memberReceiptEligible(target)) return null;
+        return self.lookupQuery(g, target, input, expected);
+    }
+    fn lookupQuery(self: *State, g: anytype, member_target: ?core.BindingRef, input: u32, expected: u32) Allocator.Error!?u32 {
         defer self.stats.graph_scratch = self.graph_scratch.stats;
         self.stats.lookups += 1;
         if (!self.gate.enabled or g.evaluator.units.ptr != self.gate.units.ptr or g.evaluator.units.len != self.gate.units.len or self.allocator.ptr != g.evaluator.allocator.ptr or self.allocator.vtable != g.evaluator.allocator.vtable) return null;
-        if (input >= g.evaluator.values.items.len or g.evaluator.valueInfo(input).kind != .closure or expected == 0 or expected >= g.evaluator.evidence.nodes.items.len or g.evaluator.evidence.node(expected).tag != .function) return null;
-        const current = g.evaluator.closureInfo(input);
+        if (input >= g.evaluator.values.items.len or expected >= g.evaluator.evidence.nodes.items.len) return null;
+        var current_source: selected_query.Source = undefined;
+        if (member_target) |target| {
+            if (g.evaluator.valueInfo(input).kind != .array or g.evaluator.valueEvidence(input) != 0) return null;
+            current_source = selected_query.memberSource(target);
+        } else {
+            if (g.evaluator.valueInfo(input).kind != .closure or expected == 0 or g.evaluator.evidence.node(expected).tag != .function) return null;
+            current_source = selected_query.source(g.evaluator.closureInfo(input));
+        }
         const pools = &self.old.metadata.pools.?;
         const ordinary = eval.Options{};
         // Exact low-quota/error/depth behavior stays on the ordinary collector.
@@ -161,19 +185,28 @@ pub const State = struct {
         if (self.session_owner) |owner| if (owner != @intFromPtr(&g.evaluator)) return null;
         // The session already owns this answer. Replaying its publication a
         // second time would allocate another graph and replace the memo.
-        if (g.evaluator.specialized_closures.contains(.{ .value = input, .evidence = expected })) return null;
+        if (member_target == null and g.evaluator.specialized_closures.contains(.{ .value = input, .evidence = expected })) return null;
         self.state_owner = @intFromPtr(self);
         self.generator_owner = @intFromPtr(g);
         self.session_owner = @intFromPtr(&g.evaluator);
         try self.index();
         const table = &self.old.metadata.specialization_queries;
-        var cursor = table.candidates(selected_query.fingerprint(selected_query.source(current)), .oldest_first);
+        var cursor = table.candidates(selected_query.fingerprint(current_source), .oldest_first);
         while (cursor.next()) |position| {
             const record = &table.records.items[position].dependencies;
             self.stats.enumerated_records += 1;
-            if (record.input >= pools.evaluator.values.len or pools.evaluator.values[record.input].kind != .closure) continue;
-            const old_source = pools.evaluator.closures[pools.evaluator.values[record.input].bits];
-            if (old_source.unit != current.unit or old_source.identity != current.identity or old_source.origin != current.origin or old_source.applied != current.applied) continue;
+            if (record.input >= pools.evaluator.values.len) continue;
+            if (member_target) |target| {
+                const member = record.member orelse continue;
+                if (!g.evaluator.memberPrincipalsMatch(member)) continue;
+                if (member.exhausted or member.transitions > g.evaluator.options.max_summary_transitions) continue;
+                if (!std.meta.eql(member.target, target) or !self.gate.admits(target) or pools.evaluator.values[record.input].kind != .array) continue;
+                if (!std.meta.eql(member.query_budgets, @import("constant_receipt.zig").queryBudgets(&g.evaluator)) or member.summary_work != g.evaluator.summary_graph_work or member.principal_nodes != g.evaluator.principal_graph_nodes or member.principal_edges != g.evaluator.principal_graph_edges) continue;
+            } else {
+                if (record.member != null or pools.evaluator.values[record.input].kind != .closure) continue;
+                const old_source = selected_query.source(pools.evaluator.closures[pools.evaluator.values[record.input].bits]);
+                if (!std.meta.eql(old_source, current_source)) continue;
+            }
             self.stats.candidates += 1;
             if (!record.complete or record.steps != 0 or record.depth != g.evaluator.depth or !std.meta.eql(record.options, g.evaluator.options)) {
                 self.reject(.mode);
@@ -187,7 +220,7 @@ pub const State = struct {
                 self.reject(.source);
                 continue;
             }
-            if (!self.rootMatches(g, record.input, input)) {
+            if (member_target == null and !self.rootMatches(g, record.input, input)) {
                 self.stats.root_preflight_declined += 1;
                 self.reject(.input);
                 continue;
@@ -221,6 +254,41 @@ pub const State = struct {
                 self.reject(.input);
                 continue;
             }
+            if (record.member) |member| {
+                var ready_matches = true;
+                for (member.ready) |read| {
+                    if (!self.gate.admits(read.target)) {
+                        ready_matches = false;
+                        break;
+                    }
+                    const read_slot = g.evaluator.slots[g.evaluator.binding_offsets[read.target.unit - 1] + read.target.binding];
+                    if (read_slot.state != .complete) {
+                        ready_matches = false;
+                        break;
+                    }
+                    const ready_match = plan.matchIntoWithScratch(g, maps, read.value, read_slot.value, anchors, &self.graph_scratch);
+                    if (!(ready_match catch |err| switch (err) {
+                        error.OutOfMemory => return error.OutOfMemory,
+                        error.Declined => false,
+                    })) {
+                        ready_matches = false;
+                        break;
+                    }
+                }
+                if (!ready_matches) {
+                    self.reject(.input);
+                    continue;
+                }
+                const slot = g.evaluator.slots[g.evaluator.binding_offsets[member.target.unit - 1] + member.target.binding];
+                const method_match = plan.matchIntoWithScratch(g, maps, member.function, slot.value, anchors, &self.graph_scratch);
+                if (!(method_match catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    error.Declined => false,
+                })) {
+                    self.reject(.input);
+                    continue;
+                }
+            }
             var valid = true;
             for (record.scalar_reads) |read| {
                 const module = &self.gate.units[read.target.unit - 1];
@@ -241,7 +309,8 @@ pub const State = struct {
                 for (proofs.items) |*proof| proof.deinit(self.allocator);
                 proofs.deinit(self.allocator);
             }
-            var batch = try self.prepareCallProofs(g, maps, record.call_reads);
+            var batch: ?@import("semantic_parallel.zig").Batch = null;
+            if (record.member == null) batch = try self.prepareCallProofs(g, maps, record.call_reads);
             defer if (batch) |*parallel| parallel.deinit();
             for (record.call_reads, 0..) |read, read_index| {
                 const actual = (try evidence(g, maps, read.evidence)) orelse {
@@ -256,7 +325,7 @@ pub const State = struct {
                         break;
                     }
                 };
-                if (!present and read.present and self.recover_call_proofs) {
+                if (!present and read.present and self.recover_call_proofs and record.member == null) {
                     const recovered = if (batch != null and batch.?.attempted(read_index)) try batch.?.take(read_index, &self.stats) else try independent.acquire(self, g, read, actual);
                     if (recovered) |proof| {
                         var owned = proof;
@@ -409,7 +478,14 @@ pub const State = struct {
             }
             var facts = plain.iterator();
             while (facts.next()) |fact| g.evaluator.plain_nominals.putAssumeCapacity(fact.key_ptr.*, fact.value_ptr.*);
-            g.evaluator.specialized_closures.putAssumeCapacity(.{ .value = input, .evidence = expected }, mapped[record.selected]);
+            if (record.member) |member| {
+                g.evaluator.summary_transitions = member.transitions;
+                g.evaluator.summary_exhausted = member.exhausted;
+                if (next.member) |current_member| {
+                    current_member.function = mapped[member.function];
+                    for (current_member.ready) |*read| read.value = mapped[read.value];
+                }
+            } else g.evaluator.specialized_closures.putAssumeCapacity(.{ .value = input, .evidence = expected }, mapped[record.selected]);
             if (g.evaluator.retain_specialization_receipts) {
                 next.input = input;
                 next.expected = expected;
@@ -429,6 +505,7 @@ pub const State = struct {
                 g.evaluator.proofs.proof_reused += 1;
             };
             self.stats.reused += 1;
+            if (record.member != null) self.stats.member_reused += 1;
             self.stats.reasons[@backingInt(Reason.imported)] += 1;
             self.stats.collected_visits_removed += record.collected;
             self.stats.source_scopes_removed += record.source_scopes;

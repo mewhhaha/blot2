@@ -284,6 +284,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                 .principals = result.result.compiled.principal,
                 .refinements = result.result.compiled.refinements,
                 .selectedQueries = result.result.compiled.completed_queries,
+                .constantReceipts = result.result.compiled.constant_receipts,
                 .restartCacheLoaded = opened.cache_loaded,
                 .sourceBytes = result.source_bytes,
                 .freshModules = result.fresh_modules,

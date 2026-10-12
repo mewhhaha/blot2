@@ -601,9 +601,15 @@ pub const Plan = struct {
         return mapped[self.root];
     }
     /// Seeds are the correspondence proved by matchInto in this paired owner.
-    pub const QueryStorage = struct { values_before: usize, values_added: usize, children_added: usize };
+    pub const QueryStorage = struct { values_before: usize, values_added: usize, children_added: usize, exact: bool = true };
     pub fn materializeMapped(self: *const Plan, g: anytype, entry: ?u32, seeds: ?[]const u32) Error![]u32 {
         return self.materializeImpl(g, entry, seeds, null, null, null);
+    }
+    /// Checked graph transport with preserved child-span aliases. It neither
+    /// evaluates dependencies nor publishes a constant, fuel or call proof.
+    pub fn materializeReachableMapped(self: *const Plan, g: anytype, graphs: *importer.Importer, seeds: []const u32) Error![]u32 {
+        const storage: QueryStorage = .{ .values_before = 0, .values_added = 0, .children_added = 0, .exact = false };
+        return self.materializeImpl(g, null, seeds, storage, graphs, null);
     }
     /// Preserve the ordinary query's exact cumulative value/child quotas.
     pub fn materializeReceiptMapped(self: *const Plan, g: anytype, seeds: []const u32, storage: QueryStorage) Error![]u32 {
@@ -701,7 +707,7 @@ pub const Plan = struct {
         defer if (scratch) |buffers| buffers.finishChildren(self.order);
         var added_children: usize = 0;
         if (storage) |query| {
-            if (count != query.values_added) return error.Declined;
+            if (query.exact and count != query.values_added) return error.Declined;
             for (self.order) |id| {
                 const info = old.values[id];
                 if (mapped[id] == 0) {
@@ -734,10 +740,12 @@ pub const Plan = struct {
                     added_children += info.len;
                 } else for (span, 0..) |position, index| if (position != span[0] + index) return error.Declined;
             };
-            if (added_children != query.children_added) return error.Declined;
+            if (query.exact and added_children != query.children_added) return error.Declined;
         }
 
-        if (count > session.options.max_values -| session.values.items.len or self.stats.children > session.options.max_children -| session.children.items.len) return error.Declined;
+        var child_count = self.stats.children;
+        if (storage != null) child_count = added_children;
+        if (count > session.options.max_values -| session.constantValueCount() or child_count > session.options.max_children -| session.constantChildCount()) return error.Declined;
         if (!room(session.values.items.len, self.order.len) or !room(session.children.items.len, if (storage != null) added_children else self.stats.children) or !room(session.closures.items.len, self.stats.closures) or !room(session.type_mappings.items.len, maps.len) or !room(session.row_mappings.items.len, rows.len) or !room(session.record_layouts.items.len, self.order.len) or !room(session.field_names.items.len, self.stats.fields)) return error.Declined;
         try session.values.ensureUnusedCapacity(a, self.order.len);
         try session.value_evidence.ensureUnusedCapacity(a, self.order.len);
@@ -843,4 +851,47 @@ pub fn observe(a: Allocator, pools: *const artifacts.Pools, gate: *const admissi
         }
     };
     return result;
+}
+
+/// Identity-free primitive representation. This proves no initializer, read,
+/// callable judgment, fuel or slot; its dedicated caller owns those authorities.
+pub fn scalarRoot(snapshot: anytype, id: u32) ?eval.ValueInfo {
+    if (id == 0 or id >= snapshot.values.len or id >= snapshot.value_records.len or id >= snapshot.value_evidence.len) return null;
+    const info = snapshot.values[id];
+    if (info.kind != .scalar or info.nominal != 0 or info.len != 0 or info.start > snapshot.children.len or snapshot.value_records[id] != 0) return null;
+    const expected: evidence.Tag = switch (info.scalar) {
+        .unit => .unit,
+        .bool => .boolean,
+        .u32 => .u32,
+        .f32 => .f32,
+        else => return null,
+    };
+    if (info.scalar == .unit and info.bits != 0 or info.scalar == .bool and info.bits > 1) return null;
+    const semantic = snapshot.value_evidence[id];
+    if (semantic == 0 or semantic >= snapshot.evidence.nodes.len) return null;
+    const node = snapshot.evidence.nodes[semantic];
+    if (node.tag != expected or node.a != 0 or node.b != 0 or node.c != 0) return null;
+    return info;
+}
+pub fn materializeScalarRoot(session: *eval.Session, info: eval.ValueInfo) Error!u32 {
+    if (info.kind != .scalar or info.len != 0 or info.nominal != 0) return error.Declined;
+    const semantic: u32 = switch (info.scalar) {
+        .unit => @import("types.zig").unit,
+        .bool => @import("types.zig").boolean,
+        .u32 => @import("types.zig").u32_type,
+        .f32 => @import("types.zig").f32_type,
+        else => return error.Declined,
+    };
+    if (info.scalar == .unit and info.bits != 0 or info.scalar == .bool and info.bits > 1) return error.Declined;
+    if (session.constantValueCount() >= session.options.max_values or session.values.items.len >= std.math.maxInt(u32)) return error.Declined;
+    try session.values.ensureUnusedCapacity(session.allocator, 1);
+    try session.value_evidence.ensureUnusedCapacity(session.allocator, 1);
+    try session.value_records.ensureUnusedCapacity(session.allocator, 1);
+    var value = info;
+    value.start = @intCast(session.children.items.len);
+    const id: u32 = @intCast(session.values.items.len);
+    session.values.appendAssumeCapacity(value);
+    session.value_evidence.appendAssumeCapacity(semantic);
+    session.value_records.appendAssumeCapacity(0);
+    return id;
 }

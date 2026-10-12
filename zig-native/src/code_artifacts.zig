@@ -200,6 +200,7 @@ pub const Pools = struct {
     leases: pool_leases.Leases = pool_leases.none,
     layouts: Layouts,
     evaluator: core_eval.Snapshot,
+    constant_records: []@import("constant_receipt.zig").Record = &.{},
     rows: Substitutions,
     templates: Substitutions,
     static_values: Substitutions = .{ .entries = &.{}, .spans = &.{} },
@@ -230,6 +231,8 @@ pub const Pools = struct {
     evaluator_traced_bodies: usize,
     evaluator_traced_nodes: usize,
     pub fn deinit(self: *Pools, allocator: Allocator) void {
+        for (self.constant_records) |*record| record.deinit(allocator);
+        allocator.free(self.constant_records);
         const leases = &self.leases;
         const free = pool_leases.free;
         if (self.dependency_certificate) |*certificate| certificate.deinit(allocator);
@@ -870,6 +873,16 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
     };
     session.counters.snapshot_copy_bytes += shared.stats.copied_bytes - before_evaluator.copied_bytes;
     session.counters.snapshot_copy_allocations += shared.stats.copied_fields - before_evaluator.copied_fields;
+    const constant_records = try allocator.alloc(@import("constant_receipt.zig").Record, session.constant_records.items.len);
+    var constant_count: usize = 0;
+    errdefer {
+        for (constant_records[0..constant_count]) |*record| record.deinit(allocator);
+        allocator.free(constant_records);
+    }
+    for (session.constant_records.items, constant_records) |record, *owned| {
+        owned.* = try record.clone(allocator);
+        constant_count += 1;
+    }
     var rows = try Substitutions.capture(allocator, &generator.row_keys);
     errdefer rows.deinit(allocator);
     var templates = try Substitutions.capture(allocator, &generator.template_keys);
@@ -1007,6 +1020,7 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
         .leases = shared.leases,
         .layouts = layouts,
         .evaluator = evaluator,
+        .constant_records = constant_records,
         .rows = rows,
         .templates = templates,
         .static_values = static_values,

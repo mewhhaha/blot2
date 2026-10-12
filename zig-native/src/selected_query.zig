@@ -5,9 +5,12 @@ const eval = @import("core_eval.zig");
 const receipt = @import("specialization_receipt.zig");
 const queries = @import("semantic_query_table.zig");
 const A = std.mem.Allocator;
-pub const Source = struct { unit: u32, identity: u32, origin: eval.ClosureOrigin, applied: u32 };
+pub const Source = struct { unit: u32, identity: u32, origin: eval.ClosureOrigin, applied: u32, member: bool = false };
 pub fn source(value: eval.ClosureValue) Source {
     return .{ .unit = value.unit, .identity = value.identity, .origin = value.origin, .applied = value.applied };
+}
+pub fn memberSource(target: @import("core.zig").BindingRef) Source {
+    return .{ .unit = target.unit, .identity = target.binding, .origin = .named, .applied = 0, .member = true };
 }
 pub fn fingerprint(value: Source) u64 {
     var hash = std.hash.Wyhash.init(0);
@@ -36,6 +39,9 @@ pub const Adapter = struct {
     }
     pub fn complete(record: Table.Record) bool {
         const proof = record.dependencies;
+        if (proof.member) |member| {
+            if (!std.meta.eql(memberSource(member.target), record.key.source)) return false;
+        } else if (record.key.source.member) return false;
         return proof.complete and proof.steps == 0 and proof.input == record.key.input and
             proof.expected == record.key.expected and proof.selected == record.value.selected and
             proof.depth == record.key.depth and std.meta.eql(proof.options, record.key.options);
@@ -47,7 +53,9 @@ pub const Adapter = struct {
 pub const Table = queries.Table(Adapter);
 /// Takes ownership even when an incomplete or saturated observation declines.
 pub fn remember(table: *Table, a: A, closure: eval.ClosureValue, owned: receipt.Record) A.Error!void {
-    var builder = Table.begin(a, .{ .source = source(closure), .input = owned.input, .expected = owned.expected, .options = owned.options, .depth = owned.depth });
+    var origin = source(closure);
+    if (owned.member) |member| origin = memberSource(member.target);
+    var builder = Table.begin(a, .{ .source = origin, .input = owned.input, .expected = owned.expected, .options = owned.options, .depth = owned.depth });
     defer builder.abort();
     builder.read(owned);
     builder.stage(.{ .selected = owned.selected });

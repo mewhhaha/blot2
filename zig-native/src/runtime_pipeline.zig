@@ -119,7 +119,7 @@ pub const Session = struct {
             else if (comptime std.mem.eql(u8, pass, "inline"))
                 try @import("wasm_inline.zig").run(self.allocator, self.module, &view)
             else if (comptime std.mem.eql(u8, pass, "scalar"))
-                try @import("wasm_sroa.zig").run(self.allocator, self.module, &view)
+                try @import("wasm_sroa.zig").runWithRoots(self.allocator, self.module, &view, self.roots)
             else if (comptime std.mem.eql(u8, pass, "vector"))
                 try @import("wasm_vectorize.zig").run(self.allocator, self.module, &view)
             else if (comptime std.mem.eql(u8, pass, "row_products"))

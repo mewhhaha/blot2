@@ -31,6 +31,22 @@ const Scan = struct {
     projections: []bool,
     work: std.ArrayList(Work) = .empty,
     closures: ?*std.ArrayList(u32) = null,
+    constant_types: bool = false,
+    fn projectedItem(self: *const Scan, comptime Item: type, left: []const Item, right: []const Item, id: usize) Error!Item {
+        if (!self.constant_types) return equalItem(Item, left, right, id);
+        if (id >= left.len or id >= right.len) return error.Changed;
+        var normalized = left[id];
+        if (comptime @typeInfo(Item) == .@"struct" and @hasField(Item, "ty")) {
+            if (!equalConstantType(self.old.types, normalized.ty, self.current.types, right[id].ty)) return error.Changed;
+            normalized.ty = right[id].ty;
+        }
+        if (comptime @typeInfo(Item) == .@"struct" and @hasField(Item, "scheme")) {
+            if (!equalConstantType(self.old.types, normalized.scheme.root, self.current.types, right[id].scheme.root)) return error.Changed;
+            normalized.scheme.root = right[id].scheme.root;
+        }
+        if (!std.meta.eql(normalized, right[id])) return error.Changed;
+        return left[id];
+    }
 
     fn enqueue(self: *Scan, item: Work) Error!void {
         const seen = switch (item) {
@@ -101,13 +117,13 @@ const Scan = struct {
         };
     }
     fn scanNode(self: *Scan, id: u32) Error!void {
-        const n = try equalItem(core.Node, self.old.nodes, self.current.nodes, id);
-        _ = try equalItem(core.Span, self.old.spans, self.current.spans, id);
+        const n = try self.projectedItem(core.Node, self.old.nodes, self.current.nodes, id);
+        _ = try self.projectedItem(core.Span, self.old.spans, self.current.spans, id);
         if (self.old.isTagCall(id) != self.current.isTagCall(id)) return error.Changed;
         if (self.old.dispatch_signatures.len != 0 or self.current.dispatch_signatures.len != 0)
-            _ = try equalItem(u32, self.old.dispatch_signatures, self.current.dispatch_signatures, id);
+            _ = try self.projectedItem(u32, self.old.dispatch_signatures, self.current.dispatch_signatures, id);
         if (self.old.merge_ranges.len != 0 or self.current.merge_ranges.len != 0) {
-            const list = try equalItem(core.List, self.old.merge_ranges, self.current.merge_ranges, id);
+            const list = try self.projectedItem(core.List, self.old.merge_ranges, self.current.merge_ranges, id);
             for (try equalSlice(core.Merge, self.old.merges, self.current.merges, list)) |merge| {
                 try self.node(merge.node);
                 try self.binding(merge.result);
@@ -120,9 +136,9 @@ const Scan = struct {
             .invalid => return error.Changed,
             .constant, .panic, .constructor_function, .type_constructor => {},
             .primitive_function => {
-                _ = try equalItem(core.Primitive, self.old.primitives, self.current.primitives, n.a);
+                _ = try self.projectedItem(core.Primitive, self.old.primitives, self.current.primitives, n.a);
             },
-            .reference => try self.reference(try equalItem(core.BindingRef, self.old.references, self.current.references, n.a)),
+            .reference => try self.reference(try self.projectedItem(core.BindingRef, self.old.references, self.current.references, n.a)),
             .scalar, .logical, .associated, .record_merge, .type_same, .effect_provider => {
                 try self.node(n.a);
                 try self.node(n.b);
@@ -131,12 +147,12 @@ const Scan = struct {
                 try self.node(n.a);
                 try self.node(n.b);
                 if (n.c != 0) {
-                    const effects = try equalItem(core.HandleEffects, self.old.handle_effects, self.current.handle_effects, n.c - 1);
+                    const effects = try self.projectedItem(core.HandleEffects, self.old.handle_effects, self.current.handle_effects, n.c - 1);
                     try self.node(effects.node);
                 }
             },
             .call => {
-                const call = try equalItem(core.CallInfo, self.old.calls, self.current.calls, n.a);
+                const call = try self.projectedItem(core.CallInfo, self.old.calls, self.current.calls, n.a);
                 try self.reference(call.target);
                 try self.children(.{ .start = n.b, .len = n.c });
             },
@@ -165,7 +181,7 @@ const Scan = struct {
             },
             .construct => try self.node(n.b),
             .closure, .suspend_ => {
-                const value = try equalItem(core.ClosureInfo, self.old.closures, self.current.closures, n.a);
+                const value = try self.projectedItem(core.ClosureInfo, self.old.closures, self.current.closures, n.a);
                 if (self.closures) |list| try list.append(self.allocator, n.a);
                 try self.binding(value.qualifier);
                 try self.binding(value.parameter.binding);
@@ -184,7 +200,7 @@ const Scan = struct {
                 }
             },
             .operation_value => {
-                const value = try equalItem(core.OperationValue, self.old.operation_values, self.current.operation_values, n.a);
+                const value = try self.projectedItem(core.OperationValue, self.old.operation_values, self.current.operation_values, n.a);
                 try self.node(value.witness);
             },
             .request_decision => {
@@ -192,7 +208,7 @@ const Scan = struct {
                 try self.node(n.c);
             },
             .request_loop => {
-                const value = try equalItem(core.RequestLoopInfo, self.old.request_loops, self.current.request_loops, n.a);
+                const value = try self.projectedItem(core.RequestLoopInfo, self.old.request_loops, self.current.request_loops, n.a);
                 try self.node(value.computation);
                 try self.pattern(value.completion_pattern);
                 try self.node(value.completion_body);
@@ -202,7 +218,7 @@ const Scan = struct {
                 for (try equalSlice(core.RequestArm, self.old.request_arms, self.current.request_arms, value.arms)) |arm| try self.node(arm.callback);
             },
             .resolver_op => {
-                const value = try equalItem(core.ResolverInfo, self.old.resolver_ops, self.current.resolver_ops, n.a);
+                const value = try self.projectedItem(core.ResolverInfo, self.old.resolver_ops, self.current.resolver_ops, n.a);
                 try self.node(value.resolver);
                 if (value.method.binding != 0) try self.reference(value.method);
                 try self.children(value.arguments);
@@ -213,7 +229,7 @@ const Scan = struct {
                 try self.node(n.c);
             },
             .match => {
-                const value = try equalItem(core.MatchInfo, self.old.matches, self.current.matches, n.a);
+                const value = try self.projectedItem(core.MatchInfo, self.old.matches, self.current.matches, n.a);
                 try self.children(value.inputs);
                 for (try equalSlice(core.MatchArm, self.old.match_arms, self.current.match_arms, value.arms)) |arm| {
                     try self.node(arm.body);
@@ -223,7 +239,7 @@ const Scan = struct {
                 }
             },
             .update => {
-                const value = try equalItem(core.UpdateInfo, self.old.updates, self.current.updates, n.a);
+                const value = try self.projectedItem(core.UpdateInfo, self.old.updates, self.current.updates, n.a);
                 try self.node(value.root);
                 try self.node(value.value);
                 try self.binding(value.self_binding);
@@ -234,7 +250,7 @@ const Scan = struct {
                 };
             },
             .loop => {
-                const value = try equalItem(core.LoopInfo, self.old.loops, self.current.loops, n.a);
+                const value = try self.projectedItem(core.LoopInfo, self.old.loops, self.current.loops, n.a);
                 try self.node(value.first);
                 try self.node(value.end);
                 try self.node(value.body);
@@ -248,10 +264,10 @@ const Scan = struct {
         }
     }
     fn run(self: *Scan, binding_id: u32) Error!void {
-        const binding_ = try equalItem(core.Binding, self.old.bindings, self.current.bindings, binding_id);
+        const binding_ = try self.projectedItem(core.Binding, self.old.bindings, self.current.bindings, binding_id);
         if (binding_.kind != .global or binding_.body_id == 0) return error.Changed;
-        const body = try equalItem(core.Body, self.old.bodies, self.current.bodies, binding_.body_id);
-        const recipe = try equalItem(core.DeclarationDependencies, self.old.declaration_dependencies, self.current.declaration_dependencies, binding_.body_id);
+        const body = try self.projectedItem(core.Body, self.old.bodies, self.current.bodies, binding_.body_id);
+        const recipe = try self.projectedItem(core.DeclarationDependencies, self.old.declaration_dependencies, self.current.declaration_dependencies, binding_.body_id);
         for (try equalSlice(core.BindingRef, self.old.dependency_references, self.current.dependency_references, recipe.references)) |ref| try self.reference(ref);
         _ = try equalSlice(core.DependencyMember, self.old.dependency_members, self.current.dependency_members, recipe.members);
         try self.node(recipe.runtime_metadata);
@@ -262,7 +278,7 @@ const Scan = struct {
         while (self.work.pop()) |work| switch (work) {
             .node => |id| try self.scanNode(id),
             .binding => |id| {
-                const value = try equalItem(core.Binding, self.old.bindings, self.current.bindings, id);
+                const value = try self.projectedItem(core.Binding, self.old.bindings, self.current.bindings, id);
                 if (self.old.sourceNamePoint(id) != self.current.sourceNamePoint(id)) return error.Changed;
                 if (self.old.runtimeNamePoint(id) != self.current.runtimeNamePoint(id)) return error.Changed;
                 // The dependency fixed point covers named producer bodies.
@@ -270,7 +286,7 @@ const Scan = struct {
                 if (value.kind == .local or value.kind == .parameter) try self.node(value.initializer);
             },
             .pattern => |id| {
-                const p = try equalItem(core.Pattern, self.old.patterns, self.current.patterns, id);
+                const p = try self.projectedItem(core.Pattern, self.old.patterns, self.current.patterns, id);
                 switch (p.tag) {
                     .invalid => return error.Changed,
                     .wildcard, .constant => {},
@@ -281,7 +297,7 @@ const Scan = struct {
                 }
             },
             .projection => |id| {
-                const p = try equalItem(core.Projection, self.old.projections, self.current.projections, id);
+                const p = try self.projectedItem(core.Projection, self.old.projections, self.current.projections, id);
                 _ = try equalSlice(core.ProjectionVariant, self.old.projection_variants, self.current.projection_variants, p.variants);
             },
         };
@@ -296,6 +312,12 @@ pub fn definitionEqual(a: Allocator, old: *const core.Module, current: *const co
 /// list is meaningful only when the result is true; each entry is then equal at
 /// the same catalog index in both modules.
 pub fn definitionEqualCollecting(a: Allocator, old: *const core.Module, current: *const core.Module, binding: u32, closures: ?*std.ArrayList(u32)) Allocator.Error!bool {
+    return definitionMode(a, old, current, binding, closures, false);
+}
+pub fn constantDefinitionEqualCollecting(a: Allocator, old: *const core.Module, current: *const core.Module, binding: u32, closures: ?*std.ArrayList(u32)) Allocator.Error!bool {
+    return definitionMode(a, old, current, binding, closures, true);
+}
+fn definitionMode(a: Allocator, old: *const core.Module, current: *const core.Module, binding: u32, closures: ?*std.ArrayList(u32), constant_types: bool) Allocator.Error!bool {
     if (binding == 0) return false;
     const nodes = try a.alloc(bool, old.nodes.len);
     defer a.free(nodes);
@@ -309,11 +331,33 @@ pub fn definitionEqualCollecting(a: Allocator, old: *const core.Module, current:
     @memset(bindings, false);
     @memset(patterns, false);
     @memset(projections, false);
-    var scan: Scan = .{ .allocator = a, .old = old, .current = current, .nodes = nodes, .bindings = bindings, .patterns = patterns, .projections = projections, .closures = closures };
+    var scan: Scan = .{ .allocator = a, .old = old, .current = current, .nodes = nodes, .bindings = bindings, .patterns = patterns, .projections = projections, .closures = closures, .constant_types = constant_types };
     defer scan.work.deinit(a);
     scan.run(binding) catch |err| switch (err) {
         error.Changed => return false,
         error.OutOfMemory => return error.OutOfMemory,
     };
     return true;
+}
+
+/// Constant-only alias proof; no variable, nominal, callable or projection ID
+/// crosses this boundary. The caller validates both complete Core graphs.
+pub fn equalConstantType(left: core.Types, before: u32, right: core.Types, after: u32) bool {
+    if (before >= left.nodes.len or after >= right.nodes.len) return false;
+    if (before == after) return true;
+    const a = left.nodes[before];
+    const b = right.nodes[after];
+    if (!std.meta.eql(a, b)) return false;
+    switch (a.tag) {
+        .unit, .boolean, .u32, .f32, .never => return true,
+        .array, .list, .cursor => {
+            if (a.a >= left.nodes.len or b.a >= right.nodes.len or a.b != 0 or a.c != 0) return false;
+            if (!std.meta.eql(left.nodes[a.a], right.nodes[b.a])) return false;
+            return switch (left.nodes[a.a].tag) {
+                .unit, .boolean, .u32, .f32, .never => true,
+                else => false,
+            };
+        },
+        else => return false,
+    }
 }

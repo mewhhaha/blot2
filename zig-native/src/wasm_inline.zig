@@ -41,6 +41,7 @@ fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
             }
         },
         .call => {
+            if (inst.operand == arena.mark_acyclic) continue;
             if (!arena.isAllocation(inst.operand) or i == 0) return false;
             const size = body.instructions.items[i - 1];
             if (size.table_reference or size.op != .i32_const or size.operand == 0 or size.operand > 64 or size.operand % 4 != 0) return false;
@@ -55,7 +56,7 @@ fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
             if (contract.effect != .pure) return false;
         },
     };
-    return allocations == 1;
+    return allocations != 0 and allocations <= 4;
 }
 
 pub fn run(a: A, module: *const wasm.Module, source: *const ir.Function) A.Error!?ir.Body {

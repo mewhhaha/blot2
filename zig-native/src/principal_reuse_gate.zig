@@ -17,6 +17,7 @@ const Allocator = std.mem.Allocator;
 const ModuleField = std.meta.FieldEnum(core.Module);
 
 pub const Gate = struct {
+    constant_types: bool = false,
     allocator: Allocator,
     units: []const core.Module,
     /// Exact retained Snapshot owner paired with this private gate.
@@ -67,6 +68,18 @@ pub const Gate = struct {
     /// declaration projections may retain principal proofs in changed modules.
     /// Executable/value/receipt admission still requires structural_units.
     pub fn initWithStamps(allocator: Allocator, old: *const artifacts.Pools, units: []const core.Module, names: ?identity.View, stamps: ?*artifacts.ModuleStamps) Allocator.Error!Gate {
+        return initMode(allocator, old, units, names, stamps, false);
+    }
+
+    /// Dedicated constant receipts retain their own exact initializer and read
+    /// proof. A duplicate closed type appended by an old evaluation has no
+    /// semantic identity; it may disappear when frontend body facts replay.
+    /// This mode never authorizes ordinary principal or executable reuse.
+    pub fn initConstantReceipts(allocator: Allocator, old: *const artifacts.Pools, units: []const core.Module, names: ?identity.View, stamps: ?*artifacts.ModuleStamps) Allocator.Error!Gate {
+        return initMode(allocator, old, units, names, stamps, true);
+    }
+
+    fn initMode(allocator: Allocator, old: *const artifacts.Pools, units: []const core.Module, names: ?identity.View, stamps: ?*artifacts.ModuleStamps, constant_types: bool) Allocator.Error!Gate {
         const structural_units = try allocator.alloc(bool, units.len);
         errdefer allocator.free(structural_units);
         @memset(structural_units, false);
@@ -93,7 +106,7 @@ pub const Gate = struct {
         const storage = try allocator.create(Storage);
         errdefer allocator.destroy(storage);
         storage.* = .{};
-        var result: Gate = .{ .storage = storage, .allocator = allocator, .source_pools = old, .units = units, .structural_units = structural_units, .certified_images = certified_images, .closure_owners = closure_owners, .closure_offsets = closure_offsets, .offsets = offsets, .dirty = dirty, .local_dirty = local_dirty };
+        var result: Gate = .{ .constant_types = constant_types, .storage = storage, .allocator = allocator, .source_pools = old, .units = units, .structural_units = structural_units, .certified_images = certified_images, .closure_owners = closure_owners, .closure_offsets = closure_offsets, .offsets = offsets, .dirty = dirty, .local_dirty = local_dirty };
 
         if (!old.project_identity or old.identity == null or names == null or old.modules.len != units.len or units.len == 0 or units.len >= std.math.maxInt(u32)) return result;
         // Artifact/query records below use one-based catalog positions. The
@@ -119,7 +132,7 @@ pub const Gate = struct {
         }
         if (!all_structural) {
             for (units, old.modules, structural_units) |*module, pin, structural| {
-                if (!structural and !catalogEqual(pin.module, module)) return result;
+                if (!structural and !catalogEqual(pin.module, module, constant_types)) return result;
             }
         }
 
@@ -194,7 +207,7 @@ pub const Gate = struct {
                 for (module.bindings[1..], 1..) |binding, id| {
                     reached.clearRetainingCapacity();
                     const same = switch (binding.kind) {
-                        .global => try projection.definitionEqualCollecting(allocator, pin.module, &module, @intCast(id), &reached),
+                        .global => try definitionEqual(allocator, pin.module, &module, @intCast(id), &reached, constant_types),
                         .external => id < pin.module.bindings.len and std.meta.eql(pin.module.bindings[id], binding),
                         .local, .parameter => false,
                     };
@@ -318,11 +331,19 @@ pub const Gate = struct {
         if (target.binding >= current.bindings.len or target.binding >= old.bindings.len) return false;
         const left = old.binding(target.binding);
         const right = current.binding(target.binding);
-        if (left.kind != .global or right.kind != .global or left.ty != right.ty) return false;
+        if (left.kind != .global or right.kind != .global) return false;
+        if (left.ty != right.ty) {
+            if (!self.constant_types or !projection.equalConstantType(old.types, left.ty, current.types, right.ty)) return false;
+        }
         if (!equal(old.source_names, current.source_names)) return false;
         const before = old.body(target.binding) orelse return false;
         const after = current.body(target.binding) orelse return false;
-        return before.runtime == after.runtime and before.is_function == after.is_function and equal(before.scheme, after.scheme);
+        var scheme = before.scheme;
+        if (scheme.root != after.scheme.root) {
+            if (!self.constant_types or !projection.equalConstantType(old.types, scheme.root, current.types, after.scheme.root)) return false;
+            scheme.root = after.scheme.root;
+        }
+        return before.runtime == after.runtime and before.is_function == after.is_function and equal(scheme, after.scheme);
     }
 
     pub fn admitsRefinement(self: *const Gate, record: anytype) bool {
@@ -409,7 +430,7 @@ fn obligationsEqual(previous: []const core.Obligation, current: []const core.Obl
     }
     return true;
 }
-fn catalogEqual(previous: *const core.Module, current: *const core.Module) bool {
+fn catalogEqual(previous: *const core.Module, current: *const core.Module, constant_types: bool) bool {
     const shared = @min(previous.bindings.len, current.bindings.len);
     for (previous.bindings[0..shared], current.bindings[0..shared]) |before, after| if (before.private != after.private) return false;
     for (previous.bindings[shared..]) |binding| if (binding.private) return false;
@@ -421,8 +442,13 @@ fn catalogEqual(previous: *const core.Module, current: *const core.Module) bool 
             // identical. Their witness expressions are projected by every
             // referencing declaration's definition equality and dependency
             // walk, so a changed witness dirties exactly its consumers.
-            .unit, .types, .nominals, .constructors, .associated, .contracts, .contract_members, .operation_names, .names, .field_names, .operation_values => {
+            .unit, .nominals, .constructors, .associated, .contracts, .contract_members, .operation_names, .names, .field_names, .operation_values => {
                 if (!equal(@field(previous, name), @field(current, name))) return false;
+            },
+            .types => {
+                if (!equal(previous.types, current.types)) {
+                    if (!constant_types or !duplicateTypeTail(previous.types, current.types)) return false;
+                }
             },
             // Obligation spans locate diagnostics only. A shifted source
             // position keeps the catalog; declarations still compare spans.
@@ -598,4 +624,66 @@ fn scalarRoot(module: core.Module, id: core.Id) ?core.BindingId {
     for (module.request_loops) |value| if (value.computation == id or value.completion_body == id) return null;
     for (module.request_arms) |value| if (value.callback == id) return null;
     return binding;
+}
+
+// Every shared ID keeps exactly the same meaning. The only discarded entries
+// are bounded duplicates of primitive/container nodes in that shared domain;
+// variables, declarations and row identities cannot enter through this path.
+fn duplicateTypeTail(left: core.Types, right: core.Types) bool {
+    if (!equal(left.extra, right.extra) or !equal(left.effects, right.effects) or !equal(left.operations, right.operations)) return false;
+    const shared = @min(left.nodes.len, right.nodes.len);
+    if (!equal(left.nodes[0..shared], right.nodes[0..shared])) return false;
+    const left_count = left.nodes.len - shared;
+    const right_count = right.nodes.len - shared;
+    if (left_count > 4096 or right_count > 4096 - left_count) return false;
+    for ([_][]const T.Node{ left.nodes[shared..], right.nodes[shared..] }) |tail| {
+        for (tail) |node| {
+            switch (node.tag) {
+                .unit, .boolean, .u32, .f32, .never => {},
+                .array, .list, .cursor => {
+                    if (node.a >= shared or node.b != 0 or node.c != 0) return false;
+                    switch (left.nodes[node.a].tag) {
+                        .unit, .boolean, .u32, .f32, .never => {},
+                        else => return false,
+                    }
+                },
+                else => return false,
+            }
+            var found = false;
+            for (left.nodes[0..shared]) |existing| {
+                if (std.meta.eql(existing, node)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) return false;
+        }
+    }
+    return true;
+}
+
+fn definitionEqual(a: Allocator, old: *const core.Module, current: *const core.Module, binding: u32, closures: ?*std.ArrayList(u32), constant_types: bool) Allocator.Error!bool {
+    if (constant_types) return projection.constantDefinitionEqualCollecting(a, old, current, binding, closures);
+    return projection.definitionEqualCollecting(a, old, current, binding, closures);
+}
+
+test "constant type tail proof rejects new shapes variables and malformed aliases" {
+    const base = [_]T.Node{
+        .{ .tag = .absent },
+        .{ .tag = .u32 },
+        .{ .tag = .array, .a = 1 },
+    };
+    const duplicate = base ++ [_]T.Node{base[2]};
+    const distinct = base ++ [_]T.Node{.{ .tag = .list, .a = 1 }};
+    const variable = base ++ [_]T.Node{.{ .tag = .variable, .a = 1 }};
+    const malformed = base ++ [_]T.Node{.{ .tag = .array, .a = 99 }};
+    const current: core.Types = .{ .nodes = @constCast(&base), .extra = &.{} };
+    try std.testing.expect(duplicateTypeTail(.{ .nodes = @constCast(&duplicate), .extra = &.{} }, current));
+    try std.testing.expect(!duplicateTypeTail(.{ .nodes = @constCast(&distinct), .extra = &.{} }, current));
+    try std.testing.expect(!duplicateTypeTail(.{ .nodes = @constCast(&variable), .extra = &.{} }, current));
+    try std.testing.expect(!duplicateTypeTail(.{ .nodes = @constCast(&malformed), .extra = &.{} }, current));
+    try std.testing.expect(projection.equalConstantType(.{ .nodes = @constCast(&duplicate), .extra = &.{} }, 3, current, 2));
+    try std.testing.expect(!projection.equalConstantType(.{ .nodes = @constCast(&distinct), .extra = &.{} }, 3, current, 2));
+    try std.testing.expect(!projection.equalConstantType(.{ .nodes = @constCast(&malformed), .extra = &.{} }, 3, current, 2));
+    try std.testing.expect(!projection.equalConstantType(current, 3, current, 3));
 }

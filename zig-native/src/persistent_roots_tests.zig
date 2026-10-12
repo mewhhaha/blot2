@@ -767,3 +767,134 @@ fn acyclicClaims(result: *const backend.Result) usize {
     };
     return count;
 }
+
+fn ownedFieldAdmission(allocator: std.mem.Allocator) !void {
+    const w = @import("wasm.zig");
+    const ir = @import("runtime_ir.zig");
+    const bodies = @import("optimized_bodies.zig");
+    const portable = @import("optimized_archive.zig");
+    var module = w.Module.init(allocator);
+    defer module.deinit();
+    const arena = try module.ensureArena();
+    const function = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+    try module.setParameterRoles(function, ir.packParameterRoles(&.{.reference}));
+    const object = try module.addLocal(function, .i32);
+    const alias = try module.addLocal(function, .i32);
+    var buffer: [ir.max_annotations]ir.Instruction = undefined;
+    try module.emit(function, .{ .op = .ownership, .operand = @bitCast(ir.Ownership{ .kind = .scope, .chunk = 0 }) });
+    try module.emitSlice(function, ir.annotations(&.{ .reference, .scalar }, .scalar, &buffer));
+    try module.emitSlice(function, &.{
+        .{ .op = .i32_const, .operand = 8 },      .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = object },
+        .{ .op = .local_get, .operand = object }, .{ .op = .local_get },                       .{ .op = .i32_store },
+        .{ .op = .local_get, .operand = object }, .{ .op = .i32_const, .operand = 8192 },      .{ .op = .i32_store, .operand = 4 },
+        .{ .op = .local_get, .operand = object }, .{ .op = .local_set, .operand = alias },
+    });
+    try module.emit(function, .{ .op = .ownership, .operand = @bitCast(ir.Ownership{ .kind = .scope, .chunk = 2, .roles = @intCast(alias) }) });
+    try module.emitSlice(function, &.{ .{ .op = .local_get, .operand = alias }, .{ .op = .i32_load }, .{ .op = .i32_load, .operand = 4 } });
+    const original = try allocator.dupe(ir.Instruction, module.functions.items[function].instructions.items);
+    defer allocator.free(original);
+    var before: bodies.Capture = .{ .allocator = allocator };
+    defer before.deinit();
+    const initial = try module.assembleWithOptions(.{ .current = &before });
+    defer allocator.free(initial);
+    try ownership(initial);
+    const compiler: [32]u8 = @splat(47);
+    const encoded = try portable.encode(allocator, compiler, &before);
+    defer allocator.free(encoded);
+    var checkpoint = try portable.decode(allocator, compiler, encoded);
+    defer checkpoint.deinit();
+    var exposed: bodies.Capture = .{ .allocator = allocator };
+    defer exposed.deinit();
+    const exported = try module.assembleWithOptions(.{ .previous = &before, .current = &exposed, .export_function_table = true });
+    defer allocator.free(exported);
+    const exported_fresh = try module.assembleWithOptions(.{ .export_function_table = true });
+    defer allocator.free(exported_fresh);
+    try std.testing.expectEqualSlices(u8, exported_fresh, exported);
+    try std.testing.expect(!exposed.roots);
+    var exported_matcher = try bodies.Matcher.init(allocator, &before, &exposed);
+    defer exported_matcher.deinit();
+    try std.testing.expect(!exported_matcher.matches(function));
+    // An unrelated dynamic raw allocation declines only the final RC proof.
+    const unproven = try module.addTypedFunction(&.{.i32}, .i32, .reference);
+    try module.emitSlice(unproven, &.{ .{ .op = .local_get }, .{ .op = .call, .operand = arena.allocate } });
+    const fresh = try module.assemble();
+    defer allocator.free(fresh);
+    for ([_]*const bodies.Capture{ &before, &checkpoint }) |previous| {
+        var current: bodies.Capture = .{ .allocator = allocator };
+        defer current.deinit();
+        const retained = try module.assembleWithOptions(.{ .previous = previous, .current = &current });
+        defer allocator.free(retained);
+        try std.testing.expectEqualSlices(u8, fresh, retained);
+        try std.testing.expect(!current.roots);
+        var matcher = try bodies.Matcher.init(allocator, previous, &current);
+        defer matcher.deinit();
+        try std.testing.expect(!matcher.matches(function));
+        const output = current.output(function).?;
+        var allocations: usize = 0;
+        for (output.instructions.items) |instruction| if (instruction.op == .call and instruction.operand == arena.allocate_typed) {
+            allocations += 1;
+        };
+        try std.testing.expectEqual(@as(usize, 1), allocations);
+    }
+    try std.testing.expectEqualSlices(ir.Instruction, original, module.functions.items[function].instructions.items);
+}
+
+test "late module ownership failure restores owning field objects through retained portable and OOM" {
+    try ownedFieldAdmission(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, ownedFieldAdmission, .{});
+}
+
+test "private cursor constructor body reads invalidate retained and portable admission" {
+    const input =
+        \\const make = fn values => @list.cursor values
+        \\entry const run = fn (count: U32) => do:
+        \\  let values = @list.fill count {x: 41, y: 8192}
+        \\  let cursor = make values
+        \\  let sum = 0
+        \\  for index in 0..count:
+        \\    let row = @cursor.value cursor
+        \\    sum := @u32.add self row.x
+        \\    cursor := @cursor.advance self
+        \\  return sum
+    ;
+    var fixture = try Fixture.initSource(input);
+    defer fixture.deinit();
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    var retained = try fixture.emit(a, &first.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
+    const compiler: [32]u8 = @splat(47);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    var portable = try fixture.emit(a, null, &checkpoint);
+    defer portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, portable.bytes);
+    var changed_fixture = try Fixture.initSource(
+        \\const make = fn values => do:
+        \\  let copy = @array.from_list values
+        \\  return @list.cursor (@list.from_array copy)
+        \\entry const run = fn (count: U32) => do:
+        \\  let values = @list.fill count {x: 41, y: 8192}
+        \\  let cursor = make values
+        \\  let sum = 0
+        \\  for index in 0..count:
+        \\    let row = @cursor.value cursor
+        \\    sum := @u32.add self row.x
+        \\    cursor := @cursor.advance self
+        \\  return sum
+    );
+    defer changed_fixture.deinit();
+    var changed = try changed_fixture.emit(a, &first.capture.?, null);
+    defer changed.deinit(a);
+    var fresh = try changed_fixture.emit(a, null, null);
+    defer fresh.deinit(a);
+    var changed_portable = try changed_fixture.emit(a, null, &checkpoint);
+    defer changed_portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, changed.bytes);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, changed_portable.bytes);
+    try std.testing.expect(!std.mem.eql(u8, first.bytes, fresh.bytes));
+}

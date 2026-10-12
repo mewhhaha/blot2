@@ -19,6 +19,7 @@ const statObjects = [
   "principals",
   "refinements",
   "selectedQueries",
+  "constantReceipts",
   "attemptStats",
 ];
 type Metadata = Record<string, any>;

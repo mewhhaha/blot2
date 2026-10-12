@@ -656,6 +656,20 @@ pub const Module = struct {
         return self.assembleWithOptions(.{});
     }
     pub fn assembleWithOptions(self: *const Module, options: AssemblyOptions) ![]u8 {
+        return self.assemblePrepared(options, true);
+    }
+    fn hasOwningFieldLayouts(self: *const Module) bool {
+        const arena = self.arena orelse return false;
+        // SROA accepts at most sixteen words. Scan source and helper bodies:
+        // inlining can expose their allocations in another function.
+        for (self.functions.items) |function| for (function.instructions.items, 0..) |inst, at| {
+            if (inst.op != .call or inst.operand != arena.allocate) continue;
+            const roles = ir.allocationAnnotations(function.instructions.items, at);
+            for (0..16) |word| if (ir.Ownership.wordRole(roles, word) == .reference) return true;
+        };
+        return false;
+    }
+    fn assemblePrepared(self: *const Module, options: AssemblyOptions, journals: bool) ![]u8 {
         if (options.import_function_table != null and self.host_references != null) return error.InvalidFunctionReference;
         if (options.stats) |stats| stats.tier = options.tier;
         if (options.current) |current| current.tier = options.tier;
@@ -664,7 +678,7 @@ pub const Module = struct {
         var passes = try @import("runtime_pipeline.zig").Session.init(self.allocator, self);
         defer passes.deinit();
         passes.tier = options.tier;
-        if (options.share_machine_code or options.import_function_table != null) passes.roots = false;
+        if (!journals or options.share_machine_code or options.import_function_table != null or options.export_function_table) passes.roots = false;
         var root_slots: u32 = 0;
         if (passes.roots) {
             const limit = std.math.maxInt(u32) / 4;
@@ -722,6 +736,15 @@ pub const Module = struct {
             }
         }
         const rc_admitted = ownership_fallback == .none;
+        // Virtual reference fields rely on enabled journals. A late module
+        // failure must rebuild ordinary bodies before disabling those journals.
+        if (passes.roots and !rc_admitted and self.hasOwningFieldLayouts()) {
+            if (options.current) |current| {
+                current.deinit();
+            }
+            if (options.stats) |stats| stats.* = .{};
+            return self.assemblePrepared(options, false);
+        }
         const roots_admitted = rc_admitted and passes.roots;
         const root_mode = blk: {
             const arena = self.arena orelse break :blk 0;
@@ -1333,4 +1356,25 @@ test "import signature conflicts and stale references are rejected" {
     const function = try module.addFunction(&.{.i32}, .i32);
     try module.emit(function, .{ .op = .call_import, .operand = 100 });
     try std.testing.expectError(error.InvalidFunctionReference, module.assemble());
+}
+
+test "mutable exported imported and shared function tables disable owned roots" {
+    const a = std.testing.allocator;
+    var module = Module.init(a);
+    defer module.deinit();
+    _ = try module.ensureArena();
+    const function = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+    try module.setParameterRoles(function, ir.packParameterRoles(&.{.scalar}));
+    try module.emit(function, .{ .op = .local_get });
+    for (0..4) |scenario| {
+        var capture: @import("optimized_bodies.zig").Capture = .{ .allocator = a };
+        defer capture.deinit();
+        var options: AssemblyOptions = .{ .current = &capture };
+        if (scenario == 1) options.export_function_table = true;
+        if (scenario == 2) options.import_function_table = @intCast(module.functions.items.len);
+        if (scenario == 3) options.share_machine_code = true;
+        const bytes = try module.assembleWithOptions(options);
+        defer a.free(bytes);
+        try std.testing.expectEqual(scenario == 0, capture.roots);
+    }
 }

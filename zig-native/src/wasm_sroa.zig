@@ -8,7 +8,7 @@ const ir = @import("runtime_ir.zig");
 const A = std.mem.Allocator;
 const none = std.math.maxInt(u32);
 const Value = struct { id: u32 = 0, offset: u32 = 0, constant: ?u32 = null };
-const Node = struct { parent: u32, bad: bool = false, size: u32 = 0, allocation: bool = false, first_copy: u32 = none, last_store: u32 = 0, store_mask: u32 = 0, scope: usize = 0, fields: u32 = 0, used_fields: u16 = 0, journaled: bool = false, untyped: bool = false };
+const Node = struct { parent: u32, bad: bool = false, size: u32 = 0, allocation: bool = false, first_copy: u32 = none, last_store: u32 = 0, store_mask: u32 = 0, scope: usize = 0, fields: u32 = 0, used_fields: u16 = 0, journaled: bool = false, untyped: bool = false, reference_fields: u16 = 0, roots: u32 = 0 };
 const Event = struct { input: Value = .{}, destination: u32 = 0, field: u32 = 0, allocation: u32 = 0, fresh: bool = false };
 const Control = struct { height: usize, result: u32, unreachable_: bool = false, identity: usize = 0 };
 pub const Output = ir.Body;
@@ -22,6 +22,7 @@ const Analysis = struct {
     constant_scopes: []?usize,
     defined_scopes: []?usize,
     valid: bool = true,
+    owning: bool = false,
     fn add(self: *Analysis, bad: bool, size: u32) !u32 {
         const id: u32 = @intCast(self.nodes.items.len);
         try self.nodes.append(self.a, .{ .parent = id, .bad = bad, .size = size });
@@ -53,7 +54,9 @@ const Analysis = struct {
         const right = self.nodes.items[source];
         const left = &self.nodes.items[target];
         left.bad = left.bad or right.bad or (left.size != 0 and right.size != 0 and left.size != right.size);
+        if (left.size != 0 and right.size != 0 and left.reference_fields != right.reference_fields) left.bad = true;
         left.size = @max(left.size, right.size);
+        left.reference_fields |= right.reference_fields;
         left.journaled = left.journaled or right.journaled;
         left.untyped = left.untyped or right.untyped;
         self.nodes.items[source].parent = target;
@@ -187,13 +190,16 @@ const Analysis = struct {
                         const size = self.pop();
                         if (size.constant != null and size.constant.? != 0 and size.constant.? <= 64 and size.constant.? % 4 == 0) {
                             var owns_fields = false;
+                            var references: u16 = 0;
                             if (callee.ownership != .allocate_scalar) {
                                 const roles = ir.allocationAnnotations(instructions, at);
                                 if (roles.len != 0) for (0..size.constant.? / 4) |word| {
-                                    if (ir.Ownership.wordRole(roles, word) != .scalar) owns_fields = true;
+                                    const role = ir.Ownership.wordRole(roles, word);
+                                    if (role == .reference and self.owning) references |= @as(u16, 1) << @intCast(word) else if (role != .scalar) owns_fields = true;
                                 };
                             }
                             const id = try self.add(owns_fields, size.constant.?);
+                            self.nodes.items[id].reference_fields = references;
                             self.nodes.items[id].untyped = callee.ownership != .allocate_scalar and ir.allocationAnnotations(instructions, at).len == 0;
                             self.events[at].allocation = id;
                             try self.push(.{ .id = id });
@@ -329,6 +335,13 @@ const Analysis = struct {
         std.debug.assert(node.used_fields & (@as(u16, 1) << @intCast(field)) != 0);
         return node.fields + @popCount(@as(u32, node.used_fields) & lower);
     }
+    fn fieldRoot(self: *Analysis, id: u32, field: u32) ?u32 {
+        const node = self.nodes.items[id];
+        const references = self.nodes.items[self.root(id)].reference_fields & node.used_fields;
+        if (references & (@as(u16, 1) << @intCast(field)) == 0) return null;
+        const lower = (@as(u32, 1) << @intCast(field)) - 1;
+        return node.roots + @popCount(@as(u32, references) & lower);
+    }
 };
 fn emit(out: *Output, a: A, op: w.Op, operand: u32) !void {
     try out.instructions.append(a, .{ .op = op, .operand = operand });
@@ -344,8 +357,15 @@ fn copyFields(out: *Output, analysis: *Analysis, event: Event) !void {
         i -= 1;
         if (mask & (@as(u16, 1) << @intCast(i)) != 0) try emit(out, a, .local_set, analysis.fieldLocal(event.destination, i));
     }
+    for (0..count) |field| try publishField(out, analysis, event.destination, @intCast(field));
 }
-fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []const w.ValueType, instructions: []const w.Instruction) !?Output {
+fn publishField(out: *Output, analysis: *Analysis, id: u32, field: u32) !void {
+    const slot = analysis.fieldRoot(id, field) orelse return;
+    const value = analysis.fieldLocal(id, field);
+    const scope: ir.Ownership = .{ .kind = .scope, .chunk = 4, .roles = @intCast(slot | (value << 13)) };
+    try emit(out, analysis.a, .ownership, @bitCast(scope));
+}
+fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []const w.ValueType, instructions: []const w.Instruction, owning: bool) !?Output {
     const events = try a.alloc(Event, instructions.len);
     defer a.free(events);
     @memset(events, .{});
@@ -368,7 +388,7 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
         if (!writes[inst.operand]) constants[inst.operand] = value else if (constants[inst.operand] != value) constants[inst.operand] = null;
         writes[inst.operand] = true;
     };
-    var analysis: Analysis = .{ .a = a, .events = events, .constants = constants, .constant_scopes = constant_scopes, .defined_scopes = defined_scopes };
+    var analysis: Analysis = .{ .a = a, .events = events, .constants = constants, .constant_scopes = constant_scopes, .defined_scopes = defined_scopes, .owning = owning };
     defer analysis.nodes.deinit(a);
     defer analysis.stack.deinit(a);
     defer analysis.controls.deinit(a);
@@ -386,6 +406,11 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
         analysis.nodes.items[event.input.id].used_fields |= @as(u16, 1) << @intCast(event.field / 4);
     };
     try analysis.demandedFields();
+    var added: usize = 0;
+    for (analysis.nodes.items, 0..) |node, id| if (analysis.selected(@intCast(id))) {
+        added += @popCount(node.used_fields) + @popCount(node.used_fields & analysis.nodes.items[analysis.root(@intCast(id))].reference_fields);
+    };
+    if (owning and (local_count >= 8192 or added >= 8192 - local_count)) return null;
     var out: Output = .{};
     errdefer out.deinit(a);
     try out.locals.appendSlice(a, locals);
@@ -394,6 +419,18 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
         const count = @popCount(analysis.nodes.items[id].used_fields);
         analysis.nodes.items[id].fields = @intCast(function.parameters.len + out.locals.items.len);
         try out.locals.appendNTimes(a, .i32, count);
+    }
+    // These slots belong to the function frame, outside source scope markers.
+    // Each static virtual field has one reusable slot across loop activations.
+    for (0..analysis.nodes.items.len) |id| {
+        if (!analysis.selected(@intCast(id))) continue;
+        const count = @popCount(analysis.nodes.items[id].used_fields & analysis.nodes.items[analysis.root(@intCast(id))].reference_fields);
+        analysis.nodes.items[id].roots = @intCast(function.parameters.len + out.locals.items.len);
+        for (0..count) |_| {
+            const slot: u32 = @intCast(function.parameters.len + out.locals.items.len);
+            try out.locals.append(a, .i32);
+            try emit(&out, a, .ownership, @bitCast(ir.Ownership{ .kind = .scope, .chunk = 3, .roles = @intCast(slot) }));
+        }
     }
     for (instructions, events) |inst, event| {
         if (inst.op == .ownership) {
@@ -422,11 +459,15 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
                 try emit(&out, a, .local_set, analysis.fieldLocal(event.input.id, event.field / 4));
             } else try emit(&out, a, .drop, 0);
             try emit(&out, a, .drop, 0);
+            try publishField(&out, &analysis, event.input.id, event.field / 4);
         } else try out.instructions.append(a, inst);
     }
     return out;
 }
 pub fn run(a: A, module: *const w.Module, function: *const w.Function) !?Output {
+    return runWithRoots(a, module, function, false);
+}
+pub fn runWithRoots(a: A, module: *const w.Module, function: *const w.Function, owning: bool) !?Output {
     if (module.arena == null) return null;
     var output: ?Output = null;
     errdefer if (output) |*out| out.deinit(a);
@@ -438,7 +479,7 @@ pub fn run(a: A, module: *const w.Module, function: *const w.Function) !?Output 
             allocations += 1;
         };
         if (allocations == 0) break;
-        const next = try pass(a, module, function, locals, instructions) orelse break;
+        const next = try pass(a, module, function, locals, instructions, owning) orelse break;
         if (output) |*out| out.deinit(a);
         output = next;
     }
@@ -599,4 +640,51 @@ fn journaledScalarSnapshots(a: A) !void {
 test "scalar replacement preserves journaled scalar snapshots and declines owning or untyped fields through OOM" {
     try journaledScalarSnapshots(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, journaledScalarSnapshots, .{});
+}
+
+fn journaledReferenceSnapshots(a: A) !void {
+    var module = w.Module.init(a);
+    defer module.deinit();
+    const arena = try module.ensureArena();
+    const function = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+    const object = try module.addLocal(function, .i32);
+    const alias = try module.addLocal(function, .i32);
+    var buffer: [ir.max_annotations]ir.Instruction = undefined;
+    try module.emit(function, .{ .op = .ownership, .operand = @bitCast(ir.Ownership{ .kind = .scope, .chunk = 0 }) });
+    try module.emitSlice(function, ir.annotations(&.{ .reference, .scalar }, .scalar, &buffer));
+    try module.emitSlice(function, &.{
+        .{ .op = .i32_const, .operand = 8 },      .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = object },
+        .{ .op = .local_get, .operand = object }, .{ .op = .local_get },                       .{ .op = .i32_store },
+        .{ .op = .local_get, .operand = object }, .{ .op = .i32_const, .operand = 8192 },      .{ .op = .i32_store, .operand = 4 },
+        .{ .op = .local_get, .operand = object }, .{ .op = .local_set, .operand = alias },
+    });
+    try module.emit(function, .{ .op = .ownership, .operand = @bitCast(ir.Ownership{ .kind = .scope, .chunk = 2, .roles = @intCast(alias) }) });
+    try module.emitSlice(function, &.{ .{ .op = .local_get, .operand = alias }, .{ .op = .i32_load }, .{ .op = .i32_load, .operand = 4 } });
+    const before = try a.dupe(w.Instruction, module.functions.items[function].instructions.items);
+    defer a.free(before);
+    try std.testing.expect(try run(a, &module, &module.functions.items[function]) == null);
+    var out = (try runWithRoots(a, &module, &module.functions.items[function], true)).?;
+    defer out.deinit(a);
+    var reserved: usize = 0;
+    var stored: usize = 0;
+    var opened = false;
+    for (out.instructions.items) |inst| {
+        try std.testing.expect(inst.op != .call);
+        if (inst.op != .ownership) continue;
+        const scope: ir.Ownership = @bitCast(inst.operand);
+        if (scope.kind != .scope) continue;
+        if (scope.chunk == 0) opened = true;
+        if (scope.chunk == 3) {
+            try std.testing.expect(!opened);
+            reserved += 1;
+        }
+        if (scope.chunk == 4) stored += 1;
+    }
+    try std.testing.expect(reserved >= 2);
+    try std.testing.expect(stored >= 2);
+    try std.testing.expectEqualSlices(w.Instruction, before, module.functions.items[function].instructions.items);
+}
+test "journaled reference snapshots reserve owning field roots before lexical scopes through OOM" {
+    try journaledReferenceSnapshots(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, journaledReferenceSnapshots, .{});
 }

@@ -904,6 +904,68 @@ fn capturedArrays(session: *const eval.Session, root: u32) []const u32 {
     const read = session.valueChildren(session.valueChildren(root)[0])[0];
     return session.valueChildren(read);
 }
+fn constantSemanticDecline(allocator: Allocator, fixture: *const Fixture, old: *const capture.Capture) !void {
+    var g = try Generator.initAt(allocator, fixture);
+    defer g.deinit();
+    g.evaluator.options.trace_runtime_dependencies = true;
+    var state: @import("constant_receipt_reuse.zig").State = .{
+        .allocator = allocator,
+        .old = &old.metadata.pools.?,
+        .gate = try gate_api.Gate.initConstantReceipts(allocator, &old.metadata.pools.?, fixture.units, fixture.names.view(), null),
+    };
+    defer state.deinit();
+    _ = try g.evaluator.richValue(fixture.target("seed"));
+    const nodes = g.evaluator.evidence.nodes.items.len;
+    const values = g.evaluator.values.items.len;
+    const views = g.evaluator.typed_views.count();
+    const serial = g.evaluator.constant_inference_serial;
+    const regions = g.evaluator.counters.inference_regions;
+    const steps = g.evaluator.steps;
+    try std.testing.expect(try state.lookup(&g, fixture.target("expensive"), .{}) == null);
+    try std.testing.expectEqual(@as(usize, 1), g.evaluator.constant_stats.reasons[@backingInt(@import("constant_receipt.zig").Reason.read)]);
+    // Matching imports the output's Array evidence before the changed scalar
+    // read declines. It publishes no alias, query or logical resource charge.
+    try std.testing.expect(g.evaluator.evidence.nodes.items.len > nodes);
+    try std.testing.expectEqual(values, g.evaluator.values.items.len);
+    try std.testing.expectEqual(views, g.evaluator.typed_views.count());
+    try std.testing.expectEqual(serial, g.evaluator.constant_inference_serial);
+    try std.testing.expectEqual(regions, g.evaluator.counters.inference_regions);
+    try std.testing.expectEqual(steps, g.evaluator.steps);
+    var ordinary = try Generator.initAt(allocator, fixture);
+    defer ordinary.deinit();
+    ordinary.evaluator.options.trace_runtime_dependencies = true;
+    const expected = try ordinary.evaluator.richValue(fixture.target("expensive"));
+    const result = try g.evaluator.richValue(fixture.target("expensive"));
+    try std.testing.expectEqual(ordinary.evaluator.steps, g.evaluator.steps);
+    try std.testing.expectEqual(ordinary.evaluator.constantValueCount(), g.evaluator.constantValueCount());
+    try std.testing.expectEqual(ordinary.evaluator.constantChildCount(), g.evaluator.constantChildCount());
+    try std.testing.expectEqual(ordinary.evaluator.typed_views.count(), g.evaluator.typed_views.count());
+    try std.testing.expectEqual(ordinary.evaluator.counters.inference_regions, g.evaluator.counters.inference_regions);
+    try std.testing.expectEqualSlices(u32, ordinary.evaluator.valueChildren(expected), g.evaluator.valueChildren(result));
+}
+test "constant receipt partial semantic import decline preserves ordinary aliases and budgets" {
+    var expression = try a.dupe(u8, "seed");
+    defer a.free(expression);
+    for (0..80) |_| {
+        const next = try a.print("@u32.add 1 ({s})", .{expression});
+        a.free(expression);
+        expression = next;
+    }
+    const source = try a.print("const input = 1\nconst seed = @u32.add input 0\nconst expensive = do:\n  let represented: Array U32 = #[{s}]\n  return represented\nentry const run = fn () => @array.get expensive 0\n", .{expression});
+    defer a.free(source);
+    var before = try Fixture.init(source);
+    defer before.deinit();
+    var initial = try before.emit(a, .{ .retain_artifacts = true });
+    defer initial.deinit(a);
+    try successful(&initial);
+    try std.testing.expect(initial.constant_receipts.recorded != 0);
+    const edited = try std.mem.replaceOwned(u8, a, source, "const input = 1", "const input = 2");
+    defer a.free(edited);
+    var after = try Fixture.init(edited);
+    defer after.deinit();
+    try constantSemanticDecline(a, &after, &initial.capture.?);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, constantSemanticDecline, .{ &after, &initial.capture.? });
+}
 test "source template anchors complete dependency graphs and preserves bidirectional global aliases" {
     var dir = try anchorDir();
     defer dir.cleanup();

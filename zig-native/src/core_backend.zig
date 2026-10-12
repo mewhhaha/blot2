@@ -90,6 +90,7 @@ pub const Result = struct {
     callable_wrappers: usize = 0,
     emitted_functions: usize = 0,
     constant_steps: usize = 0,
+    constant_receipts: @import("constant_receipt.zig").Stats = .{},
     owned_message: []u8 = &.{},
     /// Owned, spelled candidates of a failed dispatch `diagnostic` reports.
     explanation: ?dispatch_explanation.Explanation = null,
@@ -134,6 +135,7 @@ const Generator = struct {
     persisted_principals: ?*@import("principal_archive.zig").Reader = null,
     principal_stats: principal_evidence_reuse.Stats = .{},
     query_state: ?*completed_specialization_query.State = null,
+    constant_state: ?*@import("constant_receipt_reuse.zig").State = null,
     demand_owner: ?*code_artifacts.Context = null,
     refinement_owner: ?*code_artifacts.Context = null,
     refinement_stats: refinement_receipt.Stats = .{},
@@ -175,6 +177,18 @@ const Generator = struct {
         const self: *Generator = @ptrCast(@alignCast(context));
         if (session != &self.evaluator) return null;
         if (self.query_state) |state| return state.lookup(self, input, expected);
+        return null;
+    }
+    fn completedMemberLookup(context: *anyopaque, session: *core_eval.Session, target: core.BindingRef, input: u32, expected: u32) Allocator.Error!?u32 {
+        const self: *Generator = @ptrCast(@alignCast(context));
+        if (session != &self.evaluator) return null;
+        if (self.query_state) |state| return state.lookupMember(self, target, input, expected);
+        return null;
+    }
+    fn constantLookup(context: *anyopaque, session: *core_eval.Session, target: core.BindingRef, inputs: @import("constant_receipt.zig").Inputs) Allocator.Error!?u32 {
+        const self: *Generator = @ptrCast(@alignCast(context));
+        if (session != &self.evaluator) return null;
+        if (self.constant_state) |state| return state.lookup(self, target, inputs);
         return null;
     }
     fn init(allocator: Allocator, units: []const core.Module, journal: ?*artifact_emitter.Recorder) Error!Generator {
@@ -2133,6 +2147,9 @@ pub const CompileOptions = struct {
     explain_demands: bool = false,
     /// Private differential/qualification controls, never source language limits.
     ragged_builders: bool = true,
+    constant_receipts: bool = true,
+    /// Private differential laws for the existing evaluator limits.
+    constant_limits: struct { steps: ?usize = null, values: ?usize = null, children: ?usize = null, depth: ?usize = null, calls: ?usize = null } = .{},
     ragged_probe_limit: u32 = ragged_builder.probe_limit,
     checkpoint: ?*const @import("backend_checkpoint.zig").Checkpoint = null,
     io: ?std.Io = null,
@@ -2194,6 +2211,11 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         journal.clock = &metadata.clock;
     }
     var generator = try Generator.init(allocator, units, if (recording) &journal else null);
+    if (options.constant_limits.steps) |limit| generator.evaluator.options.max_steps = limit;
+    if (options.constant_limits.values) |limit| generator.evaluator.options.max_values = limit;
+    if (options.constant_limits.children) |limit| generator.evaluator.options.max_children = limit;
+    if (options.constant_limits.depth) |limit| generator.evaluator.options.max_depth = limit;
+    if (options.constant_limits.calls) |limit| generator.evaluator.options.max_call_depth = limit;
     generator.demand_lowering.enabled = options.explain_demands;
     generator.ragged_probe_limit = options.ragged_probe_limit;
     if (!options.ragged_builders) generator.ragged_probe_limit = 0;
@@ -2244,6 +2266,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     var query_state: ?completed_specialization_query.State = null;
     defer if (query_state) |*state| state.deinit();
     generator.evaluator.retain_specialization_receipts = recording;
+    generator.evaluator.retain_constant_receipts = recording and options.constant_receipts;
     if (query_previous) |previous| if (previous.metadata.pools != null) {
         // Both States are prepared here from this compile's same immutable
         // source pair and identity. A new namespace is never admitted by a
@@ -2265,7 +2288,22 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         query_state.?.io = options.io;
         query_state.?.semantic_workers = options.policy.semantic_workers;
         generator.query_state = &query_state.?;
-        generator.evaluator.specialization_provider = .{ .context = &generator, .lookup = Generator.completedQueryLookup };
+        generator.evaluator.specialization_provider = .{ .context = &generator, .lookup = Generator.completedQueryLookup, .member = Generator.completedMemberLookup };
+    };
+    var constant_state: ?@import("constant_receipt_reuse.zig").State = null;
+    defer if (constant_state) |*state| state.deinit();
+    if (options.constant_receipts) if (query_state) |*state| {
+        const pools = &state.old.metadata.pools.?;
+        if (@import("constant_receipt.zig").hasProductiveRecord(pools.constant_records, generator.evaluator.minimum_constant_steps)) {
+            var gate = state.gate.retain();
+            if (!gate.enabled) {
+                gate.deinit();
+                gate = try @import("principal_reuse_gate.zig").Gate.initConstantReceipts(allocator, pools, units, options.identity, stamps);
+            }
+            constant_state = .{ .allocator = allocator, .old = pools, .gate = gate };
+            generator.constant_state = &constant_state.?;
+            generator.evaluator.constant_provider = .{ .context = &generator, .lookup = Generator.constantLookup };
+        }
     };
     if (options.evidence_noise) {
         for (0..7) |index| _ = generator.evaluator.evidence.effects.internOperation(.{ .unit = std.math.maxInt(u32), .decl = @intCast(9000 + index) }, &.{types.f32_type}) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else error.ModuleTooLarge;
@@ -2282,7 +2320,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
             errdefer allocator.free(owned_message);
             const explanation = if (diagnostic_) |item| if (item.dispatch) |record| try generator.explainDispatch(record) else null else null;
             errdefer if (explanation) |value| value.deinit(allocator);
-            return .{ .counters = generator.evaluator.counters, .principal = generator.principalStats(), .diagnostic = diagnostic_, .owned_message = owned_message, .explanation = explanation, .startup_observation = if (options.observe_startup) try generator.startup_facts.capture(allocator, &generator.module) else null, .code_instances = generator.codeCount(), .callable_wrappers = generator.wrapperCount(), .emitted_functions = generator.module.functions.items.len, .constant_steps = generator.evaluator.steps };
+            return .{ .counters = generator.evaluator.counters, .principal = generator.principalStats(), .diagnostic = diagnostic_, .owned_message = owned_message, .explanation = explanation, .startup_observation = if (options.observe_startup) try generator.startup_facts.capture(allocator, &generator.module) else null, .code_instances = generator.codeCount(), .callable_wrappers = generator.wrapperCount(), .emitted_functions = generator.module.functions.items.len, .constant_steps = generator.evaluator.steps, .constant_receipts = generator.evaluator.constant_stats };
         },
         else => return err,
     };
@@ -2302,7 +2340,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     const retained_optimized = if (options.previous) |previous| if (previous.optimized) |*owned| owned else null else null;
     const checkpoint_optimized = if (options.checkpoint) |checkpoint| if (checkpoint.optimizer) |*owned| owned else null else null;
     const optimized_previous = retained_optimized orelse checkpoint_optimized;
-    var result: Result = .{ .bytes = try generator.module.assembleWithOptions(.{ .io = options.io, .workers = options.policy.codegen_workers, .tier = options.policy.codegen_tier, .share_machine_code = options.policy.share_machine_code, .previous = optimized_previous, .current = if (optimized) |*owned| owned else null, .stats = &runtime_optimization }), .code_instances = generator.codeCount(), .callable_wrappers = generator.wrapperCount(), .emitted_functions = generator.module.functions.items.len, .constant_steps = generator.evaluator.steps };
+    var result: Result = .{ .bytes = try generator.module.assembleWithOptions(.{ .io = options.io, .workers = options.policy.codegen_workers, .tier = options.policy.codegen_tier, .share_machine_code = options.policy.share_machine_code, .previous = optimized_previous, .current = if (optimized) |*owned| owned else null, .stats = &runtime_optimization }), .code_instances = generator.codeCount(), .callable_wrappers = generator.wrapperCount(), .emitted_functions = generator.module.functions.items.len, .constant_steps = generator.evaluator.steps, .constant_receipts = generator.evaluator.constant_stats };
     // A retained Gate lease zeros its work counters. Sum original gates once,
     // keeping validation work separate from principal-query hits/misses.
     if (retained) |*state| if (state.importer.code_gate) |*checked| result.source_validation.observe(&checked.semantic);
@@ -2333,6 +2371,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     result.completed_queries.recorded = generator.evaluator.specialization_receipts.items.len;
     for (generator.evaluator.specialization_receipts.items) |record| if (record.complete) {
         result.completed_queries.complete_records += 1;
+        if (record.member != null) result.completed_queries.member_recorded += 1;
     };
     result.reuse = generator.work;
     result.refinements = generator.refinement_stats;
@@ -2350,8 +2389,13 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     }
     if (recording) {
         for (generator.evaluator.specialization_receipts.items) |record| {
-            try @import("selected_query.zig").remember(&metadata.specialization_queries, allocator, generator.evaluator.closureInfo(record.input), try record.clone(allocator));
+            var input = record.input;
+            if (record.member) |member| input = member.function;
+            try @import("selected_query.zig").remember(&metadata.specialization_queries, allocator, generator.evaluator.closureInfo(input), try record.clone(allocator));
         }
+        for (metadata.specialization_queries.records.items) |record| if (record.dependencies.member != null) {
+            result.completed_queries.member_payload_bytes += @sizeOf(@import("selected_query.zig").Table.Record) + @import("specialization_receipt.zig").ownedBytes(record.dependencies);
+        };
         // Records exist only for parallel semantic inference.
         if (query_state) |*state| if (options.policy.semantic_workers > 1) {
             try metadata.independent_calls.ensureUnusedCapacity(allocator, state.independent_calls.items.len);
@@ -2943,6 +2987,9 @@ const Emitter = struct {
         loop: resolved_flow.Loop,
         exit: resolved_flow.SymbolicExit,
         request: resolved_flow.RequestLoop,
+        private_cursor: core.Id,
+        private_row: layout.Id,
+        private_pattern: layout.Id,
         pub fn deinit(self: *Plan, a: Allocator) void {
             switch (self.*) {
                 .request => |request| a.free(request.operations),
@@ -3153,10 +3200,32 @@ const Emitter = struct {
         if (depth >= 1024) return g.fail(self.unit_id, id, .complexity);
         const n = source.node(id);
         var entry: ?Plan = switch (n.tag) {
+            .bind => private: {
+                const value = source.node(n.b);
+                if (value.tag == .array_op and source.arrayOperation(n.b) == .cursor_value) {
+                    const operand = source.children(n.b)[0];
+                    if (source.node(operand).tag == .reference) {
+                        const ref = source.reference(operand);
+                        const cursor = g.layouts.node(try self.codeLayout(source.typeOf(operand), source.span(id)));
+                        if ((ref.unit == 0 or ref.unit == self.unit_id) and cursor.tag == .cursor and packed_layout.collectionRowWords(&g.layouts, cursor.a) != 0 and @import("private_cursor.zig").check(source, body.root, ref.binding)) {
+                            const row = g.layouts.node(cursor.a).a;
+                            if (row_projection_uses.checkBinding(source, body.root, id, n.a, &g.layouts, row)) break :private .{ .private_row = row };
+                        }
+                    }
+                }
+                if (source.types.node(source.binding(n.a).ty).tag != .cursor) break :private null;
+                const cursor = g.layouts.node(try self.codeLayout(source.binding(n.a).ty, source.span(id)));
+                if (cursor.tag != .cursor or g.layouts.node(cursor.a).tag != .list or packed_layout.collectionRowWords(&g.layouts, cursor.a) == 0) break :private null;
+                if (!@import("private_cursor.zig").check(source, body.root, n.a)) break :private null;
+                try self.prepareNode(body, n.b, depth + 1, false);
+                const input = try self.privateCursorConstructor(body, n.b);
+                if (input == null and source.node(n.b).tag != .reference and !(source.node(n.b).tag == .array_op and source.arrayOperation(n.b) == .cursor_advance)) break :private null;
+                break :private .{ .private_cursor = input orelse 0 };
+            },
             .operation_value => .{ .operation = .{ .ty = try self.codeLayout(n.ty, source.span(id)), .label = try g.operationLabel(self.unit_id, n.a, self.mappings, self.row_mappings, source.span(id)) } },
             .effect_provider, .state_provider => .{ .provider = try self.prepareProvider(id) },
             .effect_reflection => return g.fail(self.unit_id, id, .backend_const_only),
-            .pattern_bind => .{ .pattern = try self.prepareStaticPattern(id) },
+            .pattern_bind => try self.preparePrivateCursorPattern(body, id),
             .closure, .suspend_ => .{ .template = try self.prepareTemplate(id) },
             .reference => .{ .reference = try self.prepareReference(id) },
             .project => .{ .projection = try self.prepareProjection(id) },
@@ -3215,10 +3284,11 @@ const Emitter = struct {
                 } else try self.locals.put(g.allocator, n.a, 0);
             },
             .pattern_bind => {
-                if (body.get(id).pattern) |bindings| {
+                const selected = body.get(id);
+                if (selected == .pattern) if (selected.pattern) |bindings| {
                     for (bindings) |binding| try self.static_values.put(g.allocator, binding.binding, binding.value);
                     return;
-                }
+                };
                 try self.preparePattern(body, n.a, depth + 1);
                 try self.prepareNode(body, n.b, depth + 1, false);
                 try self.prepareNode(body, n.c, depth + 1, false);
@@ -4746,7 +4816,13 @@ const Emitter = struct {
         };
         var container = try self.capture(operands[0], depth);
         const cursor = if (op == .cursor_value) container else null;
+        var cache: ?[2]u32 = null;
         const index = if (op == .get) try self.capture(operands[1], depth) else blk: {
+            if (self.privateCursorReference(operands[0])) |fields| {
+                container = fields.values[0];
+                cache = .{ fields.values[2], fields.values[3] };
+                break :blk fields.values[1];
+            }
             const position = try self.temporary(.i32);
             try self.emit(.local_get, container);
             try self.emit(.i32_load, heap.offset(heap.Cursor, "index"));
@@ -4761,7 +4837,9 @@ const Emitter = struct {
         if (is_list) {
             try self.listRowBounds(container, index, words);
             const base = try self.multiplyLocal(index, words);
-            if (cursor) |cached| try self.cachedListWordAddress(container, base, field, try self.cursorCache(cached)) else try self.listWordAddress(container, base, field);
+            if (cache) |cached| {
+                try self.cachedListWordAddress(container, base, field, cached);
+            } else if (cursor) |cached| try self.cachedListWordAddress(container, base, field, try self.cursorCache(cached)) else try self.listWordAddress(container, base, field);
         } else {
             try self.arrayBounds(container, index);
             try self.arrayAddress(container, index, words * 4);
@@ -4911,10 +4989,173 @@ const Emitter = struct {
         const scalar_elements = row_words != 0 or self.generator.layouts.scalar(self.generator.layouts.node(collection).a) != null;
         return .{ .owner = array_, .container = array_, .offset = offset, .size = size, .wrapped = false, .row_words = row_words, .array_scalar = scalar_elements };
     }
+    fn preparePrivateCursorPattern(self: *Emitter, body: *const Body, id: core.Id) Error!Plan {
+        if (try self.prepareStaticPattern(id)) |bindings| return .{ .pattern = bindings };
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const node = source.node(id);
+        if (source.pattern(node.a).tag != .product or source.node(node.b).tag != .array_op or source.arrayOperation(node.b) != .cursor_value) return .{ .pattern = null };
+        const operand = source.children(node.b)[0];
+        if (source.node(operand).tag != .reference) return .{ .pattern = null };
+        const ref = source.reference(operand);
+        const cursor = g.layouts.node(try self.codeLayout(source.typeOf(operand), source.span(id)));
+        if ((ref.unit != 0 and ref.unit != self.unit_id) or cursor.tag != .cursor or g.layouts.node(cursor.a).tag != .list) return .{ .pattern = null };
+        const words = packed_layout.collectionRowWords(&g.layouts, cursor.a);
+        const row = g.layouts.node(cursor.a).a;
+        if (words == 0 or g.layouts.node(row).tag != .product or source.patternChildren(node.a).len != words or !@import("private_cursor.zig").check(source, body.root, ref.binding)) return .{ .pattern = null };
+        const fields = g.layouts.children(row);
+        for (source.patternChildren(node.a), 0..) |child, index| {
+            const pattern = source.pattern(child);
+            if (pattern.tag == .wildcard) continue;
+            if (pattern.tag != .bind) return .{ .pattern = null };
+            const concrete = try self.codeLayout(pattern.ty, source.span(id));
+            if (g.layouts.scalar(concrete) == null or g.layouts.machine(concrete) != g.layouts.machine(fields[index])) return .{ .pattern = null };
+        }
+        return .{ .private_pattern = row };
+    }
+    fn privateCursorConstructor(self: *Emitter, body: *const Body, id: core.Id) Error!?core.Id {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const node = source.node(id);
+        if (node.tag == .array_op) {
+            if (source.arrayOperation(id) == .cursor) return source.children(id)[0];
+            return null;
+        }
+        if (!body.entries.contains(id)) return null;
+        const selected = body.get(id);
+        var target: core.BindingRef = undefined;
+        var input: core.Id = 0;
+        switch (selected) {
+            .named => |plan| {
+                if (plan.call.key.count != 1 or source.children(id).len != 1) return null;
+                target = plan.call.key.target;
+                input = source.children(id)[0];
+            },
+            .projection => |projection_| if (projection_) |projection| switch (projection) {
+                .member => |member| {
+                    if (member.direct.count != 1) return null;
+                    target = member.direct.target;
+                    input = node.a;
+                },
+                else => return null,
+            } else return null,
+            else => return null,
+        }
+        const producer = g.unit(target.unit);
+        const wrapper = producer.body(target.binding) orelse return null;
+        if (wrapper.parameters.len != 1 or producer.node(wrapper.root).tag != .array_op or producer.arrayOperation(wrapper.root) != .cursor) return null;
+        const operand = producer.children(wrapper.root)[0];
+        if (producer.node(operand).tag != .reference) return null;
+        const ref = producer.reference(operand);
+        if ((ref.unit != 0 and ref.unit != target.unit) or ref.binding != producer.bodyParameters(wrapper)[0].binding) return null;
+        if (g.artifacts) |artifacts| try artifacts.readInlineBody(target);
+        return input;
+    }
+    fn privateCursor(self: *const Emitter, binding: core.BindingId) ?SmallCollection {
+        const source = self.generator.unit(self.unit_id);
+        if (source.types.node(source.binding(binding).ty).tag != .cursor) return null;
+        return self.small_values.get(binding);
+    }
+    fn privateCursorReference(self: *const Emitter, id: core.Id) ?SmallCollection {
+        const source = self.generator.unit(self.unit_id);
+        if (source.node(id).tag != .reference) return null;
+        const ref = source.reference(id);
+        if (ref.unit != 0 and ref.unit != self.unit_id) return null;
+        return self.privateCursor(ref.binding);
+    }
+    fn savePrivateCursor(self: *Emitter, binding: core.BindingId, value: SmallCollection) Error!void {
+        const g = self.generator;
+        var snapshot: SmallCollection = .{ .len = 4 };
+        // Every lexical version has independent progress locals. Fields are
+        // read before any predecessor version can be overwritten.
+        for (value.values[0..4], 0..) |from, index| {
+            snapshot.values[index] = try self.temporary(.i32);
+            try self.emit(.local_get, from);
+            try self.emit(.local_set, snapshot.values[index]);
+        }
+        try self.small_values.put(g.allocator, binding, snapshot);
+        try self.emit(.local_get, snapshot.values[0]);
+        try self.save(binding, 0);
+    }
+    fn privateCursorRow(self: *Emitter, statement: core.Id, row: layout.Id) Error!?RowView {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const binding = source.node(statement);
+        const operand = source.children(binding.b)[0];
+        const cursor = self.privateCursorReference(operand) orelse return null;
+        const input = g.layouts.node(try self.codeLayout(source.typeOf(operand), source.span(statement)));
+        const words = packed_layout.rowWords(&g.layouts, row);
+        const address = try self.temporary(.i32);
+        std.debug.assert(g.layouts.node(input.a).tag == .list);
+        try self.listRowBounds(cursor.values[0], cursor.values[1], words);
+        const position = try self.multiplyLocal(cursor.values[1], words);
+        try self.emit(.local_get, cursor.values[2]);
+        try self.emit(.local_get, position);
+        try self.emit(.local_get, cursor.values[3]);
+        try self.emit(.i32_sub, 0);
+        try self.emit(.i32_const, 4);
+        try self.emit(.i32_mul, 0);
+        try self.emit(.i32_add, 0);
+        try self.emit(.i32_const, @import("list_runtime.zig").header);
+        try self.emit(.i32_add, 0);
+        try self.emit(.local_set, address);
+        return .{ .binding = 0, .row = row, .address = address, .limit_address = address };
+    }
+    fn bindPrivateRow(self: *Emitter, statement: core.Id) Error!bool {
+        if (self.body == null or !self.body.?.entries.contains(statement)) return false;
+        const selected = self.body.?.get(statement);
+        if (selected != .private_row) return false;
+        var view = try self.privateCursorRow(statement, selected.private_row) orelse return false;
+        view.binding = self.generator.unit(self.unit_id).node(statement).a;
+        // The collection owns the leaf. This interior view stays in machine
+        // locals and checked projections, never a published source value.
+        try self.row_views.append(self.generator.allocator, view);
+        return true;
+    }
+    fn bindPrivateCursor(self: *Emitter, statement: core.Id, depth: usize) Error!bool {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const node = source.node(statement);
+        if (self.body == null or !self.body.?.entries.contains(statement)) return false;
+        const selected = self.body.?.get(statement);
+        if (selected != .private_cursor) return false;
+        if (self.privateCursorReference(node.b)) |value| {
+            try self.savePrivateCursor(node.a, value);
+            return true;
+        }
+        const value_node = source.node(node.b);
+        const cursor = g.layouts.node(try self.codeLayout(source.binding(node.a).ty, source.span(statement)));
+        std.debug.assert(g.layouts.node(cursor.a).tag == .list);
+        const words = packed_layout.collectionRowWords(&g.layouts, cursor.a);
+        var collection: u32 = undefined;
+        const index = try self.temporary(.i32);
+        var previous: ?CursorPrevious = null;
+        if (selected.private_cursor != 0) {
+            collection = try self.capture(selected.private_cursor, depth);
+            try self.emit(.local_get, collection);
+            try self.emit(.i32_const, 0);
+            try self.emit(.call, (try g.module.ensureLists()).edit);
+            collection = try self.temporary(.i32);
+            try self.emit(.local_set, collection);
+            try self.emit(.i32_const, 0);
+        } else if (value_node.tag == .array_op and source.arrayOperation(node.b) == .cursor_advance) {
+            const value = self.privateCursorReference(source.children(node.b)[0]) orelse return false;
+            collection = value.values[0];
+            try self.listRowBounds(collection, value.values[1], words);
+            try self.emit(.local_get, value.values[1]);
+            try self.emit(.i32_const, 1);
+            try self.emit(.i32_add, 0);
+            previous = .{ .fields = .{ value.values[2], value.values[3] } };
+        } else return false;
+        try self.emit(.local_set, index);
+        try self.savePrivateCursor(node.a, try self.cursorFields(collection, index, true, previous, words));
+        return true;
+    }
     fn smallCollectionCandidate(self: *const Emitter, id: core.Id) bool {
         const source = self.generator.unit(self.unit_id);
         const n = source.node(id);
         if (n.tag == .reference) {
+            if (source.types.node(n.ty).tag == .cursor) return false;
             const ref = source.reference(id);
             return (ref.unit == 0 or ref.unit == self.unit_id) and self.small_values.contains(ref.binding);
         }
@@ -5206,10 +5447,33 @@ const Emitter = struct {
         try self.emit(.end, 0);
         try self.emit(.local_get, array_);
     }
+    fn privateCursorOperation(self: *Emitter, id: core.Id) Error!bool {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const op = source.arrayOperation(id);
+        if (op != .cursor_has and op != .cursor_value) return false;
+        const operand = source.children(id)[0];
+        const cursor = self.privateCursorReference(operand) orelse return false;
+        const input = g.layouts.node(try self.codeLayout(source.typeOf(operand), source.span(id)));
+        std.debug.assert(g.layouts.node(input.a).tag == .list);
+        const words = packed_layout.collectionRowWords(&g.layouts, input.a);
+        if (op == .cursor_has) {
+            try self.emit(.local_get, cursor.values[1]);
+            try self.emit(.local_get, cursor.values[0]);
+            try self.emit(.i32_load, 0);
+            try self.logicalListLength(input.a);
+            try self.emit(.i32_lt_u, 0);
+        } else {
+            try self.listRowBounds(cursor.values[0], cursor.values[1], words);
+            try self.readListRow(cursor.values[0], cursor.values[1], words, .{ cursor.values[2], cursor.values[3] }, null);
+        }
+        return true;
+    }
     fn arrayOperation(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         const operands = unit_.children(id);
+        if (try self.privateCursorOperation(id)) return;
         if (operands.len > 3) return g.fail(self.unit_id, id, .unsupported);
         if (self.ragged_count) |probe| {
             if (probe.plan.storage.conversion == id) return self.expression(operands[0], depth + 1);
@@ -6015,7 +6279,8 @@ const Emitter = struct {
     /// Construct all fields once, so local cursors still admit scalar
     /// replacement. Stored pointers are allocation bases, never interior
     /// addresses, and a published cursor is never mutated.
-    fn cursorPosition(self: *Emitter, source: u32, index: u32, is_list: bool, previous: ?u32, row_words: u32) Error!void {
+    const CursorPrevious = union(enum) { boxed: u32, fields: [2]u32 };
+    fn cursorFields(self: *Emitter, source: u32, index: u32, is_list: bool, previous: ?CursorPrevious, row_words: u32) Error!SmallCollection {
         const position = if (is_list and row_words > 1) try self.multiplyLocal(index, row_words) else index;
         const leaf = try self.temporary(.i32);
         const base = try self.temporary(.i32);
@@ -6030,11 +6295,20 @@ const Emitter = struct {
             try self.emit(.i32_lt_u, 0);
             try self.emit(.if_, 0);
             if (previous) |cursor| {
-                try self.emit(.local_get, cursor);
-                try self.emit(.i32_load, heap.offset(heap.Cursor, "base"));
-                try self.emit(.local_set, base);
-                try self.emit(.local_get, cursor);
-                try self.emit(.i32_load, heap.offset(heap.Cursor, "leaf"));
+                switch (cursor) {
+                    .boxed => |value| {
+                        try self.emit(.local_get, value);
+                        try self.emit(.i32_load, heap.offset(heap.Cursor, "base"));
+                        try self.emit(.local_set, base);
+                        try self.emit(.local_get, value);
+                        try self.emit(.i32_load, heap.offset(heap.Cursor, "leaf"));
+                    },
+                    .fields => |values| {
+                        try self.emit(.local_get, values[1]);
+                        try self.emit(.local_set, base);
+                        try self.emit(.local_get, values[0]);
+                    },
+                }
                 try self.emit(.local_tee, leaf);
                 try self.emit(.if_, 0);
                 try self.emit(.local_get, position);
@@ -6065,8 +6339,20 @@ const Emitter = struct {
             try self.emit(.end, 0);
             try self.emit(.end, 0);
         }
+        var fields: SmallCollection = .{ .len = 4 };
+        fields.values[0] = source;
+        fields.values[1] = index;
+        fields.values[2] = leaf;
+        fields.values[3] = base;
+        return fields;
+    }
+    fn cursorPosition(self: *Emitter, source: u32, index: u32, is_list: bool, previous: ?u32, row_words: u32) Error!void {
+        var old: ?CursorPrevious = null;
+        if (previous) |cursor| old = .{ .boxed = cursor };
+        const fields = try self.cursorFields(source, index, is_list, old, row_words);
         const address = try self.allocate(@sizeOf(heap.Cursor), .heap(heap.Cursor));
-        inline for (.{ "collection", "index", "leaf", "base" }, .{ source, index, leaf, base }) |name, value| {
+        inline for (.{ "collection", "index", "leaf", "base" }, 0..) |name, i| {
+            const value = fields.values[i];
             try self.emit(.local_get, address);
             try self.emit(.local_get, value);
             try self.emit(.i32_store, heap.offset(heap.Cursor, name));
@@ -7788,6 +8074,8 @@ const Emitter = struct {
                         continue;
                     };
 
+                    if (try self.bindPrivateRow(statement)) continue;
+                    if (try self.bindPrivateCursor(statement, depth)) continue;
                     if (self.inlineDemandBinding(n.a) != null) continue;
                     if (self.inline_demands.len != 0 and @import("demand_inline.zig").localClosure(unit_, n.b) != null) continue;
                     if (self.smallCollectionCandidate(n.b)) {
@@ -8091,6 +8379,11 @@ const Emitter = struct {
         defer self.loop_targets.shrinkRetainingCapacity(target_count);
         try self.loop_targets.append(g.allocator, .{ .node = id, .label = exit_label, .cleanup = self.cleanups.mark(), .roots = roots.items });
         for (carries) |carry| {
+            if (self.privateCursor(carry.incoming)) |value| {
+                try self.savePrivateCursor(carry.iteration, value);
+                try self.savePrivateCursor(carry.outgoing, value);
+                continue;
+            }
             const incoming = self.locals.get(carry.incoming) orelse return g.fail(self.unit_id, id, .unsupported);
             try self.emit(.local_get, incoming);
             try self.save(carry.iteration, id);
@@ -8201,15 +8494,36 @@ const Emitter = struct {
         if (!try self.suite(metadata.body, depth + 1)) {
             // Push every predecessor before changing any iteration slot.
             for (carries) |carry| {
-                const backedge = self.locals.get(carry.backedge) orelse return g.fail(self.unit_id, id, .unsupported);
-                try self.emit(.local_get, backedge);
+                if (self.privateCursor(carry.backedge)) |value| {
+                    for (value.values[0..4]) |field| try self.emit(.local_get, field);
+                } else {
+                    const backedge = self.locals.get(carry.backedge) orelse return g.fail(self.unit_id, id, .unsupported);
+                    try self.emit(.local_get, backedge);
+                }
             }
             var index = carries.len;
             while (index != 0) {
                 index -= 1;
+                if (self.privateCursor(carries[index].iteration)) |value| {
+                    var field: usize = 4;
+                    while (field != 0) {
+                        field -= 1;
+                        try self.emit(.local_set, value.values[field]);
+                    }
+                    try self.emit(.local_get, value.values[0]);
+                }
                 try self.save(carries[index].iteration, id);
             }
             for (carries) |carry| {
+                if (self.privateCursor(carry.iteration)) |value| {
+                    const outgoing = self.privateCursor(carry.outgoing).?;
+                    for (value.values[0..4]) |field| try self.emit(.local_get, field);
+                    var field: usize = 4;
+                    while (field != 0) {
+                        field -= 1;
+                        try self.emit(.local_set, outgoing.values[field]);
+                    }
+                }
                 try self.emit(.local_get, self.locals.get(carry.iteration).?);
                 try self.save(carry.outgoing, id);
             }
@@ -8986,7 +9300,9 @@ const Emitter = struct {
         return try bindings.toOwnedSlice(g.allocator);
     }
     fn staticPatternBinding(self: *Emitter, id: core.Id) Error!bool {
-        const bindings = self.resolvedPlan(id).pattern orelse return false;
+        const selected = self.resolvedPlan(id);
+        if (selected != .pattern) return false;
+        const bindings = selected.pattern orelse return false;
         for (bindings) |binding| try self.static_values.put(self.generator.allocator, binding.binding, binding.value);
         return true;
     }
@@ -8995,6 +9311,11 @@ const Emitter = struct {
         const unit_ = g.unit(self.unit_id);
         const n = unit_.node(id);
         if (try self.staticPatternBinding(id)) return;
+        const selected = self.resolvedPlan(id);
+        if (selected == .private_pattern) if (try self.privateCursorRow(id, selected.private_pattern)) |view| {
+            try self.bindRowViewPattern(id, n.a, view);
+            return;
+        };
         const local = try g.module.addLocal(self.function_id, (try self.scalar(n.b)).machine());
         try self.expression(n.b, depth + 1);
         try self.emit(.local_set, local);

@@ -292,3 +292,58 @@ test "semantic archives omit owners without a complete project namespace or a re
     defer loaded.deinit();
     try std.testing.expect(loaded.semantic == null);
 }
+
+fn memberArchiveText() ![]u8 {
+    var expression = try a.dupe(u8, "@array.length values");
+    defer a.free(expression);
+    for (0..80) |_| {
+        const next = try a.print("@u32.add 0 ({s})", .{expression});
+        a.free(expression);
+        expression = next;
+    }
+    return a.print("const Array.count = fn values => {s}\nentry const warm: U32 = #[].count\nentry const result: U32 = #[].count\n", .{expression});
+}
+fn memberArchiveScenario(allocator: std.mem.Allocator, fixture: *const Fixture, captured: *const @import("artifact_capture.zig").Capture, expected: []const u8, portable_count: usize) !void {
+    const bytes = (try archive.encode(allocator, compiler, captured)).?;
+    defer allocator.free(bytes);
+    var wire = try format.decodeWithLimits(archive.Snapshot, allocator, bytes, archive.wireKey(compiler), archive.limits);
+    defer format.deinit(allocator, &wire);
+    try std.testing.expectEqual(portable_count, wire.queries.records.len);
+    var owner = try archive.decode(allocator, compiler, bytes);
+    defer owner.deinit();
+    for (owner.capture.metadata.specialization_queries.records.items) |query| {
+        try std.testing.expect(query.dependencies.member == null);
+    }
+    const checkpoint_bytes = try checkpoint.encode(allocator, compiler, captured);
+    defer allocator.free(checkpoint_bytes);
+    try restartScenario(allocator, fixture, checkpoint_bytes, expected);
+}
+test "persisted semantic owners omit member authority while retaining old valid receipts and OOM restart" {
+    const member_text = try memberArchiveText();
+    defer a.free(member_text);
+    var only = try Fixture.init(member_text);
+    defer only.deinit();
+    var only_result = try only.compile(a, null);
+    defer only_result.deinit(a);
+    try successful(&only_result);
+    try std.testing.expectEqual(@as(usize, 1), only_result.capture.?.metadata.specialization_queries.records.items.len);
+    try std.testing.expect(only_result.capture.?.metadata.specialization_queries.records.items[0].dependencies.member != null);
+    try std.testing.expectEqual(@as(?[]u8, null), try archive.encode(a, compiler, &only_result.capture.?));
+    const mixed = try a.print("{s}\n{s}", .{ source, member_text });
+    defer a.free(mixed);
+    var fixture = try Fixture.init(mixed);
+    defer fixture.deinit();
+    var initial = try fixture.compile(a, null);
+    defer initial.deinit(a);
+    try successful(&initial);
+    var ordinary: usize = 0;
+    var members: usize = 0;
+    for (initial.capture.?.metadata.specialization_queries.records.items) |query| {
+        if (query.dependencies.member != null) {
+            members += 1;
+        } else if (@import("selected_query.zig").Adapter.complete(query)) ordinary += 1;
+    }
+    try std.testing.expect(ordinary != 0 and members != 0);
+    try memberArchiveScenario(a, &fixture, &initial.capture.?, initial.bytes, ordinary);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, memberArchiveScenario, .{ &fixture, &initial.capture.?, initial.bytes, ordinary });
+}

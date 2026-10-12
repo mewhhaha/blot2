@@ -9,6 +9,13 @@ pub fn check(source: *const core.Module, root: core.Id, binding: core.BindingId,
     return proof.visit(root, 0);
 }
 
+pub fn checkBinding(source: *const core.Module, root: core.Id, definition: core.Id, binding: core.BindingId, layouts: *const layout.Store, row: layout.Id) bool {
+    for (source.loop_carries) |carry| if (carry.incoming == binding or carry.iteration == binding or carry.backedge == binding or carry.outgoing == binding) return false;
+    for (source.merges) |merge| if (merge.then_binding == binding or merge.else_binding == binding or merge.result == binding) return false;
+    var proof: Proof = .{ .source = source, .binding = binding, .layouts = layouts, .row = row, .definition = definition };
+    return proof.visit(root, 0);
+}
+
 pub fn fieldOffset(source: *const core.Module, index: u32, layouts: *const layout.Store, row: layout.Id) ?u32 {
     const projection = source.projection(index);
     if (projection.nominal.decl != 0) return null;
@@ -30,6 +37,7 @@ const Proof = struct {
     layouts: *const layout.Store,
     row: layout.Id,
     budget: usize = 4096,
+    definition: core.Id = 0,
 
     fn isRow(self: *const Proof, id: core.Id) bool {
         if (id == 0 or self.source.node(id).tag != .reference) return false;
@@ -60,7 +68,7 @@ const Proof = struct {
     }
 
     fn visit(self: *Proof, id: core.Id, depth: usize) bool {
-        if (id == 0) return true;
+        if (id == 0 or id == self.definition) return true;
         if (depth >= 128 or self.budget == 0) return false;
         self.budget -= 1;
         const node = self.source.node(id);

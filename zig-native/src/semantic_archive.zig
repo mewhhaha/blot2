@@ -72,7 +72,7 @@ pub fn encode(a: A, compiler: format.Digest, source: *const capture.Capture) for
     const names = if (pools.identity) |value| value else return null;
     if (!pools.project_identity or pools.modules.len == 0) return null;
     const complete = for (source.metadata.specialization_queries.records.items) |query| {
-        if (selected.Adapter.complete(query)) break true;
+        if (query.dependencies.member == null and selected.Adapter.complete(query)) break true;
     } else false;
     if (!complete) return null;
     const units = try a.alloc(Unit, pools.modules.len);
@@ -97,7 +97,8 @@ pub fn encode(a: A, compiler: format.Digest, source: *const capture.Capture) for
     defer records.deinit(a);
     for (source.metadata.specialization_queries.records.items) |query| {
         const proof = query.dependencies;
-        if (!selected.Adapter.complete(query)) continue;
+        // The portable closure schema cannot own Array-member authority.
+        if (proof.member != null or !selected.Adapter.complete(query)) continue;
         try records.append(a, .{
             .key = .{ .input = proof.input, .expected = proof.expected, .options = proof.options, .depth = proof.depth },
             .dependencies = .{ .values_before = proof.values_before, .children_before = proof.children_before, .values_added = proof.values_added, .children_added = proof.children_added, .collected = proof.collected, .source_scopes = proof.source_scopes, .solver_nodes = proof.solver_nodes, .sources = proof.sources, .scalar_reads = proof.scalar_reads, .call_reads = proof.call_reads, .call_publications = proof.call_publications, .views = proof.views, .plain_facts = proof.plain_facts },

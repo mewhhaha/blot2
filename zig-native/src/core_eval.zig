@@ -460,6 +460,18 @@ fn PrincipalQueries(comptime claim: PrincipalClaim) type {
             return self.table.records.items.len + self.declines.count();
         }
         pub fn get(self: *Self, key: PrincipalGraph.Key, session: *const Session) ?StoredGraph {
+            const result = self.getInner(key, session);
+            if (session.member_trace) |trace| {
+                var outcome: receipt.PrincipalOutcome = .missing;
+                if (result) |graph| {
+                    outcome = .graph;
+                    if (claim == .source_description and graph == null) outcome = .declined;
+                }
+                trace.append(.{ .target = .{ .unit = session.unitId(key.target.unit), .binding = key.target.binding }, .open = claim == .open_residual, .source_interface = key.source_interface, .deferred_member = key.deferred_member, .outcome = outcome });
+            }
+            return result;
+        }
+        fn getInner(self: *Self, key: PrincipalGraph.Key, session: *const Session) ?StoredGraph {
             if (self.owner != @intFromPtr(session) or self.units != session.units.ptr or self.unit_count != session.units.len) return null;
             if (claim == .source_description and self.declines.contains(key)) return @as(StoredGraph, null);
             var cursor = self.table.candidates(Adapter.fingerprint(.{ .source = key, .forced = self.force_collision }), .oldest_first);
@@ -498,6 +510,7 @@ fn PrincipalQueries(comptime claim: PrincipalClaim) type {
         /// Transfers a complete owned graph only after table preparation. On a
         /// budget decline the caller still owns it and takes ordinary checking.
         pub fn put(self: *Self, a: Allocator, key: PrincipalGraph.Key, value: StoredGraph, session: *Session) Allocator.Error!bool {
+            if (session.member_trace) |trace| trace.complete = false;
             if (self.owner) |owner| {
                 if (owner != @intFromPtr(session) or self.units != session.units.ptr or self.unit_count != session.units.len) return false;
             } else {
@@ -863,7 +876,7 @@ const CallSummaries = struct {
     }
     fn parallelReady(self: *CallSummaries, session: *Session) ClosureRegion.RegionError!bool {
         const io = session.semantic_io orelse return false;
-        if (session.semantic_component_workers == 0 or session.receipt_tape != null or session.principal_reads != null or session.refinement_observation != null or session.summary_exhausted) return false;
+        if (session.semantic_component_workers == 0 or session.receipt_tape != null or session.recordingConstant() or session.principal_reads != null or session.refinement_observation != null or session.summary_exhausted) return false;
         const coordination = if (session.timing) |timing| timing.enter(.semantic_coordination) else null;
         defer if (coordination) |scope| scope.deinit();
         const a = session.allocator;
@@ -1304,6 +1317,7 @@ pub const Session = struct {
     split_declined: usize = 0,
     summary_eligibility_visits: usize = 0,
     inquiry_regions: usize = 0,
+    constant_inference_serial: u64 = 0,
     summary_transitions: usize = 0,
     summary_exhausted: bool = false,
     summary_graph_work: usize = 0,
@@ -1324,10 +1338,17 @@ pub const Session = struct {
     callable_definitions: std.AutoHashMapUnmanaged(ClosureRegion.DefinitionKey, core.BindingId) = .empty,
     callable_definition_units: std.AutoHashMapUnmanaged(usize, void) = .empty,
     region_arena_pool: region_arena.Pool,
+    retain_constant_receipts: bool = false,
+    minimum_constant_steps: usize = @import("constant_receipt.zig").minimum_steps,
+    constant_provider: ?@import("constant_receipt.zig").Provider = null,
+    constant_records: std.ArrayList(@import("constant_receipt.zig").Record) = .empty,
+    constant_recorder: ?*@import("constant_receipt.zig").Recorder = null,
+    constant_stats: @import("constant_receipt.zig").Stats = .{},
     retain_specialization_receipts: bool = false,
     specialization_provider: ?receipt.Provider = null,
     specialization_receipts: std.ArrayList(receipt.Record) = .empty,
     receipt_tape: ?*receipt.Tape = null,
+    member_trace: ?*receipt.MemberTrace = null,
     refinement_observation: ?*@import("refinement_receipt.zig").Observation = null,
     principal_provider: ?PrincipalProvider = null,
     principal_regions: usize = 0,
@@ -1351,6 +1372,8 @@ pub const Session = struct {
     providers: provider_chain.Store,
     options: Options = .{},
     steps: usize = 0,
+    constant_value_debt: usize = 0,
+    constant_child_debt: usize = 0,
     diagnostic: ?Diagnostic = null,
     traced_bodies: usize = 0,
     traced_nodes: usize = 0,
@@ -1391,6 +1414,27 @@ pub const Session = struct {
     depth: usize = 0,
     call_depth: usize = 0,
 
+    fn recordingConstant(self: *const Session) bool {
+        const recorder = self.constant_recorder orelse return false;
+        return recorder.eligible;
+    }
+    fn declineConstant(self: *Session) void {
+        if (self.constant_recorder) |recorder| recorder.eligible = false;
+        self.constant_recorder = null;
+    }
+    fn observeConstantInference(self: *Session) void {
+        self.constant_inference_serial +|= 1;
+        self.declineConstant();
+    }
+
+    /// Replayed constants retain the ordinary resource charges of temporary
+    /// values whose immutable result no longer needs their physical storage.
+    pub fn constantValueCount(self: *const Session) usize {
+        return self.values.items.len +| self.constant_value_debt;
+    }
+    pub fn constantChildCount(self: *const Session) usize {
+        return self.children.items.len +| self.constant_child_debt;
+    }
     fn summaryLimit(self: *const Session) usize {
         return @min(self.options.max_summary_transitions, self.semantic_job_budget orelse self.options.max_summary_transitions);
     }
@@ -1461,6 +1505,8 @@ pub const Session = struct {
         return .{ .region_arena_pool = .init(allocator), .allocator = allocator, .units = units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .visited_nodes = visited_nodes, .values = values, .field_locations = field_locations, .value_evidence = value_evidence, .evidence = evidence, .value_records = value_records, .record_layouts = record_layouts };
     }
     pub fn deinit(self: *Session) void {
+        for (self.constant_records.items) |*record| record.deinit(self.allocator);
+        self.constant_records.deinit(self.allocator);
         self.call_summaries.deinit(self);
         self.lexical_inputs.deinit(self.allocator);
         self.canonical_specializations.deinit(self.allocator);
@@ -1594,6 +1640,7 @@ pub const Session = struct {
         return self.inferClosureMode(value_, true);
     }
     fn inferClosureMode(self: *Session, value_: ValueId, entry_interface: bool) Error!?ValueId {
+        self.observeConstantInference();
         if (self.principal_reads) |reads| reads.invalidate(.specialize);
         if (self.receipt_tape) |tape| tape.nested = true;
         const kind = self.valueInfo(value_).kind;
@@ -1665,6 +1712,7 @@ pub const Session = struct {
         return self.specializeRetained(value_, expected);
     }
     fn specializeRetained(self: *Session, value_: ValueId, expected: type_evidence.Id) Error!ValueId {
+        self.observeConstantInference();
         const metadata = self.closureInfo(value_);
         const owner = self.findUnit(metadata.unit, null) orelse return self.fail(self.units.len, .{ .start = 0, .end = 0 }, .unsupported);
         const module = &self.units[owner];
@@ -1767,6 +1815,7 @@ pub const Session = struct {
     /// The region may retain unresolved staging obligations; it never reads or
     /// publishes an evaluated constant or a caller-constrained closure header.
     pub fn sourceInterface(self: *Session, reference: core.BindingRef) Error!SourceInterface {
+        self.observeConstantInference();
         const resolved = try self.external(try self.target(null, reference));
         const module = &self.units[resolved.unit];
         const body = module.body(resolved.binding) orelse return self.fail(resolved.unit, module.binding(resolved.binding).span, .unsupported);
@@ -2150,7 +2199,7 @@ pub const Session = struct {
     }
     fn makeScalar(self: *Session, owner: usize, source: core.Id, value_: Value) Error!ValueId {
         if (value_.scalar == .unit) return 0;
-        if (self.values.items.len >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId)) return self.failNode(owner, source, .constant_fuel);
+        if (self.constantValueCount() >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId)) return self.failNode(owner, source, .constant_fuel);
         const id: ValueId = @intCast(self.values.items.len);
         try self.values.ensureUnusedCapacity(self.allocator, 1);
         try self.value_evidence.ensureUnusedCapacity(self.allocator, 1);
@@ -2167,7 +2216,11 @@ pub const Session = struct {
         return id;
     }
     fn makeAggregate(self: *Session, owner: usize, source: core.Id, kind: ValueKind, nominal: u64, tag: u32, children_: []const ValueId) Error!ValueId {
-        if (self.values.items.len >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId) or children_.len > self.options.max_children -| self.children.items.len -| self.ragged_reserved_children or children_.len > std.math.maxInt(u32) - self.children.items.len) return self.failNode(owner, source, .constant_fuel);
+        if (self.recordingConstant()) switch (kind) {
+            .scalar, .product, .record, .nominal, .array, .list, .closure, .cursor => {},
+            else => self.declineConstant(),
+        };
+        if (self.constantValueCount() >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId) or children_.len > self.options.max_children -| self.constantChildCount() -| self.ragged_reserved_children or children_.len > std.math.maxInt(u32) - self.children.items.len) return self.failNode(owner, source, .constant_fuel);
         // Both allocations precede mutation, so failed growth leaves every
         // published handle and child span valid.
         try self.values.ensureUnusedCapacity(self.allocator, 1);
@@ -2184,7 +2237,7 @@ pub const Session = struct {
     }
     fn copyFrozenAggregate(self: *Session, owner: usize, source: core.Id, original: ValueId, replacements: []const FrozenCapture, metadata: ?ClosureValue) Error!ValueId {
         const info = self.valueInfo(original);
-        if (self.values.items.len >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId) or info.len > self.options.max_children -| self.children.items.len or info.len > std.math.maxInt(u32) - self.children.items.len) return self.failNode(owner, source, .constant_fuel);
+        if (self.constantValueCount() >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId) or info.len > self.options.max_children -| self.constantChildCount() or info.len > std.math.maxInt(u32) - self.children.items.len) return self.failNode(owner, source, .constant_fuel);
         if (metadata != null and self.closures.items.len >= std.math.maxInt(u32)) return self.failNode(owner, source, .constant_fuel);
         try self.values.ensureUnusedCapacity(self.allocator, 1);
         try self.value_evidence.ensureUnusedCapacity(self.allocator, 1);
@@ -2213,7 +2266,7 @@ pub const Session = struct {
     fn copyAggregate(self: *Session, owner: usize, source: core.Id, original: ValueId, field: u32, replacement: ValueId) Error!ValueId {
         const info = self.valueInfo(original);
         if (field >= info.len) return self.failNode(owner, source, .unsupported);
-        if (self.values.items.len >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId) or info.len > self.options.max_children -| self.children.items.len or info.len > std.math.maxInt(u32) - self.children.items.len) return self.failNode(owner, source, .constant_fuel);
+        if (self.constantValueCount() >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId) or info.len > self.options.max_children -| self.constantChildCount() or info.len > std.math.maxInt(u32) - self.children.items.len) return self.failNode(owner, source, .constant_fuel);
         try self.values.ensureUnusedCapacity(self.allocator, 1);
         try self.value_evidence.ensureUnusedCapacity(self.allocator, 1);
         try self.value_records.ensureUnusedCapacity(self.allocator, 1);
@@ -2272,12 +2325,13 @@ pub const Session = struct {
     /// captured alias. The small immutable header shares children and code.
     fn typedView(self: *Session, owner: usize, source: core.Id, value_: ValueId, actual: type_evidence.Id) Error!ValueId {
         if (actual == 0 or self.valueEvidence(value_) == actual) return value_;
+        if (self.constant_recorder) |recorder| try recorder.view(self.allocator, value_);
         const key: ViewKey = .{ .value = value_, .evidence = actual };
         if (self.typed_views.get(key)) |existing| {
             if (self.receipt_tape) |tape| try tape.views.append(self.allocator, .{ .value = value_, .evidence = actual, .selected = existing, .existed = true });
             return existing;
         }
-        if (self.values.items.len >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId)) return self.failNode(owner, source, .constant_fuel);
+        if (self.constantValueCount() >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId)) return self.failNode(owner, source, .constant_fuel);
         var info = self.valueInfo(value_);
         var provider_child: ?ValueId = null;
         if (info.kind == .provider) {
@@ -2299,8 +2353,8 @@ pub const Session = struct {
                 original;
             info.start = @intCast(self.children.items.len);
         }
-        if (self.values.items.len >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId)) return self.failNode(owner, source, .constant_fuel);
-        if (provider_child != null and (self.children.items.len >= self.options.max_children or self.children.items.len >= std.math.maxInt(u32))) return self.failNode(owner, source, .constant_fuel);
+        if (self.constantValueCount() >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId)) return self.failNode(owner, source, .constant_fuel);
+        if (provider_child != null and (self.constantChildCount() >= self.options.max_children or self.children.items.len >= std.math.maxInt(u32))) return self.failNode(owner, source, .constant_fuel);
         try self.values.ensureUnusedCapacity(self.allocator, 1);
         try self.value_evidence.ensureUnusedCapacity(self.allocator, 1);
         try self.value_records.ensureUnusedCapacity(self.allocator, 1);
@@ -2421,6 +2475,16 @@ pub const Session = struct {
     pub fn cachedBindingValue(self: *Session, reference: core.BindingRef) Error!?ValueId {
         const stored = self.slot(try self.external(try self.target(null, reference)));
         return if (stored.state == .complete) stored.value else null;
+    }
+    /// Canonical receipt targets already name their original producer. This
+    /// query cannot resolve aliases, demand a value or create a diagnostic.
+    pub fn readyConstantAnchor(self: *const Session, reference: core.BindingRef) ?ValueId {
+        if (reference.unit == 0 or reference.binding == 0) return null;
+        const owner = self.findUnit(reference.unit, null) orelse return null;
+        if (reference.binding >= self.units[owner].bindings.len or self.units[owner].binding(reference.binding).kind != .global) return null;
+        const index = std.math.add(usize, self.binding_offsets[owner], reference.binding) catch return null;
+        if (index >= self.slots.len or self.slots[index].state != .complete) return null;
+        return self.slots[index].value;
     }
 
     pub fn prepare(self: *Session, reference: core.BindingRef) Error!void {
@@ -2632,10 +2696,22 @@ pub const Session = struct {
         return self.constant(try self.target(null, reference));
     }
     fn constant(self: *Session, raw: Target) Error!ValueId {
+        const resolved = try self.external(raw);
+        const reference: core.BindingRef = .{ .unit = self.unitId(resolved.unit), .binding = resolved.binding };
+        const parent = self.constant_recorder;
+        if (parent) |recorder| try recorder.flush(self.allocator, self);
+        self.constant_recorder = null;
+        defer self.constant_recorder = parent;
+        const was_ready = self.slot(resolved).state == .complete;
+        const value_ = try self.constantInner(resolved);
+        if (self.member_trace) |trace| trace.readyRead(.{ .target = reference, .value = value_ }, was_ready);
+        if (parent) |recorder| try recorder.read(self.allocator, self, reference, value_);
+        return value_;
+    }
+    fn constantInner(self: *Session, resolved: Target) Error!ValueId {
         const timing = if (self.timing) |work| work.enter(.evaluation) else null;
         defer if (timing) |scope| scope.deinit();
         if (self.principal_reads) |reads| reads.invalidate(.evaluate);
-        const resolved = try self.external(raw);
         const module = &self.units[resolved.unit];
         const binding = module.binding(resolved.binding);
         const body = module.body(resolved.binding) orelse return self.fail(resolved.unit, binding.span, .unsupported);
@@ -2649,6 +2725,7 @@ pub const Session = struct {
         const previous = self.slot(resolved).state;
         if (previous == .complete) return self.slot(resolved).value;
         if (previous == .evaluating) return self.fail(resolved.unit, body.span, .cycle);
+        const reference: core.BindingRef = .{ .unit = self.unitId(resolved.unit), .binding = resolved.binding };
         const previous_producer = self.source_producer;
         self.source_producer = resolved;
         defer self.source_producer = previous_producer;
@@ -2668,11 +2745,37 @@ pub const Session = struct {
             try frame.mappings.appendSlice(self.allocator, solved.types);
             try frame.row_mappings.appendSlice(self.allocator, solved.rows);
         }
-        const flow = try self.expression(resolved.unit, body.root, &frame);
-        const result = switch (flow) {
-            .value => |value_| value_,
-            .returning, .breaking => return self.fail(resolved.unit, body.span, .unsupported),
-        };
+        // Principal and publication inference retain their ordinary positions
+        // and all budget/cache effects. This receipt skips only value work.
+        const inputs: @import("constant_receipt.zig").Inputs = .{ .types = frame.mappings.items, .rows = frame.row_mappings.items };
+        var pending: ?@import("constant_receipt.zig").Record = null;
+        defer if (pending) |*record| record.deinit(self.allocator);
+        var outcome: ?ValueId = null;
+        const recordable = @import("constant_receipt.zig").recordable(module, body.root, body.scheme.root);
+        if (recordable) {
+            if (self.constant_provider) |provider| outcome = try provider.lookup(provider.context, self, reference, inputs);
+        }
+        if (outcome == null) {
+            var recording = @import("constant_receipt.zig").Recorder.init(self);
+            defer recording.deinit(self.allocator);
+            if (self.retain_constant_receipts and recordable) {
+                try recording.captureInputs(self.allocator, inputs);
+                self.constant_recorder = &recording;
+            }
+            defer self.constant_recorder = null;
+            const flow = try self.expression(resolved.unit, body.root, &frame);
+            outcome = switch (flow) {
+                .value => |value_| value_,
+                .returning, .breaking => return self.fail(resolved.unit, body.span, .unsupported),
+            };
+            if (self.constant_recorder != null) {
+                // A changed lexical solving environment needs its own owned
+                // output replay law; only stable mappings qualify this slice.
+                if (!@import("structural.zig").equal(recording.inputs.types, frame.mappings.items) or !@import("structural.zig").equal(recording.inputs.rows, frame.row_mappings.items)) recording.eligible = false;
+                pending = try recording.finish(self.allocator, self, reference, outcome.?);
+            }
+        }
+        const result = outcome.?;
         if (self.valueInfo(result).kind != .closure and self.hasExplicitScheme(resolved.unit, body.scheme)) {
             const actual_value = self.valueEvidence(result);
             if (actual_value != 0 and !try self.matchType(resolved.unit, body.root, resolved.unit, body.scheme.root, actual_value, &frame.mappings, &frame.row_mappings))
@@ -2684,11 +2787,20 @@ pub const Session = struct {
         // the principal type records its exact certified closing decisions.
         const actual = try self.projectType(resolved.unit, body.root, body.scheme.root, frame.mappings.items, frame.row_mappings.items);
         const published = try self.typedView(resolved.unit, body.root, result, actual);
+        // Neither a failed publication query nor OOM publishes a new owner.
+        // The successful raw-value tape moves only after ordinary validation.
+        if (pending) |record| {
+            try self.constant_records.append(self.allocator, record);
+            pending = null;
+            self.constant_stats.recorded += 1;
+            self.constant_stats.owned_payload_bytes += record.ownedBytes();
+        }
         self.slot(resolved).value = published;
         self.slot(resolved).state = .complete;
         return published;
     }
     fn principalEvidence(self: *Session, resolved: Target, body: *const core.Body, binding_type: types.Id) Error!?SolvedEvidence {
+        self.observeConstantInference();
         const principal_target: core.BindingRef = .{ .unit = self.unitId(resolved.unit), .binding = resolved.binding };
         if (self.principal_provider) |provider| if (try provider.lookup(provider.context, principal_target, self.options)) |cached| {
             var solved = cached;
@@ -3058,7 +3170,7 @@ pub const Session = struct {
         };
         if (!prepared) return null;
         const plan = ragged.analyze(module, id, facts) orelse return null;
-        const available = @min(@as(usize, 4_194_303), self.options.max_children -| self.children.items.len);
+        const available = @min(@as(usize, 4_194_303), self.options.max_children -| self.constantChildCount());
         var probe: ragged_count.Counter(RaggedFacts) = .{ .adapter = facts, .plan = plan, .remaining = self.ragged_probe_limit, .limit = @intCast(available) };
         const count = probe.run();
         self.counters.ragged_probe_visits += probe.visits;
@@ -3073,6 +3185,7 @@ pub const Session = struct {
         defer if (region.reserved) {
             self.ragged_reserved_children -= count.?;
         };
+        self.declineConstant();
         self.ragged_region = &region;
         defer self.ragged_region = null;
         const outcome = try self.blockChildren(owner, id, frame);
@@ -3097,8 +3210,13 @@ pub const Session = struct {
         if (self.steps >= self.options.max_steps or self.depth >= self.options.max_depth) return self.failNode(owner, id, .constant_fuel);
         self.steps += 1;
         self.depth += 1;
+        if (self.constant_recorder) |recorder| recorder.observe(self);
         defer self.depth -= 1;
         const n = module.node(id);
+        if (self.recordingConstant()) switch (n.tag) {
+            .suspend_, .force, .computation, .request_decision, .request_loop, .resolver_op, .effect_provider, .handle, .type_constructor => self.declineConstant(),
+            else => {},
+        };
         if (self.indexed_region) |region| if (region.owner == owner and region.frame == frame) {
             for (region.plan.edits[0..region.plan.edit_count]) |edit| if (edit.update == id) return self.indexedEdit(region, edit);
         };
@@ -3528,7 +3646,7 @@ pub const Session = struct {
     fn filledArray(self: *Session, owner: usize, source: core.Id, count: u32, value_: ValueId, kind: ValueKind) Error!ValueId {
         if (count >= 4_194_304) return self.arrayLengthFailure(owner);
         try self.chargeCells(owner, source, count);
-        if (self.values.items.len >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId) or count > self.options.max_children -| self.children.items.len or count > std.math.maxInt(u32) - self.children.items.len) return self.failNode(owner, source, .constant_fuel);
+        if (self.constantValueCount() >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId) or count > self.options.max_children -| self.constantChildCount() or count > std.math.maxInt(u32) - self.children.items.len) return self.failNode(owner, source, .constant_fuel);
         try self.values.ensureUnusedCapacity(self.allocator, 1);
         try self.value_evidence.ensureUnusedCapacity(self.allocator, 1);
         try self.value_records.ensureUnusedCapacity(self.allocator, 1);
@@ -3573,13 +3691,14 @@ pub const Session = struct {
         return .{ .value = try self.arrayValues(owner, id, operation, values[0..arity], frame.providers) };
     }
     fn extendCollection(self: *Session, owner: usize, source: core.Id, original: ValueId, value_: ValueId, front: bool) Error!ValueId {
+        self.declineConstant();
         const before = self.valueInfo(original);
         if (before.len >= 4_194_303) return self.arrayLengthFailure(owner);
-        if (self.values.items.len >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId)) return self.failNode(owner, source, .constant_fuel);
+        if (self.constantValueCount() >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId)) return self.failNode(owner, source, .constant_fuel);
         try self.values.ensureUnusedCapacity(self.allocator, 1);
         try self.value_evidence.ensureUnusedCapacity(self.allocator, 1);
         try self.value_records.ensureUnusedCapacity(self.allocator, 1);
-        const span = self.collection_buffers.extend(self.allocator, &self.children, .{ .start = before.start, .len = before.len }, value_, front, self.options.max_children) catch |err| switch (err) {
+        const span = self.collection_buffers.extend(self.allocator, &self.children, .{ .start = before.start, .len = before.len }, value_, front, self.options.max_children -| self.constant_child_debt) catch |err| switch (err) {
             error.Limit => return self.failNode(owner, source, .constant_fuel),
             error.OutOfMemory => return error.OutOfMemory,
         };
@@ -3605,7 +3724,7 @@ pub const Session = struct {
             const count = try self.requireScalar(owner, id, values[0]);
             if (count.scalar != .u32 or self.valueInfo(values[1]).kind != .closure) return self.failNode(owner, id, .unsupported);
             if (count.bits >= 4_194_304) return self.arrayLengthFailure(owner);
-            if (count.bits > self.options.max_children -| self.children.items.len) return self.failNode(owner, id, .constant_fuel);
+            if (count.bits > self.options.max_children -| self.constantChildCount()) return self.failNode(owner, id, .constant_fuel);
             try self.chargeCells(owner, id, count.bits);
             const children_ = try self.allocator.alloc(ValueId, count.bits);
             defer self.allocator.free(children_);
@@ -3796,14 +3915,103 @@ pub const Session = struct {
         defer self.allocator.free(captures);
         return self.makeClosure(owner, source, metadata, captures);
     }
+    /// A preceding ordinary use must already own the immutable syntax recipe.
+    /// Small source methods cannot repay a separate graph receipt.
+    pub fn memberReceiptEligible(self: *const Session, reference: core.BindingRef) bool {
+        if (reference.unit == 0 or reference.unit > self.units.len) return false;
+        const owner = reference.unit - 1;
+        if (reference.binding >= self.units[owner].bindings.len) return false;
+        const body = self.units[owner].body(reference.binding) orelse return false;
+        const recipe = self.body_recipes.recipes.get(.{ .owner = owner, .body = body.root, .callables = true }) orelse return false;
+        return recipe.visits.items.len >= 64;
+    }
     /// Complete evidence is optional for an aggregate with unresolved empty
     /// children. Import its actual structure and the selected method signature
     /// into a private region; export only concrete substitutions. The generic
     /// source scheme and every existing value header remain immutable.
+    pub fn memberPrincipalsMatch(self: *Session, member: *const receipt.Member) bool {
+        if (member.principal_graphs != self.reuse_principal_graphs) return false;
+        for (member.principals) |read| {
+            if (read.target.unit == 0 or read.target.unit > self.units.len) return false;
+            const key: PrincipalGraph.Key = .{ .target = .{ .unit = read.target.unit - 1, .binding = read.target.binding }, .source_interface = read.source_interface, .deferred_member = read.deferred_member, .options = self.options };
+            var outcome: receipt.PrincipalOutcome = .missing;
+            if (read.open) {
+                if (self.call_summaries.normalized_principals.get(key, self) != null) outcome = .graph;
+            } else if (self.call_summaries.principals.get(key, self)) |graph| {
+                outcome = .graph;
+                if (graph == null) outcome = .declined;
+            }
+            if (outcome != read.outcome) return false;
+        }
+        return true;
+    }
     fn partialArrayMember(self: *Session, owner: usize, source: core.Id, target_: Target, receiver: ValueId, expected: type_evidence.Id) Error!ValueId {
+        if (self.receipt_tape) |tape| tape.nested = true;
+        const member_target: core.BindingRef = .{ .unit = self.unitId(target_.unit), .binding = target_.binding };
+        if (self.receipt_tape == null and self.inquiry_regions == 0 and self.memberReceiptEligible(member_target)) if (self.specialization_provider) |provider| if (provider.member) |lookup| if (try lookup(provider.context, self, member_target, receiver, expected)) |selected| {
+            self.observeConstantInference();
+            return selected;
+        };
+        const method_slot = self.slots[self.binding_offsets[target_.unit] + target_.binding];
+        const recording = self.retain_specialization_receipts and self.receipt_tape == null and self.inquiry_regions == 0 and self.semantic_job_budget == null and method_slot.state == .complete and self.memberReceiptEligible(member_target);
+        const query_budgets = @import("constant_receipt.zig").queryBudgets(self);
+        const summary_work = self.summary_graph_work;
+        const principal_nodes = self.principal_graph_nodes;
+        const principal_edges = self.principal_graph_edges;
+        const values_before = self.values.items.len;
+        const children_before = self.children.items.len;
+        const steps_before = self.steps;
+        var tape: receipt.Tape = .{};
+        defer tape.deinit(self.allocator);
+        const previous_tape = self.receipt_tape;
+        if (recording) self.receipt_tape = &tape;
+        defer self.receipt_tape = previous_tape;
+        var member_trace: receipt.MemberTrace = .{};
+        const previous_trace = self.member_trace;
+        if (recording) self.member_trace = &member_trace;
+        defer self.member_trace = previous_trace;
         var region = ClosureRegion.init(self) catch return error.OutOfMemory;
         defer region.deinit();
-        return region.arrayMember(target_, receiver, expected) catch |err| return self.evidenceFailure(owner, self.units[owner].span(source), err);
+        const selected = region.arrayMember(target_, receiver, expected) catch |err| return self.evidenceFailure(owner, self.units[owner].span(source), err);
+        if (recording) {
+            var record = try tape.finish(self.allocator, .{
+                .input = receiver,
+                .expected = expected,
+                .selected = selected,
+                .options = self.options,
+                .depth = self.depth,
+                .values_before = values_before,
+                .children_before = children_before,
+                .values_added = self.values.items.len - values_before,
+                .children_added = self.children.items.len - children_before,
+                .steps = self.steps - steps_before,
+                .collected = tape.collected,
+                .source_scopes = region.scratch.sources.items.len,
+                .solver_nodes = region.solver.nodes.items.len,
+                .complete = region.allConstraintsSolved() and self.steps == steps_before and !region.source_interface and !region.retain_selected and !region.complete_demand_bodies and self.summary_graph_work == summary_work and self.principal_graph_nodes == principal_nodes and self.principal_graph_edges == principal_edges and std.meta.eql(query_budgets, @import("constant_receipt.zig").queryBudgets(self)),
+                .sources = &.{},
+                .scalar_reads = &.{},
+                .call_reads = &.{},
+                .call_publications = &.{},
+                .views = &.{},
+                .plain_facts = &.{},
+            });
+            var owns_record = true;
+            defer if (owns_record) record.deinit(self.allocator);
+            if (record.complete and member_trace.complete and !self.summary_exhausted and self.summary_transitions <= self.summaryLimit()) {
+                try self.specialization_receipts.ensureUnusedCapacity(self.allocator, 1);
+                const member = try self.allocator.create(receipt.Member);
+                errdefer self.allocator.destroy(member);
+                const principal_reads = try self.allocator.dupe(receipt.PrincipalRead, member_trace.entries[0..member_trace.len]);
+                errdefer self.allocator.free(principal_reads);
+                const ready_reads = try self.allocator.dupe(receipt.ReadyRead, member_trace.ready[0..member_trace.ready_len]);
+                member.* = .{ .ready = ready_reads, .principals = principal_reads, .principal_graphs = self.reuse_principal_graphs, .target = member_target, .function = method_slot.value, .query_budgets = query_budgets, .summary_work = summary_work, .principal_nodes = principal_nodes, .principal_edges = principal_edges, .transitions = self.summary_transitions, .exhausted = self.summary_exhausted };
+                record.member = member;
+                self.specialization_receipts.appendAssumeCapacity(record);
+                owns_record = false;
+            }
+        }
+        return selected;
     }
     fn replaceProjection(self: *Session, owner: usize, source: core.Id, projection_index: u32, value_: ValueId, replacement: ValueId) Error!ValueId {
         const location = try self.projectionLocation(owner, source, projection_index, value_);
@@ -3885,6 +4093,7 @@ pub const Session = struct {
         const pattern = module.pattern(pattern_id);
         if (self.steps >= self.options.max_steps or nesting >= self.options.max_depth -| self.depth) return self.fail(owner, pattern.span, .constant_fuel);
         self.steps += 1;
+        if (self.constant_recorder) |recorder| recorder.depth = @max(recorder.depth, (self.depth -| recorder.base_depth) +| nesting +| 1);
         switch (pattern.tag) {
             .wildcard => return true,
             .bind => {
@@ -4104,6 +4313,7 @@ pub const Session = struct {
         defer self.allocator.free(children);
         var region: IndexedRegion = .{ .owner = owner, .frame = frame, .original = original, .children = children, .plan = plan };
         const previous = self.indexed_region;
+        self.declineConstant();
         self.indexed_region = &region;
         defer self.indexed_region = previous;
         const outcome = try self.loopIterations(owner, id, frame, first, begin, end);
@@ -4459,6 +4669,7 @@ pub const Session = struct {
         const module = &self.units[resolved.unit];
         const body = module.body(resolved.binding) orelse return self.failNode(owner, source, .unsupported);
         const parameters = module.bodyParameters(body);
+        if (self.constant_recorder) |recorder| try recorder.source(self.allocator, .{ .unit = self.unitId(resolved.unit), .binding = resolved.binding });
         if (!body.is_function or arguments.len != parameters.len) return self.failNode(owner, source, .unsupported);
         const previous_origin = self.specialization_origin;
         self.specialization_origin = self.invocationOrigin(owner, source, callerDependentUse(&self.units[owner], source));
@@ -4487,6 +4698,7 @@ pub const Session = struct {
     fn enterCall(self: *Session, owner: usize, source: core.Id) Error!void {
         if (self.call_depth >= self.options.max_call_depth) return self.failNode(owner, source, .constant_recursion);
         self.call_depth += 1;
+        if (self.constant_recorder) |recorder| recorder.observe(self);
     }
     /// Unwinding frames move a call-depth failure to their own call site, so
     /// it ends at the outermost call of the evaluation, in the caller's code.
@@ -4827,6 +5039,7 @@ pub const Session = struct {
         const module = &self.units[producer];
         switch (closure.origin) {
             .operation => {
+                self.declineConstant();
                 const token = try self.operationToken(owner, source, function);
                 const matched = self.providers.lookup(head, token) catch |err| return self.providerFailure(owner, source, err);
                 const selected = matched orelse return self.failNode(owner, source, .const_effect);
@@ -4871,6 +5084,7 @@ pub const Session = struct {
                 return .{ .value = try self.makeAggregate(owner, source, .nominal, self.nominalIdentity(producer, nominal.identity.unit, nominal.identity.decl), constructor.tag, &.{stored}) };
             },
             .anonymous => {
+                if (self.constant_recorder) |recorder| try recorder.closure(self.allocator, closure.unit, closure.identity);
                 const template = module.closures[closure.identity];
                 const bindings = module.extra[template.captures.start..][0..template.captures.len];
                 if (bindings.len != self.valueInfo(function).len or closure.applied != 0) return self.failNode(owner, source, .unsupported);
@@ -5162,6 +5376,7 @@ const ClosureRegion = struct {
         return initWithSolverAllocator(session, null);
     }
     fn initWithSolverAllocator(session: *Session, solver_allocator: ?Allocator) types.Error!ClosureRegion {
+        session.observeConstantInference();
         const timing = if (session.timing) |work| work.enter(.inference) else null;
         errdefer if (timing) |scope| scope.deinit();
         const arena = try session.region_arena_pool.take(session.allocator);
@@ -6275,7 +6490,7 @@ const ClosureRegion = struct {
         if (!self.session.options.reuse_lexical_summaries or self.building_principal or self.source_interface or self.retain_selected or self.complete_demand_bodies or self.session.valueInfo(value).kind != .closure) return false;
         // Portable receipts require explicit replay of every observation.
         // Their current ordinary path retains the complete source/capture proof.
-        if (self.session.receipt_tape != null or self.session.principal_reads != null or self.session.refinement_observation != null) return false;
+        if (self.session.receipt_tape != null or self.session.recordingConstant() or self.session.principal_reads != null or self.session.refinement_observation != null) return false;
         if (self.session.lexical_inputs.examined_words >= self.session.options.max_children) return false;
         // The key never admits an empty environment, and it reads interfaces
         // only for values reachable from the captures. Views of unrelated
@@ -6508,6 +6723,7 @@ const ClosureRegion = struct {
                 }
             }
             if (self.session.receipt_tape) |tape| try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
+            if (self.session.constant_recorder) |recorder| try recorder.source(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
             const actual = try self.project(self.scratch.sources.items[scope].root);
             if (actual != 0) {
                 try self.scratch.call_instances.put(self.scratch_allocator, .{ .owner = target_.unit, .binding = target_.binding, .evidence = actual, .caller = 0 }, scope);
@@ -8038,7 +8254,7 @@ const ClosureRegion = struct {
         return true;
     }
     fn principalDependencies(self: *ClosureRegion, first: *const PrincipalGraph, transitive: bool) RegionError!void {
-        if (self.session.principal_reads == null and self.session.receipt_tape == null) return;
+        if (self.session.principal_reads == null and self.session.receipt_tape == null and !self.session.recordingConstant()) return;
         var pending: std.ArrayList(*const PrincipalGraph) = .empty;
         defer pending.deinit(self.scratch_allocator);
         var seen: std.AutoHashMapUnmanaged(PrincipalGraph.Key, void) = .empty;
@@ -8054,6 +8270,10 @@ const ClosureRegion = struct {
                 tape.unknown = true;
             };
             if (self.session.receipt_tape) |tape| try tape.sources.appendSlice(self.session.allocator, graph.dependencies);
+            if (self.session.constant_recorder) |recorder| {
+                if (graph.untracked_reads or graph.foreign_sources) recorder.eligible = false;
+                for (graph.dependencies) |target_| try recorder.source(self.session.allocator, target_);
+            }
             for (graph.plain_reads) |fact| {
                 const actual = self.session.plain_nominals.get(fact.key);
                 if (self.session.principal_reads) |reads| try reads.plainRead(self.session.allocator, fact.key, actual);
@@ -8411,6 +8631,7 @@ const ClosureRegion = struct {
         try self.principalDependencies(graph, false);
         const source = self.scratch.sources.items[scope];
         if (self.session.receipt_tape) |tape| try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
+        if (self.session.constant_recorder) |recorder| try recorder.source(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
         for (graph.actions) |action| switch (action) {
             .reference => |index| {
                 const target_ = graph.references[index];
@@ -8531,6 +8752,10 @@ const ClosureRegion = struct {
             const source = self.scratch.sources.items[scope];
             if (source.binding != 0 and module.binding(source.binding).kind == .global) try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
         }
+        if (self.session.constant_recorder) |recorder| {
+            const source = self.scratch.sources.items[scope];
+            if (source.binding != 0 and module.binding(source.binding).kind == .global) try recorder.source(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
+        }
         try self.callableDefinitions(self.scratch.sources.items[scope].owner);
         var work: body_recipe.Walk = .{ .recipe = recipe };
         errdefer work.deinit(self.session.allocator);
@@ -8577,6 +8802,10 @@ const ClosureRegion = struct {
         }
         if (n.tag == .reference) {
             const reference = module.reference(id);
+            if (self.session.constant_recorder) |recorder| {
+                const target_ = try self.session.external(try self.session.target(owner, reference));
+                if (self.session.units[target_.unit].binding(target_.binding).kind == .global) try recorder.source(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
+            }
             if (reference.unit == 0 or reference.unit == self.session.unitId(self.scratch.sources.items[scope].owner)) {
                 const binding = module.binding(reference.binding);
                 if (binding.kind == .local) try self.appendAlias(.{ .instance = try self.importType(scope, n.ty, 0), .principal = try self.importType(scope, binding.ty, 0) });
@@ -9436,6 +9665,7 @@ const ClosureRegion = struct {
             const binding = module.binding(target_.binding);
             if (binding.kind == .global and binding.scheme.obligations.len != 0 and try self.checkedSchemeReusable(target_)) {
                 if (self.session.receipt_tape) |tape| try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
+                if (self.session.constant_recorder) |recorder| try recorder.source(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
                 return;
             }
         }
@@ -10668,6 +10898,55 @@ fn concreteSelfRuntimeInterfaceScenario(allocator: Allocator, module: *const cor
     try std.testing.expectEqual(@as(usize, 0), session.steps);
 }
 
+fn constantReceiptTapeScenario(allocator: Allocator, module: *const core.Module) !void {
+    var ordinary = try Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    var recorded = try Session.init(allocator, &.{module.*});
+    defer recorded.deinit();
+    recorded.retain_constant_receipts = true;
+    recorded.minimum_constant_steps = 0;
+    const entry = for (module.bodies) |body| {
+        if (body.exported) break body.binding;
+    } else return error.TestUnexpectedResult;
+    const reference: core.BindingRef = .{ .unit = 1, .binding = entry };
+    try std.testing.expectEqual(try ordinary.value(reference), try recorded.value(reference));
+    try std.testing.expectEqual(ordinary.steps, recorded.steps);
+    try std.testing.expect(recorded.constant_recorder == null);
+    var steps: usize = 0;
+    var reads: usize = 0;
+    for (recorded.constant_records.items) |record| for (record.events) |event| switch (event) {
+        .work => |work| steps += work.steps,
+        .read => |read| {
+            reads += 1;
+            try std.testing.expectEqual(read.value, (try recorded.cachedBindingValue(read.target)).?);
+        },
+    };
+    try std.testing.expectEqual(recorded.steps, steps);
+    try std.testing.expect(reads >= 3);
+    var limited = try Session.init(allocator, &.{module.*});
+    defer limited.deinit();
+    limited.retain_constant_receipts = true;
+    limited.options.max_steps = ordinary.steps - 1;
+    if (limited.value(reference)) |_| return error.TestUnexpectedResult else |err| {
+        if (err == error.OutOfMemory) return err;
+        try std.testing.expectEqual(error.Declined, err);
+    }
+    try std.testing.expectEqual(Code.constant_fuel, limited.diagnostic.?.code);
+    try std.testing.expect(try limited.cachedBindingValue(reference) == null);
+}
+
+test "constant receipt tape separates nested reads and preserves ordinary fuel" {
+    const allocator = std.testing.allocator;
+    var module = try bodyRecipeLower(
+        \\const leaf = @u32.add 1 2
+        \\const outer = @u32.add leaf leaf
+        \\entry const answer = @u32.add outer leaf
+    );
+    defer module.deinit(allocator);
+    try constantReceiptTapeScenario(allocator, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(allocator, constantReceiptTapeScenario, .{&module});
+}
+
 test "concrete self runtime method interface terminates without executing recursive typed or plain bodies" {
     const allocator = std.testing.allocator;
     for ([_][]const u8{
@@ -11198,4 +11477,119 @@ fn callbackShapeDagScenario(allocator: Allocator) !void {
 test "callback shape admission bounds shared function DAGs and preserves the first order data boundary under allocation failure" {
     try callbackShapeDagScenario(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, callbackShapeDagScenario, .{});
+}
+
+fn constantWarmQueryScenario(allocator: Allocator, module: *const core.Module) !void {
+    var session = try Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    session.minimum_constant_steps = 0;
+    const callback = try session.richValue(.{ .unit = 1, .binding = 1 });
+    const answer = try session.richValue(.{ .unit = 1, .binding = 2 });
+    _ = try session.inferClosure(callback);
+    const regions = session.counters.inference_regions;
+    var warm = @import("constant_receipt.zig").Recorder.init(&session);
+    defer warm.deinit(allocator);
+    session.constant_recorder = &warm;
+    _ = try session.inferClosure(callback);
+    try std.testing.expectEqual(regions, session.counters.inference_regions);
+    try std.testing.expect(!warm.eligible);
+    try std.testing.expect(session.constant_recorder == null);
+    try std.testing.expect(try warm.finish(allocator, &session, .{ .unit = 1, .binding = 2 }, answer) == null);
+
+    // Canonical key collection spends a cumulative budget even when it never
+    // opens a solver region. The independent budget snapshot catches that too.
+    var key_reads = @import("constant_receipt.zig").Recorder.init(&session);
+    defer key_reads.deinit(allocator);
+    const serial = session.constant_inference_serial;
+    const examined = session.canonical_specializations.examined_words;
+    var key = (try session.canonical_specializations.key(&session, callback)) orelse return error.TestUnexpectedResult;
+    defer key.deinit(allocator);
+    try std.testing.expect(session.canonical_specializations.examined_words > examined);
+    try std.testing.expectEqual(serial, session.constant_inference_serial);
+    try std.testing.expect(try key_reads.finish(allocator, &session, .{ .unit = 1, .binding = 2 }, answer) == null);
+}
+
+test "constant receipt declines warm inference and canonical budget changes without a new solver" {
+    const allocator = std.testing.allocator;
+    var module = try bodyRecipeLower("const callback = fn () -> U32 => 42\nentry const answer = 42\n");
+    defer module.deinit(allocator);
+    try constantWarmQueryScenario(allocator, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(allocator, constantWarmQueryScenario, .{&module});
+}
+
+fn constantReachableViewScenario(allocator: Allocator, module: *const core.Module) !void {
+    var session = try Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    session.minimum_constant_steps = 0;
+    const reference: core.BindingRef = .{ .unit = 1, .binding = 1 };
+    const empty = try session.richValue(reference);
+    try std.testing.expectEqual(@as(u32, 0), session.valueEvidence(empty));
+    const array = try session.evidence.intern(.array, types.u32_type, 0, &.{});
+    var recording = @import("constant_receipt.zig").Recorder.init(&session);
+    defer recording.deinit(allocator);
+    try recording.read(allocator, &session, reference, empty);
+    session.constant_recorder = &recording;
+    defer session.constant_recorder = null;
+    const selected = try session.typedView(0, module.body(1).?.root, empty, array);
+    try std.testing.expect(selected != empty);
+    const warm_values = session.values.items.len;
+    const warm_children = session.children.items.len;
+    try std.testing.expectEqual(selected, try session.typedView(0, module.body(1).?.root, empty, array));
+    try std.testing.expectEqual(warm_values, session.values.items.len);
+    try std.testing.expectEqual(warm_children, session.children.items.len);
+    // The selected view and its ready input are both observable aliases. A
+    // value graph alone cannot reproduce this future cache publication.
+    try std.testing.expect(try recording.finish(allocator, &session, reference, selected) == null);
+    session.constant_recorder = null;
+    // Model the missing publication while retaining both value headers, as a
+    // graph-only replay would. Ordinary evaluation allocates a distinct alias.
+    try std.testing.expect(session.typed_views.remove(.{ .value = empty, .evidence = array }));
+    const cold = try session.typedView(0, module.body(1).?.root, empty, array);
+    try std.testing.expect(cold != selected);
+    try std.testing.expectEqual(warm_values + 1, session.values.items.len);
+    try std.testing.expectEqual(warm_children, session.children.items.len);
+    try std.testing.expect(std.meta.eql(session.valueInfo(selected), session.valueInfo(cold)));
+    // The difference is semantic under a tight ordinary value quota: a warm
+    // alias succeeds at the limit, but another missing publication fails.
+    session.options.max_values = session.constantValueCount();
+    try std.testing.expectEqual(cold, try session.typedView(0, module.body(1).?.root, empty, array));
+    try std.testing.expect(session.typed_views.remove(.{ .value = empty, .evidence = array }));
+    try std.testing.expectError(error.Declined, session.typedView(0, module.body(1).?.root, empty, array));
+    try std.testing.expectEqual(Code.constant_fuel, session.diagnostic.?.code);
+}
+
+test "constant receipt declines reachable warm view keys before owned cache publication exists" {
+    const allocator = std.testing.allocator;
+    var module = try bodyRecipeLower("const empty = #[]\nentry const answer = 42\n");
+    defer module.deinit(allocator);
+    try constantReachableViewScenario(allocator, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(allocator, constantReachableViewScenario, .{&module});
+}
+
+fn memberPrincipalScenario(a: Allocator) !void {
+    const modules = [_]core.Module{.{ .types = .{ .nodes = &.{}, .extra = &.{}, .effects = .{ .rows = &.{}, .labels = &.{}, .variable_count = 0 }, .operations = &.{} }, .nodes = &.{}, .spans = &.{}, .extra = &.{}, .bindings = &.{}, .bodies = &.{}, .parameters = &.{}, .references = &.{}, .calls = &.{}, .merges = &.{}, .merge_ranges = &.{}, .names = &.{}, .obligations = &.{}, .diagnostics = &.{}, .body_lowerings = 0 }};
+    var session = try Session.init(a, &modules);
+    defer session.deinit();
+    const key: PrincipalGraph.Key = .{ .target = .{ .unit = 0, .binding = 1 }, .source_interface = false, .deferred_member = false, .options = .{} };
+    _ = try principalQueryTestRecord(&session.call_summaries.principals, &session, key, null);
+    var trace: receipt.MemberTrace = .{};
+    session.member_trace = &trace;
+    try std.testing.expect(session.call_summaries.principals.get(key, &session) != null);
+    try std.testing.expect(session.call_summaries.normalized_principals.get(key, &session) == null);
+    session.member_trace = null;
+    var member: receipt.Member = .{ .principals = trace.entries[0..trace.len], .principal_graphs = true, .target = .{ .unit = 1, .binding = 1 }, .function = 0, .query_budgets = @splat(0), .principal_nodes = 0, .principal_edges = 0, .summary_work = 0, .transitions = 0, .exhausted = false };
+    try std.testing.expect(session.memberPrincipalsMatch(&member));
+    // Counts and entries remain equal: the actual bounded lookup now declines.
+    session.call_summaries.principals.lookup_budget = 0;
+    try std.testing.expect(!session.memberPrincipalsMatch(&member));
+    session.call_summaries.principals.lookup_budget = 4096;
+    try std.testing.expect(session.memberPrincipalsMatch(&member));
+    session.member_trace = &trace;
+    try std.testing.expect(try session.call_summaries.principals.put(a, key, null, &session));
+    session.member_trace = null;
+    try std.testing.expect(!trace.complete);
+}
+test "constant receipt member judgments pin actual principal lookup outcomes and OOM" {
+    try memberPrincipalScenario(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, memberPrincipalScenario, .{});
 }

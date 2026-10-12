@@ -9,11 +9,40 @@ pub const ViewEffect = struct { value: u32, evidence: u32, selected: u32, existe
 pub const CallRead = struct { unit: u32, binding: u32, evidence: u32, present: bool };
 pub const ScalarRead = struct { target: core.BindingRef, evidence: u32 };
 pub const PlainFact = struct { key: u64, plain: bool, read: bool = true, present: bool = true };
+pub const ReadyRead = struct { target: core.BindingRef, value: u32 };
+pub const PrincipalOutcome = enum { missing, declined, graph };
+pub const PrincipalRead = struct { target: core.BindingRef, open: bool, source_interface: bool, deferred_member: bool, outcome: PrincipalOutcome };
+pub const MemberTrace = struct {
+    entries: [64]PrincipalRead = undefined,
+    ready: [64]ReadyRead = undefined,
+    ready_len: usize = 0,
+    len: usize = 0,
+    complete: bool = true,
+    pub fn readyRead(self: *MemberTrace, read: ReadyRead, was_ready: bool) void {
+        if (!was_ready or self.ready_len == self.ready.len) {
+            self.complete = false;
+            return;
+        }
+        self.ready[self.ready_len] = read;
+        self.ready_len += 1;
+    }
+    pub fn append(self: *MemberTrace, read: PrincipalRead) void {
+        if (self.len == self.entries.len) {
+            self.complete = false;
+            return;
+        }
+        self.entries[self.len] = read;
+        self.len += 1;
+    }
+};
+pub const Member = struct { ready: []ReadyRead = &.{}, principals: []PrincipalRead = &.{}, principal_graphs: bool, target: core.BindingRef, function: u32, query_budgets: [8]usize, principal_nodes: usize, principal_edges: usize, summary_work: usize, transitions: usize, exhausted: bool };
 pub const Provider = struct {
     context: *anyopaque,
     lookup: *const fn (*anyopaque, *eval.Session, u32, u32) Allocator.Error!?u32,
+    member: ?*const fn (*anyopaque, *eval.Session, core.BindingRef, u32, u32) Allocator.Error!?u32 = null,
 };
 pub const Record = struct {
+    member: ?*Member = null,
     input: u32,
     expected: u32,
     selected: u32,
@@ -35,6 +64,11 @@ pub const Record = struct {
     views: []ViewEffect,
     plain_facts: []PlainFact,
     pub fn deinit(self: *Record, a: Allocator) void {
+        if (self.member) |member| {
+            a.free(member.principals);
+            a.free(member.ready);
+            a.destroy(member);
+        }
         a.free(self.sources);
         a.free(self.scalar_reads);
         a.free(self.call_reads);
@@ -45,6 +79,23 @@ pub const Record = struct {
     }
     pub fn clone(self: Record, a: Allocator) Allocator.Error!Record {
         var result = self;
+        result.member = null;
+        if (self.member) |member| {
+            const owned = try a.create(Member);
+            owned.* = member.*;
+            owned.principals = &.{};
+            owned.ready = &.{};
+            result.member = owned;
+            errdefer a.destroy(owned);
+            owned.principals = try a.dupe(PrincipalRead, member.principals);
+            errdefer a.free(owned.principals);
+            owned.ready = try a.dupe(ReadyRead, member.ready);
+        }
+        errdefer if (result.member) |member| {
+            a.free(member.principals);
+            a.free(member.ready);
+            a.destroy(member);
+        };
         result.sources = try a.dupe(core.BindingRef, self.sources);
         errdefer a.free(result.sources);
         result.scalar_reads = try a.dupe(ScalarRead, self.scalar_reads);
@@ -61,6 +112,7 @@ pub const Record = struct {
 };
 pub fn ownedBytes(record: Record) usize {
     var total: usize = 0;
+    if (record.member) |member| total += @sizeOf(Member) + member.principals.len * @sizeOf(PrincipalRead) + member.ready.len * @sizeOf(ReadyRead);
     inline for (.{ "sources", "scalar_reads", "call_reads", "call_publications", "views", "plain_facts" }) |field| {
         const entries = @field(record, field);
         total +|= entries.len *| @sizeOf(@TypeOf(entries[0]));
