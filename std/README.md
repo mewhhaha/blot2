@@ -398,6 +398,25 @@ traps if lengths differ.
 [The protocol and examples](../compiler/guide.md#lists-arrays-and-libraries)
 describe pull order and snapshot behavior.
 
+[rolling.blot](rolling.blot) provides complete overlapping reductions.
+`fold step initial width values` reduces each window in order, including
+effectful reducers and F32 arithmetic. `monoid combine identity width values`
+uses a balanced persistent buffer; `group combine inverse identity width
+values` removes the oldest value on the left before adding the incoming value.
+The fast callbacks must be pure. Callers promise an associative, total combine,
+a two-sided identity and, for groups, a two-sided inverse. These are explicit
+algebra contracts; use `fold` when they do not hold. Width zero traps before
+obtaining the input cursor. Copies of a cursor keep independent windows.
+
+[summary.blot](summary.blot) provides opaque persistent `Summary s` trees.
+`build combine identity values` reads its input once; `length tree`, `get index
+tree`, `query combine identity start count tree`, `set combine index value tree`
+and `concat combine left right` preserve earlier versions. Queries use
+half-open ranges and return the identity for an empty range. Reuse the same
+algebra and immutable captures for every operation. Build is linear; queries,
+updates and concatenation follow logarithmic paths. The
+[full contracts](../zig-native/ROLLING_SUMMARIES.md) specify ordering and bounds.
+
 [simd.blot](simd.blot) supplies explicit four-lane U32/F32 operations on
 ordinary tuple aliases, checked array load/store, and ordered or explicitly
 pairwise reductions. Eligible independent numeric construction also vectorizes

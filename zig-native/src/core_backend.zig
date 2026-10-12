@@ -833,6 +833,56 @@ const Generator = struct {
         }
         return self.decline(owner, .{ .start = 0, .end = 0 }, .unresolved_type);
     }
+    fn acyclicLayout(self: *Generator, owner: u32, ty: layout.Id, active: []layout.Id, depth: usize, budget: *usize) Error!bool {
+        if (depth >= active.len or budget.* == 0) return false;
+        budget.* -= 1;
+        if (std.mem.findScalar(layout.Id, active[0..depth], ty) != null) return true;
+        active[depth] = ty;
+        const n = self.layouts.node(ty);
+        switch (n.tag) {
+            .unit, .boolean, .u32, .f32, .never, .type_constructor, .resolver => return true,
+            .product, .record => {
+                const children = self.layouts.children(ty);
+                var first: usize = 0;
+                var step: usize = 1;
+                if (n.tag == .record) {
+                    first = 1;
+                    step = 2;
+                }
+                var index = first;
+                while (index < children.len) : (index += step) if (!try self.acyclicLayout(owner, children[index], active, depth + 1, budget)) return false;
+                return true;
+            },
+            .nominal => {
+                if (n.a != owner or n.a == 0 or n.a > self.units.len) return false;
+                const source = self.unit(n.a);
+                var found = false;
+                for (source.constructors) |constructor| {
+                    if (budget.* == 0) return false;
+                    budget.* -= 1;
+                    const nominal = source.nominal(constructor.nominal);
+                    if (nominal.identity.unit != n.a or nominal.identity.decl != n.b) continue;
+                    found = true;
+                    if (constructor.payload == 0) continue;
+                    const parameters = source.types.list(nominal.parameters);
+                    const arguments = self.layouts.children(ty);
+                    if (parameters.len != arguments.len or parameters.len > 32) return false;
+                    var mappings: [32]Mapping = undefined;
+                    for (parameters, arguments, 0..) |parameter, argument, index| {
+                        if (source.types.node(parameter).tag != .variable) return false;
+                        mappings[index] = .{ .variable = parameter, .layout = argument };
+                    }
+                    const payload = self.layouts.fromTypePartial(source, constructor.payload, mappings[0..parameters.len]) catch |err| {
+                        if (err == error.OutOfMemory) return error.OutOfMemory;
+                        return false;
+                    };
+                    if (!try self.acyclicLayout(owner, payload, active, depth + 1, budget)) return false;
+                }
+                return found;
+            },
+            else => return false,
+        }
+    }
     fn captureLayout(self: *Generator, owner: u32, binding: core.BindingId, value: core_eval.ValueId, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping)) Error!layout.Id {
         const source = self.unit(owner);
         const declaration = source.binding(binding);
@@ -1678,6 +1728,7 @@ const Generator = struct {
         const fn_type = self.layouts.node(key.ty);
         if (fn_type.tag != .function) return self.decline(key.unit, .{ .start = 0, .end = 0 }, .unresolved_type);
         const function_id = try self.module.addTypedFunction(&.{ .i32, self.layouts.machine(fn_type.a), .i32 }, self.layouts.machine(fn_type.b), self.layoutRole(fn_type.b));
+
         try self.setParameterRoles(function_id, self.closureRoles(fn_type.a));
         try self.constructor_functions.put(self.allocator, key, function_id);
         if (scope) |*actor| try actor.reserve(function_id);
@@ -2969,13 +3020,84 @@ const Emitter = struct {
         }
         return prepared;
     }
+    /// A generalized local with one checked instance may use that instance's
+    /// private storage. Only its quantified holes acquire facts; captures and
+    /// flow aliases decline. This never unifies the semantic producer scheme.
+    fn localStorageMappings(self: *Emitter, root: core.Id, mappings: *std.ArrayList(Mapping)) Error!void {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        if (source.nodes.len > 4096) return;
+        var budget: usize = 65536;
+        for (source.children(root)) |statement| {
+            const n = source.node(statement);
+            if (n.tag != .bind or n.a == 0 or source.node(n.b).tag != .call) continue;
+            const binding = source.binding(n.a);
+            if (binding.kind != .local or binding.scheme.variables.len == 0) continue;
+            const produced = try self.codeLayout(binding.ty, source.span(statement));
+            if (!self.hasErasedType(produced, 0)) continue;
+            var use: ?core.Id = null;
+            for (source.nodes, 0..) |node, index| {
+                if (budget == 0) return;
+                budget -= 1;
+                if (node.tag != .reference) continue;
+                const reference = source.reference(@intCast(index));
+                if (reference.binding != n.a or (reference.unit != 0 and reference.unit != self.unit_id)) continue;
+                if (use != null) {
+                    use = null;
+                    break;
+                }
+                use = @intCast(index);
+            }
+            const selected = use orelse continue;
+            var indirect = false;
+            for (source.closures) |metadata| for (source.extra[metadata.captures.start..][0..metadata.captures.len]) |held_binding| {
+                if (budget == 0) return;
+                budget -= 1;
+                if (held_binding == n.a) indirect = true;
+            };
+            for (source.merges) |merge| {
+                if (budget == 0) return;
+                budget -= 1;
+                if (merge.then_binding == n.a or merge.else_binding == n.a) indirect = true;
+            }
+            for (source.loop_carries) |carry| {
+                if (budget == 0) return;
+                budget -= 1;
+                if (carry.incoming == n.a or carry.iteration == n.a or carry.backedge == n.a or carry.outgoing == n.a) indirect = true;
+            }
+            if (indirect) continue;
+            const actual = try self.codeLayout(source.typeOf(selected), source.span(selected));
+            if (self.hasErasedType(actual, 0)) continue;
+            var next: std.ArrayList(Mapping) = .empty;
+            defer next.deinit(g.allocator);
+            const previous = if (mappings.items.len == 0) self.mappings else mappings.items;
+            try next.appendSlice(g.allocator, previous);
+            try g.mapTypeDepth(self.unit_id, &next, null, binding.ty, actual, source.span(statement), 0);
+            try g.mapTypeDepth(self.unit_id, &next, null, source.typeOf(n.b), actual, source.span(statement), 0);
+            var private = true;
+            for (next.items) |mapping| {
+                const old = for (previous) |prior| {
+                    if (prior.variable == mapping.variable) break prior.layout;
+                } else layout.erased;
+                if (mapping.layout == old) continue;
+                if (std.mem.findScalar(types.Id, source.types.list(binding.scheme.variables), mapping.variable) == null) private = false;
+            }
+            if (!private) continue;
+            mappings.deinit(g.allocator);
+            mappings.* = next;
+            next = .empty;
+        }
+    }
     /// Every source-body route enters here after its exact capture bindings
     /// exist. Preparation owns decisions; encoding alone owns runtime locals,
     /// labels, environments and the original lazy function-index order.
     fn prepareBody(self: *Emitter, root: core.Id, depth: usize, template: bool) Error!Body {
         const g = self.generator;
         if (self.preparation_depth >= 256) return g.fail(self.unit_id, root, .complexity);
-        var body = try Body.init(g.allocator, self.unit_id, root, self.mappings, self.row_mappings);
+        var storage: std.ArrayList(Mapping) = .empty;
+        defer storage.deinit(g.allocator);
+        try self.localStorageMappings(root, &storage);
+        var body = try Body.init(g.allocator, self.unit_id, root, if (storage.items.len == 0) self.mappings else storage.items, self.row_mappings);
         errdefer body.deinit(g.allocator);
         body.rows_evidence = try g.rowMappingEvidence(self.row_mappings);
         var preparer: Emitter = .{ .generator = g, .unit_id = self.unit_id, .function_id = self.function_id, .mappings = body.mappings, .row_mappings = body.rows, .factory_template = self.factory_template, .inline_demands = self.inline_demands, .preparation_depth = self.preparation_depth + 1, .preparing = true };
@@ -2994,6 +3116,20 @@ const Emitter = struct {
         const previous = self.body;
         self.body = &body;
         defer self.body = previous;
+        const old_mappings = self.mappings;
+        var changed = old_mappings.len != body.mappings.len;
+        if (!changed) for (old_mappings, body.mappings) |old, current| {
+            if (old.variable != current.variable or old.layout != current.layout) {
+                changed = true;
+                break;
+            }
+        };
+        self.mappings = body.mappings;
+        if (changed) self.layout_cache = @splat(.{});
+        defer {
+            self.mappings = old_mappings;
+            if (changed) self.layout_cache = @splat(.{});
+        }
         if (template) try self.templateExpression(root, depth) else try self.expression(root, depth);
     }
     fn prepareNode(self: *Emitter, body: *Body, id: core.Id, depth: usize, template: bool) Error!void {
@@ -4072,6 +4208,13 @@ const Emitter = struct {
     fn allocate(self: *Emitter, bytes: u32, roles: AllocationRoles) Error!u32 {
         return self.allocateStorage(bytes, false, roles);
     }
+    fn markAcyclic(self: *Emitter, value: u32, ty: layout.Id) Error!void {
+        var active: [128]layout.Id = undefined;
+        var budget: usize = 65536;
+        if (!try self.generator.acyclicLayout(self.unit_id, ty, &active, 0, &budget)) return;
+        try self.emit(.local_get, value);
+        try self.emit(.call, self.generator.module.arena.?.mark_acyclic);
+    }
     fn allocatePrivate(self: *Emitter, bytes: u32, roles: AllocationRoles) Error!u32 {
         const local = try self.allocate(bytes, roles);
         try self.cleanups.append(self.generator.allocator, .{ .release = @fromBackingInt(@intCast(local)) });
@@ -4210,6 +4353,7 @@ const Emitter = struct {
             slot_roles[if (physical.len == 0) declared else physical[declared]] = g.layoutRole(try self.codeLayout(unit_.typeOf(child), unit_.span(child)));
         }
         const address = try self.allocate(@intCast(children.len * 4), .{ .words = slot_roles });
+        if (std.mem.findScalar(ir.Role, slot_roles, .reference) != null) try self.markAcyclic(address, try self.codeLayout(unit_.typeOf(id), unit_.span(id)));
         for (children, locals.items, 0..) |child, value, index| {
             const declared = if (record) destinations[index] else index;
             const slot = if (physical.len == 0) declared else physical[declared];
@@ -4260,6 +4404,11 @@ const Emitter = struct {
             } else try self.expression(n.b, depth + 1);
             return;
         }
+        if (n.b == 0 and n.c == 0) {
+            const address = try self.generator.module.dataWords(&.{ constructor.tag, 0 });
+            try self.referenceConstant(address, .static_address);
+            return;
+        }
         var payload = if (n.b == 0) null else try self.capture(n.b, depth);
         var floating = n.b != 0 and try self.scalar(n.b) == .f32;
         if (n.c != 0) {
@@ -4278,6 +4427,7 @@ const Emitter = struct {
         // A constructor cell is its tag, then its payload or zero.
         const payload_role: ir.Role = if (n.c != 0) .reference else if (n.b == 0) .scalar else self.generator.layoutRole(try self.codeLayout(unit_.typeOf(n.b), unit_.span(n.b)));
         const address = try self.allocate(8, .{ .words = &.{ .scalar, payload_role } });
+        if (payload_role == .reference) try self.markAcyclic(address, try self.codeLayout(n.ty, unit_.span(id)));
         try self.emit(.local_get, address);
         try self.emit(.i32_const, unit_.constructor(n.a).tag);
         try self.emit(.i32_store, 0);
@@ -6010,6 +6160,7 @@ const Emitter = struct {
         try self.emit(.local_get, count);
         try self.emit(.i32_store, 0);
         try self.emit(.local_get, address);
+        try self.emit(.local_get, address);
         try self.emit(.i32_const, 4);
         try self.emit(.i32_add, 0);
         if (op == .slice) try self.arrayAddress(locals[0], locals[1], stride) else try self.emit(.local_get, locals[0]);
@@ -6018,8 +6169,9 @@ const Emitter = struct {
         try self.emit(.local_get, if (op == .slice) count else left_count);
         try self.emit(.i32_const, stride);
         try self.emit(.i32_mul, 0);
-        try self.emit(.memory_copy, 0);
+        try self.emit(.call, self.generator.module.arena.?.copy_words);
         if (op == .concat) {
+            try self.emit(.local_get, address);
             try self.arrayAddress(address, left_count, stride);
             try self.emit(.i32_const, 4);
             try self.emit(.i32_add, 0);
@@ -6031,7 +6183,7 @@ const Emitter = struct {
             try self.emit(.i32_sub, 0);
             try self.emit(.i32_const, stride);
             try self.emit(.i32_mul, 0);
-            try self.emit(.memory_copy, 0);
+            try self.emit(.call, self.generator.module.arena.?.copy_words);
         }
         try self.emit(.local_get, address);
     }

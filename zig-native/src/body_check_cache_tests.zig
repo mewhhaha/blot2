@@ -814,6 +814,36 @@ test "body check cache relocates generic local principals and covariance rows" {
     try compare(a, &before.bodies, body_edit, altered_result.bytes, 3);
 }
 
+test "body check cache relocates concrete record and nominal projections by spelling" {
+    const source =
+        \\type Packet is data = #Packet { head: U32, tail: Array U32 }
+        \\const get = fn (value: { head: U32, tail: Array U32 }) => (value).tail
+        \\const read = fn (value: Packet) => (value).tail
+        \\const make = fn (value: U32) => #Packet { head: value, tail: #[value, @u32.add value 1] }
+        \\entry const run = fn (value: U32) => read (make value)
+        \\entry const plain = fn (value: U32) => get { head: value, tail: #[value] }
+    ;
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("get") != null);
+    try std.testing.expect(before.bodies.find("read") != null);
+    const inserted = try a.print("const earlier_spelling = {{ tail: 3.0, head: 2 }}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
+    const changed = try std.mem.replaceOwned(u8, a, inserted, "@u32.add value 1", "@u32.add value 2");
+    defer a.free(changed);
+    var altered = try prepare(a, changed, null);
+    defer altered.deinit(a);
+    var altered_result = try compile(a, &altered);
+    defer altered_result.deinit(a);
+    try compare(a, &before.bodies, changed, altered_result.bytes, 2);
+}
+
 test "body check cache declines dotted access paths instead of erasing projections" {
     const source = "const seed = 2\nconst helper = fn (value: { head: U32, tail: F32 }) -> U32 => @u32.add value.head seed\nentry const run = fn (value: U32) -> U32 => helper { head: value, tail: 1.0 }\n";
     var before = try prepare(a, source, null);

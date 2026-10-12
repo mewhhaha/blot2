@@ -68,6 +68,11 @@ pub fn referenceEnd(c: Code, head: Local) Error!Local {
 }
 pub fn emit(m: *w.Module, a: w.Arena) Error!void {
     try allocate(code(m, a.allocate_typed), a);
+    const marker = code(m, a.mark_acyclic);
+    try marker.when(.{ .global, a.rc_enabled });
+    const marker_head = try dynamic(marker, a);
+    try marker.store(marker_head, f.flags, .{ .i32_or, .{ .load, marker_head, f.flags }, @import("cycles_runtime.zig").no_cycle });
+    try marker.end();
     try retain(code(m, a.retain), a);
     try decrement(code(m, a.decrement), a);
     try release(code(m, a.release), a);

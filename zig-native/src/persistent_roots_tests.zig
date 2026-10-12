@@ -47,6 +47,206 @@ const Fixture = struct {
     }
 };
 
+test "immutable algebraic shapes keep acyclic claims through replay checkpoint and OOM" {
+    var fixture = try Fixture.initSource(
+        \\type Link a is data = #End | #Next (Link a, a)
+        \\const grow = fn (count: U32) => do:
+        \\  let root: Link U32 = #End
+        \\  for index in 0..count:
+        \\    root := #Next (self, index)
+        \\  return root
+        \\entry const run = fn (count: U32) => do:
+        \\  let root = grow count
+        \\  return count
+    );
+    defer fixture.deinit();
+    const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
+    defer a.free(nodes);
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    try ownership(first.bytes);
+    var retained = try fixture.emit(a, &first.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
+    const compiler: [32]u8 = @splat(35);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    var portable = try fixture.emit(a, null, &checkpoint);
+    defer portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, portable.bytes);
+    var replayed = try backend.compileWithOptions(a, &fixture.units, 1, .{ .identity = fixture.names.view(), .artifact_replay = true });
+    defer replayed.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, replayed.bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, null, first.bytes });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
+    const changed_source =
+        \\type Link a is data = #End | #Next (Link a, a) | #Later (Unit -> a)
+        \\const grow = fn (count: U32) => do:
+        \\  let root: Link U32 = #End
+        \\  for index in 0..count:
+        \\    root := #Next (self, index)
+        \\  return root
+        \\entry const run = fn (count: U32) => do:
+        \\  let root = grow count
+        \\  return count
+    ;
+    var changed_fixture = try Fixture.initSource(changed_source);
+    defer changed_fixture.deinit();
+    var changed = try changed_fixture.emit(a, &first.capture.?, null);
+    defer changed.deinit(a);
+    var fresh = try changed_fixture.emit(a, null, null);
+    defer fresh.deinit(a);
+    var changed_portable = try changed_fixture.emit(a, null, &checkpoint);
+    defer changed_portable.deinit(a);
+    try ownership(changed.bytes);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, changed.bytes);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, changed_portable.bytes);
+    try std.testing.expect(acyclicClaims(&first) != 0);
+    try std.testing.expectEqual(@as(usize, 0), acyclicClaims(&changed));
+    try std.testing.expectEqual(@as(usize, 0), acyclicClaims(&changed_portable));
+    try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
+}
+
+test "single-use generic local storage keeps exact private roles through replay checkpoint and OOM" {
+    var fixture = try Fixture.initSource(
+        \\type Box f is data = #Box f
+        \\const box = fn value => #Box value
+        \\entry const run = fn (seed: U32) => do:
+        \\  let stored = box (fn value => {item: value})
+        \\  let #Box mapper = stored
+        \\  return @u32.add (mapper seed).item 1
+    );
+    defer fixture.deinit();
+    const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
+    defer a.free(nodes);
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    try ownership(first.bytes);
+    var retained = try fixture.emit(a, &first.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
+    const compiler: [32]u8 = @splat(35);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    var portable = try fixture.emit(a, null, &checkpoint);
+    defer portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, portable.bytes);
+    var replayed = try backend.compileWithOptions(a, &fixture.units, 1, .{ .identity = fixture.names.view(), .artifact_replay = true });
+    defer replayed.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, replayed.bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, null, first.bytes });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
+    var reference_fixture = try Fixture.initSource(
+        \\type Box f is data = #Box f
+        \\const box = fn value => #Box value
+        \\entry const run = fn (seed: Array U32) => do:
+        \\  let stored = box (fn value => {item: value})
+        \\  let #Box mapper = stored
+        \\  return @array.length (mapper seed).item
+    );
+    defer reference_fixture.deinit();
+    var changed = try reference_fixture.emit(a, &first.capture.?, null);
+    defer changed.deinit(a);
+    var fresh = try reference_fixture.emit(a, null, null);
+    defer fresh.deinit(a);
+    try ownership(changed.bytes);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, changed.bytes);
+    try std.testing.expect(!std.mem.eql(u8, first.bytes, changed.bytes));
+    try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
+}
+
+test "dynamic Array copies admit exact owners through replay checkpoint and OOM" {
+    var fixture = try Fixture.initSource(
+        \\entry const run = fn (count: U32) => do:
+        \\  let left = @array.fill count 41
+        \\  let right = @array.fill count 42
+        \\  let joined = @array.concat left right
+        \\  return @array.length (@array.slice joined 0 count)
+    );
+    defer fixture.deinit();
+    const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
+    defer a.free(nodes);
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    try ownership(first.bytes);
+    var retained = try fixture.emit(a, &first.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
+    const compiler: [32]u8 = @splat(35);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    var portable = try fixture.emit(a, null, &checkpoint);
+    defer portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, portable.bytes);
+    var replayed = try backend.compileWithOptions(a, &fixture.units, 1, .{ .identity = fixture.names.view(), .artifact_replay = true });
+    defer replayed.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, replayed.bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, null, first.bytes });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
+    try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
+}
+
+test "immutable nullary constructor cells preserve changed tags replay checkpoint and OOM" {
+    var fixture = try Fixture.initSource(
+        \\type Token is data = #Left | #Right
+        \\entry const run = fn (value: U32) => do:
+        \\  let token = if @u32.eq value 0 then #Left else #Right
+        \\  return case token of
+        \\    #Left => 11
+        \\    #Right => 22
+    );
+    defer fixture.deinit();
+    const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
+    defer a.free(nodes);
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    try std.testing.expectEqual(@as(usize, 0), first.counters.allocation_role_runs);
+    try ownership(first.bytes);
+    var retained = try fixture.emit(a, &first.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
+    const compiler: [32]u8 = @splat(35);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    var portable = try fixture.emit(a, null, &checkpoint);
+    defer portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, portable.bytes);
+    var replayed = try backend.compileWithOptions(a, &fixture.units, 1, .{ .identity = fixture.names.view(), .artifact_replay = true });
+    defer replayed.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, replayed.bytes);
+    var changed = try Fixture.initSource(
+        \\type Token is data = #Right | #Left
+        \\entry const run = fn (value: U32) => do:
+        \\  let token = if @u32.eq value 0 then #Left else #Right
+        \\  return case token of
+        \\    #Left => 11
+        \\    #Right => 22
+    );
+    defer changed.deinit();
+    var fresh = try changed.emit(a, null, null);
+    defer fresh.deinit(a);
+    var edited = try changed.emit(a, &first.capture.?, &checkpoint);
+    defer edited.deinit(a);
+    try std.testing.expect(fresh.diagnostic == null and edited.diagnostic == null);
+    try std.testing.expect(!std.mem.eql(u8, first.bytes, fresh.bytes));
+    try std.testing.expectEqualSlices(u8, fresh.bytes, edited.bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, null, first.bytes });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
+    try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
+}
+
 test "cycle zero-child source proof preserves retained checkpoint replay and OOM Wasm" {
     var fixture = try Fixture.initSource(
         \\entry const run = fn (index: U32) => #[41, 42, 43][index]
@@ -497,4 +697,13 @@ test "root frame demand changes reject retained rootless bodies and portable can
         defer matcher.deinit();
         try std.testing.expect(!matcher.matches(borrowed));
     }
+}
+
+fn acyclicClaims(result: *const backend.Result) usize {
+    const emission = &result.capture.?.emission;
+    var count: usize = 0;
+    for (emission.instructions) |instruction| if (instruction.op == .call and instruction.operand.value == emission.arena.?.mark_acyclic) {
+        count += 1;
+    };
+    return count;
 }

@@ -5746,6 +5746,37 @@ const Engine = struct {
         for (body.owner.field_names, fields) |name, *field| field.* = self.pool.lookup(name) orelse return null;
         var copier: SchemeCopier = .{ .field_mapping = fields, .allocator = self.allocator, .source = .{ .frozen = &body.owner.graph }, .destination = &self.types, .fresh_rows = true, .fresh_variables = true, .nominal_mapping = &identities };
         defer copier.deinit();
+        const field_plans = try self.allocator.alloc(Projection, body.fields.len);
+        defer self.allocator.free(field_plans);
+        for (body.fields, field_plans) |field, *plan| {
+            const id = shape.ids[field.position];
+            const syntax = self.tree.node(id);
+            var nominal: Identity = .{ .unit = 0, .decl = 0 };
+            if (field.nominal.unit != 0) nominal = identities.get(field.nominal) orelse return null;
+            var variants: std.ArrayList(u32) = .empty;
+            defer variants.deinit(self.allocator);
+            for (body.field_tags[field.tags.start..][0..field.tags.len]) |tag| {
+                const receiver_position = std.mem.findScalar(ast.Id, shape.ids, syntax.a) orelse return null;
+                var record_type = try copier.copy(body.facts[receiver_position].ty, 0);
+                if (nominal.unit != 0) {
+                    var payload: ?T.Id = null;
+                    for (self.constructors.items) |constructor| if (constructor.tag == tag and std.meta.eql(self.nominals.items[constructor.nominal].identity, nominal)) {
+                        payload = constructor.payload;
+                        break;
+                    };
+                    record_type = payload orelse return null;
+                }
+                const record = self.types.node(self.types.head(record_type, 0));
+                if (record.tag != .record) return null;
+                var index: ?u32 = null;
+                for (0..record.b) |slot| if (self.types.recordField(record, slot).name == syntax.b) {
+                    index = @intCast(slot);
+                    break;
+                };
+                try variants.appendSlice(self.allocator, &.{ tag, index orelse return null });
+            }
+            plan.* = .{ .nominal = nominal, .field = syntax.b, .variants = try self.types.saveList(variants.items) };
+        }
         for (body.bindings, mapped) |old, *target| if (old.kind == .parameter or old.kind == .local) {
             const ty = try copier.copy(old.ty, 0);
             const name = self.pool.lookup(old.name) orelse 0;
@@ -5776,6 +5807,11 @@ const Engine = struct {
             if (fact.binding != 0) self.resolved[id] = mapped[fact.binding - 1];
         }
         for (body.constructors, constructors) |old, current| self.constructor_resolved[shape.ids[old.position]] = current;
+        for (body.fields, field_plans) |field, plan| {
+            const catalog_id: u32 = @intCast(self.projection_catalog.items.len);
+            try self.projection_catalog.append(self.allocator, plan);
+            self.projection_resolved[shape.ids[field.position]] = catalog_id;
+        }
         for (body.projections) |projection| {
             const id = shape.ids[projection.position];
             var index = projection.index;

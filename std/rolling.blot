@@ -1,0 +1,64 @@
+import * as iter from "./iter"
+import * as tree from "./_summary_tree"
+
+const fold = fn step => fn initial => fn (width: U32) => fn values => do:
+  if @u32.eq width 0:
+    return @panic "rolling requires a positive width"
+  return iter.map (iter.fold_left step initial) (iter.windows width values)
+
+opaque type Monoid [i, s, f] = {
+  width: U32,
+  cursor: i,
+  combine: f,
+  identity: s,
+  window: Maybe (tree.Tree s),
+}
+const monoid = fn (combine: s -> s -> s) => fn (identity: s) => fn (width: U32) => fn values => do:
+  if @u32.eq width 0:
+    return @panic "rolling requires a positive width"
+  return #Monoid { width, cursor: values.iter, combine, identity, window: #Nothing }
+const Monoid.iter = fn (state: Monoid [i, s, f]) => state
+const Monoid.next = fn (state: Monoid [i, s, f]) => case state.window of
+  #Nothing => do:
+    use result <- tree.read state.identity state.width state.cursor
+    let #Some (buffer, rest) = result else:
+      return #Nothing
+    let summarized = tree.reduce state.combine buffer
+    return #Some (tree.total state.identity summarized, #Monoid { width: state.width, cursor: rest, combine: state.combine, identity: state.identity, window: #Some summarized })
+  #Some previous => do:
+    use step <- state.cursor.next
+    let #Some (value, rest) = step else:
+      return #Nothing
+    let summarized = tree.shift state.combine value previous
+    return #Some (tree.total state.identity summarized, #Monoid { width: state.width, cursor: rest, combine: state.combine, identity: state.identity, window: #Some summarized })
+
+opaque type Group [i, s, f, g] = {
+  width: U32,
+  cursor: i,
+  combine: f,
+  inverse: g,
+  identity: s,
+  window: Maybe (tree.Tree s),
+  total: s,
+}
+const group = fn (combine: s -> s -> s) => fn (inverse: s -> s) => fn (identity: s) => fn (width: U32) => fn values => do:
+  if @u32.eq width 0:
+    return @panic "rolling requires a positive width"
+  return #Group { width, cursor: values.iter, combine, inverse, identity, window: #Nothing, total: identity }
+const Group.iter = fn (state: Group [i, s, f, g]) => state
+const Group.next = fn (state: Group [i, s, f, g]) => case state.window of
+  #Nothing => do:
+    use result <- tree.read state.identity state.width state.cursor
+    let #Some (buffer, rest) = result else:
+      return #Nothing
+    let total = tree.fold state.combine state.identity buffer
+    return #Some (total, #Group { width: state.width, cursor: rest, combine: state.combine, inverse: state.inverse, identity: state.identity, window: #Some buffer, total })
+  #Some previous => do:
+    use step <- state.cursor.next
+    let #Some (value, rest) = step else:
+      return #Nothing
+    let total = state.combine (state.combine (state.inverse (tree.first previous)) state.total) value
+    let identity = state.identity
+    let unused = fn left => fn right => identity
+    let buffer = tree.shift unused value previous
+    return #Some (total, #Group { width: state.width, cursor: rest, combine: state.combine, inverse: state.inverse, identity: state.identity, window: #Some buffer, total })

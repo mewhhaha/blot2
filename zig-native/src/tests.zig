@@ -1,4 +1,5 @@
 comptime {
+    _ = @import("rolling_tests.zig");
     _ = @import("ragged_builder_tests.zig");
     _ = @import("native_asset_readers.zig");
     _ = @import("native_asset_wgsl.zig");

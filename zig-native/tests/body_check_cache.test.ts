@@ -1233,3 +1233,72 @@ entry const run = fn (value: U32) -> U32 => helper { head: value, tail: 1.0 }
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+Deno.test("body checker reuse relocates concrete postfix field variants and owning results", async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-body-fields-" });
+  const entry = `${directory}/main.blot`;
+  const source = (
+    prefix = "",
+    increment = "1",
+    constructor = "Packet",
+    extra = "",
+  ) =>
+    `${prefix}type Packet is data = #Packet { head: U32, tail: Array U32 } | #Alternate { tail: Array U32, head: U32 } ${extra}
+const get = fn (value: { head: U32, tail: Array U32 }) => ${
+      genericSpine("(value).tail")
+    }
+const read = fn (value: Packet) => ${genericSpine("(value).tail")}
+const make = fn (value: U32) => #${constructor} { head: value, tail: #[value, @u32.add value ${increment}] }
+entry const run = fn (value: U32) => read (make value)
+entry const plain = fn (value: U32) => get { head: value, tail: #[value] }
+`;
+  const options = { executable, entry, prelude: null };
+  const retained = await createZigProjectCompiler(options);
+  try {
+    for (
+      const [text, answer] of [
+        [source(), [40, 41]],
+        [source("const earlier_spelling = { tail: 3.0, head: 2 }\n"), [40, 41]],
+        [source("", "2", "Alternate"), [40, 42]],
+        [source("", "missing_name"), null],
+        [source("", "2", "Packet", "| #Missing { head: U32 }"), null],
+        [source("", "2"), [40, 42]],
+        [source(), [40, 41]],
+      ] as const
+    ) {
+      const fresh = await createZigProjectCompiler(options);
+      try {
+        const sources = { [entry]: text };
+        const expected = await fresh.build({ sources });
+        const actual = await retained.build({ sources });
+        assert.equal(actual.success, expected.success);
+        if (!actual.success || !expected.success) {
+          assert.ok(!actual.success && !expected.success);
+          assert.equal(answer, null);
+          assert.deepEqual(actual.diagnostics, expected.diagnostics);
+          continue;
+        }
+        assert.deepEqual(actual.bytes, expected.bytes);
+        if (text !== source()) {
+          assert.ok(
+            Number(actual.stats.frontend.body_elaborations) <
+              Number(expected.stats.frontend.body_elaborations),
+          );
+        }
+        assert.ok(answer !== null);
+        const guest = await instantiateGuest(actual.bytes);
+        try {
+          assert.deepEqual(guest.call("run", 40), new Uint32Array(answer));
+          assert.deepEqual(guest.call("plain", 40), new Uint32Array([40]));
+        } finally {
+          await guest.dispose();
+        }
+      } finally {
+        await fresh.close();
+      }
+    }
+  } finally {
+    await retained.close();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

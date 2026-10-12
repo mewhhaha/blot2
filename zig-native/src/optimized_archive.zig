@@ -53,7 +53,7 @@ pub const Snapshot = struct {
 pub fn wireKey(compiler: format.Digest) format.Key {
     // Source and dependency validity is deliberately not granted by this
     // header. Matcher compares complete machine inputs after loading.
-    return .{ .compiler = compiler, .settings = format.digest("blot-optimizer-capture-v9:associated-types+checked-call-results+root-frame-demand+compact-roots+row-fusion+forwarded-roots+paired-state+numeric-scopes+row-products"), .source = @splat(0), .dependencies = @splat(0) };
+    return .{ .compiler = compiler, .settings = format.digest("blot-optimizer-capture-v12:associated-types+checked-call-results+root-frame-demand+compact-roots+row-fusion+forwarded-roots+paired-state+numeric-scopes+row-products+conditional-roots+private-local-storage+immutable-acyclic-layouts"), .source = @splat(0), .dependencies = @splat(0) };
 }
 pub fn encode(a: A, compiler: format.Digest, capture: *const bodies.Capture) format.Error![]u8 {
     const entries = try a.alloc(Entry, capture.entries.items.len);
