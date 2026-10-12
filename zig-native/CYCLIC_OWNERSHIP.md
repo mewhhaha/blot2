@@ -139,3 +139,24 @@ Large List/Array graphs and long suspensions need no header layout change. A
 future descriptor directory must remain a typed scalar Array of borrowed leaf
 bases, with its descriptor/root retaining the leaves; borrowed directory entries
 must not become strong trial edges.
+
+## Exact immutable source layouts at 4013 b 10
+
+Fresh checked record/product/algebraic allocations may receive the existing
+no-cycle flag after a bounded exact immutable-layout proof. Nominal traversal
+checks all constructors in the emitting source unit, including unused variants;
+foreign definitions, functions, demands, providers, mutable containers and
+unknown fields decline. This flag suppresses candidate enqueue only. Counts,
+typed edges and iterative destruction remain, and genuine trial closures still
+follow those edges. Source changes revoke retained and portable claims.
+
+The joint LLVM release passes full native/OOM and 961 guest/client tests,
+including original strong cycles, suspension/cancellation and all eight budgets;
+351 analyzer files have zero findings. The scalar summary build no longer
+rescans alive immutable trees: its isolated 16384-leaf control drops 4309740
+trial vertices to zero. Real cyclic windows still pay candidate-closure cost;31
+warmed release samples charge those visits explicitly and retain bounded
+committed memory. See
+[rolling qualification](ROLLING_SUMMARIES_QUALIFICATION.md) and
+[tracing replacement](TRACING_REPLACEMENT.md) for exact pins and remaining
+scope.

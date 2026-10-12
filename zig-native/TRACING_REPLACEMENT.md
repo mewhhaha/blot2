@@ -12,7 +12,7 @@ owners; scalar results acquire no caller owner. Functions that cannot acquire or
 publish owners borrow caller roots and omit their frame and empty loop scopes.
 Allocations, allocating helpers, owning/unknown results, imports,
 force/publication scopes, entry and startup boundaries remain conservative.
-Optimizer interpretation v4 preserves the existing signatures, imported names,
+Optimizer interpretation v 4 preserves the existing signatures, imported names,
 global facts, table references, roles, roots and owner-table geometry. Malformed
 or orphan indirect annotations reject; a portable forged scalar fact plus an
 omitted frame cannot override freshly emitted reference facts.
@@ -139,7 +139,7 @@ new owning producer changes it while complete admission remains true; an
 unchanged reference-returning function must acquire its frame. Fresh, retained
 and portable bytes agree. Removing only the Matcher comparison reproduces a byte
 mismatch. `needs_roots` fits existing Capture/Snapshot padding; no Emitter field
-is added. Combined interpretation v6 retains associated type and checked
+is added. Combined interpretation v 6 retains associated type and checked
 indirect-result meaning. Invalid no-roots/needs-roots shapes reject.
 
 The nested 90-row memory law passes at 8/40/200 discarded 8192-word Arrays per
@@ -236,15 +236,15 @@ final compiler/runtime CPU qualification remain required.
 
 ## Integrated flag and marker milestone
 
-Implementation`2689ad5`, tree`92e09418…51fb6a`, passes the full native suite,
-925 guest/client laws, eight unchanged budgets and349 analyzer files/zero.
-Standard Zig0.17.0 LLVM/Fast release SHA256`9ea894d4…8b21` is immutable under
+Implementation `2689ad5`, tree `92e09418…51fb6a`, passes the full native suite,
+925 guest/client laws, eight unchanged budgets and 349 analyzer files/zero.
+Standard Zig 0.17.0 LLVM/Fast release SHA256 `9ea894d4…8b21` is immutable under
 `build/bench/joint-024-035-040/`. Its exact pins and mixed public compilation
-costs are recorded with[040](ROW_FUSION.md). Compact-marker CPU measurements
+costs are recorded with [040](ROW_FUSION.md). Compact-marker CPU measurements
 above remain a separately pinned isolated comparison; they do not close the CPU
 gate or qualify physical tracing removal. Partial/raw contracts continue to
 retain ordinary helpers. A later null-environment closure descriptor slice is
-separately frozen, not in this milestone. Task035 remains open.
+separately frozen, not in this milestone. Task 035 remains open.
 
 ## Capture-free descriptors
 
@@ -298,7 +298,7 @@ results have no marker. No ancestor-root assumption or borrowed-result ownership
 omission is used. Traps before the call acquire no wrapper owners; suspension
 keeps the original caller and callee owners.
 
-The optimizer interpretation advances to v8 with `forwarded-roots`. Native laws
+The optimizer interpretation advances to v 8 with `forwarded-roots`. Native laws
 check the rejection cases, unchanged inputs, every allocation failure,
 retained/restarted byte equality and a changed callee entry fact that restores
 the independent frame. The initial focused batch passes 18 native laws; the
@@ -315,7 +315,7 @@ cycles from 24.976 to 22.426 ms (10.0–10.2%). Other controls stay within about
 releases from 30 to 26. These are guest CPU screens, not final task 035
 acceptance.
 
-A requested single LLVM/Fast source pairing against qualified revision 2689ad5
+A requested single LLVM/Fast source pairing against qualified revision 2689 ad 5
 measures fresh preparation at 6.53 versus 6.69 ms and retained edit at 3.07
 versus 3.13 ms after two warm pairs. One measured pair cannot establish a CPU
 result. The release compiler produces the same mixed Wasm as the larger guest
@@ -341,7 +341,7 @@ The evaluator keeps numeric cells and read/write frames. Its heads/cell IDs do
 not escape into guest closures or artifacts. Generated guest frames have kinds
 callback 0, request 3 or State 4, so the old guest read/write dispatch branches
 are removed. Unexpected guest tags trap. The optimizer interpretation advances
-to v9 with `paired-state`; stale compiler artifacts cannot certify the old
+to v 9 with `paired-state`; stale compiler artifacts cannot certify the old
 layout. Raw/partial routes keep their existing ownership admission.
 
 Qualification passes 17 focused native/OOM laws, 115 executed laws including all
@@ -384,19 +384,20 @@ release qualification. Cycles still cost roughly three times historical tracing.
 Task 035 remains open for physical tracing removal, wide ownership coverage and
 the final CPU/memory gates.
 
-## Integrated descriptors, forwarding and State at850793f
+## Integrated descriptors, forwarding and State at 850793 f
 
 All three frozen slices above are in `850793f`, jointly qualified with scoped
 SIMD and guarded body receipts. Full native suite,936 guest/client tests, eight
-unchanged budgets and350 analyzer files/zero pass. Standard Zig0.17.0 LLVM/Fast
-release `fa471c09…2387` produces the exact11352-byte mixed Wasm `b973f621…9a94`
-from the isolated final State screen. The32-byte header, collection geometry,
-typed reference roles and raw/partial admission stay unchanged. The joint
-optimizer key includes both ownership and SIMD facts.
+unchanged budgets and 350 analyzer files/zero pass. Standard Zig 0.17.0
+LLVM/Fast release `fa471c09…2387` produces the exact 11352-byte mixed Wasm
+`b973f621…9a94` from the isolated final State screen. The 32-byte header,
+collection geometry, typed reference roles and raw/partial admission stay
+unchanged. The joint optimizer key includes both ownership and SIMD facts.
 
-CPU7 screening uses25 alternating baseline/joint pairs, discards the first five,
-checks values and flat warm memory. Baseline is qualified2689ad5 (`9ea894d4`),
-so these merged costs include all three slices rather than only State.
+CPU 7 screening uses 25 alternating baseline/joint pairs, discards the first
+five, checks values and flat warm memory. Baseline is qualified 2689 ad 5
+(`9ea894d4`), so these merged costs include all three slices rather than only
+State.
 
 | Guest batch              | Baseline CPU ms | Joint CPU ms |  Ratio |
 | ------------------------ | --------------: | -----------: | -----: |
@@ -409,9 +410,87 @@ so these merged costs include all three slices rather than only State.
 | JSPI requests,2000 calls |          10.330 |       10.179 |  .9853 |
 | JSPI cycles,20000 cycles |          28.567 |       18.425 |  .6450 |
 
-Cycles improve about35.5%; the JSPI Array control regresses1.7%. These costs do
-not close the historical tracing comparison. Task035 remains active for physical
-removal, complete coverage and its final CPU/memory gates. Exact raw rounds and
-compiler/fixture/harness pins are in `build/bench/joint-024-035-041/ownership/`;
-public/synthetic compiler costs are recorded in[NUMERIC_SIMD](NUMERIC_SIMD.md).
-New conditional-frame work is isolated and absent from this milestone.
+Cycles improve about 35.5%; the JSPI Array control regresses 1.7%. These costs
+do not close the historical tracing comparison. Task 035 remains active for
+physical removal, complete coverage and its final CPU/memory gates. Exact raw
+rounds and compiler/fixture/harness pins are in
+`build/bench/joint-024-035-041/ownership/`; public/synthetic compiler costs are
+recorded in [NUMERIC_SIMD](NUMERIC_SIMD.md). New conditional-frame work is
+isolated and absent from this milestone.
+
+## Integrated conditional and immutable storage at 4013 b 10
+
+Five ordinary ownership follow-ups are qualified with 045/046 at `4013b10`:
+
+- Conditional activation opens a function's invocation frame before its first
+  possible owning operation. A borrowed early reference return independently
+  publishes its counted caller result. Unknown/import/indirect calls and
+  unsupported control keep the ordinary frame.
+- Payload-free nonopaque constructors serialize their exact immutable `[tag,0]`
+  representation instead of allocating a cell per use. Tags and changed
+  admission remain exact; source/data serialization is authoritative.
+- Array concat/slice copies publish through the existing canonical-base
+  `copy_words` helper. This repairs reference-edge admission without treating
+  interior pointers as owners.
+- A generalized local producer with one concrete checked use can prepare that
+  private physical instance. Only quantified holes gain facts. Captures, merges,
+  carries, multiple uses and unresolved instances decline; semantic
+  generalization stays unchanged. The owned resolved Body carries the mapping
+  through encoding, with no Emitter growth.
+- Exact immutable source layouts suppress candidate enqueue using the existing
+  no-cycle flag. All constructors in the emitting source unit are checked;
+  foreign/unknown/mutable/callable payloads decline. Genuine trial closures
+  still follow every typed edge, with unchanged counts/destructors/header.
+
+The separately frozen inputs under `build/bench/tracing/` are
+`conditional-roots.patch` (`cdd147e0`),`immutable-constructors.patch`
+(`04006538`),`array-publication.patch` (`4231b1f5`),
+`private-local-storage.patch` (`b12a88e7`) and `immutable-acyclic.patch`
+(`1b4fcb36`). Isolated native/OOM, executable, allocation and cost screens are
+preserved in their original trees. These do not replace merged qualification.
+
+The Array publication fix changes the unchanged rolling cancellation fixture
+from fallback `[1,0,7]` and growing heap to strict `[2,2,0]` and flat 128KiB.
+Single-use private storage does the same for the original cyclic mapped-window
+and persistent-update fixture. No source annotation rewrites hide either
+failure. Both tiers retain results, zero roots/leases and bounded 4096→65536
+streams/updates. Scalar immutable summary construction eliminates repeated
+alive-graph trials, with linear actual release CPU. Cyclic values retain their
+ordinary collector cost; see
+[rolling qualification](ROLLING_SUMMARIES_QUALIFICATION.md).
+
+The merged tree is `3688e1965213b06e36a1ad5118ab1c6f1c1de54b`, compiler source
+`48f7bf8cd3219535013dd8eb96b28e0c67702bcd`. Standard Zig 0.17.0 LLVM/Fast
+release SHA-256
+`44af80a95af5de58c521a7d520c5d8c6ea993e09aae1c06e9031f3d5dbd9ec2b` passes full
+native/OOM,961 guest/client tests, all eight unchanged budgets and 351 analyzer
+files/zero. Private arena helper roles derive through the existing
+`Arena.function_fields` catalog and remap through executable artifacts;
+optimizer v 12 retains the numeric-scope/row-product domain alongside ownership
+facts.
+
+Twenty-five CPU 7 alternating merged/qualified 850793 f pairs discard the first
+five and check results/flat warm storage in sync and JSPI modes. The mixed Wasm
+grows 11352→11650 bytes; both manifests remain `[2,2,0]`.
+
+| Guest batch              | Baseline CPU ms | Merged CPU ms |  Ratio |
+| ------------------------ | --------------: | ------------: | -----: |
+| Sync scalar,10000 calls  |           3.197 |         3.227 | 1.0094 |
+| Sync Arrays,2000 calls   |           4.074 |         4.106 | 1.0079 |
+| Sync requests,2000 calls |           6.989 |         7.055 | 1.0094 |
+| Sync cycles,20000 cycles |          18.870 |        16.406 |  .8694 |
+| JSPI scalar,10000 calls  |          18.122 |        17.284 |  .9538 |
+| JSPI Arrays,2000 calls   |           7.295 |         7.338 | 1.0060 |
+| JSPI requests,2000 calls |          10.141 |        10.153 | 1.0012 |
+| JSPI cycles,20000 cycles |          18.719 |        16.319 |  .8718 |
+
+Merged cycles improve about 13% versus 850793 f; the other control costs are
+recorded above. Public compiler CPU ratios 0.9945–1.0234 and zero peak deltas
+establish no general compiler gain. Four synthetic workloads preserve exact
+fresh/retained/restart output. Exact pins/raw rounds are in
+`build/bench/joint-024-035-045-046/`.
+
+Task 035 remains open for physical tracing removal, general admission and the
+historical tracing CPU gate. A later frame-retirement batching experiment was
+rejected for neutral cycle CPU and a scalar regression. Further direct named
+reference-environment subtraction is isolated and absent from this milestone.

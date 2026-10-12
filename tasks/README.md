@@ -137,7 +137,7 @@ together, preserving effects and diagnostic order. The full native suite, 615
 guest/client tests, 608 public comparisons and zero-findings analyzer pass.
 Initial/edited execution, fifteen-pair fresh measurements and seven-pair
 retained/restart batches qualify the immutable pin. Five formerly limited deep
-cases now compile. Some controls add overhead, and diamond32 CPU rises
+cases now compile. Some controls add overhead, and diamond 32 CPU rises
 10.872→19.634 ms; no general speedup is claimed. Task [008] is in progress.
 [The component qualification](../zig-native/CALL_SUMMARIES.md#joint-recursive-inference-10-october-2026)
 retains exact identities, commands, distributions and remaining limitations.
@@ -356,7 +356,7 @@ Tasks [043] and [050] share implementation `2226d50`: bounded count/fill ragged
 builders and native completion with the client/LSP/Helix flow. The full native
 suite, 807 guest/client laws and eight unchanged allocation budgets pass;
 analyzer: 336 files, zero findings. Ragged large-case runtime ratios are
-0.028–0.458; exhausted empty probing remains a 2.37x counterexample. Completion
+0.028–0.458; exhausted empty probing remains a 2.37 x counterexample. Completion
 repeated medians are about 3 ms, or 34 ms for 4,200 names. See
 [ragged qualification](../zig-native/RAGGED_BUILDERS_QUALIFICATION.md) and
 [editor completion](../zig-native/EDITOR_COMPLETION.md#main-integration-qualification-11-october-2026).
@@ -643,8 +643,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [042] — Specify ragged builders                         | Complete    | [011], [027]                           |
 | [043] — Implement ragged builders                       | Complete    | [042]                                  |
 | [044] — Specify rolling and summary operations          | Complete    | [040]                                  |
-| [045] — Implement rolling reductions                    | In progress | [044]                                  |
-| [046] — Implement composable summary trees              | Pending     | [045]                                  |
+| [045] — Implement rolling reductions                    | Complete    | [044]                                  |
+| [046] — Implement composable summary trees              | Complete    | [045]                                  |
 | [047] — Eliminate generic iterator state                | Pending     | [040], [027]                           |
 | [048] — Explain dispatch and evidence                   | Complete    | —                                      |
 | [049] — Specify editor completion                       | Complete    | [048]                                  |
@@ -655,8 +655,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [054] — Specify associated types and implementations    | Complete    | [052]                                  |
 | [055] — Implement associated type members               | Complete    | [054]                                  |
 | [056] — Implement declarations and evidence diagnostics | In progress | [055]                                  |
-| [057] — Specify scoped effect identities                | Ready       | [052]                                  |
-| [058] — Implement effect instances and subtraction      | Pending     | [057]                                  |
+| [057] — Specify scoped effect identities                | Complete    | [052]                                  |
+| [058] — Implement effect instances and subtraction      | Ready       | [057]                                  |
 | [059] — Reject escaping capabilities                    | Pending     | [058]                                  |
 | [060] — Specify usage and lifetime contracts            | Pending     | [059], [030]                           |
 | [061] — Check usage and call multiplicity               | Pending     | [060]                                  |

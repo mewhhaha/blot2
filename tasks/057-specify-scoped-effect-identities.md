@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete — durable reviewed design at `07cbc62`; 058–059 remain
+  separate implementations.
 - **Dependencies:** [052](052-implement-opaque-types-and-privacy.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / generic scoped
   effects. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
@@ -24,13 +25,13 @@ operations.
 
 ## Implementation checklist
 
-- [ ] Define source syntax and identity representation for fresh instances,
+- [x] Define source syntax and identity representation for fresh instances,
       symbolic operation arguments and scoped capabilities.
-- [ ] Settle effect-row equality/subtraction, repeated labels, provider
+- [x] Settle effect-row equality/subtraction, repeated labels, provider
       selection and generative identity scope.
-- [ ] Specify capture, import, portable evidence and invalidation rules, plus
+- [x] Specify capture, import, portable evidence and invalidation rules, plus
       diagnostics for invalid escape or unresolved identity.
-- [ ] Document nesting and higher-order examples for implementation and
+- [x] Document nesting and higher-order examples for implementation and
       capability checking.
 
 ## Validation
@@ -47,19 +48,23 @@ change.
 
 ## Acceptance criteria
 
-- [ ] Durable syntax, identity/effect semantics, representation and
+- [x] Durable syntax, identity/effect semantics, representation and
       compatibility are settled.
-- [ ] Tasks 058–059 have exact routing, subtraction and escape acceptance cases.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Tasks 058–059 have exact routing, subtraction and escape acceptance cases.
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `07cbc62`.
+- Validation: Markdown formatting,19 local links and 23 declarative identity/
+  provider/row/escape traces pass. Independent runtime review addressed explicit
+  pre-exposure cleanup, revocation before retirement, pending retry versus
+  ready/terminal memos, JSPI rejection and longer-lived/private journal sinks.
+  Traces live in ignored `build/bench/scoped-effects-057/review.json`; they are
+  design checks, not executed Blot laws.
+- Comparison: documentation only; no executable performance claim. 058–059 have
+  explicit source/artifact/OOM, sync/JSPI and paired cost acceptance cases.
+- Remaining limitations: all proposed syntax, identity routing and escape
+  checking await 058–059. The guide preserves current executable behavior.
+- Durable record: [Scoped effect identities](../zig-native/SCOPED_EFFECTS.md).

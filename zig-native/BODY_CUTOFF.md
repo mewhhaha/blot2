@@ -587,17 +587,17 @@ including failure/recovery and repeated calls. No LLVM performance claim is made
 for this isolated follow-up. General residual/projection/pattern/control forms
 and producer ordinal relocation remain open; task 024 is active.
 
-## Integrated followups at2689ad5
+## Integrated followups at 2689 ad 5
 
 The shared-principal, declared/portable qualification, seed-rebuild body offer
-and applied-annotation/constructor recipe slices above are jointly qualified
-at`2689ad5`. Full native suite,925 guest/client laws, eight unchanged budgets
-and349 analyzer files/zero pass. The exact LLVM/Fast release is`9ea894d4…8b21`;
+and applied-annotation/constructor recipe slices above are jointly qualified at
+`2689ad5`. Full native suite,925 guest/client laws, eight unchanged budgets and
+349 analyzer files/zero pass. The exact LLVM/Fast release is `9ea894d4…8b21`;
 public CPU is mixed (.9946–1.0501), peak deltas zero and teardown zero. Earlier
 isolated costs are not substituted for merged costs. General scopes/cases,
-producer-unit ordinal relocation and the under100ms total edit target remain
-open. The current captured93-unit corpus also has substantial backend work; its
-changed input cannot establish a comparison to historical400ms. See
+producer-unit ordinal relocation and the under 100 ms total edit target remain
+open. The current captured 93-unit corpus also has substantial backend work; its
+changed input cannot establish a comparison to historical 400 ms. See
 [the combined record](ROW_FUSION.md#integrated-qualification) and ignored
 `build/bench/joint-024-035-040/qualification-pins.json`.
 
@@ -659,11 +659,11 @@ through sibling edits, earlier AST/type nodes and reversed field spellings,
 failed edits and recovery. This correction adds no cache representation and
 claims no admission or performance gain.
 
-## Integrated guarded scopes at850793f
+## Integrated guarded scopes at 850793 f
 
 The independent guard and scope/local-principal slices are jointly qualified at
 `850793f` with the full native suite,936 guest/client tests, eight unchanged
-budgets and350 analyzer files/zero. The exact LLVM/Fast compiler is
+budgets and 350 analyzer files/zero. The exact LLVM/Fast compiler is
 `fa471c09…2387`; merged public CPU .9966–1.0173, peak deltas zero, requested
 bytes−227,737..0 and teardown zero. The guard fixes the confirmed main wrong
 result; scope admission preserves local predecessors, joins, constructor tags
@@ -671,9 +671,25 @@ and complete covariance rows. Complete records never omit dotted-access side
 tables: those bodies decline.
 
 The separately frozen explicit-field follow-up is not in this release. The
-captured93-unit project still elaborates80 edited-module bodies; no total edit
+captured 93-unit project still elaborates 80 edited-module bodies; no total edit
 gain is claimed. General requirements/access paths, producer ordinal relocation
-and the under100ms target remain open. See[NUMERIC_SIMD](NUMERIC_SIMD.md) and
+and the under 100 ms target remain open. See [NUMERIC_SIMD](NUMERIC_SIMD.md) and
 ignored `build/bench/joint-024-035-041/qualification-pins.json` for merged pins;
 isolated safety/scopes/local pins remain under
 `build/bench/frontend-body-reuse/`.
+
+## Integrated explicit fields at 4013 b 10
+
+The frozen `concrete-fields-followup.patch` (`4ed0c57f…f5d8`) is now qualified
+with the full native suite,961 guest/client tests, eight unchanged budgets and
+351 analyzer files/zero. Explicit field nodes own their spelling/tag and nominal
+receipts, remapping current slots and constructor variants. This does not admit
+dotted access paths; their complete side tables are still required.
+
+The sparse field header grows 32 bytes; the 128-sibling owned payload is 119190
+versus 114998 bytes. The isolated 48 native/OOM and 16+8 executed controls stay
+separate from the merged gate. Joint public CPU ratios are 0.9945–1.0234, peak
+deltas zero, and synthetic fresh/retained/restart output remains exact. No LLVM
+field-specific speedup or overall retained-edit gain is claimed. General
+requirements/access paths, relocation and the under 100 ms target remain open.
+Merged pins are in `build/bench/joint-024-035-045-046/qualification-pins.json`.

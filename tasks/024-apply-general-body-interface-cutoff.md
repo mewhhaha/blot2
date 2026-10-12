@@ -99,26 +99,36 @@ followups were isolated at that milestone. General forms, relocation and the
 under-100-ms target keep this task open. See
 [combined qualification](../zig-native/FRONTEND_OWNERSHIP_QUALIFICATION.md).
 
-### Qualified shared/portable/annotation slice — 12 October2026
+### Qualified shared/portable/annotation slice — 12 October 2026
 
 `2689ad5` adds bounded completed shared principals, original declared
 qualification owners through source/compiled imports, independent body offers
 after seed rebuild and complete applied-annotation/constructor recipe reads. The
-joint full native/925-guest gate, eight unchanged budgets and349-file zero
+joint full native/925-guest gate, eight unchanged budgets and 349-file zero
 analyzer pass. Unsupported blocks/cases and other forms, producer-unit ordinal
 relocation and the total edit target stay open. Pinned isolated costs remain
-distinct from mixed merged release costs.
-See[BODY_CUTOFF](../zig-native/BODY_CUTOFF.md)
-and[the combined record](../zig-native/ROW_FUSION.md#integrated-qualification).
+distinct from mixed merged release costs. See
+[BODY_CUTOFF](../zig-native/BODY_CUTOFF.md) and
+[the combined record](../zig-native/ROW_FUSION.md#integrated-qualification).
 
-### Qualified guarded scopes and local principals —12 October2026
+### Qualified guarded scopes and local principals —12 October 2026
 
 `850793f` fixes a confirmed retained dotted-access wrong result by declining
 incomplete access-path metadata. It also admits owned ordinary block/case/
 constructor scopes, predecessors/joins and unqualified local principals with
 exact covariance rows. The joint native/936-guest gate, eight unchanged budgets
-and350-file zero analyzer pass. Captured93-unit work still elaborates80 bodies;
-no total edit gain is claimed. Explicit-field receipts are separately frozen;
-compact access paths, requirements, relocation and the total target remain open.
-See[BODY_CUTOFF](../zig-native/BODY_CUTOFF.md) and
+and 350-file zero analyzer pass. Captured 93-unit work still elaborates 80
+bodies; no total edit gain is claimed. Explicit-field receipts are separately
+frozen; compact access paths, requirements, relocation and the total target
+remain open. See [BODY_CUTOFF](../zig-native/BODY_CUTOFF.md) and
 [merged qualification](../zig-native/NUMERIC_SIMD.md).
+
+### Qualified explicit fields —12 October 2026
+
+`4013b10` owns explicit field tags/spellings and nominal receipts, preserving
+current physical slots and variant indices. The full native/961-guest gate,
+eight unchanged budgets and 351-file zero analyzer pass. Dotted access paths
+remain declined; the sparse field header adds 32 bytes and no field-specific
+LLVM speedup is claimed. Requirements, relocation and the total edit target
+remain open. Exact merged/isolated evidence is in
+[BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).

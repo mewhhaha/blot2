@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — isolated ordinary-source prototype; no completion is
-  claimed.
+- **Status:** Complete — ordinary APIs, ownership and release qualification at
+  `4013b10`.
 - **Dependencies:** [044](044-specify-rolling-and-summary-operations.md)
 - **Originating requirements:** PLAN: Earlier programs / rolling reductions.
   Sources: [PLAN.md](../PLAN.md).
@@ -23,11 +23,11 @@ APIs and admissible reducers.
 
 ## Implementation checklist
 
-- [ ] Implement the accepted algorithm and ordinary source-facing API with the
+- [x] Implement the accepted algorithm and ordinary source-facing API with the
       specified identity/inverse or fallback requirements.
-- [ ] Preserve numeric order, saved windows, updates, empty inputs and
+- [x] Preserve numeric order, saved windows, updates, empty inputs and
       invalid-window diagnostics.
-- [ ] Make ownership and cleanup explicit for retained window state and
+- [x] Make ownership and cleanup explicit for retained window state and
       reference-bearing accumulators.
 
 ## Validation
@@ -47,19 +47,24 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] All specified operations and edge cases match the reference semantics.
-- [ ] Measured time/storage follow the promised bounds; a fast subset does not
+- [x] All specified operations and edge cases match the reference semantics.
+- [x] Measured time/storage follow the promised bounds; a fast subset does not
       stand in for the full specified API.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `4013b10`.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes full native/OOM and
+  961 guest/client tests, both tiers, all eight unchanged budgets. Analyzer
+  351/zero.
+- Comparison: seven alternating compiler pairs against 850793 f;31 warmed guest
+  pairs, private callback counts and requested/live/committed memory. Qualified
+  LLVM SHA starts 44 af 80 a 9; source/report pins are in
+  `build/bench/joint-024-035-045-046/qualification-pins.json`.
+- Remaining limitations: caller-provided algebra; ordinary reference/cycle
+  collection costs; generic iterator elimination remains 047. No universal CPU
+  or compiler speedup is claimed.
+- Durable record:
+  [Rolling and summary qualification](../zig-native/ROLLING_SUMMARIES_QUALIFICATION.md).

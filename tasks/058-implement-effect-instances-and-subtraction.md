@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready —057's reviewed design is complete; no implementation is
+  claimed.
 - **Dependencies:** [057](057-specify-scoped-effect-identities.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / effect
   identities and handlers. Sources:

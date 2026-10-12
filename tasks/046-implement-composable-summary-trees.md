@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete — persistent AVL APIs and release qualification at
+  `4013b10`.
 - **Dependencies:** [045](045-implement-rolling-reductions.md)
 - **Originating requirements:** PLAN: Earlier programs / composable summary
   trees. Sources: [PLAN.md](../PLAN.md).
@@ -22,11 +23,11 @@ techniques, but no general summary-tree API is assumed.
 
 ## Implementation checklist
 
-- [ ] Build balanced owned summaries and compose them in the specified order
+- [x] Build balanced owned summaries and compose them in the specified order
       with explicit empty identities.
-- [ ] Implement range queries and persistent updates that preserve old versions
+- [x] Implement range queries and persistent updates that preserve old versions
       and reference ownership.
-- [ ] Respect admissible algebra/numeric behavior and bound tree depth and
+- [x] Respect admissible algebra/numeric behavior and bound tree depth and
       invalid-range handling.
 
 ## Validation
@@ -46,20 +47,25 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Construction, combination, query and persistent-update APIs satisfy all
+- [x] Construction, combination, query and persistent-update APIs satisfy all
       specified algebraic laws.
-- [ ] Measured asymptotic behavior and memory match the documented guarantees
+- [x] Measured asymptotic behavior and memory match the documented guarantees
       with snapshots intact.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `4013b10`.
+- Validation: Zig 0.17.0; full native/OOM,961 guest/client tests, both tiers,
+  eight unchanged budgets and 351 analyzer files/zero. Shared 2^31-leaf bounds,
+  references/cycles, saved versions and retained/restart failures pass.
+- Comparison:31 alternating warmed pairs show linear scalar build, logarithmic
+  callback paths, faster interval queries and measured costs versus exclusive
+  Array edits. Memory charges current/original and 64 saved versions separately.
+  LLVM/source/report pins are in
+  `build/bench/joint-024-035-045-046/qualification-pins.json`.
+- Remaining limitations: caller algebra consistency; real retained summary
+  graphs and ordinary cycle-collection cost; no universal update speedup.
+- Durable record:
+  [Rolling and summary qualification](../zig-native/ROLLING_SUMMARIES_QUALIFICATION.md).

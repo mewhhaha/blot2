@@ -66,17 +66,29 @@ development and the scenarios below.
   Late immutable flags, eight-byte journals, checked results, frame-demand
   identity and scalar stores remain qualified.
 - Full compiler gate: complete native suite,936 guest/client laws, eight
-  unchanged budgets; analyzer350/zero; Zig0.17.0. Nested discarded-Array memory
-  law preserves outer rows and roots/leases at 8/40/200 inner iterations.
+  unchanged budgets; analyzer 350/zero; Zig 0.17.0. Nested discarded-Array
+  memory law preserves outer rows and roots/leases at 8/40/200 inner iterations.
 - Open gates: conservative partial paths still use tracing. Physical removal,
   complete layout/scope coverage and CPU acceptance remain unfinished. The prior
-  compact-marker cycle workload is about4.89–4.96× the old tracing baseline,
-  about14.1% faster than the isolated flag-only control. Those exact isolated
+  compact-marker cycle workload is about 4.89–4.96× the old tracing baseline,
+  about 14.1% faster than the isolated flag-only control. Those exact isolated
   pins are separate from merged public compiler costs. The merged descriptor/
-  forwarding/State slices reduce cycle CPU about35.5% versus2689ad5, but still
-  fail the historical tracing comparison. JSPI Array CPU is+1.7% on the merged
-  screen. Conditional activation is later isolated work; no completion is
+  forwarding/State slices reduce cycle CPU about 35.5% versus 2689 ad 5, but
+  still fail the historical tracing comparison. JSPI Array CPU is+1.7% on the
+  merged screen. Conditional activation is later isolated work; no completion is
   claimed.
 - Durable record: [TRACING_REPLACEMENT](../zig-native/TRACING_REPLACEMENT.md)
   and
   [combined qualification](../zig-native/FRONTEND_OWNERSHIP_QUALIFICATION.md).
+
+### Qualified conditional and immutable storage —12 October 2026
+
+`4013b10` additionally qualifies conditional activation, static nullary
+constructors, explicit Array-copy publication, single-use private storage and
+same-unit immutable acyclic proofs. Full native/OOM and 961 guest/client tests,
+eight unchanged budgets and 351 analyzer files/zero pass. Original cancellation
+and cyclic-summary fixtures regain strict ownership/flat storage; scalar trees
+avoid repeated trials. Joint sync/JSPI cycle CPU is about 13% below 850793 f,
+with mixed controls. Physical tracing, uncovered layouts and the historical CPU
+gate remain open. See
+[TRACING_REPLACEMENT](../zig-native/TRACING_REPLACEMENT.md).
