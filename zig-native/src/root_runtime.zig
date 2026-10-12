@@ -8,8 +8,9 @@ const Code = gen.Code;
 const Local = gen.Local;
 const Error = std.mem.Allocator.Error;
 const page_bytes = 4096;
-const first_slot = 4;
-const slot_bytes = 12;
+const first_slot = 8;
+const slot_bytes = 8;
+pub const slots_per_page = (page_bytes - first_slot) / slot_bytes;
 pub const enabled: u32 = 1;
 pub const complete: u32 = 2;
 const head_bytes = @sizeOf(h.ArenaHeader);
@@ -81,7 +82,6 @@ fn pop(c: Code, a: w.Arena) Error!void {
     const page = try c.temp();
     const slot = try c.temp();
     const value = try c.temp();
-    const head = try c.temp();
     try c.trap(.{ .i32_eqz, .{ .global, a.root_page } });
     try c.when(.{ .i32_eq, .{ .global, a.root_top }, first_slot });
     try c.set(page, .{ .global, a.root_page });
@@ -89,6 +89,8 @@ fn pop(c: Code, a: w.Arena) Error!void {
     try setGlobal(c, a.root_top, page_bytes);
     try c.value(.{ .call, a.free, page });
     try c.trap(.{ .i32_eqz, .{ .global, a.root_page } });
+    // Let the caller inspect its marker after an empty page is removed.
+    try c.ret(0);
     try c.end();
     try setGlobal(c, a.root_top, .{ .i32_sub, .{ .global, a.root_top }, slot_bytes });
     try c.set(slot, .{ .i32_add, .{ .global, a.root_page }, .{ .global, a.root_top } });
@@ -108,36 +110,34 @@ fn pop(c: Code, a: w.Arena) Error!void {
     try c.store(slot, 0, 0);
     try c.when(.{ .i32_ge_u, value, .{ .global, a.static_end } });
     try count(c, a, .i32_sub);
-    try c.set(head, .{ .i32_sub, value, head_bytes });
+    const rc = @import("shared_rc.zig");
+    const head = try rc.checkedHead(c, value);
     try c.when(.{ .i32_and, .{ .i32_ne, .{ .i32_and, .{ .load, head, h.offset(h.ArenaHeader, "flags") }, @import("shared_rc.zig").lease }, 0 }, .{ .i32_eq, .{ .load, head, owner_slot }, slot } });
     try c.store(head, owner_slot, 0);
-    try c.value(.{ .call, a.release_lease, value });
+    try rc.consumeLease(c, a, value, head);
     try c.op(.else_, 0);
-    try c.value(.{ .call, a.release, value });
+    try rc.decrementKnown(c, a, value, head);
     try c.end();
+    try rc.drain(c, a);
     try c.end();
     try c.value(slot);
 }
 fn open(c: Code, a: w.Arena) Error!void {
-    const result = try c.temp();
     const frame = try c.temp();
-    // The caller result slot exists before any callee-owned value is created.
-    try c.set(result, .{ .call, a.root_reserve });
+    // The marker precedes every callee owner. At close it can become the
+    // caller result slot without another reservation or an ownership gap.
     try c.set(frame, .{ .call, a.root_reserve });
-    try c.store(frame, 8, result);
     try setGlobal(c, a.root_frame, frame);
     try c.value(frame);
 }
 fn close(c: Code, a: w.Arena) Error!void {
     const value: Local = .{ .id = 0 };
     const frame = try c.temp();
-    const result = try c.temp();
     const parent = try c.temp();
     const owner = try c.temp();
     const slot = try c.temp();
     try c.set(frame, .{ .global, a.root_frame });
     try c.trap(.{ .i32_eqz, frame });
-    try c.set(result, .{ .load, frame, 8 });
     try c.set(parent, .{ .load, frame, 4 });
     try c.when(.{ .i32_ge_u, value, .{ .global, a.static_end } });
     try c.when(.{ .i32_and, .{ .load, .{ .i32_sub, value, head_bytes }, h.offset(h.ArenaHeader, "flags") }, @import("shared_rc.zig").lease });
@@ -150,24 +150,25 @@ fn close(c: Code, a: w.Arena) Error!void {
     try c.end();
     try c.when(.{ .i32_eq, slot, frame });
     try c.store(owner, 0, 0);
-    try c.store(.{ .i32_sub, value, head_bytes }, owner_slot, result);
+    try c.store(.{ .i32_sub, value, head_bytes }, owner_slot, frame);
     try c.op(.else_, 0);
     try c.value(.{ .call, a.retain, value });
     try count(c, a, .i32_add);
     try c.end();
-    try c.store(result, 0, value);
+    try c.store(frame, 0, value);
     try c.end();
     try c.loop(1);
-    try c.set(slot, .{ .call, a.root_pop });
-    try c.when(.{ .i32_eq, slot, frame });
-    try c.op(.br, 2);
-    try c.end();
-    try c.again();
-    try setGlobal(c, a.root_frame, parent);
-    try c.when(.{ .i32_eqz, .{ .load, result, 0 } });
+    try c.when(.{ .i32_eq, .{ .i32_sub, .{ .i32_add, .{ .global, a.root_page }, .{ .global, a.root_top } }, slot_bytes }, frame });
+    try c.when(.{ .i32_eqz, .{ .load, frame, 0 } });
     try c.value(.{ .call, a.root_pop });
     try c.op(.drop, 0);
     try c.end();
+    try c.op(.br, 2);
+    try c.end();
+    try c.value(.{ .call, a.root_pop });
+    try c.op(.drop, 0);
+    try c.again();
+    try setGlobal(c, a.root_frame, parent);
     try c.when(.{ .global, a.cycle_head });
     try c.value(.{ .call, a.cycle_safe, 0 });
     try c.end();
@@ -196,7 +197,7 @@ fn mark(c: Code, a: w.Arena) Error!void {
 fn enter(c: Code, a: w.Arena) Error!void {
     try c.trap(.{ .i32_or, .{ .global, a.root_active }, .{ .global, a.root_frame } });
     // A failed frame reservation remains an invocation failure that leave(1)
-    // can discharge, including its first empty result slot.
+    // can discharge without changing earlier persistent owners.
     try setGlobal(c, a.root_active, 1);
     try setGlobal(c, a.root_active, .{ .call, a.root_open });
     try setGlobal(c, a.root_external, 1);
@@ -229,12 +230,12 @@ fn leave(c: Code, a: w.Arena) Error!void {
     try c.loop(.{ .global, a.root_frame });
     try c.value(.{ .call, a.root_close, 0 });
     try c.again();
-    // enter() can fail between its two reservations. Empty suffix slots own
-    // nothing; persistent module slots below them retain their values.
+    // Empty suffix slots own nothing; persistent module slots below them
+    // retain their values, including when enter() failed to reserve its marker.
     const last = try c.temp();
-    try c.loop(.{ .i32_and, .{ .global, a.root_page }, .{ .i32_gt_u, .{ .global, a.root_top }, first_slot } });
+    try c.loop(.{ .i32_and, .{ .i32_ne, .{ .global, a.root_page }, 0 }, .{ .i32_gt_u, .{ .global, a.root_top }, first_slot } });
     try c.set(last, .{ .i32_sub, .{ .i32_add, .{ .global, a.root_page }, .{ .global, a.root_top } }, slot_bytes });
-    try c.when(.{ .i32_or, .{ .load, last, 0 }, .{ .load, last, 8 } });
+    try c.when(.{ .load, last, 0 });
     try c.op(.br, 2);
     try c.end();
     try c.value(.{ .call, a.root_pop });

@@ -607,3 +607,90 @@ test "body check cache distinguishes equal arity closed row binder and anonymous
     binding.scheme.closed_rows = try types.saveList(&.{types.row(unknown).tail.variable});
     try std.testing.expect(cache.interfaceDigest(.{ .store = &types }, binding, &.{}, catalog) == null);
 }
+
+test "body check cache relocates shared principal edges and reinstantiates current selection" {
+    const source = "const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right\nconst F32.add = fn (left: F32) => fn (right: F32) => @f32.add left right\nconst add = fn left => fn right => @type.call \"add\" left right\nconst forwarded = fn left => fn right => add left right\nconst alias = forwarded\nentry const unsigned = fn (value: U32) => alias value 2\nentry const floating = fn (value: F32) => alias value 2.0\n";
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    const forwarded = before.bodies.find("forwarded") orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(@as(usize, 0), forwarded.predicates.len);
+    try std.testing.expect(forwarded.selection_digest != null);
+    try std.testing.expect(before.bodies.find("alias") != null);
+    const inserted = try a.print("const different_spelling = 3.0\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
+    const body_edit = try std.mem.replaceOwned(u8, a, source, "@u32.add left right", "@u32.sub left right");
+    defer a.free(body_edit);
+    try parity(source, body_edit, 1);
+    const candidate = try a.print("const Bool.add = fn (left: Bool) => fn (right: Bool) => left\n{s}", .{source});
+    defer a.free(candidate);
+    var candidate_fresh = try prepare(a, candidate, null);
+    defer candidate_fresh.deinit(a);
+    var candidate_expected = try compile(a, &candidate_fresh);
+    defer candidate_expected.deinit(a);
+    var candidate_reused = try prepare(a, candidate, &before.bodies);
+    defer candidate_reused.deinit(a);
+    try std.testing.expect(candidate_reused.elaborations > 1);
+    var candidate_result = try compile(a, &candidate_reused);
+    defer candidate_result.deinit(a);
+    try std.testing.expectEqualSlices(u8, candidate_expected.bytes, candidate_result.bytes);
+}
+
+test "body check cache recreates declared associated and representation qualifications" {
+    const source = "const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right\nconst F32.add = fn (left: F32) => fn (right: F32) => @f32.add left right\nconst twice: a -> a where { associated \"add\" a a a } = fn value => @type.call \"add\" value value\nconst identity: a -> a where { type_rep a } = fn value => value\nentry const unsigned = fn (value: U32) => identity (twice value)\nentry const floating = fn (value: F32) => identity (twice value)\n";
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("twice") != null);
+    try std.testing.expect(before.bodies.find("identity") != null);
+    const changed = try a.print("const earlier_spelling = 3.0\n{s}", .{source});
+    defer a.free(changed);
+    var fresh = try prepare(a, changed, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, changed, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 1) });
+    const edited = try std.mem.replaceOwned(u8, a, source, "@u32.add left right", "@u32.sub left right");
+    defer a.free(edited);
+    try parity(source, edited, 1);
+}
+
+test "body check cache relocates applied generic annotations and revokes constructor recipes" {
+    const source = "type Box a is data = #Box a\nconst make = fn value => #Box value\nconst read = fn (#Box value) => value\nconst identity = fn (value: Box a) -> Box a => value\ntype Pair [left, right] = (left, right)\nconst shaped = fn (value: Pair [U32, F32]) -> Pair [U32, F32] => value\nconst arrayed = fn (value: Array a) -> Array a => value\nentry const run = fn (value: U32) => read (identity (make value))\nconst pair = fn (value: U32) => shaped (value, 2.0)\nentry const array = fn (value: U32) => arrayed #[value]\n";
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("identity") != null);
+    try std.testing.expect(before.bodies.find("shaped") != null);
+    try std.testing.expect(before.bodies.find("arrayed") != null);
+    const inserted = try a.print("const new_spelling = {{ tail: 3.0, head: 2 }}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    // Constructor introduction/pattern syntax remains ordinary; every other
+    // unchanged admitted body relocates its applied annotations independently.
+    try compare(a, &before.bodies, inserted, expected.bytes, 3);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 3) });
+    const recipe_type = try std.mem.replaceOwned(u8, a, source, "#Box a", "#Box (a, U32)");
+    defer a.free(recipe_type);
+    const recipe_make = try std.mem.replaceOwned(u8, a, recipe_type, "=> #Box value", "=> #Box (value, 0)");
+    defer a.free(recipe_make);
+    const recipe_edit = try std.mem.replaceOwned(u8, a, recipe_make, "fn (#Box value) => value", "fn (#Box (value, ignored)) => value");
+    defer a.free(recipe_edit);
+    var changed = try prepare(a, recipe_edit, null);
+    defer changed.deinit(a);
+    var changed_expected = try compile(a, &changed);
+    defer changed_expected.deinit(a);
+    var reused = try prepare(a, recipe_edit, &before.bodies);
+    defer reused.deinit(a);
+    try std.testing.expect(reused.elaborations > 2);
+    var actual = try compile(a, &reused);
+    defer actual.deinit(a);
+    try std.testing.expectEqualSlices(u8, changed_expected.bytes, actual.bytes);
+}

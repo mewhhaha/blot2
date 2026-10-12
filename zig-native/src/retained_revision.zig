@@ -352,6 +352,20 @@ pub const Session = struct {
         }
         return .{ .prepared = prepared, .source = previous.snapshot.capturedSource(prepared.paths[prepared.entry - 1]) orelse return null, .reuse_modules = true };
     }
+    fn frontendOffer(self: *const Session, options: project.Options) ?partial.EntryPrevious {
+        if (!std.mem.eql(u8, &self.seed_settings, &settings(options))) return null;
+        if (self.entryOffer()) |offer| return offer;
+        return self.bodyOffer(options);
+    }
+    fn bodyOffer(self: *const Session, options: project.Options) ?partial.EntryPrevious {
+        if (!std.mem.eql(u8, &self.seed_settings, &settings(options))) return null;
+        const previous = if (self.current) |*value| value else return null;
+        const prepared = &previous.prepared;
+        if (prepared.entry == 0 or prepared.entry > prepared.paths.len or prepared.paths.len != prepared.units.len or prepared.body_caches.len != prepared.units.len) return null;
+        // Body chunks are independent of the old seed/Core pairing. Only their
+        // filename directory is offered; each body rechecks current reads.
+        return .{ .prepared = prepared, .source = previous.snapshot.capturedSource(prepared.paths[prepared.entry - 1]) orelse return null, .body_only = true };
+    }
     fn mixedFrontend(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, snapshot: *inputs.Snapshot, candidate_seed: *?retained_dependency.Seed, counts: *FallbackStats, reuse: []const bool) !?partial.Preparation {
         const a = self.allocator;
         var work: FallbackStats = .{};
@@ -363,7 +377,7 @@ pub const Session = struct {
             if (source.diagnostics.items.len != 0) return null;
             var checked: ?checker.CheckedProject = null;
             defer if (checked) |*owner| owner.deinit(a);
-            var fresh = try partial.prepareProjectKeepingEntry(a, &source, entry_path, output_identity, &self.seed, &checked, self.entryOffer());
+            var fresh = try partial.prepareProjectKeepingEntry(a, &source, entry_path, output_identity, &self.seed, &checked, self.frontendOffer(snapshot.options));
             var fresh_alive = true;
             defer if (fresh_alive) fresh.deinit(a);
             if (fresh == .rejected) return null;
@@ -461,7 +475,7 @@ pub const Session = struct {
         counts.dependency_storage = .{ .fresh_modules = frozen.modules.len, .core_checked = frozen.modules.len, .interface_checked = frozen.modules.len };
         counts.frozen_modules = frozen.modules.len;
         for (frozen.modules) |module| counts.reused_core_bodies += module.core.body_lowerings;
-        return partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &candidate_seed.*.?.value, snapshot.provider(), null);
+        return partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &candidate_seed.*.?.value, snapshot.provider(), self.bodyOffer(snapshot.options));
     }
     pub fn prepareRevision(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, options: project.Options) !Preparation {
         return self.prepareRevisionWithSources(io, entry_path, output_identity, options, &.{});
@@ -506,7 +520,7 @@ pub const Session = struct {
         var preparation: partial.Preparation = undefined;
         if (admitted) {
             var fast_result = true;
-            preparation = partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &self.seed, snapshot.provider(), self.entryOffer()) catch |err| switch (err) {
+            preparation = partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &self.seed, snapshot.provider(), self.frontendOffer(snapshot.options)) catch |err| switch (err) {
                 error.DependencySetChanged => blk: {
                     fast_result = false;
                     break :blk try self.fallback(io, entry_path, output_identity, &snapshot, &candidate_seed, &fallback_counts);

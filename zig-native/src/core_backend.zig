@@ -3649,6 +3649,19 @@ const Emitter = struct {
     fn inlineNamedValues(self: *Emitter, key: Key, arguments: []const core.Id, captured: ?[]const u32, depth: usize) Error!bool {
         return self.inlineNamedValuesMode(key, arguments, captured, depth, null);
     }
+    fn borrowedRowArgument(self: *const Emitter, id: core.Id) ?RowView {
+        const source = self.generator.unit(self.unit_id);
+        if (source.node(id).tag != .reference) return null;
+        const reference = source.reference(id);
+        if (reference.unit != 0 and reference.unit != self.unit_id) return null;
+        var index = self.row_views.items.len;
+        while (index != 0) {
+            index -= 1;
+            const view = self.row_views.items[index];
+            if (view.binding == reference.binding) return view;
+        }
+        return null;
+    }
     // Preparation owns the large mapping/initialization frame. It returns
     // before recursively emitting an inlined body, so deep call graphs retain
     // only the small emission continuation on the native stack.
@@ -3657,6 +3670,7 @@ const Emitter = struct {
         if (self.inline_depth >= 6 or g.module.functions.items[self.function_id].codeLength() > 4096 or (if (captured) |values| values.len != key.count else arguments.len < key.count) or key.templates != 0 or key.template_result) return null;
         const source = g.unit(key.target.unit);
         const body = source.body(key.target.binding) orelse return null;
+        if (!body.is_function or body.parameters.len != key.count) return null;
         const facts = try g.facts.get(g.allocator, g.units, key.target);
         borrowed_collections.* = facts.borrowed_collections;
         const in_loop = self.inline_loop or self.loop_targets.items.len != 0;
@@ -3664,8 +3678,9 @@ const Emitter = struct {
         if (captured == null) for (key.parameters[0..key.count], arguments[0..key.count], 0..) |ty, argument, i| {
             expose_data = expose_data or (g.layouts.node(ty).tag == .function and self.isCallableTemplate(argument));
             if (i < 16 and facts.borrowed_collections & (@as(u16, 1) << @intCast(i)) != 0 and self.smallCollectionCandidate(argument)) expose_data = true;
+            if (in_loop and packed_layout.rowWords(&g.layouts, ty) != 0) expose_data = true;
         };
-        if (!body.is_function or body.parameters.len != key.count or (facts.inline_cost orelse return null) > (if (expose_data) @as(u16, 64) else 4) or self.hasErasedType(key.result, 0)) return null;
+        if ((facts.inline_cost orelse return null) > (if (expose_data) @as(u16, 64) else 4) or self.hasErasedType(key.result, 0)) return null;
         for (key.parameters[0..key.count]) |ty| if (self.hasErasedType(ty, 0) or g.layouts.node(ty).tag == .demand) return null;
         var source_type = source.binding(key.target.binding).ty;
         for (key.parameters[0..key.count], 0..) |ty, i| {
@@ -3708,6 +3723,14 @@ const Emitter = struct {
                 continue;
             }
             const argument = arguments[i];
+            if (self.borrowedRowArgument(argument)) |borrowed| {
+                if (parameter.binding != 0 and key.parameters[i] == borrowed.row and row_projection_uses.check(source, body.root, parameter.binding, &g.layouts, borrowed.row)) {
+                    var view = borrowed;
+                    view.binding = parameter.binding;
+                    try emitter.row_views.append(g.allocator, view);
+                    continue;
+                }
+            }
             if (i < 16 and borrowed_collections & (@as(u16, 1) << @intCast(i)) != 0) if (try self.captureSmallCollection(argument, depth)) |values| {
                 if (parameter.binding != 0) try emitter.small_values.put(g.allocator, parameter.binding, values);
                 continue;
@@ -7224,7 +7247,18 @@ const Emitter = struct {
             while (view_index != 0) {
                 view_index -= 1;
                 const view = self.row_views.items[view_index];
-                if (view.binding == reference.binding) return self.emit(.local_get, view.address);
+                if (view.binding == reference.binding) {
+                    const words = packed_layout.rowWords(&g.layouts, view.row);
+                    const row = try self.allocateStorage(words * 4, true, .scalar);
+                    for (0..words) |word| {
+                        const offset: u32 = @intCast(word * 4);
+                        try self.emit(.local_get, row);
+                        try self.emit(.local_get, view.address);
+                        try self.emit(.i32_load, offset);
+                        try self.emit(.i32_store, offset);
+                    }
+                    return self.emit(.local_get, row);
+                }
             }
 
             if (self.computation_values.contains(reference.binding)) {
@@ -7734,13 +7768,13 @@ const Emitter = struct {
     fn loopRowView(self: *Emitter, id: core.Id, span: ?[3]u32) Error!?RowView {
         var private = self.ragged_count != null;
         if (self.ragged_fill and self.exact_build != null) private = true;
-        if (span == null and !private) return null;
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const loop = source.loopInfo(id);
         if (loop.pattern == 0) return null;
         const pattern = source.pattern(loop.pattern);
         const collection = try self.codeLayout(source.typeOf(loop.first), source.span(loop.first));
+        if (span == null and !private and g.layouts.node(collection).tag != .array) return null;
         const words = packed_layout.collectionRowWords(&g.layouts, collection);
         if (words == 0) return null;
         if (pattern.tag == .bind) {

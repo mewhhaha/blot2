@@ -464,6 +464,34 @@ Deno.test("private roots move fresh returns and retain borrowed children before 
   r.call("root_leave", 2);
 });
 
+Deno.test("frame markers transfer owning returns across journal page retirement", async () => {
+  const r = await runtime();
+  const capacity = Number(
+    (r.exports.root_capacity as WebAssembly.Global).value,
+  );
+  let retired = r.count("destroyed");
+  for (let attempt = 0; attempt < 3; attempt++) {
+    r.call("root_enter");
+    r.call("root_open");
+    const returned = r.call("root_allocate", 4, 0);
+    r.call("store_word", returned, returned, 42);
+    for (let index = 0; index < capacity * 3; index++) {
+      r.call("root_allocate", 4, 0);
+    }
+    r.call("root_close", returned);
+    assert.equal(r.word(returned), 42);
+    assert.equal(r.roots(), 1);
+    assert.equal(r.count("leases"), 1);
+    assert.equal(r.count("destroyed") - retired, capacity * 3);
+    r.call("root_leave", 0);
+    assert.equal(r.roots(), 0);
+    assert.equal(r.count("leases"), 0);
+    assert.equal(r.count("destroyed") - retired, capacity * 3 + 1);
+    retired = r.count("destroyed");
+  }
+  r.call("root_leave", 2);
+});
+
 Deno.test("private root pages preserve module roots and retire nested failed invocations", async () => {
   const r = await runtime();
   const persistent = r.call("root_allocate", 4, 0);
@@ -507,9 +535,12 @@ Deno.test("failed invocation frame reservation retires its empty prefix without 
   const r = await runtime();
   const persistent = r.call("root_allocate", 4, 0);
   r.put(persistent, 42);
-  // Leave one slot in the page. enter reserves that result slot before the
-  // marker requires growth; the private allocator seam then forces overflow.
-  for (let index = 0; index < 339; index++) r.call("root_reserve");
+  const capacity = Number(
+    (r.exports.root_capacity as WebAssembly.Global).value,
+  );
+  // Fill the page after its persistent owner. The marker requires growth;
+  // the private allocator seam forces overflow before it can be published.
+  for (let index = 1; index < capacity; index++) r.call("root_reserve");
   const heap = r.heap();
   r.setHeap(0xfffffff0);
   assert.throws(() => r.call("root_enter"), WebAssembly.RuntimeError);
@@ -518,7 +549,9 @@ Deno.test("failed invocation frame reservation retires its empty prefix without 
   assert.equal(r.roots(), 1);
   assert.equal(r.count("leases"), 1);
   assert.equal(r.word(persistent), 42);
+  const before = r.heap();
   r.call("root_enter");
+  assert.equal(r.heap(), before, "empty suffix records retired before retry");
   r.call("root_leave", 0);
   assert.equal(r.roots(), 1);
   r.call("root_leave", 2);

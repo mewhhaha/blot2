@@ -271,6 +271,49 @@ const Engine = struct {
             .source => return null,
         }
     }
+    fn originalQualification(context: *const anyopaque, unit: u32, span: ast.Span) ?@import("body_check_cache.zig").Digest {
+        const self: *const Engine = @ptrCast(@alignCast(context));
+        const cache = @import("body_check_cache.zig");
+        const module = self.catalogModule(unit) orelse return null;
+        switch (module.owner) {
+            .typed => |typed| {
+                const tree = &self.source.unit(unit).tree;
+                if (typed.bindings.len > 4096) return null;
+                for (typed.bindings) |binding| {
+                    if (binding.kind != .global) continue;
+                    const declaration = tree.valueDecl(binding.declaration);
+                    if (declaration.where_node == 0 or !std.meta.eql(span, tree.span(declaration.where_node))) continue;
+                    return cache.qualificationDigest(self.source.symbols.get(binding.name), binding.private, declaration.runtime, tree.span(binding.declaration), span);
+                }
+                return null;
+            },
+            .frozen => |frozen| {
+                const compiled = self.result.compiledModule(self.source, unit) orelse return null;
+                if (frozen.bindings.len > 4096 or frozen.obligations.len > 4096 or frozen.obligation_spans.len != frozen.obligations.len) return null;
+                var owner: ?u32 = null;
+                for (frozen.bindings, 0..) |binding, index| {
+                    if (binding.kind != .global) continue;
+                    for (frozen.obligations[binding.scheme.obligations.start..][0..binding.scheme.obligations.len], frozen.obligation_spans[binding.scheme.obligations.start..][0..binding.scheme.obligations.len]) |predicate, origin| {
+                        if (!predicate.explicit or predicate.qualification_unit != unit or !std.meta.eql(predicate.qualification_span, @as(?ast.Span, span))) continue;
+                        // Declared source clauses lie inside their where span;
+                        // forwarded use sites lie in the consumer declaration.
+                        if (origin.start < span.start or origin.end > span.end or origin.start > origin.end) continue;
+                        if (owner) |prior| if (prior != index) return null;
+                        owner = @intCast(index);
+                    }
+                }
+                const index = owner orelse return null;
+                if (index >= compiled.core.bindings.len) return null;
+                const binding = compiled.core.bindings[index];
+                if (binding.kind != .global or binding.body_id == 0 or binding.body_id >= compiled.core.bodies.len) return null;
+                const body = compiled.core.bodies[binding.body_id];
+                if (body.binding != index) return null;
+                const principal = frozen.bindings[index];
+                return cache.qualificationDigest(self.source.symbols.get(principal.name), principal.private, body.runtime, binding.span, span);
+            },
+            .source => return null,
+        }
+    }
     fn originalBindingName(context: *const anyopaque, target: check.ExternalTarget) ?[]const u8 {
         const self: *const Engine = @ptrCast(@alignCast(context));
         const producer = self.catalogModule(target.unit) orelse return null;
@@ -423,7 +466,7 @@ const Engine = struct {
         var options: check.ModuleOptions = .{ .associated_remaining = &self.associated_remaining, .purity_origins = .{ .context = self.source, .lookup = moduleOrigin }, .builtin_catalog = unit == self.source.prelude_unit, .prelude_unit = self.source.prelude_unit, .inherited_fixities = inherited_fixities.items };
         if (self.retain_bodies and self.editor == null) options.retained_bodies = &self.result.body_caches[unit - 1];
         options.body_source = self.source.unit(unit).source;
-        options.body_external_names = .{ .context = self, .lookup = originalBindingName, .closed_rows = originalBindingClosedRows };
+        options.body_external_names = .{ .context = self, .lookup = originalBindingName, .closed_rows = originalBindingClosedRows, .qualification = originalQualification };
         if (unit <= self.previous_bodies.len) options.previous_bodies = &self.previous_bodies[unit - 1];
         if (self.editor) |query| {
             options.max_inference_transitions = query.budget.remaining;
@@ -605,7 +648,7 @@ fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: c
                 }
             }
             if (unit == source.entry and !engine.source_validation and engine.diagnostics.items.len == 0) if (previous) |old| {
-                if (try entry_cutoff.confirm(allocator, source, &engine.result, old, &engine.result.entry_cutoff)) continue;
+                if (old.reuse_entry and try entry_cutoff.confirm(allocator, source, &engine.result, old, &engine.result.entry_cutoff)) continue;
             };
             if (unit != source.entry and engine.result.reused_modules.len != 0 and engine.diagnostics.items.len == 0) if (previous) |old| {
                 if (try @import("module_frontend_cutoff.zig").confirm(allocator, source, &engine.result, old, unit, &engine.result.module_cutoff)) {

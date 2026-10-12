@@ -1,5 +1,6 @@
 //! A loop row may borrow its leaf only when every use reads a checked scalar
-//! field. No row value, alias, capture or implicit loop-carried use may escape.
+//! field. Calls materialize an owned row at value boundaries; aliases,
+//! captures and implicit loop-carried uses keep ordinary representation.
 const core = @import("core.zig");
 const layout = @import("layout.zig");
 
@@ -84,7 +85,19 @@ const Proof = struct {
                 }
                 return self.pattern(loop.pattern, depth + 1) and self.visit(loop.first, depth + 1) and self.visit(loop.end, depth + 1) and self.visit(loop.body, depth + 1);
             },
-            .call, .block, .suite, .product, .record, .array, .array_op, .break_ => {
+            .call => {
+                var callable = self.source.call(id).callee_type;
+                for (self.source.children(id)) |child| {
+                    const arrow = self.source.types.node(callable);
+                    if (self.isRow(child)) {
+                        if (arrow.tag != .function or self.source.types.node(arrow.a).tag == .demand) return false;
+                    } else if (!self.visit(child, depth + 1)) return false;
+                    callable = 0;
+                    if (arrow.tag == .function) callable = arrow.b;
+                }
+                return true;
+            },
+            .block, .suite, .product, .record, .array, .array_op, .break_ => {
                 for (self.source.children(id)) |child| if (!self.visit(child, depth + 1)) return false;
                 return true;
             },

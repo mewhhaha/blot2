@@ -662,7 +662,7 @@ pub const Module = struct {
         var passes = try @import("runtime_pipeline.zig").Session.init(self.allocator, self);
         defer passes.deinit();
         passes.tier = options.tier;
-        if (options.share_machine_code) passes.roots = false;
+        if (options.share_machine_code or options.import_function_table != null) passes.roots = false;
         var root_slots: u32 = 0;
         if (passes.roots) {
             const limit = std.math.maxInt(u32) / 4;
@@ -725,6 +725,20 @@ pub const Module = struct {
             const arena = self.arena orelse break :blk 0;
             if (roots_admitted) break :blk @import("root_runtime.zig").enabled | @import("root_runtime.zig").complete;
             break :blk self.globals.items[arena.root_enabled].bits & ~@import("root_runtime.zig").complete;
+        };
+        const flags: @import("runtime_flags.zig").Facts = .{ .module = self, .root_mode = root_mode, .rc_admitted = rc_admitted };
+        // A complete module may not retain a direct or symbolic table reference
+        // to a tracer after immutable guards have been removed. Raw and mutable
+        // contracts preserve their existing helpers and checks.
+        if (flags.complete()) for (self.functions.items, 0..) |function, id| {
+            if (flags.tracer(id)) continue;
+            var reset: [7]Instruction = undefined;
+            const selected = flags.helper(id, &reset);
+            var instructions: []const Instruction = function.instructions.items;
+            if (bodies[id].body) |body| instructions = body.instructions.items;
+            if (selected) |recipe| instructions = recipe;
+            var lowered: @import("runtime_flags.zig").Iterator = .{ .facts = flags, .instructions = instructions };
+            while (lowered.next()) |inst| if ((inst.op == .call or inst.table_reference) and flags.tracer(inst.operand)) return error.InvalidFunctionReference;
         };
         var output = Bytes.init(self.allocator);
         defer output.deinit();
@@ -883,29 +897,19 @@ pub const Module = struct {
                 body.clear();
                 const optimized = bodies[id].body;
                 const locals = if (optimized) |owned| owned.locals.items else function.locals.items;
-                const instructions = if (optimized) |owned| owned.instructions.items else function.instructions.items;
+                var reset: [7]Instruction = undefined;
+                const selected = flags.helper(id, &reset);
+                var instructions: []const Instruction = function.instructions.items;
+                if (optimized) |owned| instructions = owned.instructions.items;
+                if (selected) |recipe| instructions = recipe;
+                var lowered: @import("runtime_flags.zig").Iterator = .{ .facts = flags, .instructions = instructions };
                 try body.uleb(@intCast(locals.len));
                 for (locals) |local| {
                     try body.byte(1);
                     try body.byte(@backingInt(local));
                 }
-                for (instructions) |instruction| {
+                while (lowered.next()) |instruction| {
                     var encoded = instruction;
-                    // These private immutable flags receive the authoritative
-                    // admission result above. Keep symbolic IR intact for reuse;
-                    // exposing their constants lets the guest remove idle guards.
-                    if (encoded.op == .global_get) if (self.arena) |arena| {
-                        const flag = encoded.operand;
-                        if (flag == arena.rc_enabled or flag == arena.root_enabled) {
-                            const global = self.globals.items[flag];
-                            if (!global.mutable and global.scalar == .u32) {
-                                var bits = global.bits;
-                                if (flag == arena.rc_enabled) bits = @intFromBool(rc_admitted);
-                                if (flag == arena.root_enabled) bits = root_mode;
-                                encoded = .{ .op = .i32_const, .operand = bits };
-                            }
-                        }
-                    };
                     if (encoded.op == .call) {
                         if (encoded.operand >= self.functions.items.len) return error.InvalidFunctionReference;
                         encoded.operand = code.function(encoded.operand);

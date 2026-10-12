@@ -13,12 +13,24 @@ pub const ExternalNames = struct {
     context: *const anyopaque,
     lookup: *const fn (*const anyopaque, check.ExternalTarget) ?[]const u8,
     closed_rows: ?*const fn (*const anyopaque, check.ExternalTarget) ?Digest = null,
+    qualification: ?*const fn (*const anyopaque, u32, ast.Span) ?Digest = null,
+};
+pub const Values = struct {
+    bindings: []const check.Binding,
+    tree: *const ast.Tree,
+    names: ?ExternalNames = null,
+    ready: ?struct {
+        context: *const anyopaque,
+        lookup: *const fn (*const anyopaque, check.BindingId) bool,
+    } = null,
 };
 pub const Catalog = struct {
     unit: u32,
     pool: *const symbols.Pool,
     nominals: []const check.Nominal,
     constructors: []const check.Constructor,
+    values: ?Values = null,
+    patterns: ?F.Patterns = null,
     fn identity(self: Catalog, value: T.NominalIdentity) ?usize {
         for (self.nominals, 0..) |nominal, index| if (std.meta.eql(nominal.identity, value)) return index;
         return null;
@@ -58,24 +70,74 @@ fn nominalDigestAt(source: F.Source, catalog: Catalog, index: usize, depth: usiz
     for (source.list(nominal.parameters)) |parameter| {
         if (!typeHash(source, parameter, &hash, budget, depth + 1, false, source.list(nominal.variables), &.{}, catalog)) return null;
     }
+    if (!parameterHash(source, catalog, nominal, &hash, depth + 1, budget)) return null;
+    hashWord(&hash, nominal.constructors.len);
+    for (source.list(nominal.constructors)) |constructor_index| {
+        if (constructor_index >= catalog.constructors.len) return null;
+        const constructor = catalog.constructors[constructor_index];
+        const name = catalog.pool.get(constructor.name);
+        if (name.len == 0) return null;
+        hashWord(&hash, @intCast(name.len));
+        hash.update(name);
+        hashWord(&hash, constructor.tag);
+        hashWord(&hash, @intFromBool(constructor.private));
+        hashWord(&hash, @intFromBool(constructor.declared_record));
+        if (!typeHash(source, constructor.payload, &hash, budget, depth + 1, false, source.list(nominal.variables), &.{}, catalog)) return null;
+    }
     var digest: Digest = undefined;
     hash.final(&digest);
     return digest;
 }
+fn parameterHash(source: F.Source, catalog: Catalog, nominal: check.Nominal, hash: *std.crypto.hash.Blake3, depth: usize, budget: *usize) bool {
+    if (nominal.patterns.len != nominal.parameters.len) return false;
+    if (nominal.patterns.len == 0) return true;
+    const patterns = catalog.patterns orelse return false;
+    hashWord(hash, nominal.patterns.len);
+    for (patterns.list(nominal.patterns)) |pattern| if (!patternHash(source, patterns, pattern, source.list(nominal.variables), catalog, hash, depth, budget)) return false;
+    return true;
+}
+fn patternHash(source: F.Source, patterns: F.Patterns, id: u32, variables: []const T.Id, catalog: Catalog, hash: *std.crypto.hash.Blake3, depth: usize, budget: *usize) bool {
+    if (depth >= 128 or budget.* == 0) return false;
+    budget.* -= 1;
+    const node = patterns.node(id);
+    hashWord(hash, @backingInt(node.kind));
+    switch (node.kind) {
+        .binding => return typeHash(source, node.a, hash, budget, depth + 1, false, variables, &.{}, catalog),
+        .tuple, .array => {
+            hashWord(hash, node.b);
+            for (patterns.list(.{ .start = node.a, .len = node.b })) |child| if (!patternHash(source, patterns, child, variables, catalog, hash, depth + 1, budget)) return false;
+        },
+        .record => {
+            hashWord(hash, node.b);
+            // Parameter fields bind by spelling. Their authored order is a
+            // conservative recipe read, independent of symbol ordinals.
+            for (0..node.b) |index| {
+                const field = patterns.field(node, index);
+                const name = catalog.pool.get(field.name);
+                if (name.len == 0) return false;
+                hashWord(hash, @intCast(name.len));
+                hash.update(name);
+                if (!patternHash(source, patterns, field.pattern, variables, catalog, hash, depth + 1, budget)) return false;
+            }
+        },
+    }
+    return true;
+}
 pub fn annotationDigest(source: F.Source, catalog: Catalog, name: []const u8) ?Digest {
     // Namespaced and imported aliases need their own owned name-resolution
-    // receipt. Local monomorphic annotations have a complete current catalog.
+    // receipt. Local annotations have a complete current catalog.
     const index = catalog.named(catalog.unit, name) orelse return null;
     const nominal = catalog.nominals[index];
-    if (nominal.parameters.len != 0) return null;
     if (nominal.alias != 0) {
-        const expansion = typeDigest(source, nominal.alias, catalog) orelse return null;
+        var budget: usize = 4096;
         var alias_hash: std.crypto.hash.Blake3 = .init(.{});
         hashWord(&alias_hash, @backingInt(ast.Tag.type_alias_decl));
         hashWord(&alias_hash, nominal.identity.unit);
         alias_hash.update(name);
         hashWord(&alias_hash, @intFromBool(nominal.private));
-        alias_hash.update(&expansion);
+        hashWord(&alias_hash, nominal.parameters.len);
+        if (!parameterHash(source, catalog, nominal, &alias_hash, 0, &budget)) return null;
+        if (!typeHash(source, nominal.alias, &alias_hash, &budget, 0, false, source.list(nominal.variables), source.list(nominal.alias_rows), catalog)) return null;
         var digest: Digest = undefined;
         alias_hash.final(&digest);
         return digest;
@@ -436,57 +498,170 @@ fn closedPaths(source: F.Source, ty: T.Id, target: u32, pool: *const symbols.Poo
 }
 
 pub fn interfaceDigest(source: F.Source, binding: check.Binding, obligations: []const T.Obligation, catalog: Catalog) ?Digest {
-    const principal = binding.scheme;
-    if (principal.root == 0) return null;
-    var hash: std.crypto.hash.Blake3 = .init(.{});
-    var budget: usize = 4096;
-    const variables = source.list(principal.variables);
-    hashWord(&hash, @intCast(variables.len));
-    hashWord(&hash, principal.row_variables.len);
-    const certificates = closedRowsDigest(source, binding.ty, principal, catalog.pool) orelse return null;
-    hash.update(&certificates);
-    if (!typeHash(source, principal.root, &hash, &budget, 0, false, variables, source.list(principal.row_variables), catalog)) return null;
-    hashWord(&hash, principal.obligations.len);
-    for (obligations[principal.obligations.start..][0..principal.obligations.len]) |predicate| {
-        if (!supportedPredicate(predicate)) return null;
-        hashWord(&hash, @backingInt(predicate.kind));
-        hashWord(&hash, @backingInt(predicate.operator));
-        const name = catalog.pool.get(predicate.name);
-        hashWord(&hash, @intCast(name.len));
-        hash.update(name);
-        for ([_]T.Id{ predicate.ty, predicate.other, predicate.result, predicate.signature }) |part| {
-            if (!typeHash(source, part, &hash, &budget, 0, false, variables, source.list(principal.row_variables), catalog)) return null;
-        }
-    }
-    var digest: Digest = undefined;
-    hash.final(&digest);
-    return digest;
+    var proof: InterfaceProof = .{ .source = source, .catalog = catalog };
+    return proof.interface(binding, obligations);
 }
 fn supportedPredicate(value: T.Obligation) bool {
     return (value.kind == .dispatch or value.kind == .result_dispatch) and !value.explicit and value.identity.unit == 0 and value.identity.decl == 0 and value.qualification_span == null and value.qualification_unit == 0;
 }
+fn declaredPredicate(value: T.Obligation) bool {
+    return (value.kind == .dispatch or value.kind == .result_dispatch or value.kind == .type_rep) and value.explicit and value.identity.unit == 0 and value.identity.decl == 0 and value.qualification_span != null and value.qualification_unit != 0;
+}
+fn sharedPredicate(value: T.Obligation, unit: u32) bool {
+    return value.kind == .callee_use and !value.explicit and value.identity.unit == unit and value.identity.decl != 0 and value.other == 0 and value.result == 0 and value.signature == 0 and value.name == 0 and value.qualification_span == null and value.qualification_unit == 0;
+}
+/// Read only completed principals. Shared edges retain their public-slot
+/// recipe and original declaration identity; no solver identifier is a key.
+const InterfaceProof = struct {
+    source: F.Source,
+    catalog: Catalog,
+    budget: usize = 4096,
+    remaining: usize = 64,
+    path: [64]check.BindingId = undefined,
+    depth: usize = 0,
 
-pub fn readDigest(source: F.Source, binding: check.Binding, obligations: []const T.Obligation, names: ?ExternalNames, catalog: Catalog) ?Digest {
-    var principal_binding = binding;
-    var certificates: ?Digest = null;
-    if (binding.kind == .external and binding.scheme.closed_rows.len != 0) {
-        const dictionary = names orelse return null;
-        const lookup = dictionary.closed_rows orelse return null;
-        certificates = lookup(dictionary.context, binding.external orelse return null) orelse return null;
-        // This receipt was canonicalized in the producer's raw type namespace.
-        principal_binding.scheme.closed_rows = .{};
+    fn interface(self: *InterfaceProof, binding: check.Binding, obligations: []const T.Obligation) ?Digest {
+        if (self.remaining == 0) return null;
+        self.remaining -= 1;
+        const principal = binding.scheme;
+        if (principal.root == 0) return null;
+        var hash: std.crypto.hash.Blake3 = .init(.{});
+        const variables = self.source.list(principal.variables);
+        const rows = self.source.list(principal.row_variables);
+        hashWord(&hash, @intCast(variables.len));
+        hashWord(&hash, principal.row_variables.len);
+        const certificates = closedRowsDigest(self.source, binding.ty, principal, self.catalog.pool) orelse return null;
+        hash.update(&certificates);
+        if (!typeHash(self.source, principal.root, &hash, &self.budget, 0, false, variables, rows, self.catalog)) return null;
+        hashWord(&hash, principal.obligations.len);
+        for (obligations[principal.obligations.start..][0..principal.obligations.len]) |predicate| {
+            if (self.budget == 0) return null;
+            self.budget -= 1;
+            if (!supportedPredicate(predicate) and !declaredPredicate(predicate) and !sharedPredicate(predicate, self.catalog.unit)) return null;
+            hashWord(&hash, @backingInt(predicate.kind));
+            hashWord(&hash, @backingInt(predicate.operator));
+            hashWord(&hash, @intFromBool(predicate.explicit));
+            if (predicate.explicit) {
+                const origin = self.qualificationOrigin(binding, predicate) orelse return null;
+                hash.update(&origin);
+            }
+            const name = self.catalog.pool.get(predicate.name);
+            hashWord(&hash, @intCast(name.len));
+            hash.update(name);
+            for ([_]T.Id{ predicate.ty, predicate.other, predicate.result, predicate.signature }) |part| {
+                if (!typeHash(self.source, part, &hash, &self.budget, 0, false, variables, rows, self.catalog)) return null;
+            }
+            if (predicate.kind == .callee_use) {
+                const digest = self.callee(predicate.identity.decl, obligations) orelse return null;
+                hash.update(&digest);
+            }
+        }
+        var digest: Digest = undefined;
+        hash.final(&digest);
+        return digest;
     }
-    const digest = interfaceDigest(source, principal_binding, obligations, catalog) orelse return null;
-    if (binding.kind != .external) return digest;
-    const dictionary = names orelse return null;
-    const name = dictionary.lookup(dictionary.context, binding.external orelse return null) orelse return null;
+    fn qualificationOrigin(self: *InterfaceProof, binding: check.Binding, predicate: T.Obligation) ?Digest {
+        const values = self.catalog.values orelse return null;
+        if (predicate.qualification_unit != self.catalog.unit) {
+            const dictionary = values.names orelse return null;
+            const lookup = dictionary.qualification orelse return null;
+            return lookup(dictionary.context, predicate.qualification_unit, predicate.qualification_span orelse return null);
+        }
+        const span = predicate.qualification_span orelse return null;
+        if (self.qualificationOwner(binding, span)) |digest| return digest;
+        if (values.bindings.len > 4096) return null;
+        for (values.bindings) |owner| if (self.qualificationOwner(owner, span)) |digest| return digest;
+        return null;
+    }
+    fn qualificationOwner(self: *InterfaceProof, owner: check.Binding, span: ast.Span) ?Digest {
+        if (owner.kind != .global) return null;
+        const values = self.catalog.values orelse return null;
+        const declaration = values.tree.valueDecl(owner.declaration);
+        if (declaration.where_node == 0 or !std.meta.eql(span, values.tree.span(declaration.where_node))) return null;
+        return qualificationDigest(self.catalog.pool.get(owner.name), owner.private, declaration.runtime, values.tree.span(owner.declaration), span);
+    }
+    fn callee(self: *InterfaceProof, id: check.BindingId, obligations: []const T.Obligation) ?Digest {
+        const values = self.catalog.values orelse return null;
+        if (id >= values.bindings.len or self.depth == self.path.len or std.mem.findScalar(check.BindingId, self.path[0..self.depth], id) != null) return null;
+        const binding = values.bindings[id];
+        if (binding.kind != .global and binding.kind != .external) return null;
+        if (values.ready) |ready| if (!ready.lookup(ready.context, id)) return null;
+        self.path[self.depth] = id;
+        self.depth += 1;
+        defer self.depth -= 1;
+        const digest = self.read(binding, obligations, values.names) orelse return null;
+        var hash: std.crypto.hash.Blake3 = .init(.{});
+        hash.update(&digest);
+        hashWord(&hash, @backingInt(binding.kind));
+        hashWord(&hash, @intFromBool(binding.private));
+        hashWord(&hash, @intFromBool(binding.named_function));
+        hashWord(&hash, @intFromBool(binding.kind == .global and values.tree.valueDecl(binding.declaration).runtime));
+        const name = self.catalog.pool.get(binding.name);
+        hashWord(&hash, @intCast(name.len));
+        hash.update(name);
+        if (binding.external) |target| {
+            hashWord(&hash, target.unit);
+            hashWord(&hash, target.binding);
+        }
+        const summary = binding.summary;
+        hashWord(&hash, summary.flat_size);
+        hashWord(&hash, @intFromBool(summary.shareable));
+        hashWord(&hash, @intFromBool(summary.only_result_selected));
+        hashWord(&hash, @intFromBool(summary.has_explicit));
+        const variables = self.source.list(binding.scheme.variables);
+        const rows = self.source.list(binding.scheme.row_variables);
+        for (self.source.list(summary.public_variables)) |variable| hashWord(&hash, @intCast(std.mem.findScalar(u32, variables, variable) orelse return null));
+        hashWord(&hash, summary.public_variables.len);
+        for (self.source.list(summary.public_rows)) |row| hashWord(&hash, @intCast(std.mem.findScalar(u32, rows, row) orelse return null));
+        hashWord(&hash, summary.public_rows.len);
+        for ([_]T.List{ summary.public_inputs, summary.public_outputs, summary.requirement_variables, summary.requirement_rows }) |flags| {
+            hashWord(&hash, flags.len);
+            for (self.source.list(flags)) |flag| hashWord(&hash, flag);
+        }
+        var result: Digest = undefined;
+        hash.final(&result);
+        return result;
+    }
+    fn read(self: *InterfaceProof, binding: check.Binding, obligations: []const T.Obligation, names: ?ExternalNames) ?Digest {
+        var principal_binding = binding;
+        var certificates: ?Digest = null;
+        if (binding.kind == .external and binding.scheme.closed_rows.len != 0) {
+            const dictionary = names orelse return null;
+            const lookup = dictionary.closed_rows orelse return null;
+            certificates = lookup(dictionary.context, binding.external orelse return null) orelse return null;
+            principal_binding.scheme.closed_rows = .{};
+        }
+        const digest = self.interface(principal_binding, obligations) orelse return null;
+        if (binding.kind != .external) return digest;
+        const dictionary = names orelse return null;
+        const name = dictionary.lookup(dictionary.context, binding.external orelse return null) orelse return null;
+        if (name.len == 0) return null;
+        var hash: std.crypto.hash.Blake3 = .init(.{});
+        hash.update(&digest);
+        if (certificates) |certificate| hash.update(&certificate);
+        hash.update(name);
+        var result: Digest = undefined;
+        hash.final(&result);
+        return result;
+    }
+};
+/// Canonical source/compiled origin route; source offsets are declaration local.
+pub fn qualificationDigest(name: []const u8, private: bool, runtime: bool, root: ast.Span, span: ast.Span) ?Digest {
+    if (name.len == 0 or span.start < root.start or span.end > root.end or span.start > span.end) return null;
     var hash: std.crypto.hash.Blake3 = .init(.{});
-    hash.update(&digest);
-    if (certificates) |certificate| hash.update(&certificate);
+    hashWord(&hash, @intCast(name.len));
     hash.update(name);
+    hashWord(&hash, @intFromBool(private));
+    hashWord(&hash, @intFromBool(runtime));
+    hashWord(&hash, span.start - root.start);
+    hashWord(&hash, span.end - root.start);
     var result: Digest = undefined;
     hash.final(&result);
     return result;
+}
+pub fn readDigest(source: F.Source, binding: check.Binding, obligations: []const T.Obligation, names: ?ExternalNames, catalog: Catalog) ?Digest {
+    var proof: InterfaceProof = .{ .source = source, .catalog = catalog };
+    return proof.read(binding, obligations, names);
 }
 
 /// Every matching catalog entry is a positive or negative selection read.
@@ -556,6 +731,21 @@ fn appendMember(a: A, members: *std.ArrayList([]u8), name: []const u8) !void {
     members.appendAssumeCapacity(owned);
 }
 
+fn appendSchemeMembers(a: A, members: *std.ArrayList([]u8), scheme: T.Scheme, obligations: []const T.Obligation, catalog: Catalog, budget: *usize) !bool {
+    if (budget.* == 0) return false;
+    budget.* -= 1;
+    for (obligations[scheme.obligations.start..][0..scheme.obligations.len]) |predicate| {
+        if (supportedPredicate(predicate) or declaredPredicate(predicate)) {
+            if (predicate.kind == .dispatch or predicate.kind == .result_dispatch) try appendMember(a, members, catalog.pool.get(predicate.name));
+        } else if (sharedPredicate(predicate, catalog.unit)) {
+            const values = catalog.values orelse return false;
+            if (predicate.identity.decl >= values.bindings.len) return false;
+            if (!try appendSchemeMembers(a, members, values.bindings[predicate.identity.decl].scheme, obligations, catalog, budget)) return false;
+        } else return false;
+    }
+    return true;
+}
+
 const Walker = struct {
     a: A,
     tree: *const ast.Tree,
@@ -585,14 +775,27 @@ const Walker = struct {
         switch (node.tag) {
             .value_decl => {
                 const decl = self.tree.valueDecl(id);
-                if (decl.attributes.len != 0 or decl.where_node != 0) return false;
+                if (decl.attributes.len != 0) return false;
                 self.word(@intFromBool(decl.runtime));
                 self.word(@intFromBool(decl.exported));
                 const traits = self.tree.declarationTraits(id);
                 self.word(@intFromBool(traits.private));
                 self.word(@intFromBool(traits.is_opaque));
                 if (!try self.visit(decl.annotation, depth + 1)) return false;
+                if (!try self.visit(decl.where_node, depth + 1)) return false;
                 return self.visit(decl.body, depth + 1);
+            },
+            .where_clause => {
+                for (self.tree.list(.{ .start = node.a, .len = node.b })) |clause| if (!try self.visit(clause, depth + 1)) return false;
+            },
+            .constraint => {
+                const kind = self.pool.get(node.a);
+                if (!std.mem.eql(u8, kind, "associated") and !std.mem.eql(u8, kind, "type_rep")) return false;
+                self.text(kind);
+                self.text(self.pool.get(node.b));
+                const details = self.tree.extra.items[node.c..][0..3];
+                if (details[2] != 0) return false;
+                for (self.tree.list(.{ .start = details[0], .len = details[1] })) |part| if (!try self.visit(part, depth + 1)) return false;
             },
             .lambda => {
                 if (!try self.visit(node.a, depth + 1)) return false;
@@ -606,7 +809,7 @@ const Walker = struct {
                 self.word(@intFromBool(param.is_unit));
                 return self.visit(param.annotation, depth + 1);
             },
-            .apply, .type_function => {
+            .apply, .type_apply, .type_function => {
                 if (node.tag == .type_function and node.c != 0) return false;
                 if (!try self.visit(node.a, depth + 1)) return false;
                 return self.visit(node.b, depth + 1);
@@ -631,7 +834,7 @@ const Walker = struct {
                 self.text(self.pool.get(node.a));
                 return self.visit(node.b, depth + 1);
             },
-            .product, .array, .type_product, .type_record => for (self.tree.children(id)) |child| {
+            .product, .array, .type_product, .type_array, .type_record => for (self.tree.children(id)) |child| {
                 if (!try self.visit(child, depth + 1)) return false;
             },
             .name => self.text(self.pool.get(node.a)),
@@ -716,7 +919,7 @@ pub fn captureInto(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text:
     try publishChunk(a, cache, owner);
 }
 fn freezeChunk(a: A, tree: *const ast.Tree, checked_pool: *const symbols.Pool, checked: *const check.Checked, bodies: *std.ArrayList(Body), roots: []T.Id, rows: []u32) !?*Chunk {
-    const catalog: Catalog = .{ .unit = checked.unit, .pool = checked_pool, .nominals = checked.nominals, .constructors = checked.constructors };
+    const catalog: Catalog = .{ .unit = checked.unit, .pool = checked_pool, .nominals = checked.nominals, .constructors = checked.constructors, .patterns = .{ .store = &checked.parameter_patterns } };
     var graph = snapshot.freezeRoots(a, tree, checked, roots, rows) catch |err| {
         if (err == error.OutOfMemory) return err;
         return null;
@@ -876,7 +1079,7 @@ fn publishChunk(a: A, cache: *Cache, owner: *Chunk) !void {
 }
 
 fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []const u8, checked: *const check.Checked, root: ast.Id, shape: Syntax, names: ?ExternalNames) !?Body {
-    const catalog: Catalog = .{ .unit = checked.unit, .pool = pool, .nominals = checked.nominals, .constructors = checked.constructors };
+    const catalog: Catalog = .{ .unit = checked.unit, .pool = pool, .nominals = checked.nominals, .constructors = checked.constructors, .patterns = .{ .store = &checked.parameter_patterns }, .values = .{ .bindings = checked.bindings, .tree = tree, .names = names } };
     const global = checked.resolved[root];
     if (global == 0 or interfaceDigest(.{ .store = &checked.types }, checked.bindings[global], checked.obligations, catalog) == null) return null;
     var facts: std.ArrayList(Fact) = .empty;
@@ -899,15 +1102,20 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
     }
     const principal = checked.bindings[global].scheme;
     for (checked.obligations[principal.obligations.start..][0..principal.obligations.len]) |predicate| {
-        if (!supportedPredicate(predicate)) return null;
-        // Qualified references instantiate their current principal below;
-        // copying their forwarded requirements too would duplicate predicates.
-        if (tree.node(predicate.source).tag == .name) {
-            const target = checked.resolved[predicate.source];
-            if (target == 0 or checked.bindings[target].scheme.obligations.len == 0) return null;
+        if (!supportedPredicate(predicate) and !declaredPredicate(predicate) and !sharedPredicate(predicate, checked.unit)) return null;
+        // Top-level declared clauses were already recreated by beginGlobal.
+        if (predicate.explicit and tree.node(predicate.source).tag == .constraint) {
+            if (position(shape.ids, predicate.source) == null) return null;
             continue;
         }
-        if (tree.node(predicate.source).tag != .apply) return null;
+        // Qualified references instantiate their current principal below;
+        // copying their forwarded requirements too would duplicate predicates.
+        if (tree.node(predicate.source).tag == .name or tree.node(predicate.source).tag == .binary) {
+            const target = checked.resolved[predicate.source];
+            if (target == 0 or checked.bindings[target].scheme.obligations.len == 0 or (predicate.kind == .callee_use and predicate.identity.decl != target)) return null;
+            continue;
+        }
+        if (predicate.kind == .callee_use or tree.node(predicate.source).tag != .apply) return null;
         const source_position = position(shape.ids, predicate.source) orelse return null;
         try predicates.ensureUnusedCapacity(a, 1);
         const name = try a.dupe(u8, pool.get(predicate.name));
@@ -930,6 +1138,10 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
     for (shape.ids, 0..) |id, position_| {
         if (checked.constructor_resolved[id] != 0) return null;
         if (tree.node(id).tag == .string) try appendMember(a, &members, pool.get(tree.node(id).a));
+        if (tree.node(id).tag == .constraint and std.mem.eql(u8, pool.get(tree.node(id).a), "associated")) {
+            needs_selection = true;
+            try appendMember(a, &members, pool.get(tree.node(id).b));
+        }
         if (checked.dispatch_signatures[id] != 0) {
             needs_selection = true;
             try signatures.append(a, .{ .position = @intCast(position_), .ty = checked.dispatch_signatures[id] });
@@ -942,7 +1154,7 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
         if (tree.node(id).tag == .type_name) {
             const name = pool.get(tree.node(id).a);
             const variable = name.len != 0 and (std.ascii.isLower(name[0]) or name[0] == '_') and std.mem.findScalar(u8, name, '.') == null;
-            if (!variable and !std.mem.eql(u8, name, "U32") and !std.mem.eql(u8, name, "F32") and !std.mem.eql(u8, name, "Bool") and !std.mem.eql(u8, name, "Unit")) {
+            if (!variable and !std.mem.eql(u8, name, "U32") and !std.mem.eql(u8, name, "F32") and !std.mem.eql(u8, name, "Bool") and !std.mem.eql(u8, name, "Unit") and !std.mem.eql(u8, name, "Array") and !std.mem.eql(u8, name, "List")) {
                 const digest = annotationDigest(.{ .store = &checked.types }, catalog, name) orelse return null;
                 try type_reads.append(a, .{ .position = @intCast(position_), .digest = digest });
             }
@@ -963,10 +1175,8 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
                 if (old.kind == .local) return null;
                 if (!local and old.scheme.obligations.len != 0) {
                     needs_selection = true;
-                    for (checked.obligations[old.scheme.obligations.start..][0..old.scheme.obligations.len]) |predicate| {
-                        if (!supportedPredicate(predicate)) return null;
-                        try appendMember(a, &members, pool.get(predicate.name));
-                    }
+                    var member_budget: usize = 64;
+                    if (!try appendSchemeMembers(a, &members, old.scheme, checked.obligations, catalog, &member_budget)) return null;
                 }
                 var digest: ?Digest = null;
                 if (local) {

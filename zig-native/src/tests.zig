@@ -307,6 +307,7 @@ test {
     _ = @import("resolved_flow.zig");
     _ = @import("resolved_body.zig");
     _ = @import("runtime_ir.zig");
+    _ = @import("runtime_flags.zig");
     _ = @import("backend_timing.zig");
     _ = @import("code_artifacts.zig");
     _ = @import("eval_collection_growth.zig");

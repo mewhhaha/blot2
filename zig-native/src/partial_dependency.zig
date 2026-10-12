@@ -237,7 +237,7 @@ pub fn prepareProjectKeepingCheck(a: Allocator, source: *project.Project, entry_
     return prepareProjectMode(a, source, entry_path, output_identity, dependency, kept, null, true);
 }
 
-pub const EntryPrevious = struct { prepared: *const Prepared, source: []const u8, reuse_modules: bool = false };
+pub const EntryPrevious = struct { prepared: *const Prepared, source: []const u8, reuse_modules: bool = false, body_only: bool = false };
 pub fn prepareProjectKeepingEntry(a: Allocator, source: *project.Project, entry_path: []const u8, output_identity: ?[]const u8, dependency: *const D.FrozenDependency, kept: *?checker.CheckedProject, previous: ?EntryPrevious) !Preparation {
     std.debug.assert(kept.* == null);
     return prepareProjectMode(a, source, entry_path, output_identity, dependency, kept, previous, true);
@@ -260,7 +260,7 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
         if (std.mem.eql(u8, output, source.symbols.get(unit.filename))) return error.OutputIsSource;
     };
     var checked = if (previous) |old|
-        try checker.checkProjectWithEntryCutoff(a, source, .{ .entry = old.prepared.entry, .prelude = old.prepared.prelude, .implicit_prelude = old.prepared.entry_implicit_prelude, .names = old.prepared.identity.view(), .source = old.source, .imports = old.prepared.entry_imports, .reuse_modules = old.reuse_modules, .bodies = old.prepared.body_caches })
+        try checker.checkProjectWithEntryCutoff(a, source, .{ .entry = old.prepared.entry, .prelude = old.prepared.prelude, .implicit_prelude = old.prepared.entry_implicit_prelude, .names = old.prepared.identity.view(), .source = old.source, .imports = old.prepared.entry_imports, .reuse_modules = old.reuse_modules, .reuse_entry = !old.body_only, .bodies = old.prepared.body_caches })
     else if (retain_bodies)
         try checker.checkProjectRetainingBodies(a, source, null)
     else

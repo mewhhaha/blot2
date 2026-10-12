@@ -8,6 +8,7 @@ const Allocator = std.mem.Allocator;
 
 pub const Import = struct { path: u32, target: u32 };
 pub const Previous = struct {
+    reuse_entry: bool = true,
     bodies: []const @import("body_check_cache.zig").Cache = &.{},
     reuse_modules: bool = false,
     entry: u32,

@@ -5666,6 +5666,14 @@ const Engine = struct {
     }
     /// Reconstruct owned live facts only after every direct interface read has
     /// committed. Active SCC members and unsupported shapes remain ordinary.
+    fn bodyCatalog(self: *Engine) @import("body_check_cache.zig").Catalog {
+        return .{ .unit = self.unit, .pool = self.pool, .nominals = self.nominals.items, .constructors = self.constructors.items, .patterns = .{ .store = &self.parameter_patterns }, .values = .{ .bindings = self.bindings.items, .tree = self.tree, .names = self.body_external_names, .ready = .{ .context = self, .lookup = struct {
+            fn ready(context: *const anyopaque, binding: BindingId) bool {
+                const engine: *const Engine = @ptrCast(@alignCast(context));
+                return engine.calleeSettled(binding);
+            }
+        }.ready } } };
+    }
     fn reuseBody(self: *Engine, root: ast.Id) T.Error!?T.Id {
         const cache = self.previous_bodies orelse return null;
         if (self.editor_marker != null or self.diagnostics.items.len != 0) return null;
@@ -5677,7 +5685,7 @@ const Engine = struct {
         const shape = try C.syntax(self.allocator, self.tree, self.pool, root) orelse return null;
         defer self.allocator.free(shape.ids);
         if (!std.mem.eql(u8, &shape.digest, &body.syntax) or shape.ids.len != body.facts.len) return null;
-        const catalog: C.Catalog = .{ .unit = self.unit, .pool = self.pool, .nominals = self.nominals.items, .constructors = self.constructors.items };
+        const catalog = self.bodyCatalog();
         var identities: std.AutoHashMapUnmanaged(Identity, Identity) = .empty;
         defer identities.deinit(self.allocator);
         for (body.nominals) |index| {
@@ -5705,7 +5713,7 @@ const Engine = struct {
                 const state = self.global_states.get(binding) orelse return null;
                 if (state.state != .complete or state.on_stack or self.tree.valueDecl(current.declaration).runtime != old.runtime) return null;
             }
-            const digest = C.readDigest(.{ .store = &self.types }, current, self.obligations.items, self.body_external_names, .{ .unit = self.unit, .pool = self.pool, .nominals = self.nominals.items, .constructors = self.constructors.items }) orelse return null;
+            const digest = C.readDigest(.{ .store = &self.types }, current, self.obligations.items, self.body_external_names, self.bodyCatalog()) orelse return null;
             if (!std.mem.eql(u8, &digest, &old.interface)) return null;
             target.* = binding;
         }
@@ -5720,7 +5728,7 @@ const Engine = struct {
             for (self.associated.items) |entry| {
                 for (body.members) |member| if (std.mem.eql(u8, member, self.pool.get(entry.member)) and !self.calleeSettled(entry.binding)) return null;
             }
-            const digest = C.associatedDigest(.{ .store = &self.types }, .{ .unit = self.unit, .pool = self.pool, .nominals = self.nominals.items, .constructors = self.constructors.items }, self.tree, self.associated.items, self.bindings.items, self.obligations.items, self.body_external_names, body.members) orelse return null;
+            const digest = C.associatedDigest(.{ .store = &self.types }, self.bodyCatalog(), self.tree, self.associated.items, self.bindings.items, self.obligations.items, self.body_external_names, body.members) orelse return null;
             if (!std.mem.eql(u8, &digest, &old_digest)) return null;
         }
         const fields = try self.allocator.alloc(symbols.Symbol, body.owner.field_names.len);

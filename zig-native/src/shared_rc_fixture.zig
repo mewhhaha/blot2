@@ -13,6 +13,7 @@ pub fn main(init: std.process.Init) !void {
     try module.exportGlobal(arena.root_count, "roots");
     inline for (.{ "cycle_head", "cycle_passes", "cycle_vertices", "cycle_edges", "cycle_bytes" }) |name| try module.exportGlobal(@field(arena, name), name);
     try module.exportGlobal(arena.heap, "heap");
+    try module.exportConstant("root_capacity", .u32, @import("root_runtime.zig").slots_per_page);
     const demand = try module.dataObject(@import("runtime_layout.zig").Demand{ .function = 0, .environment = 0, .status = .pending, .cached = 0 });
     try module.exportGlobal(try module.addGlobal(.u32, demand, false), "static_demand");
     const noop = try module.addFunction(&.{.i32}, .none);

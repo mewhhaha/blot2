@@ -157,3 +157,47 @@ test "packed List borrowed row emission preserves immutable Core under allocatio
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, packedEmissionFailures, .{&units});
     try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
 }
+
+test "ordinary checked row consumers remove per-row scalar boxes" {
+    const a = std.testing.allocator;
+    for ([_][]const u8{ "array", "list" }) |collection| {
+        const text = try a.print(
+            \\const seed = {{a: 1, b: 2, c: 3}}
+            \\const consume = fn row => @u32.add (@u32.add row.a row.b) row.c
+            \\entry const run = fn (count: U32) => do:
+            \\  let values = @{s}.fill count seed
+            \\  let total = 0
+            \\  for row in values:
+            \\    total := @u32.add total (consume row)
+            \\  return total
+            \\
+        , .{collection});
+        defer a.free(text);
+        var module = try lower(a, text);
+        defer module.deinit(a);
+        var result = try @import("core_backend.zig").compileWithOptions(a, &.{module}, 1, .{ .retain_artifacts = true });
+        defer result.deinit(a);
+        try std.testing.expect(result.diagnostic == null);
+        const capture = &result.capture.?;
+        const optimized = &capture.optimized.?;
+        var found = false;
+        for (capture.metadata.pools.?.functions) |function| {
+            if (function.request != .named or function.request.named.target.binding != module.bodies[module.bodies.len - 1].binding) continue;
+            found = true;
+            const entry_ = &optimized.entries.items[function.function];
+            var instructions = entry_.source.instructions.items;
+            if (entry_.output) |body| instructions = body.instructions.items;
+            for (instructions) |inst| {
+                // List directory scratch has a mixed role and remains owned.
+                // A temporary flat row always uses the checked scalar allocator.
+                if (inst.op == .call) try std.testing.expect(inst.operand != optimized.arena.?.allocate_scalar);
+            }
+        }
+        if (!found) std.debug.print("row fusion {s} missed source binding {d}\n", .{ collection, module.bodies[module.bodies.len - 1].binding });
+        try std.testing.expect(found);
+        const before = @import("core_snapshot_tests.zig").stamp(module);
+        const units = [_]core.Module{module};
+        try @import("allocation_failures.zig").checkAllAllocationFailures(a, packedEmissionFailures, .{&units});
+        try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
+    }
+}

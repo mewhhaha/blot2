@@ -32,6 +32,11 @@ fn dynamic(c: Code, a: w.Arena) Error!Local {
     try c.when(.{ .i32_lt_u, p, .{ .global, a.static_end } });
     try c.op(.return_, 0);
     try c.end();
+    return checkedHead(c, p);
+}
+/// Check once at the start of an ownership transaction. Header storage stays
+/// live until its decrement is queued and the transaction drains destruction.
+pub fn checkedHead(c: Code, p: Local) Error!Local {
     const head = try c.temp();
     try c.set(head, .{ .i32_sub, p, header });
     try c.trap(.{ .i32_or, .{ .i32_and, p, 3 }, .{ .i32_eqz, .{ .load, head, f.requested } } });
@@ -117,6 +122,9 @@ fn retain(c: Code, a: w.Arena) Error!void {
 fn decrement(c: Code, a: w.Arena) Error!void {
     const p: Local = .{ .id = 0 };
     const head = try dynamic(c, a);
+    try decrementKnown(c, a, p, head);
+}
+pub fn decrementKnown(c: Code, a: w.Arena, p: Local, head: Local) Error!void {
     try c.trap(.{ .i32_eqz, .{ .load, head, f.strong } });
     try c.store(head, f.strong, .{ .i32_sub, .{ .load, head, f.strong }, 1 });
     try bump(c, a.rc_releases);
@@ -150,10 +158,16 @@ fn releaseLease(c: Code, a: w.Arena) Error!void {
     const head = try dynamic(c, a);
     try c.trap(.{ .i32_eqz, .{ .i32_and, .{ .load, head, f.flags }, lease } });
     try @import("root_runtime.zig").detach(c, a, head);
+    try consumeLease(c, a, p, head);
+    try drain(c, a);
+}
+/// The caller checked a live leased header and detached its original root.
+/// This removes the lease and its counted owner in one checked transaction.
+pub fn consumeLease(c: Code, a: w.Arena, p: Local, head: Local) Error!void {
     try c.store(head, f.flags, .{ .i32_and, .{ .load, head, f.flags }, ~lease });
     try c.value(.{ .i32_sub, .{ .global, a.rc_leases }, 1 });
     try c.op(.global_set, a.rc_leases);
-    try c.value(.{ .call, a.release, p });
+    try decrementKnown(c, a, p, head);
 }
 fn retire(c: Code, a: w.Arena) Error!void {
     const p: Local = .{ .id = 0 };

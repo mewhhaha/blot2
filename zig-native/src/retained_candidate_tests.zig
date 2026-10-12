@@ -1392,3 +1392,56 @@ test "body check cache revision allocation failures keep the successful checked 
     try std.testing.expect(session.commit(retry));
     try std.testing.expectEqual(@as(usize, 2), session.revisions);
 }
+
+fn qualifiedBodySeedScenario(allocator: std.mem.Allocator, session: *retained.Session, fixture: *Fixture, expected: *const partial.Result) !void {
+    const previous_allocator = session.allocator;
+    const before = Stamp.read(session);
+    const cache = &session.current.?.prepared.body_caches[session.current.?.prepared.entry - 1];
+    const references = try a.alloc(usize, cache.bodies.items.len);
+    defer a.free(references);
+    for (cache.bodies.items, references) |lease, *count| count.* = lease.owner.references;
+    session.allocator = allocator;
+    defer {
+        session.allocator = previous_allocator;
+        std.debug.assert(std.meta.eql(before, Stamp.read(session)));
+        for (cache.bodies.items, references) |lease, count| std.debug.assert(lease.owner.references == count);
+    }
+    const candidate = try ready(session, fixture, .{});
+    defer candidate.deinit();
+    try equal(candidate.result().?, expected);
+    // Only the small entry body elaborates; the qualified wrapper replays.
+    try std.testing.expectEqual(@as(usize, 1), candidate.result().?.result.stats.body_elaborations);
+    candidate.discard();
+}
+
+test "body check cache rebuilt seed replays portable qualified facts through allocation failures" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    var argument = try a.dupe(u8, "value");
+    defer a.free(argument);
+    for (0..12) |_| {
+        const next = try a.print("(fn item => item) ({s})", .{argument});
+        a.free(argument);
+        argument = next;
+    }
+    const entry = try a.print("import {{Number, make, read, twice}} from \"./dep\"\nconst wrapper: a -> a where {{associated \"add\" a a a}} = fn value => twice ({s})\nentry const answer = fn (value: U32) => read (wrapper (make value))\n", .{argument});
+    defer a.free(entry);
+    const producer = "const earlier = fn value => value\ntype Number is data = #Number U32\nconst make = fn value => #Number value\nconst read = fn (#Number value) => value\nconst Number.add = fn (#Number left) => fn (#Number right) => #Number (@u32.add left right)\nconst twice: a -> a where {associated \"add\" a a a} = fn value => @type.call \"add\" value value\n";
+    try fixture.write("main.blot", entry);
+    try fixture.write("dep.blot", producer);
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    var initial = try session.revise(io, fixture.path, null, .{});
+    defer initial.deinit(a);
+    try std.testing.expect(session.current.?.prepared.body_caches[session.current.?.prepared.entry - 1].find("wrapper") != null);
+    const changed_producer = try std.mem.replaceOwned(u8, a, producer, "fn value => value", "fn value => {fresh_spelling: value}");
+    defer a.free(changed_producer);
+    try fixture.write("dep.blot", changed_producer);
+    var expected = try fresh(&fixture, .{});
+    defer expected.deinit(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, qualifiedBodySeedScenario, .{ &session, &fixture, &expected });
+    const retry = try ready(&session, &fixture, .{});
+    defer retry.deinit();
+    try equal(retry.result().?, &expected);
+    try std.testing.expect(session.commit(retry));
+}
