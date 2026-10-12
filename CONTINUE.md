@@ -164,6 +164,13 @@ The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
     pins and limitations are in ROW_FUSION, BODY_CUTOFF, TRACING_REPLACEMENT and
     `build/bench/joint-024-035-040/qualification-pins.json`. Nothing is pushed.
 
+13. **044's design is complete at`20ef28d`.** ROLLING_SUMMARIES specifies
+    ordinary ordered fold/monoid/group windows and opaque persistent summary
+    trees with build/get/query/set/concat, explicit caller algebra, precise
+    pull/trap/F32 order, persistent snapshots and callback/storage bounds.
+    Markdown/link and independent U32/F32/noncommutative trace checks pass. It
+    adds no executable API or optimization;045–046 remain separate work.
+
 ## bpm tangent
 
 The owner requested Git packages, caching, `blot.json`, package exports in
@@ -216,12 +223,14 @@ agents use focused checks/screens, with no redundant full gates or main edits.
   cycles, escape/suspension/cancellation and raw fallbacks. Agent
   `/root/resolved_body_028` owns it in `/var/tmp/blot2-tracing-035`.
 - **040 is complete**, with isolated worktrees and failed prototypes preserved.
-  Root proceeds to041, then044/047. The numeric-vectorizer currently rejects all
-  inlined kernel-local writes and explicit helper returns; bounded
-  private-local/independent-lane proof is the next candidate hill. A rolling/
-  summary API draft is prepared at
-  `build/bench/rolling-summary-contract-044.md`; it is not yet a committed044
-  design or045/046 implementation.
+  Root owns041 in`/var/tmp/blot2-numeric-simd-041` on`babf57a`. Bounded
+  private-local definitions and pure lexical block/return proofs pass focused
+  native checks; the actual source pipeline now shows vector stores. Further
+  numeric row shapes, guest/cost controls and combined qualification remain. Its
+  first guest fixtures used a missing build directory and an unsupported
+  effectful generator; corrected controls pass in both tiers. The test helper
+  now uses system temporary directories, avoiding a release-build prerequisite.
+  044's ordinary API design is committed;045/046 and047 are ready afterward.
 - **056 has started** after completed 055, in
   `/var/tmp/blot2-implementations-056-qualified` on `46bf8b9`. Agent
   `/root/associated_members_055` owns explicit impl grammar/head binders/member

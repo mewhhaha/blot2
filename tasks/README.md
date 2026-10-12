@@ -639,10 +639,10 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [038] — Eliminate demands through known callbacks       | Complete    | [037], [032]                           |
 | [039] — Guarantee and explain demand lowering           | Complete    | [038], [033]                           |
 | [040] — Fuse packed row producers and consumers         | Complete    | [002], [027]                           |
-| [041] — Broaden numeric simd                            | Pending     | [040]                                  |
+| [041] — Broaden numeric simd                            | In progress | [040]                                  |
 | [042] — Specify ragged builders                         | Complete    | [011], [027]                           |
 | [043] — Implement ragged builders                       | Complete    | [042]                                  |
-| [044] — Specify rolling and summary operations          | Pending     | [040]                                  |
+| [044] — Specify rolling and summary operations          | Complete    | [040]                                  |
 | [045] — Implement rolling reductions                    | Pending     | [044]                                  |
 | [046] — Implement composable summary trees              | Pending     | [045]                                  |
 | [047] — Eliminate generic iterator state                | Pending     | [040], [027]                           |

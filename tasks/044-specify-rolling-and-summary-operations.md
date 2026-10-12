@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete at `20ef28d` (design only).
 - **Dependencies:** [040](040-fuse-packed-row-producers-and-consumers.md)
 - **Originating requirements:** PLAN: Earlier programs / rolling reductions and
   summary trees. Sources: [PLAN.md](../PLAN.md).
@@ -22,13 +22,13 @@ folds. Incremental rolling reductions and summary trees remain open.
 
 ## Implementation checklist
 
-- [ ] Define signatures, identities, combination laws, query/update operations
+- [x] Define signatures, identities, combination laws, query/update operations
       and failure diagnostics using ordinary source APIs.
-- [ ] Specify ordering, associativity requirements, floating-point behavior,
+- [x] Specify ordering, associativity requirements, floating-point behavior,
       purity/effects and persistence of saved versions.
-- [ ] Set complexity/storage expectations and fallback behavior for
+- [x] Set complexity/storage expectations and fallback behavior for
       noninvertible/nonassociative reducers, empty inputs and invalid windows.
-- [ ] Document examples and acceptance laws for tasks 045–046 without silently
+- [x] Document examples and acceptance laws for tasks 045–046 without silently
       changing existing folds/windows.
 
 ## Validation
@@ -45,20 +45,25 @@ change.
 
 ## Acceptance criteria
 
-- [ ] Durable API and algebra documentation settles semantics, representation,
+- [x] Durable API and algebra documentation settles semantics, representation,
       diagnostics and compatibility.
-- [ ] Complexity claims and numeric laws are concrete enough to test separately
+- [x] Complexity claims and numeric laws are concrete enough to test separately
       from implementation.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `20ef28d`; reviewed against qualified compiler `2689ad5`.
+- Validation: Deno2.9.7 Markdown formatting/local links; independent U32
+  wrapping, F32 order and noncommutative left-inverse trace assertions. No
+  compiler source or executable fixtures changed; compiler builds were not
+  needed for this documentation milestone.
+- Comparison: concrete callback/node/time/storage bounds are specified for
+  ordered fold, monoid/group windows and persistent summary build/get/query/
+  update/concatenation. Measurements belong to045–046.
+- Remaining limits: arbitrary algebra laws and reducer agreement are explicit
+  caller promises, not compiler-certified proofs or guessed function identity.
+  No executable API/optimization is claimed by this design.
+- Durable record: [ROLLING_SUMMARIES](../zig-native/ROLLING_SUMMARIES.md), with
+  exact purity/pull/trap/snapshot/numeric and acceptance laws.

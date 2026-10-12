@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — isolated native/guest proof work; no completion is
+  claimed.
 - **Dependencies:** [040](040-fuse-packed-row-producers-and-consumers.md)
 - **Originating requirements:** PLAN: Earlier programs / broader SIMD. Sources:
   [PLAN.md](../PLAN.md).
