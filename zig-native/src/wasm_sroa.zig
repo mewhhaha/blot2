@@ -8,7 +8,7 @@ const ir = @import("runtime_ir.zig");
 const A = std.mem.Allocator;
 const none = std.math.maxInt(u32);
 const Value = struct { id: u32 = 0, offset: u32 = 0, constant: ?u32 = null };
-const Node = struct { parent: u32, bad: bool = false, size: u32 = 0, allocation: bool = false, first_copy: u32 = none, last_store: u32 = 0, store_mask: u32 = 0, scope: usize = 0, fields: u32 = 0, used_fields: u16 = 0 };
+const Node = struct { parent: u32, bad: bool = false, size: u32 = 0, allocation: bool = false, first_copy: u32 = none, last_store: u32 = 0, store_mask: u32 = 0, scope: usize = 0, fields: u32 = 0, used_fields: u16 = 0, journaled: bool = false, untyped: bool = false };
 const Event = struct { input: Value = .{}, destination: u32 = 0, field: u32 = 0, allocation: u32 = 0, fresh: bool = false };
 const Control = struct { height: usize, result: u32, unreachable_: bool = false, identity: usize = 0 };
 pub const Output = ir.Body;
@@ -54,6 +54,8 @@ const Analysis = struct {
         const left = &self.nodes.items[target];
         left.bad = left.bad or right.bad or (left.size != 0 and right.size != 0 and left.size != right.size);
         left.size = @max(left.size, right.size);
+        left.journaled = left.journaled or right.journaled;
+        left.untyped = left.untyped or right.untyped;
         self.nodes.items[source].parent = target;
     }
     fn push(self: *Analysis, v: Value) !void {
@@ -98,7 +100,11 @@ const Analysis = struct {
                     const scope: ir.Ownership = @bitCast(inst.operand);
                     if (scope.kind != .scope) continue;
                     switch (scope.chunk) {
-                        2, 5, 6 => self.escape(.{ .id = scope.roles + 1 }),
+                        // A scalar-only object owns no edges. Its zero address
+                        // may remain in the journal after replacement; exact
+                        // allocation roles must prove that before admission.
+                        2, 5 => self.nodes.items[self.root(scope.roles + 1)].journaled = true,
+                        6 => self.escape(.{ .id = scope.roles + 1 }),
                         3 => {
                             self.constants[scope.roles] = null;
                             self.constant_scopes[scope.roles] = null;
@@ -106,7 +112,7 @@ const Analysis = struct {
                         },
                         4 => {
                             self.escape(.{ .id = (scope.roles & 8191) + 1 });
-                            self.escape(.{ .id = (scope.roles >> 13) + 1 });
+                            self.nodes.items[self.root((scope.roles >> 13) + 1)].journaled = true;
                         },
                         else => {},
                     }
@@ -188,12 +194,17 @@ const Analysis = struct {
                                 };
                             }
                             const id = try self.add(owns_fields, size.constant.?);
+                            self.nodes.items[id].untyped = callee.ownership != .allocate_scalar and ir.allocationAnnotations(instructions, at).len == 0;
                             self.events[at].allocation = id;
                             try self.push(.{ .id = id });
                         } else {
                             self.escape(size);
                             try self.push(.{});
                         }
+                    } else if (module.arena != null and inst.operand == module.arena.?.mark_acyclic) {
+                        // This flag affects only the allocation being removed.
+                        // Ordinary heap objects retain their marker call.
+                        self.events[at].input = self.pop();
                     } else try self.call(callee.parameters.len, callee.result);
                 },
                 .call_indirect => {
@@ -276,7 +287,7 @@ const Analysis = struct {
     fn selected(self: *Analysis, id: u32) bool {
         if (id == 0) return false;
         const n = self.nodes.items[self.root(id)];
-        return !n.bad and n.size != 0;
+        return !n.bad and n.size != 0 and !(n.journaled and n.untyped);
     }
     fn demandedFields(self: *Analysis) !void {
         // Copies are snapshots, but only fields subsequently read need slots.
@@ -385,6 +396,16 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
         try out.locals.appendNTimes(a, .i32, count);
     }
     for (instructions, events) |inst, event| {
+        if (inst.op == .ownership) {
+            const scope: ir.Ownership = @bitCast(inst.operand);
+            // This anonymous slot owns only the removed scalar object. Carry
+            // slots and scope boundaries keep their original clearing/order.
+            if (scope.kind == .scope and scope.chunk == 5 and analysis.selected(scope.roles + 1)) continue;
+        }
+        if (inst.op == .call and inst.operand == module.arena.?.mark_acyclic and analysis.selected(event.input.id)) {
+            try emit(&out, a, .drop, 0);
+            continue;
+        }
         if (analysis.selected(event.allocation)) {
             try emit(&out, a, .drop, 0);
             try emit(&out, a, .i32_const, 0);
@@ -529,4 +550,53 @@ fn owningFields(a: A) !void {
 test "scalar replacement preserves checked owning fields until equivalent roots exist through OOM" {
     try owningFields(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, owningFields, .{});
+}
+
+fn journaledScalarSnapshots(a: A) !void {
+    for (0..4) |scenario| {
+        var module = w.Module.init(a);
+        defer module.deinit();
+        const arena = try module.ensureArena();
+        const function = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+        const object = try module.addLocal(function, .i32);
+        const alias = try module.addLocal(function, .i32);
+        const slot = try module.addLocal(function, .i32);
+        var buffer: [ir.max_annotations]ir.Instruction = undefined;
+        var role: ir.Role = .scalar;
+        if (scenario == 1) role = .reference;
+        if (scenario != 2) try module.emitSlice(function, ir.annotations(&.{role}, .scalar, &buffer));
+        try module.emitSlice(function, &.{
+            .{ .op = .i32_const, .operand = 4 },      .{ .op = .call, .operand = arena.allocate },     .{ .op = .local_set, .operand = object },
+            .{ .op = .local_get, .operand = object }, .{ .op = .local_get },                           .{ .op = .i32_store },
+            .{ .op = .local_get, .operand = object }, .{ .op = .call, .operand = arena.mark_acyclic }, .{ .op = .local_get, .operand = object },
+            .{ .op = .local_set, .operand = alias },
+        });
+        const scopes = [_]ir.Ownership{
+            .{ .kind = .scope, .chunk = 3, .roles = @intCast(slot) },
+            .{ .kind = .scope, .chunk = 4, .roles = @intCast(slot + alias * 8192) },
+            .{ .kind = .scope, .chunk = 5, .roles = @intCast(alias) },
+            .{ .kind = .scope, .chunk = 2, .roles = @intCast(alias) },
+        };
+        for (scopes) |scope| try module.emit(function, .{ .op = .ownership, .operand = @bitCast(scope) });
+        if (scenario == 3) try module.emit(function, .{ .op = .ownership, .operand = @bitCast(ir.Ownership{ .kind = .scope, .chunk = 6, .roles = @intCast(alias) }) });
+        try module.emitSlice(function, &.{ .{ .op = .local_get, .operand = alias }, .{ .op = .i32_load } });
+        const before = try a.dupe(w.Instruction, module.functions.items[function].instructions.items);
+        defer a.free(before);
+        var output = try run(a, &module, &module.functions.items[function]);
+        defer if (output) |*body| body.deinit(a);
+        try std.testing.expectEqual(scenario == 0, output != null);
+        if (output) |body| {
+            var scope_count: usize = 0;
+            for (body.instructions.items) |inst| {
+                try std.testing.expect(inst.op != .call);
+                if (inst.op == .ownership and @as(ir.Ownership, @bitCast(inst.operand)).kind == .scope) scope_count += 1;
+            }
+            try std.testing.expectEqual(scopes.len - 1, scope_count);
+        }
+        try std.testing.expectEqualSlices(w.Instruction, before, module.functions.items[function].instructions.items);
+    }
+}
+test "scalar replacement preserves journaled scalar snapshots and declines owning or untyped fields through OOM" {
+    try journaledScalarSnapshots(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, journaledScalarSnapshots, .{});
 }

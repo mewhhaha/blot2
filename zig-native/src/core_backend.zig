@@ -1055,8 +1055,13 @@ const Generator = struct {
         var words: std.ArrayList(u32) = .empty;
         defer words.deinit(self.allocator);
         for (types_.items, 0..) |child_type, index| try words.append(self.allocator, try self.serialize(self.evaluator.valueChildren(id)[index], child_type, depth + 1));
-        const environment = if (words.items.len == 0) 0 else try self.module.dataWords(words.items);
-        for (words.items, 0..) |bits, slot| try self.dataValueReference(environment + @as(u32, @intCast(slot * 4)), self.evaluator.valueChildren(id)[slot], bits);
+        var environment: u32 = 0;
+        if (self.directCallableEnvironment(full_type, metadata.applied)) {
+            environment = words.items[0];
+        } else if (words.items.len != 0) {
+            environment = try self.module.dataWords(words.items);
+            for (words.items, 0..) |bits, slot| try self.dataValueReference(environment + @as(u32, @intCast(slot * 4)), self.evaluator.valueChildren(id)[slot], bits);
+        }
         const address = try self.closureData(function_id, environment);
         try self.serialized.put(self.allocator, .{ .value = id, .ty = ty }, address);
         return address;
@@ -1495,6 +1500,11 @@ const Generator = struct {
         for (self.static_keys.get(key)) |entry| if (entry.variable == binding) return entry.value;
         return null;
     }
+    fn directCallableEnvironment(self: *const Generator, ty: layout.Id, applied: usize) bool {
+        if (applied != 1) return false;
+        const arrow = self.layouts.node(ty);
+        return arrow.tag == .function and self.layoutRole(arrow.a) == .reference;
+    }
     fn retainedCapture(self: *Generator, allocator: Allocator, binding: core.BindingId, template: CapturedTemplate, depth: usize) Error!core_eval.RetainedCapture {
         if (depth >= 256) return self.fail(template.unit, template.node, .complexity);
         var rows: std.ArrayList(type_evidence.RowMapping) = .empty;
@@ -1693,11 +1703,14 @@ const Generator = struct {
             const target_function = try self.function(direct);
             for (direct.parameters[0..key.applied], 0..) |parameter, index| {
                 try emitter.emit(.local_get, 0);
-                try emitter.emit(if (self.layouts.machine(parameter) == .f32) .f32_load else .i32_load, @intCast(index * 4));
+                if (!self.directCallableEnvironment(key.ty, key.applied)) try emitter.emit(if (self.layouts.machine(parameter) == .f32) .f32_load else .i32_load, @intCast(index * 4));
             }
             try emitter.emit(.local_get, 1);
             try emitter.providerHead();
             try emitter.emit(.call, target_function);
+        } else if (self.directCallableEnvironment(key.ty, key.applied + 1)) {
+            const next = try self.callable(.{ .target = key.target, .ty = key.ty, .applied = key.applied + 1 });
+            try emitter.descriptor(next, 1);
         } else {
             const environment_roles = try emitter.layoutRoles(self.allocator, direct.parameters[0 .. key.applied + 1]);
             defer self.allocator.free(environment_roles);
@@ -1706,7 +1719,7 @@ const Generator = struct {
                 const floating = self.layouts.machine(parameter) == .f32;
                 try emitter.emit(.local_get, environment);
                 try emitter.emit(.local_get, 0);
-                try emitter.emit(if (floating) .f32_load else .i32_load, @intCast(index * 4));
+                if (!self.directCallableEnvironment(key.ty, key.applied)) try emitter.emit(if (floating) .f32_load else .i32_load, @intCast(index * 4));
                 try emitter.emit(if (floating) .f32_store else .i32_store, @intCast(index * 4));
             }
             try emitter.emit(.local_get, environment);

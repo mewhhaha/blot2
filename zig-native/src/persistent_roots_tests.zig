@@ -47,6 +47,66 @@ const Fixture = struct {
     }
 };
 
+test "single-reference named environments preserve static captures replay changed roles and OOM" {
+    var fixture = try Fixture.initSource(
+        \\const read = fn (values: Array U32) => fn (index: U32) => values[index]
+        \\const add = fn (values: Array U32) => fn (bias: U32) => fn (index: U32) => @u32.add values[index] bias
+        \\const selected = read #[41, 8192]
+        \\entry const run = fn (seed: U32) => do:
+        \\  let values = @array.fill 3 seed
+        \\  let partial = add values
+        \\  let biased = partial 8192
+        \\  let choices = #[selected, read values]
+        \\  let chosen = choices[@u32.rem seed 2]
+        \\  return @u32.add (biased 1) (chosen 0)
+    );
+    defer fixture.deinit();
+    const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
+    defer a.free(nodes);
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    try ownership(first.bytes);
+    var retained = try fixture.emit(a, &first.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
+    const compiler: [32]u8 = @splat(35);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    var portable = try fixture.emit(a, null, &checkpoint);
+    defer portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, portable.bytes);
+    var replayed = try backend.compileWithOptions(a, &fixture.units, 1, .{ .identity = fixture.names.view(), .artifact_replay = true });
+    defer replayed.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, replayed.bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, null, first.bytes });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
+    var changed_fixture = try Fixture.initSource(
+        \\const read = fn (value: U32) => fn (index: U32) => value
+        \\const add = fn (value: U32) => fn (bias: U32) => fn (index: U32) => @u32.add value bias
+        \\const selected = read 8192
+        \\entry const run = fn (seed: U32) => do:
+        \\  let partial = add seed
+        \\  let biased = partial 8192
+        \\  let choices = #[selected, read seed]
+        \\  let chosen = choices[@u32.rem seed 2]
+        \\  return @u32.add (biased 1) (chosen 0)
+    );
+    defer changed_fixture.deinit();
+    var changed = try changed_fixture.emit(a, &first.capture.?, null);
+    defer changed.deinit(a);
+    var fresh = try changed_fixture.emit(a, null, null);
+    defer fresh.deinit(a);
+    var changed_portable = try changed_fixture.emit(a, null, &checkpoint);
+    defer changed_portable.deinit(a);
+    try ownership(changed.bytes);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, changed.bytes);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, changed_portable.bytes);
+    try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
+}
+
 test "immutable algebraic shapes keep acyclic claims through replay checkpoint and OOM" {
     var fixture = try Fixture.initSource(
         \\type Link a is data = #End | #Next (Link a, a)
