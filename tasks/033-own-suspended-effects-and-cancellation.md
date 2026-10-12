@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete — local implementation `f184dde`; qualified evidence
+  below.
 - **Dependencies:** [032](032-own-escaping-values-and-persistent-roots.md)
 - **Originating requirements:** PLAN: Earlier programs / suspended ownership;
   DEMANDS: Completion and cancellation. Sources: [PLAN.md](../PLAN.md),
@@ -26,11 +27,11 @@ remains part of the runtime program.
 
 ## Implementation checklist
 
-- [ ] Own suspended arguments, captures, replies and continuations/frames
+- [x] Own suspended arguments, captures, replies and continuations/frames
       through host suspension and resumption.
-- [ ] Release each canceled scope once; handler return/break resets unfinished
+- [x] Release each canceled scope once; handler return/break resets unfinished
       demands to pending, while yield resumes the same evaluation.
-- [ ] Preserve terminal persistent demands after traps/host exceptions,
+- [x] Preserve terminal persistent demands after traps/host exceptions,
       recursive-force rejection and the usability of unrelated entries.
 
 ## Validation
@@ -50,20 +51,29 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Every suspended or canceled value has a valid owner and all applicable
+- [x] Every suspended or canceled value has a valid owner and all applicable
       cleanup runs once.
-- [ ] Demand completion semantics and sync/JSPI parity survive ownership
+- [x] Demand completion semantics and sync/JSPI parity survive ownership
       transfer and exceptional exits.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: local implementation `f184dde`; the separate record commit contains
+  this completion evidence. Nothing is pushed.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes all 1,400 native and
+  871 guest/client laws; eight unchanged release allocation budgets pass.
+  `deno task lint:zig` checks 343 files with zero findings. Sync/JSPI, nested
+  requests, terminal failures, revoked capabilities, cancellation retry, pending
+  roots, exceptional cleanup and repeated-allocation pressure pass alongside
+  source/import/checkpoint/OOM laws.
+- Comparison: Focused scalar sync overhead remains +89.4% (about 262 ns/call);
+  all focused and combined distributions are recorded. This ownership task makes
+  no overall speedup claim.
+- Remaining limitations: Task 034 owns complete cycle collection; task 035 owns
+  tracing removal and final CPU/memory qualification. JSPI settlement/rejection
+  is supported; the guest has no abort API.
+- Durable record: [SUSPENDED_OWNERSHIP](../zig-native/SUSPENDED_OWNERSHIP.md);
+  exact combined pins, commands, rejected attempts and raw evidence are in
+  [integrated qualification](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026).

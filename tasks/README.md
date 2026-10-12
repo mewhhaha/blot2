@@ -361,6 +361,17 @@ repeated medians are about 3 ms, or 34 ms for 4,200 names. See
 [ragged qualification](../zig-native/RAGGED_BUILDERS_QUALIFICATION.md) and
 [editor completion](../zig-native/EDITOR_COMPLETION.md#main-integration-qualification-11-october-2026).
 
+Tasks [052], [033] and [038] are complete at `f184dde`, with the reviewed [054]
+associated-contract specification. The combined gate passes all 1,400 native
+laws, 871 guest/client laws, eight unchanged allocation budgets and zero
+analyzer findings across 343 Zig files. Seven cold public and seven synthetic
+pairs preserve declared semantic counters and fresh/retained/restart behavior;
+public compiler CPU rises 0.4–2.9%, so no overall speedup is claimed. Known
+local callback fixtures remove memo storage; host-call overhead remains material
+for [035]. Broader body cutoffs [024]/[053] and cursor performance [047] remain
+open. Exact pins, failed attempts and distributions are in the
+[joint qualification](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026).
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -610,13 +621,13 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [030] — Specify shared and cyclic ownership             | Complete    | [027]                                  |
 | [031] — Implement shared reference counting             | Complete    | [030]                                  |
 | [032] — Own escaping values and persistent roots        | Complete    | [031]                                  |
-| [033] — Own suspended effects and cancellation          | Ready       | [032]                                  |
-| [034] — Reclaim cyclic ownership                        | Pending     | [033]                                  |
+| [033] — Own suspended effects and cancellation          | Complete    | [032]                                  |
+| [034] — Reclaim cyclic ownership                        | Ready       | [033]                                  |
 | [035] — Remove the tracing runtime                      | Pending     | [034]                                  |
 | [036] — Summarize demand control flow                   | Complete    | [007], [014]                           |
 | [037] — Lower loop aware local memos                    | Complete    | [036]                                  |
-| [038] — Eliminate demands through known callbacks       | Ready       | [037], [032]                           |
-| [039] — Guarantee and explain demand lowering           | Pending     | [038], [033]                           |
+| [038] — Eliminate demands through known callbacks       | Complete    | [037], [032]                           |
+| [039] — Guarantee and explain demand lowering           | Ready       | [038], [033]                           |
 | [040] — Fuse packed row producers and consumers         | Pending     | [002], [027]                           |
 | [041] — Broaden numeric simd                            | Pending     | [040]                                  |
 | [042] — Specify ragged builders                         | Complete    | [011], [027]                           |
@@ -629,12 +640,12 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [049] — Specify editor completion                       | Complete    | [048]                                  |
 | [050] — Implement editor completion                     | Complete    | [049]                                  |
 | [051] — Specify module abstraction                      | Complete    | [020]                                  |
-| [052] — Implement opaque types and privacy              | Ready       | [051]                                  |
+| [052] — Implement opaque types and privacy              | Complete    | [051]                                  |
 | [053] — Qualify module cutoffs and wrapper erasure      | Pending     | [052], [024]                           |
-| [054] — Specify associated types and implementations    | Pending     | [052]                                  |
-| [055] — Implement associated type members               | Pending     | [054]                                  |
+| [054] — Specify associated types and implementations    | Complete    | [052]                                  |
+| [055] — Implement associated type members               | Ready       | [054]                                  |
 | [056] — Implement declarations and evidence diagnostics | Pending     | [055]                                  |
-| [057] — Specify scoped effect identities                | Pending     | [052]                                  |
+| [057] — Specify scoped effect identities                | Ready       | [052]                                  |
 | [058] — Implement effect instances and subtraction      | Pending     | [057]                                  |
 | [059] — Reject escaping capabilities                    | Pending     | [058]                                  |
 | [060] — Specify usage and lifetime contracts            | Pending     | [059], [030]                           |

@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete — local implementation `f184dde`; qualified evidence
+  below.
 - **Dependencies:** [052](052-implement-opaque-types-and-privacy.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 3 / generic
   contracts. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
@@ -24,13 +25,13 @@ cover existing contracts/catalogs; associated type members remain open.
 
 ## Implementation checklist
 
-- [ ] Settle declaration/projection syntax, parameter scopes, implementation
+- [x] Settle declaration/projection syntax, parameter scopes, implementation
       matching, overlap/coherence and selection precedence.
-- [ ] Define evidence representation, associated-type equality/substitution,
+- [x] Define evidence representation, associated-type equality/substitution,
       effect interaction and public/private visibility.
-- [ ] Specify missing, incompatible and ambiguous evidence diagnostics and
+- [x] Specify missing, incompatible and ambiguous evidence diagnostics and
       artifact versions, including separate-compilation selection.
-- [ ] Give accepted/rejected examples and bounded inference rules for tasks
+- [x] Give accepted/rejected examples and bounded inference rules for tasks
       055–056.
 
 ## Validation
@@ -47,20 +48,29 @@ change.
 
 ## Acceptance criteria
 
-- [ ] Durable syntax, selection/coherence, representation and diagnostics are
+- [x] Durable syntax, selection/coherence, representation and diagnostics are
       settled.
-- [ ] Evidence and artifact behavior is precise enough to implement without
+- [x] Evidence and artifact behavior is precise enough to implement without
       guessing.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: local implementation `f184dde`; the separate record commit contains
+  this completion evidence. Nothing is pushed.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes all 1,400 native and
+  871 guest/client laws; eight unchanged release allocation budgets pass.
+  `deno task lint:zig` checks 343 files with zero findings. The specification
+  passes no-config Markdown formatting and local link/anchor checks. Examples
+  were reviewed against current contracts, dispatch, privacy and ownership
+  behavior. The accompanying compiler batch is independently qualified.
+- Comparison: Documentation-only specification: no associated-member performance
+  claim. Task 055 wire version 3 and task 056 wire version 4 are specified;
+  their counters, bounded-work and performance laws remain executable work.
+- Remaining limitations: Tasks 055–056 implement the specified members,
+  projections, equality, implementations, coherence, methods and portable
+  evidence. No such behavior is claimed by this design milestone.
+- Durable record: [ASSOCIATED_CONTRACTS](../zig-native/ASSOCIATED_CONTRACTS.md);
+  exact combined pins, commands, rejected attempts and raw evidence are in
+  [integrated qualification](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026).

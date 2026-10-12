@@ -145,3 +145,74 @@ creation and variable JIT/GC costs; it shows additional host cost, not a
 speedup. The generated parser plan grows 726,137 → 780,662 bytes. Native
 compiler sources and the pinned LLVM binary are unchanged by this correction.
 Raw commands and samples are in `build/bench/module-abstraction/tooling/`.
+
+## Integrated qualification — 12 October 2026
+
+Local implementation `f184dde` jointly qualifies tasks 052, 033 and 038 and
+records the reviewed 054 specification. Its staged tree is
+`1431522db1bd9b93b1e0b3f3f69949e2122aa5e6`; the compiler source tree used for
+the build is `310d60ce85a8ebe26f3c9f4d48fc35811fd98a94`. The intervening changes
+correct the raw dependency-header test to version 2 and format two client tests;
+compiler inputs are unchanged. The standard Zig 0.17.0 LLVM Fast build has
+SHA-256 `5c689ad5caad6952f1c4643f5c40e10d6e41bcf819bf016f751ac105d82020a1`, size
+40,838,704 bytes and compiler identity
+`bb6bda62bee29cebe741d9f3baf9b8184cc722a1691c109ecc43e1feef2f1ed5`.
+
+The required `deno task test:compiler` passes all 1,400 native laws and 871
+guest/client laws. All eight unchanged release allocation budgets pass.
+`ZIG_ANALYZER=build/tools/zig-analyzer/zig-out/bin/zig-analyzer deno task lint:zig`
+checks 343 files with zero findings. Host syntax/formatter, generated parser,
+Tree-sitter corpus/highlights and Helix checks above also pass. Native
+deterministic OOM and executed source/compiled/checkpoint laws exercise the
+combined representation, roots, callbacks and privacy rules.
+
+The incoming release is the earlier qualified `2798ff9` artifact, SHA-256
+`b802365944a69db01df83442db960a8fd7b717828f7cbb1ac5aba2b661d80d17`. Seven
+alternating CPU-6 pairs cover all 13 public examples with restart caching
+explicitly disabled and checked absent. Public median CPU ratios range
+1.0042–1.0292; requested-byte deltas range −312 to +39,350 and peak deltas +376
+to +960. Every teardown has zero live requested bytes. No overall speedup is
+established. Twelve modules intentionally change Wasm for counted ownership
+helpers; the scalar module stays byte equal, and each variant is stable across
+its seven repeats. Semantic/prepared counters match except the exact
+`requests.blot` allocation-role correction, 19 → 20, caused by proper
+Request/Pair reference classification. The harness permits only that change.
+
+Seven further alternating pairs cover four synthetic graphs through fresh,
+population, edit/revert, no-op and checkpoint restart. All cross-variant and
+within-variant Wasm comparisons pass, including edited output against fresh
+edited builds; the harness reports no problems. Median process CPU is:
+
+| Workload         | Fresh baseline → candidate | Restart baseline → candidate |
+| ---------------- | -------------------------- | ---------------------------- |
+| Mono chain 128   | 13 → 13 ms                 | 12 → 13 ms                   |
+| Generic chain 64 | 12 → 12 ms                 | 12 → 12 ms                   |
+| Diamond 8        | 7 → 8 ms                   | 7 → 7 ms                     |
+| Fanout 128       | 24 → 23 ms                 | 24 → 24 ms                   |
+
+Retained CPU uses coarse 10-ms ticks; tied/zero phases do not establish small
+gains or losses. Public load was 4.09; synthetic load was 3.73 → 3.91. A
+separate cached public run remains supplemental evidence, not the cold result.
+These combined costs do not replace the focused callback improvement or close
+the host-call CPU gate recorded in
+[suspended ownership](SUSPENDED_OWNERSHIP.md).
+
+Rejected attempts remain separate: `e2492ea4…` failed native compilation at an
+incorrect test result field and exceeded the fanout budget by 4,856 bytes;
+`bb85a4e0…` passed budgets but failed two of 1,400 native laws. Removing
+redundant export producer-name fields restored allocation headroom without
+weakening original-target/visibility checks. The privacy gate now permits unused
+public lexical-table growth while rejecting private bits in any unmatched tail;
+an old local-name fixture now checks its deliberately redacted name by original
+binding ordinal. The first final-binary gate passed native laws but failed four
+guest assertions expecting dependency version 1. Updating that raw-wire
+assertion to version 2 yields the passing required gate above.
+
+Immutable binaries, complete hashes, correction patches, rejected logs,
+allocation results and raw distributions remain under ignored
+`build/bench/joint-052-033-038-054/`. Accepted evidence is
+`qualified/{binary-pins.json,compiler-gate.log}` and
+`final/{analyzer.log,budgets-early.log,public-cold/,public-summary.json,synthetic/}`.
+Tasks 024/053 still own broader semantic cutoffs and wrapper-operation
+qualification; tasks 034/035 own complete cycle reclamation and final tracing
+removal. No push or whole-program completion is claimed.

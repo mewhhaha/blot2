@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — module abstraction contract qualified; no completion is
-  claimed.
+- **Status:** Complete — local implementation `f184dde`; qualified evidence
+  below.
 - **Dependencies:** [051](051-specify-module-abstraction.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 2 / opacity and
   privacy. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
@@ -26,11 +26,11 @@ visibility model.
 
 ## Implementation checklist
 
-- [ ] Parse/check opaque declarations and access controls using stable nominal
+- [x] Parse/check opaque declarations and access controls using stable nominal
       identities and controlled representation access.
-- [ ] Enforce visibility through aliases, namespace imports and re-export
+- [x] Enforce visibility through aliases, namespace imports and re-export
       chains; publish only permitted interface information.
-- [ ] Version artifact changes and keep existing public-by-default programs
+- [x] Version artifact changes and keep existing public-by-default programs
       compatible as specified.
 
 ## Validation
@@ -50,19 +50,29 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Opaque representations remain private across every supported import path.
-- [ ] Positive/negative abstraction laws and separate-compilation compatibility
+- [x] Opaque representations remain private across every supported import path.
+- [x] Positive/negative abstraction laws and separate-compilation compatibility
       pass.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: local implementation `f184dde`; the separate record commit contains
+  this completion evidence. Nothing is pushed.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes all 1,400 native and
+  871 guest/client laws; eight unchanged release allocation budgets pass.
+  `deno task lint:zig` checks 343 files with zero findings.
+  Opaque/public/private storage and executable boundaries pass source,
+  compiled-import, checkpoint, forged-interface, failed-edit and OOM laws.
+  Contextual host/editor syntax is regenerated and qualified.
+- Comparison: Public CPU ratios 1.0042–1.0292; four synthetic graphs preserve
+  all Wasm through fresh/retained/restart phases. Exact binary pins and all
+  distributions are in the durable record.
+- Remaining limitations: Tasks 024/053 own broader body cutoffs and
+  operation-level wrapper qualification. Deep/unresolved storage recipes decline
+  bounded proofs; namespace-wide exports remain outside the specified syntax.
+- Durable record:
+  [MODULE_ABSTRACTION_QUALIFICATION](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md);
+  exact combined pins, commands, rejected attempts and raw evidence are in
+  [integrated qualification](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026).

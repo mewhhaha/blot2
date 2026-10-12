@@ -69,3 +69,14 @@ and peak requested memory 114,050 → 60,959 bytes, with zero live bytes after
 teardown. The short fixture does not establish a whole-program compiler speedup.
 Raw source/binary/guest/harness hashes and distributions remain ignored under
 `build/bench/known-callback-memos/`.
+
+## Integrated qualification
+
+Task 038 is complete at local implementation `f184dde`. The joint
+[qualification record](MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026)
+pins the final source/binary and passes 1,400 native laws, 871 guest/client
+laws, eight unchanged allocation budgets and zero findings across 343 Zig files.
+Callback storage elimination is qualified alongside opaque storage, persistent
+roots and suspended ownership. The paired public/synthetic results do not
+establish an overall compiler speedup. Exhausted, recursive, unknown, escaping
+and unsupported routes retain their bounded shared-cell fallback.

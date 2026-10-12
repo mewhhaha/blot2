@@ -131,6 +131,15 @@ laws, 18 host client laws, the live force-record fixture law and zero analyzer
 findings across 340 Zig files. Newly admitted host client laws explicitly
 require ABI 3 and mode 2; ABI 2 compatibility laws remain.
 
-The root integration still runs the mandatory combined compiler/analyzer gate
-before completion. This change does not claim tracing removal, complete cycle
-collection without tracing, or an all-program qualification.
+## Integrated qualification
+
+Task 033 is complete at local implementation `f184dde`. The joint
+[qualification record](MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026)
+pins the actual integrated source/binary, all 1,400 native and 871 guest/client
+laws, eight unchanged allocation budgets, zero analyzer findings across 343
+files, and paired public/synthetic costs. Suspended owners, exceptional cleanup,
+revoked capabilities and retryable cancellation are qualified with task 032's
+roots and tasks 052/038's representation and callback changes.
+
+The focused host-call overhead above remains material. Tasks 034/035 still own
+complete cycle reclamation, tracing removal and the final CPU/memory gate.

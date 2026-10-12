@@ -11,7 +11,7 @@ pushed; keep it that way unless the owner authorizes it.
 
 ## Qualified state
 
-Latest compiler implementation on local `main`: `2798ff9`. Qualified milestones,
+Latest compiler implementation on local `main`: `f184dde`. Qualified milestones,
 each with a durable record:
 
 | Task                                           | Implementation       | Record                                                       |
@@ -97,14 +97,22 @@ The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
    deltas are zero. Ownership helpers intentionally change public Wasm. The
    failed `9142c5f0…` candidate remains separate. Durable final evidence is in
    PERSISTENT_ROOTS, SYMBOLIC_BODY_REUSE and LOCAL_MEMOS_QUALIFICATION.
-9. **052 is prepared for integration, not complete.** Its compiler patch and
-   fast-release pins are under `build/bench/module-abstraction/`; 37 focused
-   native/OOM and 31 executed-Wasm laws pass. Joint ownership integration is in
-   `/var/tmp/blot2-joint-opaque-052`: 32 ownership/language laws and the
-   regenerated host/editor tooling checks pass. Tooling inputs are under
-   `build/bench/module-abstraction/tooling/`. The reviewed 054 contract draft
-   remains under `build/bench/associated-contract/`; no 055 implementation has
-   begun.
+9. **052/033/038 and the reviewed 054 specification are complete at `f184dde`.**
+   Qualified tree `1431522db1bd9b93b1e0b3f3f69949e2122aa5e6` (compiler inputs
+   `310d60ce85a8ebe26f3c9f4d48fc35811fd98a94`) passes all 1,400 native and 871
+   guest/client laws, all eight unchanged release budgets and zero analyzer
+   findings across 343 files. Accepted LLVM release SHA-256
+   `5c689ad5caad6952f1c4643f5c40e10d6e41bcf819bf016f751ac105d82020a1` is
+   immutable under `build/bench/joint-052-033-038-054/final/`. Regenerated
+   host/editor tooling passes. Seven cold public pairs show CPU +0.4–2.9%;
+   synthetic fresh/retained/restart output is identical. No overall speedup is
+   claimed. Rejected compilation, allocation, privacy/local-name and stale
+   wire-test attempts stay separate in the durable integrated qualification.
+   038's scalar callback fixture removes heap/table storage and allocation
+   traffic. 033's sync scalar host-call overhead remains +89.4%, about 262
+   ns/call; task 035's final CPU gate remains open. See
+   MODULE_ABSTRACTION_QUALIFICATION, KNOWN_CALLBACK_MEMOS, SUSPENDED_OWNERSHIP
+   and ASSOCIATED_CONTRACTS. Nothing is pushed.
 
 ## bpm tangent
 
@@ -118,22 +126,36 @@ and the full compiler gate pass. No package is published. See
 
 ## Next work
 
-Integrate 052 and its regenerated tooling for the next shared gate. 033's
-preserved work is in `/var/tmp/blot2-suspended-033`; corrected release costs
-show material host-call overhead, so its owner is subtracting proven scalar stub
-frame work before final qualification. 002's active tree is
-`/var/tmp/blot2-traversal-002-joint`; all-width/lifecycle release gates remain
-open, and failed candidates stay pinned. Root's bounded lexical callback work
-for 038 is in `/var/tmp/blot2-known-callback-memos-038`: native/OOM and eight
-executed laws cover polymorphism, snapshots, strong retirement, fallback cells,
-imports, stable-type edits and checkpoint/failure recovery. Final qualification
-and measurements remain. 024 is moving to an owned per-body frontend result
-boundary; 093 and 086's value-template boundary remain open. Nothing is pushed.
+034's trial-deletion work is isolated in `/var/tmp/blot2-cycles-034` against
+incoming `f184dde`. Its final release must include collection barriers in
+runtime IR/lifetime analysis and rerun its CPU/memory gate; earlier costs are
+historical. 002 is fixed at V13 in `/var/tmp/blot2-traversal-002-joint`: all six
+current release all-width guards pass, including wide F32 folds. Final paired
+compiler costs and review handoff remain. Its narrow cursor costs and localized
+shared-append record tails remain explicit; task047 owns cursor elimination. The
+single-owner List journal restores allocation headroom (fanout −521,320
+requested bytes). 024's owned checked-body facts are isolated in
+`/var/tmp/blot2-body-reuse-024`; chunk leasing and compaction bound retained
+payload, and generic principals/callback rows now replay. Nominal/opaque
+receipts, broader coverage and measured cost admission remain. Cheap-body CPU
+regression is not admitted; deeper typed bodies show a development gain that
+still needs final release calibration. Next ready work includes039 and055; 053
+waits for024,035 waits for034. 093 and086 remain open. Nothing is pushed.
+
+Task055 has an isolated incoming tree310d in `/var/tmp/blot2-associated-055`.
+Its uncommitted native parser recognizes type equations, abstract type members
+and value signatures only inside contract bodies; the focused parser/OOM law
+passes. Checked member/projection tables and all later semantics are still open.
+This partial syntax is not integrated or a task completion.
 
 ## Waiting on the owner
 
-- Task 086: reusing constant evaluation means publishing constant slots and fuel
-  from receipts, which crosses the documented value-template boundary.
+- Task 086: the owner decision is pending on the measured
+  [constant receipt proposal](zig-native/CONSTANT_REUSE.md). A dedicated receipt
+  would publish validated constant slots and recorded fuel; the existing
+  value-template transport contract stays unchanged. Read-only attribution on
+  the current captured 93-unit corpus preserves all six outputs and source-step
+  counts; no implementation or speedup is claimed.
 - Task 093: the module-stamp integrity re-hash (~39 ms per gdev edit) is
   deliberate; replacing it with owned lifetimes is a design decision.
 - An unapplied Wasm name-section patch at `/var/tmp/blot2-names.patch` (from the
@@ -212,3 +234,9 @@ the current List lowering; F32 folds are within 0.6–1.7% of boxed at widths
   partial-runtime OOM 27 s, request-backend OOM 19 s. Raw timings are ignored in
   `build/bench/joint-043-050/native-durations.json`; optimize these with
   preserved failure coverage before adding more repeated full gates.
+
+- Allocation screens use Fast/no-LLVM builds with the production allocator, with
+  a separate output prefix. Debug uses a different allocator and cannot
+  establish release allocation deltas. The corrected incoming screen matches
+  LLVM requested bytes exactly; accepted candidates still use the standard LLVM
+  release command and full compiler gate.
