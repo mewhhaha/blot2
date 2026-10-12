@@ -61,18 +61,22 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Partial implementation: `2689ad5` additionally qualifies late immutable flag
-  lowering and one-marker eight-byte ownership journals. Checked results,
-  admission, frame-demand cache identity and scalar stores remain qualified.
-- Full compiler gate: complete native suite,925 guest/client laws, eight
-  unchanged budgets; analyzer349/zero; Zig0.17.0. Nested discarded-Array memory
+- Partial implementation: `850793f` additionally qualifies capture-free static
+  descriptors, checked direct result forwarding and paired guest State frames.
+  Late immutable flags, eight-byte journals, checked results, frame-demand
+  identity and scalar stores remain qualified.
+- Full compiler gate: complete native suite,936 guest/client laws, eight
+  unchanged budgets; analyzer350/zero; Zig0.17.0. Nested discarded-Array memory
   law preserves outer rows and roots/leases at 8/40/200 inner iterations.
 - Open gates: conservative partial paths still use tracing. Physical removal,
   complete layout/scope coverage and CPU acceptance remain unfinished. The prior
   compact-marker cycle workload is about4.89–4.96× the old tracing baseline,
   about14.1% faster than the isolated flag-only control. Those exact isolated
-  pins are separate from merged public compiler costs. The later static
-  closure-descriptor subtraction remains isolated; no completion is claimed.
+  pins are separate from merged public compiler costs. The merged descriptor/
+  forwarding/State slices reduce cycle CPU about35.5% versus2689ad5, but still
+  fail the historical tracing comparison. JSPI Array CPU is+1.7% on the merged
+  screen. Conditional activation is later isolated work; no completion is
+  claimed.
 - Durable record: [TRACING_REPLACEMENT](../zig-native/TRACING_REPLACEMENT.md)
   and
   [combined qualification](../zig-native/FRONTEND_OWNERSHIP_QUALIFICATION.md).

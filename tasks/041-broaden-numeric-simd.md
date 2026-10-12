@@ -2,8 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — isolated native/guest proof work; no completion is
-  claimed.
+- **Status:** Complete — qualified at `850793f`.
 - **Dependencies:** [040](040-fuse-packed-row-producers-and-consumers.md)
 - **Originating requirements:** PLAN: Earlier programs / broader SIMD. Sources:
   [PLAN.md](../PLAN.md).
@@ -24,11 +23,11 @@ F32 behavior.
 
 ## Implementation checklist
 
-- [ ] Admit new loop/row shapes only with independent lane, bounds, ownership
+- [x] Admit new loop/row shapes only with independent lane, bounds, ownership
       and effect proofs.
-- [ ] Preserve U32 wrapping, F32 expression/reduction order, NaNs and signed
+- [x] Preserve U32 wrapping, F32 expression/reduction order, NaNs and signed
       zero, and original bounds/trap behavior.
-- [ ] Generate correct scalar tails and retain scalar fallback for unsupported
+- [x] Generate correct scalar tails and retain scalar fallback for unsupported
       operations or unproved loops.
 
 ## Validation
@@ -48,20 +47,26 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] New shapes show proved SIMD lowering with scalar-equivalent observable
+- [x] New shapes show proved SIMD lowering with scalar-equivalent observable
       results.
-- [ ] Tail, bounds and trap behavior stay exact and unsupported cases use the
+- [x] Tail, bounds and trap behavior stay exact and unsupported cases use the
       ordinary path.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `850793f`, joint implementation tree`ee33b8b5…cf46`.
+- Validation: Zig0.17.0 full native/936 guest-client gate, eight unchanged
+  budgets and350 analyzer files/zero. Both-tier tails, row widths/slices,
+  snapshots, effects, F32 order/traps, retained/checkpoint edits and OOM pass.
+  The initial helper-directory failure and corrected recovery are preserved.
+- Comparison: LLVM/Fast`fa471c09…2387` versus qualified040`9ea894d4…8b21`.
+  Scoped generator CPU ratios .5013/.5717; Array rows .8350–.9046, smaller List
+  rows .8997–.9127. Guest memory is unchanged. Public compile CPU .9966–1.0173;
+  no general compiler speedup or reliable widest-List gain is claimed.
+- Remaining limitations: conditional/carrying loops, trapping/effectful kernels
+  and unproved row products retain ordinary scalar lowering. Reductions are
+  never automatically regrouped. Development artifacts stay scalar and exact.
+- Durable record:[NUMERIC_SIMD](../zig-native/NUMERIC_SIMD.md), with exact pins,
+  three isolated screens and the merged release distributions.

@@ -245,3 +245,173 @@ above remain a separately pinned isolated comparison; they do not close the CPU
 gate or qualify physical tracing removal. Partial/raw contracts continue to
 retain ordinary helpers. A later null-environment closure descriptor slice is
 separately frozen, not in this milestone. Task035 remains open.
+
+## Capture-free descriptors
+
+A closure with no environment now uses the existing immutable static descriptor
+and relocation path. Captured closures, demand cells and host invocation
+identities retain their dynamic owners. This adds five production lines and no
+fields, maps or header changes. The native law checks unchanged Core,
+fresh/retained/checkpoint/replay bytes and every fresh/retained allocation
+failure. Qualification passes 16 native laws, 56 executed laws, eight unchanged
+allocation budgets and 345 analyzer files with zero findings.
+
+The final Safe/noLLVM executable is
+`511a78439d799f8debacf1517cf67587b2e73a8911be930214a9d2c1889133ad`. The measured
+executable before the test-only addition is
+`7384cbcddd826dfdb502537ddc1b4f9975583b2d44175eb6622572a6c6ef5a5b`. Both produce
+the same 11409-byte mixed Wasm,
+`6b299dbb2d9ffa3cc9c01fcf531f2960c271591724606fe46c62efcbc381e3da`.
+
+CPU 6 qualification uses 25 alternating three-way rounds, five discarded rounds,
+equal values, flat warmed memory and load averages 1.45–1.61. These are Wasm
+guest measurements, not release compiler qualification.
+
+| Guest batch               | Tracing CPU ms | Compact CPU ms | Static CPU ms |
+| ------------------------- | -------------: | -------------: | ------------: |
+| Sync scalar, 10000 calls  |          2.669 |          3.217 |         3.183 |
+| Sync Arrays, 2000 calls   |          3.834 |          4.356 |         4.306 |
+| Sync requests, 2000 calls |          5.676 |          7.333 |         7.140 |
+| Sync cycles, 20000 cycles |          6.066 |         31.850 |        24.565 |
+| JSPI scalar, 10000 calls  |         16.834 |         18.630 |        17.830 |
+| JSPI Arrays, 2000 calls   |          7.352 |          7.704 |         7.640 |
+| JSPI requests, 2000 calls |          8.992 |         10.623 |        10.542 |
+| JSPI cycles, 20000 cycles |          5.816 |         31.856 |        24.586 |
+
+Each strong cycle now allocates/destroys 12 objects instead of 16. Reservations
+and pops fall from 31 to 27; opens/closes remain 14. Actual dynamic retains
+remain 22 and releases fall from 34 to 30. Trial deletion runs 233 times per
+20000 cycles. Cycle CPU falls about 22.8%, but still costs 4.05–4.23 times
+tracing; sync request CPU remains 25.8% above tracing. Task 035 remains open.
+
+## Direct result forwarding
+
+A thin private wrapper can use the marker already published by its direct source
+callee. Admission permits only argument loads/constants before one nonentry
+source call whose checked result is a reference. The wrapper then returns that
+exact result, optionally with the generated scalar-global guard that discards it
+and returns zero. Helpers, indirect/import calls, mutations, independent owners
+and scope directives decline. The callee has its own frame, or forwards through
+the same proof to such a frame. It publishes at most one result marker in the
+wrapper's caller. A dynamic discard explicitly pops that marker; static/zero
+results have no marker. No ancestor-root assumption or borrowed-result ownership
+omission is used. Traps before the call acquire no wrapper owners; suspension
+keeps the original caller and callee owners.
+
+The optimizer interpretation advances to v8 with `forwarded-roots`. Native laws
+check the rejection cases, unchanged inputs, every allocation failure,
+retained/restarted byte equality and a changed callee entry fact that restores
+the independent frame. The initial focused batch passes 18 native laws; the
+final expanded forwarding/OOM/restart law passes with 16 tests. Execution passes
+45 ownership/cycle/JSPI/callable laws and 51 request laws, all eight unchanged
+allocation budgets, and 349 analyzer files with zero findings.
+
+CPU 6 screening uses 25 alternating pairs, five discarded rounds, checked
+values, flat warmed memory and load averages 1.59–1.78. Against the frozen
+static-descriptor candidate, sync cycles fall from 24.925 to 22.430 ms and JSPI
+cycles from 24.976 to 22.426 ms (10.0–10.2%). Other controls stay within about
+1%. Each cycle still allocates/destroys 12 objects; opens/closes fall from 14 to
+10, reservations/pops from 27 to 23, actual dynamic retains from 22 to 18 and
+releases from 30 to 26. These are guest CPU screens, not final task 035
+acceptance.
+
+A requested single LLVM/Fast source pairing against qualified revision 2689ad5
+measures fresh preparation at 6.53 versus 6.69 ms and retained edit at 3.07
+versus 3.13 ms after two warm pairs. One measured pair cannot establish a CPU
+result. The release compiler produces the same mixed Wasm as the larger guest
+screen. Journal drain batching was separately rejected: it added 57 Wasm bytes,
+improved cycles only 1.6%, and regressed sync scalar CPU 3.4%. Its raw evidence
+stays separate. Physical tracing removal, wide ownership coverage and the
+material remaining cycle/host CPU gate keep task 035 open.
+
+## Paired guest State frames
+
+A guest State installation now owns one 20-byte frame: read token, checked
+value, strong outer link, guest-only kind tag 4, and write token. It replaces a
+4-byte cell and two 16-byte frames: three 64-byte allocation classes become one.
+The 32-byte header and collection geometry do not change. Lookup matches either
+nominal token before forwarding outer; callback dispatch still excludes the
+matched provider and every younger scope. Loads and typed stores address the
+canonical frame base and its value at byte 4. Scalar/F32 fields never become
+edges; reference values and the outer link remain strong, including ready-demand
+cycles. No interior heap references, owner-token exceptions or Emitter fields
+are added.
+
+The evaluator keeps numeric cells and read/write frames. Its heads/cell IDs do
+not escape into guest closures or artifacts. Generated guest frames have kinds
+callback 0, request 3 or State 4, so the old guest read/write dispatch branches
+are removed. Unexpected guest tags trap. The optimizer interpretation advances
+to v9 with `paired-state`; stale compiler artifacts cannot certify the old
+layout. Raw/partial routes keep their existing ownership admission.
+
+Qualification passes 17 focused native/OOM laws, 115 executed laws including all
+eight unchanged allocation budgets, and 349 analyzer files with zero findings.
+The new native law changes an ordinary source State value from Array to scalar,
+requires fresh/retained/artifact/restarted equality and checks all retained
+allocation failures without mutating Core. New executed laws require complete
+ownership for forwarding aliases, two nested same-typed states, an interleaved
+arbitrary provider, Array snapshots under pressure and pointer-looking U32/F32
+values. Existing suspended/cancelled strong-ready-memo cycle laws remain intact.
+
+The final Safe/noLLVM binary is
+`f2847d6a6b4e6c483598f7a404199bc885bbf058a9c68881e34f28a6e776d2d0`. Its
+11352-byte mixed Wasm is
+`b973f6214f9e5a8cfe7a3d5f68903c5f468e9747a1543863f5bde07854419a94`. Per strong
+cycle, allocations/destructions fall from 12 to 10, reservations/pops from 23 to
+21 and actual dynamic retains/releases from 18/26 to 15/21. Frames remain 10.
+The first prototype retained the old guest dispatch branches and improved cycle
+CPU 14.3–14.6%; it is preserved separately.
+
+The final CPU 6 screen uses 25 alternating three-way rounds with five discarded
+rounds, checked values, flat warmed memory and load averages 1.40–1.87. These
+are guest CPU screens prepared by a development compiler, not release compiler
+CPU qualification.
+
+| Guest batch               | Forward CPU ms | Paired State CPU ms |
+| ------------------------- | -------------: | ------------------: |
+| Sync scalar, 10000 calls  |          3.266 |               3.211 |
+| Sync Arrays, 2000 calls   |          4.205 |               4.321 |
+| Sync requests, 2000 calls |          7.293 |               7.263 |
+| Sync cycles, 20000 cycles |         21.841 |              19.139 |
+| JSPI scalar, 10000 calls  |         17.856 |              18.259 |
+| JSPI Arrays, 2000 calls   |          7.264 |               7.481 |
+| JSPI requests, 2000 calls |         10.365 |              10.449 |
+| JSPI cycles, 20000 cycles |         21.889 |              19.157 |
+
+Final cycle CPU improves 12.4–12.5% versus the frozen forwarder. Array controls
+regress 2.7–3.0% and JSPI scalar 2.3% on this screen; these tails require final
+release qualification. Cycles still cost roughly three times historical tracing.
+Task 035 remains open for physical tracing removal, wide ownership coverage and
+the final CPU/memory gates.
+
+## Integrated descriptors, forwarding and State at850793f
+
+All three frozen slices above are in `850793f`, jointly qualified with scoped
+SIMD and guarded body receipts. Full native suite,936 guest/client tests, eight
+unchanged budgets and350 analyzer files/zero pass. Standard Zig0.17.0 LLVM/Fast
+release `fa471c09…2387` produces the exact11352-byte mixed Wasm `b973f621…9a94`
+from the isolated final State screen. The32-byte header, collection geometry,
+typed reference roles and raw/partial admission stay unchanged. The joint
+optimizer key includes both ownership and SIMD facts.
+
+CPU7 screening uses25 alternating baseline/joint pairs, discards the first five,
+checks values and flat warm memory. Baseline is qualified2689ad5 (`9ea894d4`),
+so these merged costs include all three slices rather than only State.
+
+| Guest batch              | Baseline CPU ms | Joint CPU ms |  Ratio |
+| ------------------------ | --------------: | -----------: | -----: |
+| Sync scalar,10000 calls  |           3.215 |        3.102 |  .9649 |
+| Sync Arrays,2000 calls   |           4.043 |        4.044 | 1.0002 |
+| Sync requests,2000 calls |           7.054 |        6.898 |  .9780 |
+| Sync cycles,20000 cycles |          28.536 |       18.432 |  .6459 |
+| JSPI scalar,10000 calls  |          18.027 |       17.801 |  .9875 |
+| JSPI Arrays,2000 calls   |           7.316 |        7.441 | 1.0171 |
+| JSPI requests,2000 calls |          10.330 |       10.179 |  .9853 |
+| JSPI cycles,20000 cycles |          28.567 |       18.425 |  .6450 |
+
+Cycles improve about35.5%; the JSPI Array control regresses1.7%. These costs do
+not close the historical tracing comparison. Task035 remains active for physical
+removal, complete coverage and its final CPU/memory gates. Exact raw rounds and
+compiler/fixture/harness pins are in `build/bench/joint-024-035-041/ownership/`;
+public/synthetic compiler costs are recorded in[NUMERIC_SIMD](NUMERIC_SIMD.md).
+New conditional-frame work is isolated and absent from this milestone.

@@ -110,3 +110,15 @@ relocation and the total edit target stay open. Pinned isolated costs remain
 distinct from mixed merged release costs.
 See[BODY_CUTOFF](../zig-native/BODY_CUTOFF.md)
 and[the combined record](../zig-native/ROW_FUSION.md#integrated-qualification).
+
+### Qualified guarded scopes and local principals —12 October2026
+
+`850793f` fixes a confirmed retained dotted-access wrong result by declining
+incomplete access-path metadata. It also admits owned ordinary block/case/
+constructor scopes, predecessors/joins and unqualified local principals with
+exact covariance rows. The joint native/936-guest gate, eight unchanged budgets
+and350-file zero analyzer pass. Captured93-unit work still elaborates80 bodies;
+no total edit gain is claimed. Explicit-field receipts are separately frozen;
+compact access paths, requirements, relocation and the total target remain open.
+See[BODY_CUTOFF](../zig-native/BODY_CUTOFF.md) and
+[merged qualification](../zig-native/NUMERIC_SIMD.md).

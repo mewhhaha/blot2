@@ -551,6 +551,13 @@ transformation accesses exactly the original bytes, retains scalar tails, and
 cannot cross cleanup calls or control edges. Floating-point addition retains its
 original order. This pass must not move ahead of lifetime analysis.
 
+Numeric construction proofs may use private locals defined independently on each
+lane and unconditional exits from proved lexical blocks. Checked complete F32
+row loads may share four same-factor products; scalar additions keep their
+written order. Memory writes, calls, escaping control and exhausted proofs take
+ordinary lowering. Transformed bodies own their locals/instructions without
+mutating retained inputs. See[numeric SIMD qualification](NUMERIC_SIMD.md).
+
 `function_facts` memoizes bounded source-body facts within one Generator owner.
 Unknown dispatch/calls remain unknown, and inlined bodies retain the ordinary
 executable dependency reads. A collection of up to eight scalar elements can use

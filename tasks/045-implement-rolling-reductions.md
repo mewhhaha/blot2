@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — isolated ordinary-source prototype; no completion is
+  claimed.
 - **Dependencies:** [044](044-specify-rolling-and-summary-operations.md)
 - **Originating requirements:** PLAN: Earlier programs / rolling reductions.
   Sources: [PLAN.md](../PLAN.md).

@@ -600,3 +600,80 @@ open. The current captured93-unit corpus also has substantial backend work; its
 changed input cannot establish a comparison to historical400ms. See
 [the combined record](ROW_FUSION.md#integrated-qualification) and ignored
 `build/bench/joint-024-035-040/qualification-pins.json`.
+
+## Ordinary scopes and constructor patterns
+
+Owned body facts now include ordinary blocks, lets, returns, scalar rebinding,
+branch joins and case pattern rows. Local declarations, predecessors and join
+edges use declaration-relative IDs. Case coverage still runs against the current
+checker tables. Constructor reads pin the complete original nominal recipe and
+selected tag; constructor and pattern catalog ordinals never survive a revision.
+Record-pattern fields relocate by spelling against the restored record type.
+
+This slice admits monomorphic and unqualified polymorphic local schemes.
+Qualified local schemes, member projections, resolver blocks, providers and
+loops keep ordinary checking. The syntax proof retains its existing depth/node
+bounds and the 64-node capture floor. Source/compiled origin, privacy, effects
+and current candidate reads retain the same conservative proof requirements.
+
+Focused qualification: 45 native laws including allocation-failure sweeps, 13
+executed-Wasm laws, all eight unchanged compile budgets, and 349 analyzer files
+with zero findings. Laws cover new AST/type/spelling insertion, scalar mutation
+and joins, constructor-tag changes, owning array payloads, failed edits and
+recovery. The parent owns full integration qualification.
+
+The current captured 93-unit project still elaborates all 80 bodies in its
+edited module after this extension. No captured-project speedup is claimed;
+richer scoped forms remain a concrete unfinished hill. The qualified incoming
+LLVM diagnostic measured 940 ms child CPU / 1072 ms wall for steady revert, with
+backend generation about 755 ms. Diagnostic noLLVM clocks are recorded
+separately and never used as a release speed ratio; the under-100-ms goal
+remains open. Private captured inputs remain read-only in ignored benchmark
+storage.
+
+Sparse unqualified local principals now retain their quantified type variables,
+row variables and covariance certificates through the same projector and shared
+graph owner as other checked facts. Replay preserves a row identity already
+copied through a type when it restores that row's quantifier or certificate.
+Local requirements still decline until their source/name/selection reads have a
+complete relocation route. No new portable archive schema is introduced.
+
+Focused qualification extends to 46 native/OOM laws and 14 executed-Wasm laws,
+with the unchanged eight budgets and 349 analyzer files at zero findings. The
+new local-scheme law instantiates U32/F32 and owning array values, preserves a
+Foreign callback trace, relocates binders after earlier spelling insertion, and
+checks rejected edits/recovery. This is semantic qualification of the admitted
+slice, with no new LLVM or captured-project performance claim.
+
+### Dotted-access safety boundary
+
+The owned body cache declines any body with a nonempty checked access path.
+Dotted references consume access types and projection metadata during lowering;
+copying their result type and binding alone erases the field read. An unchanged
+record getter previously returned 73763 after a sibling edit while fresh
+execution returned 43. Until these side tables have owned relocation receipts,
+ordinary checking and lowering remain authoritative for dotted accesses.
+
+Native allocation-failure and executed-Wasm regressions compare fresh output
+through sibling edits, earlier AST/type nodes and reversed field spellings,
+failed edits and recovery. This correction adds no cache representation and
+claims no admission or performance gain.
+
+## Integrated guarded scopes at850793f
+
+The independent guard and scope/local-principal slices are jointly qualified at
+`850793f` with the full native suite,936 guest/client tests, eight unchanged
+budgets and350 analyzer files/zero. The exact LLVM/Fast compiler is
+`fa471c09…2387`; merged public CPU .9966–1.0173, peak deltas zero, requested
+bytes−227,737..0 and teardown zero. The guard fixes the confirmed main wrong
+result; scope admission preserves local predecessors, joins, constructor tags
+and complete covariance rows. Complete records never omit dotted-access side
+tables: those bodies decline.
+
+The separately frozen explicit-field follow-up is not in this release. The
+captured93-unit project still elaborates80 edited-module bodies; no total edit
+gain is claimed. General requirements/access paths, producer ordinal relocation
+and the under100ms target remain open. See[NUMERIC_SIMD](NUMERIC_SIMD.md) and
+ignored `build/bench/joint-024-035-041/qualification-pins.json` for merged pins;
+isolated safety/scopes/local pins remain under
+`build/bench/frontend-body-reuse/`.

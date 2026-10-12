@@ -11,7 +11,7 @@ pushed; keep it that way unless the owner authorizes it.
 
 ## Qualified state
 
-Latest compiler implementation on local `main`: `2689ad5`. Qualified milestones,
+Latest compiler implementation on local `main`: `850793f`. Qualified milestones,
 each with a durable record:
 
 | Task                                           | Implementation       | Record                                                       |
@@ -171,6 +171,22 @@ The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
     Markdown/link and independent U32/F32/noncommutative trace checks pass. It
     adds no executable API or optimization;045–046 remain separate work.
 
+14. **041 is complete at`850793f`.** The combined024/035/041 tree
+    `ee33b8b58c9cd979405d7ba10bd9864d27dacf46`, compiler source
+    `30c9709fb8e3f176f7bb1bc7250f89a2d78bdd8f`, LLVM/Fast release
+    `fa471c093d2aaab35fbbbb66c8c1a518c07cbb5586e129143c95db8ff8572387` passes
+    the full native suite,936 guest/client tests, all eight unchanged budgets
+    and350 analyzer files/zero. Numeric helpers admit private locals/lexical
+    returns; checked four-lane F32 products keep scalar reduction order. Joint
+    generator CPU ratios .5013/.5717, Array rows .8350–.9046, smaller List
+    .8997–.9127, unchanged memory. Widest List varies; no general compiler gain
+    is claimed.024 fixes a confirmed dotted-access retained wrong result and
+    adds owned scopes/joins/local principals.035 qualifies static descriptors,
+    forwarding and paired State, with cycle CPU about35.5% below2689ad5; its
+    final tracing comparison remains open. The initial test-helper path failure
+    and corrected full gate stay separate. See NUMERIC_SIMD, BODY_CUTOFF and
+    TRACING_REPLACEMENT. Nothing is pushed.
+
 ## bpm tangent
 
 The owner requested Git packages, caching, `blot.json`, package exports in
@@ -203,7 +219,12 @@ agents use focused checks/screens, with no redundant full gates or main edits.
   declines and substantial backend cost. Bounded scope/case ownership is now
   isolated work; preserve lexical/mutation/join evidence. General
   forms/relocation and the under-100-ms target remain open; 053 still waits.
-  Agent `/root/demand_summary_036` owns it.
+  At850793f, bounded block/case/constructor scopes and unqualified local
+  principals are qualified. Dotted access paths decline until their complete
+  side tables are owned. A separately frozen explicit-field slice is
+  `build/bench/frontend-body-reuse/concrete-fields-followup.patch` (`4ed0c57f`),
+  over guarded scope tree83cbd849; it is not in main. Captured93-unit work still
+  elaborates80 bodies. Agent036 now prioritizes the approved086 constant hill.
 - **035 remains active.** Main qualifies checked scalar/reference results,
   complete/rootless admission, immutable variants, scalar stores and separate
   frame-demand cache validity. The frozen flag-only follow-up is
@@ -221,16 +242,20 @@ agents use focused checks/screens, with no redundant full gates or main edits.
   experiment regressed JSPI controls and was rejected. Prioritize removing
   redundant frames/slots using checked lifetimes; preserve nested memory,
   cycles, escape/suspension/cancellation and raw fallbacks. Agent
-  `/root/resolved_body_028` owns it in `/var/tmp/blot2-tracing-035`.
-- **040 is complete**, with isolated worktrees and failed prototypes preserved.
-  Root owns041 in`/var/tmp/blot2-numeric-simd-041` on`babf57a`. Bounded
-  private-local definitions and pure lexical block/return proofs pass focused
-  native checks; the actual source pipeline now shows vector stores. Further
-  numeric row shapes, guest/cost controls and combined qualification remain. Its
-  first guest fixtures used a missing build directory and an unsupported
-  effectful generator; corrected controls pass in both tiers. The test helper
-  now uses system temporary directories, avoiding a release-build prerequisite.
-  044's ordinary API design is committed;045/046 and047 are ready afterward.
+  `/root/resolved_body_028` owns the next isolated conditional-activation proof
+  over frozen paired-State tree47fb6ec4. Static descriptors, forwarding and
+  State are qualified at850793f. Merged cycles improve35.5% versus2689ad5; JSPI
+  Arrays are+1.7%. Physical removal and the historical tracing CPU gate stay
+  open.
+- **040/041/044 are complete.** All isolated worktrees and failed prototypes
+  remain preserved. Root owns045 in`/var/tmp/blot2-rolling-045` on19645e5,
+  compiler2689 base; focused laws use the qualified850793f executable. Ordinary
+  fold/monoid/group source and an opaque internal persistent AVL window tree
+  pass the first U32 full-window/wrapping matrix. Broader effect/reference/
+  numeric/persistence laws and scaling/cleanup measurements remain. The shared
+  test helper now creates the repository build directory on demand, preserving
+  existing relative std imports.046/047 follow; no rolling completion is
+  claimed.
 - **056 has started** after completed 055, in
   `/var/tmp/blot2-implementations-056-qualified` on `46bf8b9`. Agent
   `/root/associated_members_055` owns explicit impl grammar/head binders/member
@@ -246,7 +271,12 @@ agents use focused checks/screens, with no redundant full gates or main edits.
   constants49ms, inference536ms, lookup84ms, exact70330 source steps. This
   changed captured corpus is not a comparison to the historical400ms input.
   **086 is approved for implementation:** the owner accepted CONSTANT_REUSE on12
-  October2026. Root owns the isolated implementation after the current batch.
+  October2026. Agent `/root/demand_summary_036` owns the dedicated receipt
+  implementation in`/var/tmp/blot2-constant-reuse-086` on19645e5, compiler2689
+  base. Owned observation/fuel tapes pass a focused native/OOM law; resource
+  debt, ready anchors and backend reuse are unfinished. Existing source-value
+  transport retains its representation-only authority. Full coverage/costs and
+  joint qualification remain required.
 
 After 040: 041/044/047. After 024: 053. Continue later ready tasks in index
 order. Never push or delete old artifacts without the separately required
