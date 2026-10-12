@@ -54,33 +54,39 @@ subset never closes a broader gate.
   `/var/tmp/blot2-packed-cursor-047`, based on `2f706e8`. Private cursor
   versions use four locals in existing storage; the collection is their
   canonical owning carrier. Width-three profiling removes 4,097 cursor
-  allocations. Native replay/OOM and first all-width F32/fork/pressure laws
-  pass. A plain-word control trapped; admission is being narrowed to checked
-  packed rows and cache timing restored before rerunning. No frozen
-  handoff/release qualification yet.
+  allocations. The plain-word trap is fixed by checked packed-row admission; its
+  fallback is byte-identical to the control. Native 17 replay/OOM laws, 33
+  guests/eight unchanged budgets and 352-file zero analyzer pass. Frozen
+  LLVM/Fast SHA begins `52f682b0`; final repeated all-width record/tuple release
+  comparisons run on CPU 7. No main port/full gate yet.
 - **047 generic:** `/var/tmp/blot2-owned-sroa-047` contains root's next
-  prototype: exact reference fields use reusable function-frame roots, only with
-  complete module ownership; small straight-line producers can expose up to four
-  allocations and acyclic markers. Initial roots-only matrix was neutral and
-  preserved. Producer exposure removes 4,096 pipeline objects and improves a
-  development screen about 8%, but broad native/OOM/lifetime and release
-  qualification remain. Keep it isolated; main is frozen/qualified separately.
+  prototype: exact reference fields use reusable function-frame roots; small
+  straight-line producers expose up to four allocations and acyclic markers.
+  Initial roots-only matrix was neutral and preserved. Isolated LLVM/Fast
+  `077d2266` removes 4,097 Array cursor objects (about 11.6x guest CPU) and
+  4,096 pipeline objects (about 3.7%). Focused native/OOM, 31 guests/eight
+  budgets, public/synthetic parity and 351-file zero analyzer pass. A new late
+  module ownership-failure law exposed disabled journals: assembly now retries
+  ordinary immutable source bodies before disabling roots. Retained/portable/OOM
+  law passes; this correction still needs its frozen release pin and main gate.
 - **056:** `/root/associated_members_055` works in
   `/var/tmp/blot2-implementations-056-qualified` on `46bf8b9`. Explicit impls,
-  selected proof DAGs, methods/captures and transitive prerequisites have 55
+  selected proof DAGs, methods/captures and transitive prerequisites have 59
   focused native/OOM laws plus further owned operation-row/diagnostic controls.
   Checkpoint 126 is immutable, not a final handoff. Compatibility,
   diagnostic/source/compiled/restart parity and measured screens remain. Port
   only its final delta onto current main; preserve the dotted access guard.
 - **086 is approved:** the owner accepted
   [CONSTANT_REUSE](zig-native/CONSTANT_REUSE.md) on 12 October 2026.
-  `/root/demand_summary_036` owns it. Latest immutable development slice: tree
-  `9455eedc`/`literal-floor-checkpoint.patch` under
-  `build/bench/constant-receipts/`, based on `850793f`. Owned read/fuel/resource
-  receipts keep principal work ordinary and decline escaping view publications.
-  Literal scalar collections skip recording; matched scalar/Array edits improve
-  about 1–2%, with explicit cold costs. Native/OOM, 12 guests/eight budgets and
-  353-file zero analyzer pass; no LLVM integration/final 086 claim.
+  `/root/demand_summary_036` owns it. Qualified-main port is in
+  `/var/tmp/blot2-constant-qualified-086`, based on `58aa965`. Owned read/fuel/
+  resource receipts keep principal work ordinary and decline escaping view
+  publications. Its first LLVM pin has 26 native/OOM, 27 guests/eight budgets
+  and 354-file zero analyzer; measured scalar/primitive-Array edits improve
+  about 1–2% and deep-member edits about 5%, with explicit cold costs. Captured
+  compound graphs regress about 0.6% while adding 18–20 MB indexes: preserve
+  that pin and narrow admission to measured scalar/primitive collection graphs
+  before the corrected frozen release. No main port/full gate/final 086 claim.
 - **086 next:** a fresh-only diagnostic identified collection-buffer publication
   followed by a real solver inside the dominant value computation. A growth-only
   expansion is held until that later inference judgment has an owned worthwhile
@@ -130,7 +136,7 @@ merged release costs separate.
 
 ## Packages and other sessions
 
-bpm is complete at 2798 ff 9: Git/local/transitive exports, caching, exact
+bpm is complete at `2798ff9`: Git/local/transitive exports, caching, exact
 locks, frozen installs, updates and clean-cache checks. The owner's choice is
 **omitted/null prelude means no prelude**. No package is published. See
 [packages](compiler/packages.md).
