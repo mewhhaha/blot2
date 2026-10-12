@@ -687,3 +687,224 @@ Continue with reproducible current traversal inputs, explicit scalar reference
 results, pinned compiler/library/workload hashes, and paired fold/cursor CPU and
 guest-memory measurements. Task 002's current all-width correctness and
 performance checks remain open. Task 047 still owns the explicit cursor work.
+
+### Current joint directory qualification, 12 October 2026
+
+The current candidate derives whole-row leaf limits from the ordinary 1-KiB
+allocation class and 32-byte shared-ownership header: `244 / width * width`. It
+does not enlarge global leaves. Its 32-byte descriptor still fits the same
+64-byte allocation class and owns its tree, cached leaf and scalar leaf
+directory (reference mask 134). A directory is a scalar Array of borrowed leaf
+allocation bases in tree order; it owns no leaf edges. A private eight-byte
+holder owns the exact descriptor and directory for the traversal, including
+every exit and suspension. Incoming owner-synchronous row/loop cleanup and
+managed local memo owners are preserved.
+
+Dynamic packed construction with several leaves reserves one directory entry per
+leaf and fills it while constructing the existing tree, removing the lazy
+count/write passes. A single leaf uses the descriptor's existing root word as a
+one-entry view at the same payload offset, avoiding another allocation and
+publishing no self-owning edge. Scalars and reference-bearing rows keep ordinary
+construction. Copies and changed edits clear the directory before mutation;
+no-op edits preserve it. Static packed directories serialize beside their known
+immutable leaves with ordinary symbolic address relocations, so first use
+allocates no directory and adds no fallback base-promotion policy. The existing
+counted static-field role remains explicit. A late-first-use pressure law keeps
+an unrelated 512-KiB Array live across that first read, checks identical tracing
+reset bases and bounded committed pages over 100 calls.
+
+The fifteen canonical width-two through width-sixteen empty descriptors belong
+to the arena metadata prefix. Runtime helper reconstruction shares this prefix;
+it cannot publish the empties again as source-owned data during fragment replay.
+The reserved-address admission/relocation boundary derives from the prefix size.
+The unchanged retained cursor/List/SIMD law caught the earlier duplicate block;
+its byte-parity assertion passes after this correction. Static tracing also
+starts at this canonical metadata boundary.
+
+Every typed constructor, conversion and static serialization supplies the
+checked row width and aligned limit. Whole-row slices trim whole rows,
+concatenation joins at whole-row boundaries, rotations preserve leaf order and
+whole-row updates preserve lengths. These operations inductively keep every leaf
+nonempty, row-aligned and bounded by its carried limit. The monotone reader
+consequently starts each next row at `leaf + header` and derives the last
+complete-row address from that leaf's length. It removes crossing assembly,
+scratch rows, repeated root/path walks, the repeated directory-size check and
+row/word round trips. A bounded byte offset addresses the directory; advancing
+the physical row pointer requires another complete row, so no physical one-past
+pointer is formed.
+
+F32 projections group loads only when a complete checked scalar row contains the
+entire four-word block. Lane extraction preserves bits, while scalar additions
+retain their original source order. U32 loads and reductions keep their existing
+lowering. Nested, nominal, reference-bearing, erased and wider rows retain boxed
+paths. No public List indexing is added. The outer packed loop counts storage
+words directly, removing a division per leaf. An older tracing descriptor does
+not cache a newly allocated directory below the reset frontier; its private
+traversal holder owns the temporary directory. This removes broad frontier
+promotion. The late dynamic slice/concat pressure law checks both forms over 100
+calls; the rejected version grew committed pages on its second call.
+
+Final serialization folds only the exact immutable U32 `rc_enabled` and
+`root_enabled` admission globals, after computing their authoritative final
+values. Symbolic IR and retained archives keep their original global reads. A
+four-case native law covers enabled/disabled modes and immutable/mutable flags,
+checks that unrelated immutable globals remain reads, and confirms unchanged
+symbolic instructions. This lets V8 remove disabled ownership guards from the
+actual native fold body without weakening active ownership.
+
+The isolated V9 candidate is measured against a separately reconstructed boxed
+compiler and exact incoming tree `6064c8e2d114bfb39ab3c78d5c0b295f51f1be15`. The
+owner waived historical artifact restoration; these current pins do not recover
+the historical private benchmark. Every record width 1–16 and tuple width 2–16
+is checked against a source-ordered scalar oracle. The pinned Deno 2.9.7 runtime
+uses V8 15.0.245.2-rusty; measurement affinity is CPU 7.
+
+| Isolated input           | SHA-256                                                            |
+| ------------------------ | ------------------------------------------------------------------ |
+| Reconstructed boxed Fast | `0e3262764a0feb76a44a937bac73d67b98127e054436fcc0ecd30dba67ec8dec` |
+| Corrected incoming Fast  | `b802365944a69db01df83442db960a8fd7b717828f7cbb1ac5aba2b661d80d17` |
+| V9 Fast                  | `b8b065eb13a727ec992d5face06a4433a94fbd934af14e74477beb5f7ecaed80` |
+| V9 compiler identity     | `86051af170105d269a9c06c3dea2c06dad6138328ced6957b6032ecb4149ac2d` |
+
+Three predetermined complete F32 fold batches use 20 warmups, 31 alternating
+paired samples and 128 traversals per sample. The largest median-of-three paired
+CPU ratio across all widths is 0.993286 for records and 0.995449 for tuples
+(V9/boxed). Ratios of CPU medians give 0.994511 and 0.995862 respectively. The
+Fast compiler reproduces all 93 development guest artifacts byte for byte: 31
+primary F32 fold inputs and 62 F32/U32 record/tuple lifecycle inputs. Compiler
+CPU/allocation comparisons use Fast executables; development compiler allocation
+and CPU are excluded from those comparisons.
+
+Three complete lifecycle batches retain all widths, source-order checks,
+ownership manifests and initialization, first use, static fold, edit, shared
+append, exclusive append and saved-value extraction distributions. Against
+incoming, the largest median-of-three F32 init+first paired ratios are 1.0457
+and 1.0417; U32 stays below incoming. Edit ratios stay below incoming. Exclusive
+append tails from the first batch (up to 1.33) did not repeat: the largest
+median-of-three is 1.0494 (F32 record width two, 0.168 versus 0.158
+microseconds). Shared append's largest median-of-three ratio is 1.0396. These
+measurements do not establish initialization or update speedups over boxed: the
+current joint ownership implementation costs materially more than that
+reference.
+
+Saved-value extraction still has tens-of-nanoseconds tails: up to 2.57 times
+incoming for F32 records and 3.71 for U32 records. Task 047 owns the bounded
+cursor follow-up. This directory reader changes direct folds; cursor paths
+retain owned extracted row storage and the current snapshot behavior.
+
+At width sixteen, current F32 initialization/fold memory is 3,407,872 committed
+bytes versus incoming 3,342,336 and boxed 2,293,760. Shared append commits
+4,325,376 versus incoming 4,259,840; edit commits 4,915,200 versus incoming
+4,980,736. U32 has the same initialization counts, 4,259,840 versus 4,194,304
+shared append and 4,849,664 versus 4,915,200 edit. Leaf capacity remains one
+KiB; these page counts do not establish a joint packed-memory win over boxed.
+
+The native allocation-failure batch passes 17 laws, including packed U32/F32
+emission with immutable Core and shared-RC emission. The exact flag law passes
+with the 15 discovery tests. All 72 focused executed-Wasm laws and four
+fresh/retained/checkpoint laws pass on V9 Fast. An initial focused run omitted
+fixture placement, producing only file-not-found failures; the pinned fixture
+rerun passes. The isolated analyzer checks 339 files with zero findings.
+
+All earlier candidates and complete failed screens are preserved. V5's repeated
+wide F32 tails (up to 1.0065) reject that version. Scalar-load and manual-unroll
+screens were rejected and their source changes removed. The earlier
+function-zero "fold body parity" observation is invalid evidence: function zero
+is the arena allocator. Correct export-to-native-body disassembly identified two
+disabled root-flag checks per row, which V9 removes. The raw diagnosis
+explicitly records the correction; removal of disabled guards proves nothing
+about active tracing or counted ownership costs.
+
+Raw distributions, source snapshots, compiler/library/workload pins, the failed
+screens and disassembly remain in
+`/var/tmp/blot2-traversal-002-joint/build/bench/joint-traversal/`. The isolated
+V9 handoff is followed by a port to the corrected 052/033/038/054 incoming tree.
+V9 subsequently failed the unchanged fanout allocation budget: 16,332,544
+requested bytes exceeded 16,179,519. It is a preserved intermediate, not an
+accepted release. The final port and journal subtraction below supersede it.
+
+### Current V13 release handoff, 12 October 2026
+
+The final source overlays incoming commit `f184dde` (tree
+`1431522db1bd9b93b1e0b3f3f69949e2122aa5e6`). Its compiler production source is
+unchanged from tree `310d60ce85a8ebe26f3c9f4d48fc35811fd98a94`; the later client
+assertions follow dependency header version two. Root ownership, suspension,
+module abstraction, redaction and retained-helper corrections are preserved.
+
+| Final input           | SHA-256                                                            |
+| --------------------- | ------------------------------------------------------------------ |
+| Incoming Fast         | `5c689ad5caad6952f1c4643f5c40e10d6e41bcf819bf016f751ac105d82020a1` |
+| V13 Fast              | `f62db8b1e4d80bd5b7be8c308f18185e6f72104bf3911e615b83a96b7f079f22` |
+| V13 compiler identity | `8c660b6dedeb894284900ff12aa6a848cec21c0c1cbd2e4c7a59e1eeb96a73e3` |
+
+The List resource journal follows the existing single-owner arena
+representation: `Event.lists` is an ordered marker and `Recorder.lists` owns its
+one runtime value. Replay and fragment reconstruction remap the same symbolic
+function IDs. The three directory helpers had inflated every event record, even
+for arithmetic programs without Lists: pre002 Event/Record sizes were 88/104
+bytes and V9 104/120. The one-owner representation is 32/48 bytes. All eight
+unchanged Fast allocation budgets pass. Matched default-cache fanout requests
+15,653,638 versus 16,174,958 incoming bytes, with peak 2,541,306 versus
+3,065,786. Cache-disabled screens omit that journal traffic and do not
+demonstrate this size reduction.
+
+Constructed leaf capacity is the smaller of physical capacity and its carried
+aligned limit. Insertion checks that limit only inside the full-capacity path;
+it removes a descriptor load/check per inserted word. Static leaves already
+carry their length as capacity, copied leaves preserve this bound, and the
+allocation class stays unchanged. Three complete all-width append screens retain
+exact source-order results and identical pages against the preceding candidate.
+The completed V11/V12 screens, including their update tails, remain preserved.
+
+V13 was held fixed across all declared batches. Three complete primary F32
+batches have largest median-of-three paired ratios 0.991265 records and 0.994806
+tuples versus reconstructed boxed; ratios of medians give 0.992824 and 0.995966.
+All 31 widths remain in each raw report. Six complete Fast guard batches give
+largest paired fold ratios 0.953517/0.948612 (F32 records/tuples) and
+0.580222/0.663366 (U32) against incoming, and 0.673759/0.676529 U32 versus
+boxed. The final incoming Fast reproduces all 155 earlier baseline guest
+artifacts exactly. V13 Fast reproduces all 93 measured development guest
+artifacts exactly. These byte checks qualify the guest runtime distributions;
+compiler CPU and allocation use Fast-to-Fast comparisons.
+
+Twelve lifecycle reports (three complete batches for each scalar/shape pair)
+retain init, first, init+first, static fold, edit, shared/exclusive append,
+saved extraction, ownership manifests and committed pages at every width.
+Largest median-of-three init+first paired ratios versus incoming are
+0.9910/0.9968 F32 and 0.9795/0.9772 U32. Static fold and edit stay below
+incoming. Exclusive append has largest ratios 1.0349/1.0000 F32 and
+0.9597/0.9840 U32. Localized shared-append record tails remain: F32 width eleven
+is 1.1987 (2.238 versus 1.867 microseconds), U32 width fifteen 1.2104 (3.033
+versus 2.328); tuple maxima are 1.0260/0.9834. These are recorded costs, not
+update speedup claims. Width-sixteen committed memory has the same counts
+reported above: one extra 64-KiB page for dynamic initialization/shared append
+versus incoming, one fewer for edit. There is no global leaf resize or joint
+packed-memory win over the reconstructed boxed reference.
+
+Saved extraction remains tens of nanoseconds: largest current ratios 2.50/2.43
+F32 and 3.71/3.50 U32. Full explicit cursor guard maxima are 1.1446/1.1270 F32
+and 1.1589/1.1598 U32 versus incoming, and up to 9.82 versus reconstructed
+boxed. The cursor still constructs owned extracted rows and advancing cursor
+snapshots; it does not use the direct fold's borrowed physical row view. Task
+047 owns this measured follow-up, including narrowing materialization and
+ownership costs; current tests preserve extracted values, forks, edits and
+suspension exactly.
+
+All 92 focused executed-Wasm laws pass on the immutable Fast release, including
+active roots, callbacks, suspended ownership, all-width boundaries, pressure,
+retained edits and portable checkpoints. Focused native batches pass packed
+span/borrow/directory emission OOM (18 tests including discovery), List journal
+construction OOM (16) and exact admission flag serialization (16). The analyzer
+checks all 343 Zig source files with zero findings. Seven alternating compiler
+pairs across four synthetic workloads preserve exact cross-compiler,
+fresh/retained/restart bytes and all compared semantic work counters; fresh CPU
+medians are 11/10, 11/10, 6/6 and 21/20 ms (incoming/V13). Retained accounting
+is coarse, so this establishes no broad compiler speedup. Missing private legacy
+snapshots remain waived and are not re-requested.
+
+The frozen source snapshot, review patch, pins and complete qualification report
+are `v13-source/`, `task002-review-final.patch`, `v13-final-pins.json` and
+`FINAL_REPORT.md` under the ignored joint-traversal evidence directory above.
+The current all-width read-only fold criterion is met. The mandatory compiler
+and analyzer gate on the integrated patch still belongs to the root batch; this
+handoff does not claim that gate has run or task completion before it.

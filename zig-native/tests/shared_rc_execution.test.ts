@@ -37,6 +37,182 @@ async function runtime(bytes?: Uint8Array<ArrayBuffer>) {
   };
 }
 
+Deno.test("trial deletion reclaims self cycles and shared children without tracing", async () => {
+  const r = await runtime();
+  const metric = (name: string) =>
+    Number((r.exports[name] as WebAssembly.Global).value);
+  const child = r.call("allocate_typed", 4, 0);
+  r.call("store_word", child, child, 42);
+  const left = r.call("allocate_typed", 12, 7);
+  const right = r.call("allocate_typed", 8, 3);
+  r.call("store_word", left, left, left);
+  r.call("store_word", left, left + 4, right);
+  r.call("store_word", left, left + 8, child);
+  r.call("store_word", right, right, left);
+  r.call("store_word", right, right + 4, child);
+  r.call("release_lease", left);
+  r.call("cycle_collect");
+  assert.equal(r.count("destroyed"), 0);
+  // The still-leased right node contributes an outside edge into left.
+  assert.equal(r.word(left), left);
+  r.call("release_lease", right);
+  r.call("cycle_collect");
+  assert.equal(r.count("destroyed"), 2);
+  assert.equal(r.word(child), 42);
+  assert.equal(r.word(child - 16), 1);
+  assert.equal(metric("cycle_bytes"), 20);
+  assert.equal(metric("cycle_head"), 0);
+  r.call("release_lease", child);
+  assert.equal(r.count("destroyed"), 3);
+});
+
+Deno.test("finite typed masks bound sparse cycles without interpreting scalar tails", async () => {
+  const r = await runtime();
+  const metric = (name: string) =>
+    Number((r.exports[name] as WebAssembly.Global).value);
+  const scalar = r.call("allocate_typed", 4, 0);
+  r.call("store_word", scalar, scalar, 42);
+  for (const mask of [1, 0x40000000]) {
+    const object = r.call("allocate_typed", 4194304, mask);
+    let edgeOffset = 0;
+    if (mask !== 1) edgeOffset = 120;
+    r.call("store_word", object, object + edgeOffset, object);
+    // This is beyond the finite mask, despite looking like a live pointer.
+    r.call("store_word", object, object + 4194300, scalar);
+    r.call("release_lease", object);
+    const edges = metric("cycle_edges"), vertices = metric("cycle_vertices");
+    r.call("cycle_collect");
+    assert.equal(metric("cycle_edges") - edges, 1);
+    assert.equal(metric("cycle_vertices") - vertices, 1);
+    assert.equal(r.word(scalar), 42);
+    assert.equal(r.word(scalar - 16), 1);
+  }
+  assert.equal(r.count("destroyed"), 2);
+  r.call("release_lease", scalar);
+  assert.equal(r.count("destroyed"), 3);
+});
+
+Deno.test("trial deletion preserves alias roots and duplicate capacity edges then retires their cycle", async () => {
+  const r = await runtime();
+  const leaf = r.call("allocate_typed", 992, 0xfffffff0);
+  const node = r.call("allocate_typed", 4, 1);
+  // Logical length is zero; these physical capacity slots still own edges.
+  r.call("store_word", leaf, leaf + 16, node);
+  r.call("store_word", leaf, leaf + 988, node);
+  r.call("store_word", node, node, leaf);
+  r.call("retain", leaf);
+  r.call("release_lease", leaf);
+  r.call("release_lease", node);
+  r.call("cycle_collect");
+  assert.equal(r.count("destroyed"), 0);
+  assert.equal(r.word(node - 16), 2);
+  assert.equal(r.word(leaf - 16), 2);
+  r.call("release", leaf);
+  r.call("cycle_collect");
+  assert.equal(r.count("destroyed"), 2);
+  assert.equal(r.count("leases"), 0);
+});
+
+Deno.test("trial deletion is allocation free at exhausted heap and weak candidates survive tracer retirement", async () => {
+  const r = await runtime();
+  const value = r.call("allocate_typed", 4, 1);
+  r.call("store_word", value, value, value);
+  r.call("release_lease", value);
+  const heap = r.heap();
+  r.setHeap(0xfffffff0);
+  r.call("cycle_collect");
+  assert.equal(r.count("destroyed"), 1);
+  r.setHeap(heap);
+  const replacement = r.call("allocate_typed", 4, 1);
+  assert.equal(replacement, value);
+  r.call("store_word", replacement, replacement, replacement);
+  r.call("release_lease", replacement);
+  r.call("collect", 0);
+  r.call("cycle_collect");
+  assert.equal(r.count("destroyed"), 2);
+  assert.equal(Number((r.exports.cycle_head as WebAssembly.Global).value), 0);
+});
+
+Deno.test("trial deletion keeps ready memo cycles alive through force and module journal roots", async () => {
+  const r = await runtime();
+  const demand = r.call("root_allocate", 16, 10);
+  const node = r.call("allocate_typed", 4, 1);
+  r.call("store_word", demand, demand + 12, node);
+  r.call("store_word", node, node, demand);
+  r.put(demand + 8, 2);
+  r.call("release_lease", node);
+  r.call("cycle_collect");
+  assert.equal(r.count("destroyed"), 0);
+  r.call("root_enter");
+  r.call("root_force", demand);
+  r.call("release_lease", demand);
+  r.call("cycle_collect");
+  assert.equal(r.count("destroyed"), 0);
+  assert.equal(r.word(demand + 8), 2);
+  assert.equal(r.word(r.word(demand + 12)), demand);
+  r.call("root_leave", 0);
+  assert.equal(r.count("destroyed"), 2);
+  assert.equal(r.roots(), 0);
+  r.call("root_leave", 2);
+});
+
+Deno.test("candidate discovery remains local and deduplicates repeated nonzero drops", async () => {
+  const r = await runtime();
+  const metric = (name: string) =>
+    Number((r.exports[name] as WebAssembly.Global).value);
+  // Unrelated leased allocations must not enter the candidate closure.
+  const unrelated = Array.from(
+    { length: 8192 },
+    () => r.call("allocate_typed", 4, 0),
+  );
+  const value = r.call("allocate_typed", 4, 1);
+  r.call("store_word", value, value, value);
+  r.call("retain", value);
+  r.call("release_lease", value);
+  for (let i = 0; i < 8192; i++) {
+    r.call("retain", value);
+    r.call("release", value);
+  }
+  assert.equal(metric("cycle_head"), value);
+  r.call("cycle_collect");
+  assert.equal(metric("cycle_vertices"), 1);
+  assert.equal(metric("cycle_edges"), 1);
+  assert.equal(r.count("destroyed"), 0);
+  r.call("release", value);
+  r.call("cycle_safe", 1);
+  assert.equal(r.count("destroyed"), 1);
+  for (const child of unrelated) r.call("release_lease", child);
+  assert.equal(r.count("destroyed"), 8193);
+});
+
+Deno.test("removal traffic triggers a complete pass without allocation or queue duplication", async () => {
+  const r = await runtime();
+  const metric = (name: string) =>
+    Number((r.exports[name] as WebAssembly.Global).value);
+  const value = r.call("allocate_typed", 1024, 1);
+  r.call("store_word", value, value, value);
+  r.call("retain", value);
+  r.call("release_lease", value);
+  r.call("cycle_collect");
+  const heap = r.heap(), passes = metric("cycle_passes");
+  for (let i = 0; i < 63; i++) {
+    r.call("retain", value);
+    r.call("release", value);
+    r.call("cycle_safe", 0);
+  }
+  assert.equal(metric("cycle_passes"), passes);
+  r.call("retain", value);
+  r.call("release", value);
+  r.call("cycle_safe", 0);
+  assert.equal(metric("cycle_passes"), passes + 1);
+  assert.equal(metric("cycle_head"), 0);
+  assert.equal(metric("cycle_vertices"), 2);
+  assert.equal(r.heap(), heap);
+  r.call("release", value);
+  r.call("cycle_safe", 1);
+  assert.equal(r.count("destroyed"), 1);
+});
+
 Deno.test("checked RC preserves aliases and self stores and retires duplicate children once", async () => {
   const r = await runtime();
   assert.equal(r.mode[1], 1);

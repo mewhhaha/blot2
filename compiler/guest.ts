@@ -252,6 +252,23 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
       }
     }
   }
+  const cycles = WebAssembly.Module.customSections(module, "blot:cycles");
+  if (cycles.length > 1) {
+    throw new GuestError("invalid_abi", "Duplicate cycle section");
+  }
+  if (cycles.length === 1) {
+    const state = new Uint8Array(cycles[0]);
+    if (
+      state.length !== 2 || state[0] !== 1 || state[1] > 1 ||
+      ownership.length !== 1 ||
+      state[1] !== Number(new Uint8Array(ownership[0])[1] !== 0)
+    ) {
+      throw new GuestError("invalid_abi", "Invalid cycle section");
+    }
+    for (const counter of ["passes", "vertices", "edges", "bytes"]) {
+      declare(`blot:cycle_${counter}`, "global");
+    }
+  }
   if (version === 3 && ownership.length !== 1) {
     throw new GuestError("invalid_abi", "Missing root ownership section");
   }

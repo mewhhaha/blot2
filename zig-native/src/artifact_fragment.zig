@@ -110,7 +110,7 @@ pub const State = struct {
             .import_ => |item| import_count = @max(import_count, @as(usize, item.id) + 1),
             .global => |item| global_count = @max(global_count, @as(usize, item.id) + 1),
             .arena => arena = old.emission.arena,
-            .lists => |value| lists = value,
+            .lists => lists = old.emission.lists,
             .host_references => |value| host = value,
             else => {},
         };
@@ -286,7 +286,7 @@ pub const State = struct {
         return old != 0 and old <= self.importer.unit_map.len and current != 0 and self.importer.unit_map[old - 1] == current;
     }
     fn localAddress(self: *const State, address: u32, owner: u32) bool {
-        if (address < 256) return self.arena != null;
+        if (address < @import("arena_runtime.zig").metadata_bytes) return self.arena != null;
         var cursor = self.emissionAt(self.starts[owner - 1]);
         while (cursor < self.old.emission.records.items.len) : (cursor += 1) {
             const record = self.old.emission.records.items[cursor];
@@ -312,7 +312,7 @@ pub const State = struct {
                 const function = self.old.emission.functions[operand.value];
                 if (self.staticHelper(function, owner)) break :blk true;
                 if (function.owner == 0) break :blk arenaFunction(function.role) or switch (function.role) {
-                    .host_retain, .host_release, .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance, .list_concat, .list_slice, .list_join, .list_cut => true,
+                    .host_retain, .host_release, .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance, .list_concat, .list_slice, .list_join, .list_cut, .list_directory, .list_leaf_count, .list_write_leaves => true,
                     else => false,
                 };
                 break :blk try self.importer.importRequest(g, self.old.metadata.jobs.items[function.owner - 1].request) != null;
@@ -469,7 +469,7 @@ pub const State = struct {
         return self.globals[id];
     }
     fn resolveAddress(self: *const State, original: u32) Error!u32 {
-        if (original < 256 and self.arena != null) return original;
+        if (original < @import("arena_runtime.zig").metadata_bytes and self.arena != null) return original;
         for (self.constant_addresses.items) |item| if (original == item.original) return item.actual;
         for (self.addresses.items) |item| if (original >= item.original and original < item.original + item.len) return item.actual + original - item.original;
         return error.InvalidFunctionReference;
@@ -494,7 +494,7 @@ pub const State = struct {
         if (arenaFunction(role)) return self.ensureArena(g);
         switch (role) {
             .host_retain, .host_release => try self.ensureHost(g),
-            .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance, .list_concat, .list_slice, .list_join, .list_cut => try self.ensureLists(g),
+            .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance, .list_concat, .list_slice, .list_join, .list_cut, .list_directory, .list_leaf_count, .list_write_leaves => try self.ensureLists(g),
             else => return error.InvalidFunctionReference,
         }
     }

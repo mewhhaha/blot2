@@ -47,6 +47,20 @@ pub fn referenceSlot(c: Code, head: Local, offset: anytype) Error!void {
     try c.end();
     try c.value(.{ .i32_and, .{ .i32_shr_u, .{ .load, head, f.layout }, word }, 1 });
 }
+// Bit 31 describes every tail word; finite masks stop at their last edge.
+pub fn referenceEnd(c: Code, head: Local) Error!Local {
+    const end = try c.temp();
+    const mask = try c.temp();
+    try c.set(end, .{ .load, head, f.requested });
+    try c.set(mask, .{ .load, head, f.layout });
+    try c.when(.{ .i32_eqz, .{ .i32_and, mask, 0x80000000 } });
+    try c.set(mask, .{ .i32_mul, .{ .i32_sub, 32, .{ .i32_clz, mask } }, 4 });
+    try c.when(.{ .i32_lt_u, mask, end });
+    try c.set(end, mask);
+    try c.end();
+    try c.end();
+    return end;
+}
 pub fn emit(m: *w.Module, a: w.Arena) Error!void {
     try allocate(code(m, a.allocate_typed), a);
     try retain(code(m, a.retain), a);
@@ -107,13 +121,23 @@ fn decrement(c: Code, a: w.Arena) Error!void {
     try c.store(head, f.strong, .{ .i32_sub, .{ .load, head, f.strong }, 1 });
     try bump(c, a.rc_releases);
     try c.when(.{ .i32_eqz, .{ .load, head, f.strong } });
+    try c.when(.{ .i32_and, .{ .load, head, f.flags }, @import("cycles_runtime.zig").queued });
+    try c.value(.{ .call, a.cycle_unlink, p });
+    try c.end();
     try c.store(head, f.next, .{ .load, queue, 0 });
     try c.store(queue, 0, p);
+    try c.op(.else_, 0);
+    try c.when(.{ .load, head, f.layout });
+    try c.value(.{ .call, a.cycle_enqueue, p });
+    try c.end();
     try c.end();
 }
 fn release(c: Code, a: w.Arena) Error!void {
-    const p = try c.temp();
     try c.value(.{ .call, a.decrement, Local{ .id = 0 } });
+    try drain(c, a);
+}
+pub fn drain(c: Code, a: w.Arena) Error!void {
+    const p = try c.temp();
     try c.loop(.{ .load, queue, 0 });
     try c.set(p, .{ .load, queue, 0 });
     try c.store(queue, 0, .{ .load, .{ .i32_sub, p, header }, f.next });
@@ -139,6 +163,9 @@ fn retire(c: Code, a: w.Arena) Error!void {
     const child = try c.temp();
     try c.set(is_dead, .{ .i32_and, .{ .load, head, f.flags }, dead });
     try c.trap(.{ .i32_and, .{ .i32_eqz, is_dead }, .{ .load, head, f.strong } });
+    try c.when(.{ .i32_and, .{ .load, head, f.flags }, @import("cycles_runtime.zig").queued });
+    try c.value(.{ .call, a.cycle_unlink, p });
+    try c.end();
     // The tracer owns the full white set before calling this destructor.
     // Internal white edges disappear with that set, live outgoing edges drop.
     try c.when(.{ .i32_and, .{ .load, head, f.flags }, lease });
@@ -149,7 +176,8 @@ fn retire(c: Code, a: w.Arena) Error!void {
     try c.store(head, f.strong, 0);
     // Zero-child layouts retire without scanning their scalar payload.
     try c.when(.{ .load, head, f.layout });
-    try c.loop(.{ .i32_lt_u, offset, .{ .load, head, f.requested } });
+    const end = try referenceEnd(c, head);
+    try c.loop(.{ .i32_lt_u, offset, end });
     try referenceSlot(c, head, offset);
     try c.op(.if_, 0);
     try c.set(child, .{ .load, .{ .i32_add, p, offset }, 0 });

@@ -47,6 +47,88 @@ const Fixture = struct {
     }
 };
 
+test "cycle zero-child source proof preserves retained checkpoint replay and OOM Wasm" {
+    var fixture = try Fixture.initSource(
+        \\entry const run = fn (index: U32) => #[41, 42, 43][index]
+    );
+    defer fixture.deinit();
+    const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
+    defer a.free(nodes);
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    const emission = &first.capture.?.emission;
+    try std.testing.expectEqual(@as(u32, 0), emission.functions[emission.arena.?.cycle_collect].instructions.len);
+    var retained = try fixture.emit(a, &first.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
+    const compiler: [32]u8 = @splat(34);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    var portable = try fixture.emit(a, null, &checkpoint);
+    defer portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, portable.bytes);
+    var replayed = try backend.compileWithOptions(a, &fixture.units, 1, .{ .identity = fixture.names.view(), .artifact_replay = true });
+    defer replayed.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, replayed.bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, null, first.bytes });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
+    try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
+}
+
+test "strong cycle source owns full helper bodies across retained checkpoint replay and OOM" {
+    var fixture = try Fixture.initSource(
+        \\type State a is effect = { get: Unit -> a, set: a -> Unit }
+        \\type Node is data = #End | #Next (Unit -> Node ! {State.get Node})
+        \\const keep = fn ~value => fn () => @demand value
+        \\const get = fn (witness: Unit -> a) -> a => State.get ()
+        \\entry const run = fn (seed: U32) => do:
+        \\  let (_, result) = @effect.run State.get State.set #End (fn () => do:
+        \\    let delayed = keep (get (fn () => #End))
+        \\    use State.set (#Next delayed)
+        \\    use first <- delayed ()
+        \\    use State.set #End
+        \\    use cached <- delayed ()
+        \\    return case cached of
+        \\      #End => @panic "the demand lost its memoized cycle"
+        \\      #Next same => do:
+        \\        use again <- same ()
+        \\        return case again of
+        \\          #End => @panic "the retained closure lost its memo"
+        \\          #Next _ => seed
+        \\  )
+        \\  return result
+    );
+    defer fixture.deinit();
+    const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
+    defer a.free(nodes);
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    try ownership(first.bytes);
+    const emission = &first.capture.?.emission;
+    try std.testing.expect(emission.functions[emission.arena.?.cycle_collect].instructions.len != 0);
+    var retained = try fixture.emit(a, &first.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
+    const compiler: [32]u8 = @splat(34);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    var portable = try fixture.emit(a, null, &checkpoint);
+    defer portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, portable.bytes);
+    var replayed = try backend.compileWithOptions(a, &fixture.units, 1, .{ .identity = fixture.names.view(), .artifact_replay = true });
+    defer replayed.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, replayed.bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, null, first.bytes });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
+    try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
+}
+
 test "persistent List rotations keep borrowed pivots through source preparation and OOM" {
     var fixture = try Fixture.initSource(
         \\entry const forward = fn (count: U32) => do:

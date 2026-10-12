@@ -19,8 +19,8 @@ pub const Callback = struct { parameter: Scalar, result: Scalar };
 pub const OwnershipFallback = enum(u8) { none, no_arena, public_arena, host_references, imports, initializer, static_sequence_cache, unproven_body };
 const Export = struct { name: []u8, index: u32, parameter: Scalar, result: Scalar, global: bool, callback: ?Callback = null };
 pub const Arena = struct {
-    pub const function_fields = .{ "allocate", "allocate_scalar", "recycle", "reset", "mark", "collect", "allocate_typed", "retain", "release", "release_lease", "retire", "free", "store_word", "copy_words", "decrement", "root_allocate", "root_reserve", "root_pop", "root_open", "root_close", "root_mark", "root_enter", "root_leave", "root_store", "root_public_allocate", "root_public_reset", "root_force" };
-    pub const global_fields = .{ "heap", "base", "static_end", "allocated", "rc_enabled", "rc_leases", "rc_retains", "rc_releases", "rc_destroyed", "root_enabled", "root_page", "root_top", "root_frame", "root_active", "root_external", "root_count", "root_globals", "root_started", "root_static_map", "root_static_count", "root_global_count" };
+    pub const function_fields = .{ "allocate", "allocate_scalar", "recycle", "reset", "mark", "collect", "allocate_typed", "retain", "release", "release_lease", "retire", "free", "store_word", "copy_words", "decrement", "root_allocate", "root_reserve", "root_pop", "root_open", "root_close", "root_mark", "root_enter", "root_leave", "root_store", "root_public_allocate", "root_public_reset", "root_force", "cycle_enqueue", "cycle_unlink", "cycle_visit", "cycle_collect", "cycle_safe" };
+    pub const global_fields = .{ "heap", "base", "static_end", "allocated", "rc_enabled", "rc_leases", "rc_retains", "rc_releases", "rc_destroyed", "root_enabled", "root_page", "root_top", "root_frame", "root_active", "root_external", "root_count", "root_globals", "root_started", "root_static_map", "root_static_count", "root_global_count", "cycle_head", "cycle_members", "cycle_work", "cycle_phase", "cycle_removed", "cycle_cadence", "cycle_passes", "cycle_vertices", "cycle_edges", "cycle_bytes" };
     allocate: u32,
     allocate_scalar: u32,
     recycle: u32,
@@ -69,6 +69,22 @@ pub const Arena = struct {
     root_static_map: u32,
     root_static_count: u32,
     root_global_count: u32,
+
+    cycle_enqueue: u32,
+    cycle_unlink: u32,
+    cycle_visit: u32,
+    cycle_collect: u32,
+    cycle_safe: u32,
+    cycle_head: u32,
+    cycle_members: u32,
+    cycle_work: u32,
+    cycle_phase: u32,
+    cycle_removed: u32,
+    cycle_cadence: u32,
+    cycle_passes: u32,
+    cycle_vertices: u32,
+    cycle_edges: u32,
+    cycle_bytes: u32,
 
     pub fn isAllocation(self: Arena, function: u32) bool {
         return function == self.allocate or function == self.allocate_scalar;
@@ -120,6 +136,8 @@ pub const Module = struct {
     lists: ?@import("list_runtime.zig").Runtime = null,
     host_references: ?HostReferences = null,
     public_arena: bool = false,
+    /// Source generation decides cycle helper demand after completing bodies.
+    defer_cycles: bool = false,
     mutable_static: bool = false,
     static_fields: std.ArrayList(u32) = .empty,
     indirect: bool = false,
@@ -384,14 +402,22 @@ pub const Module = struct {
             try self.demandResource(.arena, 0, true);
             return arena;
         }
-        try self.data.appendNTimes(self.allocator, 0, 256);
+        try self.data.appendNTimes(self.allocator, 0, arena_runtime.metadata_bytes);
         std.mem.writeInt(u32, self.data.items[arena_runtime.empty_list_address + heap_layout.offset(heap_layout.ListDescriptor, "immutable") ..][0..4], 1, .little);
         std.mem.writeInt(u32, self.data.items[arena_runtime.empty_scalar_list_address + heap_layout.offset(heap_layout.ListDescriptor, "immutable") ..][0..4], 1, .little);
-        std.mem.writeInt(u32, self.data.items[arena_runtime.empty_scalar_list_address + heap_layout.offset(heap_layout.ListDescriptor, "scalar_elements") ..][0..4], 2, .little);
+        std.mem.writeInt(u32, self.data.items[arena_runtime.empty_scalar_list_address + heap_layout.offset(heap_layout.ListDescriptor, "scalar_elements") ..][0..4], 1, .little);
+        inline for (.{ arena_runtime.empty_list_address, arena_runtime.empty_scalar_list_address }) |address|
+            std.mem.writeInt(u32, self.data.items[address + heap_layout.offset(heap_layout.ListDescriptor, "leaf_limit") ..][0..4], @import("list_runtime.zig").capacity, .little);
+        for (2..17) |width| {
+            const address = arena_runtime.empty_rows_address + (width - 2) * @sizeOf(heap_layout.ListDescriptor);
+            std.mem.writeInt(u32, self.data.items[address + heap_layout.offset(heap_layout.ListDescriptor, "scalar_elements") ..][0..4], @intCast(width), .little);
+            std.mem.writeInt(u32, self.data.items[address + heap_layout.offset(heap_layout.ListDescriptor, "immutable") ..][0..4], 1, .little);
+            std.mem.writeInt(u32, self.data.items[address + heap_layout.offset(heap_layout.ListDescriptor, "leaf_limit") ..][0..4], @import("list_runtime.zig").leafLimit(@intCast(width)), .little);
+        }
         if (self.artifacts) |journal| try journal.data(0, self.data.items);
-        const heap = try self.addGlobal(.u32, 256, true);
-        const base = try self.addGlobal(.u32, 256, true);
-        const static_end = try self.addGlobal(.u32, 256, false);
+        const heap = try self.addGlobal(.u32, arena_runtime.metadata_bytes, true);
+        const base = try self.addGlobal(.u32, arena_runtime.metadata_bytes, true);
+        const static_end = try self.addGlobal(.u32, arena_runtime.metadata_bytes, false);
         const allocated = try self.addGlobal(.u32, 0, true);
         const rc_enabled = try self.addGlobal(.u32, 0, false);
         const rc_leases = try self.addGlobal(.u32, 0, true);
@@ -410,6 +436,16 @@ pub const Module = struct {
         const root_static_map = try self.addGlobal(.pointer, 0, false);
         const root_static_count = try self.addGlobal(.u32, 0, false);
         const root_global_count = try self.addGlobal(.u32, 0, false);
+        const cycle_head = try self.addGlobal(.u32, 0, true);
+        const cycle_members = try self.addGlobal(.u32, 0, true);
+        const cycle_work = try self.addGlobal(.u32, 0, true);
+        const cycle_phase = try self.addGlobal(.u32, 0, true);
+        const cycle_removed = try self.addGlobal(.u32, 0, true);
+        const cycle_cadence = try self.addGlobal(.u32, 0, true);
+        const cycle_passes = try self.addGlobal(.u32, 0, true);
+        const cycle_vertices = try self.addGlobal(.u32, 0, true);
+        const cycle_edges = try self.addGlobal(.u32, 0, true);
+        const cycle_bytes = try self.addGlobal(.u32, 0, true);
         const allocate = try self.addFunction(&.{.i32}, .i32);
         const allocate_scalar = try self.addFunction(&.{.i32}, .i32);
         const recycle = try self.addFunction(&.{.i32}, .none);
@@ -437,8 +473,14 @@ pub const Module = struct {
         const root_public_allocate = try self.addFunction(&.{.i32}, .i32);
         const root_force = try self.addFunction(&.{.i32}, .none);
         const root_public_reset = try self.addFunction(&.{.i32}, .i32);
-        const arena: Arena = .{ .root_force = root_force, .root_public_allocate = root_public_allocate, .root_public_reset = root_public_reset, .root_started = root_started, .root_static_map = root_static_map, .root_static_count = root_static_count, .root_global_count = root_global_count, .root_globals = root_globals, .root_store = root_store, .root_allocate = root_allocate, .root_reserve = root_reserve, .root_pop = root_pop, .root_open = root_open, .root_close = root_close, .root_mark = root_mark, .root_enter = root_enter, .root_leave = root_leave, .root_enabled = root_enabled, .root_page = root_page, .root_top = root_top, .root_frame = root_frame, .root_active = root_active, .root_external = root_external, .root_count = root_count, .rc_enabled = rc_enabled, .rc_leases = rc_leases, .rc_retains = rc_retains, .rc_releases = rc_releases, .rc_destroyed = rc_destroyed, .allocate_typed = allocate_typed, .retain = retain, .release = release, .release_lease = release_lease, .retire = retire, .free = free, .store_word = store_word, .copy_words = copy_words, .decrement = decrement, .heap = heap, .base = base, .static_end = static_end, .allocated = allocated, .allocate = allocate, .allocate_scalar = allocate_scalar, .recycle = recycle, .reset = reset, .mark = mark, .collect = collect };
+        const cycle_enqueue = try self.addFunction(&.{.i32}, .none);
+        const cycle_unlink = try self.addFunction(&.{.i32}, .none);
+        const cycle_visit = try self.addFunction(&.{.i32}, .none);
+        const cycle_collect = try self.addFunction(&.{}, .none);
+        const cycle_safe = try self.addFunction(&.{.i32}, .none);
+        const arena: Arena = .{ .cycle_enqueue = cycle_enqueue, .cycle_unlink = cycle_unlink, .cycle_visit = cycle_visit, .cycle_collect = cycle_collect, .cycle_safe = cycle_safe, .cycle_head = cycle_head, .cycle_members = cycle_members, .cycle_work = cycle_work, .cycle_phase = cycle_phase, .cycle_removed = cycle_removed, .cycle_cadence = cycle_cadence, .cycle_passes = cycle_passes, .cycle_vertices = cycle_vertices, .cycle_edges = cycle_edges, .cycle_bytes = cycle_bytes, .root_force = root_force, .root_public_allocate = root_public_allocate, .root_public_reset = root_public_reset, .root_started = root_started, .root_static_map = root_static_map, .root_static_count = root_static_count, .root_global_count = root_global_count, .root_globals = root_globals, .root_store = root_store, .root_allocate = root_allocate, .root_reserve = root_reserve, .root_pop = root_pop, .root_open = root_open, .root_close = root_close, .root_mark = root_mark, .root_enter = root_enter, .root_leave = root_leave, .root_enabled = root_enabled, .root_page = root_page, .root_top = root_top, .root_frame = root_frame, .root_active = root_active, .root_external = root_external, .root_count = root_count, .rc_enabled = rc_enabled, .rc_leases = rc_leases, .rc_retains = rc_retains, .rc_releases = rc_releases, .rc_destroyed = rc_destroyed, .allocate_typed = allocate_typed, .retain = retain, .release = release, .release_lease = release_lease, .retire = retire, .free = free, .store_word = store_word, .copy_words = copy_words, .decrement = decrement, .heap = heap, .base = base, .static_end = static_end, .allocated = allocated, .allocate = allocate, .allocate_scalar = allocate_scalar, .recycle = recycle, .reset = reset, .mark = mark, .collect = collect };
         try arena_runtime.emit(self, arena);
+        if (!self.defer_cycles) try @import("cycles_runtime.zig").emit(self, arena);
         try @import("root_runtime.zig").emit(self, arena);
         // Reset discards post-base blocks and every free-list link into them.
         // Pre-base runtime initializers remain in the physical block chain.
@@ -470,6 +512,43 @@ pub const Module = struct {
         try self.demandResource(.arena, 0, false);
         return arena;
     }
+    /// All source bodies are roots; allocator demand follows checked direct and
+    /// table references through compiler helpers. Foreign/public allocation and
+    /// initialization are explicit roots too. Helpers keep stable early IDs.
+    pub fn prepareCycles(self: *Module) Allocator.Error!void {
+        const arena = self.arena orelse return;
+        if (self.functions.items[arena.cycle_collect].instructions.items.len != 0) return;
+        if (self.public_arena or self.host_references != null or self.start != null) {
+            try @import("cycles_runtime.zig").emit(self, arena);
+            return;
+        }
+        const seen = try self.allocator.alloc(bool, self.functions.items.len);
+        defer self.allocator.free(seen);
+        for (seen, 0..) |*slot, id| slot.* = !self.runtimeHelper(id);
+        for (self.exports.items) |item| if (!item.global) {
+            seen[item.index] = true;
+        };
+        var changed = true;
+        while (changed) {
+            changed = false;
+            for (self.functions.items, 0..) |function, id| {
+                if (!seen[id]) continue;
+                if (id == arena.allocate or id == arena.allocate_typed or id == arena.root_allocate or id == arena.root_public_allocate) {
+                    try @import("cycles_runtime.zig").emit(self, arena);
+                    return;
+                }
+                for (function.instructions.items) |inst| {
+                    if (inst.op != .call and !inst.table_reference) continue;
+                    // The checked scalar allocator is a zero-child terminal;
+                    // following its raw allocator would erase that proof.
+                    if (inst.op == .call and inst.operand == arena.allocate_scalar) continue;
+                    if (inst.operand >= seen.len or seen[inst.operand]) continue;
+                    seen[inst.operand] = true;
+                    changed = true;
+                }
+            }
+        }
+    }
     pub fn ensureLists(self: *Module) (Allocator.Error || error{ ModuleTooLarge, InvalidGlobalReference })!@import("list_runtime.zig").Runtime {
         if (self.lists) |runtime| {
             try self.demandResource(.lists, 0, true);
@@ -477,7 +556,7 @@ pub const Module = struct {
         }
         const arena = try self.ensureArena();
         const runtime = try @import("list_runtime.zig").emit(self, arena);
-        if (self.artifacts) |journal| try journal.append(.{ .lists = runtime });
+        if (self.artifacts) |journal| try journal.recordLists(runtime);
         self.lists = runtime;
         try self.demandResource(.lists, 0, false);
         return runtime;
@@ -713,7 +792,7 @@ pub const Module = struct {
             try output.section(6, payload.items());
             payload.clear();
         }
-        try payload.uleb(@intCast(self.exports.items.len + @as(usize, if (self.public_arena) 2 else 0) + @intFromBool(self.public_arena or options.export_memory) + @intFromBool(options.export_function_table) + @as(usize, if (self.arena != null) 4 else 0) + @as(usize, if (roots_admitted) 3 else 0) + @intFromBool(roots_admitted and self.host_references != null)));
+        try payload.uleb(@intCast(self.exports.items.len + @as(usize, if (self.public_arena) 2 else 0) + @intFromBool(self.public_arena or options.export_memory) + @intFromBool(options.export_function_table) + @as(usize, if (self.arena != null) 8 else 0) + @as(usize, if (roots_admitted) 3 else 0) + @intFromBool(roots_admitted and self.host_references != null)));
         for (self.exports.items) |item| {
             try payload.name(item.name);
             try payload.byte(if (item.global) 3 else 0);
@@ -739,6 +818,11 @@ pub const Module = struct {
             try payload.uleb(references.cursor);
         };
         if (self.arena) |arena| inline for (.{ "rc_leases", "rc_retains", "rc_releases", "rc_destroyed" }) |field| {
+            try payload.name("blot:" ++ field);
+            try payload.byte(3);
+            try payload.uleb(@field(arena, field));
+        };
+        if (self.arena) |arena| inline for (.{ "cycle_passes", "cycle_vertices", "cycle_edges", "cycle_bytes" }) |field| {
             try payload.name("blot:" ++ field);
             try payload.byte(3);
             try payload.uleb(@field(arena, field));
@@ -792,6 +876,21 @@ pub const Module = struct {
                 }
                 for (instructions) |instruction| {
                     var encoded = instruction;
+                    // These private immutable flags receive the authoritative
+                    // admission result above. Keep symbolic IR intact for reuse;
+                    // exposing their constants lets the guest remove idle guards.
+                    if (encoded.op == .global_get) if (self.arena) |arena| {
+                        const flag = encoded.operand;
+                        if (flag == arena.rc_enabled or flag == arena.root_enabled) {
+                            const global = self.globals.items[flag];
+                            if (!global.mutable and global.scalar == .u32) {
+                                var bits = global.bits;
+                                if (flag == arena.rc_enabled) bits = @intFromBool(rc_admitted);
+                                if (flag == arena.root_enabled and roots_admitted) bits = 1;
+                                encoded = .{ .op = .i32_const, .operand = bits };
+                            }
+                        }
+                    };
                     if (encoded.op == .call) {
                         if (encoded.operand >= self.functions.items.len) return error.InvalidFunctionReference;
                         encoded.operand = code.function(encoded.operand);
@@ -826,6 +925,13 @@ pub const Module = struct {
         try payload.byte(@backingInt(ownership_fallback));
         try output.section(0, payload.items());
         payload.clear();
+        if (self.arena != null) {
+            try payload.name("blot:cycles");
+            try payload.byte(1);
+            try payload.byte(@intFromBool(rc_admitted));
+            try output.section(0, payload.items());
+            payload.clear();
+        }
         try payload.name("blot:abi");
         try payload.byte(if (roots_admitted) 3 else 2);
         var function_count: u32 = 0;
@@ -1095,6 +1201,42 @@ test "flat symbolic scalar module owns output independently" {
     module.deinit();
     try std.testing.expectEqualSlices(u8, &.{ 0, 97, 115, 109, 1, 0, 0, 0 }, bytes[0..8]);
     try std.testing.expect(std.mem.find(u8, bytes, "blot:abi") != null);
+}
+test "serialization folds exact immutable admission flags after deciding enabled and disabled modes" {
+    const a = std.testing.allocator;
+    for ([_]bool{ false, true }) |enabled| for ([_]bool{ false, true }) |mutable| {
+        var module = Module.init(a);
+        defer module.deinit();
+        const arena = try module.ensureArena();
+        module.public_arena = true;
+        module.mutable_static = !enabled;
+        module.globals.items[arena.rc_enabled].mutable = mutable;
+        module.globals.items[arena.root_enabled].mutable = mutable;
+        const unrelated = try module.addGlobal(.u32, 73, false);
+        const id = try module.addFunction(&.{}, .i32);
+        module.functions.items[id].result_role = .scalar;
+        const source = [_]Instruction{
+            .{ .op = .global_get, .operand = arena.rc_enabled },
+            .{ .op = .global_get, .operand = arena.root_enabled },
+            .{ .op = .i32_add },
+            .{ .op = .global_get, .operand = unrelated },
+            .{ .op = .i32_add },
+        };
+        try module.emitSlice(id, &source);
+        try module.exportFunction(id, "flag_probe", .unit, .u32);
+        const bytes = try module.assemble();
+        defer a.free(bytes);
+        var expected = Bytes.init(a);
+        defer expected.deinit();
+        for (source) |instruction| {
+            var encoded = instruction;
+            if (!mutable and instruction.op == .global_get and instruction.operand != unrelated)
+                encoded = .{ .op = .i32_const, .operand = @intFromBool(enabled) };
+            try encodeInstruction(&expected, encoded, module.functions.items.len, module.globals.items.len, module.signatures.items.len, 0);
+        }
+        try std.testing.expect(std.mem.find(u8, bytes, expected.items()) != null);
+        try std.testing.expectEqualSlices(Instruction, &source, module.functions.items[id].instructions.items);
+    };
 }
 test "backend reports stale symbolic function references" {
     var module = Module.init(std.testing.allocator);

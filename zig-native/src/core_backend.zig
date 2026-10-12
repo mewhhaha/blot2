@@ -190,6 +190,7 @@ const Generator = struct {
             error.TypeMismatch => return error.Declined,
         };
         var module = wasm.Module.init(allocator);
+        module.defer_cycles = true;
         module.artifacts = journal;
         errdefer module.deinit();
         var requests = false;
@@ -690,11 +691,11 @@ const Generator = struct {
                     defer leaves.deinit(self.allocator);
                     var offset: usize = 0;
                     while (offset < words.items.len) {
-                        const end = @min(words.items.len, offset + lists.capacity);
+                        const end = @min(words.items.len, offset + lists.leafLimit(row_words));
                         try leaves.append(self.allocator, try lists.staticChunk(&self.module, words.items[offset..end]));
                         offset = end;
                     }
-                    break :blk try lists.staticScalarDescriptor(&self.module, @intCast(words.items.len), leaves.items);
+                    break :blk try lists.staticScalarDescriptor(&self.module, @intCast(words.items.len), leaves.items, row_words);
                 };
                 try self.serialized.put(self.allocator, key, address);
                 return address;
@@ -2208,6 +2209,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         error.OutOfMemory => return error.OutOfMemory,
         error.ModuleTooLarge => return error.ModuleTooLarge,
     };
+    try generator.module.prepareCycles();
     timing.initialize_us = clock.lap();
     var optimized: ?@import("optimized_bodies.zig").Capture = if (options.retain_artifacts) .{ .allocator = allocator } else null;
     defer if (optimized) |*owned| owned.deinit();
@@ -2880,7 +2882,8 @@ const Emitter = struct {
     };
     const Body = resolved_body.Body(Plan);
 
-    const RowView = struct { binding: core.BindingId, row: layout.Id, owner: u32, offset: u32, address: u32, next_address: u32, limit_address: u32, scratch: u32 };
+    const RowView = struct { binding: core.BindingId, row: layout.Id, address: u32, limit_address: u32 };
+    const ListDirectory = struct { storage: u32, array: u32, offset: u32 };
     const LayoutEntry = struct { ty: types.Id = 0, value: layout.Id = 0 };
     const SmallCollection = struct { values: [function_facts.small_limit]u32 = undefined, len: usize = 0, machine: wasm.ValueType = .i32 };
     body: ?*const Body = null,
@@ -4446,8 +4449,7 @@ const Emitter = struct {
                     const view = self.row_views.items[index];
                     if (view.binding != reference.binding) continue;
                     const offset = row_projection_uses.fieldOffset(unit_, n.b, &g.layouts, view.row) orelse return g.fail(self.unit_id, id, .unresolved_type);
-                    try self.emit(.local_get, view.address);
-                    try self.emit(if (try self.scalar(id) == .f32) .f32_load else .i32_load, offset);
+                    try self.loadRowView(view, offset, (try self.scalar(id)).machine());
                     return;
                 }
             }
@@ -4749,7 +4751,10 @@ const Emitter = struct {
             const address = try self.temporary(.i32);
             if (children.len > 0x10000000 / @max(1, row_words)) return g.fail(self.unit_id, id, .complexity);
             try self.emit(.i32_const, @intCast(children.len * @max(1, row_words)));
-            try self.emit(.i32_const, @intFromBool(scalar_elements));
+            var scalar_words: u32 = 0;
+            if (scalar_elements) scalar_words = @max(1, row_words);
+            try self.emit(.i32_const, scalar_words);
+            try self.emit(.i32_const, @import("list_runtime.zig").leafLimit(@max(1, row_words)));
             try self.emit(.call, runtime.new);
             try self.emit(.local_set, address);
             for (children, locals.items, 0..) |child, value, index| {
@@ -4888,7 +4893,12 @@ const Emitter = struct {
         const index = try self.temporary(.i32);
         const physical = if (is_list and row_words > 1) try self.listWordCount(count, row_words) else count;
         try self.emit(.local_get, if (is_list) physical else size);
-        if (is_list) try self.emit(.i32_const, @intFromBool(scalar_elements));
+        if (is_list) {
+            var scalar_words: u32 = 0;
+            if (scalar_elements) scalar_words = @max(1, row_words);
+            try self.emit(.i32_const, scalar_words);
+            try self.emit(.i32_const, @import("list_runtime.zig").leafLimit(@max(1, row_words)));
+        }
         if (is_list) try self.emit(.call, (try self.generator.module.ensureLists()).new) else try self.allocateArray(scalar_elements);
         try self.emit(.local_set, array_);
         try self.emit(.local_get, array_);
@@ -5087,7 +5097,12 @@ const Emitter = struct {
         const size = if (is_list) (if (row_words > 1) try self.listWordCount(count, row_words) else count) else try self.arraySize(count, stride);
         const storage = try self.temporary(.i32);
         try self.emit(.local_get, size);
-        if (is_list) try self.emit(.i32_const, @intFromBool(scalar_elements));
+        if (is_list) {
+            var scalar_words: u32 = 0;
+            if (scalar_elements) scalar_words = @max(1, row_words);
+            try self.emit(.i32_const, scalar_words);
+            try self.emit(.i32_const, @import("list_runtime.zig").leafLimit(@max(1, row_words)));
+        }
         if (is_list) try self.emit(.call, (try g.module.ensureLists()).new) else try self.allocateArray(scalar_elements);
         try self.emit(.local_set, storage);
         if (!is_list) {
@@ -5494,47 +5509,24 @@ const Emitter = struct {
         try self.emit(.i32_add, 0);
     }
     fn readListSpanRow(self: *Emitter, source: u32, base: u32, words: u32, span: [3]u32, walk: ?list_traversal.Walk) Error!void {
-        var fields: [16]u32 = undefined;
-        for (fields[0..words]) |*field| field.* = try self.temporary(.i32);
-        // Successive rows are monotone. A crossing row updates these loop-local
-        // spans as it goes, so the next row starts in the last resolved leaf.
+        // Every stored row occupies one leaf. The source descriptor roots its
+        // immutable tree while these private physical addresses are live.
         try self.emit(.local_get, base);
-        if (words != 1) {
-            try self.emit(.i32_const, words - 1);
-            try self.emit(.i32_add, 0);
-        }
         try self.emit(.local_get, span[2]);
-        try self.emit(.i32_lt_u, 0);
+        try self.emit(.i32_ge_u, 0);
         try self.emit(.if_, 0);
+        try self.resolveListSpan(source, base, span, walk);
+        try self.emit(.end, 0);
         const address = try self.temporary(.i32);
         try self.listSpanAddress(base, span);
         try self.emit(.local_set, address);
-        for (fields[0..words], 0..) |field, i| {
+        var fields: [16]u32 = undefined;
+        for (fields[0..words], 0..) |*field, i| {
+            field.* = try self.temporary(.i32);
             try self.emit(.local_get, address);
             try self.emit(.i32_load, @intCast(i * 4));
-            try self.emit(.local_set, field);
+            try self.emit(.local_set, field.*);
         }
-        try self.emit(.else_, 0);
-        for (fields[0..words], 0..) |field, i| {
-            const position = if (i == 0) base else blk: {
-                const local = try self.temporary(.i32);
-                try self.emit(.local_get, base);
-                try self.emit(.i32_const, @intCast(i));
-                try self.emit(.i32_add, 0);
-                try self.emit(.local_set, local);
-                break :blk local;
-            };
-            try self.emit(.local_get, position);
-            try self.emit(.local_get, span[2]);
-            try self.emit(.i32_ge_u, 0);
-            try self.emit(.if_, 0);
-            try self.resolveListSpan(source, position, span, walk);
-            try self.emit(.end, 0);
-            try self.listSpanAddress(position, span);
-            try self.emit(.i32_load, 0);
-            try self.emit(.local_set, field);
-        }
-        try self.emit(.end, 0);
         const row = try self.allocateStorage(words * 4, true, .scalar);
         for (fields[0..words], 0..) |field, i| {
             try self.emit(.local_get, row);
@@ -5543,216 +5535,40 @@ const Emitter = struct {
         }
         try self.emit(.local_get, row);
     }
-    fn listLeafView(self: *Emitter, base: u32, span: [3]u32, view: RowView) Error!void {
-        try self.emit(.local_get, span[0]);
-        try self.emit(.local_set, view.owner);
-        try self.emit(.local_get, base);
-        try self.emit(.local_get, span[1]);
-        try self.emit(.i32_sub, 0);
+    fn readListRowView(self: *Emitter, words: u32, span: [3]u32, view: RowView, directory: ListDirectory) Error!void {
+        // A monotone complete-row traversal begins at the next whole leaf.
+        // The directory covers the immutable tree in order; every leaf is
+        // nonempty and row aligned. No word-to-row-to-word round trip or
+        // physical one-past pointer is needed to recover its two addresses.
+        try self.emit(.local_get, directory.array);
+        try self.emit(.local_get, directory.offset);
+        try self.emit(.i32_add, 0);
+        try self.emit(.i32_load, @sizeOf(heap.Array));
+        try self.emit(.local_set, span[0]);
+        try self.emit(.local_get, directory.offset);
         try self.emit(.i32_const, 4);
-        try self.emit(.i32_mul, 0);
-        try self.emit(.i32_const, @import("list_runtime.zig").header);
         try self.emit(.i32_add, 0);
-        try self.emit(.local_set, view.offset);
-    }
-    fn listRowFits(self: *Emitter, base: u32, words: u32, end: u32) Error!void {
-        try self.emit(.local_get, base);
-        try self.emit(.i32_const, words);
-        try self.emit(.i32_add, 0);
-        try self.emit(.local_get, end);
-        try self.emit(.i32_le_u, 0);
-    }
-    // The caller proves 1 <= count <= words <= 16. Constant copy sizes avoid
-    // a host memcpy call for each short fragment of a crossing row.
-    fn copyScalarSpan(self: *Emitter, destination: u32, source: u32, count: u32, first: u32, last: u32) Error!void {
-        if (first == last) {
-            try self.emit(.local_get, destination);
-            try self.emit(.local_get, source);
-            try self.emit(.i32_const, first * 4);
-            try self.emit(.memory_copy, 0);
-            return;
-        }
-        const middle = first + (last - first) / 2;
-        try self.emit(.local_get, count);
-        try self.emit(.i32_const, middle);
-        try self.emit(.i32_le_u, 0);
-        try self.emit(.if_, 0);
-        try self.copyScalarSpan(destination, source, count, first, middle);
-        try self.emit(.else_, 0);
-        try self.copyScalarSpan(destination, source, count, middle + 1, last);
-        try self.emit(.end, 0);
-    }
-    /// The caller proves base < span[2] < base + words and passes a buffer of
-    /// 2 * words words. The row is assembled at its second half; the first half
-    /// is slack. Returns with span at the leaf holding the row's last word.
-    fn copyCrossingListRow(self: *Emitter, source: u32, base: u32, words: u32, span: [3]u32, scratch: u32, walk: ?list_traversal.Walk) Error!void {
-        const bytes = words * 4;
-        const position = try self.temporary(.i32);
-        const head_bytes = try self.temporary(.i32);
-        const head_end = try self.temporary(.i32);
-        try self.emit(.local_get, span[2]);
-        try self.emit(.local_set, position);
-        try self.emit(.local_get, position);
-        try self.emit(.local_get, base);
-        try self.emit(.i32_sub, 0);
-        try self.emit(.i32_const, 4);
-        try self.emit(.i32_mul, 0);
-        try self.emit(.local_set, head_bytes);
-        try self.listSpanAddress(position, span);
-        try self.emit(.local_set, head_end);
-        try self.resolveListSpan(source, position, span, walk);
-        try self.listRowFits(base, words, span[2]);
-        try self.emit(.if_, 0);
-        // Two leaves hold the row. Two constant-size copies replace a
-        // size-dependent branch per fragment. Each block ends at its fragment's
-        // end, so neither reads past a leaf. Earlier bytes come from preceding
-        // headers or objects. Payloads lie above the 256 reserved bytes and a
-        // row has at most 64, so no address wraps. The tail block lands first;
-        // the head block overwrites its leading words and spills only into the
-        // slack half.
-        try self.emit(.local_get, scratch);
-        try self.emit(.i32_const, bytes);
-        try self.emit(.i32_add, 0);
-        try self.listSpanAddress(position, span);
-        try self.emit(.local_get, head_bytes);
-        try self.emit(.i32_sub, 0);
-        try self.emit(.i32_const, bytes);
-        try self.emit(.memory_copy, 0);
-        try self.emit(.local_get, scratch);
-        try self.emit(.local_get, head_bytes);
-        try self.emit(.i32_add, 0);
-        try self.emit(.local_get, head_end);
-        try self.emit(.i32_const, bytes);
-        try self.emit(.i32_sub, 0);
-        try self.emit(.i32_const, bytes);
-        try self.emit(.memory_copy, 0);
-        try self.emit(.else_, 0);
-        // A short later leaf: copy each fragment exactly.
-        const row = try self.temporary(.i32);
-        const copied = try self.temporary(.i32);
-        const count = try self.temporary(.i32);
-        const fragment = try self.temporary(.i32);
-        try self.emit(.local_get, scratch);
-        try self.emit(.i32_const, bytes);
-        try self.emit(.i32_add, 0);
-        try self.emit(.local_set, row);
-        try self.emit(.local_get, position);
-        try self.emit(.local_get, base);
-        try self.emit(.i32_sub, 0);
-        try self.emit(.local_set, count);
-        try self.emit(.local_get, head_end);
-        try self.emit(.local_get, head_bytes);
-        try self.emit(.i32_sub, 0);
-        try self.emit(.local_set, fragment);
-        try self.copyScalarSpan(row, fragment, count, 1, words);
-        try self.emit(.local_get, count);
-        try self.emit(.local_set, copied);
-        try self.emit(.block, 0);
-        try self.emit(.loop, 0);
-        try self.emit(.local_get, copied);
-        try self.emit(.i32_const, words);
-        try self.emit(.i32_ge_u, 0);
-        try self.emit(.br_if, 1);
-        try self.emit(.local_get, position);
-        try self.emit(.local_get, span[2]);
-        try self.emit(.i32_ge_u, 0);
-        try self.emit(.if_, 0);
-        try self.resolveListSpan(source, position, span, walk);
-        try self.emit(.end, 0);
-        try self.emit(.local_get, span[2]);
-        try self.emit(.local_get, position);
-        try self.emit(.i32_sub, 0);
-        try self.emit(.local_set, count);
-        try self.emit(.i32_const, words);
-        try self.emit(.local_get, copied);
-        try self.emit(.i32_sub, 0);
-        try self.emit(.local_get, count);
-        try self.emit(.i32_lt_u, 0);
-        try self.emit(.if_, 0);
-        try self.emit(.i32_const, words);
-        try self.emit(.local_get, copied);
-        try self.emit(.i32_sub, 0);
-        try self.emit(.local_set, count);
-        try self.emit(.end, 0);
-        const destination = try self.temporary(.i32);
-        try self.emit(.local_get, row);
-        try self.emit(.local_get, copied);
-        try self.emit(.i32_const, 4);
-        try self.emit(.i32_mul, 0);
-        try self.emit(.i32_add, 0);
-        try self.emit(.local_set, destination);
-        try self.listSpanAddress(position, span);
-        try self.emit(.local_set, fragment);
-        try self.copyScalarSpan(destination, fragment, count, 1, words);
-        try self.emit(.local_get, position);
-        try self.emit(.local_get, count);
-        try self.emit(.i32_add, 0);
-        try self.emit(.local_set, position);
-        try self.emit(.local_get, copied);
-        try self.emit(.local_get, count);
-        try self.emit(.i32_add, 0);
-        try self.emit(.local_set, copied);
-        try self.emit(.br, 0);
-        try self.emit(.end, 0);
-        try self.emit(.end, 0);
-        try self.emit(.end, 0);
-    }
-    fn readListRowView(self: *Emitter, source: u32, index: u32, words: u32, span: [3]u32, view: RowView, walk: ?list_traversal.Walk) Error!void {
-        // Keep an allocation base and separate scalar offset. Only direct
-        // scalar projections can consume this view; no interior pointer is a
-        // source value or retained across the next iteration.
-        try self.emit(.local_get, view.next_address);
-        try self.emit(.local_get, view.limit_address);
-        try self.emit(.i32_le_u, 0);
-        try self.emit(.if_, 0);
-        try self.emit(.local_get, view.next_address);
-        try self.emit(.local_set, view.address);
-        try self.emit(.local_get, view.next_address);
-        try self.emit(.i32_const, words * 4);
-        try self.emit(.i32_add, 0);
-        try self.emit(.local_set, view.next_address);
-        try self.emit(.else_, 0);
-        const base = try self.multiplyLocal(index, words);
-        try self.emit(.local_get, base);
-        try self.emit(.local_get, span[2]);
-        try self.emit(.i32_ge_u, 0);
-        try self.emit(.if_, 0);
-        try self.resolveListSpan(source, base, span, walk);
-        try self.emit(.end, 0);
-        try self.listRowFits(base, words, span[2]);
-        try self.emit(.if_, 0);
-        try self.listLeafView(base, span, view);
-        try self.emit(.else_, 0);
-        try self.copyCrossingListRow(source, base, words, span, view.scratch, walk);
-        try self.emit(.local_get, view.scratch);
-        try self.emit(.local_set, view.owner);
-        try self.emit(.i32_const, words * 4);
-        try self.emit(.local_set, view.offset);
-        try self.emit(.end, 0);
-        try self.emit(.local_get, view.owner);
-        try self.emit(.local_get, view.offset);
-        try self.emit(.i32_add, 0);
-        try self.emit(.local_set, view.address);
-        const next = try self.temporary(.i32);
-        try self.emit(.local_get, base);
-        try self.emit(.i32_const, words);
-        try self.emit(.i32_add, 0);
-        try self.emit(.local_set, next);
-        try self.listSpanAddress(next, span);
-        try self.emit(.local_set, view.next_address);
+        try self.emit(.local_set, directory.offset);
         try self.emit(.local_get, span[0]);
         try self.emit(.i32_const, @import("list_runtime.zig").header);
         try self.emit(.i32_add, 0);
+        try self.emit(.local_set, view.address);
+        try self.emit(.local_get, span[0]);
+        try self.emit(.i32_load, heap.offset(heap.ListNode, "length"));
+        const length = try self.temporary(.i32);
+        try self.emit(.local_set, length);
         try self.emit(.local_get, span[2]);
-        try self.emit(.local_get, span[1]);
+        try self.emit(.local_get, length);
+        try self.emit(.i32_add, 0);
+        try self.emit(.local_set, span[2]);
+        try self.emit(.local_get, view.address);
+        try self.emit(.local_get, length);
+        try self.emit(.i32_const, words);
         try self.emit(.i32_sub, 0);
         try self.emit(.i32_const, 4);
         try self.emit(.i32_mul, 0);
         try self.emit(.i32_add, 0);
-        try self.emit(.i32_const, words * 4);
-        try self.emit(.i32_sub, 0);
         try self.emit(.local_set, view.limit_address);
-        try self.emit(.end, 0);
     }
     fn readListRow(self: *Emitter, source: u32, index: u32, words: u32, cache: ?[2]u32, span_end: ?u32) Error!void {
         const base = try self.multiplyLocal(index, words);
@@ -7777,6 +7593,32 @@ const Emitter = struct {
         }
         return false;
     }
+    fn loopListDirectory(self: *Emitter, source: u32, end: u32) Error!ListDirectory {
+        const directory: ListDirectory = .{ .storage = try self.temporary(.i32), .array = try self.temporary(.i32), .offset = try self.temporary(.i32) };
+        try self.emit(.i32_const, 0);
+        try self.emit(.local_set, directory.storage);
+        try self.emit(.i32_const, 0);
+        try self.emit(.local_set, directory.offset);
+        try self.emit(.local_get, end);
+        try self.emit(.if_, 0);
+        // Only descriptor/directory edges belong to this holder. Row and carry
+        // roots retain their existing, independently checked lifetime paths.
+        try self.emit(.local_get, source);
+        try self.emit(.call, (try self.generator.module.ensureLists()).directory);
+        try self.emit(.local_set, directory.array);
+        const storage = try self.allocate(8, .{ .words = &.{ .reference, .reference }, .rest = .scalar });
+        try self.emit(.local_get, storage);
+        try self.emit(.local_get, source);
+        try self.storeCollectionWord(storage, false, .i32, 0);
+        try self.emit(.local_get, storage);
+        try self.emit(.local_get, directory.array);
+        try self.storeCollectionWord(storage, false, .i32, 4);
+        try self.emit(.local_get, storage);
+        try self.emit(.local_set, directory.storage);
+        try self.emit(.end, 0);
+        try self.cleanups.append(self.generator.allocator, .{ .release_if_nonzero = @fromBackingInt(@intCast(directory.storage)) });
+        return directory;
+    }
     fn loopListWalk(self: *Emitter, source: u32, end: u32, enabled: bool) Error!?list_traversal.Walk {
         if (!enabled) return null;
         const walk: list_traversal.Walk = .{ .storage = try self.temporary(.i32), .top = try self.temporary(.i32), .limit = try self.temporary(.i32), .node = try self.temporary(.i32) };
@@ -7797,7 +7639,7 @@ const Emitter = struct {
         try self.cleanups.append(self.generator.allocator, .{ .release_if_nonzero = @fromBackingInt(@intCast(walk.storage)) });
         return walk;
     }
-    fn loopRowView(self: *Emitter, id: core.Id, span: ?[3]u32, end: u32) Error!?RowView {
+    fn loopRowView(self: *Emitter, id: core.Id, span: ?[3]u32) Error!?RowView {
         var private = self.ragged_count != null;
         if (self.ragged_fill and self.exact_build != null) private = true;
         if (span == null and !private) return null;
@@ -7819,28 +7661,21 @@ const Emitter = struct {
                 else => return null,
             };
         } else return null;
-        const view: RowView = .{ .binding = if (pattern.tag == .bind) pattern.a else 0, .row = g.layouts.node(collection).a, .owner = try self.temporary(.i32), .offset = try self.temporary(.i32), .address = try self.temporary(.i32), .next_address = try self.temporary(.i32), .limit_address = try self.temporary(.i32), .scratch = try self.temporary(.i32) };
-        try self.emit(.i32_const, 0);
-        try self.emit(.local_set, view.scratch);
-        if (span != null and words > 1) {
-            // A crossing row uses one private scalar buffer per nonempty loop
-            // activation, released on every exit. Allocating it before the
-            // loop keeps calls off the per-leaf path, so engines need not
-            // spill loop-carried values around a rarely taken allocation.
-            try self.emit(.local_get, end);
-            try self.emit(.if_, 0);
-            const scratch = try self.allocateStorage(words * 8, true, .scalar);
-            try self.emit(.local_get, scratch);
-            try self.emit(.local_set, view.scratch);
-            try self.emit(.end, 0);
-        }
-        try self.emit(.i32_const, 0);
-        try self.emit(.local_set, view.limit_address);
-        try self.emit(.i32_const, 1);
-        try self.emit(.local_set, view.next_address);
-        try self.cleanups.append(g.allocator, .{ .release_if_nonzero = @fromBackingInt(@intCast(view.scratch)) });
+        const view: RowView = .{ .binding = if (pattern.tag == .bind) pattern.a else 0, .row = g.layouts.node(collection).a, .address = try self.temporary(.i32), .limit_address = try self.temporary(.i32) };
         if (view.binding != 0) try self.row_views.append(g.allocator, view);
         return view;
+    }
+    fn loadRowView(self: *Emitter, view: RowView, offset: u32, machine: wasm.ValueType) Error!void {
+        const words = packed_layout.rowWords(&self.generator.layouts, view.row);
+        try self.emit(.local_get, view.address);
+        if (machine == .f32 and offset / 16 * 4 + 4 <= words) {
+            // The checked complete row includes this whole block. Repeated
+            // scalar projections share the load; arithmetic stays ordered.
+            try self.emit(.v128_load, offset / 16 * 16);
+            try self.emit(.f32x4_extract_lane, offset / 4 % 4);
+            return;
+        }
+        try self.emit(if (machine == .f32) .f32_load else .i32_load, offset);
     }
     fn bindRowViewPattern(self: *Emitter, id: core.Id, pattern: core.PatternId, view: RowView) Error!void {
         if (view.binding != 0) return;
@@ -7850,8 +7685,7 @@ const Emitter = struct {
             const binding = source.pattern(child);
             if (binding.tag == .wildcard) continue;
             const concrete = try self.codeLayout(binding.ty, source.span(id));
-            try self.emit(.local_get, view.address);
-            try self.emit(if (g.layouts.machine(concrete) == .f32) .f32_load else .i32_load, @intCast(field * 4));
+            try self.loadRowView(view, @intCast(field * 4), g.layouts.machine(concrete));
             try self.save(binding.a, id);
         }
     }
@@ -7899,11 +7733,21 @@ const Emitter = struct {
                 try self.emit(.local_set, list_span.?[2]);
             }
         }
-        const list_walk = try self.loopListWalk(array_local, end, list_span != null);
-        const borrowed_view = try self.loopRowView(id, list_span, end);
+        const borrowed_view = try self.loopRowView(id, list_span);
         var row_view: ?RowView = null;
         var array_view: ?RowView = null;
         if (list_span != null) row_view = borrowed_view else array_view = borrowed_view;
+        if (row_view != null) {
+            // Complete leaves and the descriptor length use storage words.
+            // Share that counter instead of dividing at each leaf boundary.
+            counter = list_span.?[2];
+            try self.emit(.local_get, array_local);
+            try self.emit(.i32_load, 0);
+            try self.emit(.local_set, end);
+        }
+        var list_directory: ?ListDirectory = null;
+        if (row_view != null) list_directory = try self.loopListDirectory(array_local, end);
+        const list_walk = try self.loopListWalk(array_local, end, list_span != null and row_view == null);
         // A floor belongs to this activation. Earlier allocations are pinned
         // and traced. Collect after allocation traffic proportional to the
         // arena, so a small cursor does not repeatedly trace a large snapshot.
@@ -7962,7 +7806,7 @@ const Emitter = struct {
         if (row_view) |view| {
             const collection = try self.codeLayout(source.typeOf(metadata.first), source.span(metadata.first));
             const words = packed_layout.collectionRowWords(&g.layouts, collection);
-            try self.readListRowView(array_local, counter, words, list_span.?, view, list_walk);
+            try self.readListRowView(words, list_span.?, view, list_directory.?);
         } else if (array_view) |view| {
             const collection = try self.codeLayout(source.typeOf(metadata.first), source.span(metadata.first));
             const words = packed_layout.collectionRowWords(&g.layouts, collection);
@@ -8066,35 +7910,24 @@ const Emitter = struct {
             if (row_view) |view| {
                 const collection = try self.codeLayout(source.typeOf(metadata.first), source.span(metadata.first));
                 const bytes = packed_layout.collectionRowWords(&g.layouts, collection) * 4;
-                // The current leaf bounds the inner loop, including the last
-                // leaf. A fitting next row cannot pass the List's logical end.
-                try self.emit(.local_get, view.next_address);
+                // Row alignment places both addresses on the same stride
+                // grid. Compare before advancing: only a following complete
+                // row permits pointer addition, including at Wasm32's limit.
+                try self.emit(.local_get, view.address);
                 try self.emit(.local_get, view.limit_address);
-                try self.emit(.i32_le_u, 0);
-                try self.emit(.local_get, view.next_address);
-                try self.emit(.local_set, view.address);
-                try self.emit(.local_get, view.next_address);
+                try self.emit(.i32_lt_u, 0);
+                try self.emit(.if_, 0);
+                self.labels += 1;
+                try self.cleanupTo(inner_cleanup);
+                self.cleanups.restore(inner_cleanup);
+                try self.emit(.local_get, view.address);
                 try self.emit(.i32_const, bytes);
                 try self.emit(.i32_add, 0);
-                try self.emit(.local_set, view.next_address);
-                try self.cleanupTo(inner_cleanup);
-                try self.emit(.br_if, self.labels - 1 - row_label);
-                self.cleanups.restore(inner_cleanup);
-                // The address now denotes the first unconsumed logical row.
-                // Recover its index only at a leaf boundary; the inner loop
-                // needs no per-row integer counter.
-                try self.emit(.local_get, view.address);
-                try self.emit(.local_get, list_span.?[0]);
-                try self.emit(.i32_sub, 0);
-                try self.emit(.i32_const, @import("list_runtime.zig").header);
-                try self.emit(.i32_sub, 0);
-                try self.emit(.i32_const, 4);
-                try self.emit(.i32_div_u, 0);
-                try self.emit(.local_get, list_span.?[1]);
-                try self.emit(.i32_add, 0);
-                try self.emit(.i32_const, bytes / 4);
-                try self.emit(.i32_div_u, 0);
-                try self.emit(.local_set, counter);
+                try self.emit(.local_set, view.address);
+                try self.emit(.br, self.labels - 1 - row_label);
+                self.labels -= 1;
+                try self.emit(.end, 0);
+                // No physical one-past address is formed at a leaf boundary.
             }
             if (row_view != null) try self.cleanupTo(outer_cleanup);
             try self.emit(.br, self.labels - 1 - head_label);
@@ -8115,11 +7948,30 @@ const Emitter = struct {
         const g = self.generator;
         if (carries.len >= std.math.maxInt(u32) / 4) return g.fail(self.unit_id, id, .complexity);
         const arena = try g.module.ensureArena();
+        const trace_due = try self.temporary(.i32);
         try self.emit(.global_get, arena.allocated);
         try self.emit(.local_get, cadence);
         try self.emit(.i32_sub, 0);
         try self.emit(.local_get, budget);
         try self.emit(.i32_ge_u, 0);
+        try self.emit(.local_tee, trace_due);
+        // Trial deletion has its own traffic/removal trigger; a large retained
+        // heap must not postpone it until the tracer's larger allocation budget.
+        try self.emit(.global_get, arena.cycle_head);
+        try self.emit(.if_, 0x7f);
+        try self.emit(.global_get, arena.cycle_removed);
+        try self.emit(.i32_const, 65536);
+        try self.emit(.i32_ge_u, 0);
+        try self.emit(.global_get, arena.allocated);
+        try self.emit(.global_get, arena.cycle_cadence);
+        try self.emit(.i32_sub, 0);
+        try self.emit(.i32_const, 65536);
+        try self.emit(.i32_ge_u, 0);
+        try self.emit(.i32_or, 0);
+        try self.emit(.else_, 0);
+        try self.emit(.i32_const, 0);
+        try self.emit(.end, 0);
+        try self.emit(.i32_or, 0);
         try self.emit(.if_, 0);
         self.labels += 1;
         // Carried scalars must not become references merely because their bits
@@ -8171,14 +8023,25 @@ const Emitter = struct {
         try self.emit(.local_get, root);
         try self.providerHead();
         try self.emit(.i32_store, @intCast(position * 4));
+        try self.emit(.global_get, arena.cycle_head);
+        try self.emit(.if_, 0);
+        try self.emit(.i32_const, 0);
+        try self.emit(.call, arena.cycle_safe);
+        try self.emit(.end, 0);
+        try self.emit(.local_get, trace_due);
+        try self.emit(.if_, 0);
         try self.emit(.local_get, root);
         try self.emit(.local_get, floor);
         try self.emit(.i32_const, 0);
         try self.emit(.call, arena.collect);
         try self.emit(.drop, 0);
+        try self.emit(.end, 0);
         try self.emit(.local_get, root);
         try self.emit(.call, arena.recycle);
+        try self.emit(.local_get, trace_due);
+        try self.emit(.if_, 0);
         try self.collectionBudget(cadence, budget);
+        try self.emit(.end, 0);
         self.labels -= 1;
         try self.emit(.end, 0);
     }

@@ -257,3 +257,37 @@ fn emitTypedCollections(allocator: std.mem.Allocator, module: *const core.Module
     const offset = std.mem.findLast(u8, result.bytes, marker) orelse return error.TestExpectedOwnershipManifest;
     try std.testing.expectEqualSlices(u8, &.{ 2, 2, 0 }, result.bytes[offset + marker.len ..][0..3]);
 }
+
+// Packed traversal publishes a scalar leaf directory owned by its exact tree.
+test "packed List directory emission preserves frozen Core through every allocation failure" {
+    const source =
+        \\const static = [{ a: 1, b: 2, c: 3 }, { a: 4, b: 5, c: 6 }]
+        \\entry const answer = fn (value: U32) => do:
+        \\  let rows = @list.fill 600 { a: value, b: value, c: value }
+        \\  let saved = rows
+        \\  rows := [ { a: value, b: value, c: value }, ...self ]
+        \\  let total = 0
+        \\  for row in static:
+        \\    total := @u32.add (@u32.add (@u32.add self row.a) row.b) row.c
+        \\  for row in saved:
+        \\    total := @u32.add (@u32.add (@u32.add self row.a) row.b) row.c
+        \\  for row in rows:
+        \\    total := @u32.add (@u32.add (@u32.add self row.a) row.b) row.c
+        \\  return total
+        \\entry const float_answer = fn (value: F32) => do:
+        \\  let rows = @list.fill 601 { a: value, b: value, c: value, d: value }
+        \\  let total = 0.0
+        \\  for row in rows:
+        \\    total := @f32.add (@f32.add (@f32.add (@f32.add self row.a) row.b) row.c) row.d
+        \\  return total
+    ;
+    var module = try lower(a, source);
+    defer module.deinit(a);
+    const nodes = try a.dupe(core.Node, module.nodes);
+    defer a.free(nodes);
+    const type_nodes = try a.dupe(types.Node, module.types.nodes);
+    defer a.free(type_nodes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitResolvedBody, .{&module});
+    try std.testing.expectEqualDeep(nodes, module.nodes);
+    try std.testing.expectEqualDeep(type_nodes, module.types.nodes);
+}

@@ -137,7 +137,7 @@ pub const Summaries = struct {
         if (self.prepared) return summary.*;
         if (summary.state != .unseen or self.depth == 128) return summary.*;
         if (self.module.arena) |arena| {
-            if (id == arena.recycle or id == arena.reset or id == arena.collect or id == arena.mark or arena.isAllocation(id)) {
+            if (id == arena.recycle or id == arena.reset or id == arena.collect or id == arena.cycle_collect or id == arena.cycle_safe or id == arena.mark or arena.isAllocation(id)) {
                 summary.state = .done;
                 return summary.*;
             }

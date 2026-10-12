@@ -56,6 +56,230 @@ async function runtime() {
   return { call, word, put, get, create, inspect };
 }
 
+Deno.test("row-aligned leaf limits survive construction, conversion, empty edits and persistent snapshots", async () => {
+  const r = await runtime();
+  const capacity = r.call("capacity");
+  const verify = (list: number, width: number) => {
+    const limit = Math.floor(capacity / width) * width;
+    equal(r.word(list + 24), limit);
+    const visit = (node: number): number => {
+      const length = r.word(node + 8);
+      equal(length % width, 0);
+      if (r.word(node + 4) === 0) {
+        ok(length > 0 && length <= limit);
+        return length;
+      }
+      equal(visit(r.word(node + 16)) + visit(r.word(node + 20)), length);
+      return length;
+    };
+    const root = r.word(list + 4);
+    equal(root === 0 ? 0 : visit(root), r.word(list));
+  };
+  for (let width = 1; width <= 16; width++) {
+    const limit = Math.floor(capacity / width) * width;
+    // Keep a one-row first leaf: its adjacent full leaf cannot coalesce.
+    const full = r.call("new_limit", limit * 3, width, limit);
+    const short = r.call("slice", full, limit - width, limit + width * 2);
+    verify(short, width);
+    let first = r.word(short + 4);
+    while (r.word(first + 4) !== 0) first = r.word(first + 16);
+    equal(r.word(first + 8), width);
+    verify(r.call("concat", short, r.call("slice", short, 0, 0)), width);
+    verify(full, width);
+    const source = r.call("new_limit", 400 * width, width, limit);
+    for (let i = 0; i < 400 * width; i++) {
+      r.put(r.call("address", source, i), i);
+    }
+    verify(source, width);
+    const copy = r.call("copy", source, 404 * width);
+    verify(copy, width);
+    const array = r.call("to_array", source);
+    r.put(array, 400);
+    const converted = r.call("from_array_rows", array, width);
+    verify(converted, width);
+    for (let i = 0; i < 400 * width; i++) equal(r.get(converted, i), i);
+    const empty = r.call("slice", source, 0, 0);
+    verify(empty, width);
+    verify(r.call("concat", empty, empty), width);
+    const emptyArray = r.call("to_array", empty);
+    verify(r.call("from_array_rows", emptyArray, width), width);
+    let list = empty;
+    for (let a = 0; a < 6; a++) {
+      for (let b = 0; b < 8; b++) {
+        const part = r.call(
+          "slice",
+          source,
+          (a * 47 + b * 5) * width,
+          (1 + a + b * 2) * width,
+        );
+        list = r.call("concat", list, part);
+        verify(list, width);
+        const saved = list;
+        for (const front of [0, 1]) {
+          for (let field = 0; field < width; field++) {
+            list = r.call("push", list, field, front, 0);
+          }
+          verify(list, width);
+        }
+        list = r.call("slice", list, width, r.word(saved));
+        verify(list, width);
+        verify(saved, width);
+      }
+    }
+    for (let row = 0; row < 300; row++) {
+      for (let field = 0; field < width; field++) {
+        list = r.call("push", list, field, 0, 1);
+      }
+    }
+    verify(list, width);
+    verify(source, width);
+    verify(copy, width);
+    verify(converted, width);
+    verify(empty, width);
+    let fresh = r.call("new_limit", 0, width, limit);
+    for (let row = 0; row < 300; row++) {
+      for (let field = 0; field < width; field++) {
+        fresh = r.call("push", fresh, field, row % 2, 1);
+      }
+    }
+    verify(fresh, width);
+  }
+  const singleArray = r.call("to_array", r.create(1));
+  let wideTrapped = false;
+  try {
+    r.call("from_array_rows", singleArray, 17);
+  } catch (error) {
+    wideTrapped = error instanceof WebAssembly.RuntimeError;
+  }
+  ok(wideTrapped);
+  for (const leafLimit of [0, capacity + 1]) {
+    let trapped = false;
+    try {
+      r.call("new_limit", 1, 1, leafLimit);
+    } catch (error) {
+      trapped = error instanceof WebAssembly.RuntimeError;
+    }
+    ok(trapped);
+  }
+});
+
+Deno.test("packed constructors fill their leaf directories during existing tree construction", async () => {
+  const r = await runtime();
+  const capacity = r.call("capacity");
+  for (let width = 2; width <= 16; width++) {
+    const limit = Math.floor(capacity / width) * width;
+    for (
+      const rows of [
+        0,
+        1,
+        limit / width - 1,
+        limit / width,
+        limit / width + 1,
+        limit / width * 3 + 5,
+      ]
+    ) {
+      const list = r.call("new_limit", rows * width, width, limit);
+      equal(r.word(list + 16), width);
+      const directory = r.word(list + 28);
+      if (rows <= limit / width) {
+        equal(directory, 0);
+        if (rows !== 0) {
+          const heap = r.call("heap");
+          equal(r.call("directory", list), list);
+          equal(r.word(list + 4), r.inspect(list).chunks[0]);
+          equal(r.call("heap"), heap);
+        }
+        continue;
+      }
+      ok(
+        directory !== 0,
+        "Packed leaf creation supplies the directory before the first read",
+      );
+      const chunks = r.inspect(list).chunks;
+      equal(r.word(directory), Math.ceil(rows * width / limit));
+      equal(r.word(directory), chunks.length);
+      for (let i = 0; i < chunks.length; i++) {
+        equal(r.word(directory + 4 + i * 4), chunks[i]);
+      }
+      const heap = r.call("heap");
+      equal(r.call("directory", list), directory);
+      equal(r.call("heap"), heap);
+    }
+  }
+  for (const scalar of [true, false]) {
+    const list = r.call(scalar ? "new" : "new_references", 10000);
+    equal(r.word(list + 28), 0);
+  }
+});
+
+Deno.test("leaf directories follow descriptor snapshots and scalar borrowing through reclamation", async () => {
+  const r = await runtime();
+  const verify = (list: number) => {
+    const chunks = r.inspect(list).chunks;
+    const directory = r.call("directory", list);
+    equal(r.word(directory), chunks.length);
+    for (let i = 0; i < chunks.length; i++) {
+      equal(r.word(directory + 4 + i * 4), chunks[i]);
+    }
+    return directory;
+  };
+  const empty = r.call("new", 0);
+  const emptyHeap = r.call("heap");
+  equal(r.call("directory", empty), 0);
+  equal(r.call("heap"), emptyHeap);
+  const original = r.create(10000);
+  const directory = verify(original);
+  equal(r.word(original + 28), directory);
+  const cachedHeap = r.call("heap");
+  equal(verify(original), directory);
+  equal(r.call("heap"), cachedHeap);
+  const unchanged = r.call("set", original, 5000, 5000, 0);
+  equal(unchanged, original);
+  equal(r.word(unchanged + 28), directory);
+  equal(r.call("heap"), cachedHeap);
+  let changed = r.call("set", original, 5000, 77, 0);
+  equal(r.word(changed + 28), 0);
+  equal(r.word(original + 28), directory);
+  const changedDirectory = verify(changed);
+  ok(changedDirectory !== directory);
+  equal(r.get(original, 5000), 5000);
+  equal(r.get(changed, 5000), 77);
+  changed = r.call("push", changed, 88, 0, 1);
+  equal(r.word(changed + 28), 0);
+  equal(r.word(original + 28), directory);
+  verify(changed);
+  const copied = r.call("copy", original, 10000);
+  equal(r.word(copied + 28), 0);
+  verify(copied);
+  const sliced = r.call("slice", original, 247, 400);
+  equal(r.word(sliced + 28), 0);
+  verify(sliced);
+  const joined = r.call("concat", sliced, copied);
+  equal(r.word(joined + 28), 0);
+  verify(joined);
+  const staticList = r.call("static");
+  const firstStatic = verify(staticList);
+  equal(r.word(staticList + 28), 0);
+  equal(firstStatic, staticList);
+  equal(verify(staticList), firstStatic);
+  const staticMany = r.call("slice", original, 0, 1000);
+  // A static descriptor with several leaves exercises the permanent cache
+  // in source execution laws; this fixture's static value has one leaf.
+  verify(staticMany);
+  r.call("collect", original);
+  equal(verify(original), directory);
+  for (const index of [0, 247, 248, 5000, 9999]) {
+    equal(r.get(original, index), index);
+  }
+  // Scalar leaf bases are borrowed addresses, not independent owning edges.
+  const orphan = r.create(1000);
+  const orphanLeaves = r.inspect(orphan).chunks;
+  const orphanDirectory = verify(orphan);
+  r.call("collect", orphanDirectory);
+  for (const leaf of orphanLeaves) equal(r.word(leaf - 12), 0);
+  equal(r.word(orphanDirectory), orphanLeaves.length);
+});
+
 Deno.test("list growth preserves balanced trees and dense leaves at boundaries", async () => {
   const r = await runtime();
   for (

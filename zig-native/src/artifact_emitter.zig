@@ -23,7 +23,7 @@ pub const Event = union(enum) {
     data_word: struct { address: u32, operand: Operand },
     arena: void,
     host_references: wasm.HostReferences,
-    lists: @import("list_runtime.zig").Runtime,
+    lists: void,
     export_: struct { name: Span, index: u32, parameter: wasm.Scalar, result: wasm.Scalar, global: bool, callback: ?wasm.Callback },
     public_arena: void,
     mutable_static: void,
@@ -32,7 +32,7 @@ pub const Event = union(enum) {
 };
 pub const Record = struct { sequence: u64, owner: u32, event: Event };
 pub const SymbolicInstruction = struct { op: wasm.Op, operand: Operand };
-pub const FunctionRole = enum { job, arena_allocate, arena_allocate_scalar, arena_recycle, arena_reset, arena_mark, arena_collect, arena_allocate_typed, arena_retain, arena_release, arena_release_lease, arena_retire, arena_free, arena_store_word, arena_copy_words, arena_decrement, arena_root_allocate, arena_root_reserve, arena_root_pop, arena_root_open, arena_root_close, arena_root_mark, arena_root_enter, arena_root_leave, arena_root_store, arena_root_public_allocate, arena_root_public_reset, arena_root_force, host_retain, host_release, output_export, runtime_initializer, module_start, unknown, list_new, list_address, list_copy, list_push, list_set, list_from_array, list_to_array, list_chunk_new, list_edit, list_branch, list_own, list_insert, list_replace, list_refresh, list_rotate_left, list_rotate_right, list_balance, list_concat, list_slice, list_join, list_cut, static_closure };
+pub const FunctionRole = enum { job, arena_allocate, arena_allocate_scalar, arena_recycle, arena_reset, arena_mark, arena_collect, arena_allocate_typed, arena_retain, arena_release, arena_release_lease, arena_retire, arena_free, arena_store_word, arena_copy_words, arena_decrement, arena_root_allocate, arena_root_reserve, arena_root_pop, arena_root_open, arena_root_close, arena_root_mark, arena_root_enter, arena_root_leave, arena_root_store, arena_root_public_allocate, arena_root_public_reset, arena_root_force, host_retain, host_release, output_export, runtime_initializer, module_start, unknown, list_new, list_address, list_copy, list_push, list_set, list_from_array, list_to_array, list_chunk_new, list_edit, list_branch, list_own, list_insert, list_replace, list_refresh, list_rotate_left, list_rotate_right, list_balance, list_concat, list_slice, list_join, list_cut, static_closure, list_directory, list_leaf_count, list_write_leaves, arena_cycle_enqueue, arena_cycle_unlink, arena_cycle_visit, arena_cycle_collect, arena_cycle_safe };
 pub const FunctionArtifact = struct { owner: u32, resource_owner: u32, role: FunctionRole, signature: u32, creation_sequence: u64, locals: Span, instructions: Span };
 const Operation = struct { key: Span, foreign: bool };
 pub const Recorder = struct {
@@ -49,6 +49,7 @@ pub const Recorder = struct {
     instructions: []SymbolicInstruction = &.{},
     sealed: bool = false,
     arena: ?wasm.Arena = null,
+    lists: ?@import("list_runtime.zig").Runtime = null,
     pub fn init(allocator: Allocator) Recorder {
         return .{ .allocator = allocator };
     }
@@ -74,6 +75,11 @@ pub const Recorder = struct {
         std.debug.assert(self.arena == null);
         try self.append(.{ .arena = {} });
         self.arena = arena;
+    }
+    pub fn recordLists(self: *Recorder, lists: @import("list_runtime.zig").Runtime) Allocator.Error!void {
+        std.debug.assert(self.lists == null);
+        try self.append(.{ .lists = {} });
+        self.lists = lists;
     }
     pub fn raw(self: *Recorder, value: []const u8) Allocator.Error!Span {
         const span: Span = .{ .start = @intCast(self.bytes.items.len), .len = @intCast(value.len) };
@@ -169,7 +175,8 @@ pub const Recorder = struct {
                 functions[references.retain].role = .host_retain;
                 functions[references.release].role = .host_release;
             },
-            .lists => |runtime| {
+            .lists => {
+                const runtime = self.lists.?;
                 inline for (@typeInfo(@TypeOf(runtime)).@"struct".field_names) |field|
                     functions[@field(runtime, field)].role = @field(FunctionRole, "list_" ++ field);
             },
@@ -270,7 +277,8 @@ pub const Recorder = struct {
                 module.arena = mapped;
             },
             .host_references => |item| module.host_references = .{ .retain = try replay.get(replay.functions.items, item.retain), .release = try replay.get(replay.functions.items, item.release), .cursor = try replay.get(replay.globals.items, item.cursor), .active = try replay.get(replay.globals.items, item.active) },
-            .lists => |item| {
+            .lists => {
+                const item = self.lists orelse return error.InvalidArtifact;
                 var runtime: @TypeOf(item) = undefined;
                 inline for (@typeInfo(@TypeOf(item)).@"struct".field_names) |field|
                     @field(runtime, field) = try replay.get(replay.functions.items, @field(item, field));

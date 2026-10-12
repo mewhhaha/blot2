@@ -314,6 +314,7 @@ test {
     _ = @import("semantic_evidence_import.zig");
     _ = @import("wasm_lifetimes.zig");
     _ = @import("shared_rc_tests.zig");
+    _ = @import("cycles_runtime.zig");
     _ = @import("root_lowering.zig");
     _ = @import("persistent_roots_tests.zig");
     _ = @import("suspended_ownership_tests.zig");

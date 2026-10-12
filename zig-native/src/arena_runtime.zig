@@ -11,7 +11,11 @@ const Error = std.mem.Allocator.Error;
 // These pointer-free immutable descriptors are shared by every list helper,
 // including helpers reconstructed from a retained executable fragment.
 pub const empty_list_address: u32 = 168;
-pub const empty_scalar_list_address: u32 = 192;
+pub const empty_scalar_list_address: u32 = empty_list_address + @sizeOf(heap.ListDescriptor);
+// Canonical width-two through width-sixteen empty descriptors are arena
+// resources, never source-owned payloads replayed beside rebuilt helpers.
+pub const empty_rows_address: u32 = 256;
+pub const metadata_bytes: u32 = empty_rows_address + 15 * @sizeOf(heap.ListDescriptor);
 
 pub fn emit(module: *wasm.Module, arena: wasm.Arena) Error!void {
     try allocate(module, arena);
@@ -483,7 +487,7 @@ fn collect(module: *wasm.Module, arena: wasm.Arena) Error!void {
         .{ .op = .i32_store },
     };
     const static_mark = [_]wasm.Instruction{
-        .{ .op = .i32_const, .operand = 256 },
+        .{ .op = .i32_const, .operand = metadata_bytes },
         .{ .op = .local_set, .operand = slot },
         .{ .op = .block },
         .{ .op = .loop },

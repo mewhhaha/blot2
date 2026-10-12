@@ -107,7 +107,7 @@ fn pop(c: Code, a: w.Arena) Error!void {
     try c.when(.{ .i32_ge_u, value, .{ .global, a.static_end } });
     try count(c, a, .i32_sub);
     try c.set(head, .{ .i32_sub, value, head_bytes });
-    try c.when(.{ .i32_eq, .{ .load, head, owner_slot }, slot });
+    try c.when(.{ .i32_and, .{ .i32_ne, .{ .i32_and, .{ .load, head, h.offset(h.ArenaHeader, "flags") }, @import("shared_rc.zig").lease }, 0 }, .{ .i32_eq, .{ .load, head, owner_slot }, slot } });
     try c.store(head, owner_slot, 0);
     try c.value(.{ .call, a.release_lease, value });
     try c.op(.else_, 0);
@@ -138,7 +138,9 @@ fn close(c: Code, a: w.Arena) Error!void {
     try c.set(result, .{ .load, frame, 8 });
     try c.set(parent, .{ .load, frame, 4 });
     try c.when(.{ .i32_ge_u, value, .{ .global, a.static_end } });
+    try c.when(.{ .i32_and, .{ .load, .{ .i32_sub, value, head_bytes }, h.offset(h.ArenaHeader, "flags") }, @import("shared_rc.zig").lease });
     try c.set(owner, .{ .load, .{ .i32_sub, value, head_bytes }, owner_slot });
+    try c.end();
     // A fresh owner in this frame moves into the caller slot. Borrowed values
     // retain before the frame closes, including shared children and aliases.
     try c.when(owner);
@@ -163,6 +165,9 @@ fn close(c: Code, a: w.Arena) Error!void {
     try c.when(.{ .i32_eqz, .{ .load, result, 0 } });
     try c.value(.{ .call, a.root_pop });
     try c.op(.drop, 0);
+    try c.end();
+    try c.when(.{ .global, a.cycle_head });
+    try c.value(.{ .call, a.cycle_safe, 0 });
     try c.end();
 }
 fn mark(c: Code, a: w.Arena) Error!void {
@@ -237,6 +242,9 @@ fn leave(c: Code, a: w.Arena) Error!void {
     try setGlobal(c, a.root_external, 0);
     try setGlobal(c, a.root_started, 0);
     try c.end();
+    try c.when(.{ .global, a.cycle_head });
+    try c.value(.{ .call, a.cycle_safe, 1 });
+    try c.end();
 }
 
 /// Consume an allocation's original journal owner before its lease releases.
@@ -258,7 +266,7 @@ pub fn detach(c: Code, a: w.Arena, head: Local) Error!void {
 pub fn retainBorrow(c: Code, a: w.Arena, value: Local) Error!void {
     try c.when(.{ .global, a.root_enabled });
     try c.when(.{ .i32_ge_u, value, .{ .global, a.static_end } });
-    try c.when(.{ .i32_eqz, .{ .load, .{ .i32_sub, value, head_bytes }, owner_slot } });
+    try c.when(.{ .i32_eqz, .{ .i32_and, .{ .load, .{ .i32_sub, value, head_bytes }, h.offset(h.ArenaHeader, "flags") }, @import("shared_rc.zig").lease } });
     try c.value(.{ .call, a.root_reserve });
     try c.value(value);
     try c.op(.call, a.root_store);

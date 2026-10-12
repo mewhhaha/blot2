@@ -96,7 +96,9 @@ pub const ListDescriptor = extern struct {
     cached_base: u32,
     scalar_elements: u32,
     immutable: u32,
-    pub const roles = [_]Role{ .scalar, .reference, .reference, .scalar, .scalar, .scalar };
+    leaf_limit: u32,
+    directory: u32,
+    pub const roles = [_]Role{ .scalar, .reference, .reference, .scalar, .scalar, .scalar, .scalar, .reference };
 };
 pub const ListNode = extern struct {
     owner_token: u32,

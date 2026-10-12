@@ -28,13 +28,21 @@ pub const Runtime = struct {
     slice: u32,
     join: u32,
     cut: u32,
+    directory: u32,
+    leaf_count: u32,
+    write_leaves: u32,
 };
-// Descriptor: length, root, cached leaf, cached base, scalar-elements, immutable.
+// Descriptor: length, root, cached leaf/base, scalar row width, immutable,
+// aligned leaf limit and scalar leaf-directory reference.
 // Node: descriptor token (base + 1, zero if shared), height, length, capacity.
 // Tokens are not GC pointers: sharing never retains an obsolete descriptor.
 // Leaves store elements after the header; branches store left/right pointers.
 pub const header = @sizeOf(heap.ListNode);
-pub const capacity = (1024 - @sizeOf(heap.ArenaHeader) - header) / 4; // Leaf + arena headers fit exactly in 1024 bytes.
+pub const capacity = (1024 - @sizeOf(heap.ArenaHeader) - header) / 4;
+pub fn leafLimit(words: u32) u32 {
+    std.debug.assert(words >= 1 and words <= 16);
+    return capacity / words * words;
+}
 const d = struct {
     const length = heap.offset(heap.ListDescriptor, "length");
     const root = heap.offset(heap.ListDescriptor, "root");
@@ -42,6 +50,8 @@ const d = struct {
     const cached_base = heap.offset(heap.ListDescriptor, "cached_base");
     const scalar_elements = heap.offset(heap.ListDescriptor, "scalar_elements");
     const immutable = heap.offset(heap.ListDescriptor, "immutable");
+    const leaf_limit = heap.offset(heap.ListDescriptor, "leaf_limit");
+    const directory = heap.offset(heap.ListDescriptor, "directory");
 };
 const n = struct {
     const owner_token = heap.offset(heap.ListBranch, "owner_token");
@@ -83,7 +93,7 @@ fn function(module: *wasm.Module, comptime parameters: usize, result: wasm.Value
 }
 pub fn emit(module: *wasm.Module, arena: wasm.Arena) Error!Runtime {
     const r: Runtime = .{
-        .new = try function(module, 2, .i32),
+        .new = try function(module, 3, .i32),
         .address = try function(module, 2, .i32),
         .copy = try function(module, 2, .i32),
         .push = try function(module, 4, .i32),
@@ -104,6 +114,9 @@ pub fn emit(module: *wasm.Module, arena: wasm.Arena) Error!Runtime {
         .slice = try function(module, 3, .i32),
         .join = try function(module, 3, .i32),
         .cut = try function(module, 4, .i32),
+        .directory = try function(module, 1, .i32),
+        .leaf_count = try function(module, 1, .i32),
+        .write_leaves = try function(module, 3, .i32),
     };
     try emitNode(code(module, r.chunk_new), r, arena);
     try emitBranch(code(module, r.branch), r, arena);
@@ -126,6 +139,9 @@ pub fn emit(module: *wasm.Module, arena: wasm.Arena) Error!Runtime {
     try emitCut(code(module, r.cut), r);
     try emitConcat(code(module, r.concat), r, arena);
     try emitSlice(code(module, r.slice), r, arena);
+    try emitLeafCount(code(module, r.leaf_count), r);
+    try emitWriteLeaves(code(module, r.write_leaves), r);
+    try emitDirectory(code(module, r.directory), r, arena);
     return r;
 }
 fn emitNode(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
@@ -135,12 +151,14 @@ fn emitNode(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     const bucket = try c.temp();
     const left = try c.temp();
     const split = try c.temp();
+    const leaf_limit = try c.temp();
+    try c.set(leaf_limit, .{ .load, owner, d.leaf_limit });
     try c.when(.{ .i32_eqz, count });
     try c.ret(0);
     try c.end();
-    try c.when(.{ .i32_gt_u, count, capacity });
+    try c.when(.{ .i32_gt_u, count, leaf_limit });
     // Split by leaf count, not element count, to keep initial leaves dense.
-    try c.set(split, .{ .i32_mul, .{ .i32_div_u, .{ .i32_div_u, .{ .i32_add, count, capacity - 1 }, capacity }, 2 }, capacity });
+    try c.set(split, .{ .i32_mul, .{ .i32_div_u, .{ .i32_div_u, .{ .i32_sub, .{ .i32_add, count, leaf_limit }, 1 }, leaf_limit }, 2 }, leaf_limit });
     try c.set(left, .{ .call, r.chunk_new, split, owner });
     try c.ret(.{ .call, r.branch, left, .{ .call, r.chunk_new, .{ .i32_sub, count, split }, owner }, owner });
     try c.end();
@@ -152,8 +170,35 @@ fn emitNode(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.zero(node, .{ .i32_sub, bucket, @sizeOf(heap.ArenaHeader) });
     try store(c, node, n.owner_token, .{ .i32_add, owner, 1 });
     try store(c, node, n.length, count);
-    try store(c, node, n.capacity, .{ .i32_div_u, .{ .i32_sub, bucket, @sizeOf(heap.ArenaHeader) + header }, 4 });
+    // Capacity carries the row-aligned bound as well as the physical bucket.
+    // Writers need the descriptor limit only when this capacity is full.
+    try c.set(bucket, .{ .i32_div_u, .{ .i32_sub, bucket, @sizeOf(heap.ArenaHeader) + header }, 4 });
+    try c.when(.{ .i32_gt_u, bucket, leaf_limit });
+    try c.set(bucket, leaf_limit);
+    try c.end();
+    try store(c, node, n.capacity, bucket);
+    // Packed constructors already visit leaves in sequence order. Fill their
+    // directory here instead of counting and traversing this tree afterward.
+    const directory = try c.temp();
+    const index = try c.temp();
+    try c.set(directory, .{ .load, owner, d.directory });
+    try c.when(directory);
+    try c.set(index, .{ .load, directory, heap.offset(heap.Array, "length") });
+    try store(c, .{ .cell, directory, index, @sizeOf(heap.Array) }, 0, node);
+    try store(c, directory, heap.offset(heap.Array, "length"), .{ .i32_add, index, 1 });
+    try c.end();
     try c.value(node);
+}
+// Scalar List trees have only downward private branch/cache edges. The exact
+// scalar element proof is preserved by all descriptor constructors and clones;
+// reference Lists remain candidates even when their current contents are null.
+fn acyclic(c: Code, arena: wasm.Arena, value: Local, scalar_elements: anytype) Error!void {
+    try c.when(.{ .global, arena.rc_enabled });
+    try c.when(scalar_elements);
+    const flags = heap.offset(heap.ArenaHeader, "flags");
+    try c.store(.{ .i32_sub, value, @sizeOf(heap.ArenaHeader) }, flags, .{ .i32_or, .{ .load, .{ .i32_sub, value, @sizeOf(heap.ArenaHeader) }, flags }, @import("cycles_runtime.zig").no_cycle });
+    try c.end();
+    try c.end();
 }
 fn emitBranch(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     const left: Local = .{ .id = 0 };
@@ -161,6 +206,7 @@ fn emitBranch(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     const owner: Local = .{ .id = 2 };
     const node = try c.temp();
     try c.set(node, .{ .call, arena.allocate_typed, 24, 0x30 });
+    try acyclic(c, arena, node, .{ .load, owner, d.scalar_elements });
     try store(c, node, n.owner_token, .{ .i32_add, owner, 1 });
     try store(c, node, n.capacity, 0);
     try store(c, node, n.left, left);
@@ -202,6 +248,7 @@ fn emitOwn(c: Code, arena: wasm.Arena) Error!void {
     try c.set(mask, .{ .i32_mul, .{ .i32_eqz, .{ .load, owner, d.scalar_elements } }, 0xfffffff0 });
     try c.end();
     try c.set(result, .{ .call, arena.allocate_typed, bytes, mask });
+    try acyclic(c, arena, result, .{ .load, owner, d.scalar_elements });
     try copy(c, result, node, bytes);
     try store(c, result, n.owner_token, .{ .i32_add, owner, 1 });
     try c.value(result);
@@ -252,7 +299,8 @@ fn emitInsert(c: Code, r: Runtime) Error!void {
     try c.end();
     try c.when(.{ .i32_eqz, .{ .load, node, n.height } });
     try c.set(count, .{ .load, node, n.length });
-    try c.when(.{ .i32_eq, count, capacity });
+    try c.when(.{ .i32_eq, count, .{ .load, node, n.capacity } });
+    try c.when(.{ .i32_eq, count, .{ .load, owner, d.leaf_limit } });
     try c.set(added, .{ .call, r.chunk_new, 1, owner });
     try store(c, added, header, value);
     try c.when(front);
@@ -260,7 +308,6 @@ fn emitInsert(c: Code, r: Runtime) Error!void {
     try c.end();
     try c.ret(.{ .call, r.branch, node, added, owner });
     try c.end();
-    try c.when(.{ .i32_eq, count, .{ .load, node, n.capacity } });
     try c.set(added, .{ .call, r.chunk_new, .{ .i32_add, count, 1 }, owner });
     try copy(c, .{ .i32_add, added, header }, .{ .i32_add, node, header }, .{ .i32_mul, count, 4 });
     try c.set(node, added);
@@ -318,28 +365,112 @@ fn emitReplace(c: Code, r: Runtime) Error!void {
 }
 fn emitNew(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     const count: Local = .{ .id = 0 };
-    const scalar_elements: Local = .{ .id = 1 };
+    const row_words: Local = .{ .id = 1 };
+    const leaf_limit: Local = .{ .id = 2 };
     const result = try c.temp();
     try c.trap(.{ .i32_gt_u, count, limit });
+    try c.trap(.{ .i32_gt_u, row_words, 16 });
+    try c.trap(.{ .i32_eqz, leaf_limit });
+    try c.trap(.{ .i32_gt_u, leaf_limit, capacity });
     // Empty lists are immutable and carry no per-value state. Reuse one static
     // descriptor, including through conversions and empty slices. Any writer
     // must go through edit(), which detaches immutable descriptors.
     const empty = @import("arena_runtime.zig").empty_list_address;
     const scalar_empty = @import("arena_runtime.zig").empty_scalar_list_address;
     try c.when(.{ .i32_eqz, count });
-    try c.when(scalar_elements);
+    for (2..17) |words| {
+        const aligned = leafLimit(@intCast(words));
+        const address = @import("arena_runtime.zig").empty_rows_address + @as(u32, @intCast(words - 2)) * descriptor_bytes;
+        try c.when(.{ .i32_eq, row_words, words });
+        try c.when(.{ .i32_eq, leaf_limit, aligned });
+        try c.module.emitReference(c.function, .{ .op = .i32_const, .operand = address }, .static_address);
+        try c.op(.return_, 0);
+        try c.end();
+        try c.end();
+    }
+    try c.when(.{ .i32_eq, leaf_limit, capacity });
+    try c.when(row_words);
     try c.module.emitReference(c.function, .{ .op = .i32_const, .operand = scalar_empty }, .static_address);
     try c.op(.return_, 0);
     try c.end();
     try c.module.emitReference(c.function, .{ .op = .i32_const, .operand = empty }, .static_address);
     try c.op(.return_, 0);
     try c.end();
-    try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 6 });
+    try c.end();
+    try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 134 });
     try c.zero(result, descriptor_bytes);
     try store(c, result, d.length, count);
-    try store(c, result, d.scalar_elements, .{ .i32_mul, scalar_elements, 2 });
+    // Word four is checked scalar row width: zero denotes references. Leaf
+    // flags normalize it to two; no descriptor field or allocation class grows.
+    try store(c, result, d.scalar_elements, row_words);
+    try c.when(.{ .i32_gt_u, row_words, 1 });
+    const leaves = try c.temp();
+    const directory = try c.temp();
+    try c.set(leaves, .{ .i32_div_u, .{ .i32_sub, .{ .i32_add, count, leaf_limit }, 1 }, leaf_limit });
+    try c.when(.{ .i32_gt_u, leaves, 1 });
+    try c.set(directory, .{ .call, arena.allocate_typed, .{ .cell, @sizeOf(heap.Array), leaves, 0 }, 0 });
+    try store(c, directory, heap.offset(heap.Array, "length"), 0);
+    try store(c, result, d.directory, directory);
+    try c.end();
+    try c.end();
+    try store(c, result, d.leaf_limit, leaf_limit);
+    try acyclic(c, arena, result, row_words);
     try store(c, result, d.root, .{ .call, r.chunk_new, count, result });
     try c.value(result);
+}
+// The directory owns scalar addresses, not leaf edges. Its descriptor keeps
+// the immutable tree alive; traversal holders also root uncached static cases.
+fn emitLeafCount(c: Code, r: Runtime) Error!void {
+    const node: Local = .{ .id = 0 };
+    try c.when(.{ .i32_eqz, node });
+    try c.ret(0);
+    try c.end();
+    try c.when(.{ .load, node, n.height });
+    try c.ret(.{ .i32_add, .{ .call, r.leaf_count, .{ .load, node, n.left } }, .{ .call, r.leaf_count, .{ .load, node, n.right } } });
+    try c.end();
+    try c.value(1);
+}
+fn emitWriteLeaves(c: Code, r: Runtime) Error!void {
+    const node: Local = .{ .id = 0 };
+    const array: Local = .{ .id = 1 };
+    const index: Local = .{ .id = 2 };
+    try c.when(.{ .load, node, n.height });
+    try c.set(index, .{ .call, r.write_leaves, .{ .load, node, n.left }, array, index });
+    try c.ret(.{ .call, r.write_leaves, .{ .load, node, n.right }, array, index });
+    try c.end();
+    try store(c, .{ .cell, array, index, @sizeOf(heap.Array) }, 0, node);
+    try c.value(.{ .i32_add, index, 1 });
+}
+fn emitDirectory(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
+    const sequence: Local = .{ .id = 0 };
+    const array = try c.temp();
+    const count = try c.temp();
+    try c.set(array, .{ .load, sequence, d.directory });
+    try c.when(array);
+    try c.ret(array);
+    try c.end();
+    try c.when(.{ .i32_eqz, .{ .load, sequence, d.root } });
+    try c.ret(0);
+    try c.end();
+    // For one leaf, the descriptor's root word is already a complete
+    // one-entry view at the Array payload offset. Return its exact owning
+    // allocation; no separate directory or self-owning cache is published.
+    comptime std.debug.assert(d.root == @sizeOf(heap.Array));
+    try c.when(.{ .i32_eqz, .{ .load, .{ .load, sequence, d.root }, n.height } });
+    try c.ret(sequence);
+    try c.end();
+    try c.set(count, .{ .call, r.leaf_count, .{ .load, sequence, d.root } });
+    try c.set(array, .{ .call, arena.allocate_typed, .{ .cell, @sizeOf(heap.Array), count, 0 }, 0 });
+    try store(c, array, heap.offset(heap.Array, "length"), count);
+    try c.value(.{ .call, r.write_leaves, .{ .load, sequence, d.root }, array, 0 });
+    try c.op(.drop, 0);
+    // Counted descriptors own this edge. In tracing mode, an older descriptor
+    // must not pin unrelated traffic by promoting the whole arena frontier.
+    // Its traversal holder owns this uncached directory until the read ends.
+    try c.when(.{ .i32_or, .{ .i32_ge_u, sequence, .{ .global, arena.base } }, .{ .global, arena.root_enabled } });
+    try store(c, sequence, d.directory, array);
+    try c.end();
+    try c.value(array);
 }
 fn emitAddress(c: Code) Error!void {
     const sequence: Local = .{ .id = 0 };
@@ -382,7 +513,7 @@ fn emitCopy(c: Code, r: Runtime) Error!void {
     const span = try c.temp();
     const available = try c.temp();
     try c.trap(.{ .i32_gt_u, .{ .load, sequence, d.length }, count });
-    try c.set(result, .{ .call, r.new, count, .{ .i32_ne, .{ .load, sequence, d.scalar_elements }, 0 } });
+    try c.set(result, .{ .call, r.new, count, .{ .load, sequence, d.scalar_elements }, .{ .load, sequence, d.leaf_limit } });
     try c.loop(.{ .i32_lt_u, index, .{ .load, sequence, d.length } });
     try c.set(from, .{ .call, r.address, sequence, index });
     try c.set(to, .{ .call, r.address, result, index });
@@ -403,8 +534,10 @@ fn emitEdit(c: Code, arena: wasm.Arena) Error!void {
     try c.when(.{ .i32_and, owned, .{ .i32_eqz, .{ .load, sequence, d.immutable } } });
     try c.ret(sequence);
     try c.end();
-    try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 6 });
+    try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 134 });
     try copy(c, result, sequence, descriptor_bytes);
+    try store(c, result, d.directory, 0);
+    try acyclic(c, arena, result, .{ .load, sequence, d.scalar_elements });
     try store(c, result, d.cached_leaf, 0);
     try store(c, result, d.immutable, 0);
     try c.when(.{ .load, sequence, d.root });
@@ -420,6 +553,8 @@ fn emitPush(c: Code, r: Runtime) Error!void {
     const owned: Local = .{ .id = 3 };
     try c.trap(.{ .i32_ge_u, .{ .load, sequence, d.length }, limit });
     try c.set(sequence, .{ .call, r.edit, sequence, owned });
+    // Borrowed leaf bases are valid only while this exact tree is retained.
+    try store(c, sequence, d.directory, 0);
     try store(c, sequence, d.root, .{ .call, r.insert, .{ .load, sequence, d.root }, value, front, sequence });
     try store(c, sequence, d.length, .{ .i32_add, .{ .load, sequence, d.length }, 1 });
     try store(c, sequence, d.cached_leaf, 0);
@@ -441,6 +576,8 @@ fn emitSet(c: Code, r: Runtime) Error!void {
     try c.ret(sequence);
     try c.end();
     try c.set(sequence, .{ .call, r.edit, sequence, owned });
+    // Borrowed leaf bases are valid only while this exact tree is retained.
+    try store(c, sequence, d.directory, 0);
     try store(c, sequence, d.root, .{ .call, r.replace, .{ .load, sequence, d.root }, index, value, sequence });
     try store(c, sequence, d.cached_leaf, 0);
     try c.value(sequence);
@@ -461,7 +598,13 @@ fn emitConversion(c: Code, r: Runtime, arena: wasm.Arena, to_list: bool) Error!v
         try c.trap(.{ .i32_gt_u, count, .{ .i32_div_u, limit, width } });
         try c.set(count, .{ .i32_mul, count, width });
         try c.end();
-        try c.set(result, .{ .call, r.new, count, .{ .i32_ne, width, 0 } });
+        const leaf_limit = try c.temp();
+        try c.set(leaf_limit, capacity);
+        try c.when(.{ .i32_gt_u, width, 1 });
+        try c.trap(.{ .i32_gt_u, width, 16 });
+        try c.set(leaf_limit, .{ .i32_mul, .{ .i32_div_u, capacity, width }, width });
+        try c.end();
+        try c.set(result, .{ .call, r.new, count, width, leaf_limit });
     } else {
         try c.set(result, .{ .call, arena.allocate_typed, .{ .cell, 4, count, 0 }, .{ .i32_mul, .{ .i32_eqz, .{ .load, source, d.scalar_elements } }, 0xfffffffe } });
         try store(c, result, heap.offset(heap.Array, "length"), count);
@@ -561,7 +704,7 @@ fn emitConcat(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.set(count, .{ .i32_add, .{ .load, left, d.length }, .{ .load, right, d.length } });
     try c.trap(.{ .i32_gt_u, count, limit });
     try c.when(.{ .i32_eqz, count });
-    try c.ret(.{ .call, r.new, 0, .{ .i32_ne, .{ .i32_and, .{ .load, left, d.scalar_elements }, .{ .load, right, d.scalar_elements } }, 0 } });
+    try c.ret(.{ .call, r.new, 0, .{ .i32_and, .{ .load, left, d.scalar_elements }, .{ .load, right, d.scalar_elements } }, .{ .load, left, d.leaf_limit } });
     try c.end();
     inline for (.{ .{ left, right }, .{ right, left } }) |pair| {
         try c.when(.{ .i32_eqz, .{ .load, pair[0], d.length } });
@@ -569,9 +712,11 @@ fn emitConcat(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
         try c.ret(pair[1]);
         try c.end();
     }
-    try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 6 });
+    try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 134 });
     try c.zero(result, descriptor_bytes);
     try store(c, result, d.scalar_elements, .{ .i32_and, .{ .load, left, d.scalar_elements }, .{ .load, right, d.scalar_elements } });
+    try store(c, result, d.leaf_limit, .{ .load, left, d.leaf_limit });
+    try acyclic(c, arena, result, .{ .load, result, d.scalar_elements });
     try store(c, result, d.length, count);
     try store(c, result, d.root, .{ .call, r.join, .{ .load, left, d.root }, .{ .load, right, d.root }, result });
     try c.value(result);
@@ -584,15 +729,17 @@ fn emitSlice(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.trap(.{ .i32_gt_u, start, .{ .load, source, d.length } });
     try c.trap(.{ .i32_gt_u, count, .{ .i32_sub, .{ .load, source, d.length }, start } });
     try c.when(.{ .i32_eqz, count });
-    try c.ret(.{ .call, r.new, 0, .{ .i32_ne, .{ .load, source, d.scalar_elements }, 0 } });
+    try c.ret(.{ .call, r.new, 0, .{ .load, source, d.scalar_elements }, .{ .load, source, d.leaf_limit } });
     try c.end();
     try c.when(.{ .i32_eq, count, .{ .load, source, d.length } });
     try store(c, source, d.immutable, 1);
     try c.ret(source);
     try c.end();
-    try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 6 });
+    try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 134 });
     try c.zero(result, descriptor_bytes);
     try store(c, result, d.scalar_elements, .{ .load, source, d.scalar_elements });
+    try store(c, result, d.leaf_limit, .{ .load, source, d.leaf_limit });
+    try acyclic(c, arena, result, .{ .load, source, d.scalar_elements });
     try store(c, result, d.length, count);
     try store(c, result, d.root, .{ .call, r.cut, .{ .load, source, d.root }, start, count, result });
     try c.value(result);
@@ -624,18 +771,29 @@ fn staticTree(module: *wasm.Module, leaves: []const u32) Error!StaticNode {
     return .{ .address = address, .height = height, .count = left.count + right.count };
 }
 pub fn staticDescriptor(module: *wasm.Module, length: u32, leaves: []const u32) Error!u32 {
-    return staticDescriptorKind(module, length, leaves, false);
+    return staticDescriptorKind(module, length, leaves, 0, capacity);
 }
-pub fn staticScalarDescriptor(module: *wasm.Module, length: u32, leaves: []const u32) Error!u32 {
-    return staticDescriptorKind(module, length, leaves, true);
+pub fn staticScalarDescriptor(module: *wasm.Module, length: u32, leaves: []const u32, row_words: u32) Error!u32 {
+    return staticDescriptorKind(module, length, leaves, row_words, leafLimit(row_words));
 }
-fn staticDescriptorKind(module: *wasm.Module, length: u32, leaves: []const u32, scalar_elements: bool) Error!u32 {
+fn staticDescriptorKind(module: *wasm.Module, length: u32, leaves: []const u32, row_words: u32, leaf_limit: u32) Error!u32 {
     const root = try staticTree(module, leaves);
     std.debug.assert(root.count == length);
-    const address = try module.dataObject(heap.ListDescriptor{ .length = length, .root = root.address, .cached_leaf = 0, .cached_base = 0, .scalar_elements = if (scalar_elements) 2 else 0, .immutable = 1 });
+    var directory: u32 = 0;
+    if (row_words != 0 and leaves.len > 1) {
+        const words = try module.allocator.alloc(u32, leaves.len + 1);
+        defer module.allocator.free(words);
+        words[0] = @intCast(leaves.len);
+        @memcpy(words[1..], leaves);
+        directory = try module.dataWords(words);
+        for (leaves, 0..) |leaf, index| try module.dataReference(directory + @as(u32, @intCast((index + 1) * 4)), .{ .role = .static_address, .value = leaf });
+    }
+    const address = try module.dataObject(heap.ListDescriptor{ .length = length, .root = root.address, .cached_leaf = 0, .cached_base = 0, .scalar_elements = row_words, .immutable = 1, .leaf_limit = leaf_limit, .directory = directory });
     try module.staticField(address + d.cached_leaf, .reference);
     try module.staticField(address + d.cached_base, .scalar);
     try module.staticField(address + d.immutable, .scalar);
+    try module.staticField(address + d.directory, .reference);
+    if (directory != 0) try module.dataReference(address + d.directory, .{ .role = .static_address, .value = directory });
     if (root.address != 0) try module.dataReference(address + d.root, .{ .role = .static_address, .value = root.address });
     return address;
 }

@@ -391,7 +391,7 @@ pub fn call(module: *const @import("wasm.zig").Module, inst: Instruction) Call {
                 if (inst.operand == arena.allocate_scalar) result.ownership = .allocate_scalar;
                 if (inst.operand == arena.allocate_typed or inst.operand == arena.root_allocate) result.ownership = .allocate_typed;
                 if (inst.operand == arena.recycle) result.ownership = .release;
-                if (inst.operand == arena.collect or inst.operand == arena.reset) result.ownership = .collect;
+                if (inst.operand == arena.collect or inst.operand == arena.reset or inst.operand == arena.cycle_collect or inst.operand == arena.cycle_safe) result.ownership = .collect;
             }
             return result;
         },
