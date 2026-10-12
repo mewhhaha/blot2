@@ -893,3 +893,9 @@ govern aggregate storage, captures, callable results and staged relocations. All
 new scans/proofs own their scratch, retain only plain descriptors and obey the
 existing transactional revision and allocation-failure laws. See
 [qualification and current conservative reuse limits](MODULE_ABSTRACTION_QUALIFICATION.md).
+
+[Rolling reductions and summaries](ROLLING_SUMMARIES.md) specifies the next
+ordinary source APIs. Sequential folds preserve callback/F32 order; fast
+monoid/group APIs require explicit pure, total algebra and consistent reducer
+captures. Cached summaries retain checked reference roles and persistent
+versions. The design alone enables no executable optimization.
