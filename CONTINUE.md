@@ -245,7 +245,8 @@ agents use focused checks/screens, with no redundant full gates or main edits.
   `build/bench/constant-receipts/current-profile-039.json`: steady wall ~1040ms,
   constants49ms, inference536ms, lookup84ms, exact70330 source steps. This
   changed captured corpus is not a comparison to the historical400ms input.
-  **086 still requires its explicitly pending owner decision.**
+  **086 is approved for implementation:** the owner accepted CONSTANT_REUSE on12
+  October2026. Root owns the isolated implementation after the current batch.
 
 After 040: 041/044/047. After 024: 053. Continue later ready tasks in index
 order. Never push or delete old artifacts without the separately required
@@ -253,12 +254,6 @@ authorization.
 
 ## Waiting on the owner
 
-- Task 086: the owner decision is pending on the measured
-  [constant receipt proposal](zig-native/CONSTANT_REUSE.md). A dedicated receipt
-  would publish validated constant slots and recorded fuel; the existing
-  value-template transport contract stays unchanged. Read-only attribution on
-  the current captured 93-unit corpus preserves all six outputs and source-step
-  counts; no implementation or speedup is claimed.
 - An unapplied Wasm name-section patch at `/var/tmp/blot2-names.patch` (from the
   pen session: 14 files, always on, +5% Wasm).
 - The gdev session asked for tuple patterns in comprehension generators

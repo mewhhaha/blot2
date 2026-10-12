@@ -684,7 +684,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [083] — Review and clean old build artifacts            | Pending     | [081]                                  |
 | [084] — Qualify the complete program                    | Pending     | [082], [083], [085]–[099]              |
 | [085] — Gate principal-graph sharing on payoff          | Complete    | —                                      |
-| [086] — Retain constant evaluation across revisions     | Ready       | [023]                                  |
+| [086] — Retain constant evaluation across revisions     | In progress | [023]                                  |
 | [087] — Skip rebuilds for trivia-only edits             | Complete    | —                                      |
 | [088] — Restore summary-job inference cost              | Complete    | —                                      |
 | [089] — Report inference budget exhaustion              | Complete    | —                                      |

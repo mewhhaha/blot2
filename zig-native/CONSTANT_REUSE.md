@@ -1,7 +1,7 @@
-# Proposed constant receipts
+# Approved constant receipts
 
-Task 086 requires the owner's agreement before publishing constant slots from
-retained evidence. This is the proposed boundary; it is not implemented.
+The owner approved this design and requested implementation on12 October2026.
+Task086 is in progress; no constant-slot reuse is implemented or qualified yet.
 
 ## Current evidence
 

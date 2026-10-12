@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** In progress — owner approved the constant-receipt design on12
+  October2026; no completion is claimed.
 - **Dependencies:** [023](023-narrow-literal-edit-invalidation.md)
 - **Originating requirements:** discovered while qualifying task
   [023](023-narrow-literal-edit-invalidation.md); PLAN: Hill 6 / literal edits
@@ -39,8 +40,9 @@ publishing a constant slot and its fuel from a validated receipt, which the
 value-template boundary in
 [source_value_template.zig](../zig-native/src/source_value_template.zig)
 explicitly excludes today ("does not publish constant slots, callable
-certificates, or skip source fuel"). Changing that boundary needs the owner's
-agreement before implementation.
+certificates, or skip source fuel"). The owner approved the dedicated
+[constant-receipt design](../zig-native/CONSTANT_REUSE.md) on12 October2026. The
+existing value-template transport boundary stays unchanged.
 
 Task 088 (`86db5b1`) later let `sandbox`'s principal region replay from its
 recorded inputs: a gdev literal edit now costs about 570 ms CPU with 240 ms of
