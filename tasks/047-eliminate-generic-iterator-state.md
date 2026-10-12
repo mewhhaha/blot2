@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — scalar-only local checkpoint at `cb3ebec`; generic
-  adapters and packed cursor qualification remain open.
+- **Status:** In progress — owned/scalar local checkpoint at `6a57437`; other
+  adapters and U32 packed cursor tails remain open.
 - **Dependencies:** [040](040-fuse-packed-row-producers-and-consumers.md),
   [027](027-represent-ownership-in-resolved-ir.md)
 - **Originating requirements:** PLAN: Earlier programs / iterator step and
@@ -69,20 +69,12 @@ development and the scenarios below.
 
 ## Completion evidence
 
-The first checkpoint passes full native/OOM and 965 guest/client tests, all
-eight unchanged budgets and the 351-file zero-finding analyzer. Scalar record
-cursors lose their per-step objects while snapshots and fallback remain exact.
-Generic range/map/take allocation is unchanged, so none of the broader
-acceptance gates is marked complete. See
-[iterator state qualification](../zig-native/ITERATOR_STATE.md) and ignored
-`build/bench/iterators-047/release/pins.json` for exact release inputs, counts
-and paired compiler/runtime costs.
+Compiler6a57437 passes full native/OOM,973 guests,8 unchanged budgets and355
+analyzer files/zero. Exact owning-field locals remove4097 Array cursor objects
+and4096 generic pipeline objects. Three merged all-width F32 cursor batches
+qualify; U32 boxed tails and other tagged adapters remain open.
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+[The durable merged record](../zig-native/ITERATOR_CONSTANTS_QUALIFICATION.md)
+pins actual source/binary, counts, runtime/compiler costs, failures and limits.
+Projection and word-position candidates remain separate unqualified work. No
+broader completion or push is claimed.

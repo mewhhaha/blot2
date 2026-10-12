@@ -941,3 +941,14 @@ carry-slot clearing retain their original order. Unknown/owning fields and
 demand-force markers decline. Source arithmetic, eager operands and F32 bits
 remain exact; this grants no semantic or value-cache validity. See
 [iterator state qualification](ITERATOR_STATE.md).
+
+A closed private packed List cursor family may keep its four immutable version
+fields in machine locals. Exact source uses, scalar row layouts and constructor
+bodies license this representation; publication, captures and unsupported uses
+retain heap cursors. Its binding/root slot contains the canonical collection
+base, so collection follows the actual allocation header and owning tree. Every
+backedge snapshots all fields before destination writes. Private scalar row
+views and flat tuple bindings remain scoped to that live collection; no interior
+pointer becomes a source or captured value. Constructor body reads participate
+in retained and portable validity. See
+[the cursor boundary](LIST_TRAVERSAL.md#private-packed-cursor-checkpoint).

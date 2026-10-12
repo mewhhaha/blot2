@@ -593,6 +593,19 @@ also adds `zig-native/tests/list_span_execution.test.ts`.
   qualifying the work. Keep the older boxed traversal baseline separate; the
   saved packed comparison alone cannot close the 1.9× regression.
 
+## Latest local compiler checkpoint
+
+Compiler6a57437 qualifies owned iterator state, private packed cursors and
+validated primitive constant/member receipts. Full native/OOM,973 guest/client
+laws,8 unchanged budgets and355-file zero analyzer pass. Array cursors lose4097
+objects; generic range/map/take loses4096. Repeated all-width F32 cursors pass.
+U32 tails, other adapters, dominant constant payoff and broader035/086 gates
+remain open. Captured edits regress about5% from double fallback assembly.
+[The merged qualification](../zig-native/ITERATOR_CONSTANTS_QUALIFICATION.md)
+records exact pins, failures and costs. Safe/noLLVM development and retained
+native-cache savings are separate
+[iteration evidence](../zig-native/ITERATION_COST.md).
+
 ## Task index
 
 Dependency numbers below link to their task files. All tasks are initially open.

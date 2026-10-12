@@ -929,3 +929,88 @@ additional committed page for initialization/shared append remain measured
 limits. Neither task 002 nor this joint qualification claims a packed-memory,
 update or cursor speedup over boxed. Legacy restoration remains waived; all
 current pins and rejected probes above stay preserved. Nothing is pushed.
+
+## Private packed cursor checkpoint
+
+Task 047's isolated source lowering keeps a closed family of packed List cursor
+versions in four independent Wasm locals: collection, logical index, leaf base
+and leaf start word. A small bounded source proof closes direct aliases and loop
+carry versions. It admits only checked flat scalar rows and exact primitive or
+selected one-argument constructor wrappers. Ordinary calls that consume a
+cursor, captures, publication, branch merges, unbound/nested advances, request
+loops, breaks and exhausted proofs retain immutable heap cursors. Reference,
+plain-word, Array and unknown shapes retain their existing path.
+
+The existing small-value table stores these private versions; no Emitter field,
+map, header or public Cursor representation is added. Each lexical snapshot has
+separate progress locals. Backedges read every predecessor field before writing
+any destination. The ordinary binding/root slot holds the canonical collection
+allocation base. Partial-tracer packets consequently follow that allocation's
+actual header and edges, never the logical Cursor layout. Its immutable tree
+keeps cached leaf bases live. Constructor wrappers are checked during body
+preparation and registered as consumed bodies for retained/artifact validity.
+
+Record rows whose uses are checked projections use the existing private row
+view. Flat tuple patterns load their scalar fields directly into independent
+locals. Bounds still trap at the original value/advance operation; no interior
+address enters source values, captured environments or heap fields. Published
+rows retain owned extraction. Published cursors are never mutated, and forks
+retain their creation-time positions.
+
+A 4096-row width-three profile drops 4097 sixteen-byte cursor allocations to
+zero. One snapshot descriptor remains per creation; private version and field
+locals have a bounded per-call footprint. The old plain-word
+cursor/fork/pressure control remains byte-identical to qualified `44af80a9`,
+SHA-256 `e6c50c7999d540928c67c968f7d1ba145c14fe2526a6fd136e34179c02010fe4`.
+Native immutable-Core, replay, portable checkpoint, changed constructor-body
+admission and exhaustive fresh/retained OOM laws pass. Focused executed laws
+cover every F32 record/tuple width, forks, old snapshots, collection pressure,
+nested/published fallback and the unchanged compiler budgets.
+
+The frozen LLVM/Fast release is SHA-256
+`52f682b01b07bb598249a1f06c23b1cd3c2364908f13948b0b736b9ec5a65199`. Three
+complete record and tuple F32 batches use the unchanged
+`scripts/bench_list_traversal.ts`, 16384 rows, 20 warmups and 31 alternating
+process CPU pairs of 16 traversals. Every supported width preserves the oracle.
+Maximum median-of-three cursor ratios versus reconstructed boxed are 0.9488
+records and 0.9498 tuples. The rejected first development tuple screen reached
+1.209; direct checked pattern loads remove that extraction hill.
+
+Separate all-width U32 controls retain a boxed tail: record median 0.969,
+maximum 1.296 at width 7; tuple median 1.190, maximum 1.234. Against qualified
+`44af80a9`, median cursor ratios are U32 record 0.255, tuple 0.371 and F32
+record 0.353, tuple 0.400. Direct fold controls remain near parity with that
+incoming release. This checkpoint closes the measured F32 cursor regression; the
+U32 boxed tail and generic adapters remain open task 047 work. Wide packed rows
+still commit about 3.4 MiB versus 2.3 MiB boxed, so no packed-memory improvement
+is claimed. Header and leaf geometry are unchanged.
+
+Seven alternating ordinary width-16 compiler pairs measure fresh process CPU
+6.240 to 5.811 ms and wall 6.689 to 6.399 ms. Requested bytes drop 4721173 to
+4475703 and allocation count 13901 to 13776; peak remains 1134535 bytes and four
+code instances. Seven retained sessions measure populate/edit/revert CPU
+1.660/1.361/1.302 to 1.401/1.308/1.241 ms. No-op CPU stays 0.093/0.092 ms; its
+small host wall tail rises 0.528 to 0.706 ms. All phases execute the expected
+result and teardown has zero live compiler bytes. These are small ordinary
+source controls, not a broad compiler speedup.
+
+The ignored evidence directory is `build/bench/packed-cursor/` in
+`/var/tmp/blot2-packed-cursor-047`:
+`release-boxed-f32-{record,tuple}-{1,2,3}/report.json`, six `release-*-guard/`
+reports, `compiler-cost.json` and `retained-cost.json` preserve raw samples,
+compiler/harness/source pins and load. Native immutable-Core, replay, checkpoint
+and exhaustive OOM checks pass; 33 LLVM executed groups include all eight
+unchanged budgets. The additional JSPI suspension/rejection/rebind law passes.
+The analyzer checks 352 Zig files with zero findings. The merged mandatory
+compiler gate belongs to the parent batch; neither task completion nor tracing
+removal is claimed here.
+
+### Merged private cursor checkpoint
+
+Compiler6a57437 qualifies the private cursor source lowering with the full
+native/973-guest gate, eight budgets and355-file zero analyzer. Three complete
+merged F32 record/tuple batches retain all widths and oracle values; largest
+median-of-three boxed cursor ratios are0.9473/0.9515. U32 tails remain open. The
+[merged qualification](ITERATOR_CONSTANTS_QUALIFICATION.md) pins this result
+separately from the isolated52f682b0 source and later unqualified word-progress
+experiment. No memory or full task047 completion claim is added.

@@ -277,6 +277,7 @@ the reference client rejects an empty or invalid module.
     "principals": {},
     "refinements": {},
     "selectedQueries": {},
+    "constantReceipts": {},
     "attemptStats": {}
   }
 }
@@ -301,7 +302,7 @@ the revision.
   `cachedModules`;
 - objects: `frontend`, `backend`, `optimization`, `runtimeOptimization`,
   `backendTiming`, `workCounters`, `principals`, `refinements`,
-  `selectedQueries` and `attemptStats`;
+  `selectedQueries`, `constantReceipts` and `attemptStats`;
 - a boolean: `restartCacheLoaded`.
 
 `demandLowering` is null by default. With `explainDemands: true`, it is

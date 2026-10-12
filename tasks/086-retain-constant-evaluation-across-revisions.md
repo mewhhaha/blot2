@@ -80,11 +80,14 @@ before the local milestone commit.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+Compiler6a57437 qualifies exact primitive constant and ready partial-member
+receipts. Full native/OOM,973 guests,8 budgets and355-file zero analyzer pass.
+Seven paired primitive/member controls preserve bytes/fuel and show modest
+retained gains; the captured93-unit project has zero dedicated bookkeeping and
+no constant payoff. Its roughly5% retained CPU regression is late ownership
+fallback assembly, not a fulfilled edit target.
+
+[The durable merged record](../zig-native/ITERATOR_CONSTANTS_QUALIFICATION.md)
+pins actual release/source, measurements, failures and ordinary fallbacks.
+Growth/enclosing judgments, typed-view publication, broader relocation/data
+retention and portable member authority remain open. Task086 is incomplete.

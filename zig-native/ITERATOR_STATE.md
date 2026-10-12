@@ -70,3 +70,14 @@ independent private progress, bounded sequential leaf traversal and all-width
 comparison with the reconstructed boxed reference. Published cursors, forks,
 saved rows, cross-leaf rows, effects and reference fallbacks must remain exact.
 Nothing is pushed and rejected/provisional artifacts remain preserved.
+
+## Owning-field and packed cursor checkpoint
+
+Compiler6a57437 adds reusable roots for exact private reference fields and
+bounded producer exposure, plus four-local checked packed List cursor families.
+The [merged qualification](ITERATOR_CONSTANTS_QUALIFICATION.md) records actual
+release counts, CPU/compiler costs, full native/973 guests and355-file zero
+analyzer. Array cursors lose4097 objects; range/map/take loses4096. Repeated F32
+all-width cursors qualify; U32 boxed tails and other tagged adapters remain
+open. Late ownership rollback keeps ordinary source bodies and scalar-only reuse
+exact. Projection and word-progress experiments remain separate.

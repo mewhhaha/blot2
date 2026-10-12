@@ -7,117 +7,91 @@ their separate owner decisions.
 
 ## Qualified main
 
-Latest compiler implementation: `cb3ebec`. Latest design: `07cbc62` (057).
+Latest compiler implementation: `6a57437`. Latest design: `07cbc62` (057).
 045/046 are complete: ordinary rolling fold/monoid/group windows and opaque
 persistent AVL summary build/get/query/set/concat. 057's scoped-effect design is
 complete; 058–059 are not implemented. Earlier completed milestones remain in
 the task index and durable records.
 
-- Qualified tree: `e8525b1d36c5c30bc81f971d59b296787a83f6cd`; compiler source:
-  `feefe32c716a268ece1c46171a44f8ad3cd6b6ed`.
-- LLVM/Fast SHA-256:
-  `7c5c3068284f423f0bdd341b1b3b17dc2ee812591146a362b67c3b6a87b9cc2f`. Immutable
-  executable: `build/bench/iterators-047/release/blotc-candidate`.
-- Full native/OOM and 965 guest/client tests pass, all eight unchanged budgets,
-  351 analyzer files/zero, Zig 0.17.0.
-- Seven public compiler pairs preserve diagnostics/work and per-binary output;
-  CPU 0.9624–1.0321, peak deltas zero, teardown zero. Synthetic fresh/retained/
-  restart bytes are exact. No general compiler gain is claimed.
-- Widest scalar fast windows are about 11–12× faster. Summary build now scales
-  linearly; exclusive Array updates remain cheaper. Current streams/updates are
-  bounded; saved versions and real cyclic trials are charged. See
-  [ROLLING_SUMMARIES_QUALIFICATION](zig-native/ROLLING_SUMMARIES_QUALIFICATION.md).
-- This compiler also qualifies explicit-field receipts, conditional frames,
-  static nullary constructors, Array-copy publication, single-use private
-  physical storage and same-unit immutable acyclic proofs. 024/035 remain open.
-  See [BODY_CUTOFF](zig-native/BODY_CUTOFF.md),
-  [TRACING_REPLACEMENT](zig-native/TRACING_REPLACEMENT.md) and
-  `build/bench/joint-024-035-045-046/qualification-pins.json`.
-- The latest checkpoint removes scalar-only local state and direct named
-  reference environment boxes. Scalar record cursor allocations fall to zero;
-  merged cycle CPU falls about 13.7%. Generic adapters and packed cursors remain
-  open. See [ITERATOR_STATE](zig-native/ITERATOR_STATE.md) and
-  `build/bench/iterators-047/release/pins.json`.
+- Qualified tree: `885c7d8a8461d404990a309d89d095fceb24e85f`; compiler source:
+  `b9d9208f0938ab2111a913328a8b0992792623c3`. LLVM/Fast SHA:
+  `904b1ac1558ae3d5c9b1c11744f6cf45a096297753b4b8e572fc4bb99935adb2`. Immutable
+  binary/pins: `build/bench/joint-047-086-qualified/`.
+- Full native/OOM suite,973 guest/client tests, eight unchanged budgets and
+  355-file zero-finding analyzer pass with Zig0.17.0. The final test-only wire
+  counter correction reuses the preceding successful native cache.
+- Owning-field locals remove4097 Array cursor objects and4096 generic pipeline
+  objects. Three merged all-width F32 cursor comparisons pass; U32 tails and
+  other adapters remain open. Validated primitive constant and ready member
+  receipts qualify modest measured edits; dominant captured constants remain
+  ordinary. The captured project regresses about5% from double fallback
+  assembly. See
+  [merged qualification](zig-native/ITERATOR_CONSTANTS_QUALIFICATION.md).
+- Earlier rolling/summary, body-cutoff and tracing milestones remain qualified.
+  Scalar state and direct named reference environments are recorded in
+  [ITERATOR_STATE](zig-native/ITERATOR_STATE.md) and
+  [TRACING_REPLACEMENT](zig-native/TRACING_REPLACEMENT.md).
 
 ## Active work
 
-Root owns 047 generic adapters. 058 is ready; 053 still depends on 024. Take
-ready tasks in index order and keep task/index status together. A successful
-subset never closes a broader gate.
+Continue past partial checkpoints. Combined047/086 is qualified at6a57437. 053
+depends on024. Preserve rejected pins/logs and keep main source frozen through
+each gate.
 
-- **035:** direct named reference environments are qualified at `cb3ebec`.
-  Frozen source/pins remain in `/var/tmp/blot2-tracing-final-035` and
-  `build/bench/tracing/direct-callable-environments.patch`. Frame-retirement
-  batching was rejected and preserved. Physical tracing removal, whole-module
-  coverage and the historical tracing CPU gate remain open.
-- **047 packed cursors:** `/root/resolved_body_028` now owns
-  `/var/tmp/blot2-packed-cursor-047`, based on `2f706e8`. Private cursor
-  versions use four locals in existing storage; the collection is their
-  canonical owning carrier. Width-three profiling removes 4,097 cursor
-  allocations. The plain-word trap is fixed by checked packed-row admission; its
-  fallback is byte-identical to the control. Native 17 replay/OOM laws, 33
-  guests/eight unchanged budgets and 352-file zero analyzer pass. Frozen
-  LLVM/Fast SHA begins `52f682b0`; final repeated all-width record/tuple release
-  comparisons run on CPU 7. No main port/full gate yet.
-- **047 generic:** `/var/tmp/blot2-owned-sroa-047` contains root's next
-  prototype: exact reference fields use reusable function-frame roots; small
-  straight-line producers expose up to four allocations and acyclic markers.
-  Initial roots-only matrix was neutral and preserved. Isolated LLVM/Fast
-  `077d2266` removes 4,097 Array cursor objects (about 11.6x guest CPU) and
-  4,096 pipeline objects (about 3.7%). Focused native/OOM, 31 guests/eight
-  budgets, public/synthetic parity and 351-file zero analyzer pass. A new late
-  module ownership-failure law exposed disabled journals: assembly now retries
-  ordinary immutable source bodies before disabling roots. Retained/portable/OOM
-  law passes; this correction still needs its frozen release pin and main gate.
-- **056:** `/root/associated_members_055` works in
-  `/var/tmp/blot2-implementations-056-qualified` on `46bf8b9`. Explicit impls,
-  selected proof DAGs, methods/captures and transitive prerequisites have 59
-  focused native/OOM laws plus further owned operation-row/diagnostic controls.
-  Checkpoint 126 is immutable, not a final handoff. Compatibility,
-  diagnostic/source/compiled/restart parity and measured screens remain. Port
-  only its final delta onto current main; preserve the dotted access guard.
-- **086 is approved:** the owner accepted
-  [CONSTANT_REUSE](zig-native/CONSTANT_REUSE.md) on 12 October 2026.
-  `/root/demand_summary_036` owns it. Qualified-main port is in
-  `/var/tmp/blot2-constant-qualified-086`, based on `58aa965`. Owned read/fuel/
-  resource receipts keep principal work ordinary and decline escaping view
-  publications. Its first LLVM pin has 26 native/OOM, 27 guests/eight budgets
-  and 354-file zero analyzer; measured scalar/primitive-Array edits improve
-  about 1–2% and deep-member edits about 5%, with explicit cold costs. Captured
-  compound graphs regress about 0.6% while adding 18–20 MB indexes: preserve
-  that pin and narrow admission to measured scalar/primitive collection graphs
-  before the corrected frozen release. No main port/full gate/final 086 claim.
-- **086 next:** a fresh-only diagnostic identified collection-buffer publication
-  followed by a real solver inside the dominant value computation. A growth-only
-  expansion is held until that later inference judgment has an owned worthwhile
-  boundary. Preserve discarded-tape diagnostics and frozen slices. The
-  19645/compiler 2689 tree is historical; corrected work is in
-  `/var/tmp/blot2-constant-reuse-current-086` and
-  `/var/tmp/blot2-constant-inference-086`.
-- **086 member follow-up:** `/var/tmp/blot2-constant-member-086` records the
-  executed partial-member judgment with an exact already-ready method anchor. A
-  deep-body development edit/revert improves about 6.6%, while small bodies are
-  being excluded. Complete owned principal lookup observations are required;
-  equal aggregate budgets alone cannot certify ready-cache contents. No main
-  port, LLVM qualification or final task claim.
-- **024:** captures still elaborate 80 edited-module bodies in the 93-unit
-  project. Dotted paths, local requirements, producer ordinal relocation and the
-  under 100 ms target remain. Agent 036 prioritizes 086 before returning here.
-- **093:** ordinary authorized work; no further approval is required. Its
-  owned-lifetime/hash design remains. Read-only 93-unit attribution:
-  `build/bench/constant-receipts/current-profile-039.json` (about 1040 ms wall;
-  constants 49 ms, inference 536 ms, lookup 84 ms). This changed corpus is not a
-  comparison to the historical 400 ms input.
+- **047 next:** isolated `/var/tmp/blot2-next-047-058` contains reviewed table
+  projections, static058 and early conservative source-conflict cost admission.
+  Unqualified integration basis `ec6a2ae41c92c9025ced4fada28e502ad354756c`, tree
+  `470f8402ad4f1b0af68ef0b2b60a06778ae6e826`, parent6a57437. Focused native, 21
+  merged guests and355-file zero analyzer pass. One matched Safe captured pair
+  preserves bytes/fuel and roughly halves assembly; no release CPU claim.
+  Projection pins: `build/bench/iterators-047/table-projection/`; isolatedLLVM
+  c31847b2 removes4096 more pipeline boxes, with runtime ratios
+  1.0117/0.9728/0.9208 and86207 extra requested compiler bytes.
+- **047 U32:** `/root/resolved_body_028` freezes a separate four-local
+  word-position delta after17 native/Core/replay/OOM,18 guest groups,8 budgets
+  and352 analyzer/zero. Quiet matched Fast/noLLVM U32 width7/16 ratios are
+  record0.8966/0.9585 and tuple0.9343/0.9928; F32 controls improve slightly.
+  LLVM qualification is starting onCPU4, runtimeCPU7. The boxed U32 tail remains
+  open. A later leaf-directory proposal is separate and unimplemented;
+  duplicated/irregular leaf positions require more than pointer equality.
+- **056:** `/root/associated_members_055` preserves immutable235 in
+  `/var/tmp/blot2-implementations-056-qualified`, base46bf8b9. Additional
+  measured DAG gaps in exact comparison, raw unification and optional source
+  admission were found and fixed separately. Closed64 proof controls now have
+  bounded CPU/work and zero teardown. Final74-law/OOM sweep, guests and analyzer
+  precede a NEW isolated port onto explicit `ec6a2ae41` basis. Preserve
+  static058 argument closure/chronology, dotted access guard, optimizerv15
+  features and all seven exact catalog comparisons in the constant-only gate.
+  Root owns the combined full gate.
+- **058:** static symbolic rows are included only in that next basis. Frozen
+  original slice/evidence: `/home/jacobt/src/blot2-task058`, ignored
+  `build/bench/scoped-static-058/`. Seven Safe/noLLVM public controls show
+  1.5–2.4% CPU overhead, unchanged allocation; closed State and source/compiled/
+  retained/checkpoint controls pass. The agent hit model capacity after saving
+  evidence. No work was lost. Fresh identities, subtraction/routing and
+  activation-owned revocation remain unimplemented;058/059 remain open.
+- **086:** approved primitive constant and ready member checkpoint is qualified
+  at6a57437. Dominant captured constants remain ordinary, with zero dedicated
+  bookkeeping and no project-level payoff. Growth/enclosing judgments, escaping
+  typed views, relocation/serialized-data breadth and portable member authority
+  remain open. Preserve `build/bench/constant-receipts/` slices.
+- **035:** scalar/direct environments are qualified; physical tracing removal,
+  whole-module coverage and historical CPU acceptance remain open.
+- **024/093:**80 edited-module bodies in the93-unit capture still elaborate.
+  Dotted paths, local requirements, producer relocation and100ms target remain
+  open.093 ordinary work is authorized. Current input differs from historical
+  400ms evidence.
 
 Agents do not edit main or run duplicate full gates. Root reviews frozen inputs
 and runs one combined gate per commit-ready batch. Keep isolated, rejected and
-merged release costs separate.
+merged costs separate.
 
 ## Build and validation
 
 - Check `zig version` before each build batch; use Zig 0.17.0.
-- Incremental:`deno task build:compiler:dev`;
-  release:`deno task build:compiler`.
+- Incremental:`deno task build:compiler:dev` uses Safe/noLLVM;
+  release:`deno task build:compiler` uses LLVM/Fast. See
+  [iteration costs](zig-native/ITERATION_COST.md).
 - Focused native in `zig-native/`:
   `zig build test -Doptimize=safe -Dllvm=false
   -Dtest-filter="name"`. Use LLVM
