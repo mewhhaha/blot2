@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — no completion is claimed.
+- **Status:** Complete at `2689ad5`.
 - **Dependencies:** [002](002-close-packed-list-traversal-regression.md),
   [027](027-represent-ownership-in-resolved-ir.md)
 - **Originating requirements:** PLAN: Earlier programs / broader row fusion.
@@ -24,11 +24,11 @@ explicit layout/ownership facts.
 
 ## Implementation checklist
 
-- [ ] Fuse eligible producer/consumer paths using checked shapes and use
+- [x] Fuse eligible producer/consumer paths using checked shapes and use
       evidence, without recognizing library declaration names.
-- [ ] Keep snapshots, logical row counts, F32 operation order, effect boundaries
+- [x] Keep snapshots, logical row counts, F32 operation order, effect boundaries
       and evaluation/trap order exact.
-- [ ] Retain ordinary representation for escapes, unsupported shapes and unknown
+- [x] Retain ordinary representation for escapes, unsupported shapes and unknown
       effects; do not expose interior row pointers.
 
 ## Validation
@@ -48,20 +48,28 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Additional ordinary typed pipelines demonstrably fuse with fewer
+- [x] Additional ordinary typed pipelines demonstrably fuse with fewer
       intermediate allocations.
-- [ ] Snapshots, order, effects and fallback remain correct across source and
+- [x] Snapshots, order, effects and fallback remain correct across source and
       dependency builds.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `2689ad5`; qualified tree `92e09418…51fb6a`, Zig0.17.0 LLVM/Fast
+  release SHA256 `9ea894d4…8b21`.
+- Validation: full native suite,925 guest/client tests, eight unchanged
+  allocation budgets and349 analyzer files/zero. Widths1–16, F32/U32 order,
+  slices/snapshots, escapes, effects/traps, source/compiled/checkpoint edits and
+  exhaustive OOM controls pass.
+- Comparison: native optimized callers eliminate temporary scalar row boxes; 31
+  alternating100,000-row guest pairs have named/composed CPU ratios .0212–.0521
+  versus qualified039/055. Direct controls, committed memory and seven
+  fresh/retained compiler pairs are reported separately; no general compiler
+  speedup is claimed.
+- Remaining limits: bounded small-body fusion; lazy/escaped/nested/reference/
+  width17/unknown uses retain owned fallback. Collection construction and
+  general iterator-state elimination remain separate work.
+- Durable record: [ROW_FUSION](../zig-native/ROW_FUSION.md), including exact
+  pins, rejected prototypes, raw distributions and combined costs.

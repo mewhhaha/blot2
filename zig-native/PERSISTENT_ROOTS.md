@@ -18,17 +18,20 @@ The reserved `candidate_prev` word points to the original owner's slot while its
 lease exists. Lease consumption clears both links before decrement/destruction.
 The cycle collector must reuse that word only after this phase ends.
 
-A journal page has a scalar 4096-byte payload, a previous-page link and 341
-12-byte slots: value, frame identity and caller result slot. Only values are
-roots. Frame identities and page links are allocator bookkeeping. A page uses
-the existing 8192-byte allocation class. Empty suffix pages are recycled; the
-base page is reusable until instance teardown.
+A journal page has a scalar 4096-byte payload, a previous-page link and 511
+8-byte slots: value and frame identity. Only values are roots. Frame identities
+and page links are allocator bookkeeping. A page uses the existing 8192-byte
+allocation class. Empty suffix pages are recycled; the base page is reusable
+until instance teardown.
 
-A call reserves its caller result slot before opening its frame. Allocation
-reserves a slot before publishing storage. On a fresh return, the original owner
-moves into the caller slot. Returning a borrowed child retains a new slot before
-closing the callee. Scalar and static results need no owning slot. Frame close
-clears slots before release and uses the existing iterative destructor.
+A call reserves one marker before opening its frame. Allocation reserves a slot
+before publishing storage. At close the marker becomes the caller result owner:
+a fresh original owner moves into it, while a borrowed child retains before the
+callee suffix retires. The marker's frame link already names the caller. Close
+keeps an owning marker and pops an empty one. Scalar and static results need no
+owning slot. Frame close clears slots before release and uses the existing
+iterative destructor. Empty-page retirement returns to the close loop before it
+inspects the next marker, including when a return spans several journal pages.
 
 Loop carries have stable slots in the parent frame. Stores retain the
 replacement before dropping the old version. Each iteration separately holds its

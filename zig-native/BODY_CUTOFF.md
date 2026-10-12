@@ -456,3 +456,147 @@ pins, memory deltas and controls are in
 Task 024 remains open. Later shared-callee, explicit-qualification and portable
 origin/body-offer work is isolated and not in this release. General supported
 forms, producer-unit relocation and the under-100-ms target remain unfinished.
+
+## Shared principal edges (task 024 follow-up)
+
+An acyclic shared `callee_use` edge is now an admitted interface read when its
+completed principal contains only implicit dispatch/result predicates or other
+admitted shared edges. The receipt hashes the complete transitive principal,
+original declaration spelling/kind/privacy/runtime and producer identity,
+canonical public type/row binder positions, and the sharing recipe flags. A
+borrowed current catalog proves completion; the retained owner stores only the
+resulting digest. Cycles, unavailable or redacted original names, unsupported
+predicates and exhausted proof budgets continue through ordinary checking.
+
+The proof visits at most 64 principals and 4,096 type/predicate nodes.
+Closed-row certificates retain their separate bounded path proof. The same
+64-principal limit collects all transitive dispatch member names, so candidate
+presence and negative candidate interfaces remain reads even behind wrapper
+layers. Exact wrapper bodies still undergo syntax and identity checks
+independently.
+
+Replay reinstantiates the current qualified reference at its relocated source
+node. It does not copy a `callee_use` solver identity into the owner or
+duplicate its forwarded predicates. The normal shared-use solver remains
+authoritative for selection, generalization, effect propagation and diagnostics;
+lowering and executable encoding remain fresh.
+
+Focused evidence: 40 Safe/no-LLVM native laws (25 substantive plus 15 suite
+anchors), nine executed-Wasm laws and eight unchanged allocation-budget laws;
+346 analyzer files, zero findings. Native laws cover two wrapper layers, an
+alias, insertion/new spelling, same-interface selected-body edits, new negative
+candidates and every allocation failure. The executed law traverses two generic
+wrapper layers, changes the selected operation body, rejects a Foreign interface
+edit in a pure consumer with fresh-identical diagnostics, and recovers. Source
+and compiled imports relocate shared producer schemes, recover after an
+unbound-name revision, and regenerate changed selected implementation values.
+This follow-up has no LLVM performance claim yet. Task 024 remains active for
+explicit qualifications, other residual predicates and unsupported body forms.
+
+## Source declared qualifications (task 024 follow-up)
+
+Top-level source `associated` and `type_rep` clauses are admitted alongside the
+shared-principal proof. A declared predicate includes its explicitness, complete
+type/row signature, and original qualification owner's spelling/privacy/runtime
+with a span relative to that declaration. A direct owner lookup is constant
+work; a forwarded origin uses a bounded scan. Missing owners, higher-rank
+scopes, other written clause kinds and explicit effect-row syntax remain
+ordinary. Imported explicit clauses remain ordinary: the current compiled
+principal schema has no canonical source-owner route for that origin. No
+portable-origin identity is invented from a solver ID or a consumer AST
+position.
+
+`beginGlobal` recreates the current declared obligations and qualification
+boundary before any replay. Capture does not duplicate those declared clauses.
+References instantiate their current qualifications, and the ordinary solver
+checks coverage and publishes the resulting scheme. Declared dispatch members
+also pin the complete positive/negative candidate catalog, preventing solved
+body facts from concealing a new effect or operation interface.
+
+Focused evidence: 41 Safe/no-LLVM native tests (26 substantive plus 15 suite
+anchors), ten executed-Wasm laws, eight unchanged allocation-budget laws, and
+346 analyzer files with zero findings. The new laws relocate quantified clauses
+past inserted AST/type nodes and new spellings, specialize U32 and F32 callers,
+sweep allocation failures, regenerate same-interface operation values, compare
+wrong-clause and Foreign failures with fresh diagnostics, and recover. This
+isolated follow-up has no LLVM qualification yet. Task 024 remains active for
+portable imported qualification origins, other residual/effect-operation kinds
+and unsupported general expression/pattern forms.
+
+## Portable imported qualifications and seed rebuild offers
+
+Imported explicit qualification origins now use a bounded producer receipt
+instead of requiring a source tree in the consumer. A source producer identifies
+its declaring `where` owner directly. A compiled producer's parallel
+`obligation_spans` identifies the original constraint inside its qualification
+span, excluding forwarded use sites; its frozen Core binding/body supplies the
+same declaration span and runtime flag. The original producer spelling/privacy
+and declaration-relative qualification span produce the same owned digest.
+Ambiguous, redacted, missing or out-of-bounds owners decline. Each producer scan
+is bounded to 4,096 bindings and obligations. The archive schema is unchanged.
+
+The rebuilt-seed consumer path previously passed no previous frontend offer. It
+now offers independent body leases while explicitly disabling whole-entry and
+whole-module cutoffs. A body-only offer requires unchanged check settings, a
+live previous owner with complete paths/cache arrays, and exact filename pairing
+in the current checker. Each body still proves its own exact source, current
+identities, interfaces, candidate reads, annotations and committed callee
+states. Old seed/Core address pairing remains mandatory for whole-entry or
+module offers; body leases have their own immutable owners. Executable and
+staging invalidation remains authoritative.
+
+Focused evidence: 42 Safe/no-LLVM native tests (27 substantive plus 15 suite
+anchors), eleven executed-Wasm laws, eight unchanged allocation budgets, and 346
+analyzer files with zero findings. The new executed law covers source and
+compiled imports, entry insertion/failure/recovery, an earlier producer body
+that adds AST/type nodes and a first-use field spelling, and an operation body
+edit with changed execution but unchanged public interface. The new native
+allocation-failure sweep exercises a rebuilt producer seed and retained
+qualified consumer, checking fresh output, unchanged previous stamps, balanced
+chunk lease counts, discard and successful retry. This isolated follow-up is not
+LLVM-qualified. Task 024 remains active for other residual/effect-operation
+kinds, generic annotation heads, projection/pattern/block/control forms and
+producer ordinal relocation.
+
+## Applied annotation and constructor recipe reads
+
+Local applied generic annotations now admit data/opaque heads, shaped
+transparent aliases, `Array`/`List` heads and tuple/array/record argument
+syntax. The receipt uses the current owned parameter-pattern store to hash
+binding, tuple, array and record recipe kinds, canonical type-binder positions
+and field spellings. Aliases pin their complete expansion and quantified
+effect-row positions. Nominal reads additionally pin constructor spellings,
+tags, privacy, record-construction flags and payload types. Symbol/AST ordinals
+remain absent from these keys. This strengthens both inferred and explicitly
+annotated nominal receipts without adding fields to dense expression facts.
+
+Each recipe and payload traversal shares the existing 4,096-node/128-depth proof
+limit. Recursive constructor payloads, unavailable patterns, redacted spellings,
+unknown effects, imported/namespaced annotation heads and unsupported forms
+remain ordinary. Captures retain only owned digests and frozen semantic types;
+borrowed pattern stores remain within the current preparation.
+
+Focused evidence: 43 Safe/no-LLVM native tests (28 substantive plus 15 anchors),
+eleven executed-Wasm laws, eight unchanged allocation budgets, and 348 analyzer
+files with zero findings. Applied Box, shaped Pair and Array annotations
+relocate through inserted AST/type nodes and first-use spellings under every
+allocation failure. A constructor payload recipe edit revokes unchanged
+consumers and preserves fresh bytes. The executed generic opaque law now
+exercises those annotations for U32, F32 and owning numeric-array payloads,
+including failure/recovery and repeated calls. No LLVM performance claim is made
+for this isolated follow-up. General residual/projection/pattern/control forms
+and producer ordinal relocation remain open; task 024 is active.
+
+## Integrated followups at2689ad5
+
+The shared-principal, declared/portable qualification, seed-rebuild body offer
+and applied-annotation/constructor recipe slices above are jointly qualified
+at`2689ad5`. Full native suite,925 guest/client laws, eight unchanged budgets
+and349 analyzer files/zero pass. The exact LLVM/Fast release is`9ea894d4…8b21`;
+public CPU is mixed (.9946–1.0501), peak deltas zero and teardown zero. Earlier
+isolated costs are not substituted for merged costs. General scopes/cases,
+producer-unit ordinal relocation and the under100ms total edit target remain
+open. The current captured93-unit corpus also has substantial backend work; its
+changed input cannot establish a comparison to historical400ms. See
+[the combined record](ROW_FUSION.md#integrated-qualification) and ignored
+`build/bench/joint-024-035-040/qualification-pins.json`.

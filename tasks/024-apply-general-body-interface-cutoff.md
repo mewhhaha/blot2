@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — partial milestones `a686304` and `46bf8b9`; no
-  completion is claimed.
+- **Status:** In progress — partial milestones through `2689ad5`; no completion
+  is claimed.
 - **Dependencies:** [023](023-narrow-literal-edit-invalidation.md)
 - **Originating requirements:** PLAN: Hill 6 / general body edits under 100 ms.
   Sources: [PLAN.md](../PLAN.md).
@@ -95,6 +95,18 @@ closed-row, nominal/field and evidence receipts. The full native/914-guest
 compiler gate, eight unchanged budgets and 348-file zero analyzer pass. Admitted
 deep-body edit CPU falls about 29–30%; population/retained-memory costs and
 cheap-body regressions remain explicit. Shared-callee and qualification
-followups remain isolated. General forms, relocation and the under-100-ms target
-keep this task open. See
+followups were isolated at that milestone. General forms, relocation and the
+under-100-ms target keep this task open. See
 [combined qualification](../zig-native/FRONTEND_OWNERSHIP_QUALIFICATION.md).
+
+### Qualified shared/portable/annotation slice — 12 October2026
+
+`2689ad5` adds bounded completed shared principals, original declared
+qualification owners through source/compiled imports, independent body offers
+after seed rebuild and complete applied-annotation/constructor recipe reads. The
+joint full native/925-guest gate, eight unchanged budgets and349-file zero
+analyzer pass. Unsupported blocks/cases and other forms, producer-unit ordinal
+relocation and the total edit target stay open. Pinned isolated costs remain
+distinct from mixed merged release costs.
+See[BODY_CUTOFF](../zig-native/BODY_CUTOFF.md)
+and[the combined record](../zig-native/ROW_FUSION.md#integrated-qualification).

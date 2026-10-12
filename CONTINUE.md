@@ -11,7 +11,7 @@ pushed; keep it that way unless the owner authorizes it.
 
 ## Qualified state
 
-Latest compiler implementation on local `main`: `46bf8b9`. Qualified milestones,
+Latest compiler implementation on local `main`: `2689ad5`. Qualified milestones,
 each with a durable record:
 
 | Task                                           | Implementation       | Record                                                       |
@@ -148,6 +148,22 @@ The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
     BODY_CUTOFF and TRACING_REPLACEMENT. Initial strict pointer-snapshot and
     stale raw-wire fixture failures remain preserved. Nothing is pushed.
 
+12. **040 is complete at`2689ad5`.** The combined024/035/040 tree
+    `92e09418c4449fd772c0037ead43cd922e51fb6a`, compiler source
+    `497069ed0c61181232520acdb249b35828334ae1`, standard LLVM/Fast release
+    `9ea894d41e157824dd951e5f92827284da98c59af47c8b5831ebd04623688b21` passes
+    the full native suite,925 guest/client laws, all eight unchanged budgets
+    and349 analyzer files/zero. Checked named consumers and small row
+    compositions eliminate temporary scalar boxes; widths/order/escapes/effects,
+    source/artifact/checkpoint edits and OOM pass.31 paired100,000-row samples
+    give named/composed guest CPU ratios .0212–.0521; committed memory is
+    unchanged. Public compile CPU .9946–1.0501, peak deltas zero, teardown zero;
+    synthetic fresh/hot/restart bytes equal across compilers.024 also adds
+    shared/portable/annotation receipts;035 adds final flag lowering and compact
+    one-marker journals. Their broader scope and CPU gates remain open. Exact
+    pins and limitations are in ROW_FUSION, BODY_CUTOFF, TRACING_REPLACEMENT and
+    `build/bench/joint-024-035-040/qualification-pins.json`. Nothing is pushed.
+
 ## bpm tangent
 
 The owner requested Git packages, caching, `blot.json`, package exports in
@@ -169,35 +185,43 @@ agents use focused checks/screens, with no redundant full gates or main edits.
   binary, seven alternating CPU6 pairs, 20 hot edits and preserved execution/
   per-binary byte parity. Report:
   `build/bench/frontend-body-reuse/final-floor-llvm-qualification.json`.
-  Shared-callee and source-qualification deltas are frozen separately at
+  Shared-callee and source-qualification deltas were frozen separately at
   `build/bench/frontend-body-reuse/shared-callee-followup.patch`
   (`d321d502…fff507`) and `source-qualification-followup.patch`
   (`40d36505…35fd`). Imported origin reconstruction now uses existing portable
   principal/Core facts; producer edits additionally need an independent body
-  offer after seed rebuild, with whole-module/entry cutoff disabled. This work
-  is isolated. General forms/relocation and the under-100-ms target remain open;
-  053 still waits. Agent `/root/demand_summary_036` owns it.
+  offer after seed rebuild, with whole-module/entry cutoff disabled. These and
+  applied annotation/constructor recipe reads are qualified at`2689ad5`. Current
+  captured93-unit attribution identifies blocks/cases as50 of53 offered syntax
+  declines and substantial backend cost. Bounded scope/case ownership is now
+  isolated work; preserve lexical/mutation/join evidence. General
+  forms/relocation and the under-100-ms target remain open; 053 still waits.
+  Agent `/root/demand_summary_036` owns it.
 - **035 remains active.** Main qualifies checked scalar/reference results,
   complete/rootless admission, immutable variants, scalar stores and separate
   frame-demand cache validity. The frozen flag-only follow-up is
   `build/bench/tracing/flag-lowering.patch`, SHA
   `74992378c8264413ac929f503fa529bd0ea4e911214b968a66731869038ae5c0`. It lowers
   immutable complete guards only after final admission, preserving symbolic
-  captures and changed-admission replay. Later journal validation experiments
-  are measured separately; cycles remain about 5.4× tracing. A scalar-result
-  slot experiment regressed JSPI controls and was rejected. Prioritize removing
+  captures and changed-admission replay. Flag lowering and compact single
+  eight-byte frame markers are qualified at`2689ad5`. Their separately pinned
+  cycle comparison is about4.9× tracing. The five-line null-environment closure
+  descriptor slice is frozen separately at
+  `build/bench/tracing/static-descriptor-ported.patch` (`f9c8ff03…23239`),
+  ported on`2689ad5` in`/var/tmp/blot2-tracing-next-035`. It removes four
+  objects per cycle in its measured control but remains about4.05–4.23× tracing.
+  A weak journal-drain batching experiment was rejected. A scalar-result slot
+  experiment regressed JSPI controls and was rejected. Prioritize removing
   redundant frames/slots using checked lifetimes; preserve nested memory,
   cycles, escape/suspension/cancellation and raw fallbacks. Agent
   `/root/resolved_body_028` owns it in `/var/tmp/blot2-tracing-035`.
-- **040 has started**, root-owned in `/var/tmp/blot2-row-fusion-040` on the
-  qualified 002/034 base. A machine-consumer inlining prototype did not
-  eliminate source row copies and is preserved/reverted. The current small Core
-  change passes borrowed flat-row views into proved named consumers and
-  materializes owned bases at fallback value boundaries. Array and List
-  widths/order/escapes still need qualification. The initial native
-  zero-allocation assertion was too broad for List producer construction; its
-  failure is preserved and needs a consumer-only control. No main 040
-  implementation/completion is claimed.
+- **040 is complete**, with isolated worktrees and failed prototypes preserved.
+  Root proceeds to041, then044/047. The numeric-vectorizer currently rejects all
+  inlined kernel-local writes and explicit helper returns; bounded
+  private-local/independent-lane proof is the next candidate hill. A rolling/
+  summary API draft is prepared at
+  `build/bench/rolling-summary-contract-044.md`; it is not yet a committed044
+  design or045/046 implementation.
 - **056 has started** after completed 055, in
   `/var/tmp/blot2-implementations-056-qualified` on `46bf8b9`. Agent
   `/root/associated_members_055` owns explicit impl grammar/head binders/member

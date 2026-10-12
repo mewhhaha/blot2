@@ -638,7 +638,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [037] — Lower loop aware local memos                    | Complete    | [036]                                  |
 | [038] — Eliminate demands through known callbacks       | Complete    | [037], [032]                           |
 | [039] — Guarantee and explain demand lowering           | Complete    | [038], [033]                           |
-| [040] — Fuse packed row producers and consumers         | In progress | [002], [027]                           |
+| [040] — Fuse packed row producers and consumers         | Complete    | [002], [027]                           |
 | [041] — Broaden numeric simd                            | Pending     | [040]                                  |
 | [042] — Specify ragged builders                         | Complete    | [011], [027]                           |
 | [043] — Implement ragged builders                       | Complete    | [042]                                  |
