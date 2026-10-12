@@ -113,7 +113,7 @@ pub const Session = struct {
         var owned: ?ir.Body = null;
         errdefer if (owned) |*body| body.deinit(self.allocator);
         var view = source.*;
-        inline for (.{ "inline", "scalar", "vector", "lifetime", "reduce", "rc" }) |pass| {
+        inline for (.{ "inline", "scalar", "vector", "row_products", "lifetime", "reduce", "rc" }) |pass| {
             const next: ?ir.Body = if (self.tier == .development and !std.mem.eql(u8, pass, "lifetime") and !std.mem.eql(u8, pass, "rc"))
                 null
             else if (comptime std.mem.eql(u8, pass, "inline"))
@@ -122,6 +122,8 @@ pub const Session = struct {
                 try @import("wasm_sroa.zig").run(self.allocator, self.module, &view)
             else if (comptime std.mem.eql(u8, pass, "vector"))
                 try @import("wasm_vectorize.zig").run(self.allocator, self.module, &view)
+            else if (comptime std.mem.eql(u8, pass, "row_products"))
+                try @import("wasm_row_products.zig").run(self.allocator, &view)
             else if (comptime std.mem.eql(u8, pass, "rc"))
                 if (self.runtimeHelper(source)) null else try lifetimes.runRc(self.allocator, self.module, &view, &self.summaries)
             else if (comptime std.mem.eql(u8, pass, "reduce"))

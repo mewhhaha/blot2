@@ -52,6 +52,17 @@ pub const StateCell = extern struct {
     value: u32,
     pub const roles = [_]Role{.value};
 };
+/// One guest installation owns both operation tokens and the mutable value.
+/// The evaluator keeps its numeric cell IDs; this tag belongs to guest frames.
+pub const StateFrame = extern struct {
+    read: u32,
+    value: u32,
+    outer: u32,
+    kind: u32,
+    write: u32,
+    pub const tag: u32 = 4;
+    pub const roles = [_]Role{ .scalar, .value, .reference, .scalar, .scalar };
+};
 pub const Provider = extern struct {
     operation: u32,
     implementation: u32,
@@ -141,11 +152,15 @@ pub fn fields(comptime T: type) [T.roles.len]Field {
 }
 
 comptime {
-    for (.{ Closure, HostClosure, Demand, Pair, Cursor, ProviderFrame, StateCell, Provider, StateProvider, RequestCell, RequestFrame, Decision, Array, ListDescriptor, ListNode, ListBranch, ArenaHeader }) |T| {
+    for (.{ Closure, HostClosure, Demand, Pair, Cursor, ProviderFrame, StateCell, StateFrame, Provider, StateProvider, RequestCell, RequestFrame, Decision, Array, ListDescriptor, ListNode, ListBranch, ArenaHeader }) |T| {
         _ = fields(T);
     }
     for (@typeInfo(ListNode).@"struct".field_names) |name|
         std.debug.assert(offset(ListNode, name) == offset(ListBranch, name));
+    std.debug.assert(offset(StateFrame, "read") == offset(ProviderFrame, "operation"));
+    std.debug.assert(offset(StateFrame, "value") == offset(ProviderFrame, "target"));
+    for (.{ "outer", "kind" }) |name|
+        std.debug.assert(offset(StateFrame, name) == offset(ProviderFrame, name));
     for (@typeInfo(Closure).@"struct".field_names) |name| {
         std.debug.assert(offset(Closure, name) == offset(Demand, name));
         std.debug.assert(offset(Closure, name) == offset(HostClosure, name));

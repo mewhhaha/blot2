@@ -677,11 +677,14 @@ lists, like the scalar compiler operations.
 
 Eligible independent numeric array-construction kernels automatically use
 four-lane Wasm SIMD and a scalar tail. Admission follows bounded ordinary
-function bodies; it does not recognize library names. Memory reads, effects,
-branches and potentially trapping integer division remain scalar. F32 expression
-order and U32 wrapping are preserved. No reduction is automatically regrouped:
-`f32_sum` adds left to right, while `f32_sum_pairwise` explicitly chooses
-`(a + b) + (c + d)` and can round differently.
+function bodies, including private numeric locals and unconditional block
+returns; it does not recognize library names. Memory reads, effects, conditional
+branches and potentially trapping integer division remain scalar. Four checked
+F32 row fields multiplied by the same factor may share a vector product. Stores,
+calls and unproved control edges end that proof. F32 expression order and U32
+wrapping are preserved. No reduction is automatically regrouped: `f32_sum` adds
+left to right, while `f32_sum_pairwise` explicitly chooses `(a + b) + (c + d)`
+and can round differently.
 
 ## Effects and host capabilities
 

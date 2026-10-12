@@ -6,8 +6,35 @@ const ir = @import("runtime_ir.zig");
 const w = @import("wasm.zig");
 const A = std.mem.Allocator;
 
+// A thin direct forwarder acquires exactly the source callee's result marker.
+// That marker already belongs to its caller when this wrapper has no frame.
+// The sole discard exit consumes it explicitly; no ancestor-root assumption
+// or borrowed-result ownership omission participates in this proof.
+const Forward = struct { call: usize, discard: ?usize = null };
+fn forwarded(module: *const w.Module, source: *const ir.Function) ?Forward {
+    if (source.result != .i32 or source.result_role != .reference) return null;
+    for (source.instructions.items, 0..) |inst, at| switch (inst.op) {
+        .local_get, .i32_const, .f32_const, .i32_load, .f32_load => {},
+        .call => {
+            if (module.runtimeHelper(inst.operand)) return null;
+            const callee = &module.functions.items[inst.operand];
+            if (callee.entry or callee.result != .i32 or callee.result_role != .reference) return null;
+            const tail = source.instructions.items[at + 1 ..];
+            if (tail.len == 0 or (tail.len == 1 and tail[0].op == .return_)) return .{ .call = at };
+            if (tail.len != 5 or tail[0].op != .global_get or tail[1].op != .if_ or tail[1].operand != 0 or tail[2].op != .i32_const or tail[2].operand != 0 or tail[2].table_reference or tail[3].op != .return_ or tail[4].op != .end) return null;
+            const guard = module.globals.items[tail[0].operand];
+            if (guard.scalar.role() != .scalar or guard.scalar.machine() != .i32) return null;
+            return .{ .call = at, .discard = at + 4 };
+        },
+        else => return null,
+    };
+    return null;
+}
+
 pub fn run(a: A, module: *const w.Module, source: *const ir.Function, framed: bool, entry: bool, start: bool) A.Error!?ir.Body {
     const arena = module.arena orelse return null;
+    const forward = if (framed and !entry and !start) forwarded(module, source) else null;
+    const frame = framed and forward == null;
     var changes = framed;
     for (source.instructions.items) |inst| if (inst.op == .call and inst.operand == arena.allocate_typed) {
         changes = true;
@@ -20,7 +47,7 @@ pub fn run(a: A, module: *const w.Module, source: *const ir.Function, framed: bo
     const result: u32 = @intCast(source.parameters.len + out.locals.items.len);
     const automatic = result + @intFromBool(source.result != .none);
     const array_parameter = entry and source.parameters.len != 0 and source.parameterRole(0) == .reference;
-    if (framed and source.result != .none) try out.locals.append(a, source.result);
+    if ((frame and source.result != .none) or (forward != null and forward.?.discard != null)) try out.locals.append(a, source.result);
     if (entry) try out.locals.append(a, .i32);
     const publication: u32 = @intCast(source.parameters.len + out.locals.items.len);
     var global_stores = false;
@@ -37,7 +64,7 @@ pub fn run(a: A, module: *const w.Module, source: *const ir.Function, framed: bo
         try out.emit(a, .global_set, arena.root_globals);
         try out.emit(a, .end, 0);
     }
-    if (framed) {
+    if (frame) {
         try out.emit(a, .global_get, arena.root_enabled);
         try out.emit(a, .if_, 0);
         if (entry) {
@@ -76,8 +103,20 @@ pub fn run(a: A, module: *const w.Module, source: *const ir.Function, framed: bo
         try out.emit(a, .block, if (source.result == .none) 0 else @backingInt(source.result));
     }
     var depth: u32 = 0;
-    for (source.instructions.items) |instruction| {
+    for (source.instructions.items, 0..) |instruction, at| {
         var inst = instruction;
+        if (forward) |proof| if (proof.discard != null and at == proof.discard.?) {
+            try out.emit(a, .global_get, arena.root_enabled);
+            try out.emit(a, .if_, 0);
+            try out.emit(a, .local_get, result);
+            try out.emit(a, .global_get, arena.static_end);
+            try out.emit(a, .i32_ge_u, 0);
+            try out.emit(a, .if_, 0);
+            try out.emit(a, .call, arena.root_pop);
+            try out.emit(a, .drop, 0);
+            try out.emit(a, .end, 0);
+            try out.emit(a, .end, 0);
+        };
         if (inst.op == .ownership) {
             const scope: ir.Ownership = @bitCast(inst.operand);
             if (scope.kind == .scope) {
@@ -132,7 +171,7 @@ pub fn run(a: A, module: *const w.Module, source: *const ir.Function, framed: bo
         switch (inst.op) {
             .block, .loop, .if_ => depth += 1,
             .end => depth -= 1,
-            .return_ => if (framed) {
+            .return_ => if (frame) {
                 inst.op = .br;
                 inst.operand = depth;
             },
@@ -142,8 +181,9 @@ pub fn run(a: A, module: *const w.Module, source: *const ir.Function, framed: bo
             else => {},
         }
         try out.instructions.append(a, inst);
+        if (forward) |proof| if (proof.discard != null and at == proof.call) try out.emit(a, .local_tee, result);
     }
-    if (framed) {
+    if (frame) {
         try out.emit(a, .end, 0);
         if (source.result != .none) try out.emit(a, .local_set, result);
         try out.emit(a, .global_get, arena.root_enabled);
@@ -194,4 +234,99 @@ fn ownership(a: A) !void {
 test "typed function root lowering owns early returns and preserves inputs through OOM" {
     try ownership(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, ownership, .{});
+}
+
+fn forwarding(a: A) !void {
+    var module = w.Module.init(a);
+    defer module.deinit();
+    const arena = try module.ensureArena();
+    const guard = try module.addGlobal(.bool, 0, true);
+    const producer = try module.addTypedFunction(&.{.i32}, .i32, .reference);
+    module.functions.items[producer].parameter_roles = ir.packParameterRoles(&.{.scalar});
+    const value = try module.addLocal(producer, .i32);
+    try module.emitSlice(producer, &.{
+        .{ .op = .i32_const, .operand = 8 },     .{ .op = .i32_const },               .{ .op = .call, .operand = arena.allocate_typed }, .{ .op = .local_set, .operand = value },
+        .{ .op = .local_get, .operand = value }, .{ .op = .i32_const, .operand = 1 }, .{ .op = .i32_store },                             .{ .op = .local_get, .operand = value },
+        .{ .op = .local_get },                   .{ .op = .i32_store, .operand = 4 }, .{ .op = .local_get, .operand = value },
+    });
+    const wrapper = try module.addTypedFunction(&.{.i32}, .i32, .reference);
+    module.functions.items[wrapper].parameter_roles = ir.packParameterRoles(&.{.scalar});
+    try module.emitSlice(wrapper, &.{
+        .{ .op = .local_get }, .{ .op = .call, .operand = producer }, .{ .op = .global_get, .operand = guard },
+        .{ .op = .if_ },       .{ .op = .i32_const },                 .{ .op = .return_ },
+        .{ .op = .end },
+    });
+    const original = try a.dupe(ir.Instruction, module.functions.items[wrapper].instructions.items);
+    defer a.free(original);
+    try std.testing.expectEqual(Forward{ .call = 1, .discard = 5 }, forwarded(&module, &module.functions.items[wrapper]).?);
+    var body = (try run(a, &module, &module.functions.items[wrapper], true, false, false)).?;
+    defer body.deinit(a);
+    var discards: usize = 0;
+    for (body.instructions.items) |inst| if (inst.op == .call) {
+        try std.testing.expect(inst.operand != arena.root_open and inst.operand != arena.root_close);
+        if (inst.operand == arena.root_pop) discards += 1;
+    };
+    try std.testing.expectEqual(@as(usize, 1), discards);
+    try std.testing.expectEqualSlices(ir.Instruction, original, module.functions.items[wrapper].instructions.items);
+    // Nonforwarding exits, independent owners, mutations and unknown callees
+    // must keep the wrapper's own retirement boundary.
+    for ([_]ir.Instruction{
+        .{ .op = .local_tee },     .{ .op = .call, .operand = producer }, .{ .op = .i32_store },
+        .{ .op = .call_indirect }, .{ .op = .call_import },               .{ .op = .ownership, .operand = @bitCast(ir.Ownership{ .kind = .scope, .chunk = 5 }) },
+    }) |replacement| {
+        module.functions.items[wrapper].instructions.items[0] = replacement;
+        try std.testing.expect(forwarded(&module, &module.functions.items[wrapper]) == null);
+    }
+    module.functions.items[wrapper].instructions.items[0] = original[0];
+    module.functions.items[wrapper].instructions.items[1].operand = arena.root_allocate;
+    try std.testing.expect(forwarded(&module, &module.functions.items[wrapper]) == null);
+    module.functions.items[wrapper].instructions.items[1] = original[1];
+    module.functions.items[producer].entry = true;
+    try std.testing.expect(forwarded(&module, &module.functions.items[wrapper]) == null);
+    module.functions.items[producer].entry = false;
+    module.functions.items[producer].result_role = .unknown;
+    try std.testing.expect(forwarded(&module, &module.functions.items[wrapper]) == null);
+    module.functions.items[producer].result_role = .reference;
+    module.functions.items[wrapper].instructions.items[4].operand = 1;
+    try std.testing.expect(forwarded(&module, &module.functions.items[wrapper]) == null);
+    module.functions.items[wrapper].instructions.items[4] = original[4];
+    const consumer = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+    module.functions.items[consumer].parameter_roles = ir.packParameterRoles(&.{.scalar});
+    try module.emitSlice(consumer, &.{ .{ .op = .local_get }, .{ .op = .call, .operand = wrapper }, .{ .op = .i32_load, .operand = 4 } });
+    try module.exportFunction(consumer, "run", .u32, .u32);
+    var capture: @import("optimized_bodies.zig").Capture = .{ .allocator = a };
+    defer capture.deinit();
+    const bytes = try module.assembleWithOptions(.{ .tier = .development, .current = &capture });
+    defer a.free(bytes);
+    var retained: @import("optimized_bodies.zig").Capture = .{ .allocator = a };
+    defer retained.deinit();
+    const reused = try module.assembleWithOptions(.{ .tier = .development, .current = &retained, .previous = &capture });
+    defer a.free(reused);
+    try std.testing.expectEqualSlices(u8, bytes, reused);
+    const archive = @import("optimized_archive.zig");
+    const compiler: [32]u8 = @splat(35);
+    const saved = try archive.encode(a, compiler, &capture);
+    defer a.free(saved);
+    var loaded = try archive.decode(a, compiler, saved);
+    defer loaded.deinit();
+    var restarted: @import("optimized_bodies.zig").Capture = .{ .allocator = a };
+    defer restarted.deinit();
+    const replayed = try module.assembleWithOptions(.{ .tier = .development, .current = &restarted, .previous = &loaded });
+    defer a.free(replayed);
+    try std.testing.expectEqualSlices(u8, bytes, replayed);
+    // The source callee's entry fact participates in the exact graph proof.
+    // Changing it restores this wrapper's independent frame, including replay.
+    module.functions.items[producer].entry = true;
+    const changed = try module.assembleWithOptions(.{ .tier = .development });
+    defer a.free(changed);
+    var after: @import("optimized_bodies.zig").Capture = .{ .allocator = a };
+    defer after.deinit();
+    const changed_replay = try module.assembleWithOptions(.{ .tier = .development, .current = &after, .previous = &loaded });
+    defer a.free(changed_replay);
+    try std.testing.expect(!std.mem.eql(u8, bytes, changed));
+    try std.testing.expectEqualSlices(u8, changed, changed_replay);
+}
+test "direct reference forwarders preserve sole result ownership and discard exits through OOM" {
+    try forwarding(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, forwarding, .{});
 }

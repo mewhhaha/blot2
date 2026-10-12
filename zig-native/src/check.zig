@@ -5704,7 +5704,7 @@ const Engine = struct {
         defer self.allocator.free(mapped);
         @memset(mapped, 0);
         for (body.bindings, mapped) |old, *target| {
-            if (old.kind == .parameter) continue;
+            if (old.kind == .parameter or old.kind == .local) continue;
             const name = self.pool.lookup(old.name) orelse return null;
             const binding = try self.catalogBinding(name) orelse return null;
             const current = self.bindings.items[binding];
@@ -5731,23 +5731,66 @@ const Engine = struct {
             const digest = C.associatedDigest(.{ .store = &self.types }, self.bodyCatalog(), self.tree, self.associated.items, self.bindings.items, self.obligations.items, self.body_external_names, body.members) orelse return null;
             if (!std.mem.eql(u8, &digest, &old_digest)) return null;
         }
+        const constructors = try self.allocator.alloc(u32, body.constructors.len);
+        defer self.allocator.free(constructors);
+        for (body.constructors, constructors) |old, *mapped_constructor| {
+            const id = shape.ids[old.position];
+            const current_id = self.constructor_names.get(self.catalogKey(self.tree.node(id).a)) orelse return null;
+            const current = self.constructors.items[current_id];
+            const nominal = identities.get(old.nominal) orelse return null;
+            if (self.nominals.items[current.nominal].identity.unit != nominal.unit or self.nominals.items[current.nominal].identity.decl != nominal.decl or current.tag != old.tag) return null;
+            mapped_constructor.* = current_id;
+        }
         const fields = try self.allocator.alloc(symbols.Symbol, body.owner.field_names.len);
         defer self.allocator.free(fields);
         for (body.owner.field_names, fields) |name, *field| field.* = self.pool.lookup(name) orelse return null;
         var copier: SchemeCopier = .{ .field_mapping = fields, .allocator = self.allocator, .source = .{ .frozen = &body.owner.graph }, .destination = &self.types, .fresh_rows = true, .fresh_variables = true, .nominal_mapping = &identities };
         defer copier.deinit();
-        for (body.bindings, mapped) |old, *target| if (old.kind == .parameter) {
+        for (body.bindings, mapped) |old, *target| if (old.kind == .parameter or old.kind == .local) {
             const ty = try copier.copy(old.ty, 0);
             const name = self.pool.lookup(old.name) orelse 0;
             var principal: T.Scheme = .{};
             if (old.scheme) principal.root = ty;
-            target.* = try self.addBinding(.{ .name = name, .kind = .parameter, .ty = ty, .scheme = principal, .declaration = shape.ids[old.declaration], .owner = shape.ids[old.owner] });
+            target.* = try self.addBinding(.{ .name = name, .kind = old.kind, .ty = ty, .scheme = principal, .declaration = shape.ids[old.declaration], .owner = shape.ids[old.owner] });
         };
+        for (body.local_schemes) |owned_scheme| {
+            const frozen = owned_scheme.principal;
+            const variables = copier.source.list(frozen.variables);
+            const mapped_variables = try self.allocator.alloc(T.Id, variables.len);
+            defer self.allocator.free(mapped_variables);
+            for (variables, mapped_variables) |variable, *mapped_variable| mapped_variable.* = try copier.copy(variable, 0);
+            self.bindings.items[mapped[owned_scheme.binding - 1]].scheme = .{
+                .root = try copier.copy(frozen.root, 0),
+                .variables = try self.types.saveList(mapped_variables),
+                .row_variables = try copier.relocatedRows(copier.source.list(frozen.row_variables)),
+                .closed_rows = try copier.relocatedRows(copier.source.list(frozen.closed_rows)),
+            };
+        }
+        for (body.bindings, mapped) |old, target| {
+            if (old.predecessor != 0) self.bindings.items[target].predecessor = mapped[old.predecessor - 1];
+        }
+        for (body.merges) |merge| try self.merges.append(self.allocator, .{ .node = shape.ids[merge.position], .result = mapped[merge.result - 1], .then_binding = mapped[merge.yes - 1], .else_binding = mapped[merge.no - 1] });
+        for (shape.ids) |id| if (self.tree.node(id).tag == .case_expr) try self.cases.append(self.allocator, id);
         for (shape.ids, body.facts) |id, fact| {
             self.expr_types[id] = try copier.copy(fact.ty, 0);
             if (fact.binding != 0) self.resolved[id] = mapped[fact.binding - 1];
         }
-        for (body.projections) |projection| self.projections[shape.ids[projection.position]] = projection.index;
+        for (body.constructors, constructors) |old, current| self.constructor_resolved[shape.ids[old.position]] = current;
+        for (body.projections) |projection| {
+            const id = shape.ids[projection.position];
+            var index = projection.index;
+            if (projection.owner != 0) {
+                const record = self.types.node(self.types.head(self.expr_types[shape.ids[projection.owner - 1]], 0));
+                if (record.tag != .record) return error.TypeLimit;
+                var mapped_index: ?u32 = null;
+                for (0..record.b) |field| if (self.types.recordField(record, field).name == self.tree.node(id).a) {
+                    mapped_index = @intCast(field);
+                    break;
+                };
+                index = mapped_index orelse return error.TypeLimit;
+            }
+            self.projections[id] = index;
+        }
         for (body.signatures) |signature| self.dispatch_signatures[shape.ids[signature.position]] = try copier.copy(signature.ty, 0);
         // References to qualified schemes still instantiate their current
         // predicates. The candidate receipt first proves that copying their
@@ -5757,15 +5800,7 @@ const Engine = struct {
             if (self.bindings.items[target].scheme.obligations.len != 0) try self.constrain(try self.instantiate(target, id), self.expr_types[id], id);
         };
         for (shape.ids, body.facts) |id, fact| if (fact.closed_rows.len != 0) {
-            var rows: std.ArrayList(u32) = .empty;
-            defer rows.deinit(self.allocator);
-            for (body.closed_rows[fact.closed_rows.start..][0..fact.closed_rows.len]) |old| {
-                const entry = try copier.row_variables.getOrPut(self.allocator, old);
-                if (!entry.found_existing) entry.value_ptr.* = try self.types.freshEffects();
-                const variable = self.types.effects.node(entry.value_ptr.*).tail.variable;
-                try rows.append(self.allocator, variable);
-            }
-            self.lambda_closed_rows[id] = try self.types.saveList(rows.items);
+            self.lambda_closed_rows[id] = try copier.relocatedRows(body.closed_rows[fact.closed_rows.start..][0..fact.closed_rows.len]);
         };
         for (body.predicates) |predicate| {
             var value = predicate.value;
@@ -8724,6 +8759,18 @@ const SchemeCopier = struct {
         self.row_variables.deinit(self.allocator);
         self.rows.deinit(self.allocator);
         self.labels.deinit(self.allocator);
+    }
+    // Body facts may already have copied a row through a type. Keep that same
+    // fresh identity when restoring its quantifier or covariance certificate.
+    fn relocatedRows(self: *SchemeCopier, source: []const u32) T.Error!T.List {
+        var rows: std.ArrayList(u32) = .empty;
+        defer rows.deinit(self.allocator);
+        for (source) |old| {
+            const entry = try self.row_variables.getOrPut(self.allocator, old);
+            if (!entry.found_existing) entry.value_ptr.* = try self.destination.freshEffects();
+            try rows.append(self.allocator, self.destination.effects.node(entry.value_ptr.*).tail.variable);
+        }
+        return self.destination.saveList(rows.items);
     }
     fn quantifiedRows(self: *SchemeCopier, span: T.List) T.Error!T.List {
         var variables: std.ArrayList(u32) = .empty;

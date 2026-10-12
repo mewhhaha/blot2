@@ -264,11 +264,21 @@ pub fn freezePrincipal(allocator: Allocator, tree: *const ast.Tree, checked: *co
 /// Publish a shared immutable graph for checked body facts. The caller owns
 /// roots and the returned graph; no solver substitution or scratch view escapes.
 pub fn freezeRoots(allocator: Allocator, tree: *const ast.Tree, checked: *const check.Checked, roots: []T.Id, row_variables: []u32) Error!@import("frozen_types.zig").Graph {
+    return freezeRootsWithSchemes(allocator, tree, checked, roots, row_variables, &.{});
+}
+
+/// Sparse local principals share the exact root/row projection and graph owner.
+/// Requirements need their own source/name relocation and remain unsupported.
+pub fn freezeRootsWithSchemes(allocator: Allocator, tree: *const ast.Tree, checked: *const check.Checked, roots: []T.Id, row_variables: []u32, schemes: []T.Scheme) Error!@import("frozen_types.zig").Graph {
     var projector: Projector = .{ .allocator = allocator, .checked = checked, .tree = tree };
     defer projector.deinit();
     try projector.initialize();
     for (roots) |*root| root.* = try projector.projectType(root.*, 0);
     for (row_variables) |*variable| variable.* = try projector.projectRowVariable(variable.*);
+    for (schemes) |*scheme| {
+        if (scheme.obligations.len != 0) return error.DependencyLimit;
+        scheme.* = try projector.projectScheme(scheme.*);
+    }
     var graph: @import("frozen_types.zig").Graph = .{ .nodes = &.{}, .extra = &.{}, .rows = &.{}, .labels = &.{}, .operations = &.{}, .row_variable_count = projector.effect_variable_count };
     errdefer deinitGraph(allocator, &graph);
     graph.nodes = try projector.type_nodes.toOwnedSlice(allocator);

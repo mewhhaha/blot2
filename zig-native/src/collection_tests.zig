@@ -201,3 +201,60 @@ test "ordinary checked row consumers remove per-row scalar boxes" {
         try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
     }
 }
+
+test "ordinary numeric scope helpers lower to vector stores with immutable Core" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\const calculate = fn (index: U32) => do:
+        \\  let shifted = @u32.add index 17
+        \\  let wrapped = @u32.mul shifted 4294967295
+        \\  return @u32.add wrapped 1
+        \\entry const run = fn (count: U32) => @array.generate count calculate
+    );
+    defer module.deinit(a);
+    const before = @import("core_snapshot_tests.zig").stamp(module);
+    var result = try @import("core_backend.zig").compileWithOptions(a, &.{module}, 1, .{ .retain_artifacts = true });
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic == null);
+    var vector_stores: usize = 0;
+    const capture = &result.capture.?;
+    for (capture.metadata.pools.?.functions) |function| {
+        if (function.request != .named or function.request.named.target.binding != module.bodies[module.bodies.len - 1].binding) continue;
+        const entry_ = &capture.optimized.?.entries.items[function.function];
+        if (entry_.output) |body| for (body.instructions.items) |inst| {
+            if (inst.op == .v128_store) vector_stores += 1;
+        };
+    }
+    try std.testing.expect(vector_stores != 0);
+    try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
+}
+
+test "ordinary checked row products lower to SIMD without reordering scalar additions" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\const seed = {a: 1.0, b: 2.0, c: 3.0, d: 4.0}
+        \\const consume = fn row => @f32.add (@f32.add (@f32.add (@f32.mul row.a 1.25) (@f32.mul row.b 1.25)) (@f32.mul row.c 1.25)) (@f32.mul row.d 1.25)
+        \\entry const run = fn (count: U32) => do:
+        \\  let rows = @array.fill count seed
+        \\  let total = 0.0
+        \\  for row in rows:
+        \\    total := @f32.add total (consume row)
+        \\  return total
+    );
+    defer module.deinit(a);
+    const before = @import("core_snapshot_tests.zig").stamp(module);
+    var result = try @import("core_backend.zig").compileWithOptions(a, &.{module}, 1, .{ .retain_artifacts = true });
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic == null);
+    const capture = &result.capture.?;
+    var vector_products: usize = 0;
+    for (capture.metadata.pools.?.functions) |function| {
+        if (function.request != .named or function.request.named.target.binding != module.bodies[module.bodies.len - 1].binding) continue;
+        const entry_ = &capture.optimized.?.entries.items[function.function];
+        if (entry_.output) |body| for (body.instructions.items) |inst| {
+            if (inst.op == .f32x4_mul) vector_products += 1;
+        };
+    }
+    try std.testing.expect(vector_products != 0);
+    try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
+}

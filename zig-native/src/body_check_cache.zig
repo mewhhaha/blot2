@@ -164,8 +164,12 @@ pub const Binding = struct {
     runtime: bool,
     external: ?check.ExternalTarget,
     interface: Digest,
+    predecessor: u32 = 0,
 };
-pub const Projection = struct { position: u32, index: u32 };
+pub const LocalScheme = struct { binding: u32, principal: T.Scheme };
+pub const Constructor = struct { position: u32, nominal: T.NominalIdentity, tag: u32 };
+pub const Merge = struct { position: u32, result: u32, yes: u32, no: u32 };
+pub const Projection = struct { position: u32, index: u32, owner: u32 = 0 };
 pub const Signature = struct { position: u32, ty: T.Id };
 pub const Predicate = struct { value: T.Obligation, position: u32, name: []u8 };
 pub const Body = struct {
@@ -182,6 +186,9 @@ pub const Body = struct {
     predicates: []Predicate = &.{},
     signatures: []Signature = &.{},
     projections: []Projection = &.{},
+    merges: []Merge = &.{},
+    constructors: []Constructor = &.{},
+    local_schemes: []LocalScheme = &.{},
     members: [][]u8 = &.{},
     selection_digest: ?Digest = null,
     pub fn bytes(self: *const Body) usize {
@@ -189,7 +196,7 @@ pub const Body = struct {
         for (self.bindings) |binding| total += binding.name.len;
         total += self.predicates.len * @sizeOf(Predicate);
         for (self.predicates) |predicate| total += predicate.name.len;
-        total += self.projections.len * @sizeOf(Projection) + self.signatures.len * @sizeOf(Signature) + self.members.len * @sizeOf([]u8);
+        total += self.local_schemes.len * @sizeOf(LocalScheme) + self.constructors.len * @sizeOf(Constructor) + self.merges.len * @sizeOf(Merge) + self.projections.len * @sizeOf(Projection) + self.signatures.len * @sizeOf(Signature) + self.members.len * @sizeOf([]u8);
         for (self.members) |member| total += member.len;
         return total;
     }
@@ -206,6 +213,9 @@ pub const Body = struct {
         a.free(self.predicates);
         a.free(self.signatures);
         a.free(self.projections);
+        a.free(self.merges);
+        a.free(self.constructors);
+        a.free(self.local_schemes);
         for (self.members) |member| a.free(member);
         a.free(self.members);
     }
@@ -820,13 +830,57 @@ const Walker = struct {
                 return self.visit(node.c, depth + 1);
             },
             .group => return self.visit(node.a, depth + 1),
-            .if_expr => {
+            .block => {
+                if (node.c != 0) return false;
+                for (self.tree.children(id)) |child| if (!try self.visit(child, depth + 1)) return false;
+            },
+            .let_stmt => {
+                const binding = self.tree.binding(id);
+                if (binding.where_node != 0) return false;
+                if (!try self.visit(binding.annotation, depth + 1)) return false;
+                if (!try self.visit(binding.value, depth + 1)) return false;
+                if (!try self.visit(binding.pattern, depth + 1)) return false;
+                return self.visit(binding.fallback, depth + 1);
+            },
+            .return_stmt => {
+                if (node.b != 0) return false;
+                return self.visit(node.a, depth + 1);
+            },
+            .rebind_stmt => {
+                if (self.tree.node(node.a).tag != .name) return false;
+                if (!try self.visit(node.a, depth + 1)) return false;
+                return self.visit(node.b, depth + 1);
+            },
+            .case_expr => {
+                const inputs = self.tree.extra.items[node.a..][0..2];
+                for (self.tree.list(.{ .start = inputs[0], .len = inputs[1] })) |input| if (!try self.visit(input, depth + 1)) return false;
+                for (self.tree.list(.{ .start = node.b, .len = node.c })) |arm| if (!try self.visit(arm, depth + 1)) return false;
+            },
+            .case_arm => {
+                for (self.tree.list(.{ .start = node.a, .len = node.b })) |row| if (!try self.visit(row, depth + 1)) return false;
+                const parts = self.tree.extra.items[node.c..][0..2];
+                for (parts) |part| if (!try self.visit(part, depth + 1)) return false;
+            },
+            .pattern_row, .pattern_product, .pattern_record => for (self.tree.children(id)) |child| {
+                if (!try self.visit(child, depth + 1)) return false;
+            },
+            .pattern_name, .constructor_ref => self.text(self.pool.get(node.a)),
+            .pattern_constructor => {
+                self.text(self.pool.get(node.a));
+                return self.visit(node.b, depth + 1);
+            },
+            .pattern_field => {
+                self.text(self.pool.get(node.a));
+                return self.visit(node.b, depth + 1);
+            },
+            .pattern_integer, .pattern_boolean => self.word(node.a),
+            .if_expr, .if_stmt => {
                 if (!try self.visit(node.a, depth + 1)) return false;
                 if (!try self.visit(node.b, depth + 1)) return false;
                 return self.visit(node.c, depth + 1);
             },
             .record => {
-                if (node.a != 0) return false;
+                self.text(self.pool.get(node.a));
                 for (self.tree.children(id)) |child| if (!try self.visit(child, depth + 1)) return false;
             },
             .field, .type_field => {
@@ -920,7 +974,10 @@ pub fn captureInto(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text:
 }
 fn freezeChunk(a: A, tree: *const ast.Tree, checked_pool: *const symbols.Pool, checked: *const check.Checked, bodies: *std.ArrayList(Body), roots: []T.Id, rows: []u32) !?*Chunk {
     const catalog: Catalog = .{ .unit = checked.unit, .pool = checked_pool, .nominals = checked.nominals, .constructors = checked.constructors, .patterns = .{ .store = &checked.parameter_patterns } };
-    var graph = snapshot.freezeRoots(a, tree, checked, roots, rows) catch |err| {
+    var schemes: std.ArrayList(T.Scheme) = .empty;
+    defer schemes.deinit(a);
+    for (bodies.items) |body| for (body.local_schemes) |local| try schemes.append(a, local.principal);
+    var graph = snapshot.freezeRootsWithSchemes(a, tree, checked, roots, rows, schemes.items) catch |err| {
         if (err == error.OutOfMemory) return err;
         return null;
     };
@@ -976,7 +1033,12 @@ fn freezeChunk(a: A, tree: *const ast.Tree, checked_pool: *const symbols.Pool, c
     };
     var next_type: usize = 0;
     var next_row: usize = 0;
+    var next_scheme: usize = 0;
     for (bodies.items) |*body| {
+        for (body.local_schemes) |*local| {
+            local.principal = schemes.items[next_scheme];
+            next_scheme += 1;
+        }
         for (body.facts) |*fact| {
             fact.ty = roots[next_type];
             next_type += 1;
@@ -998,6 +1060,16 @@ fn freezeChunk(a: A, tree: *const ast.Tree, checked_pool: *const symbols.Pool, c
         }
         @memcpy(body.closed_rows, rows[next_row..][0..body.closed_rows.len]);
         next_row += body.closed_rows.len;
+        for (body.constructors) |*constructor| {
+            const nominal_index = catalog.identity(constructor.nominal) orelse return error.DependencyLimit;
+            const original = catalog.nominals[nominal_index];
+            var mapped: ?u32 = null;
+            for (nominals.items, 0..) |read, index| if (read.unit == original.identity.unit and std.mem.eql(u8, read.name, catalog.pool.get(original.name))) {
+                mapped = @intCast(index + 1);
+                break;
+            };
+            constructor.nominal = .{ .unit = mapped orelse return error.DependencyLimit, .decl = 0 };
+        }
         const reads = try bodyReads(a, &graph, body, field_names.items, nominals.items);
         body.nominals = reads.nominals;
         body.type_work = reads.bytes;
@@ -1032,12 +1104,17 @@ fn bodyReads(a: A, graph: *const F.Graph, body: *const Body, names: []const []co
     defer pending.deinit(a);
     var result: std.ArrayList(u32) = .empty;
     defer result.deinit(a);
+    const source: F.Source = .{ .frozen = graph };
     for (body.facts) |fact| try pending.append(a, fact.ty);
     for (body.bindings) |binding| try pending.append(a, binding.ty);
     for (body.signatures) |signature| try pending.append(a, signature.ty);
+    for (body.local_schemes) |local| {
+        try pending.append(a, local.principal.root);
+        try pending.appendSlice(a, source.list(local.principal.variables));
+    }
     for (body.predicates) |predicate| try pending.appendSlice(a, &.{ predicate.value.ty, predicate.value.other, predicate.value.result, predicate.value.signature });
-    const source: F.Source = .{ .frozen = graph };
     var bytes: usize = 0;
+    for (body.local_schemes) |local| bytes += (local.principal.variables.len + local.principal.row_variables.len + local.principal.closed_rows.len) * 4;
     while (pending.pop()) |id| {
         const entry = try seen.getOrPut(a, id);
         if (entry.found_existing) continue;
@@ -1068,6 +1145,13 @@ fn bodyReads(a: A, graph: *const F.Graph, body: *const Body, names: []const []co
             },
             .array, .list => try pending.append(a, node.a),
             else => {},
+        }
+    }
+    for (body.constructors) |constructor| {
+        const index = constructor.nominal.unit - 1;
+        if (std.mem.findScalar(u32, result.items, index) == null) {
+            try result.append(a, index);
+            bytes += @sizeOf(NominalRead) + nominals[index].name.len;
         }
     }
     return .{ .nominals = try result.toOwnedSlice(a), .bytes = bytes };
@@ -1133,10 +1217,23 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
     defer projections.deinit(a);
     var signatures: std.ArrayList(Signature) = .empty;
     defer signatures.deinit(a);
+    var merges: std.ArrayList(Merge) = .empty;
+    defer merges.deinit(a);
+    var constructors: std.ArrayList(Constructor) = .empty;
+    defer constructors.deinit(a);
     var needs_selection = false;
     var type_work: usize = 0;
     for (shape.ids, 0..) |id, position_| {
-        if (checked.constructor_resolved[id] != 0) return null;
+        // Dotted reads need complete access-path/type/projection side tables.
+        // A copied scalar result alone must not turn a projection into a raw ref.
+        if (checked.access_paths[id].len != 0) return null;
+        const constructor_id = checked.constructor_resolved[id];
+        if (constructor_id != 0) {
+            const constructor = checked.constructors[constructor_id];
+            const nominal = checked.nominals[constructor.nominal];
+            if (nominalDigest(.{ .store = &checked.types }, catalog, constructor.nominal) == null) return null;
+            try constructors.append(a, .{ .position = @intCast(position_), .nominal = nominal.identity, .tag = constructor.tag });
+        }
         if (tree.node(id).tag == .string) try appendMember(a, &members, pool.get(tree.node(id).a));
         if (tree.node(id).tag == .constraint and std.mem.eql(u8, pool.get(tree.node(id).a), "associated")) {
             needs_selection = true;
@@ -1159,7 +1256,17 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
                 try type_reads.append(a, .{ .position = @intCast(position_), .digest = digest });
             }
         }
-        if (checked.projections[id] != std.math.maxInt(u32)) try projections.append(a, .{ .position = @intCast(position_), .index = checked.projections[id] });
+        if (checked.projections[id] != std.math.maxInt(u32)) {
+            var owner: u32 = 0;
+            if (tree.node(id).tag == .pattern_field) {
+                for (shape.ids, 0..) |parent, parent_position| if (tree.node(parent).tag == .pattern_record and std.mem.findScalar(ast.Id, tree.children(parent), id) != null) {
+                    owner = @intCast(parent_position + 1);
+                    break;
+                };
+                if (owner == 0) return null;
+            }
+            try projections.append(a, .{ .position = @intCast(position_), .index = checked.projections[id], .owner = owner });
+        }
         var fact: Fact = .{ .ty = ty };
         if (tree.node(id).tag == .lambda) {
             const rows = checked.types.list(checked.lambda_closed_rows[id]);
@@ -1171,8 +1278,8 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             var index = std.mem.findScalar(check.BindingId, old_bindings.items, old_id);
             if (index == null) {
                 const old = checked.bindings[old_id];
-                const local = old.kind == .parameter;
-                if (old.kind == .local) return null;
+                const local = old.kind == .parameter or old.kind == .local;
+                if (old.kind == .local and old.scheme.obligations.len != 0) return null;
                 if (!local and old.scheme.obligations.len != 0) {
                     needs_selection = true;
                     var member_budget: usize = 64;
@@ -1200,6 +1307,22 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
         } else if (old_id == global and id != root) return null;
         try facts.append(a, fact);
     }
+    for (checked.merges) |merge| if (position(shape.ids, merge.node)) |at| {
+        const result = try captureLocal(a, checked, pool, catalog, shape, merge.result, &bindings, &old_bindings) orelse return null;
+        const yes = try captureLocal(a, checked, pool, catalog, shape, merge.then_binding, &bindings, &old_bindings) orelse return null;
+        const no = try captureLocal(a, checked, pool, catalog, shape, merge.else_binding, &bindings, &old_bindings) orelse return null;
+        try merges.append(a, .{ .position = at, .result = result, .yes = yes, .no = no });
+    };
+    for (old_bindings.items, bindings.items) |old_id, *binding| {
+        const predecessor = checked.bindings[old_id].predecessor;
+        if (predecessor != 0) binding.predecessor = @intCast((std.mem.findScalar(check.BindingId, old_bindings.items, predecessor) orelse return null) + 1);
+    }
+    var local_schemes: std.ArrayList(LocalScheme) = .empty;
+    defer local_schemes.deinit(a);
+    for (old_bindings.items, 0..) |id, index| {
+        const old = checked.bindings[id];
+        if (old.kind == .local and (old.scheme.variables.len != 0 or old.scheme.row_variables.len != 0 or old.scheme.closed_rows.len != 0)) try local_schemes.append(a, .{ .binding = @intCast(index + 1), .principal = old.scheme });
+    }
     var selection_digest: ?Digest = null;
     if (needs_selection) selection_digest = associatedDigest(.{ .store = &checked.types }, catalog, tree, checked.associated, checked.bindings, checked.obligations, names, members.items) orelse return null;
     const name = try a.dupe(u8, pool.get(tree.valueDecl(root).name));
@@ -1222,11 +1345,38 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
         for (owned_members) |member| a.free(member);
         a.free(owned_members);
     }
+    const owned_local_schemes = try local_schemes.toOwnedSlice(a);
+    errdefer a.free(owned_local_schemes);
+    const owned_constructors = try constructors.toOwnedSlice(a);
+    errdefer a.free(owned_constructors);
+    const owned_merges = try merges.toOwnedSlice(a);
+    errdefer a.free(owned_merges);
     const owned_predicates = try predicates.toOwnedSlice(a);
     errdefer {
         for (owned_predicates) |predicate| a.free(predicate.name);
         a.free(owned_predicates);
     }
     const owned_bindings = try bindings.toOwnedSlice(a);
-    return .{ .owner = undefined, .name = name, .source = source, .syntax = shape.digest, .facts = owned_facts, .bindings = owned_bindings, .closed_rows = owned_rows, .type_work = type_work, .type_reads = owned_reads, .predicates = owned_predicates, .signatures = owned_signatures, .projections = owned_projections, .members = owned_members, .selection_digest = selection_digest };
+    return .{ .owner = undefined, .name = name, .source = source, .syntax = shape.digest, .facts = owned_facts, .bindings = owned_bindings, .closed_rows = owned_rows, .type_work = type_work, .type_reads = owned_reads, .predicates = owned_predicates, .signatures = owned_signatures, .projections = owned_projections, .merges = owned_merges, .constructors = owned_constructors, .local_schemes = owned_local_schemes, .members = owned_members, .selection_digest = selection_digest };
+}
+
+// Branch joins can define a binding that no source reference uses. Preserve
+// those complete local facts too, so lowering sees the ordinary scope graph.
+fn captureLocal(a: A, checked: *const check.Checked, pool: *const symbols.Pool, catalog: Catalog, shape: Syntax, id: check.BindingId, bindings: *std.ArrayList(Binding), old_bindings: *std.ArrayList(check.BindingId)) !?u32 {
+    if (std.mem.findScalar(check.BindingId, old_bindings.items, id)) |index| return @intCast(index + 1);
+    if (id == 0 or id >= checked.bindings.len) return null;
+    const old = checked.bindings[id];
+    if (old.kind != .local and old.kind != .parameter) return null;
+    if (old.scheme.obligations.len != 0) return null;
+    const declaration = position(shape.ids, old.declaration) orelse return null;
+    const owner = position(shape.ids, old.owner) orelse return null;
+    var hash: std.crypto.hash.Blake3 = .init(.{});
+    var budget: usize = 4096;
+    if (!typeHash(.{ .store = &checked.types }, old.ty, &hash, &budget, 0, true, &.{}, &.{}, catalog)) return null;
+    try bindings.ensureUnusedCapacity(a, 1);
+    try old_bindings.ensureUnusedCapacity(a, 1);
+    const name = try a.dupe(u8, pool.get(old.name));
+    bindings.appendAssumeCapacity(.{ .name = name, .kind = old.kind, .private = old.private, .declaration = declaration, .owner = owner, .ty = old.ty, .scheme = old.scheme.root != 0, .named_function = old.named_function, .runtime = false, .external = null, .interface = @splat(0) });
+    old_bindings.appendAssumeCapacity(id);
+    return @intCast(old_bindings.items.len);
 }

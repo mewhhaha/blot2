@@ -1,7 +1,8 @@
 //! Vectorize independent numeric stores in counted construction loops. This
 //! pass consumes symbolic instructions and follows bounded, pure call bodies.
-//! It recognizes no source declarations. Loads, traps, effects, branches and
-//! reductions in the kernel are deliberately outside the admission rule.
+//! It recognizes no source declarations. Private numeric locals must be
+//! defined before each lane reads them and have no use outside the kernel.
+//! Loads, traps, effects, conditional branches and reductions stay scalar.
 const std = @import("std");
 const w = @import("wasm.zig");
 const ops = @import("runtime_ir.zig");
@@ -9,6 +10,7 @@ const A = std.mem.Allocator;
 const Id = u16;
 const none = std.math.maxInt(Id);
 const Node = struct { op: w.Op, operand: u32 = 0, left: Id = none, right: Id = none, machine: w.ValueType = .i32 };
+const Block = struct { base: usize, result: ?w.ValueType };
 const Plan = struct {
     nodes: [256]Node = undefined,
     len: usize = 0,
@@ -27,12 +29,51 @@ const Plan = struct {
         @memcpy(locals[0..initial.len], initial);
         var stack: [256]Id = undefined;
         var len: usize = 0;
-        for (instructions) |inst| {
+        var blocks: [16]Block = undefined;
+        var block_count: usize = 0;
+        var at: usize = 0;
+        while (at < instructions.len) : (at += 1) {
+            const inst = instructions[at];
             // Ownership annotations are not code and cost no budget.
             if (inst.op == .ownership) continue;
             if (inst.table_reference or self.budget == 0) return null;
             self.budget -= 1;
             const result: ?Id = switch (inst.op) {
+                .block => blk: {
+                    if (block_count == blocks.len) return null;
+                    const machine: ?w.ValueType = switch (inst.operand) {
+                        0 => null,
+                        @backingInt(w.ValueType.i32) => .i32,
+                        @backingInt(w.ValueType.f32) => .f32,
+                        else => return null,
+                    };
+                    blocks[block_count] = .{ .base = len, .result = machine };
+                    block_count += 1;
+                    break :blk null;
+                },
+                .end => blk: {
+                    if (block_count == 0) return null;
+                    block_count -= 1;
+                    const block = blocks[block_count];
+                    if (len != block.base + @intFromBool(block.result != null)) return null;
+                    if (block.result) |machine| if (self.nodes[stack[len - 1]].machine != machine) return null;
+                    break :blk null;
+                },
+                .br => blk: {
+                    // Only a lexical block inside this parsed kernel can be
+                    // exited. An enclosing loop/function branch stays scalar.
+                    if (inst.operand >= block_count) return null;
+                    const target = block_count - 1 - inst.operand;
+                    const block = blocks[target];
+                    if (block.result) |machine| {
+                        if (len <= block.base or self.nodes[stack[len - 1]].machine != machine) return null;
+                        stack[block.base] = stack[len - 1];
+                    }
+                    len = block.base + @intFromBool(block.result != null);
+                    at = (self.exitBlock(instructions, at + 1, inst.operand) orelse return null) - 1;
+                    block_count = target + 1;
+                    break :blk null;
+                },
                 .local_get => if (inst.operand < initial.len and locals[inst.operand] != none) locals[inst.operand] else return null,
                 .local_set, .local_tee => blk: {
                     if (len == 0 or inst.operand >= initial.len) return null;
@@ -47,6 +88,9 @@ const Plan = struct {
                     len -= 1;
                     break :blk null;
                 },
+                // A known helper's unconditional scalar return discards only
+                // unreachable code. Caller control remains outside the plan.
+                .return_ => return if (depth != 0 and len == 1) stack[0] else null,
                 .call => blk: {
                     if (inst.operand >= module.functions.items.len) return null;
                     const target = module.functions.items[inst.operand];
@@ -84,7 +128,27 @@ const Plan = struct {
                 len += 1;
             }
         }
-        return if (len == 1) stack[0] else null;
+        return if (block_count == 0 and len == 1) stack[0] else null;
+    }
+    fn exitBlock(self: *Plan, instructions: []const w.Instruction, start: usize, labels: usize) ?usize {
+        var nested: usize = 0;
+        var remaining = labels;
+        for (instructions[start..], start..) |inst, at| {
+            if (self.budget == 0) return null;
+            self.budget -= 1;
+            switch (inst.op) {
+                .block, .loop, .if_ => nested += 1,
+                .end => {
+                    if (nested != 0) {
+                        nested -= 1;
+                    } else if (remaining != 0) {
+                        remaining -= 1;
+                    } else return at;
+                },
+                else => {},
+            }
+        }
+        return null;
     }
 };
 pub const Output = ops.Body;
@@ -125,6 +189,28 @@ fn expression(self: *Output, a: A, plan: *const Plan, id: Id, ready: *[256]?u32,
 fn is(inst: w.Instruction, op: w.Op, operand: u32) bool {
     return inst.op == op and inst.operand == operand;
 }
+fn privateLocals(function: *const w.Function, start: usize, end: usize, slots: usize) bool {
+    const source = function.instructions.items;
+    var written: std.bit_set.Static(128) = .empty;
+    for (source[start..end]) |inst| if (inst.op == .local_set or inst.op == .local_tee) {
+        if (inst.operand < function.parameters.len or inst.operand >= slots) return false;
+        written.set(inst.operand);
+    };
+    if (written.count() == 0) return true;
+    if (source.len > 4096) return false;
+    for (source, 0..) |inst, at| {
+        if (at >= start and at < end) continue;
+        if ((inst.op == .local_get or inst.op == .local_set or inst.op == .local_tee) and inst.operand < slots and written.isSet(inst.operand)) return false;
+    }
+    var defined: std.bit_set.Static(128) = .empty;
+    for (source[start..end]) |inst| {
+        // An unwritten incoming local is a loop-carried value, even when
+        // nobody reads it after the loop. Such lanes are not independent.
+        if (inst.op == .local_get and inst.operand < slots and written.isSet(inst.operand) and !defined.isSet(inst.operand)) return false;
+        if (inst.op == .local_set or inst.op == .local_tee) defined.set(inst.operand);
+    }
+    return true;
+}
 pub fn run(a: A, module: *const w.Module, function: *const w.Function) A.Error!?Output {
     const source = function.instructions.items;
     var out: Output = .{};
@@ -158,16 +244,7 @@ pub fn run(a: A, module: *const w.Module, function: *const w.Function) A.Error!?
             value.* = plan.add(.{ .op = .local_get, .operand = @intCast(i), .machine = machine }).?;
         }
         if (!allowed) continue;
-        // Writes to an enclosing local are observable after the kernel. The
-        // prefix only replaces values stored in the output array. Callee locals
-        // are private and may still be interpreted by Plan.parse.
-        for (source[at + 11 .. end]) |instruction| {
-            if (instruction.op == .local_set or instruction.op == .local_tee) {
-                allowed = false;
-                break;
-            }
-        }
-        if (!allowed) continue;
+        if (!privateLocals(function, at + 11, end, local_count)) continue;
         const result = plan.parse(module, source[at + 11 .. end], initial[0..local_count], 0) orelse continue;
         const machine: w.ValueType = if (source[end].op == .f32_store) .f32 else .i32;
         if (plan.nodes[result].machine != machine) continue;
@@ -225,7 +302,7 @@ fn fixture(module: *w.Module, kernel: []const w.Instruction) !u32 {
 fn vectorizationOwnership(a: A) !void {
     var module = w.Module.init(a);
     defer module.deinit();
-    const id = try fixture(&module, &.{ .{ .op = .local_get }, .{ .op = .i32_const, .operand = 3 }, .{ .op = .i32_mul } });
+    const id = try fixture(&module, &.{ .{ .op = .block, .operand = @backingInt(w.ValueType.i32) }, .{ .op = .local_get }, .{ .op = .i32_const, .operand = 3 }, .{ .op = .i32_mul }, .{ .op = .br }, .{ .op = .unreachable_ }, .{ .op = .end }, .{ .op = .return_ } });
     const before = try a.dupe(w.Instruction, module.functions.items[id].instructions.items);
     defer a.free(before);
     var out = (try run(a, &module, &module.functions.items[id])).?;
@@ -263,5 +340,58 @@ test "vectorization declines memory reads, traps, unknown calls and enclosing lo
     // A local.tee can change a subsequent iteration even when the stored lane
     // still looks pure. It must not disappear in the vector prefix.
     module.functions.items[id].instructions.items[17] = .{ .op = .local_tee, .operand = 1 };
+    try std.testing.expect(try run(a, &module, &module.functions.items[id]) == null);
+}
+
+fn replaceKernel(a: A, module: *w.Module, id: u32, kernel: []const w.Instruction) !void {
+    const function = &module.functions.items[id];
+    const before = try a.dupe(w.Instruction, function.instructions.items);
+    defer a.free(before);
+    var end: usize = 16;
+    while (before[end].op != .i32_store and before[end].op != .f32_store) : (end += 1) {}
+    function.instructions.clearRetainingCapacity();
+    try function.instructions.appendSlice(a, before[0..16]);
+    try function.instructions.appendSlice(a, kernel);
+    try function.instructions.appendSlice(a, before[end..]);
+}
+test "vectorization proves private kernel definitions and rejects carried or externally read locals" {
+    const a = std.testing.allocator;
+    var module = w.Module.init(a);
+    defer module.deinit();
+    const id = try fixture(&module, &.{.{ .op = .local_get }});
+    const temporary = try module.addLocal(id, .i32);
+    try replaceKernel(a, &module, id, &.{
+        .{ .op = .local_get, .operand = 2 },
+        .{ .op = .local_set, .operand = temporary },
+        .{ .op = .local_get, .operand = temporary },
+        .{ .op = .i32_const, .operand = 3 },
+        .{ .op = .i32_mul },
+    });
+    const before = try a.dupe(w.Instruction, module.functions.items[id].instructions.items);
+    defer a.free(before);
+    var output = (try run(a, &module, &module.functions.items[id])).?;
+    defer output.deinit(a);
+    try std.testing.expectEqualSlices(w.Instruction, before, module.functions.items[id].instructions.items);
+    try module.emitSlice(id, &.{ .{ .op = .local_get, .operand = temporary }, .{ .op = .drop } });
+    try std.testing.expect(try run(a, &module, &module.functions.items[id]) == null);
+    module.functions.items[id].instructions.shrinkRetainingCapacity(before.len);
+    try replaceKernel(a, &module, id, &.{
+        .{ .op = .local_get, .operand = temporary },
+        .{ .op = .i32_const, .operand = 1 },
+        .{ .op = .i32_add },
+        .{ .op = .local_tee, .operand = temporary },
+    });
+    try std.testing.expect(try run(a, &module, &module.functions.items[id]) == null);
+}
+test "vectorization follows unconditional helper returns but preserves caller control" {
+    const a = std.testing.allocator;
+    var module = w.Module.init(a);
+    defer module.deinit();
+    const id = try fixture(&module, &.{
+        .{ .op = .local_get }, .{ .op = .i32_const, .operand = 3 }, .{ .op = .i32_mul }, .{ .op = .return_ }, .{ .op = .unreachable_ },
+    });
+    var output = (try run(a, &module, &module.functions.items[id])).?;
+    defer output.deinit(a);
+    try replaceKernel(a, &module, id, &.{ .{ .op = .local_get, .operand = 2 }, .{ .op = .return_ } });
     try std.testing.expect(try run(a, &module, &module.functions.items[id]) == null);
 }

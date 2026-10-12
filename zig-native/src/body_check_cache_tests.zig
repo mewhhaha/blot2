@@ -401,20 +401,20 @@ test "body check cache relocates nominal identities and revokes retargeted local
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("identity") != null);
     try std.testing.expect(before.bodies.find("run") != null);
-    try std.testing.expect(before.bodies.find("make") == null);
+    try std.testing.expect(before.bodies.find("make") != null);
     const inserted = "type Earlier is data = #Earlier F32\nconst earlier_spelling = fn (f: F32) -> F32 => @f32.add f 2.0\ntype Token is data = #Token U32\nconst make = fn (n: U32) => #Token n\nconst identity = fn (value: Token) -> Token => value\nconst read = fn (#Token value) => value\nentry const run = fn (n: U32) => read (identity (make n))\n";
     var fresh = try prepare(a, inserted, null);
     defer fresh.deinit(a);
     var expected = try compile(a, &fresh);
     defer expected.deinit(a);
-    try compare(a, &before.bodies, inserted, expected.bytes, 3);
-    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 3) });
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
     const alias_first = "type First is data = #First U32\ntype Second is data = #Second U32\ntype Alias = First\nconst identity = fn (value: Alias) -> Alias => value\nconst read = fn (#First value) => value\nentry const run = fn (n: U32) => read (identity (#First n))\n";
     const alias_next = "type First is data = #First U32\ntype Second is data = #Second U32\ntype Alias = Second\nconst identity = fn (value: Alias) -> Alias => value\nconst read = fn (#Second value) => value\nentry const run = fn (n: U32) => read (identity (#Second n))\n";
     try parity(alias_first, alias_next, 3);
     const private_alias = try std.mem.replaceOwned(u8, a, alias_first, "type Alias = First", "private type Alias = First");
     defer a.free(private_alias);
-    try parity(alias_first, private_alias, 3);
+    try parity(alias_first, private_alias, 1);
 }
 
 test "body check cache opaque storage roles revoke scalar to reference consumers" {
@@ -427,7 +427,7 @@ test "body check cache opaque storage roles revoke scalar to reference consumers
     defer fresh.deinit(a);
     var expected = try compile(a, &fresh);
     defer expected.deinit(a);
-    try compare(a, &before.bodies, inserted, expected.bytes, 3);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
     const changed = "opaque type Token = Array U32\nconst make = fn (n: U32) => #Token #[n]\nconst identity = fn (value: Token) -> Token => value\nconst read = fn (#Token value) => value\nentry const run = fn (n: U32) => read (identity (make n))\n";
     try parity(original, changed, 4);
 }
@@ -445,8 +445,8 @@ test "body check cache relocates generic nominal arguments and opaque parameter 
     defer fresh.deinit(a);
     var expected = try compile(a, &fresh);
     defer expected.deinit(a);
-    try compare(a, &first.bodies, changed, expected.bytes, 3);
-    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &first.bodies, changed, expected.bytes, @as(usize, 3) });
+    try compare(a, &first.bodies, changed, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &first.bodies, changed, expected.bytes, @as(usize, 1) });
 }
 
 test "body check cache relocates structural field spellings and shaped nominal arguments" {
@@ -462,8 +462,8 @@ test "body check cache relocates structural field spellings and shaped nominal a
     defer fresh.deinit(a);
     var expected = try compile(a, &fresh);
     defer expected.deinit(a);
-    try compare(a, &first.bodies, changed, expected.bytes, 3);
-    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &first.bodies, changed, expected.bytes, @as(usize, 3) });
+    try compare(a, &first.bodies, changed, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &first.bodies, changed, expected.bytes, @as(usize, 1) });
 }
 
 test "body check cache reconstructs symbolic associated predicates in the current solver" {
@@ -673,10 +673,10 @@ test "body check cache relocates applied generic annotations and revokes constru
     defer fresh.deinit(a);
     var expected = try compile(a, &fresh);
     defer expected.deinit(a);
-    // Constructor introduction/pattern syntax remains ordinary; every other
-    // unchanged admitted body relocates its applied annotations independently.
-    try compare(a, &before.bodies, inserted, expected.bytes, 3);
-    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 3) });
+    // The new declaration elaborates; constructor references, destructuring
+    // and applied annotations all keep their independently owned receipts.
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
     const recipe_type = try std.mem.replaceOwned(u8, a, source, "#Box a", "#Box (a, U32)");
     defer a.free(recipe_type);
     const recipe_make = try std.mem.replaceOwned(u8, a, recipe_type, "=> #Box value", "=> #Box (value, 0)");
@@ -693,4 +693,138 @@ test "body check cache relocates applied generic annotations and revokes constru
     var actual = try compile(a, &reused);
     defer actual.deinit(a);
     try std.testing.expectEqualSlices(u8, changed_expected.bytes, actual.bytes);
+}
+
+test "body check cache relocates ordinary block locals mutations joins and cases" {
+    const original =
+        \\const seed = 2
+        \\const branched = fn (value: U32) -> U32 => do:
+        \\  let count = value
+        \\  if @u32.lt value 8:
+        \\    count := @u32.add self seed
+        \\  else:
+        \\    count := @u32.add self 1
+        \\  return count
+        \\const matched = fn (value: U32) -> U32 => case value of
+        \\  0 => seed
+        \\  result => @u32.add result seed
+        \\entry const run = fn (value: U32) -> U32 => matched (branched value)
+    ;
+    var before = try prepare(a, original, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("branched") != null);
+    try std.testing.expect(before.bodies.find("matched") != null);
+    const prefix = "const earlier_spelling = fn (fraction: F32) => @f32.add fraction 3.0\n";
+    const inserted = try std.mem.concat(a, u8, &.{ prefix, original });
+    defer a.free(inserted);
+    const next = try std.mem.replaceOwned(u8, a, inserted, "const seed = 2", "const seed = @u32.add 2 1");
+    defer a.free(next);
+    var fresh = try prepare(a, next, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, next, expected.bytes, 2);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, next, expected.bytes, @as(usize, 2) });
+    const body_edit = try std.mem.replaceOwned(u8, a, next, "count := @u32.add self seed", "count := @u32.mul self seed");
+    defer a.free(body_edit);
+    var altered = try prepare(a, body_edit, null);
+    defer altered.deinit(a);
+    var altered_output = try compile(a, &altered);
+    defer altered_output.deinit(a);
+    try compare(a, &before.bodies, body_edit, altered_output.bytes, 3);
+    const polymorphic = "const local_generic = fn (value: U32) => do:\n  let identity = fn item => item\n  return identity value\nentry const run = fn (value: U32) => local_generic value\n";
+    var ordinary = try prepare(a, polymorphic, null);
+    defer ordinary.deinit(a);
+    try std.testing.expect(ordinary.bodies.find("local_generic") != null);
+}
+
+test "body check cache relocates constructor cases and record pattern fields by spelling" {
+    const source =
+        \\type Packet is data = #Packet { head: U32, tail: Array U32 }
+        \\const make = fn (value: U32) => #Packet { head: value, tail: #[value, @u32.add value 1] }
+        \\const read = fn (packet: Packet) => case packet of
+        \\  #Packet { tail } => tail
+        \\entry const run = fn (value: U32) => read (make value)
+    ;
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("make") != null);
+    try std.testing.expect(before.bodies.find("read") != null);
+    const inserted = try a.print("const new_spelling = {{ tail: 3.0, head: 2 }}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
+    const changed = try std.mem.replaceOwned(u8, a, inserted, "@u32.add value 1", "@u32.add value 2");
+    defer a.free(changed);
+    var altered = try prepare(a, changed, null);
+    defer altered.deinit(a);
+    var altered_result = try compile(a, &altered);
+    defer altered_result.deinit(a);
+    try compare(a, &before.bodies, changed, altered_result.bytes, 2);
+    // Both the tag recipe and nominal identity are reads, even if the selected
+    // constructor's own payload and the exported function type stay unchanged.
+    const reordered = try std.mem.replaceOwned(u8, a, source, "= #Packet { head: U32, tail: Array U32 }", "= #Unused | #Packet { head: U32, tail: Array U32 }");
+    defer a.free(reordered);
+    const exhaustive = try std.mem.replaceOwned(u8, a, reordered, "#Packet { tail } => tail", "#Packet { tail } => tail\n  #Unused => #[0]");
+    defer a.free(exhaustive);
+    var recipe = try prepare(a, exhaustive, null);
+    defer recipe.deinit(a);
+    var recipe_result = try compile(a, &recipe);
+    defer recipe_result.deinit(a);
+    try compare(a, &before.bodies, exhaustive, recipe_result.bytes, 3);
+}
+
+test "body check cache relocates generic local principals and covariance rows" {
+    const source =
+        \\const seed = 2
+        \\const helper = fn (value: U32) -> U32 => do:
+        \\  let identity = fn item => item
+        \\  let apply = fn callback => fn argument => callback argument
+        \\  let fraction = identity 3.0
+        \\  let whole = apply identity value
+        \\  return @u32.add whole seed
+        \\entry const run = fn (value: U32) -> U32 => helper value
+    ;
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    const helper = before.bodies.find("helper") orelse return error.TestUnexpectedResult;
+    try std.testing.expect(helper.local_schemes.len >= 2);
+    const inserted = try a.print("const earlier_spelling = {{ tail: 3.0, head: 2 }}\n{s}", .{source});
+    defer a.free(inserted);
+    const changed = try std.mem.replaceOwned(u8, a, inserted, "const seed = 2", "const seed = @u32.add 2 1");
+    defer a.free(changed);
+    var fresh = try prepare(a, changed, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, changed, expected.bytes, 2);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 2) });
+    // A changed local template is executable source, independent of the
+    // unchanged outer scalar signature and its neighboring generic local.
+    const body_edit = try std.mem.replaceOwned(u8, a, changed, "=> callback argument", "=> callback (@u32.add argument 1)");
+    defer a.free(body_edit);
+    var altered = try prepare(a, body_edit, null);
+    defer altered.deinit(a);
+    var altered_result = try compile(a, &altered);
+    defer altered_result.deinit(a);
+    try compare(a, &before.bodies, body_edit, altered_result.bytes, 3);
+}
+
+test "body check cache declines dotted access paths instead of erasing projections" {
+    const source = "const seed = 2\nconst helper = fn (value: { head: U32, tail: F32 }) -> U32 => @u32.add value.head seed\nentry const run = fn (value: U32) -> U32 => helper { head: value, tail: 1.0 }\n";
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("helper") == null);
+    const changed = try std.mem.replaceOwned(u8, a, source, "const seed = 2", "const seed = 3");
+    defer a.free(changed);
+    var fresh = try prepare(a, changed, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, changed, expected.bytes, 2);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 2) });
 }

@@ -1874,11 +1874,43 @@ const Generator = struct {
         try emitter.emit(.i32_eq, 0);
         try emitter.emit(.br_if, 1);
         try emitter.emit(.local_get, frame);
+        try emitter.emit(.i32_load, @offsetOf(heap.StateFrame, "kind"));
+        try emitter.emit(.i32_const, heap.StateFrame.tag);
+        try emitter.emit(.i32_eq, 0);
+        try emitter.emit(.if_, 0);
+        try emitter.emit(.local_get, frame);
+        try emitter.emit(.i32_load, @offsetOf(heap.StateFrame, "write"));
+        try emitter.operationConstant(key.operation);
+        try emitter.emit(.i32_eq, 0);
+        try emitter.emit(.br_if, 2);
+        try emitter.emit(.end, 0);
+        try emitter.emit(.local_get, frame);
         try emitter.emit(.i32_load, @offsetOf(provider_chain.Frame, "outer"));
         try emitter.emit(.local_set, frame);
         try emitter.emit(.br, 0);
         try emitter.emit(.end, 0);
         try emitter.emit(.end, 0);
+        try emitter.emit(.local_get, frame);
+        try emitter.emit(.i32_load, @offsetOf(heap.StateFrame, "kind"));
+        try emitter.emit(.i32_const, heap.StateFrame.tag);
+        try emitter.emit(.i32_eq, 0);
+        try emitter.emit(.if_, @backingInt(result_machine));
+        try emitter.emit(.local_get, frame);
+        try emitter.emit(.i32_load, @offsetOf(heap.StateFrame, "read"));
+        try emitter.operationConstant(key.operation);
+        try emitter.emit(.i32_eq, 0);
+        try emitter.emit(.if_, @backingInt(result_machine));
+        if (arrow.a == types.unit) {
+            try emitter.emit(.local_get, frame);
+            try emitter.emit(if (result_machine == .f32) .f32_load else .i32_load, @offsetOf(heap.StateFrame, "value"));
+        } else try emitter.emit(.unreachable_, 0);
+        try emitter.emit(.else_, 0);
+        if (arrow.b == types.unit) {
+            try emitter.storeTypedWord(frame, @offsetOf(heap.StateFrame, "value"), 1, self.layouts.scalar(arrow.a) orelse .pointer, 0);
+            try emitter.emit(.i32_const, 0);
+        } else try emitter.emit(.unreachable_, 0);
+        try emitter.emit(.end, 0);
+        try emitter.emit(.else_, 0);
         try emitter.emit(.local_get, frame);
         try emitter.emit(.i32_load, @offsetOf(provider_chain.Frame, "kind"));
         try emitter.emit(.i32_const, @backingInt(provider_chain.Kind.callback));
@@ -1897,30 +1929,6 @@ const Generator = struct {
         try emitter.emit(.i32_load, 0);
         try emitter.emit(.call_indirect, try self.module.internType(&.{ .i32, argument_machine, .i32 }, result_machine));
         try emitter.emit(.else_, 0);
-        try emitter.emit(.local_get, frame);
-        try emitter.emit(.i32_load, @offsetOf(provider_chain.Frame, "kind"));
-        try emitter.emit(.i32_const, @backingInt(provider_chain.Kind.state_read));
-        try emitter.emit(.i32_eq, 0);
-        try emitter.emit(.if_, @backingInt(result_machine));
-        if (arrow.a == types.unit) {
-            try emitter.emit(.local_get, frame);
-            try emitter.emit(.i32_load, @offsetOf(provider_chain.Frame, "target"));
-            try emitter.emit(if (result_machine == .f32) .f32_load else .i32_load, @offsetOf(provider_chain.Cell, "value"));
-        } else try emitter.emit(.unreachable_, 0);
-        try emitter.emit(.else_, 0);
-        try emitter.emit(.local_get, frame);
-        try emitter.emit(.i32_load, @offsetOf(provider_chain.Frame, "kind"));
-        try emitter.emit(.i32_const, @backingInt(provider_chain.Kind.state_write));
-        try emitter.emit(.i32_eq, 0);
-        try emitter.emit(.if_, @backingInt(result_machine));
-        if (arrow.b == types.unit) {
-            try emitter.emit(.local_get, frame);
-            try emitter.emit(.i32_load, @offsetOf(provider_chain.Frame, "target"));
-            try emitter.emit(.local_set, implementation);
-            try emitter.storeTypedWord(implementation, @offsetOf(provider_chain.Cell, "value"), 1, self.layouts.scalar(arrow.a) orelse .pointer, 0);
-            try emitter.emit(.i32_const, 0);
-        } else try emitter.emit(.unreachable_, 0);
-        try emitter.emit(.else_, 0);
         if (self.request_owner != null) {
             try emitter.emit(.local_get, frame);
             try emitter.emit(.i32_load, @offsetOf(provider_chain.Frame, "kind"));
@@ -1932,7 +1940,6 @@ const Generator = struct {
             try emitter.emit(.unreachable_, 0);
             try emitter.emit(.end, 0);
         } else try emitter.emit(.unreachable_, 0);
-        try emitter.emit(.end, 0);
         try emitter.emit(.end, 0);
         try emitter.emit(.end, 0);
         if (scope) |*actor| try actor.complete(function_id, null);
@@ -6029,6 +6036,11 @@ const Emitter = struct {
         try self.emit(.local_get, address);
     }
     fn descriptor(self: *Emitter, function_id: u32, environment: ?u32) Error!void {
+        if (environment == null) {
+            const address = try self.generator.closureData(function_id, 0);
+            try self.referenceConstant(address, .static_address);
+            return;
+        }
         const address = try self.allocate(@sizeOf(heap.Closure), .heap(heap.Closure));
         try self.emit(.local_get, address);
         try self.referenceConstant(function_id, .table_function);
@@ -7050,11 +7062,11 @@ const Emitter = struct {
             try self.emit(.local_get, provider);
         }
     }
-    fn providerFrame(self: *Emitter, provider: u32, operation_offset: u32, target: u32, outer: ?u32, kind: provider_chain.Kind) Error!u32 {
+    fn callbackFrame(self: *Emitter, provider: u32, target: u32, outer: ?u32) Error!u32 {
         const frame = try self.allocatePrivate(@sizeOf(provider_chain.Frame), .heap(provider_chain.Frame));
         try self.emit(.local_get, frame);
         try self.emit(.local_get, provider);
-        try self.emit(.i32_load, operation_offset);
+        try self.emit(.i32_load, @offsetOf(provider_chain.Provider, "operation"));
         try self.emit(.i32_store, @offsetOf(provider_chain.Frame, "operation"));
         try self.emit(.local_get, frame);
         try self.emit(.local_get, target);
@@ -7063,7 +7075,7 @@ const Emitter = struct {
         if (outer) |local| try self.emit(.local_get, local) else try self.emit(.i32_const, 0);
         try self.emit(.i32_store, @offsetOf(provider_chain.Frame, "outer"));
         try self.emit(.local_get, frame);
-        try self.emit(.i32_const, @backingInt(kind));
+        try self.emit(.i32_const, @backingInt(provider_chain.Kind.callback));
         try self.emit(.i32_store, @offsetOf(provider_chain.Frame, "kind"));
         return frame;
     }
@@ -7083,24 +7095,35 @@ const Emitter = struct {
             try self.emit(.local_get, provider);
             try self.emit(.i32_load, @offsetOf(provider_chain.Provider, "implementation"));
             try self.emit(.local_set, implementation);
-            self.provider_local = try self.providerFrame(provider, @offsetOf(provider_chain.Provider, "operation"), implementation, outer, .callback);
+            self.provider_local = try self.callbackFrame(provider, implementation, outer);
             try self.expression(n.b, depth + 1);
         } else if (ty.tag == .state_provider) {
             const state_machine = g.layouts.machine(ty.c);
-            const cell = try self.allocatePrivate(@sizeOf(provider_chain.Cell), .{ .words = &.{g.layoutRole(ty.c)} });
-            try self.emit(.local_get, cell);
+            const frame = try self.allocatePrivate(@sizeOf(heap.StateFrame), .{ .words = &.{ .scalar, g.layoutRole(ty.c), .reference, .scalar, .scalar } });
+            inline for (.{ "read", "write" }) |field| {
+                try self.emit(.local_get, frame);
+                try self.emit(.local_get, provider);
+                try self.emit(.i32_load, @offsetOf(provider_chain.StateProvider, field));
+                try self.emit(.i32_store, @offsetOf(heap.StateFrame, field));
+            }
+            try self.emit(.local_get, frame);
             try self.emit(.local_get, provider);
             try self.emit(if (state_machine == .f32) .f32_load else .i32_load, @offsetOf(provider_chain.StateProvider, "initial"));
-            try self.emit(if (state_machine == .f32) .f32_store else .i32_store, @offsetOf(provider_chain.Cell, "value"));
-            const write = try self.providerFrame(provider, @offsetOf(provider_chain.StateProvider, "write"), cell, outer, .state_write);
-            self.provider_local = try self.providerFrame(provider, @offsetOf(provider_chain.StateProvider, "read"), cell, write, .state_read);
+            try self.emit(if (state_machine == .f32) .f32_store else .i32_store, @offsetOf(heap.StateFrame, "value"));
+            try self.emit(.local_get, frame);
+            if (outer) |local| try self.emit(.local_get, local) else try self.emit(.i32_const, 0);
+            try self.emit(.i32_store, @offsetOf(heap.StateFrame, "outer"));
+            try self.emit(.local_get, frame);
+            try self.emit(.i32_const, heap.StateFrame.tag);
+            try self.emit(.i32_store, @offsetOf(heap.StateFrame, "kind"));
+            self.provider_local = frame;
             const result = try self.capture(n.b, depth);
             const result_machine = (try self.scalar(n.b)).machine();
             // The final state, then the result.
             const pair = try self.allocate(8, .{ .words = &.{ g.layoutRole(ty.c), g.layoutRole(try self.codeLayout(g.unit(self.unit_id).typeOf(n.b), g.unit(self.unit_id).span(n.b))) } });
             try self.emit(.local_get, pair);
-            try self.emit(.local_get, cell);
-            try self.emit(if (state_machine == .f32) .f32_load else .i32_load, @offsetOf(provider_chain.Cell, "value"));
+            try self.emit(.local_get, frame);
+            try self.emit(if (state_machine == .f32) .f32_load else .i32_load, @offsetOf(heap.StateFrame, "value"));
             try self.emit(if (state_machine == .f32) .f32_store else .i32_store, 0);
             try self.emit(.local_get, pair);
             try self.emit(.local_get, result);

@@ -9,7 +9,9 @@ export async function compileAndRun(
   run: (guest: Awaited<ReturnType<typeof instantiateGuest>>, bytes: Uint8Array<ArrayBuffer>) => void | Promise<void>,
   options: { prelude?: string; stdRoot?: string; asynchronous?: boolean } = {},
 ): Promise<void> {
-  const dir = await Deno.makeTempDir({ dir: new URL("../../build", import.meta.url).pathname, prefix: "zig-native-rich-" });
+  const parent = new URL("../../build", import.meta.url).pathname;
+  await Deno.mkdir(parent, { recursive: true });
+  const dir = await Deno.makeTempDir({ dir: parent, prefix: "zig-native-rich-" });
   try {
     const input = `${dir}/program.blot`;
     const output = `${dir}/program.wasm`;
@@ -33,7 +35,9 @@ export function equal(actual: unknown, expected: unknown): void {
 }
 
 export async function compileExpectedFailure(source: string, code: string, message?: string, options: { prelude?: string; stdRoot?: string; span?: readonly [number, number] } = {}): Promise<void> {
-  const dir = await Deno.makeTempDir({ dir: new URL("../../build", import.meta.url).pathname, prefix: "zig-native-failure-" });
+  const parent = new URL("../../build", import.meta.url).pathname;
+  await Deno.mkdir(parent, { recursive: true });
+  const dir = await Deno.makeTempDir({ dir: parent, prefix: "zig-native-failure-" });
   try {
     const input = `${dir}/program.blot`;
     const output = `${dir}/program.wasm`;

@@ -78,6 +78,93 @@ test "cycle zero-child source proof preserves retained checkpoint replay and OOM
     try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
 }
 
+test "capture-free descriptor addresses relocate through retained portable replay and OOM" {
+    var fixture = try Fixture.initSource(
+        \\const make = fn (value: U32) => { value, apply: fn (input: U32) => @u32.add input 1 }
+        \\entry const run = fn (value: U32) => do:
+        \\  let holder = make value
+        \\  return holder.apply holder.value
+    );
+    defer fixture.deinit();
+    const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
+    defer a.free(nodes);
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    try ownership(first.bytes);
+    var retained = try fixture.emit(a, &first.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
+    try std.testing.expect(retained.reuse.reused_named + retained.reuse.reused_closures > 0);
+    const compiler: [32]u8 = @splat(35);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    var portable = try fixture.emit(a, null, &checkpoint);
+    defer portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, portable.bytes);
+    var replayed = try backend.compileWithOptions(a, &fixture.units, 1, .{ .identity = fixture.names.view(), .artifact_replay = true });
+    defer replayed.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, replayed.bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, null, first.bytes });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
+    try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
+}
+
+test "changed State value roles preserve retained artifact and checkpoint roots through OOM" {
+    const definitions =
+        \\type State a is effect = { get: Unit -> a, set: a -> Unit }
+        \\const stable = fn (value: U32) => @u32.add value 1
+    ;
+    var first = try Fixture.initSource(definitions ++ "\n" ++
+        \\const shape = fn (value: U32) => @effect.run State.get State.set #[value] (fn () => do:
+        \\  use current <- State.get ()
+        \\  return current[0]
+        \\)
+        \\entry const run = fn (value: U32) => do:
+        \\  let (_, result) = shape value
+        \\  return stable result
+    );
+    defer first.deinit();
+    var changed = try Fixture.initSource(definitions ++ "\n" ++
+        \\const shape = fn (value: U32) => @effect.run State.get State.set value (fn () => do:
+        \\  use current <- State.get ()
+        \\  return current
+        \\)
+        \\entry const run = fn (value: U32) => do:
+        \\  let (_, result) = shape value
+        \\  return stable result
+    );
+    defer changed.deinit();
+    const nodes = try a.dupe(core.Node, changed.units[0].nodes);
+    defer a.free(nodes);
+    var before = try first.emit(a, null, null);
+    defer before.deinit(a);
+    var fresh = try changed.emit(a, null, null);
+    defer fresh.deinit(a);
+    try std.testing.expect(before.diagnostic == null and fresh.diagnostic == null);
+    try ownership(before.bytes);
+    try ownership(fresh.bytes);
+    try std.testing.expect(!std.mem.eql(u8, before.bytes, fresh.bytes));
+    var retained = try changed.emit(a, &before.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, retained.bytes);
+    const compiler: [32]u8 = @splat(35);
+    const saved = try archive.encode(a, compiler, &before.capture.?);
+    defer a.free(saved);
+    var checkpoint = try archive.decode(a, compiler, saved);
+    defer checkpoint.deinit();
+    var restarted = try changed.emit(a, null, &checkpoint);
+    defer restarted.deinit(a);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, restarted.bytes);
+    var replayed = try backend.compileWithOptions(a, &changed.units, 1, .{ .identity = changed.names.view(), .artifact_replay = true });
+    defer replayed.deinit(a);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, replayed.bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &changed, &before.capture.?, fresh.bytes });
+    try std.testing.expectEqualDeep(nodes, changed.units[0].nodes);
+}
+
 test "strong cycle source owns full helper bodies across retained checkpoint replay and OOM" {
     var fixture = try Fixture.initSource(
         \\type State a is effect = { get: Unit -> a, set: a -> Unit }
