@@ -1,6 +1,86 @@
 import { deepStrictEqual as equal } from "node:assert/strict";
 import { formatSource } from "./format.ts";
 
+Deno.test("formatter preserves private opaque forwarding and constructor lambda syntax", async () => {
+  const source = `export {Token as Ticket, make} from "./tokens"
+private opaque type Token=F32
+opaque type Box a={value:a}
+private type Alias=U32
+private type Choice is data=#Choice U32
+private type Read a is contract={type_rep a}
+private effect Hidden:Unit->U32
+private type HiddenFamily is effect={ask:Unit->U32}
+private const private=fn opaque=>opaque
+private entry const answer=fn export=>private export
+const unwrap=fn (#Box value)=>value.value
+const typed=fn (value:U32)=>value
+const pattern=fn ((left,right))=>left
+export {Box} from "./tokens"
+`;
+  const formatted = await formatSource(source);
+  equal(await formatSource(formatted), formatted);
+  equal(await formatSource(source.replaceAll("\n", "\r\n")), formatted);
+  equal(formatted.includes("private opaque type Token = F32"), true);
+  equal(formatted.includes("fn (#Box value)"), true);
+  equal(formatted.includes("fn ((left, right))"), true);
+  equal(
+    formatted.includes('export { Token as Ticket, make } from "./tokens"'),
+    true,
+  );
+});
+
+Deno.test({
+  name: "formatter keeps source and forwarded opaque project Wasm identical",
+  ignore: Deno.args[0] === undefined,
+  async fn() {
+    const { createZigProjectCompiler } = await import(
+      "./zig_project_client.ts"
+    );
+    const directory = await Deno.makeTempDir({
+      prefix: "blot-format-opacity-",
+    });
+    try {
+      const entry = `${directory}/main.blot`;
+      const sources = {
+        [entry]:
+          'import {make} from "./tokens"\nimport * as facade from "./facade"\ntype Alias=facade.Ticket\nentry const answer=fn (value:F32)=>facade.read (make value)\nentry const folded=facade.read (make 40.0)\n',
+        [`${directory}/tokens.blot`]:
+          "opaque type Token=F32\nprivate const offset=2.0\nconst make:F32->Token=fn value=>#Token (@f32.add value offset)\nconst read:Token->F32=fn (#Token value)=>value\nprivate const Token.hidden=read\n",
+        [`${directory}/facade.blot`]:
+          'export {Token as Ticket,read} from "./tokens"\n',
+      };
+      const formatted: Record<string, string> = {};
+      for (const [path, source] of Object.entries(sources)) {
+        await Deno.writeTextFile(path, source);
+        formatted[path] = await formatSource(source);
+        equal(await formatSource(formatted[path]), formatted[path]);
+      }
+      const options = {
+        executable: Deno.args[0],
+        entry,
+        prelude: null,
+        cacheDirectory: false as const,
+      };
+      const original = await createZigProjectCompiler(options);
+      const rewritten = await createZigProjectCompiler(options);
+      try {
+        const expected = await original.build();
+        const actual = await rewritten.build({ sources: formatted });
+        equal(expected.success, true, JSON.stringify(expected));
+        equal(actual.success, true, JSON.stringify(actual));
+        if (expected.success && actual.success) {
+          equal(actual.bytes, expected.bytes);
+        }
+      } finally {
+        await original.dispose();
+        await rewritten.dispose();
+      }
+    } finally {
+      await Deno.remove(directory, { recursive: true });
+    }
+  },
+});
+
 Deno.test("formatter preserves comments, literals, postfix calls, selectors and layout", async () => {
   const source = `// leading comment
 import * as array from "std/array"

@@ -34,8 +34,8 @@ pub fn parseWithFixities(allocator: std.mem.Allocator, source: []const u8, token
             },
         };
         try p.tree.roots.append(allocator, root);
-        if (p.tree.node(root).tag != .import_decl) declarations_seen = true;
-        if (p.tree.node(root).tag != .import_decl and p.tree.node(root).tag != .fixity_decl) body_declarations_seen = true;
+        if (p.tree.node(root).tag != .import_decl and p.tree.node(root).tag != .export_decl) declarations_seen = true;
+        if (p.tree.node(root).tag != .import_decl and p.tree.node(root).tag != .export_decl and p.tree.node(root).tag != .fixity_decl) body_declarations_seen = true;
         if (!p.at(.newline) and !p.at(.eof)) {
             try p.report(.unexpected_token);
             p.recover(before);
@@ -232,13 +232,45 @@ const Parser = struct {
         return self.intern(bytes.items);
     }
     fn declaration(self: *Parser, declarations_seen: bool, body_declarations_seen: bool) Error!Id {
+        var private = false;
+        var is_opaque = false;
+        if (self.word("entry") and self.peek(1) == .identifier and std.mem.eql(u8, self.text(self.tokens[self.index + 1]), "private")) {
+            _ = self.advance();
+            self.declaration_origin = .{ .start = self.current().start, .end = self.current().end };
+            return self.fail(.unexpected_token);
+        }
+        if (self.word("private")) {
+            private = true;
+            _ = self.advance();
+            if (self.word("private")) {
+                self.declaration_origin = .{ .start = self.current().start, .end = self.current().end };
+                return self.fail(.unexpected_token);
+            }
+        }
+        if (self.word("opaque") and self.peek(1) == .kw_type) {
+            is_opaque = true;
+            _ = self.advance();
+        }
+        if (self.word("export") and self.peek(1) == .l_brace) {
+            if (private or is_opaque) return self.fail(.unexpected_token);
+            return self.importDecl(true);
+        }
+        const id = try self.declarationBody(declarations_seen, body_declarations_seen, is_opaque);
+        if (private or is_opaque) {
+            const tag = self.tree.node(id).tag;
+            if (tag == .import_decl or tag == .fixity_decl) return self.fail(.unexpected_token);
+            try self.tree.declaration_traits.append(self.allocator, .{ .declaration = id, .private = private, .is_opaque = is_opaque });
+        }
+        return id;
+    }
+    fn declarationBody(self: *Parser, declarations_seen: bool, body_declarations_seen: bool, is_opaque: bool) Error!Id {
         _ = body_declarations_seen;
         self.declaration_origin = .{ .start = self.current().start, .end = self.current().end };
         self.collection_names = 0;
         const start = self.current().start;
         if (self.at(.kw_import)) {
             if (declarations_seen) return self.fail(.unexpected_token);
-            return self.importDecl();
+            return self.importDecl(false);
         }
         var attributes: std.ArrayList(Id) = .empty;
         defer attributes.deinit(self.allocator);
@@ -255,7 +287,7 @@ const Parser = struct {
         if (self.at(.kw_infixl) or self.at(.kw_infixr) or self.at(.kw_infix)) {
             return self.fixityDecl(attrs, start);
         }
-        if (self.at(.kw_type) or self.at(.kw_data)) return self.typeDeclaration(attrs, start);
+        if (self.at(.kw_type) or self.at(.kw_data)) return self.typeDeclaration(attrs, start, is_opaque);
         if (self.eat(.kw_effect)) {
             const name = try self.qualified();
             _ = try self.expect(.colon);
@@ -280,13 +312,14 @@ const Parser = struct {
         if (runtime != 0) try self.tree.runtime_names.append(self.allocator, .{ .declaration = value_declaration, .point = name_point }) else try self.tree.constant_names.append(self.allocator, .{ .declaration = value_declaration, .point = name_point });
         return value_declaration;
     }
-    fn importDecl(self: *Parser) Error!Id {
-        const start = (try self.expect(.kw_import)).start;
+    fn importDecl(self: *Parser, forwarding: bool) Error!Id {
+        const start = self.current().start;
+        if (forwarding) _ = self.advance() else _ = try self.expect(.kw_import);
         var bindings: std.ArrayList(Id) = .empty;
         defer bindings.deinit(self.allocator);
         var namespace: symbols.Symbol = 0;
         var namespace_span: ast.Span = .{ .start = start, .end = start };
-        if (self.eat(.star)) {
+        if (!forwarding and self.eat(.star)) {
             _ = try self.expect(.kw_as);
             const t = self.current();
             namespace = try self.lowerIdentifier();
@@ -309,7 +342,9 @@ const Parser = struct {
         const path_token = self.current();
         const path = try self.stringSymbol();
         const range = try self.list(bindings.items);
-        return self.add(.import_decl, path, range.start, try self.extra(&.{ range.len, namespace, path_token.start, path_token.end, namespace_span.start, namespace_span.end }), start);
+        var tag: ast.Tag = .import_decl;
+        if (forwarding) tag = .export_decl;
+        return self.add(tag, path, range.start, try self.extra(&.{ range.len, namespace, path_token.start, path_token.end, namespace_span.start, namespace_span.end }), start);
     }
     fn fixityDecl(self: *Parser, attrs: ast.List, start: u32) Error!Id {
         const association: u32 = switch (self.advance().tag) {
@@ -360,7 +395,7 @@ const Parser = struct {
         try self.tree.operator_origins.append(self.allocator, .{ .node = id, .span = target_span });
         return id;
     }
-    fn typeDeclaration(self: *Parser, attrs: ast.List, start: u32) Error!Id {
+    fn typeDeclaration(self: *Parser, attrs: ast.List, start: u32, is_opaque: bool) Error!Id {
         const old_data = self.eat(.kw_data);
         if (!old_data) _ = try self.expect(.kw_type);
         const name = try self.typeIdentifier();
@@ -374,8 +409,14 @@ const Parser = struct {
         if (!old_data and self.eat(.equal)) {
             const body = try self.typeExpression();
             const range = try self.list(params.items);
+            if (is_opaque) {
+                const constructor = try self.add(.constructor_ref, name, body, 0, start);
+                const constructors = try self.listNode(.constructors, &.{constructor}, start);
+                return self.add(.data_decl, name, constructors, try self.extra(&.{ range.start, range.len, attrs.start, attrs.len }), start);
+            }
             return self.add(.type_alias_decl, name, body, try self.extra(&.{ range.start, range.len, attrs.start, attrs.len }), start);
         }
+        if (is_opaque) return self.fail(.expected_token);
         var effect = false;
         if (!old_data) {
             _ = try self.expect(.kw_is);
@@ -562,8 +603,14 @@ const Parser = struct {
         var name: symbols.Symbol = 0;
         var annotation: Id = 0;
         var constraints: Where = .{};
+        var pattern_parameter: Id = 0;
         if (self.eat(.l_paren)) {
-            if (self.eat(.r_paren)) unit = true else {
+            if (self.eat(.r_paren)) unit = true else if (self.at(.hash)) {
+                if (demanded) return self.fail(.unexpected_token);
+                pattern_parameter = try self.pattern();
+                _ = try self.expect(.r_paren);
+                name = try self.collectionName(item_start);
+            } else {
                 name = try self.lowerIdentifier();
                 _ = try self.expect(.colon);
                 annotation = try self.typeExpression();
@@ -574,7 +621,14 @@ const Parser = struct {
         const parameter = try self.add(.parameter, name, annotation, try self.extra(&.{ @as(u32, @intFromBool(demanded)) | (@as(u32, @intFromBool(unit)) << 1), constraints.predicates.start, constraints.predicates.len, constraints.node }), item_start);
         const result = if (self.eat(.arrow)) try self.typeExpression() else 0;
         _ = try self.expect(.fat_arrow);
-        return self.add(.lambda, parameter, try self.expression(), result, start);
+        var body = try self.expression();
+        if (pattern_parameter != 0) {
+            const argument = try self.add(.name, name, 0, 0, item_start);
+            const binding = try self.add(.let_stmt, pattern_parameter, argument, try self.extra(&.{ 0, 0, 0, 0, 0 }), item_start);
+            const returned = try self.add(.return_stmt, body, 0, 0, start);
+            body = try self.listNode(.block, &.{ binding, returned }, start);
+        }
+        return self.add(.lambda, parameter, body, result, start);
     }
     fn doBlock(self: *Parser) Error!Id {
         const start = (try self.expect(.kw_do)).start;

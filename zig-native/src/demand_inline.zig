@@ -4,6 +4,23 @@
 //! it through another admitted body, within the same shared node budget.
 const core = @import("core.zig");
 pub const max_parameters = 16;
+/// A lexical callback is an immutable closure or a bounded chain of local
+/// aliases. Global/foreign values and computed callback choices stay ordinary.
+pub fn localClosure(module: *const core.Module, id: core.Id) ?core.Id {
+    var current = id;
+    for (0..64) |_| {
+        if (current == 0) return null;
+        const node = module.node(current);
+        if (node.tag == .closure) return current;
+        if (node.tag != .reference) return null;
+        const reference = module.reference(current);
+        if (reference.unit != 0 and reference.unit != module.unit) return null;
+        const binding = module.binding(reference.binding);
+        if (binding.kind == .global or binding.kind == .external) return null;
+        current = binding.initializer;
+    }
+    return null;
+}
 pub const Plan = struct {
     uses: [max_parameters]u8 = @splat(0),
     remaining: u8 = 96,
@@ -12,17 +29,21 @@ pub const Plan = struct {
     calls: [96]core.Id = @splat(0),
     call_count: usize = 0,
     multiplier: u8 = 1,
+    local_callbacks: bool = false,
 
     pub fn init(module: *const core.Module, body: *const core.Body) ?Plan {
-        return initBudget(module, body, 96);
-    }
-    fn initBudget(module: *const core.Module, body: *const core.Body, remaining: u8) ?Plan {
-        if (!body.is_function or body.parameters.len > max_parameters) return null;
         var has_demand = false;
         for (module.bodyParameters(body)) |item| {
             has_demand = has_demand or module.types.node(item.ty).tag == .demand;
         }
         if (!has_demand) return null;
+        return initCallee(module, body);
+    }
+    pub fn initCallee(module: *const core.Module, body: *const core.Body) ?Plan {
+        return initBudget(module, body, 96);
+    }
+    fn initBudget(module: *const core.Module, body: *const core.Body, remaining: u8) ?Plan {
+        if (!body.is_function or body.parameters.len > max_parameters) return null;
         var plan: Plan = .{ .remaining = remaining };
         if (!plan.visit(module, body, body.root)) return null;
         return plan;
@@ -34,6 +55,7 @@ pub const Plan = struct {
         if (target.arguments.len != callee.parameters.len) return false;
         const child = initBudget(module, callee, self.remaining) orelse return false;
         self.remaining = child.remaining;
+        self.local_callbacks = self.local_callbacks or child.local_callbacks;
         if (self.call_count == self.calls.len) return false;
         self.calls[self.call_count] = id;
         self.call_count += 1;
@@ -105,7 +127,7 @@ pub const Plan = struct {
         const node = module.node(id);
         return switch (node.tag) {
             .constant, .panic => true,
-            .reference => if (parameter(module, body, id)) |index|
+            .reference => if (localClosure(module, id) != null) false else if (parameter(module, body, id)) |index|
                 module.types.node(module.bodyParameters(body)[index].ty).tag != .demand
             else blk: {
                 const ref = module.reference(id);
@@ -147,6 +169,10 @@ pub const Plan = struct {
                 break :blk true;
             },
             .bind => blk: {
+                if (localClosure(module, node.b) != null) {
+                    self.local_callbacks = true;
+                    break :blk self.addBinding(module, node.a);
+                }
                 if (module.types.node(module.typeOf(node.b)).tag == .demand) {
                     const index = parameter(module, body, node.b) orelse break :blk false;
                     break :blk module.types.node(module.bodyParameters(body)[index].ty).tag == .demand;
@@ -178,6 +204,17 @@ pub const Plan = struct {
                 break :blk self.visit(module, body, loop.body);
             },
             .call => self.call(module, body, id),
+            .apply => blk: {
+                const closure_id = localClosure(module, node.a) orelse break :blk false;
+                const closure = module.closure(closure_id);
+                if (module.types.node(closure.parameter.ty).tag == .demand) break :blk false;
+                if (!self.visit(module, body, node.b)) break :blk false;
+                self.local_callbacks = true;
+                const saved = self.binding_count;
+                defer self.binding_count = saved;
+                if (!self.addBinding(module, closure.parameter.binding)) break :blk false;
+                break :blk self.visit(module, body, closure.body);
+            },
             .if_value => self.visit(module, body, node.a) and self.visit(module, body, node.b) and self.visit(module, body, node.c),
             // Associated operations may execute an arbitrary source body.
             .scalar => node.c == 0 and self.visit(module, body, node.a) and (node.b == 0 or self.visit(module, body, node.b)),

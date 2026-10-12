@@ -117,7 +117,7 @@ pub const ImportedCatalog = struct {
     pub fn declaration(self: ImportedCatalog, id: BindingId) SourceDeclaration {
         if (self.frozen) |owner| {
             const value = owner.bindings[id];
-            return .{ .name = value.name, .declaration = 0, .kind = value.kind, .named_function = value.named_function, .external = value.external };
+            return .{ .private = value.private, .name = value.name, .declaration = 0, .kind = value.kind, .named_function = value.named_function, .external = value.external };
         }
         return sourceDeclaration(self.producer.?.bindings[id]);
     }
@@ -157,7 +157,7 @@ pub const SchemeSummary = struct {
     /// Only schemes made of position-independent obligations are shared.
     shareable: bool = false,
 };
-pub const Binding = struct { name: symbols.Symbol, declaration: ast.Id, owner: ast.Id, kind: Kind, named_function: bool = false, ty: T.Id, scheme: T.Scheme = .{}, external: ?ExternalTarget = null, predecessor: BindingId = 0, summary: SchemeSummary = .{} };
+pub const Binding = struct { private: bool = false, name: symbols.Symbol, declaration: ast.Id, owner: ast.Id, kind: Kind, named_function: bool = false, ty: T.Id, scheme: T.Scheme = .{}, external: ?ExternalTarget = null, predecessor: BindingId = 0, summary: SchemeSummary = .{} };
 /// An immutable interface borrows only semantic tables, never a source body.
 pub const SchemeInterface = struct {
     named_function: bool = false,
@@ -200,9 +200,9 @@ pub const ImportedBinding = struct {
 };
 /// Declaration facts admitted only by the owned source-validation API.
 pub const SourceHeader = struct { name: symbols.Symbol = 0, namespace: symbols.Symbol = 0, member: symbols.Symbol = 0, target: ExternalTarget, named_function: bool = false, origin: ast.Id, expose: bool = true };
-pub const SourceDeclaration = struct { name: symbols.Symbol, declaration: ast.Id, kind: Kind, named_function: bool, external: ?ExternalTarget };
+pub const SourceDeclaration = struct { private: bool = false, name: symbols.Symbol, declaration: ast.Id, kind: Kind, named_function: bool, external: ?ExternalTarget };
 pub fn sourceDeclaration(binding: Binding) SourceDeclaration {
-    return .{ .name = binding.name, .declaration = binding.declaration, .kind = binding.kind, .named_function = binding.named_function, .external = binding.external };
+    return .{ .private = binding.private, .name = binding.name, .declaration = binding.declaration, .kind = binding.kind, .named_function = binding.named_function, .external = binding.external };
 }
 /// Shared borrowed declaration payloads. No value schemes, obligations or bodies.
 pub const DeclarationCatalog = struct { types: F.Source, parameter_patterns: F.Patterns, nominals: []const Nominal, constructors: []const Constructor, effect_families: []const EffectFamily, effect_templates: []const EffectTemplate, associated: []const Associated, unit: u32, contracts: []const Contract = &.{}, contract_predicates: []const T.Obligation = &.{} };
@@ -230,7 +230,7 @@ pub const LoopCarry = struct { node: ast.Id, incoming: BindingId, iteration: Bin
 pub const LoopExit = struct { node: ast.Id, loop: ast.Id, bindings: T.List };
 pub const ClosedRow = struct { owner: BindingId, variable: u32 };
 pub const Merge = struct { node: ast.Id, result: BindingId, then_binding: BindingId, else_binding: BindingId };
-pub const Code = enum { unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, unknown_rebinding, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget };
+pub const Code = enum { private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, unknown_rebinding, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget };
 pub const PurityWitness = @import("purity_diagnostics.zig").Witness;
 pub const Diagnostic = struct {
     pub const TypeApplication = enum { missing_array, missing_nominal, extra };
@@ -352,6 +352,8 @@ pub const Diagnostic = struct {
             .nesting_limit => "Semantic nesting exceeds the compiler limit",
             .inference_budget => "Type inference exceeded this module's work budget",
             .constructor_marker => "Record constructors require # before the name",
+            .private_access => "Private declaration or opaque representation is unavailable here",
+            .private_identity_escape => "Public signature exposes a private declaration",
             .unknown_constructor => if (self.symbol != 0) "unknown record constructor" else "Unknown data constructor",
             .unknown_field => "This value has no such named field",
             .duplicate_field => "A field was supplied more than once",
@@ -834,6 +836,10 @@ const Engine = struct {
         const param_pattern = self.parameter_patterns.list(patterns)[consumed];
         return try self.possibleParameterArgument(param_pattern, argument, true, 0) and try self.sourceParameterMatches(param_pattern, argument);
     }
+    pub fn sourcePrivateConstructor(self: *const Engine, symbol: symbols.Symbol) bool {
+        const nominal = self.nominal_names.get(self.catalogKey(symbol)) orelse return false;
+        return self.nominals.items[nominal].is_opaque and self.nominals.items[nominal].identity.unit != self.unit;
+    }
     pub fn sourceConstructorExists(self: *const Engine, symbol: symbols.Symbol) bool {
         return self.constructor_names.contains(self.catalogKey(symbol));
     }
@@ -848,8 +854,11 @@ const Engine = struct {
         return false;
     }
     pub fn sourceRecordTarget(self: *Engine, symbol: symbols.Symbol) T.Error!enum { missing, record, other } {
-        if (self.constructor_names.get(self.catalogKey(symbol))) |constructor|
-            return if (self.constructors.items[constructor].declared_record) .record else .other;
+        if (self.constructor_names.get(self.catalogKey(symbol))) |constructor| {
+            const definition = self.constructors.items[constructor];
+            if (definition.declared_record or (self.nominals.items[definition.nominal].is_opaque and self.types.node(definition.payload).tag == .record)) return .record;
+            return .other;
+        }
         const value = try self.catalogBinding(symbol) != null or self.catalogOperationTemplate(symbol) != null or self.effect_family_names.contains(self.catalogKey(symbol));
         return if (value) .other else .missing;
     }
@@ -1573,11 +1582,12 @@ const Engine = struct {
         const names = try self.types.saveList(producer.types.list(source.parameter_names));
         const patterns = try self.copyParameterPatterns(producer.parameter_patterns, source.patterns, &copier);
         const alias_rows = try copier.quantifiedRows(source.alias_rows);
-        try self.nominals.append(self.allocator, .{ .identity = source.identity, .name = source.name, .variables = quantified, .parameters = try self.types.saveList(parameters.items), .patterns = patterns, .parameter_names = names, .alias_rows = alias_rows, .alias = if (source.alias == 0) 0 else try copier.copy(source.alias, 0) });
+        try self.nominals.append(self.allocator, .{ .private = source.private, .is_opaque = source.is_opaque, .storage = source.storage, .identity = source.identity, .name = source.name, .variables = quantified, .parameters = try self.types.saveList(parameters.items), .patterns = patterns, .parameter_names = names, .alias_rows = alias_rows, .alias = if (source.alias == 0) 0 else try copier.copy(source.alias, 0) });
         try self.nominal_identities.put(self.allocator, source.identity, index);
         var constructors: std.ArrayList(T.Id) = .empty;
         defer constructors.deinit(self.allocator);
         for (producer.types.list(source.constructors)) |old| {
+            if (source.is_opaque) continue;
             const ctor = producer.constructors[old];
             const own: u32 = @intCast(self.constructors.items.len);
             try self.constructors.append(self.allocator, .{ .identity = ctor.identity, .nominal = index, .tag = ctor.tag, .name = ctor.name, .scheme = .{ .root = try copier.copy(ctor.scheme.root, 0), .variables = quantified }, .payload = if (ctor.payload == 0) 0 else try copier.copy(ctor.payload, 0), .declared_record = ctor.declared_record });
@@ -1609,7 +1619,7 @@ const Engine = struct {
         if (self.effect_families.items.len == std.math.maxInt(u32)) return error.TypeLimit;
         const family: u32 = @intCast(self.effect_families.items.len);
         const patterns = try self.copyParameterPatterns(producer.parameter_patterns, source.patterns, &copier);
-        try self.effect_families.append(self.allocator, .{ .identity = source.identity, .name = source.name, .callable = source.callable, .variables = try self.types.saveList(variables.items), .parameters = try self.types.saveList(parameters.items), .patterns = patterns, .parameter_names = try self.types.saveList(producer.types.list(source.parameter_names)) });
+        try self.effect_families.append(self.allocator, .{ .private = source.private, .identity = source.identity, .name = source.name, .callable = source.callable, .variables = try self.types.saveList(variables.items), .parameters = try self.types.saveList(parameters.items), .patterns = patterns, .parameter_names = try self.types.saveList(producer.types.list(source.parameter_names)) });
         try self.effect_family_identities.put(self.allocator, source.identity, family);
         var operations: std.ArrayList(T.Id) = .empty;
         defer operations.deinit(self.allocator);
@@ -1628,11 +1638,21 @@ const Engine = struct {
     fn importCatalog(self: *Engine, imported: anytype) T.Error!void {
         const producer = if (@TypeOf(imported) == SourceCatalog) imported.producer else imported.catalog();
         if (imported.kind == .catalog) {
-            for (1..producer.nominals.len) |index| _ = try self.copyNominal(producer, @intCast(index));
-            for (1..producer.effect_families.len) |index| _ = try self.copyEffectFamily(producer, @intCast(index));
-            for (0..producer.contracts.len) |index| _ = try self.copyContract(producer, @intCast(index));
+            for (1..producer.nominals.len) |index| {
+                if (producer.nominals[index].private) continue;
+                _ = try self.copyNominal(producer, @intCast(index));
+            }
+            for (1..producer.effect_families.len) |index| {
+                if (producer.effect_families[index].private) continue;
+                _ = try self.copyEffectFamily(producer, @intCast(index));
+            }
+            for (0..producer.contracts.len) |index| {
+                if (producer.contracts[index].private) continue;
+                _ = try self.copyContract(producer, @intCast(index));
+            }
             for (producer.associated) |method| {
                 const definition = if (@TypeOf(imported) == SourceCatalog) imported.declarations[method.binding] else imported.declaration(method.binding);
+                if (definition.private) continue;
                 const target = definition.external orelse ExternalTarget{ .unit = producer.unit, .binding = method.binding };
                 if (@TypeOf(imported) == SourceCatalog) try self.importHeader(.{ .target = target, .named_function = definition.named_function, .origin = imported.origin, .expose = false }) else if (self.source_validation) try self.importHeader(.{ .target = target, .named_function = definition.named_function, .origin = imported.origin, .expose = false }) else try self.importBinding(.{ .target = target, .interface = imported.interface(method.binding), .origin = imported.origin, .expose = false });
                 const binding = self.external_targets.get(target).?;
@@ -1677,6 +1697,87 @@ const Engine = struct {
             if (self.constructor_names.contains(key)) try self.diagnostic(.duplicate_name, imported.origin) else try self.constructor_names.put(self.allocator, key, index);
         }
     }
+    fn prepareOpaqueStorage(self: *Engine) void {
+        var remaining: usize = 1_000_000;
+        for (self.nominals.items, 0..) |nominal, index| {
+            if (!nominal.is_opaque or nominal.identity.unit != self.unit) continue;
+            self.nominals.items[index].storage = @import("opaque_storage.zig").infer(.{ .store = &self.types }, self.nominals.items, self.constructors.items, @intCast(index), &remaining);
+        }
+    }
+    fn validateVisibility(self: *Engine) T.Error!void {
+        var private = false;
+        for (self.bindings.items) |binding| private = private or binding.private;
+        for (self.nominals.items) |nominal| private = private or nominal.private;
+        for (self.effect_families.items) |family| private = private or family.private;
+        for (self.contracts.items) |contract| private = private or contract.private;
+        if (!private) return;
+        const visibility = @import("module_visibility.zig");
+        var scan = try visibility.Scan.init(self.allocator, .{ .store = &self.types }, self.nominals.items, self.effect_families.items, self.effect_templates.items);
+        defer scan.deinit();
+        for (self.bindings.items) |binding| {
+            if (binding.kind != .global or binding.private) continue;
+            var allowed = try scan.allowed(binding.scheme.root);
+            for (self.tree.list(self.tree.valueDecl(binding.declaration).where)) |predicate| {
+                const name = self.tree.node(predicate).a;
+                if (self.contract_names.get(self.catalogKey(name))) |index| if (self.contracts.items[index].private) {
+                    allowed = false;
+                };
+            }
+            for (self.obligations.items[binding.scheme.obligations.start..][0..binding.scheme.obligations.len]) |requirement| {
+                if (requirement.kind == .callee_use and requirement.identity.decl < self.bindings.items.len and self.bindings.items[requirement.identity.decl].private) allowed = false;
+                inline for (.{ "ty", "result", "other", "signature" }) |field| {
+                    if (!try scan.allowed(@field(requirement, field))) allowed = false;
+                }
+            }
+            if (!allowed) try self.diagnostic(.private_identity_escape, binding.declaration);
+        }
+        for (self.nominals.items) |nominal| {
+            if (nominal.identity.unit != self.unit or nominal.private) continue;
+            var allowed = try scan.allowed(nominal.alias);
+            for (self.types.list(nominal.parameters)) |parameter| if (!try scan.allowed(parameter)) {
+                allowed = false;
+            };
+            if (nominal.is_opaque) {
+                if (!allowed) try self.diagnostic(.private_identity_escape, nominal.declaration);
+                continue;
+            }
+            for (self.types.list(nominal.constructors)) |index| if (!try scan.allowed(self.constructors.items[index].payload)) {
+                allowed = false;
+            };
+            if (!allowed) try self.diagnostic(.private_identity_escape, nominal.declaration);
+        }
+        for (self.contracts.items) |contract| {
+            if (contract.identity.unit != self.unit or contract.private) continue;
+            var allowed = true;
+            for (self.contract_predicates.items[contract.predicates.start..][0..contract.predicates.len]) |requirement| {
+                inline for (.{ "ty", "result", "other", "signature" }) |field| {
+                    if (!try scan.allowed(@field(requirement, field))) allowed = false;
+                }
+            }
+            const body = self.tree.node(self.tree.node(contract.identity.decl).b);
+            for (self.tree.list(.{ .start = body.a, .len = body.b })) |predicate| {
+                if (self.contract_names.get(self.catalogKey(self.tree.node(predicate).a))) |index| if (self.contracts.items[index].private) {
+                    allowed = false;
+                };
+            }
+            if (!allowed) try self.diagnostic(.private_identity_escape, contract.identity.decl);
+        }
+        for (self.effect_families.items) |family| {
+            if (family.identity.unit != self.unit or family.private) continue;
+            var allowed = true;
+            for (self.types.list(family.operations)) |index| {
+                const operation = self.effect_templates.items[index];
+                if (!try scan.allowed(operation.parameter) or !try scan.allowed(operation.result)) allowed = false;
+            }
+            if (!allowed) try self.diagnostic(.private_identity_escape, family.identity.decl);
+        }
+    }
+    fn constructorDiagnostic(self: *Engine, symbol: symbols.Symbol, source: ast.Id) Allocator.Error!void {
+        if (self.nominal_names.get(self.catalogKey(symbol))) |index| {
+            if (self.nominals.items[index].is_opaque and self.nominals.items[index].identity.unit != self.unit) return self.diagnostic(.private_access, source);
+        }
+        try self.diagnostic(.unknown_constructor, source);
+    }
     fn constructorType(self: *Engine, index: u32) T.Error!T.Id {
         return self.constructorUse(index, false);
     }
@@ -1709,7 +1810,7 @@ const Engine = struct {
         }
         const index: u32 = @intCast(self.contracts.items.len);
         const patterns = try self.copyParameterPatterns(producer.parameter_patterns, source.patterns, &copier);
-        try self.contracts.append(self.allocator, .{ .identity = source.identity, .name = source.name, .variables = try self.types.saveList(variables.items), .parameters = try self.types.saveList(parameters.items), .patterns = patterns, .parameter_names = try self.types.saveList(producer.types.list(source.parameter_names)), .row_variables = rows, .predicates = .{ .start = start, .len = source.predicates.len } });
+        try self.contracts.append(self.allocator, .{ .private = source.private, .identity = source.identity, .name = source.name, .variables = try self.types.saveList(variables.items), .parameters = try self.types.saveList(parameters.items), .patterns = patterns, .parameter_names = try self.types.saveList(producer.types.list(source.parameter_names)), .row_variables = rows, .predicates = .{ .start = start, .len = source.predicates.len } });
         try self.contract_identities.put(self.allocator, source.identity, index);
         return index;
     }
@@ -1745,7 +1846,7 @@ const Engine = struct {
             }
             const index: u32 = @intCast(self.contracts.items.len);
             const identity: Identity = .{ .unit = self.unit, .decl = id };
-            try self.contracts.append(self.allocator, .{ .identity = identity, .name = node.a, .parameters = try self.types.saveList(parameters.items), .patterns = try self.parameter_patterns.saveList(self.allocator, patterns.items), .variables = try self.types.saveList(variables.items), .parameter_names = try self.types.saveList(names.items) });
+            try self.contracts.append(self.allocator, .{ .private = self.tree.declarationTraits(id).private, .identity = identity, .name = node.a, .parameters = try self.types.saveList(parameters.items), .patterns = try self.parameter_patterns.saveList(self.allocator, patterns.items), .variables = try self.types.saveList(variables.items), .parameter_names = try self.types.saveList(names.items) });
             try self.contract_names.put(self.allocator, key, index);
             try self.contract_identities.put(self.allocator, identity, index);
         }
@@ -1833,15 +1934,17 @@ const Engine = struct {
                 continue;
             }
             const index: u32 = @intCast(self.nominals.items.len);
-            try self.nominals.append(self.allocator, .{ .identity = .{ .unit = self.unit, .decl = id }, .name = n.a, .parameters = .{}, .variables = .{} });
-            try self.nominal_identities.put(self.allocator, .{ .unit = self.unit, .decl = id }, index);
+            var identity: Identity = .{ .unit = self.unit, .decl = id };
+            if (self.tree.declarationTraits(id).is_opaque) identity.decl = n.a | T.opaque_name_bit;
+            try self.nominals.append(self.allocator, .{ .private = self.tree.declarationTraits(id).private, .is_opaque = self.tree.declarationTraits(id).is_opaque, .declaration = id, .identity = identity, .name = n.a, .parameters = .{}, .variables = .{} });
+            try self.nominal_identities.put(self.allocator, identity, index);
             try self.nominal_names.put(self.allocator, key, index);
         }
         for (self.nominals.items[1..], 1..) |nominal_, index| {
             if (nominal_.identity.unit != self.unit) continue;
-            const n = self.tree.node(nominal_.identity.decl);
+            const n = self.tree.node(nominal_.declaration);
             const meta = self.tree.extra.items[n.c..][0..4];
-            if (meta[3] != 0) try self.diagnostic(.unsupported_attribute, nominal_.identity.decl);
+            if (meta[3] != 0) try self.diagnostic(.unsupported_attribute, nominal_.declaration);
             self.type_env.clearRetainingCapacity();
             self.row_env.clearRetainingCapacity();
             var parameters: std.ArrayList(T.Id) = .empty;
@@ -1872,9 +1975,9 @@ const Engine = struct {
     fn resolveAlias(self: *Engine, index: u32) T.Error!T.Id {
         const nominal_ = self.nominals.items[index];
         if (nominal_.alias != 0) return nominal_.alias;
-        if (nominal_.identity.unit != self.unit or self.tree.node(nominal_.identity.decl).tag != .type_alias_decl) return 0;
+        if (nominal_.identity.unit != self.unit or self.tree.node(nominal_.declaration).tag != .type_alias_decl) return 0;
         if (self.active_aliases.contains(index)) {
-            try self.diagnostic(.recursive_type_alias, nominal_.identity.decl);
+            try self.diagnostic(.recursive_type_alias, nominal_.declaration);
             return self.types.fresh();
         }
         if (self.active_aliases.count() >= 256) return error.TypeLimit;
@@ -1899,7 +2002,7 @@ const Engine = struct {
         for (0..nominal_.variables.len) |parameter| {
             try self.type_env.append(self.allocator, .{ .name = self.types.list(nominal_.parameter_names)[parameter], .ty = self.types.list(nominal_.variables)[parameter] });
         }
-        const target = try self.annotation(self.tree.node(nominal_.identity.decl).b);
+        const target = try self.annotation(self.tree.node(nominal_.declaration).b);
         const rows = try self.types.freeRowVariables(target);
         defer self.allocator.free(rows);
         self.nominals.items[index].alias_rows = try self.types.saveList(rows);
@@ -1930,7 +2033,7 @@ const Engine = struct {
         while (index < self.nominals.items.len) : (index += 1) {
             const nominal_ = self.nominals.items[index];
             if (nominal_.identity.unit != self.unit) continue;
-            if (self.tree.node(nominal_.identity.decl).tag == .type_alias_decl) {
+            if (self.tree.node(nominal_.declaration).tag == .type_alias_decl) {
                 _ = try self.resolveAlias(@intCast(index));
                 continue;
             }
@@ -1946,7 +2049,7 @@ const Engine = struct {
             const result = try self.types.nominal(nominal_.identity, args);
             var constructors: std.ArrayList(T.Id) = .empty;
             defer constructors.deinit(self.allocator);
-            const declaration = self.tree.node(nominal_.identity.decl);
+            const declaration = self.tree.node(nominal_.declaration);
             for (self.tree.children(declaration.b), 0..) |id, tag| {
                 const n = self.tree.node(id);
                 const key = self.catalogKey(n.a);
@@ -1957,13 +2060,14 @@ const Engine = struct {
                 var payload = if (n.b == 0) 0 else try self.constructorPayloadAnnotation(n.b);
                 if (payload != 0) {
                     const shape = self.types.node(payload);
-                    if (shape.tag == .record and shape.b == 0) payload = 0;
+                    if (!nominal_.is_opaque and shape.tag == .record and shape.b == 0) payload = 0;
                 }
                 const storage = self.types.node(payload);
-                const parameter = if (payload != 0 and storage.tag == .record) try self.canonicalRecordType(storage) else payload;
+                var parameter = payload;
+                if (!nominal_.is_opaque and payload != 0 and storage.tag == .record) parameter = try self.canonicalRecordType(storage);
                 const ty = if (payload == 0) result else try self.types.function(parameter, result);
                 const constructor: u32 = @intCast(self.constructors.items.len);
-                try self.constructors.append(self.allocator, .{ .identity = .{ .unit = self.unit, .decl = id }, .nominal = @intCast(index), .tag = @intCast(tag), .name = n.a, .payload = payload, .declared_record = n.b != 0 and self.tree.node(n.b).tag == .type_record and self.tree.typeConversionOrigin(n.b) == self.tree.span(n.b).start, .scheme = .{ .root = ty, .variables = nominal_.variables } });
+                try self.constructors.append(self.allocator, .{ .private = nominal_.private or nominal_.is_opaque, .identity = .{ .unit = self.unit, .decl = id }, .nominal = @intCast(index), .tag = @intCast(tag), .name = n.a, .payload = payload, .declared_record = !nominal_.is_opaque and n.b != 0 and self.tree.node(n.b).tag == .type_record and self.tree.typeConversionOrigin(n.b) == self.tree.span(n.b).start, .scheme = .{ .root = ty, .variables = nominal_.variables } });
                 try self.constructor_identities.put(self.allocator, .{ .unit = self.unit, .decl = id }, constructor);
                 try self.constructor_names.put(self.allocator, key, constructor);
                 try constructors.append(self.allocator, constructor);
@@ -2013,7 +2117,7 @@ const Engine = struct {
             }
             if (self.effect_families.items.len == std.math.maxInt(u32)) return error.TypeLimit;
             const family: u32 = @intCast(self.effect_families.items.len);
-            try self.effect_families.append(self.allocator, .{ .identity = .{ .unit = self.unit, .decl = id }, .name = n.a, .callable = self.tree.node(n.b).tag != .effect_operations, .patterns = try self.parameter_patterns.saveList(self.allocator, patterns.items), .parameters = try self.types.saveList(parameters.items), .variables = try self.types.saveList(variables.items), .parameter_names = try self.types.saveList(names.items) });
+            try self.effect_families.append(self.allocator, .{ .private = self.tree.declarationTraits(id).private, .identity = .{ .unit = self.unit, .decl = id }, .name = n.a, .callable = self.tree.node(n.b).tag != .effect_operations, .patterns = try self.parameter_patterns.saveList(self.allocator, patterns.items), .parameters = try self.types.saveList(parameters.items), .variables = try self.types.saveList(variables.items), .parameter_names = try self.types.saveList(names.items) });
             try self.effect_family_names.put(self.allocator, key, family);
             try self.effect_family_identities.put(self.allocator, .{ .unit = self.unit, .decl = id }, family);
             var operations: std.ArrayList(T.Id) = .empty;
@@ -3051,7 +3155,12 @@ const Engine = struct {
                 try self.diagnostic(.unknown_field, source);
                 return .{ .ty = try self.types.fresh(), .projection = 0 };
             };
-            const ctors = try self.allocator.dupe(T.Id, self.types.list(self.nominals.items[index].constructors));
+            const nominal_definition = self.nominals.items[index];
+            if (nominal_definition.is_opaque and nominal_definition.identity.unit != self.unit and !self.associated_members.contains(.{ .identity = identity, .member = name })) {
+                try self.diagnostic(.private_access, source);
+                return .{ .ty = try self.types.fresh(), .projection = 0 };
+            }
+            const ctors = try self.allocator.dupe(T.Id, self.types.list(nominal_definition.constructors));
             defer self.allocator.free(ctors);
             for (ctors) |ctor| {
                 const definition = self.constructors.items[ctor];
@@ -3268,7 +3377,7 @@ const Engine = struct {
             return if (diverges) T.never else self.types.record(fields.items);
         }
         const constructor = self.constructor_names.get(self.catalogKey(n.a)) orelse {
-            try self.diagnostic(.unknown_constructor, id);
+            try self.constructorDiagnostic(self.tree.node(id).a, id);
             return self.types.fresh();
         };
         self.constructor_resolved[id] = constructor;
@@ -3461,7 +3570,7 @@ const Engine = struct {
             },
             .pattern_constructor => {
                 const ctor = self.constructor_names.get(self.catalogKey(n.a)) orelse {
-                    try self.diagnostic(.unknown_constructor, id);
+                    try self.constructorDiagnostic(self.tree.node(id).a, id);
                     return false;
                 };
                 self.constructor_resolved[id] = ctor;
@@ -3487,7 +3596,7 @@ const Engine = struct {
                 const shape = self.types.node(try self.types.resolve(payload, 0));
                 // A whole record constructor payload exposes its canonical
                 // field values; named record patterns retain the record view.
-                if (self.types.node(definition.payload).tag == .record and shape.tag == .record and self.tree.node(n.b).tag != .pattern_record) {
+                if (!self.nominals.items[definition.nominal].is_opaque and self.types.node(definition.payload).tag == .record and shape.tag == .record and self.tree.node(n.b).tag != .pattern_record) {
                     payload = try self.canonicalRecordType(shape);
                 }
                 return (try self.pattern(n.b, payload, scope, reuse, generalize)) and unique;
@@ -5451,7 +5560,7 @@ const Engine = struct {
                     break :blk try self.captureEditor(id, 0, key.namespace);
                 }
                 const ctor = self.constructor_names.get(self.catalogKey(node.a)) orelse {
-                    try self.diagnostic(.unknown_constructor, id);
+                    try self.constructorDiagnostic(self.tree.node(id).a, id);
                     break :blk try self.types.fresh();
                 };
                 self.constructor_resolved[id] = ctor;
@@ -5460,11 +5569,11 @@ const Engine = struct {
             .type_witness => blk: {
                 const value = try self.expression(node.a);
                 const name = self.pool.lookup("Type") orelse {
-                    try self.diagnostic(.unknown_constructor, id);
+                    try self.constructorDiagnostic(self.tree.node(id).a, id);
                     break :blk try self.types.fresh();
                 };
                 const ctor = self.constructor_names.get(self.catalogKey(name)) orelse {
-                    try self.diagnostic(.unknown_constructor, id);
+                    try self.constructorDiagnostic(self.tree.node(id).a, id);
                     break :blk try self.types.fresh();
                 };
                 self.constructor_resolved[id] = ctor;
@@ -8390,7 +8499,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     for (options.inherited_fixities) |fixity| try engine.overrides.put(allocator, fixity.operator, .{ .target = fixity.target, .named = fixity.named, .external = fixity.external });
     for (tree.roots.items) |id| {
         if (tree.node(id).tag == .data_decl or tree.node(id).tag == .type_alias_decl or tree.node(id).tag == .contract_decl or tree.node(id).tag == .effect_decl or tree.node(id).tag == .effect_type_decl) continue;
-        if (allow_imports and tree.node(id).tag == .import_decl) continue;
+        if (allow_imports and (tree.node(id).tag == .import_decl or tree.node(id).tag == .export_decl)) continue;
         if (tree.node(id).tag == .fixity_decl) {
             const fixity = tree.fixity(id);
             if (fixity.attributes.len != 0) try engine.diagnostic(.unsupported_attribute, id);
@@ -8409,7 +8518,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
             try engine.diagnostic(.duplicate_name, id);
             continue;
         }
-        const binding = try engine.addBinding(.{ .name = declaration.name, .declaration = id, .owner = id, .kind = .global, .named_function = tree.node(declaration.body).tag == .lambda and declaration.attributes.len == 0, .ty = try engine.types.fresh() });
+        const binding = try engine.addBinding(.{ .private = tree.declarationTraits(id).private, .name = declaration.name, .declaration = id, .owner = id, .kind = .global, .named_function = tree.node(declaration.body).tag == .lambda and declaration.attributes.len == 0, .ty = try engine.types.fresh() });
         try engine.globals.put(allocator, declaration.name, binding);
         try engine.global_states.put(allocator, binding, .{});
         engine.resolved[id] = binding;
@@ -8422,6 +8531,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     for (headers) |imported| try engine.importHeader(imported);
     try engine.effectHeaders();
     try engine.dataBodies();
+    engine.prepareOpaqueStorage();
     for (0..engine.contracts.items.len) |index| try engine.resolveContract(@intCast(index));
     try engine.indexAssociated();
     for (options.inherited_fixities) |fixity| {
@@ -8467,6 +8577,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
             .unsupported_prefix => .unsupported_prefix,
             .unknown_intrinsic => .unknown_intrinsic,
             .unsupported_expression => .unsupported_expression,
+            .private_access => .private_access,
             .unknown_constructor => .unknown_constructor,
             .sealed_effect => .sealed_effect,
             .call_arity => .call_arity,
@@ -8506,6 +8617,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
         try engine.finish();
         try engine.finishReflection();
         try engine.finishHoles();
+        if (engine.diagnostics.items.len == 0) try engine.validateVisibility();
     }
     const computations = try engine.computations.toOwnedSlice(allocator);
     errdefer allocator.free(computations);

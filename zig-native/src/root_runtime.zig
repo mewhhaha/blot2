@@ -35,9 +35,11 @@ pub fn emit(m: *w.Module, a: w.Arena) Error!void {
     try mark(code(m, a.root_mark), a);
     try enter(code(m, a.root_enter), a);
     try leave(code(m, a.root_leave), a);
+    if (m.host_references != null) try hostCleanup(m, a);
     try store(code(m, a.root_store), a);
     try publicAllocate(code(m, a.root_public_allocate), a);
     try publicReset(code(m, a.root_public_reset), a);
+    try force(code(m, a.root_force), a);
 }
 fn reserve(c: Code, a: w.Arena) Error!void {
     const page = try c.temp();
@@ -89,9 +91,20 @@ fn pop(c: Code, a: w.Arena) Error!void {
     try setGlobal(c, a.root_top, .{ .i32_sub, .{ .global, a.root_top }, slot_bytes });
     try c.set(slot, .{ .i32_add, .{ .global, a.root_page }, .{ .global, a.root_top } });
     try c.set(value, .{ .load, slot, 0 });
+    // Interrupted forces become terminal before any of their owners retire.
+    // Language cancellation already reset its selected force to pending.
+    try c.when(value);
+    try c.when(.{ .i32_and, .{ .load, slot, 4 }, 1 });
+    try c.when(.{ .i32_and, .{ .global, a.root_active }, 1 });
+    try c.when(.{ .i32_eq, .{ .load, value, h.offset(h.Demand, "status") }, @backingInt(h.DemandStatus.evaluating) });
+    try c.store(value, h.offset(h.Demand, "status"), @backingInt(h.DemandStatus.terminal));
+    try c.end();
+    try c.end();
+    try c.end();
+    try c.end();
     // Detach before destruction. Nested releases cannot consume this root twice.
     try c.store(slot, 0, 0);
-    try c.when(value);
+    try c.when(.{ .i32_ge_u, value, .{ .global, a.static_end } });
     try count(c, a, .i32_sub);
     try c.set(head, .{ .i32_sub, value, head_bytes });
     try c.when(.{ .i32_eq, .{ .load, head, owner_slot }, slot });
@@ -203,6 +216,9 @@ fn leave(c: Code, a: w.Arena) Error!void {
     try setGlobal(c, a.root_globals, 0);
     try c.op(.else_, 0);
     try c.trap(.{ .i32_eqz, .{ .global, a.root_active } });
+    try c.when(.{ .i32_eq, outcome, 1 });
+    try setGlobal(c, a.root_active, .{ .i32_or, .{ .global, a.root_active }, 1 });
+    try c.end();
     try c.loop(.{ .global, a.root_frame });
     try c.value(.{ .call, a.root_close, 0 });
     try c.again();
@@ -292,4 +308,24 @@ fn publicReset(c: Code, a: w.Arena) Error!void {
     try c.end();
     try c.end();
     try c.value(.{ .call, a.reset, 0 });
+}
+
+/// The same leave boundary clears the externref cursor on success, failure and
+/// idle teardown. Guest finally must not leave stale capabilities after a trap.
+pub fn hostCleanup(m: *w.Module, a: w.Arena) Error!void {
+    const references = m.host_references.?;
+    try code(m, a.root_leave).value(.{ .call, references.release, 0 });
+}
+
+// The low frame bit marks an active-force record. Static demand cells are
+// immortal references and need a record, but consume no dynamic strong count.
+fn force(c: Code, a: w.Arena) Error!void {
+    const value: Local = .{ .id = 0 };
+    const slot = try c.temp();
+    try c.set(slot, .{ .call, a.root_reserve });
+    try c.value(.{ .call, a.root_store, slot, value });
+    try c.when(.{ .i32_lt_u, value, .{ .global, a.static_end } });
+    try c.store(slot, 0, value);
+    try c.end();
+    try c.store(slot, 4, .{ .i32_or, .{ .load, slot, 4 }, 1 });
 }

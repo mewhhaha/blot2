@@ -230,6 +230,9 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     declare("blot:allocate", "function");
     declare("blot:reset", "function");
   }
+  if (version === 3 && signatures.size !== 0) {
+    declare("blot:rc_host_refs", "global");
+  }
   const actualExports = WebAssembly.Module.exports(module);
   const ownership = WebAssembly.Module.customSections(module, "blot:ownership");
   if (ownership.length > 1) {
@@ -906,6 +909,7 @@ export async function instantiateGuest(
       if (lifetime.disposed) return;
       idle();
       ownership?.leave(2);
+      if (ownership) arena?.reset(0);
       lifetime.disposed = true;
       callbacks = new WeakMap();
     },

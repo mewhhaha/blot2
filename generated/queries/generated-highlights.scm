@@ -44,6 +44,7 @@
 (data_type "data" @keyword)
 (data_type "is" @keyword)
 (data_type "type" @keyword)
+(declaration visibility: "privatE" @keyword)
 (do_block "do" @keyword)
 (effect_binding "use" @keyword)
 (effect_declaration "effect" @keyword)
@@ -54,6 +55,8 @@
 (else_clause "else" @keyword)
 (ever_statement "ever" @keyword)
 (ever_statement "for" @keyword)
+(export_declaration "exporT" @keyword)
+(export_declaration "froM" @keyword)
 (for_statement "for" @keyword)
 (for_statement "in" @keyword)
 (for_statement "let" @keyword)
@@ -68,6 +71,7 @@
 (named_fixity associativity: "infixl" @keyword)
 (named_fixity associativity: "infixr" @keyword)
 (namespace_import "as" @keyword)
+(opaque_type "opaquE" @keyword)
 (pattern_conditional "if" @keyword)
 (pattern_conditional "let" @keyword)
 (range_statement "for" @keyword)
@@ -84,6 +88,7 @@
 (value_declaration kind: "const" @keyword)
 (value_declaration kind: "let" @keyword)
 (where_clause marker: "wherE" @keyword)
+(opaque_type) @type
 (type_alias) @type
 (contract_type) @type
 (effect_type) @type
@@ -127,3 +132,4 @@
 (symbolic_fixity target: (qualified_name) @variable)
 (type_alias name: (TYPE_IDENT) @type)
 (type_field name: (IDENT) @type)
+(typed_parameter name: (IDENT) @variable)

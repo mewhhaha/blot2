@@ -649,3 +649,169 @@ test "generated monadic progress preserves designated prelude identity through l
     try std.testing.expect(fixture.source.entry != fixture.source.prelude_unit);
     try std.testing.expectEqual(fixture.source.prelude_unit, consumer.bindings[consumer.resolver_ops[loop.iterate - 1].method].external.?.unit);
 }
+
+test "module abstraction public opaque factories hide constructor and representation" {
+    const producer =
+        \\opaque type Token = U32
+        \\private const offset = 1
+        \\const make: U32 -> Token = fn value => #Token (@u32.add value offset)
+        \\const read: Token -> U32 = fn (#Token value) => value
+    ;
+    var fixture = try Fixture.init(&.{
+        .{ .name = "tokens.blot", .text = producer },
+        .{ .name = "main.blot", .text = "import { Token, make, read } from \"./tokens\"\nentry const answer = read (make 41)\n" },
+    });
+    defer fixture.deinit();
+    var checked = try project_check.checkProject(a, &fixture.source);
+    defer checked.deinit(a);
+    try requireValid(&checked);
+    const producer_id = fixture.source.unitImports(1)[0].target;
+    const producer_catalog = checked.module(producer_id);
+    try std.testing.expectEqual(@as(usize, 3), producer_catalog.exports.len);
+    const imported = checked.module(1);
+    for (imported.checked.nominals) |nominal| if (nominal.is_opaque) try std.testing.expectEqual(@as(u32, 0), nominal.constructors.len);
+}
+
+test "module abstraction private named imports and associated declarations stay private" {
+    const producer =
+        \\private const hidden = 42
+        \\private type Secret is data = #Secret U32
+        \\private type Reader is effect = Unit -> U32
+        \\type Token is data = #Token U32
+        \\private const Token.hidden = fn (#Token value) => value
+    ;
+    for ([_][]const u8{ "hidden", "Secret", "Reader" }) |name| {
+        const source = try a.print("import {{ {s} }} from \"./producer\"\nentry const answer = 42\n", .{name});
+        defer a.free(source);
+        var fixture = try Fixture.init(&.{ .{ .name = "producer.blot", .text = producer }, .{ .name = "main.blot", .text = source } });
+        defer fixture.deinit();
+        var checked = try project_check.checkProject(a, &fixture.source);
+        defer checked.deinit(a);
+        try std.testing.expect(hasDiagnostic(&checked, "unknown_export", 1));
+    }
+}
+
+test "module abstraction selective forwarding preserves type and value producers" {
+    var fixture = try Fixture.init(&.{
+        .{ .name = "tokens.blot", .text = "opaque type Token = U32\nconst make: U32 -> Token = fn value => #Token value\nconst read: Token -> U32 = fn (#Token value) => value\n" },
+        .{ .name = "facade.blot", .text = "export { Token as Ticket, make, read } from \"./tokens\"\n" },
+        .{ .name = "outward.blot", .text = "export { Ticket, make, read } from \"./facade\"\n" },
+        .{ .name = "main.blot", .text = "import * as outward from \"./outward\"\nconst direct: outward.Ticket = outward.make 42\nentry const answer = outward.read direct\n" },
+    });
+    defer fixture.deinit();
+    var checked = try project_check.checkProject(a, &fixture.source);
+    defer checked.deinit(a);
+    try requireValid(&checked);
+    try std.testing.expectEqual(@as(usize, 3), checked.module(2).exports.len);
+}
+
+test "module abstraction public signatures cannot escape private identities" {
+    for ([_][]const u8{
+        "private opaque type Secret = U32\nconst leak: Secret = #Secret 42\n",
+        "private type Secret is data = #Secret U32\nconst leak = #Secret 42\n",
+        "private type Reader is effect = Unit -> U32\nconst leak = fn () => Reader ()\n",
+    }) |source| {
+        var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text = source }});
+        defer fixture.deinit();
+        var checked = try project_check.checkProject(a, &fixture.source);
+        defer checked.deinit(a);
+        try std.testing.expect(hasDiagnostic(&checked, "private_identity_escape", 1));
+    }
+}
+
+test "module abstraction opaque import aliases cannot construct project or coerce" {
+    const producer = "opaque type Token = { value: U32 }\nconst make: U32 -> Token = fn value => #Token { value: value }\n";
+    for ([_]struct { text: []const u8, code: []const u8 }{
+        .{ .text = "import { Token, make } from \"./producer\"\nentry const answer = (make 42).value\n", .code = "private_access" },
+        .{ .text = "import { Token as Ticket } from \"./producer\"\nentry const answer = #Ticket { value: 42 }\n", .code = "private_access" },
+        .{ .text = "import { Token, make } from \"./producer\"\ntype Alias = Token\nconst read = fn (#Token value) => value\nentry const answer = read (make 42)\n", .code = "private_access" },
+        .{ .text = "import { Token } from \"./producer\"\nconst pass: Token -> Token = fn value => value\nentry const answer = pass 42\n", .code = "type_mismatch" },
+    }) |item| {
+        var fixture = try Fixture.init(&.{ .{ .name = "producer.blot", .text = producer }, .{ .name = "main.blot", .text = item.text } });
+        defer fixture.deinit();
+        var checked = try project_check.checkProject(a, &fixture.source);
+        defer checked.deinit(a);
+        if (!hasDiagnostic(&checked, item.code, 1)) for (checked.diagnostics) |diagnostic| std.debug.print("{s} at{d}: {s}\n", .{ diagnostic.codeName(), diagnostic.span.start, diagnostic.message() });
+        try std.testing.expect(hasDiagnostic(&checked, item.code, 1));
+    }
+}
+
+test "module abstraction nominal identity ignores unrelated declaration insertion" {
+    for ([_][]const u8{
+        "opaque type Token = U32\nconst make = #Token\n",
+        "private const inserted = 7\nopaque type Token = U32\nconst make = #Token\n",
+    }) |text| {
+        var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text = text }});
+        defer fixture.deinit();
+        var checked = try project_check.checkProject(a, &fixture.source);
+        defer checked.deinit(a);
+        try requireValid(&checked);
+        const name = fixture.source.symbols.lookup("Token").?;
+        const nominal = for (checked.module(1).checked.nominals) |definition| {
+            if (definition.is_opaque) break definition;
+        } else return error.TestUnexpectedResult;
+        try std.testing.expectEqual(name | types.opaque_name_bit, nominal.identity.decl);
+        try std.testing.expectEqualStrings("Token", fixture.source.symbols.get(nominal.identity.decl & ~types.opaque_name_bit));
+    }
+}
+
+test "module abstraction private helpers remain usable in public factory bodies" {
+    var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text =
+        \\private const identity = fn value => value
+        \\opaque type Token a = a
+        \\const make = fn value => #Token (identity value)
+        \\const read = fn (#Token value) => value
+        \\entry const answer = read (make 42)
+    }});
+    defer fixture.deinit();
+    var checked = try project_check.checkProject(a, &fixture.source);
+    defer checked.deinit(a);
+    try requireValid(&checked);
+}
+
+test "module abstraction distinct producers namespace privacy and reexports cannot bypass access" {
+    const producer = "opaque type Token = U32\nprivate const hidden = 42\nconst make = #Token\nprivate const Token.hidden = fn (#Token value) => value\n";
+    for ([_]struct { source: []const u8, code: []const u8 }{
+        .{ .source = "import * as producer from \"./producer\"\nentry const answer = producer.hidden\n", .code = "unknown_value" },
+        .{ .source = "export { hidden } from \"./producer\"\nentry const answer = 42\n", .code = "unknown_export" },
+        .{ .source = "export { Token as Ticket } from \"./producer\"\nexport { Token as Ticket } from \"./producer\"\nentry const answer = 42\n", .code = "duplicate_name" },
+        .{ .source = "import { Token, make } from \"./producer\"\nentry const answer = (make 42).hidden\n", .code = "private_access" },
+        .{ .source = "import { Token } from \"./producer\"\nimport { make } from \"./other\"\nconst value: Token = make 42\nentry const answer = 42\n", .code = "type_mismatch" },
+    }) |example| {
+        var fixture = try Fixture.init(&.{ .{ .name = "main.blot", .text = example.source }, .{ .name = "producer.blot", .text = producer }, .{ .name = "other.blot", .text = producer } });
+        defer fixture.deinit();
+        var checked = try project_check.checkProject(a, &fixture.source);
+        defer checked.deinit(a);
+        if (!hasDiagnostic(&checked, example.code, 1)) for (checked.diagnostics) |diagnostic| std.debug.print("{s} at{d}\n", .{ diagnostic.codeName(), diagnostic.span.start });
+        try std.testing.expect(hasDiagnostic(&checked, example.code, 1));
+    }
+}
+
+test "module abstraction forwarding retains data constructors effects and contracts" {
+    var fixture = try Fixture.init(&.{
+        .{ .name = "producer.blot", .text = "type Choice is data = #Pick U32\ntype Signal is effect = Unit -> U32\ntype Evidence a is contract = {type_rep a}\n" },
+        .{ .name = "facade.blot", .text = "export {Choice as Result, Pick as Build, Signal as Read, Evidence as Witness} from \"./producer\"\n" },
+        .{ .name = "main.blot", .text =
+        \\import {Result, Build, Read, Witness} from "./facade"
+        \\const value: Result = #Build 42
+        \\const keep: a -> a where {Witness a} = fn value => value
+        \\const reader = @effect.provider Read (fn () => 42)
+        \\entry const answer = fn () => do reader:
+        \\  use number <- Read ()
+        \\  return keep number
+        },
+    });
+    defer fixture.deinit();
+    var checked = try project_check.checkProject(a, &fixture.source);
+    defer checked.deinit(a);
+    try requireValid(&checked);
+    try std.testing.expectEqual(@as(usize, 4), checked.module(2).exports.len);
+}
+
+test "module abstraction public contracts cannot name private predicates" {
+    var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text = "private type Hidden a is contract = {type_rep a}\ntype Leaked a is contract = {Hidden a}\nentry const answer = 42\n" }});
+    defer fixture.deinit();
+    var checked = try project_check.checkProject(a, &fixture.source);
+    defer checked.deinit(a);
+    try std.testing.expect(hasDiagnostic(&checked, "private_identity_escape", 1));
+}

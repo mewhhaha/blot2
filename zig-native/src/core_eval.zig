@@ -3688,6 +3688,7 @@ pub const Session = struct {
             return self.failNode(owner, source, .unsupported);
         }
         if (info.kind != .nominal or info.len != 1 or name == 0) return self.failNode(owner, source, .unsupported);
+        if (@as(u32, @truncate(info.nominal)) & types.opaque_name_bit != 0 and info.nominal >> 32 != self.unitId(owner)) return self.failNode(owner, source, .missing_field);
         const location = self.field_locations.get(.{ .family = info.nominal, .tag = info.bits, .name = name }) orelse return self.failNode(owner, source, .unsupported);
         const container = self.valueChildren(value_)[0];
         const record = self.valueInfo(container);
@@ -3705,6 +3706,7 @@ pub const Session = struct {
         var container = value_;
         var wrapped = false;
         if (info.kind == .nominal) {
+            if (@as(u32, @truncate(info.nominal)) & types.opaque_name_bit != 0 and info.nominal >> 32 != self.unitId(owner)) return self.failNode(owner, source, .missing_field);
             if (info.nominal != self.nominalIdentity(owner, projection.nominal.unit, projection.nominal.decl) or info.len != 1) return self.failNode(owner, source, .unsupported);
             for (variants) |variant| if (variant.tag == info.bits) {
                 field = variant.field;
@@ -4219,6 +4221,7 @@ pub const Session = struct {
             for (self.units[catalog].associated) |method| {
                 if ((if (member != 0) method.member != member else method.operator != op) or !std.meta.eql(method.identity, identity)) continue;
                 const target_ = try self.external(try self.target(catalog, method.target));
+                if (target_.unit != owner and self.units[target_.unit].binding(target_.binding).private) continue;
                 return .{ .unit = self.unitId(target_.unit), .binding = target_.binding };
             }
         }
@@ -4863,7 +4866,8 @@ pub const Session = struct {
                 const constructor = module.constructor(closure.identity);
                 if (constructor.payload == 0) return self.failNode(owner, source, .unsupported);
                 const nominal = module.nominal(constructor.nominal);
-                const stored = if (module.types.node(constructor.payload).tag == .record) try self.recordArgument(producer, owner, source, closure.identity, argument) else argument;
+                var stored = argument;
+                if (!nominal.is_opaque and module.types.node(constructor.payload).tag == .record) stored = try self.recordArgument(producer, owner, source, closure.identity, argument);
                 return .{ .value = try self.makeAggregate(owner, source, .nominal, self.nominalIdentity(producer, nominal.identity.unit, nominal.identity.decl), constructor.tag, &.{stored}) };
             },
             .anonymous => {
@@ -9545,9 +9549,14 @@ const ClosureRegion = struct {
             };
             const nominal_module = &self.session.units[nominal_owner];
             var constructors: usize = 0;
+            var hidden = false;
             for (nominal_module.constructors) |constructor| {
                 const nominal = nominal_module.nominal(constructor.nominal);
                 if (self.session.nominalIdentity(nominal_owner, nominal.identity.unit, nominal.identity.decl) != (@as(u64, owner.a) << 32) | owner.b) continue;
+                if (nominal.is_opaque and nominal.identity.unit != self.session.unitId(source.owner)) {
+                    hidden = true;
+                    continue;
+                }
                 constructors += 1;
                 if (constructor.payload == 0) {
                     field = null;
@@ -9576,7 +9585,7 @@ const ClosureRegion = struct {
                 }
                 if (field) |prior| try self.solver.unify(prior, found.?) else field = found;
             }
-            if (constructors == 0) return error.UnresolvedType;
+            if (constructors == 0 and !hidden) return error.UnresolvedType;
         }
         const identity: ?types.NominalIdentity = switch (owner.tag) {
             .nominal => .{ .unit = owner.a, .decl = owner.b },

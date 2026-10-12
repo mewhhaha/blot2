@@ -49,13 +49,18 @@ Deno.test("explicit capabilities implement source effects, with no domain import
   equal(WebAssembly.Module.imports(module), [
     { module: "blot:host/1", name: "call_u32_u32", kind: "function" },
   ]);
+  equal([
+    ...new Uint8Array(
+      WebAssembly.Module.customSections(module, "blot:ownership")[0],
+    ),
+  ], [2, 2, 0]);
   const guest = await instantiateGuest(module);
   try {
     equal(guest.call("main", advance(guest)), 42);
     equal(guest.call("pure", null), 7);
     equal(guest.read("count"), 12);
     equal(guest.abi, {
-      version: 2,
+      version: 3,
       functions: [
         {
           name: "main",

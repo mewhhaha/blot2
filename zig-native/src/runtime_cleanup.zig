@@ -79,9 +79,11 @@ fn emit(action: Action, module: *wasm.Module, function: ir.FunctionId, result: ?
             try module.emit(id, .{ .op = .end });
         },
         .reset_demand => |local| {
-            try module.emit(id, .{ .op = .local_get, .operand = @backingInt(local) });
-            try module.emit(id, .{ .op = .i32_const, .operand = @backingInt(heap.DemandStatus.pending) });
-            try module.emit(id, .{ .op = .i32_store, .operand = heap.offset(heap.Demand, "status") });
+            try module.emitSlice(id, &.{
+                .{ .op = .local_get, .operand = @backingInt(local) },                     .{ .op = .local_get, .operand = @backingInt(local) },
+                .{ .op = .i32_const, .operand = heap.offset(heap.Demand, "status") },     .{ .op = .i32_add },
+                .{ .op = .i32_const, .operand = @backingInt(heap.DemandStatus.pending) }, .{ .op = .call, .operand = module.arena.?.store_word },
+            });
         },
     }
 }

@@ -1,0 +1,32 @@
+private opaque type Token = U32
+// <- keyword.storage.modifier
+//      ^ keyword.storage.modifier
+//             ^ keyword.storage.type
+//                  ^ type
+
+private const hidden = 42
+// <- keyword.storage.modifier
+//      ^ keyword.storage.type
+
+private entry const run = fn value => value
+// <- keyword.storage.modifier
+//      ^ keyword.storage.modifier
+
+private effect Hidden: Unit -> U32
+// <- keyword.storage.modifier
+//      ^ keyword.storage.type
+
+export { Token as Ticket } from "./tokens"
+// <- keyword.control.import
+//                         ^ keyword.control.import
+
+const private = fn opaque => opaque
+//    ^ function
+//    ^ !keyword.storage.modifier
+//                 ^ variable.parameter
+//                 ^ !keyword.storage.modifier
+const opaque = fn export => export
+//    ^ function
+//    ^ !keyword.storage.modifier
+//                ^ variable.parameter
+//                ^ !keyword.control.import

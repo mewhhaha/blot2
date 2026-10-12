@@ -47,7 +47,7 @@ pub const Op = enum(u8) { none, add, sub, mul, div, rem, equal, not_equal, less,
 pub const Node = struct { tag: Tag, op: Op = .none, ty: T.Id = 0, a: u32 = 0, b: u32 = 0, c: u32 = 0 };
 /// Keep source inference provenance after callback inputs are concretized.
 pub const Parameter = struct { binding: BindingId, ty: T.Id, span: Span, inferred: bool = false };
-pub const Binding = struct { initializer: Id = 0, kind: checked_types.Kind, ty: T.Id, scheme: T.Scheme, public_variables: T.List = .{}, public_rows: T.List = .{}, has_explicit: bool = false, body_id: BodyId = 0, target: BindingRef, span: Span };
+pub const Binding = struct { private: bool = false, initializer: Id = 0, kind: checked_types.Kind, ty: T.Id, scheme: T.Scheme, public_variables: T.List = .{}, public_rows: T.List = .{}, has_explicit: bool = false, body_id: BodyId = 0, target: BindingRef, span: Span };
 pub const RuntimeName = struct { binding: BindingId, point: u32 };
 /// Original declaration reads survive executable branch/value elimination.
 pub const DeclarationDependencies = struct { references: List = .{}, members: List = .{}, runtime_metadata: Id = 0 };
@@ -59,7 +59,7 @@ pub const Call = struct { target: BindingRef, callee_type: T.Id, arguments: []co
 pub const Merge = struct { node: Id, result: BindingId, then_binding: BindingId, else_binding: BindingId };
 pub const Obligation = struct { ty: T.Id, kind: T.ObligationKind, span: Span, name: u32 = 0, result: T.Id = 0, other: T.Id = 0, signature: T.Id = 0, operator: T.Operator = .none, identity: T.NominalIdentity = .{ .unit = 0, .decl = 0 }, explicit: bool = false, qualification_span: ?Span = null, qualification_unit: u32 = 0, diagnostic_name: Name = .{} };
 pub const Associated = struct { identity: T.NominalIdentity, member: u32, operator: T.Operator, target: BindingRef };
-pub const Nominal = struct { diagnostic_name: Name = .{}, diagnostic_origin: Name = .{}, identity: T.NominalIdentity, parameters: T.List, variables: T.List, constructors: List };
+pub const Nominal = struct { private: bool = false, is_opaque: bool = false, storage: @import("opaque_storage.zig").Storage = .{}, diagnostic_name: Name = .{}, diagnostic_origin: Name = .{}, identity: T.NominalIdentity, parameters: T.List, variables: T.List, constructors: List };
 /// Source operation names survive frontend teardown; identities still select
 /// effects independently of these owned diagnostic strings.
 pub const OperationName = struct { identity: T.NominalIdentity, diagnostic_name: Name = .{}, diagnostic_origin: Name = .{} };
@@ -1041,7 +1041,7 @@ const Builder = struct {
                 if (metadata.payload != 0 and syntax.b != 0) {
                     payload = try self.patternNode(syntax.b, depth + 1);
                     const record = self.checked.types.node(metadata.payload);
-                    if (record.tag == .record and self.tree.node(syntax.b).tag != .pattern_record) {
+                    if (!self.checked.nominals[metadata.nominal].is_opaque and record.tag == .record and self.tree.node(syntax.b).tag != .pattern_record) {
                         const child_ty = self.patterns.items[payload].ty;
                         const child = self.type_nodes.items[child_ty];
                         if (record.b == 0 or (record.b != 1 and (child.tag != .product or child.b != record.b))) return error.CoreLimit;
@@ -1805,7 +1805,7 @@ const Builder = struct {
                 return 0;
             }
             const payload = self.checked.constructors[catalog].payload;
-            const record = payload != 0 and self.checked.types.node(payload).tag == .record;
+            const record = !self.checked.nominals[self.checked.constructors[catalog].nominal].is_opaque and payload != 0 and self.checked.types.node(payload).tag == .record;
             return self.make(source, .{ .tag = .construct, .ty = result, .a = catalog, .b = arguments.items[0], .c = @intFromBool(record) });
         }
         if (syntax.tag == .intrinsic) {
@@ -2574,7 +2574,7 @@ const Builder = struct {
             for (self.checked.obligations[value.scheme.obligations.start..][0..value.scheme.obligations.len]) |requirement| {
                 has_explicit = has_explicit or requirement.explicit or (requirement.kind == .callee_use and self.checked.bindings[requirement.identity.decl].summary.has_explicit);
             }
-            try self.bindings.append(self.allocator, .{ .kind = value.kind, .ty = try self.projectType(value.ty, 0), .scheme = try self.projectScheme(value.scheme), .public_variables = try self.projectPublic(value.summary.public_variables, false), .public_rows = try self.projectPublic(value.summary.public_rows, true), .has_explicit = has_explicit, .target = if (i == 0) .{ .binding = 0 } else self.target(@intCast(i)), .span = self.tree.span(value.declaration) });
+            try self.bindings.append(self.allocator, .{ .private = value.private, .kind = value.kind, .ty = try self.projectType(value.ty, 0), .scheme = try self.projectScheme(value.scheme), .public_variables = try self.projectPublic(value.summary.public_variables, false), .public_rows = try self.projectPublic(value.summary.public_rows, true), .has_explicit = has_explicit, .target = if (i == 0) .{ .binding = 0 } else self.target(@intCast(i)), .span = self.tree.span(value.declaration) });
         }
     }
     fn projectedTypeList(self: *Builder, source: T.List) Error!T.List {
@@ -2593,7 +2593,7 @@ const Builder = struct {
         for (self.checked.nominals) |metadata| {
             const constructors = try self.save(self.checked.types.list(metadata.constructors));
             const display = try self.nominalDiagnosticNames(metadata);
-            try self.nominals.append(self.allocator, .{ .diagnostic_name = display.name, .diagnostic_origin = display.origin, .identity = metadata.identity, .parameters = try self.projectedTypeList(metadata.parameters), .variables = try self.projectedTypeList(metadata.variables), .constructors = constructors });
+            try self.nominals.append(self.allocator, .{ .private = metadata.private, .is_opaque = metadata.is_opaque, .storage = metadata.storage, .diagnostic_name = display.name, .diagnostic_origin = display.origin, .identity = metadata.identity, .parameters = try self.projectedTypeList(metadata.parameters), .variables = try self.projectedTypeList(metadata.variables), .constructors = constructors });
         }
         for (self.checked.effect_templates) |metadata| {
             if (metadata.identity.decl == 0 or metadata.family == 0) continue;

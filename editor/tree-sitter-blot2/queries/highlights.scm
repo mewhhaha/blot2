@@ -1,10 +1,22 @@
 "fn" @keyword.function
 ["import" "from" "as"] @keyword.control.import
+(export_declaration "export" @keyword.control.import)
 ["data" "type" "is" "effect" "const" "let" "use"] @keyword.storage.type
 (entry_modifier) @variable
 ((entry_binding (entry_modifier) @keyword.storage.modifier) @_entry
   (#match? @_entry "^entry[ \t]+(const|let)"))
 (entry_binding (binding_keyword) @keyword.storage.type)
+(private_modifier) @variable
+(opaque_modifier) @variable
+((private_binding (private_modifier) @keyword.storage.modifier) @_private
+  (#match? @_private "^private[ \t]+(entry[ \t]+)?(const|let)"))
+((private_effect_header (private_modifier) @keyword.storage.modifier) @_private_effect
+  (#match? @_private_effect "^private[ \t]+effect"))
+((type_header . (private_modifier) @keyword.storage.modifier
+    (opaque_modifier)? @keyword.storage.modifier) @_private_type
+  (#match? @_private_type "^private[ \t]+(opaque[ \t]+)?(type|data)"))
+((type_header . (opaque_modifier) @keyword.storage.modifier) @_opaque
+  (#match? @_opaque "^opaque[ \t]+type"))
 (where_clause "where" @keyword.control)
 (contract_header "contract" @keyword.storage.type)
 ["infixl" "infixr" "infix" "prefix"] @keyword.directive

@@ -123,6 +123,7 @@ const Bounds = struct {
             return require(value.decl >= 1 and value.decl <= 6);
         }
         _ = try self.owner(value.unit);
+        if (value.unit != 0 and value.decl & T.opaque_name_bit != 0) try self.symbol(value.decl & ~T.opaque_name_bit, false);
         // Declaration numbers belong to the source producer, not Core catalogs.
     }
     fn symbol(self: Bounds, value: u32, optional: bool) BoundsError!void {
@@ -373,6 +374,7 @@ const Bounds = struct {
             try range(self.m.names.len, value.diagnostic_name.start, value.diagnostic_name.len);
         }
         for (self.m.nominals, 0..) |value, id| {
+            if (value.identity.unit != 0 and value.identity.unit != std.math.maxInt(u32)) try require(value.is_opaque == (value.identity.decl & T.opaque_name_bit != 0));
             try range(self.m.names.len, value.diagnostic_name.start, value.diagnostic_name.len);
             try range(self.m.names.len, value.diagnostic_origin.start, value.diagnostic_origin.len);
             try self.identity(value.identity, id == 0);

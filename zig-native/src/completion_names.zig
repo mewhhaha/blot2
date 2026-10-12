@@ -204,7 +204,7 @@ pub fn capture(engine: anytype, captured: *C.EditorCapture, receiver_identity: ?
             if (entry.key_ptr.namespace != captured.namespace or seen.contains(entry.key_ptr.member)) continue;
             const declaration_ = engine.nominals.items[entry.value_ptr.*];
             if (declaration_.alias != 0) continue;
-            if (declaration_.identity.unit == engine.unit and engine.tree.node(declaration_.identity.decl).tag == .type_alias_decl) continue;
+            if (declaration_.identity.unit == engine.unit and engine.tree.node(declaration_.declaration).tag == .type_alias_decl) continue;
             try out.add(.{ .name = entry.key_ptr.member, .kind = .type_, .scheme = .{ .root = try engine.types.typeConstructor(declaration_.identity) }, .identity = declaration_.identity, .distance = 1_000_000 });
         }
     }

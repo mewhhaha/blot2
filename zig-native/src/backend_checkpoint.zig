@@ -10,8 +10,8 @@ const format = @import("dependency_format.zig");
 const A = std.mem.Allocator;
 const Wire = struct { principal: []const u8, optimizer: []const u8, semantic: []const u8 };
 fn key(compiler: format.Digest) format.Key {
-    // Version three adds the optional persisted semantic owner.
-    return .{ .compiler = compiler, .settings = format.digest("blot-backend-checkpoint-v3"), .source = @splat(0), .dependencies = @splat(0) };
+    // Version four separates visibility and opaque storage facts.
+    return .{ .compiler = compiler, .settings = format.digest("blot-backend-checkpoint-v4:module-abstraction"), .source = @splat(0), .dependencies = @splat(0) };
 }
 pub fn encode(a: A, compiler: format.Digest, source: *const capture.Capture) format.Error![]u8 {
     if (!source.emission.sealed) return error.InvalidArtifact;

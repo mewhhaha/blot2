@@ -10,7 +10,15 @@ pub const Closure = extern struct {
     environment: u32,
     pub const roles = [_]Role{ .table_function, .reference };
 };
-pub const DemandStatus = enum(u32) { pending, evaluating, ready };
+/// An invocation-scoped host closure uses a borrowed self identity. The table
+/// handle is scalar; the invocation owns the actual externref table entry.
+pub const HostClosure = extern struct {
+    function: u32,
+    environment: u32,
+    handle: u32,
+    pub const roles = [_]Role{ .table_function, .owner_token, .scalar };
+};
+pub const DemandStatus = enum(u32) { pending, evaluating, ready, terminal };
 pub const Demand = extern struct {
     function: u32,
     environment: u32,
@@ -131,13 +139,15 @@ pub fn fields(comptime T: type) [T.roles.len]Field {
 }
 
 comptime {
-    for (.{ Closure, Demand, Pair, Cursor, ProviderFrame, StateCell, Provider, StateProvider, RequestCell, RequestFrame, Decision, Array, ListDescriptor, ListNode, ListBranch, ArenaHeader }) |T| {
+    for (.{ Closure, HostClosure, Demand, Pair, Cursor, ProviderFrame, StateCell, Provider, StateProvider, RequestCell, RequestFrame, Decision, Array, ListDescriptor, ListNode, ListBranch, ArenaHeader }) |T| {
         _ = fields(T);
     }
     for (@typeInfo(ListNode).@"struct".field_names) |name|
         std.debug.assert(offset(ListNode, name) == offset(ListBranch, name));
-    for (@typeInfo(Closure).@"struct".field_names) |name|
+    for (@typeInfo(Closure).@"struct".field_names) |name| {
         std.debug.assert(offset(Closure, name) == offset(Demand, name));
+        std.debug.assert(offset(Closure, name) == offset(HostClosure, name));
+    }
     for (@typeInfo(ProviderFrame).@"struct".field_names) |name|
         std.debug.assert(offset(ProviderFrame, name) == offset(RequestFrame, name));
 }

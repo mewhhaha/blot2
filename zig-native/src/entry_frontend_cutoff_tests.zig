@@ -203,3 +203,40 @@ test "entry interface cutoff rejects changed import resolution within an unchang
     try std.testing.expectEqual(modules, session.seed.modules.len);
     try std.testing.expectEqual(@as(usize, 0), session.last.fallback.entry_cutoff.reused);
 }
+
+fn abstractionFailure(allocator: std.mem.Allocator, fixture: *Fixture, session: *retained.Session, expected: *const partial.Result) !void {
+    const saved = session.allocator;
+    session.allocator = allocator;
+    defer session.allocator = saved;
+    const revision = session.revisions;
+    const before = artifacts.stamp(session.seed);
+    const nodes = session.current.?.prepared.units[session.current.?.prepared.entry - 1].nodes.ptr;
+    defer {
+        std.debug.assert(session.revisions == revision);
+        std.debug.assert(std.mem.eql(u8, &before, &artifacts.stamp(session.seed)));
+        std.debug.assert(session.current.?.prepared.units[session.current.?.prepared.entry - 1].nodes.ptr == nodes);
+    }
+    var candidate = try session.prepareRevision(io, fixture.path, null, .{});
+    defer candidate.deinit();
+    try std.testing.expect(candidate == .ready);
+    try equal(candidate.ready.result().?, expected);
+    candidate.ready.discard();
+}
+test "module abstraction publication OOM preserves old opaque owners and retry" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    const consumer = "import {Token, make, read} from \"./changed\"\nentry const answer = read (make 41)\n";
+    const producer = "opaque type Token = U32\nprivate const offset = 1\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst read: Token -> U32 = fn (#Token value) => value\n";
+    try fixture.write("main.blot", consumer);
+    try fixture.write("changed.blot", producer);
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    try initialize(&session, &fixture);
+    try fixture.write("changed.blot", "private const inserted = 7\n" ++ producer);
+    var expected = try fresh(&fixture);
+    defer expected.deinit(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, abstractionFailure, .{ &fixture, &session, &expected });
+    var result = try session.revise(io, fixture.path, null, .{});
+    defer result.deinit(a);
+    try equal(&result, &expected);
+}

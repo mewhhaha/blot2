@@ -4,7 +4,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Hash = std.crypto.hash.Blake3;
 const magic = "BLOTDEP1";
-const version: u32 = 1;
+const version: u32 = 2;
 const header_size = 212;
 
 pub const Digest = [32]u8;

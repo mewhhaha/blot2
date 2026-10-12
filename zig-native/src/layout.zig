@@ -16,6 +16,7 @@ pub const Mapping = struct { variable: types.Id, layout: Id };
 pub const RowMapping = struct { variable: u32, row: evidence.Effects.Id };
 pub const Error = Allocator.Error || error{ UnresolvedType, LayoutLimit, TypeMismatch };
 pub const Store = struct {
+    opaque_sources: []const core.Module = &.{},
     record_names: @import("record_order.zig").Names = .{},
     allocator: Allocator,
     effects: evidence.Effects.Store,
@@ -101,13 +102,19 @@ pub const Store = struct {
         }
     }
     pub fn machine(self: *const Store, id: Id) wasm.ValueType {
-        return if (self.node(id).tag == .f32) .f32 else .i32;
+        if (self.scalar(id)) |value| return value.machine();
+        return .i32;
     }
     pub fn listInput(self: *const Store, id: Id) bool {
         const n = self.node(id);
         return n.tag == .list or (n.tag == .cursor and self.node(n.a).tag == .list);
     }
     pub fn scalar(self: *const Store, id: Id) ?wasm.Scalar {
+        return self.scalarDepth(id, 0);
+    }
+    fn scalarDepth(self: *const Store, id: Id, depth: usize) ?wasm.Scalar {
+        if (depth >= 128) return null;
+        if (self.node(id).tag == .nominal) return self.opaqueScalar(id, depth + 1);
         return switch (self.node(id).tag) {
             .unit => .unit,
             .boolean => .bool,
@@ -115,6 +122,58 @@ pub const Store = struct {
             .f32 => .f32,
             else => null,
         };
+    }
+    fn opaqueScalar(self: *const Store, id: Id, depth: usize) ?wasm.Scalar {
+        const node_ = self.node(id);
+        if (node_.a == 0 or node_.a > self.opaque_sources.len) return null;
+        for (self.opaque_sources[node_.a - 1].nominals) |nominal| {
+            if (!nominal.is_opaque or nominal.identity.decl != node_.b) continue;
+            switch (nominal.storage.kind) {
+                .unit => return .unit,
+                .boolean => return .bool,
+                .u32 => return .u32,
+                .f32 => return .f32,
+                .parameter => {
+                    const arguments = self.children(id);
+                    if (nominal.storage.parameter >= arguments.len) return null;
+                    var ordinal: u32 = 0;
+                    var remaining: usize = 1_000_000;
+                    const module = &self.opaque_sources[node_.a - 1];
+                    const selected = self.opaqueParameter(module, module.types.list(nominal.parameters)[nominal.storage.parameter], arguments[nominal.storage.parameter], nominal.storage.selector, &ordinal, depth + 1, &remaining) orelse return null;
+                    return self.scalarDepth(selected, depth + 1);
+                },
+                .reference, .unknown => return null,
+            }
+        }
+        return null;
+    }
+    fn opaqueParameter(self: *const Store, module: *const core.Module, parameter: types.Id, actual: Id, target: u32, ordinal: *u32, depth: usize, remaining: *usize) ?Id {
+        if (depth >= 128 or remaining.* == 0) return null;
+        remaining.* -= 1;
+        const node_ = module.types.node(parameter);
+        if (node_.tag == .variable) {
+            const selected = ordinal.*;
+            ordinal.* += 1;
+            if (selected == target) return actual;
+            return null;
+        }
+        const argument = self.node(actual);
+        if (node_.tag == .product and argument.tag == .product and node_.b == argument.b) {
+            for (module.types.list(.{ .start = node_.a, .len = node_.b }), self.children(actual)) |child, supplied| {
+                if (self.opaqueParameter(module, child, supplied, target, ordinal, depth + 1, remaining)) |found| return found;
+            }
+        } else if (node_.tag == .record and argument.tag == .record) {
+            for (0..node_.b) |index| {
+                const field = module.types.recordField(node_, index);
+                const children_ = self.children(actual);
+                for (0..children_.len / 2) |slot| {
+                    if (children_[slot * 2] != field.name) continue;
+                    if (self.opaqueParameter(module, field.ty, children_[slot * 2 + 1], target, ordinal, depth + 1, remaining)) |found| return found;
+                    break;
+                }
+            }
+        }
+        return null;
     }
     pub fn abi(self: *const Store, id: Id) ?wasm.Scalar {
         if (self.scalar(id)) |value| return value;
@@ -130,6 +189,11 @@ pub const Store = struct {
         return self.internWithEffects(tag, a, b, 0, values);
     }
     pub fn internWithEffects(self: *Store, tag: Tag, a: u32, b: u32, row: evidence.Effects.Id, values: []const u32) Error!Id {
+        if (tag == .nominal and a != 0 and a <= self.opaque_sources.len) {
+            for (self.opaque_sources[a - 1].nominals) |nominal| {
+                if (nominal.identity.decl == b and nominal.is_opaque and nominal.storage.kind == .unknown) return error.UnresolvedType;
+            }
+        }
         return self.internFields(tag, a, b, row, values);
     }
     pub fn internStateProvider(self: *Store, read: Id, write: Id, state: Id) Error!Id {

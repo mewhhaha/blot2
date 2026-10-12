@@ -212,10 +212,15 @@ pub const Importer = struct {
         }
         const mapped = if (require_stable) try self.typeUnit(old_unit) else try self.unit(old_unit, false);
         const module = &self.units[mapped - 1];
-        for (module.nominals) |value| if (value.identity.decl == decl and (value.identity.unit == 0 or value.identity.unit == mapped)) return mapped;
+        const declaration = try self.nominalDeclaration(decl);
+        for (module.nominals) |value| if (value.identity.decl == declaration and (value.identity.unit == 0 or value.identity.unit == mapped)) return mapped;
         for (module.types.operations) |value| if (value.identity.decl == decl and value.identity.unit == mapped) return mapped;
         for (module.operation_values) |value| if (value.identity.decl == decl and value.identity.unit == mapped) return mapped;
         return error.Declined;
+    }
+    fn nominalDeclaration(self: *const Importer, decl: u32) Error!u32 {
+        if (decl & types.opaque_name_bit != 0) return (try self.symbol(decl & ~types.opaque_name_bit)) | types.opaque_name_bit;
+        return decl;
     }
     fn symbol(self: *const Importer, old_symbol: u32) Error!u32 {
         if (old_symbol == 0 or old_symbol >= self.symbol_map.len or self.symbol_map[old_symbol] == 0) return error.Declined;
@@ -602,7 +607,7 @@ pub const Importer = struct {
                     if (n.a == std.math.maxInt(u32) or n.b == 0) return error.Declined;
                     const current = &self.units[(try self.unit(n.a, true)) - 1];
                     for (current.nominals) |nominal_| {
-                        if (nominal_.identity.decl == n.b and (nominal_.identity.unit == 0 or nominal_.identity.unit == current.unit or nominal_.identity.unit == self.unit_map[n.a - 1])) break;
+                        if (nominal_.identity.decl == try self.nominalDeclaration(n.b) and (nominal_.identity.unit == 0 or nominal_.identity.unit == current.unit or nominal_.identity.unit == self.unit_map[n.a - 1])) break;
                     } else return error.Declined;
                 } else if (n.c != 0) return error.Declined;
                 const children = try evidenceChildren(self.old.evaluator.evidence.view(), id);
@@ -663,7 +668,10 @@ pub const Importer = struct {
             .product, .record, .nominal => {
                 if (n.tag != .nominal and n.c != 0) return error.Declined;
                 const children = try shapeChildren(self.old.layouts, id);
-                if (n.tag == .nominal) a = try self.nominal(a, b) else {
+                if (n.tag == .nominal) {
+                    a = try self.nominal(a, b);
+                    b = try self.nominalDeclaration(b);
+                } else {
                     a = 0;
                     b = 0;
                 }
@@ -693,6 +701,7 @@ pub const Importer = struct {
             .type_constructor => {
                 if (c != 0) return error.Declined;
                 a = try self.nominal(a, b);
+                b = try self.nominalDeclaration(b);
             },
         }
         const mapped = if (n.tag == .state_provider)
@@ -718,7 +727,10 @@ pub const Importer = struct {
             .product, .record, .nominal => {
                 if (n.tag != .nominal and n.c != 0) return error.Declined;
                 const children = try evidenceChildren(self.old.evaluator.evidence.view(), id);
-                if (n.tag == .nominal) a = try self.semanticNominal(a, b) else {
+                if (n.tag == .nominal) {
+                    a = try self.semanticNominal(a, b);
+                    b = try self.nominalDeclaration(b);
+                } else {
                     a = 0;
                     b = 0;
                 }
@@ -748,6 +760,7 @@ pub const Importer = struct {
             .type_constructor => {
                 if (c != 0) return error.Declined;
                 a = try self.semanticNominal(a, b);
+                b = try self.nominalDeclaration(b);
             },
         }
         const mapped = if (n.tag == .state_provider)
@@ -940,6 +953,7 @@ pub const Importer = struct {
     fn remapIdentity(self: *const Importer, value: *types.NominalIdentity) Error!void {
         if (value.unit == 0 or value.unit == std.math.maxInt(u32)) return;
         value.unit = try self.unit(value.unit, false);
+        value.decl = try self.nominalDeclaration(value.decl);
     }
     fn remapReference(self: *const Importer, value: *core.BindingRef) Error!void {
         if (value.unit != 0) value.unit = try self.unit(value.unit, false);
@@ -958,6 +972,7 @@ pub const Importer = struct {
         for (module.types.nodes) |*n| switch (n.tag) {
             .nominal, .type_constructor => if (n.a != 0 and n.a != std.math.maxInt(u32)) {
                 n.a = try self.unit(n.a, false);
+                n.b = try self.nominalDeclaration(n.b);
             },
             .record => {
                 const fields = try bounded(u32, module.types.extra, n.a, @as(usize, n.b) * 2);

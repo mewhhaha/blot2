@@ -11,6 +11,7 @@ pub const Tag = enum(u32) {
     // Declaration metadata schemas are exposed by the helpers below.
     value_decl,
     import_decl,
+    export_decl,
     import_binding,
     data_decl,
     // type_alias_decl(a=name,b=type body,c=[params start,len,attrs start,len]).
@@ -183,6 +184,8 @@ pub const ImportDecl = struct { path: symbols.Symbol, namespace: symbols.Symbol,
 pub const ImportBinding = struct { name: symbols.Symbol, alias: symbols.Symbol };
 pub const Fixity = struct { operator: symbols.Symbol, target: symbols.Symbol, precedence: u32, association: u32, named: bool, attributes: List, literal_error: Id = 0 };
 
+pub const DeclarationTraits = struct { declaration: Id, private: bool = false, is_opaque: bool = false };
+
 pub const RuntimeName = struct { declaration: Id, point: u32 };
 pub const Tree = struct {
     nodes: std.ArrayList(Node) = .empty,
@@ -191,6 +194,7 @@ pub const Tree = struct {
     roots: std.ArrayList(Id) = .empty,
     runtime_names: std.ArrayList(RuntimeName) = .empty,
     constant_names: std.ArrayList(RuntimeName) = .empty,
+    declaration_traits: std.ArrayList(DeclarationTraits) = .empty,
     diagnostics: std.ArrayList(Diagnostic) = .empty,
     operator_origins: std.ArrayList(struct { node: Id, span: Span, member: symbols.Symbol = 0, member_point: u32 = 0 }) = .empty,
     // Singleton type groups share a semantic node but retain the source
@@ -210,10 +214,19 @@ pub const Tree = struct {
         self.roots.deinit(allocator);
         self.runtime_names.deinit(allocator);
         self.constant_names.deinit(allocator);
+        self.declaration_traits.deinit(allocator);
         self.diagnostics.deinit(allocator);
         self.operator_origins.deinit(allocator);
         self.type_conversion_origins.deinit(allocator);
         self.* = .{};
+    }
+    pub fn declarationTraits(self: *const Tree, id: Id) DeclarationTraits {
+        const index = std.sort.binarySearch(DeclarationTraits, self.declaration_traits.items, id, struct {
+            fn compare(key: Id, value: DeclarationTraits) std.math.Order {
+                return std.math.order(key, value.declaration);
+            }
+        }.compare) orelse return .{ .declaration = id };
+        return self.declaration_traits.items[index];
     }
     pub fn node(self: *const Tree, id: Id) Node {
         return self.nodes.items[id];
@@ -288,7 +301,7 @@ pub const Tree = struct {
     // [bindings len,namespace symbol,path start,end,namespace start,end].
     pub fn importDecl(self: *const Tree, id: Id) ImportDecl {
         const n = self.node(id);
-        std.debug.assert(n.tag == .import_decl);
+        std.debug.assert(n.tag == .import_decl or n.tag == .export_decl);
         const x = self.extra.items[n.c..][0..6];
         return .{ .path = n.a, .namespace = x[1], .bindings = .{ .start = n.b, .len = x[0] }, .path_span = .{ .start = x[2], .end = x[3] }, .namespace_span = .{ .start = x[4], .end = x[5] } };
     }

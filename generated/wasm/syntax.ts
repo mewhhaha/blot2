@@ -122,11 +122,14 @@ export type AnyNamedTokenKind = NamedTokenKind extends never
 export type LiteralKind =
   | "import"
   | "froM"
+  | "exporT"
   | "*"
   | "as"
   | "{"
   | ","
   | "}"
+  | "privatE"
+  | "opaquE"
   | "type"
   | "=>"
   | "="
@@ -236,10 +239,12 @@ export type Token =
 export type RuleName =
   | "program"
   | "import_declaration"
+  | "export_declaration"
   | "namespace_import"
   | "named_import"
   | "import_binding"
   | "declaration"
+  | "opaque_type"
   | "type_alias"
   | "contract_type"
   | "declaration_attribute"
@@ -258,6 +263,7 @@ export type RuleName =
   | "named_fixity"
   | "qualified_name"
   | "parameter"
+  | "typed_parameter"
   | "type_array"
   | "type_record"
   | "type_field"
@@ -369,14 +375,22 @@ export interface RuleCursorBase<N extends RuleName = RuleName> {
 }
 
 export interface ProgramCursor extends RuleCursorBase<"program"> {
-  field(name: "declarations"): ReadonlyArray<DeclarationCursor>;
-  field(name: "imports"): ReadonlyArray<ImportDeclarationCursor>;
+  field(name: "declarations"): ReadonlyArray<DeclarationCursor | ReadonlyArray<DeclarationCursor | ExportDeclarationCursor>>;
+  field(name: "imports"): ReadonlyArray<ExportDeclarationCursor | ImportDeclarationCursor>;
   field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "declarations"): ReadonlyArray<DeclarationCursor | ReadonlyArray<DeclarationCursor | ExportDeclarationCursor>>;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
 export interface ImportDeclarationCursor extends RuleCursorBase<"import_declaration"> {
   field(name: "binding"): NamedImportCursor | NamespaceImportCursor;
+  field(name: "path"): TokenCursor<"named", "STRING">;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ExportDeclarationCursor extends RuleCursorBase<"export_declaration"> {
+  field(name: "binding"): NamedImportCursor;
   field(name: "path"): TokenCursor<"named", "STRING">;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -403,8 +417,15 @@ export interface ImportBindingCursor extends RuleCursorBase<"import_binding"> {
 }
 
 export interface DeclarationCursor extends RuleCursorBase<"declaration"> {
-  field(name: "attributes"): ReadonlyArray<DeclarationAttributeCursor>;
-  field(name: "value"): ContractTypeCursor | DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | NamedFixityCursor | SymbolicFixityCursor | TypeAliasCursor | ValueDeclarationCursor;
+  field(name: "attributes"): ReadonlyArray<DeclarationAttributeCursor> | null;
+  field(name: "value"): ContractTypeCursor | DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | NamedFixityCursor | SymbolicFixityCursor | TypeAliasCursor | ValueDeclarationCursor | OpaqueTypeCursor;
+  field(name: "visibility"): TokenCursor<"literal", "privatE"> | null;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface OpaqueTypeCursor extends RuleCursorBase<"opaque_type"> {
+  field(name: "value"): TypeAliasCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -542,10 +563,18 @@ export interface QualifiedNameCursor extends RuleCursorBase<"qualified_name"> {
 }
 
 export interface ParameterCursor extends RuleCursorBase<"parameter"> {
-  field(name: "annotation"): TypeExpressionCursor | null;
   field(name: "demand"): TokenCursor<"literal", "~"> | null;
   field(name: "name"): TokenCursor<"named", "IDENT"> | null;
-  field(name: "where"): WhereClauseCursor | null | null;
+  field(name: "pattern"): PatternCursor | null;
+  field(name: "typed"): TypedParameterCursor | null;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface TypedParameterCursor extends RuleCursorBase<"typed_parameter"> {
+  field(name: "annotation"): TypeExpressionCursor;
+  field(name: "name"): TokenCursor<"named", "IDENT">;
+  field(name: "where"): WhereClauseCursor | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -1081,10 +1110,12 @@ export interface CollectionInfixTailCursor extends RuleCursorBase<"collection_in
 export type AnyRuleCursor =
   | ProgramCursor
   | ImportDeclarationCursor
+  | ExportDeclarationCursor
   | NamespaceImportCursor
   | NamedImportCursor
   | ImportBindingCursor
   | DeclarationCursor
+  | OpaqueTypeCursor
   | TypeAliasCursor
   | ContractTypeCursor
   | DeclarationAttributeCursor
@@ -1103,6 +1134,7 @@ export type AnyRuleCursor =
   | NamedFixityCursor
   | QualifiedNameCursor
   | ParameterCursor
+  | TypedParameterCursor
   | TypeArrayCursor
   | TypeRecordCursor
   | TypeFieldCursor

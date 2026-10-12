@@ -309,7 +309,7 @@ const Loader = struct {
         const first: u32 = @intCast(self.project.imports.items.len);
         if (lexical.len == 0 and tree.diagnostics.items.len == 0) {
             for (tree.roots.items) |root| {
-                if (tree.node(root).tag != .import_decl) continue;
+                if (tree.node(root).tag != .import_decl and tree.node(root).tag != .export_decl) continue;
                 const info = tree.importDecl(root);
                 try self.project.imports.append(self.allocator, .{
                     .declaration = .{ .unit = id, .node = root },

@@ -18,7 +18,15 @@ entry const callback = fn (io: U32 -> U32 ! {Foreign}) => do:
 async function exercise(bytes: Uint8Array<ArrayBuffer>) {
   const guest = await instantiateGuest(bytes);
   try {
-    equal(guest.abi.version, 2);
+    equal(guest.abi.version, 3);
+    equal([
+      ...new Uint8Array(
+        WebAssembly.Module.customSections(
+          new WebAssembly.Module(bytes),
+          "blot:ownership",
+        )[0],
+      ),
+    ], [2, 2, 0]);
     equal(guest.abi.functions[0], {
       name: "integers",
       parameter: "Array U32",

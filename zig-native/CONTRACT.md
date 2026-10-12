@@ -10,6 +10,13 @@ imported into this compiler.
 opaque identities, storage contracts and exact cutoff laws required by tasks
 052–053. It adds no executable visibility feature.
 
+[Associated contracts](ASSOCIATED_CONTRACTS.md) specifies type members,
+projections, implementation coherence and owned evidence for tasks 055–056.
+These declarations extend qualified evidence without changing legacy associated
+dispatch. Symbolic principal projections and complete selected witnesses remain
+distinct claims; neither mutable solver IDs nor private catalogs cross the
+public or portable evidence boundary.
+
 ## Storage and ownership
 
 Source bytes are immutable UTF-8. Tokens refer to byte ranges. Identifiers use
@@ -359,7 +366,12 @@ Checked globals and mutable static reference fields publish through one typed
 module owner table. Scalar fields never add edges. Optimizer context includes
 root mode and owner-table geometry; start bodies cannot reuse an old table size.
 ABI 3 private entry/leave hooks preserve the public value set and copy numeric
-results before leave. Host/JSPI graphs keep tracing until 033 qualifies them.
+results before leave. [Suspended ownership](SUSPENDED_OWNERSHIP.md) admits exact
+generated host imports and checked request graphs with the same counted journal
+through JSPI. Failed leave terminalizes active evaluating demands before
+retirement; request cancellation resets them to pending. Externref cleanup and
+revoked-descriptor checks prevent a strong ready memo from rebinding an old host
+closure. Unknown imports retain the complete tracing fallback.
 
 Optimized body captures own their inputs and outputs. Reuse requires exact local
 instructions and types, called bodies, call signatures, arena roles and
@@ -855,3 +867,29 @@ state; the next real edit diffs against the last compiled sources. The reuse
 gate compares obligations without their diagnostic spans, so shifted positions
 revoke only the declarations whose node spans moved. See
 [trivia-only edits](TRIVIA_EDITS.md).
+
+## Module privacy and opaque storage
+
+Declaration visibility is checked before publication of the public catalog.
+Private declarations retain executable Core ownership but publish no names,
+schemes, payload graphs or associated evidence. Public opaque interfaces expose
+only nominal identity, public parameters and an exact one-word ABI/ownership
+recipe. The defining Core owner proves that recipe against its private payload.
+Generic recipes select a variable occurrence in the public parameter shape;
+unknown or exhausted recipes cannot license a guessed pointer/F32 layout.
+
+Opaque identity uses the original producer path and declaration name. Dependency
+and backend artifact relocation translate its name handle alongside unit IDs;
+reserved built-in structural identities retain their separate domain. Forwarding
+preserves original kinds/targets and validates reachable producers within a
+shared bounded graph walk. No private catalog can become public through a
+source, dependency or checkpoint import. Delayed generic dispatch and field
+resolution enforce the defining-module boundary too.
+
+Erasure changes physical storage, never semantic identity: scalar payload bits
+and reference payload addresses pass through unchanged. There is no wrapper
+cell, tag, indirection or additional owned reference. Typed physical roles
+govern aggregate storage, captures, callable results and staged relocations. All
+new scans/proofs own their scratch, retain only plain descriptors and obey the
+existing transactional revision and allocation-failure laws. See
+[qualification and current conservative reuse limits](MODULE_ABSTRACTION_QUALIFICATION.md).

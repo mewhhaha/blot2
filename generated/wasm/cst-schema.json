@@ -61,8 +61,10 @@
     "tail",
     "tails",
     "target",
+    "typed",
     "value",
     "values",
+    "visibility",
     "where"
   ],
   "tokens": [

@@ -32,7 +32,7 @@ pub const Event = union(enum) {
 };
 pub const Record = struct { sequence: u64, owner: u32, event: Event };
 pub const SymbolicInstruction = struct { op: wasm.Op, operand: Operand };
-pub const FunctionRole = enum { job, arena_allocate, arena_allocate_scalar, arena_recycle, arena_reset, arena_mark, arena_collect, arena_allocate_typed, arena_retain, arena_release, arena_release_lease, arena_retire, arena_free, arena_store_word, arena_copy_words, arena_decrement, arena_root_allocate, arena_root_reserve, arena_root_pop, arena_root_open, arena_root_close, arena_root_mark, arena_root_enter, arena_root_leave, arena_root_store, arena_root_public_allocate, arena_root_public_reset, host_retain, host_release, output_export, runtime_initializer, module_start, unknown, list_new, list_address, list_copy, list_push, list_set, list_from_array, list_to_array, list_chunk_new, list_edit, list_branch, list_own, list_insert, list_replace, list_refresh, list_rotate_left, list_rotate_right, list_balance, list_concat, list_slice, list_join, list_cut, static_closure };
+pub const FunctionRole = enum { job, arena_allocate, arena_allocate_scalar, arena_recycle, arena_reset, arena_mark, arena_collect, arena_allocate_typed, arena_retain, arena_release, arena_release_lease, arena_retire, arena_free, arena_store_word, arena_copy_words, arena_decrement, arena_root_allocate, arena_root_reserve, arena_root_pop, arena_root_open, arena_root_close, arena_root_mark, arena_root_enter, arena_root_leave, arena_root_store, arena_root_public_allocate, arena_root_public_reset, arena_root_force, host_retain, host_release, output_export, runtime_initializer, module_start, unknown, list_new, list_address, list_copy, list_push, list_set, list_from_array, list_to_array, list_chunk_new, list_edit, list_branch, list_own, list_insert, list_replace, list_refresh, list_rotate_left, list_rotate_right, list_balance, list_concat, list_slice, list_join, list_cut, static_closure };
 pub const FunctionArtifact = struct { owner: u32, resource_owner: u32, role: FunctionRole, signature: u32, creation_sequence: u64, locals: Span, instructions: Span };
 const Operation = struct { key: Span, foreign: bool };
 pub const Recorder = struct {
@@ -269,7 +269,7 @@ pub const Recorder = struct {
                 inline for (wasm.Arena.global_fields) |field| @field(mapped, field) = try replay.get(replay.globals.items, @field(item, field));
                 module.arena = mapped;
             },
-            .host_references => |item| module.host_references = .{ .retain = try replay.get(replay.functions.items, item.retain), .release = try replay.get(replay.functions.items, item.release), .cursor = try replay.get(replay.globals.items, item.cursor) },
+            .host_references => |item| module.host_references = .{ .retain = try replay.get(replay.functions.items, item.retain), .release = try replay.get(replay.functions.items, item.release), .cursor = try replay.get(replay.globals.items, item.cursor), .active = try replay.get(replay.globals.items, item.active) },
             .lists => |item| {
                 var runtime: @TypeOf(item) = undefined;
                 inline for (@typeInfo(@TypeOf(item)).@"struct".field_names) |field|

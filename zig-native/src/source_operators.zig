@@ -4,7 +4,7 @@ const std = @import("std");
 const ast = @import("ast.zig");
 const symbols = @import("symbols.zig");
 const T = @import("types.zig");
-pub const Code = enum { effect_member, constructor_marker, integer_range, float_range, float_literal, duplicate_name, unknown_operator, unknown_value, unknown_rebinding, unreachable_statement, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, unsupported_expression, unknown_constructor, sealed_effect, call_arity, requests_scope, yield_scope, break_scope, literal_required, product_index_literal, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, nesting_limit };
+pub const Code = enum { private_access, effect_member, constructor_marker, integer_range, float_range, float_literal, duplicate_name, unknown_operator, unknown_value, unknown_rebinding, unreachable_statement, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, unsupported_expression, unknown_constructor, sealed_effect, call_arity, requests_scope, yield_scope, break_scope, literal_required, product_index_literal, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, nesting_limit };
 pub const Terminator = enum { none, return_, break_, yield_ };
 pub const Issue = struct { code: Code, node: ast.Id, point: u32, symbol: symbols.Symbol = 0, implicit_type_witness: bool = false, terminator: Terminator = .none, numeric_literal: ?ast.NumericFault = null };
 pub fn origin(tree: *const ast.Tree, id: ast.Id) u32 {
@@ -137,6 +137,12 @@ fn Validator(comptime Context: type) type {
         }
         fn recordTarget(self: *Self, id: ast.Id, symbol: symbols.Symbol) T.Error!bool {
             const point = self.tree.span(id).start + 1;
+            if (comptime @hasDecl(@TypeOf(self.context.*), "sourcePrivateConstructor")) {
+                if (self.context.sourcePrivateConstructor(symbol)) {
+                    self.fail(.private_access, id, point, symbol);
+                    return false;
+                }
+            }
             var lexical = false;
             for (self.locals.items[0 .. self.pattern_scope orelse self.locals.items.len]) |item| if (item == symbol) {
                 lexical = true;

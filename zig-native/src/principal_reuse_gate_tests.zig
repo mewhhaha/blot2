@@ -543,7 +543,7 @@ test "principal gate globally rejects dirty associated candidates and their tran
 }
 
 test "principal gate rejects changed catalogs and the affected provider or runtime declaration" {
-    inline for (0..5) |mutation| {
+    inline for (0..6) |mutation| {
         var before = try Fixture.init(a, &.{independent});
         defer before.deinit(a);
         var after = try Fixture.init(a, &.{independent});
@@ -555,6 +555,7 @@ test "principal gate rejects changed catalogs and the affected provider or runti
             2 => after.units[0].nodes[root(&after.units[0], "builder")].tag = .state_provider,
             3 => after.units[0].bodies[after.units[0].bindings[schema.binding].body_id].runtime = true,
             4 => after.units[0].names[0] = 'X',
+            5 => after.units[0].bindings[schema.binding].private = true,
             else => unreachable,
         }
         var pinned = try Pinned.init(a, &before);

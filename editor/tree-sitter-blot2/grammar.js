@@ -12,6 +12,9 @@ export default grammar({
   ) => [
     [$.function_binding, $._syntax],
     [$.import_declaration, $.keyword],
+    [$.export_declaration, $.identifier],
+    [$.private_binding, $.identifier],
+    [$.private_effect_header, $.identifier],
     [$.entry_binding, $.identifier],
     [$.request_complete_header, $.identifier],
   ],
@@ -22,6 +25,7 @@ export default grammar({
     _syntax: ($) =>
       choice(
         $.import_declaration,
+        $.export_declaration,
         $.function_binding,
         $.lambda_header,
         $.type_header,
@@ -47,6 +51,8 @@ export default grammar({
         $.boolean,
         $.self,
         $.entry_binding,
+        $.private_binding,
+        $.private_effect_header,
         $.ever_loop,
         $.request_effect_header,
         $.request_complete_header,
@@ -69,11 +75,14 @@ export default grammar({
         ),
       ),
 
+    export_declaration: ($) =>
+      prec.dynamic(3, seq("export", $.braced, "from", $.text_literal)),
+
     function_binding: ($) =>
       prec.dynamic(
         2,
         seq(
-          choice($.binding_keyword, $.entry_binding),
+          choice($.binding_keyword, $.entry_binding, $.private_binding),
           field("name", choice($.identifier, $.qualified_function_name)),
           optional($.binding_annotation),
           alias("=", $.operator),
@@ -129,6 +138,18 @@ export default grammar({
         1,
         seq(alias("entry", $.entry_modifier), $.binding_keyword),
       ),
+
+    private_binding: ($) =>
+      prec.dynamic(
+        1,
+        seq(
+          alias("private", $.private_modifier),
+          choice($.entry_binding, $.binding_keyword),
+        ),
+      ),
+
+    private_effect_header: ($) =>
+      seq(alias("private", $.private_modifier), "effect"),
 
     ever_loop: ($) => seq("for", "ever", alias(":", $.separator)),
 
@@ -211,6 +232,8 @@ export default grammar({
       prec.right(
         2,
         seq(
+          optional(alias("private", $.private_modifier)),
+          optional(alias("opaque", $.opaque_modifier)),
           choice("type", "data"),
           field("name", $.type_identifier),
           optional(field("parameter", $._type_parameter)),
@@ -325,7 +348,8 @@ export default grammar({
     self: (_) => "self",
     intrinsic: (_) => token(/@[a-z_][A-Za-z0-9_]*(\.[a-z_][A-Za-z0-9_]*)*/),
     _identifier: (_) => /[a-z_][A-Za-z0-9_]*/,
-    identifier: ($) => choice($._identifier, "complete", "entry"),
+    identifier: ($) =>
+      choice($._identifier, "complete", "entry", "private", "opaque", "export"),
     type_identifier: (_) => /[A-Z][A-Za-z0-9_]*/,
     operator: (_) => choice(":=", "=>", "..", /[+\-*\/%=!<>|&^~?$]+/),
     separator: (_) => choice(":", ",", ";"),

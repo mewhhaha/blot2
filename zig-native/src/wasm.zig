@@ -19,7 +19,7 @@ pub const Callback = struct { parameter: Scalar, result: Scalar };
 pub const OwnershipFallback = enum(u8) { none, no_arena, public_arena, host_references, imports, initializer, static_sequence_cache, unproven_body };
 const Export = struct { name: []u8, index: u32, parameter: Scalar, result: Scalar, global: bool, callback: ?Callback = null };
 pub const Arena = struct {
-    pub const function_fields = .{ "allocate", "allocate_scalar", "recycle", "reset", "mark", "collect", "allocate_typed", "retain", "release", "release_lease", "retire", "free", "store_word", "copy_words", "decrement", "root_allocate", "root_reserve", "root_pop", "root_open", "root_close", "root_mark", "root_enter", "root_leave", "root_store", "root_public_allocate", "root_public_reset" };
+    pub const function_fields = .{ "allocate", "allocate_scalar", "recycle", "reset", "mark", "collect", "allocate_typed", "retain", "release", "release_lease", "retire", "free", "store_word", "copy_words", "decrement", "root_allocate", "root_reserve", "root_pop", "root_open", "root_close", "root_mark", "root_enter", "root_leave", "root_store", "root_public_allocate", "root_public_reset", "root_force" };
     pub const global_fields = .{ "heap", "base", "static_end", "allocated", "rc_enabled", "rc_leases", "rc_retains", "rc_releases", "rc_destroyed", "root_enabled", "root_page", "root_top", "root_frame", "root_active", "root_external", "root_count", "root_globals", "root_started", "root_static_map", "root_static_count", "root_global_count" };
     allocate: u32,
     allocate_scalar: u32,
@@ -56,6 +56,7 @@ pub const Arena = struct {
     root_store: u32,
     root_public_allocate: u32,
     root_public_reset: u32,
+    root_force: u32,
     root_enabled: u32,
     root_page: u32,
     root_top: u32,
@@ -90,7 +91,7 @@ pub const AssemblyOptions = struct {
 };
 /// Handles are indexes into an externref table, never encoded host pointers.
 /// Callers retain a cursor mark and release only handles owned by that scope.
-pub const HostReferences = struct { retain: u32, release: u32, cursor: u32 };
+pub const HostReferences = struct { retain: u32, release: u32, cursor: u32, active: u32 };
 fn isArray(scalar: Scalar) bool {
     return scalar == .array_u32 or scalar == .array_f32;
 }
@@ -289,7 +290,8 @@ pub const Module = struct {
             return references;
         }
         const cursor = try self.addGlobal(.u32, 0, true);
-        const retain = try self.addFunction(&.{.externref}, .i32);
+        const active = try self.addGlobal(.u32, 0, true);
+        const retain = try self.addTypedFunction(&.{.externref}, .i32, .scalar);
         const slot = try self.addLocal(retain, .i32);
         for ([_]Instruction{
             .{ .op = .global_get, .operand = cursor },              .{ .op = .local_tee, .operand = slot },
@@ -304,7 +306,7 @@ pub const Module = struct {
             .{ .op = .i32_const, .operand = 1 },                    .{ .op = .i32_add },
             .{ .op = .global_set, .operand = cursor },              .{ .op = .local_get, .operand = slot },
         }) |instruction| try self.emit(retain, instruction);
-        const release = try self.addFunction(&.{.i32}, .none);
+        const release = try self.addTypedFunction(&.{.i32}, .none, .scalar);
         const current = try self.addLocal(release, .i32);
         for ([_]Instruction{
             .{ .op = .local_get, .operand = 0 },       .{ .op = .global_get, .operand = cursor },
@@ -321,9 +323,14 @@ pub const Module = struct {
             .{ .op = .end },                           .{ .op = .end },
             .{ .op = .local_get, .operand = 0 },       .{ .op = .global_set, .operand = cursor },
         }) |instruction| try self.emit(release, instruction);
-        const references: HostReferences = .{ .retain = retain, .release = release, .cursor = cursor };
+        try self.emitSlice(release, &.{
+            .{ .op = .local_get, .operand = 0 }, .{ .op = .i32_eqz },                       .{ .op = .if_ },
+            .{ .op = .i32_const },               .{ .op = .global_set, .operand = active }, .{ .op = .end },
+        });
+        const references: HostReferences = .{ .retain = retain, .release = release, .cursor = cursor, .active = active };
         if (self.artifacts) |journal| try journal.append(.{ .host_references = references });
         self.host_references = references;
+        if (self.arena) |arena| try @import("root_runtime.zig").hostCleanup(self, arena);
         try self.demandResource(.host_references, 0, false);
         return references;
     }
@@ -411,7 +418,7 @@ pub const Module = struct {
         const collect = try self.addFunction(&.{ .i32, .i32, .i32 }, .i32);
         const allocate_typed = try self.addFunction(&.{ .i32, .i32 }, .i32);
         const retain = try self.addFunction(&.{.i32}, .none);
-        const release = try self.addFunction(&.{.i32}, .none);
+        const release = try self.addTypedFunction(&.{.i32}, .none, .scalar);
         const release_lease = try self.addFunction(&.{.i32}, .none);
         const retire = try self.addFunction(&.{.i32}, .none);
         const free = try self.addFunction(&.{.i32}, .none);
@@ -428,8 +435,9 @@ pub const Module = struct {
         const root_leave = try self.addFunction(&.{.i32}, .none);
         const root_store = try self.addFunction(&.{ .i32, .i32 }, .none);
         const root_public_allocate = try self.addFunction(&.{.i32}, .i32);
+        const root_force = try self.addFunction(&.{.i32}, .none);
         const root_public_reset = try self.addFunction(&.{.i32}, .i32);
-        const arena: Arena = .{ .root_public_allocate = root_public_allocate, .root_public_reset = root_public_reset, .root_started = root_started, .root_static_map = root_static_map, .root_static_count = root_static_count, .root_global_count = root_global_count, .root_globals = root_globals, .root_store = root_store, .root_allocate = root_allocate, .root_reserve = root_reserve, .root_pop = root_pop, .root_open = root_open, .root_close = root_close, .root_mark = root_mark, .root_enter = root_enter, .root_leave = root_leave, .root_enabled = root_enabled, .root_page = root_page, .root_top = root_top, .root_frame = root_frame, .root_active = root_active, .root_external = root_external, .root_count = root_count, .rc_enabled = rc_enabled, .rc_leases = rc_leases, .rc_retains = rc_retains, .rc_releases = rc_releases, .rc_destroyed = rc_destroyed, .allocate_typed = allocate_typed, .retain = retain, .release = release, .release_lease = release_lease, .retire = retire, .free = free, .store_word = store_word, .copy_words = copy_words, .decrement = decrement, .heap = heap, .base = base, .static_end = static_end, .allocated = allocated, .allocate = allocate, .allocate_scalar = allocate_scalar, .recycle = recycle, .reset = reset, .mark = mark, .collect = collect };
+        const arena: Arena = .{ .root_force = root_force, .root_public_allocate = root_public_allocate, .root_public_reset = root_public_reset, .root_started = root_started, .root_static_map = root_static_map, .root_static_count = root_static_count, .root_global_count = root_global_count, .root_globals = root_globals, .root_store = root_store, .root_allocate = root_allocate, .root_reserve = root_reserve, .root_pop = root_pop, .root_open = root_open, .root_close = root_close, .root_mark = root_mark, .root_enter = root_enter, .root_leave = root_leave, .root_enabled = root_enabled, .root_page = root_page, .root_top = root_top, .root_frame = root_frame, .root_active = root_active, .root_external = root_external, .root_count = root_count, .rc_enabled = rc_enabled, .rc_leases = rc_leases, .rc_retains = rc_retains, .rc_releases = rc_releases, .rc_destroyed = rc_destroyed, .allocate_typed = allocate_typed, .retain = retain, .release = release, .release_lease = release_lease, .retire = retire, .free = free, .store_word = store_word, .copy_words = copy_words, .decrement = decrement, .heap = heap, .base = base, .static_end = static_end, .allocated = allocated, .allocate = allocate, .allocate_scalar = allocate_scalar, .recycle = recycle, .reset = reset, .mark = mark, .collect = collect };
         try arena_runtime.emit(self, arena);
         try @import("root_runtime.zig").emit(self, arena);
         // Reset discards post-base blocks and every free-list link into them.
@@ -485,6 +493,34 @@ pub const Module = struct {
         if (self.artifacts) |journal| try journal.exportItem(@as(Export, .{ .name = owned, .index = id, .parameter = parameter, .result = result, .global = false }));
         try self.exports.append(self.allocator, .{ .name = owned, .index = id, .parameter = parameter, .result = result, .global = false });
         self.functions.items[id].entry = true;
+    }
+    /// These helpers do no user/host work and cannot set request cancellation.
+    pub fn runtimeHelper(self: *const Module, id: usize) bool {
+        if (self.arena) |arena| inline for (Arena.function_fields) |field| {
+            if (id == @field(arena, field)) return true;
+        };
+        if (self.lists) |lists| inline for (@typeInfo(@TypeOf(lists)).@"struct".field_names) |field| {
+            if (id == @field(lists, field)) return true;
+        };
+        if (self.host_references) |references| {
+            if (id == references.retain or id == references.release) return true;
+        }
+        return false;
+    }
+    /// Exact generated host ABI: the adapter copies Array arguments/replies.
+    /// Other imports keep whole-module tracing admission closed.
+    pub fn hostCallbackImport(self: *const Module, id: usize) ?Callback {
+        if (id >= self.imports.items.len) return null;
+        const item = self.imports.items[id];
+        if (!std.mem.eql(u8, item.module, "blot:host/1") or item.signature >= self.signatures.items.len) return null;
+        const signature = self.signatures.items[item.signature];
+        inline for (.{ Scalar.unit, Scalar.u32, Scalar.bool, Scalar.f32, Scalar.array_u32, Scalar.array_f32 }) |parameter| {
+            inline for (.{ Scalar.unit, Scalar.u32, Scalar.bool, Scalar.f32, Scalar.array_u32, Scalar.array_f32 }) |result| {
+                const name = comptime std.fmt.comptimePrint("call_{s}_{s}", .{ callbackName(parameter).?, callbackName(result).? });
+                if (std.mem.eql(u8, item.name, name) and signature.result == result.machine() and std.mem.eql(ValueType, signature.parameters, &.{ .externref, parameter.machine() })) return .{ .parameter = parameter, .result = result };
+            }
+        }
+        return null;
     }
     pub fn importHostCallback(self: *Module, callback: Callback) !u32 {
         const parameter = callbackName(callback.parameter) orelse return error.InvalidFunctionReference;
@@ -567,7 +603,7 @@ pub const Module = struct {
             if (prepared.body) |*body| body.deinit(self.allocator);
         };
         var ownership_fallback: OwnershipFallback = .none;
-        if (self.arena == null) ownership_fallback = .no_arena else if (self.public_arena and !passes.roots) ownership_fallback = .public_arena else if (self.host_references != null) ownership_fallback = .host_references else if (self.imports.items.len != 0) ownership_fallback = .imports else if (self.start != null and !passes.roots) ownership_fallback = .initializer;
+        if (self.arena == null) ownership_fallback = .no_arena else if (self.public_arena and !passes.roots) ownership_fallback = .public_arena else if (self.host_references != null and !passes.roots) ownership_fallback = .host_references else if (self.imports.items.len != 0 and !passes.roots) ownership_fallback = .imports else if (self.start != null and !passes.roots) ownership_fallback = .initializer;
         if (ownership_fallback == .none and (self.mutable_static or (self.static_fields.items.len != 0 and !passes.roots))) ownership_fallback = .static_sequence_cache;
         for (self.functions.items, 0..) |*function, id| {
             if (options.stats) |stats| stats.functions += 1;
@@ -677,7 +713,7 @@ pub const Module = struct {
             try output.section(6, payload.items());
             payload.clear();
         }
-        try payload.uleb(@intCast(self.exports.items.len + @as(usize, if (self.public_arena) 2 else 0) + @intFromBool(self.public_arena or options.export_memory) + @intFromBool(options.export_function_table) + @as(usize, if (self.arena != null) 4 else 0) + @as(usize, if (roots_admitted) 3 else 0)));
+        try payload.uleb(@intCast(self.exports.items.len + @as(usize, if (self.public_arena) 2 else 0) + @intFromBool(self.public_arena or options.export_memory) + @intFromBool(options.export_function_table) + @as(usize, if (self.arena != null) 4 else 0) + @as(usize, if (roots_admitted) 3 else 0) + @intFromBool(roots_admitted and self.host_references != null)));
         for (self.exports.items) |item| {
             try payload.name(item.name);
             try payload.byte(if (item.global) 3 else 0);
@@ -697,6 +733,11 @@ pub const Module = struct {
             try payload.byte(0);
             try payload.uleb(code.function(if (roots_admitted) self.arena.?.root_public_reset else self.arena.?.reset) + import_count);
         }
+        if (roots_admitted) if (self.host_references) |references| {
+            try payload.name("blot:rc_host_refs");
+            try payload.byte(3);
+            try payload.uleb(references.cursor);
+        };
         if (self.arena) |arena| inline for (.{ "rc_leases", "rc_retains", "rc_releases", "rc_destroyed" }) |field| {
             try payload.name("blot:" ++ field);
             try payload.byte(3);

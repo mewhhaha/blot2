@@ -1,10 +1,13 @@
-// deno run -A scripts/bench_local_memos.ts BASELINE CANDIDATE OUTPUT
+// deno run -A scripts/bench_local_memos.ts BASELINE CANDIDATE OUTPUT [--callbacks]
 import { strict as assert } from "node:assert";
 import { resolve } from "node:path";
 import { cpuUsage } from "node:process";
 import { createZigProjectCompiler } from "../compiler/zig_project_client.ts";
-assert.equal(Deno.args.length, 3);
-const [baseline, candidate, output] = Deno.args.map((path) => resolve(path));
+assert(Deno.args.length === 3 || Deno.args.length === 4);
+assert(Deno.args[3] === undefined || Deno.args[3] === "--callbacks");
+const [baseline, candidate, output] = Deno.args.slice(0, 3).map((path) =>
+  resolve(path)
+);
 await Deno.mkdir(output, { recursive: true });
 const variants = [{ name: "cells", compiler: baseline }, {
   name: "memos",
@@ -25,7 +28,7 @@ pins[new URL(import.meta.url).pathname] = await hash(
 );
 const load = async () => (await Deno.readTextFile("/proc/loadavg")).trim();
 const loadStart = await load();
-const body = `const sum = fn (count: U32) => fn ~(value: U32) => do:
+let body = `const sum = fn (count: U32) => fn ~(value: U32) => do:
   let first = value
   let second = first
   let total = 0
@@ -34,6 +37,19 @@ const body = `const sum = fn (count: U32) => fn ~(value: U32) => do:
     total := @u32.add self current
   return total
 `;
+if (Deno.args[3] === "--callbacks") {
+  body = `const sum = fn (count: U32) => fn ~(value: U32) => do:
+  let first = fn () => @demand value
+  let alias = first
+  let second = fn () => @demand value
+  let total = 0
+  for i in 0..count:
+    use current <- alias ()
+    use second ()
+    total := @u32.add self current
+  return total
+`;
+}
 const source = body + `entry const outside = fn (count: U32) => sum count 21
 entry const inside = fn (count: U32) => do:
   let total = 0

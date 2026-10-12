@@ -5,6 +5,15 @@ import {
   equal,
 } from "./compile_helpers.ts";
 
+function counted(bytes: Uint8Array<ArrayBuffer>): void {
+  const module = new WebAssembly.Module(bytes);
+  assert.deepEqual([
+    ...new Uint8Array(
+      WebAssembly.Module.customSections(module, "blot:ownership")[0],
+    ),
+  ], [2, 2, 0]);
+}
+
 function cancellationSource(exit: "return" | "break", nested: boolean): string {
   return `
 type Tick is effect = { read: U32 -> U32 }
@@ -81,45 +90,51 @@ for (const asynchronous of [false, true]) {
   Deno.test(`cancelled demands retry without caching a partial result (${mode})`, async () => {
     for (const exit of ["return", "break"] as const) {
       for (const nested of [false, true]) {
-        await compileAndRun(cancellationSource(exit, nested), async (guest) => {
-          const events: number[] = [];
-          const log = asynchronous
-            ? guest.capabilityAsync({
-              parameter: "U32",
-              result: "U32",
-              call: async (value) => {
-                await Promise.resolve();
-                events.push(value);
-                return value;
-              },
-            })
-            : guest.capability({
-              parameter: "U32",
-              result: "U32",
-              call: (value) => {
-                events.push(value);
-                return value;
-              },
-            });
-          for (let repetition = 0; repetition < 3; repetition++) {
-            equal(
-              asynchronous
-                ? await guest.callAsync("answer", log)
-                : guest.call("answer", log),
-              91,
-            );
-          }
-          // Cancellation does not roll back effects already performed. A
-          // successful retry caches once for both aliases of the computation.
-          assert.deepEqual(events, [1, 2, 1, 2, 1, 2]);
-          equal(guest.read("folded"), 91);
-        }, { asynchronous });
+        await compileAndRun(
+          cancellationSource(exit, nested),
+          async (guest, bytes) => {
+            counted(bytes);
+            const events: number[] = [];
+            const log = asynchronous
+              ? guest.capabilityAsync({
+                parameter: "U32",
+                result: "U32",
+                call: async (value) => {
+                  await Promise.resolve();
+                  events.push(value);
+                  return value;
+                },
+              })
+              : guest.capability({
+                parameter: "U32",
+                result: "U32",
+                call: (value) => {
+                  events.push(value);
+                  return value;
+                },
+              });
+            for (let repetition = 0; repetition < 3; repetition++) {
+              equal(
+                asynchronous
+                  ? await guest.callAsync("answer", log)
+                  : guest.call("answer", log),
+                91,
+              );
+            }
+            // Cancellation does not roll back effects already performed. A
+            // successful retry caches once for both aliases of the computation.
+            assert.deepEqual(events, [1, 2, 1, 2, 1, 2]);
+            equal(guest.read("folded"), 91);
+          },
+          { asynchronous },
+        );
       }
     }
   });
 
   Deno.test(`failed persistent demands remain terminal after host or Wasm traps (${mode})`, async () => {
-    await compileAndRun(trappedSource, async (guest) => {
+    await compileAndRun(trappedSource, async (guest, bytes) => {
+      counted(bytes);
       let calls = 0;
       const good = asynchronous
         ? guest.capabilityAsync({
@@ -197,7 +212,8 @@ for (const asynchronous of [false, true]) {
   });
 
   Deno.test(`reentrant demand through State fails without poisoning another entry (${mode})`, async () => {
-    await compileAndRun(recursiveSource, async (guest) => {
+    await compileAndRun(recursiveSource, async (guest, bytes) => {
+      counted(bytes);
       for (let repetition = 0; repetition < 3; repetition++) {
         if (asynchronous) {
           await assert.rejects(() => guest.callAsync("answer", null));

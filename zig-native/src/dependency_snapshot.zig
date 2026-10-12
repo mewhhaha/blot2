@@ -19,6 +19,9 @@ const Projector = struct {
     effect_operations: std.ArrayList(T.Operation) = .empty,
     obligations: std.ArrayList(T.Obligation) = .empty,
     obligation_spans: std.ArrayList(ast.Span) = .empty,
+    pattern_nodes: std.ArrayList(@import("parameter_patterns.zig").Node) = .empty,
+    pattern_extra: std.ArrayList(u32) = .empty,
+    pattern_map: std.AutoHashMapUnmanaged(u32, u32) = .empty,
     type_map: []T.Id = &.{},
     variable_map: []T.Id = &.{},
     effect_row_map: []u32 = &.{},
@@ -44,6 +47,9 @@ const Projector = struct {
         self.effect_operation_map[T.foreign_operation] = T.foreign_operation;
     }
     fn deinit(self: *Projector) void {
+        self.pattern_nodes.deinit(self.allocator);
+        self.pattern_extra.deinit(self.allocator);
+        self.pattern_map.deinit(self.allocator);
         inline for (.{ "type_nodes", "type_extra", "effect_rows", "effect_labels", "effect_operations", "obligations", "obligation_spans" }) |field| @field(self, field).deinit(self.allocator);
         inline for (.{ "type_map", "variable_map", "effect_row_map", "effect_variable_map", "effect_operation_map" }) |field| self.allocator.free(@field(self, field));
     }
@@ -198,6 +204,38 @@ const Projector = struct {
         for (self.checked.types.list(source)) |id| try values.append(self.allocator, try self.projectType(id, 0));
         return self.saveTypes(values.items);
     }
+    fn parameterPattern(self: *Projector, id: u32, depth: usize) Error!u32 {
+        if (depth >= 256) return error.DependencyLimit;
+        if (self.pattern_map.get(id)) |known| return known;
+        const source = self.checked.parameter_patterns.node(id);
+        var result = source;
+        if (source.kind == .binding) {
+            result.a = try self.projectType(source.a, 0);
+        } else {
+            var children: std.ArrayList(u32) = .empty;
+            defer children.deinit(self.allocator);
+            if (source.kind == .record) {
+                for (0..source.b) |index| {
+                    const field = self.checked.parameter_patterns.field(source, index);
+                    try children.appendSlice(self.allocator, &.{ field.name, try self.parameterPattern(field.pattern, depth + 1) });
+                }
+            } else for (self.checked.parameter_patterns.list(.{ .start = source.a, .len = source.b })) |child| try children.append(self.allocator, try self.parameterPattern(child, depth + 1));
+            result.a = @intCast(self.pattern_extra.items.len);
+            try self.pattern_extra.appendSlice(self.allocator, children.items);
+        }
+        const index: u32 = @intCast(self.pattern_nodes.items.len);
+        try self.pattern_nodes.append(self.allocator, result);
+        try self.pattern_map.put(self.allocator, id, index);
+        return index;
+    }
+    fn parameterPatterns(self: *Projector, source: T.List) Error!T.List {
+        var nodes: std.ArrayList(u32) = .empty;
+        defer nodes.deinit(self.allocator);
+        for (self.checked.parameter_patterns.list(source)) |id| try nodes.append(self.allocator, try self.parameterPattern(id, 0));
+        const start: u32 = @intCast(self.pattern_extra.items.len);
+        try self.pattern_extra.appendSlice(self.allocator, nodes.items);
+        return .{ .start = start, .len = @intCast(nodes.items.len) };
+    }
     fn copiedList(self: *Projector, source: T.List) Error!T.List {
         return self.saveTypes(self.checked.types.list(source));
     }
@@ -244,23 +282,33 @@ fn freezeMode(allocator: Allocator, tree: *const ast.Tree, checked: *const check
     const retained = if (principal_only) try allocator.alloc(bool, checked.bindings.len) else &.{};
     defer if (principal_only) allocator.free(retained);
     if (principal_only) {
-        for (checked.bindings, retained) |b, *keep| keep.* = b.kind == .global or b.kind == .external;
-        for (checked.associated) |method| retained[method.binding] = true;
+        for (checked.bindings, retained) |b, *keep| keep.* = (b.kind == .global and !b.private) or b.kind == .external;
+        for (checked.associated) |method| if (!checked.bindings[method.binding].private) {
+            retained[method.binding] = true;
+        };
     }
     for (checked.bindings, result.bindings, 0..) |old, *value, id| {
         value.* = if (!principal_only or retained[id])
-            .{ .name = old.name, .kind = old.kind, .named_function = old.named_function, .ty = try projector.projectType(old.ty, 0), .scheme = try projector.projectScheme(old.scheme), .external = old.external }
+            .{ .private = old.private, .name = old.name, .kind = old.kind, .named_function = old.named_function, .ty = try projector.projectType(old.ty, 0), .scheme = try projector.projectScheme(old.scheme), .external = old.external }
         else
-            .{ .name = old.name, .kind = old.kind, .named_function = false, .ty = 0, .scheme = .{}, .external = null };
+            .{ .private = old.private, .name = 0, .kind = old.kind, .named_function = false, .ty = 0, .scheme = .{}, .external = null };
     }
-    result.patterns.nodes = try allocator.dupe(@import("parameter_patterns.zig").Node, checked.parameter_patterns.nodes.items);
-    result.patterns.extra = try allocator.dupe(u32, checked.parameter_patterns.extra.items);
-    for (result.patterns.nodes) |*node| if (node.kind == .binding) {
-        node.a = try projector.projectType(node.a, 0);
-    };
     result.nominals = try allocator.alloc(PI.Nominal, checked.nominals.len);
     for (checked.nominals, result.nominals) |old, *value| {
         value.* = old;
+        value.declaration = 0;
+        if (principal_only and old.private) {
+            value.storage = .{};
+            value.name = 0;
+            value.parameters = .{};
+            value.variables = .{};
+            value.patterns = .{};
+            value.parameter_names = .{};
+            value.constructors = .{};
+            value.alias = 0;
+            value.alias_rows = .{};
+            continue;
+        }
         value.alias = try projector.projectType(old.alias, 0);
         var alias_rows: std.ArrayList(T.Id) = .empty;
         defer alias_rows.deinit(allocator);
@@ -269,46 +317,100 @@ fn freezeMode(allocator: Allocator, tree: *const ast.Tree, checked: *const check
         value.parameters = try projector.projectedList(old.parameters);
         value.variables = try projector.projectedList(old.variables);
         value.parameter_names = try projector.copiedList(old.parameter_names);
-        value.constructors = try projector.copiedList(old.constructors);
+        value.patterns = try projector.parameterPatterns(old.patterns);
+        value.constructors = .{};
+        if (!principal_only or !old.is_opaque) value.constructors = try projector.copiedList(old.constructors);
     }
     result.constructors = try allocator.alloc(PI.Constructor, checked.constructors.len);
     for (checked.constructors, result.constructors) |old, *value| {
         value.* = old;
+        if (principal_only and old.private) {
+            value.name = 0;
+            value.scheme = .{};
+            value.payload = 0;
+            continue;
+        }
         value.scheme = try projector.projectScheme(old.scheme);
         value.payload = try projector.projectType(old.payload, 0);
     }
     result.effect_families = try allocator.alloc(PI.EffectFamily, checked.effect_families.len);
     for (checked.effect_families, result.effect_families) |old, *value| {
         value.* = old;
+        if (principal_only and old.private) {
+            value.name = 0;
+            value.parameters = .{};
+            value.variables = .{};
+            value.patterns = .{};
+            value.parameter_names = .{};
+            value.operations = .{};
+            continue;
+        }
         value.parameters = try projector.projectedList(old.parameters);
         value.variables = try projector.projectedList(old.variables);
         value.parameter_names = try projector.copiedList(old.parameter_names);
+        value.patterns = try projector.parameterPatterns(old.patterns);
         value.operations = try projector.copiedList(old.operations);
     }
     result.effect_templates = try allocator.alloc(PI.EffectTemplate, checked.effect_templates.len);
     for (checked.effect_templates, result.effect_templates) |old, *value| {
         value.* = old;
+        if (principal_only and checked.effect_families[old.family].private) {
+            value.name = 0;
+            value.parameter = 0;
+            value.result = 0;
+            continue;
+        }
         value.parameter = try projector.projectType(old.parameter, 0);
         value.result = try projector.projectType(old.result, 0);
     }
-    result.associated = try allocator.dupe(PI.Associated, checked.associated);
+    var associated: std.ArrayList(PI.Associated) = .empty;
+    defer associated.deinit(allocator);
+    for (checked.associated) |method| {
+        if (principal_only and checked.bindings[method.binding].private) continue;
+        try associated.append(allocator, method);
+    }
+    result.associated = try associated.toOwnedSlice(allocator);
     result.contracts = try allocator.alloc(PI.Contract, checked.contracts.len);
     for (checked.contracts, result.contracts) |old, *value| {
         value.* = old;
+        if (principal_only and old.private) {
+            value.name = 0;
+            value.parameters = .{};
+            value.variables = .{};
+            value.patterns = .{};
+            value.parameter_names = .{};
+            value.row_variables = .{};
+            value.predicates = .{};
+            continue;
+        }
         value.parameters = try projector.projectedList(old.parameters);
         value.variables = try projector.projectedList(old.variables);
         value.parameter_names = try projector.copiedList(old.parameter_names);
+        value.patterns = try projector.parameterPatterns(old.patterns);
         var rows: std.ArrayList(T.Id) = .empty;
         defer rows.deinit(allocator);
         for (checked.types.list(old.row_variables)) |row| try rows.append(allocator, try projector.projectRowVariable(row));
         value.row_variables = try projector.saveTypes(rows.items);
     }
+    const public_predicates = try allocator.alloc(bool, checked.contract_predicates.len);
+    defer allocator.free(public_predicates);
+    @memset(public_predicates, true);
+    if (principal_only) for (checked.contracts) |contract| {
+        if (!contract.private) continue;
+        @memset(public_predicates[contract.predicates.start..][0..contract.predicates.len], false);
+    };
     result.contract_predicates = try allocator.alloc(T.Obligation, checked.contract_predicates.len);
-    for (checked.contract_predicates, result.contract_predicates) |old, *value| {
+    for (checked.contract_predicates, result.contract_predicates, public_predicates) |old, *value, public| {
+        if (!public) {
+            value.* = .{ .ty = 0, .kind = .type_rep, .source = 0, .explicit = true };
+            continue;
+        }
         value.* = old;
         inline for (.{ "ty", "other", "result", "signature" }) |field| @field(value, field) = try projector.projectType(@field(old, field), 0);
         value.source = 0;
     }
+    result.patterns.nodes = try projector.pattern_nodes.toOwnedSlice(allocator);
+    result.patterns.extra = try projector.pattern_extra.toOwnedSlice(allocator);
     result.obligations = try projector.obligations.toOwnedSlice(allocator);
     result.obligation_spans = try projector.obligation_spans.toOwnedSlice(allocator);
     result.graph.nodes = try projector.type_nodes.toOwnedSlice(allocator);

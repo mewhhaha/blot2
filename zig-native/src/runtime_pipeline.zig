@@ -19,8 +19,12 @@ pub const Session = struct {
         errdefer summaries.deinit();
         try summaries.prepare();
         var result: Session = .{ .allocator = a, .module = module, .summaries = summaries };
-        result.roots = module.arena != null and !module.mutable_static and module.host_references == null and module.imports.items.len == 0;
-        var needs_roots = module.public_arena or module.static_fields.items.len != 0;
+        result.roots = module.arena != null and !module.mutable_static;
+        for (module.imports.items, 0..) |_, index| if (module.hostCallbackImport(index) == null) {
+            result.roots = false;
+            break;
+        };
+        var needs_roots = module.host_references != null or module.public_arena or module.static_fields.items.len != 0;
         if (result.roots) for (module.functions.items) |*function| {
             if (result.runtimeHelper(function)) continue;
             if (function.parameters.len >= 8192 or function.locals.items.len >= 8192 - function.parameters.len or (function.result_role != .scalar and function.result_role != .reference)) {
@@ -49,13 +53,30 @@ pub const Session = struct {
     }
     pub fn runtimeHelper(self: *const Session, function: *const ir.Function) bool {
         const id = (@intFromPtr(function) - @intFromPtr(self.module.functions.items.ptr)) / @sizeOf(ir.Function);
-        if (self.module.arena) |arena| inline for (wasm.Arena.function_fields) |field| {
-            if (id == @field(arena, field)) return true;
+        return self.module.runtimeHelper(id);
+    }
+    fn borrowedHost(self: *const Session, function: *const ir.Function) bool {
+        const references = self.module.host_references orelse return false;
+        if (function.entry or function.result_role != .scalar or function.instructions.items.len == 0) return false;
+        const marker: ir.Ownership = .{ .kind = .scope, .chunk = 14 };
+        if (!std.meta.eql(function.instructions.items[0], ir.Instruction{ .op = .ownership, .operand = @bitCast(marker) })) return false;
+        var imports: usize = 0;
+        for (function.instructions.items) |inst| switch (inst.op) {
+            .ownership => if (inst.operand != @as(u32, @bitCast(marker))) return false,
+            .call_import => {
+                const callback = self.module.hostCallbackImport(inst.operand) orelse return false;
+                if (callback.result.role() != .scalar or function.result != callback.result.machine()) return false;
+                if (!std.mem.eql(ir.ValueType, function.parameters, &.{ .i32, callback.parameter.machine(), .i32 })) return false;
+                if (function.parameter_roles != ir.packParameterRoles(&.{ .reference, callback.parameter.role(), .reference })) return false;
+                imports += 1;
+            },
+            .global_get => if (inst.operand != references.active) return false,
+            .local_get => if (inst.operand >= function.parameters.len) return false,
+            .i32_load => if (inst.operand != @import("runtime_layout.zig").offset(@import("runtime_layout.zig").HostClosure, "handle")) return false,
+            .host_ref_get, .i32_ne, .if_, .end, .unreachable_ => {},
+            else => return false,
         };
-        if (self.module.lists) |lists| inline for (@typeInfo(@TypeOf(lists)).@"struct".field_names) |field| {
-            if (id == @field(lists, field)) return true;
-        };
-        return false;
+        return imports == 1;
     }
     pub fn optimize(self: *Session, source: *const ir.Function) A.Error!?ir.Body {
         var owned: ?ir.Body = null;
@@ -89,9 +110,12 @@ pub const Session = struct {
             inline for (wasm.Arena.function_fields) |field| {
                 if (id == @field(self.module.arena.?, field)) arena_helper = true;
             }
+            if (self.module.host_references) |references| {
+                if (id == references.retain or id == references.release) arena_helper = true;
+            }
             if (!arena_helper) {
                 const entry = source.entry;
-                if (try @import("root_lowering.zig").run(self.allocator, self.module, &view, !self.runtimeHelper(source), entry, self.module.start != null and id == self.module.start.?)) |replacement| {
+                if (try @import("root_lowering.zig").run(self.allocator, self.module, &view, !self.runtimeHelper(source) and !self.borrowedHost(&view), entry, self.module.start != null and id == self.module.start.?)) |replacement| {
                     if (owned) |*body| body.deinit(self.allocator);
                     owned = replacement;
                 }

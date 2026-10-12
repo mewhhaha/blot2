@@ -39,7 +39,10 @@ export function parserSource(
     );
     position = right;
   };
-  let importDeclaration = false;
+  let moduleDeclaration = false;
+  let declarationStart = true;
+  let delimiters = 0;
+  let indentation = 0;
   for (
     let index = range.tokenStart ?? 0;
     index < (range.tokenEnd ?? prepared.tokens.length);
@@ -53,22 +56,58 @@ export function parserSource(
         "0".repeat(token.span.end - token.span.start),
       );
     }
-    // Contextual import and selector markers preserve the source's width.
-    if (token.text === "import") importDeclaration = true;
-    if (token.text === "\uE000") importDeclaration = false;
+    // Declaration words remain ordinary names outside a top-level header.
+    // Same-width markers preserve original CST text and source offsets.
+    const topLevel = delimiters === 0 && indentation === 0;
+    if (topLevel && declarationStart) {
+      if (["privatE", "opaquE", "exporT"].includes(token.text)) {
+        throw new SourceError(
+          "reserved_declaration_marker",
+          "Use ordinary declaration spellings",
+          prepared.originalOffsets[token.span.start],
+          prepared.originalOffsets[token.span.end],
+        );
+      }
+      if (token.text === "private") {
+        replace(token.span.end - 1, token.span.end, "E");
+      } else {
+        declarationStart = false;
+        if (
+          token.text === "opaque" && prepared.tokens[index + 1]?.text === "type"
+        ) {
+          replace(token.span.end - 1, token.span.end, "E");
+        } else if (
+          token.text === "export" && prepared.tokens[index + 1]?.text === "{"
+        ) {
+          replace(token.span.end - 1, token.span.end, "T");
+          moduleDeclaration = true;
+        } else if (token.text === "import") moduleDeclaration = true;
+      }
+    }
+    if (token.text === "\uE000" && topLevel) {
+      declarationStart = true;
+      moduleDeclaration = false;
+    }
+    if (["(", "[", "{"].includes(token.text)) delimiters++;
+    else if ([")", "]", "}"].includes(token.text)) delimiters--;
+    if (token.text === "\uE001") indentation++;
+    else if (token.text === "\uE002") {
+      indentation--;
+      if (indentation === 0 && delimiters === 0) declarationStart = true;
+    }
     if (
-      importDeclaration && token.text === "froM" &&
+      moduleDeclaration && token.text === "froM" &&
       prepared.tokens[index + 1]?.text.startsWith('"')
     ) {
       throw new SourceError(
         "reserved_import_marker",
-        "Use 'from' in an import declaration",
+        "Use 'from' in an import or export declaration",
         prepared.originalOffsets[token.span.start],
         prepared.originalOffsets[token.span.end],
       );
     }
     if (
-      importDeclaration && token.text === "from" &&
+      moduleDeclaration && token.text === "from" &&
       prepared.tokens[index + 1]?.text.startsWith('"')
     ) {
       replace(token.span.start + 3, token.span.start + 4, "M");

@@ -323,7 +323,7 @@ pub const State = struct {
         if (self.arena) |value| inline for (Arena.global_fields) |field| {
             if (id == @field(value, field)) return true;
         };
-        if (self.host) |value| if (id == value.cursor) return true;
+        if (self.host) |value| if (id == value.cursor or id == value.active) return true;
         // The first recorded resource is the Requests root global, when any
         // source unit contains request loops. Every other global is explicit.
         return requests != null and id == 0 and self.old.emission.records.items.len != 0 and switch (self.old.emission.records.items[0].event) {
@@ -453,6 +453,7 @@ pub const State = struct {
         const old = self.host orelse return error.InvalidFunctionReference;
         const actual = try g.module.ensureHostReferences();
         self.globals[old.cursor] = actual.cursor;
+        self.globals[old.active] = actual.active;
         self.functions[old.retain] = actual.retain;
         self.functions[old.release] = actual.release;
     }
@@ -462,7 +463,7 @@ pub const State = struct {
         if (self.arena) |value| inline for (Arena.global_fields) |field| {
             if (id == @field(value, field)) try self.ensureArena(g);
         };
-        if (self.host) |value| if (id == value.cursor) try self.ensureHost(g);
+        if (self.host) |value| if (id == value.cursor or id == value.active) try self.ensureHost(g);
         if (self.globals[id] == absent and id == 0 and g.request_owner != null) self.globals[id] = g.request_owner.?;
         if (self.globals[id] == absent) return error.InvalidGlobalReference;
         return self.globals[id];

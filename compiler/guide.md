@@ -584,10 +584,12 @@ nonmoving tracing collector in linear memory, without the Wasm GC extension.
 Forever loops collect according to allocation traffic, retaining their carries,
 providers and earlier reachable objects. The guest API resets temporary arena
 storage between completed invocations while preserving module initialization
-values. Checked synchronous modules also use counted invocation, loop and module
-roots for returned/captured values and strong demand memos. Unknown layouts and
-host graphs retain the complete tracing fallback; tracing still reclaims cycles.
-See `zig-native/PERSISTENT_ROOTS.md` for the transition.
+values. Checked modules also use counted invocation, loop and module roots for
+returned/captured values and strong demand memos, including generated host
+callbacks and requests suspended through JSPI. Unknown layouts and imports
+retain the complete tracing fallback; tracing still reclaims cycles. See
+`zig-native/PERSISTENT_ROOTS.md` and `zig-native/SUSPENDED_OWNERSHIP.md` for the
+transition.
 
 Direct `array.replace`, `list.append` and `list.prepend` calls preserve this
 ownership optimization, including aliases and source wrappers whose body passes
@@ -897,7 +899,9 @@ parameters, wrong argument shapes, and missing requirements are errors. Existing
 rules about written function effects remain in force: use `a -> b ! {| e}` when
 a wrapper propagates effects. Associated type members and implementation
 declarations are subsequent work; output type parameters express relationships
-with the existing predicates.
+with the existing predicates. Their specified syntax, coherence and portable
+evidence rules are in
+[associated contracts](../zig-native/ASSOCIATED_CONTRACTS.md).
 
 In gdev, const resource/component registrations determine the nested world type;
 `ecs.build` discards registration metadata and retains initial state, scope and
@@ -932,9 +936,24 @@ receive `unsupported_attribute`.
 Imports precede declarations: `import * as math from "./math"` or
 `import { Point as Position, distance } from "./geometry"`. Relative paths may
 omit `.blot`; the CLI maps `std/` to the source library. Cycles are errors.
-Top-level declarations are public by default: every declaration of every module
-stays importable. Importing a type does not import differently named
-constructors. Imported operator functions need local fixity declarations.
+Top-level declarations are public by default. `private` before a value, alias,
+data, contract or effect declaration keeps its name inside its defining module;
+constructors and operations inherit that visibility. `private entry const` keeps
+the host export while hiding the Blot import. Importing a type does not import
+differently named constructors. Imported operator functions need local fixity
+declarations. `export { answer as forwarded, Token } from "./producer"` forwards
+selected public names while retaining their original producer and kind.
+
+`opaque type Token = U32` declares a nominal type with one private constructor,
+`#Token`. The producer can construct and match it, including
+`fn (#Token value) => value`, and inspect record representation fields. Callers
+use public factories, observers and associated declarations; aliases and type
+witnesses preserve opacity. Token remains distinct from U32 inside its producer.
+Public signatures cannot expose private nominal/effect identities or predicate
+implementations. Scalar and reference representations erase the opaque wrapper
+without adding a runtime allocation or tag. See
+[module abstraction](../zig-native/MODULE_ABSTRACTION.md) for import and
+artifact rules.
 
 Hosts can register typed parsers for external files through `createCompiler`'s
 `assets` option. Source imports those virtual modules normally, for example
@@ -1030,8 +1049,10 @@ Hosts use `compiler/guest.ts` and guest ABI 2 or 3. ABI 3 adds private
 invocation ownership hooks while preserving the same host value types. Numeric
 arrays cross as copied typed arrays; host callbacks are explicit scalar or
 numeric-array capabilities. Async capabilities suspend a guest invocation
-without discarding its local state. Records, general arrays and persistent guest
-handles are not host ABI values yet. There are no implicit
+without discarding its local state. A guest closure capturing a host callback
+stays bound to that invocation: calling it after the invocation ends fails; a
+later host argument cannot rebind it. Records, general arrays and persistent
+guest handles are not host ABI values yet. There are no implicit
 window/filesystem/network imports. For details read `compiler/guest-abi.md`,
 `compiler/effects-and-io.md`, `compiler/README.md`, and `std/README.md`.
 
@@ -1107,10 +1128,12 @@ This includes the prelude's `&&` and `||`, equivalent user functions and acyclic
 forwarding through other small functions in the same module. A memo created
 outside a callee loop survives all its iterations; a call inside a loop creates
 fresh state on each execution. Aliases share the first normally completed
-result. Zero iterations and unchosen branches perform no demand. Escaping
-demands, provider changes, arbitrary callbacks and bodies outside the bounded
-proof retain the shared runtime cell. Evaluation order, capture versions and
-first-demand providers are the same in both cases.
+result. Known lexical callbacks and local aliases can share those same memo
+locals when the complete bounded proof establishes every use and capture. Zero
+iterations and unchosen branches perform no demand. Escaping demands, provider
+changes, arbitrary callbacks and bodies outside the bounded proof retain the
+shared runtime cell. Evaluation order, capture versions and first-demand
+providers are the same in both cases.
 
 ## Pattern alternatives and layout
 

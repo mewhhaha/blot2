@@ -316,6 +316,7 @@ test {
     _ = @import("shared_rc_tests.zig");
     _ = @import("root_lowering.zig");
     _ = @import("persistent_roots_tests.zig");
+    _ = @import("suspended_ownership_tests.zig");
     _ = @import("code_expectation.zig");
     _ = @import("demand_inline_tests.zig");
     _ = @import("demand_summary_tests.zig");

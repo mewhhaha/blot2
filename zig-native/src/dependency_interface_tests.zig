@@ -349,3 +349,82 @@ test "decoded malformed Core declines before symbols or interface are published"
     owner.nodes[1].ty = old;
     try admission.validatePrelude(a, &frozen, source, "std/prelude.blot");
 }
+
+const abstraction_producer =
+    \\opaque type Token = U32
+    \\private const offset = 1
+    \\const make: U32 -> Token = fn value => #Token (@u32.add value offset)
+    \\const read: Token -> U32 = fn (#Token value) => value
+;
+const abstraction_consumer = "entry const answer = fn (value: U32) => read (make value)\n";
+
+test "module abstraction compiled principal has no opaque representation or private binding" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, abstraction_producer);
+    defer a.free(bytes);
+    var owner = try format.decode(D.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &owner);
+    const producer = &owner.modules[0];
+    for (producer.interface.nominals) |nominal| if (nominal.is_opaque) {
+        try std.testing.expectEqual(@as(u32, 0), nominal.constructors.len);
+        try std.testing.expectEqual(@import("opaque_storage.zig").Storage{ .kind = .u32 }, nominal.storage);
+    };
+    for (producer.interface.constructors) |constructor| if (constructor.private) {
+        try std.testing.expectEqual(@as(u32, 0), constructor.name);
+        try std.testing.expectEqual(@as(u32, 0), constructor.payload);
+    };
+    for (producer.interface.bindings) |binding| if (binding.private) {
+        try std.testing.expectEqual(@as(u32, 0), binding.name);
+        try std.testing.expectEqual(@as(u32, 0), binding.scheme.root);
+    };
+    var result = try consume(a, bytes, abstraction_consumer);
+    defer result.deinit(a);
+    try std.testing.expect(result.compiled.bytes.len > 8);
+    try std.testing.expectEqual(@as(?consumer_api.Diagnostic, null), result.diagnostic);
+}
+
+fn abstractionRoundTrip(allocator: std.mem.Allocator, bytes: []const u8) !void {
+    var owner = try format.decode(D.FrozenDependency, allocator, bytes, key);
+    defer format.deinit(allocator, &owner);
+    try admission.validatePrelude(allocator, &owner, abstraction_producer, "std/prelude.blot");
+    const encoded = try format.encode(allocator, key, owner);
+    defer allocator.free(encoded);
+    try std.testing.expectEqualSlices(u8, bytes, encoded);
+    var names: symbols.Pool = .{};
+    defer names.deinit(allocator);
+    try relink.relink(allocator, &owner, &names, &.{2});
+}
+
+test "module abstraction allocation failure releases every unpublished compiled owner" {
+    const bytes = try artifact(std.testing.allocator, abstraction_producer);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, abstractionRoundTrip, .{bytes});
+}
+
+test "module abstraction forged identities ABI and private constructor promotion reject before publication" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, abstraction_producer);
+    defer a.free(bytes);
+    var owner = try format.decode(D.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &owner);
+    const producer = &owner.modules[0];
+    const nominal = for (producer.interface.nominals) |*definition| {
+        if (definition.is_opaque) break definition;
+    } else return error.TestUnexpectedResult;
+    const saved = nominal.*;
+    nominal.storage.kind = .f32;
+    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &owner, abstraction_producer, "std/prelude.blot"));
+    nominal.* = saved;
+    nominal.identity.decl = @import("types.zig").opaque_name_bit | producer.interface.bindings[1].name;
+    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &owner, abstraction_producer, "std/prelude.blot"));
+    nominal.* = saved;
+    const constructor = for (producer.interface.constructors) |*definition| {
+        if (definition.private) break definition;
+    } else return error.TestUnexpectedResult;
+    const original = constructor.*;
+    constructor.private = false;
+    constructor.name = nominal.name;
+    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &owner, abstraction_producer, "std/prelude.blot"));
+    constructor.* = original;
+    try admission.validatePrelude(a, &owner, abstraction_producer, "std/prelude.blot");
+}

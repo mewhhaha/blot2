@@ -410,6 +410,10 @@ fn obligationsEqual(previous: []const core.Obligation, current: []const core.Obl
     return true;
 }
 fn catalogEqual(previous: *const core.Module, current: *const core.Module) bool {
+    const shared = @min(previous.bindings.len, current.bindings.len);
+    for (previous.bindings[0..shared], current.bindings[0..shared]) |before, after| if (before.private != after.private) return false;
+    for (previous.bindings[shared..]) |binding| if (binding.private) return false;
+    for (current.bindings[shared..]) |binding| if (binding.private) return false;
     inline for (@typeInfo(core.Module).@"struct".field_names) |name| {
         const field = @field(ModuleField, name);
         switch (field) {

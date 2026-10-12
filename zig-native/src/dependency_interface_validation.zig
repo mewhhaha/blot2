@@ -23,6 +23,10 @@ fn names(values: []const u32, count: usize) Error!void {
 fn units(id: u32, count: usize) Error!void {
     try require(id == 0 or id == std.math.maxInt(u32) or id <= count);
 }
+fn identity(value: T.NominalIdentity, symbol_count: usize, unit_count: usize) Error!void {
+    try units(value.unit, unit_count);
+    if (value.unit != 0 and value.unit != std.math.maxInt(u32) and value.decl & T.opaque_name_bit != 0) try require((value.decl & ~T.opaque_name_bit) < symbol_count);
+}
 fn scheme(owner: *const PI.Interface, value: T.Scheme) Error!void {
     try ty(owner, value.root);
     for (try list(owner, value.variables)) |id| {
@@ -58,12 +62,12 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
             }
         },
         .nominal => {
-            try units(node.a, unit_count);
+            try identity(.{ .unit = node.a, .decl = node.b }, symbol_count, unit_count);
             try require(node.c < owner.graph.extra.len);
             const start = std.math.add(u32, node.c, 1) catch return error.InvalidArtifact;
             for (try list(owner, .{ .start = start, .len = owner.graph.extra[node.c] })) |child| try ty(owner, child);
         },
-        .type_constructor => try units(node.a, unit_count),
+        .type_constructor => try identity(.{ .unit = node.a, .decl = node.b }, symbol_count, unit_count),
         .array, .list, .cursor, .resolver => try ty(owner, node.a),
         .demand, .provider => {
             try ty(owner, node.a);
@@ -83,7 +87,7 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
     }
     try require(owner.graph.rows[0].labels.len == 0 and owner.graph.rows[0].tail == .closed);
     for (owner.graph.operations) |operation| {
-        try units(operation.identity.unit, unit_count);
+        try identity(operation.identity, symbol_count, unit_count);
         for (try list(owner, operation.arguments)) |argument| try ty(owner, argument);
     }
     try require(owner.graph.operations[0].identity.unit == 0 and owner.graph.operations[0].identity.decl == 0);
@@ -119,14 +123,21 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
         try ty(owner, obligation.other);
         try ty(owner, obligation.signature);
         try require(obligation.source == 0 and obligation.name < symbol_count);
-        try units(obligation.identity.unit, unit_count);
+        try identity(obligation.identity, symbol_count, unit_count);
         try units(obligation.qualification_unit, unit_count);
     }
     for (owner.nominals) |nominal| {
+        if (nominal.identity.unit != 0 and nominal.identity.unit != std.math.maxInt(u32)) try require(nominal.is_opaque == (nominal.identity.decl & T.opaque_name_bit != 0));
+        if (nominal.is_opaque) {
+            try require(nominal.alias == 0 and nominal.constructors.len == 0);
+            try require(nominal.storage.kind != .parameter or nominal.storage.parameter < nominal.parameters.len);
+            try require(nominal.identity.decl & T.opaque_name_bit != 0);
+            try require((nominal.identity.decl & ~T.opaque_name_bit) < symbol_count);
+        }
         try ty(owner, nominal.alias);
         for (try list(owner, nominal.alias_rows)) |row| try require(row < owner.graph.row_variable_count);
         if (nominal.alias != 0) try require(nominal.constructors.len == 0);
-        try units(nominal.identity.unit, unit_count);
+        try identity(nominal.identity, symbol_count, unit_count);
         try require(nominal.name < symbol_count);
         for (try list(owner, nominal.parameters)) |id| try ty(owner, id);
         for (try list(owner, nominal.variables)) |id| try ty(owner, id);
@@ -136,7 +147,7 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
         for (try list(owner, nominal.constructors)) |id| try require(id < owner.constructors.len);
     }
     for (owner.contracts) |contract| {
-        try units(contract.identity.unit, unit_count);
+        try identity(contract.identity, symbol_count, unit_count);
         try require(contract.name < symbol_count);
         for (try list(owner, contract.parameters)) |id| try ty(owner, id);
         for (try list(owner, contract.variables)) |id| {
@@ -153,17 +164,17 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
     for (owner.contract_predicates) |predicate| {
         inline for (.{ "ty", "other", "result", "signature" }) |field| try ty(owner, @field(predicate, field));
         try require(predicate.source == 0 and predicate.name < symbol_count and predicate.explicit);
-        try units(predicate.identity.unit, unit_count);
+        try identity(predicate.identity, symbol_count, unit_count);
         try units(predicate.qualification_unit, unit_count);
     }
     for (owner.constructors) |constructor| {
-        try units(constructor.identity.unit, unit_count);
+        try identity(constructor.identity, symbol_count, unit_count);
         try require(constructor.name < symbol_count and constructor.nominal < owner.nominals.len);
         try scheme(owner, constructor.scheme);
         try ty(owner, constructor.payload);
     }
     for (owner.effect_families) |family| {
-        try units(family.identity.unit, unit_count);
+        try identity(family.identity, symbol_count, unit_count);
         try require(family.name < symbol_count);
         for (try list(owner, family.parameters)) |id| try ty(owner, id);
         for (try list(owner, family.variables)) |id| try ty(owner, id);
@@ -173,13 +184,13 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
         for (try list(owner, family.operations)) |id| try require(id < owner.effect_templates.len);
     }
     for (owner.effect_templates) |operation| {
-        try units(operation.identity.unit, unit_count);
+        try identity(operation.identity, symbol_count, unit_count);
         try require(operation.name < symbol_count and operation.family < owner.effect_families.len);
         try ty(owner, operation.parameter);
         try ty(owner, operation.result);
     }
     for (owner.associated) |method| {
-        try units(method.identity.unit, unit_count);
+        try identity(method.identity, symbol_count, unit_count);
         try require(method.member < symbol_count and method.binding < owner.bindings.len);
     }
 }

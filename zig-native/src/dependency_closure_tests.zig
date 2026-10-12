@@ -275,9 +275,10 @@ test "principal publication keeps reusable globals and Core retains later-constr
     var value = try closure.freeze(a, &source, &checked);
     defer format.deinit(a, &value);
     const found = source.symbols.lookup("found").?;
-    const local = for (value.modules[0].interface.bindings, 0..) |b, id| {
+    const local = for (checked.module(2).checked.bindings, 0..) |b, id| {
         if (b.kind == .local and b.name == found) break id;
     } else return error.TestUnexpectedResult;
+    try std.testing.expectEqual(@as(u32, 0), value.modules[0].interface.bindings[local].name);
     try std.testing.expectEqual(@as(u32, 0), value.modules[0].interface.bindings[local].ty);
     try std.testing.expectEqual(@as(u32, 0), value.modules[0].interface.bindings[local].scheme.root);
     try std.testing.expectEqual(@as(u32, 0), value.modules[0].interface.bindings[local].scheme.variables.len);

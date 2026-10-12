@@ -26,7 +26,7 @@ pub const Module = struct {
         allocator.free(self.exports);
     }
 };
-pub const Code = enum { source_validation, semantic, duplicate_name, unknown_export, entry_module, declaration_modifier, dependency_failed };
+pub const Code = enum { resolution_budget, source_validation, semantic, duplicate_name, unknown_export, entry_module, declaration_modifier, dependency_failed };
 pub const Diagnostic = struct {
     unit: project.UnitId,
     span: ast.Span,
@@ -53,6 +53,7 @@ pub const Diagnostic = struct {
         if (self.semantic) |code| return (check.Diagnostic{ .code = code, .node = 0, .span = self.span, .type_application = self.type_application, .symbol = self.symbol, .implicit_type_witness = self.implicit_type_witness, .source_terminator = self.source_terminator }).message();
         if (self.source) |source| return source.message();
         return switch (self.code) {
+            .resolution_budget => "Module forwarding resolution budget exhausted",
             .source_validation => "Source loading or parsing failed",
             .semantic => "Module semantic checking failed",
             .duplicate_name => "Import aliases cannot collide with another alias or a local declaration",
@@ -124,6 +125,7 @@ const Engine = struct {
     diagnostics: std.ArrayList(Diagnostic) = .empty,
     source_validation: bool = false,
     execution: check.PrivateExecution = .{},
+    resolution_remaining: usize = 1_000_000,
     editor: ?EditorQuery = null,
     source_modules: []?SourceModule = &.{},
     compiled_catalogs: []CompiledCatalog = &.{},
@@ -252,6 +254,8 @@ const Engine = struct {
         const tree = &source.tree;
         var occupied: std.AutoHashMapUnmanaged(symbols.Symbol, void) = .empty;
         defer occupied.deinit(self.allocator);
+        var forwarded: std.ArrayList(Export) = .empty;
+        defer forwarded.deinit(self.allocator);
         var imports: std.ArrayList(check.ImportedBinding) = .empty;
         defer imports.deinit(self.allocator);
         var headers: std.ArrayList(check.SourceHeader) = .empty;
@@ -278,6 +282,7 @@ const Engine = struct {
         }
         for (self.source.unitImports(unit)) |imported| {
             const info = tree.importDecl(imported.declaration.node);
+            const forwarding = tree.node(imported.declaration.node).tag == .export_decl;
             if (info.namespace != 0) {
                 const entry = try occupied.getOrPut(self.allocator, info.namespace);
                 if (entry.found_existing) {
@@ -296,7 +301,11 @@ const Engine = struct {
             }
             try self.appendCatalog(&catalogs, &source_catalogs, producer, 0, 0, .catalog, 0, imported.declaration.node);
             if (info.namespace != 0) {
-                for (producer.exports) |exported| try self.importExport(&imports, &headers, &catalogs, &source_catalogs, producer, exported, exported.name, info.namespace, imported.declaration.node);
+                for (producer.exports) |exported| {
+                    var original = producer;
+                    if (exported.kind != .value and exported.target.unit != 0 and exported.target.unit != imported.target) original = self.catalogModule(exported.target.unit).?;
+                    try self.importExport(&imports, &headers, &catalogs, &source_catalogs, original, exported, exported.name, info.namespace, imported.declaration.node);
+                }
             } else {
                 for (tree.list(info.bindings)) |binding| {
                     const alias = tree.importBinding(binding);
@@ -306,10 +315,25 @@ const Engine = struct {
                         continue;
                     }
                     var found = false;
-                    for (producer.exports) |exported| if (exported.name == alias.name) {
+                    for (producer.exports) |exported| {
+                        if (forwarding) {
+                            if (self.resolution_remaining == 0) {
+                                try self.diagnostic(unit, tree.span(binding), .resolution_budget);
+                                break;
+                            }
+                            self.resolution_remaining -= 1;
+                        }
+                        if (exported.name != alias.name) continue;
                         found = true;
-                        try self.importExport(&imports, &headers, &catalogs, &source_catalogs, producer, exported, alias.alias, 0, binding);
-                    };
+                        var original = producer;
+                        if (exported.kind != .value and exported.target.unit != 0 and exported.target.unit != imported.target) original = self.catalogModule(exported.target.unit).?;
+                        try self.importExport(&imports, &headers, &catalogs, &source_catalogs, original, exported, alias.alias, 0, binding);
+                        if (forwarding) {
+                            var public = exported;
+                            public.name = alias.alias;
+                            try forwarded.append(self.allocator, public);
+                        }
+                    }
                     if (!found) {
                         try self.diagnostic(unit, tree.span(binding), .unknown_export);
                         continue;
@@ -378,7 +402,7 @@ const Engine = struct {
             var transferred = false;
             defer if (!transferred) validation.deinit(self.allocator);
             if (check.hasNumericFailure(tree) and validation.diagnostics.len == 0) return error.NumericValidationIncomplete;
-            const owned_exports = try self.moduleExports(unit, check.declarationCatalog(&validation), validation.declarations, validation.diagnostics);
+            const owned_exports = try self.moduleExports(unit, check.declarationCatalog(&validation), validation.declarations, validation.diagnostics, forwarded.items);
             self.source_modules[unit - 1] = .{ .validation = validation, .exports = owned_exports, .valid = self.diagnostics.items.len == diagnostics_before };
             transferred = true;
         } else {
@@ -397,7 +421,7 @@ const Engine = struct {
                 try self.appendDiagnostics(unit, checked.diagnostics);
                 return;
             }
-            const owned_exports = try self.moduleExports(unit, check.declarationCatalog(&checked), checked.bindings, checked.diagnostics);
+            const owned_exports = try self.moduleExports(unit, check.declarationCatalog(&checked), checked.bindings, checked.diagnostics, forwarded.items);
             self.result.modules[unit - 1] = .{ .checked = checked, .exports = owned_exports, .valid = self.diagnostics.items.len == diagnostics_before };
             transferred = true;
             self.result.body_elaborations += checked.body_elaborations;
@@ -431,25 +455,26 @@ const Engine = struct {
             });
         }
     }
-    fn moduleExports(self: *Engine, unit: project.UnitId, catalog: check.DeclarationCatalog, declarations: anytype, diagnostics: []const check.Diagnostic) ![]Export {
+    fn moduleExports(self: *Engine, unit: project.UnitId, catalog: check.DeclarationCatalog, declarations: anytype, diagnostics: []const check.Diagnostic, forwarded: []const Export) ![]Export {
         var exports: std.ArrayList(Export) = .empty;
         defer exports.deinit(self.allocator);
         for (declarations, 0..) |binding, index| {
-            if (binding.kind != .global) continue;
+            if (binding.kind != .global or binding.private) continue;
             try exports.append(self.allocator, .{ .name = binding.name, .target = .{ .unit = unit, .binding = @intCast(index) } });
         }
-        for (catalog.nominals, 0..) |nominal, index| if (index != 0 and nominal.identity.unit == unit) {
-            try exports.append(self.allocator, .{ .name = nominal.name, .kind = .nominal, .catalog = @intCast(index) });
+        for (catalog.nominals, 0..) |nominal, index| if (index != 0 and nominal.identity.unit == unit and !nominal.private) {
+            try exports.append(self.allocator, .{ .name = nominal.name, .target = .{ .unit = unit, .binding = 0 }, .kind = .nominal, .catalog = @intCast(index) });
         };
-        for (catalog.constructors, 0..) |constructor, index| if (index != 0 and constructor.identity.unit == unit) {
-            try exports.append(self.allocator, .{ .name = constructor.name, .kind = .constructor, .catalog = @intCast(index) });
+        for (catalog.constructors, 0..) |constructor, index| if (index != 0 and constructor.identity.unit == unit and !constructor.private) {
+            try exports.append(self.allocator, .{ .name = constructor.name, .target = .{ .unit = unit, .binding = 0 }, .kind = .constructor, .catalog = @intCast(index) });
         };
-        for (catalog.effect_families, 0..) |family, index| if (index != 0 and family.identity.unit == unit) {
-            try exports.append(self.allocator, .{ .name = family.name, .kind = .effect_family, .catalog = @intCast(index) });
+        for (catalog.effect_families, 0..) |family, index| if (index != 0 and family.identity.unit == unit and !family.private) {
+            try exports.append(self.allocator, .{ .name = family.name, .target = .{ .unit = unit, .binding = 0 }, .kind = .effect_family, .catalog = @intCast(index) });
         };
-        for (catalog.contracts, 0..) |contract, index| if (contract.identity.unit == unit) {
-            try exports.append(self.allocator, .{ .name = contract.name, .kind = .contract, .catalog = @intCast(index) });
+        for (catalog.contracts, 0..) |contract, index| if (contract.identity.unit == unit and !contract.private) {
+            try exports.append(self.allocator, .{ .name = contract.name, .target = .{ .unit = unit, .binding = 0 }, .kind = .contract, .catalog = @intCast(index) });
         };
+        try exports.appendSlice(self.allocator, forwarded);
         try self.appendDiagnostics(unit, diagnostics);
         // All fallible transfers finish before the caller publishes its owner.
         return exports.toOwnedSlice(self.allocator);
@@ -565,7 +590,7 @@ test "project exports preserve positioned inference budget rejection with empty 
         for (engine.diagnostics.items) |diagnostic| if (diagnostic.detail) |detail| allocator.free(detail);
         engine.diagnostics.deinit(allocator);
     }
-    const exports = try engine.moduleExports(1, check.declarationCatalog(&checked), checked.bindings, checked.diagnostics);
+    const exports = try engine.moduleExports(1, check.declarationCatalog(&checked), checked.bindings, checked.diagnostics, &.{});
     defer engine.allocator.free(exports);
     try std.testing.expectEqual(@as(usize, 0), exports.len);
     try std.testing.expectEqual(@as(usize, 1), engine.diagnostics.items.len);

@@ -32,6 +32,8 @@ pub const Node = struct {
 comptime {
     std.debug.assert(@sizeOf(Node) == 16);
 }
+/// Opaque declarations use a relocated spelling handle rather than an AST ordinal.
+pub const opaque_name_bit: u32 = 0x80000000;
 pub const NominalIdentity = struct { unit: u32, decl: u32 };
 pub const Operation = struct { identity: NominalIdentity, arguments: List = .{} };
 pub const foreign_operation: Effects.Label = 1;

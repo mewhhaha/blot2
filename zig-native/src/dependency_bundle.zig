@@ -13,7 +13,7 @@ const Allocator = std.mem.Allocator;
 /// This never freezes application-specific instances, evaluated values or code.
 pub fn freeze(allocator: Allocator, path: []const u8, source: []const u8, pool: *const symbols.Pool, tree: *const ast.Tree, checked: *const check.Checked, prelude: bool) !D.FrozenDependency {
     if (checked.unit != 1 or checked.diagnostics.len != 0 or source.len > std.math.maxInt(u32)) return error.InvalidArtifact;
-    for (tree.roots.items) |id| if (tree.node(id).tag == .import_decl) return error.ImportedDependencyUnsupported;
+    for (tree.roots.items) |id| if (tree.node(id).tag == .import_decl or tree.node(id).tag == .export_decl) return error.ImportedDependencyUnsupported;
     var ir = try core.lower(allocator, tree, pool, checked);
     errdefer ir.deinit(allocator);
     ir.unit = 1;
@@ -22,23 +22,23 @@ pub fn freeze(allocator: Allocator, path: []const u8, source: []const u8, pool: 
     // portable proof. Core semantics consist only of tag/a/b/c here.
     for (ir.types.nodes) |*node| node.* = .{ .tag = node.tag, .a = node.a, .b = node.b, .c = node.c };
     for (ir.bodies) |body| if (body.exported) return error.EntryDependencyUnsupported;
-    var interface = try snapshot.freeze(allocator, tree, checked);
+    var interface = try snapshot.freezePrincipal(allocator, tree, checked);
     errdefer snapshot.deinit(allocator, &interface);
     var exports: std.ArrayList(D.Export) = .empty;
     defer exports.deinit(allocator);
-    for (checked.bindings, 0..) |binding, id| if (binding.kind == .global) {
+    for (checked.bindings, 0..) |binding, id| if (binding.kind == .global and !binding.private) {
         try exports.append(allocator, .{ .name = binding.name, .target = .{ .unit = 1, .binding = @intCast(id) }, .kind = .value, .catalog = 0 });
     };
-    for (checked.nominals[1..], 1..) |nominal, id| if (nominal.identity.unit == 1) {
+    for (checked.nominals[1..], 1..) |nominal, id| if (nominal.identity.unit == 1 and !nominal.private) {
         try exports.append(allocator, .{ .name = nominal.name, .target = .{ .unit = 0, .binding = 0 }, .kind = .nominal, .catalog = @intCast(id) });
     };
-    for (checked.constructors[1..], 1..) |constructor, id| if (constructor.identity.unit == 1) {
+    for (checked.constructors[1..], 1..) |constructor, id| if (constructor.identity.unit == 1 and !constructor.private) {
         try exports.append(allocator, .{ .name = constructor.name, .target = .{ .unit = 0, .binding = 0 }, .kind = .constructor, .catalog = @intCast(id) });
     };
-    for (checked.effect_families[1..], 1..) |family, id| if (family.identity.unit == 1) {
+    for (checked.effect_families[1..], 1..) |family, id| if (family.identity.unit == 1 and !family.private) {
         try exports.append(allocator, .{ .name = family.name, .target = .{ .unit = 0, .binding = 0 }, .kind = .effect_family, .catalog = @intCast(id) });
     };
-    for (checked.contracts, 0..) |contract, id| if (contract.identity.unit == 1) {
+    for (checked.contracts, 0..) |contract, id| if (contract.identity.unit == 1 and !contract.private) {
         try exports.append(allocator, .{ .name = contract.name, .target = .{ .unit = 0, .binding = 0 }, .kind = .contract, .catalog = @intCast(id) });
     };
     var fixities: std.ArrayList(D.Fixity) = .empty;

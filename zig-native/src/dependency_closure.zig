@@ -348,6 +348,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
     if (saved) |old| {
         for (old.value.modules, previous_views) |*module, *view| view.* = &module.core;
     }
+    var resolution_remaining: usize = 1_000_000;
     for (value.modules, 0..) |*m, id| {
         const shared = if (saved) |old| if (current) |owner| owner.shares(old, id) else false else false;
         const same_interface_bounds = if (saved) |old| value.symbols.len == old.value.symbols.len and value.modules.len == old.value.modules.len else false;
@@ -372,6 +373,8 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
             for (m.core.field_names) |field| try require(std.mem.eql(u8, m.core.name(field.spelling), value.symbols[field.symbol].text));
             stats.core_checked += 1;
         }
+        try @import("module_abstraction_validation.zig").publicView(a, &m.interface);
+        try @import("module_abstraction_validation.zig").storageContracts(&m.interface, &m.core);
         for (m.core.bodies) |body| try require(!body.exported);
         for (m.imports) |unit| try require(unit != 0 and unit <= value.modules.len and unit != id + 1);
         try require(m.imports.len == m.source_imports.len + @intFromBool(m.implicit_prelude));
@@ -381,19 +384,31 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
             try require(std.unicode.utf8ValidateSlice(request.path) and std.mem.findScalar(u8, request.path, 0) == null);
         }
         for (m.interface.bindings) |b| if (b.external) |target| try external(value, id, target);
+        var names: std.AutoHashMapUnmanaged(struct { name: u32, kind: @FieldType(D.Export, "kind") }, void) = .empty;
+        defer names.deinit(a);
+        const reachable = try forwardedOwners(a, value, id, &resolution_remaining);
+        defer a.free(reachable);
         for (m.exports) |exported| {
             try require(exported.name != 0 and exported.name < value.symbols.len);
+            const slot = try names.getOrPut(a, .{ .name = exported.name, .kind = exported.kind });
+            try require(!slot.found_existing);
+            var producer = id + 1;
+            if (exported.target.unit != 0) producer = exported.target.unit;
+            try require(producer != 0 and producer <= value.modules.len);
+            if (producer != id + 1) try require(reachable.len != 0 and reachable[producer - 1]);
+            const owner = &value.modules[producer - 1].interface;
+            // The producer ordinal and catalog/binding select the original
+            // declaration. Forwarding changes only its public spelling.
             switch (exported.kind) {
                 .value => {
                     try external(value, id, exported.target);
-                    const unit = if (exported.target.unit == 0) id + 1 else exported.target.unit;
-                    const b = value.modules[unit - 1].interface.bindings[exported.target.binding];
-                    try require(b.kind == .global and b.name == exported.name);
+                    const b = owner.bindings[exported.target.binding];
+                    try require(b.kind == .global and !b.private and (producer != id + 1 or b.name == exported.name));
                 },
-                .nominal => try require(exported.catalog != 0 and exported.catalog < m.interface.nominals.len and m.interface.nominals[exported.catalog].name == exported.name),
-                .constructor => try require(exported.catalog != 0 and exported.catalog < m.interface.constructors.len and m.interface.constructors[exported.catalog].name == exported.name),
-                .effect_family => try require(exported.catalog != 0 and exported.catalog < m.interface.effect_families.len and m.interface.effect_families[exported.catalog].name == exported.name),
-                .contract => try require(exported.catalog < m.interface.contracts.len and m.interface.contracts[exported.catalog].name == exported.name),
+                .nominal => try require(exported.catalog != 0 and exported.catalog < owner.nominals.len and !owner.nominals[exported.catalog].private and (producer != id + 1 or owner.nominals[exported.catalog].name == exported.name)),
+                .constructor => try require(exported.catalog != 0 and exported.catalog < owner.constructors.len and !owner.constructors[exported.catalog].private and (producer != id + 1 or owner.constructors[exported.catalog].name == exported.name)),
+                .effect_family => try require(exported.catalog != 0 and exported.catalog < owner.effect_families.len and !owner.effect_families[exported.catalog].private and (producer != id + 1 or owner.effect_families[exported.catalog].name == exported.name)),
+                .contract => try require(exported.catalog < owner.contracts.len and !owner.contracts[exported.catalog].private and (producer != id + 1 or owner.contracts[exported.catalog].name == exported.name)),
             }
         }
         for (m.fixities) |f| {
@@ -403,6 +418,29 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
         }
     }
     try validateImportGraph(a, value);
+}
+
+fn forwardedOwners(a: std.mem.Allocator, value: *const D.FrozenDependency, current: usize, remaining: *usize) Error![]bool {
+    var forwarding = false;
+    for (value.modules[current].exports) |entry| forwarding = forwarding or (entry.target.unit != 0 and entry.target.unit != current + 1);
+    if (!forwarding) return &.{};
+    const seen = try a.alloc(bool, value.modules.len);
+    errdefer a.free(seen);
+    @memset(seen, false);
+    var work: std.ArrayList(u32) = .empty;
+    defer work.deinit(a);
+    try require(value.modules[current].imports.len <= remaining.*);
+    remaining.* -= value.modules[current].imports.len;
+    try work.appendSlice(a, value.modules[current].imports);
+    while (work.pop()) |unit| {
+        try require(unit != 0 and unit <= seen.len);
+        if (seen[unit - 1]) continue;
+        seen[unit - 1] = true;
+        try require(value.modules[unit - 1].imports.len <= remaining.*);
+        remaining.* -= value.modules[unit - 1].imports.len;
+        try work.appendSlice(a, value.modules[unit - 1].imports);
+    }
+    return seen;
 }
 
 fn validateImportGraph(a: std.mem.Allocator, value: *const D.FrozenDependency) Error!void {

@@ -180,6 +180,15 @@ fn makeItem(a: Allocator, loaded: *P.Project, project_checked: *PC.CheckedProjec
     if (name.identity.unit != 0 and name.identity.unit <= loaded.units.items.len) {
         item.filename = try a.dupe(u8, loaded.filename(name.identity.unit));
         var declaration_ = name.identity.decl;
+        if (declaration_ & T.opaque_name_bit != 0) {
+            declaration_ = 0;
+            if (name.identity.unit <= project_checked.modules.len) if (project_checked.modules[name.identity.unit - 1]) |module| {
+                for (module.checked.nominals) |nominal| if (std.meta.eql(nominal.identity, name.identity)) {
+                    declaration_ = nominal.declaration;
+                    break;
+                };
+            };
+        }
         if (name.external) |external| if (external.unit <= project_checked.modules.len) if (project_checked.modules[external.unit - 1]) |module| {
             declaration_ = module.checked.bindings[external.binding].declaration;
         };
@@ -523,6 +532,35 @@ test "editor completion follows named aliases namespace boundaries fields constr
         try std.testing.expectEqual(case.match, item.match);
         try std.testing.expect(find(result, case.absent) == null);
         try std.testing.expectEqual(@as(usize, 0), result.diagnostics.len);
+    }
+}
+
+test "module abstraction completion keeps source origins without exposing constructors or fields" {
+    const a = std.testing.allocator;
+    const library = "opaque type Token = { secret: U32 }\nprivate const hidden = 7\nconst make = fn value => #Token { secret: value }\n";
+    for ([_][]const u8{
+        "import * as lib from \"./library\"\nconst work = lib.",
+        "import {Token} from \"./library\"\nconst work = fn (value: Token) => value.",
+        "opaque type Token = U32\nconst work = To",
+    }, 0..) |text, index| {
+        var snapshot = try inputs.Snapshot.initWithSources(a, std.testing.io, .{}, &.{
+            .{ .path = "/editor/main.blot", .contents = text },
+            .{ .path = "/editor/library.blot", .contents = library },
+        });
+        defer snapshot.deinit();
+        const result = try query(a, std.testing.io, "/editor/main.blot", &snapshot, "/editor/main.blot", @intCast(text.len));
+        defer result.deinit(a);
+        try std.testing.expectEqual(@as(usize, 0), result.diagnostics.len);
+        try std.testing.expect(find(result, "hidden") == null);
+        try std.testing.expect(find(result, "secret") == null);
+        if (index < 2) try std.testing.expect(find(result, "#Token") == null);
+        if (index != 1) {
+            const item = find(result, "Token") orelse return error.MissingCompletion;
+            var filename: []const u8 = "/editor/library.blot";
+            if (index == 2) filename = "/editor/main.blot";
+            try std.testing.expectEqualStrings(filename, item.filename);
+            try std.testing.expect(item.start < library.len);
+        }
     }
 }
 

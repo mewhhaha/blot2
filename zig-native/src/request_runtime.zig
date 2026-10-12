@@ -37,9 +37,11 @@ pub fn runner(module: *wasm.Module, function: u32, owner: u32, cell: u32, cleanu
     try module.emit(function, .{ .op = .end });
 }
 pub fn cancel(module: *wasm.Module, function: u32, owner: u32, cell: u32, status: Status, cleanups: *const cleanup.Stack) !void {
-    try module.emit(function, .{ .op = .local_get, .operand = cell });
-    try module.emit(function, .{ .op = .i32_const, .operand = @backingInt(status) });
-    try module.emit(function, .{ .op = .i32_store, .operand = heap.offset(Cell, "status") });
+    try module.emitSlice(function, &.{
+        .{ .op = .local_get, .operand = cell },                        .{ .op = .local_get, .operand = cell },
+        .{ .op = .i32_const, .operand = heap.offset(Cell, "status") }, .{ .op = .i32_add },
+        .{ .op = .i32_const, .operand = @backingInt(status) },         .{ .op = .call, .operand = module.arena.?.store_word },
+    });
     try module.emit(function, .{ .op = .local_get, .operand = cell });
     try module.emit(function, .{ .op = .global_set, .operand = owner });
     try dummy(module, function, cleanups);

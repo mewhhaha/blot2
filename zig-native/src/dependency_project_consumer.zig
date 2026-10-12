@@ -77,13 +77,17 @@ fn importExport(a: Allocator, bundle: *const D.FrozenDependency, imports: *std.A
         value.namespace = namespace;
         value.member = if (namespace == 0) 0 else name;
         try imports.append(a, value);
-    } else try catalogs.append(a, .{ .frozen = &bundle.modules[owner - 1].interface, .name = name, .namespace = namespace, .origin = origin, .index = exported.catalog, .kind = switch (exported.kind) {
-        .nominal => .nominal,
-        .constructor => .constructor,
-        .effect_family => .effect_family,
-        .contract => .contract,
-        .value => unreachable,
-    } });
+    } else {
+        var producer = owner;
+        if (exported.target.unit != 0) producer = exported.target.unit;
+        try catalogs.append(a, .{ .frozen = &bundle.modules[producer - 1].interface, .name = name, .namespace = namespace, .origin = origin, .index = exported.catalog, .kind = switch (exported.kind) {
+            .nominal => .nominal,
+            .constructor => .constructor,
+            .effect_family => .effect_family,
+            .contract => .contract,
+            .value => unreachable,
+        } });
+    }
 }
 
 /// Keep the first gate's closure exact. Retaining an unreachable former module

@@ -25,6 +25,13 @@
         }
       },
       {
+        "rule": "export_declaration",
+        "boundary": {
+          "kind": "terminated",
+          "terminal": "LAYOUT_NEWLINE"
+        }
+      },
+      {
         "rule": "namespace_import",
         "boundary": {
           "kind": "root"
@@ -64,6 +71,12 @@
       },
       {
         "rule": "data_type",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "opaque_type",
         "boundary": {
           "kind": "root"
         }
@@ -154,6 +167,12 @@
       },
       {
         "rule": "parameter",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "typed_parameter",
         "boundary": {
           "kind": "root"
         }

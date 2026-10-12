@@ -16,59 +16,63 @@ fn symbol(map: []const u32, id: u32) u32 {
 fn unit(map: []const u32, id: u32) u32 {
     return if (id == 0 or id == std.math.maxInt(u32)) id else map[id - 1];
 }
-fn identity(map: []const u32, value: *T.NominalIdentity) void {
+fn identity(map: []const u32, names: []const u32, value: *T.NominalIdentity) void {
     value.unit = unit(map, value.unit);
+    if (value.unit != 0 and value.unit != std.math.maxInt(u32) and value.decl & T.opaque_name_bit != 0) value.decl = T.opaque_name_bit | symbol(names, value.decl & ~T.opaque_name_bit);
 }
 fn target(map: []const u32, value: anytype) void {
     value.unit = unit(map, value.unit);
 }
-fn typeUnits(nodes: []T.Node, units: []const u32) void {
+fn typeUnits(nodes: []T.Node, names: []const u32, units: []const u32) void {
     for (nodes) |*node| switch (node.tag) {
-        .nominal, .type_constructor => node.a = unit(units, node.a),
+        .nominal, .type_constructor => {
+            node.a = unit(units, node.a);
+            if (node.a != 0 and node.a != std.math.maxInt(u32) and node.b & T.opaque_name_bit != 0) node.b = T.opaque_name_bit | symbol(names, node.b & ~T.opaque_name_bit);
+        },
         else => {},
     };
 }
 
 pub fn interface(owner: *PI.Interface, names: []const u32, units: []const u32) void {
     owner.unit = unit(units, owner.unit);
-    typeUnits(owner.graph.nodes, units);
-    for (owner.graph.operations) |*operation| identity(units, &operation.identity);
+    typeUnits(owner.graph.nodes, names, units);
+    for (owner.graph.operations) |*operation| identity(units, names, &operation.identity);
     for (owner.bindings) |*binding| {
         binding.name = symbol(names, binding.name);
         if (binding.external) |*external| target(units, external);
     }
     for (owner.obligations) |*obligation| {
         obligation.name = symbol(names, obligation.name);
-        identity(units, &obligation.identity);
+        identity(units, names, &obligation.identity);
         obligation.qualification_unit = unit(units, obligation.qualification_unit);
     }
     for (owner.nominals) |*nominal| {
-        identity(units, &nominal.identity);
+        identity(units, names, &nominal.identity);
         nominal.name = symbol(names, nominal.name);
     }
     for (owner.contracts) |*contract| {
-        identity(units, &contract.identity);
+        identity(units, names, &contract.identity);
         contract.name = symbol(names, contract.name);
     }
     for (owner.contract_predicates) |*predicate| {
         predicate.name = symbol(names, predicate.name);
-        identity(units, &predicate.identity);
+        identity(units, names, &predicate.identity);
         predicate.qualification_unit = unit(units, predicate.qualification_unit);
     }
     for (owner.constructors) |*constructor| {
-        identity(units, &constructor.identity);
+        identity(units, names, &constructor.identity);
         constructor.name = symbol(names, constructor.name);
     }
     for (owner.effect_families) |*family| {
-        identity(units, &family.identity);
+        identity(units, names, &family.identity);
         family.name = symbol(names, family.name);
     }
     for (owner.effect_templates) |*operation| {
-        identity(units, &operation.identity);
+        identity(units, names, &operation.identity);
         operation.name = symbol(names, operation.name);
     }
     for (owner.associated) |*method| {
-        identity(units, &method.identity);
+        identity(units, names, &method.identity);
         method.member = symbol(names, method.member);
     }
 }
@@ -81,8 +85,8 @@ pub fn module(owner: *core.Module, names: []const u32, units: []const u32) void 
         }
     }.less);
     owner.unit = unit(units, owner.unit);
-    typeUnits(owner.types.nodes, units);
-    for (owner.types.operations) |*operation| identity(units, &operation.identity);
+    typeUnits(owner.types.nodes, names, units);
+    for (owner.types.operations) |*operation| identity(units, names, &operation.identity);
     for (owner.nodes) |*node| switch (node.tag) {
         .associated => node.c = symbol(names, node.c),
         .result_associated => node.b = symbol(names, node.b),
@@ -96,18 +100,18 @@ pub fn module(owner: *core.Module, names: []const u32, units: []const u32) void 
     for (owner.calls) |*call| target(units, &call.target);
     for (owner.obligations) |*obligation| {
         obligation.name = symbol(names, obligation.name);
-        identity(units, &obligation.identity);
+        identity(units, names, &obligation.identity);
         obligation.qualification_unit = unit(units, obligation.qualification_unit);
     }
-    for (owner.nominals) |*nominal| identity(units, &nominal.identity);
-    for (owner.operation_names) |*operation| identity(units, &operation.identity);
-    for (owner.constructors) |*constructor| identity(units, &constructor.identity);
+    for (owner.nominals) |*nominal| identity(units, names, &nominal.identity);
+    for (owner.operation_names) |*operation| identity(units, names, &operation.identity);
+    for (owner.constructors) |*constructor| identity(units, names, &constructor.identity);
     for (owner.projections) |*projection| {
-        identity(units, &projection.nominal);
+        identity(units, names, &projection.nominal);
         projection.field = symbol(names, projection.field);
     }
     for (owner.associated) |*method| {
-        identity(units, &method.identity);
+        identity(units, names, &method.identity);
         method.member = symbol(names, method.member);
         target(units, &method.target);
     }
@@ -115,7 +119,7 @@ pub fn module(owner: *core.Module, names: []const u32, units: []const u32) void 
         operation.member = symbol(names, operation.member);
         target(units, &operation.method);
     }
-    for (owner.operation_values) |*operation| identity(units, &operation.identity);
+    for (owner.operation_values) |*operation| identity(units, names, &operation.identity);
 }
 
 /// The caller validates all payload IDs before this transaction. Failure to

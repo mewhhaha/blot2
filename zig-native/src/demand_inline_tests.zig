@@ -25,6 +25,54 @@ fn emit(a: std.mem.Allocator, module: *const core.Module) !void {
     try std.testing.expect(result.bytes.len > 8);
 }
 
+test "known callback type and row specialization releases every allocation failure" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\const read = fn ~value => do:
+        \\  let identity = fn item => item
+        \\  let callback = fn () => identity (@demand value)
+        \\  use first <- callback ()
+        \\  use callback ()
+        \\  return first
+        \\entry const integer = fn (value: U32) => read value
+        \\entry const floating = fn (value: F32) => read value
+    );
+    defer module.deinit(a);
+    const before = @import("core_snapshot_tests.zig").stamp(module);
+    try emit(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+    try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
+}
+
+test "known local callbacks preserve one creation memo through aliases and loops" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\const repeat = fn (count: U32) => fn ~(value: U32) => do:
+        \\  let read = fn (extra: U32) => @u32.add (@demand value) extra
+        \\  let alias = read
+        \\  let second = fn (extra: U32) => @u32.add (@demand value) extra
+        \\  let total = 0
+        \\  for i in 0..count:
+        \\    use left <- alias i
+        \\    use right <- second i
+        \\    total := @u32.add self (@u32.add left right)
+        \\  return total
+        \\entry const run = fn (count: U32) => repeat count 21
+    );
+    defer module.deinit(a);
+    var admitted = false;
+    for (module.bodies) |*body| if (demand.Plan.init(&module, body)) |plan| {
+        admitted = true;
+        try std.testing.expect(plan.local_callbacks);
+        try std.testing.expectEqual(@as(u8, 2), plan.uses[1]);
+    };
+    try std.testing.expect(admitted);
+    const before = @import("core_snapshot_tests.zig").stamp(module);
+    try emit(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+    try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
+}
+
 test "local memo proof admits structured loops and aliases without mutating Core" {
     const a = std.testing.allocator;
     var module = try lower(a,

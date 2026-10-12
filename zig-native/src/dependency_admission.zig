@@ -25,6 +25,8 @@ pub fn validatePrelude(allocator: std.mem.Allocator, value: *const D.FrozenDepen
     try validation.validate(&owner.interface, value.symbols.len, value.modules.len);
     try validation.validateGraph(allocator, &owner.interface);
     try core_validation.validate(allocator, &owner.core, .{ .units = &.{&owner.core}, .symbol_count = value.symbols.len, .source_length = owner.identity.source_bytes });
+    try @import("module_abstraction_validation.zig").publicView(allocator, &owner.interface);
+    try @import("module_abstraction_validation.zig").storageContracts(&owner.interface, &owner.core);
     for (owner.core.field_names) |field| try require(std.mem.eql(u8, owner.core.name(field.spelling), value.symbols[field.symbol].text));
     for (owner.interface.bindings) |binding| if (binding.external) |target| try external(value, 0, target);
     for (owner.exports) |entry| {
@@ -33,12 +35,12 @@ pub fn validatePrelude(allocator: std.mem.Allocator, value: *const D.FrozenDepen
             .value => {
                 try external(value, 0, entry.target);
                 const definition = owner.interface.bindings[entry.target.binding];
-                try require(definition.kind == .global and definition.name == entry.name);
+                try require(definition.kind == .global and !definition.private and definition.name == entry.name);
             },
-            .nominal => try require(entry.catalog != 0 and entry.catalog < owner.interface.nominals.len and owner.interface.nominals[entry.catalog].name == entry.name),
-            .constructor => try require(entry.catalog != 0 and entry.catalog < owner.interface.constructors.len and owner.interface.constructors[entry.catalog].name == entry.name),
-            .effect_family => try require(entry.catalog != 0 and entry.catalog < owner.interface.effect_families.len and owner.interface.effect_families[entry.catalog].name == entry.name),
-            .contract => try require(entry.catalog < owner.interface.contracts.len and owner.interface.contracts[entry.catalog].name == entry.name),
+            .nominal => try require(entry.catalog != 0 and entry.catalog < owner.interface.nominals.len and !owner.interface.nominals[entry.catalog].private and owner.interface.nominals[entry.catalog].name == entry.name),
+            .constructor => try require(entry.catalog != 0 and entry.catalog < owner.interface.constructors.len and !owner.interface.constructors[entry.catalog].private and owner.interface.constructors[entry.catalog].name == entry.name),
+            .effect_family => try require(entry.catalog != 0 and entry.catalog < owner.interface.effect_families.len and !owner.interface.effect_families[entry.catalog].private and owner.interface.effect_families[entry.catalog].name == entry.name),
+            .contract => try require(entry.catalog < owner.interface.contracts.len and !owner.interface.contracts[entry.catalog].private and owner.interface.contracts[entry.catalog].name == entry.name),
         }
     }
     for (owner.fixities) |fixity| {

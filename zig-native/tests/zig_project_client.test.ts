@@ -17,7 +17,7 @@ async function sha(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
     new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
   ).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
-// Version-one dependency provenance independently supplies the identity for
+// Dependency provenance independently supplies the identity for
 // the same executable's project server, without machine-specific proof pins.
 async function verified(directory: string): Promise<string> {
   const seed = directory + "/identity";
@@ -38,7 +38,7 @@ async function verified(directory: string): Promise<string> {
   const bytes = await Deno.readFile(bundle);
   ok(bytes.length >= 212);
   equal(new TextDecoder().decode(bytes.subarray(0, 8)), "BLOTDEP1");
-  equal(new DataView(bytes.buffer).getUint32(8, true), 1);
+  equal(new DataView(bytes.buffer).getUint32(8, true), 2);
   const identity = Array.from(
     bytes.subarray(44, 76),
     (byte) => byte.toString(16).padStart(2, "0"),
@@ -334,7 +334,7 @@ Deno.test("Zig project client rejects an incompatible dependency schema during o
       directory + "/identity/dependencies.blotdep",
     );
     const incompatible = valid.slice();
-    // The fixed version-one schema digest starts after magic and version.
+    // The fixed schema digest starts after magic and version.
     // Preserve provenance, payload and checksum; invalidate only this schema.
     incompatible[12] ^= 1;
     equal(incompatible.subarray(0, 12), valid.subarray(0, 12));

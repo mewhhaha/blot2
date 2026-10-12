@@ -15,6 +15,7 @@ async function runtime(bytes?: Uint8Array<ArrayBuffer>) {
   const exports = instance.exports;
   const memory = exports["blot:memory"] as WebAssembly.Memory;
   return {
+    exports,
     mode: [
       ...new Uint8Array(
         WebAssembly.Module.customSections(module, "blot:ownership")[0],
@@ -347,4 +348,35 @@ Deno.test("failed invocation frame reservation retires its empty prefix without 
   r.call("root_leave", 2);
   assert.equal(r.roots(), 0);
   assert.equal(r.count("leases"), 0);
+});
+
+Deno.test("force records distinguish exceptional terminal demands from canceled pending and ready memos", async () => {
+  const r = await runtime();
+  const { exports: e } = r;
+  const memory = e["blot:memory"] as WebAssembly.Memory;
+  const view = () => new DataView(memory.buffer);
+  const force = e.root_force as CallableFunction;
+  const enter = e.root_enter as CallableFunction;
+  const leave = e.root_leave as CallableFunction;
+  const allocate = e.root_allocate as CallableFunction;
+  const staticDemand = Number((e.static_demand as WebAssembly.Global).value);
+  for (const [state, outcome, expected] of [[1, 1, 3], [0, 0, 0], [2, 1, 2]]) {
+    enter();
+    const demand = allocate(16, 2);
+    r.call("retain", demand);
+    force(demand);
+    view().setUint32(demand + 8, state, true);
+    leave(outcome);
+    assert.equal(view().getUint32(demand + 8, true), expected);
+    r.call("release", demand);
+    assert.equal((e.roots as WebAssembly.Global).value, 0);
+    assert.equal((e["blot:rc_leases"] as WebAssembly.Global).value, 0);
+  }
+  enter();
+  force(staticDemand);
+  view().setUint32(staticDemand + 8, 1, true);
+  leave(1);
+  assert.equal(view().getUint32(staticDemand + 8, true), 3);
+  assert.equal((e.roots as WebAssembly.Global).value, 0);
+  leave(2);
 });

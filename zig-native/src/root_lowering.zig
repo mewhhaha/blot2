@@ -81,6 +81,7 @@ pub fn run(a: A, module: *const w.Module, source: *const ir.Function, framed: bo
         if (inst.op == .ownership) {
             const scope: ir.Ownership = @bitCast(inst.operand);
             if (scope.kind == .scope) {
+                if (scope.chunk == 14) continue;
                 try out.emit(a, .global_get, arena.root_enabled);
                 try out.emit(a, .if_, 0);
                 switch (scope.chunk) {
@@ -100,6 +101,10 @@ pub fn run(a: A, module: *const w.Module, source: *const ir.Function, framed: bo
                         try out.emit(a, .local_get, scope.roles & 8191);
                         try out.emit(a, .local_get, scope.roles >> 13);
                         try out.emit(a, .call, arena.root_store);
+                    },
+                    6 => {
+                        try out.emit(a, .local_get, scope.roles);
+                        try out.emit(a, .call, arena.root_force);
                     },
                     5 => {
                         try out.emit(a, .call, arena.root_reserve);
