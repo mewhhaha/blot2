@@ -13,10 +13,20 @@ also implemented: known, fully applied expression bodies consisting of parameter
 reads, scalar intrinsics, `if`, constructor matches, aggregate expressions,
 constants and demands use branches and locals. Pattern locals and guards retain
 lexical scope. Analysis admits at most 96 expression/pattern nodes, including
-the bodies of fully applied local forwarding calls. It does not inspect operator
+the bodies of fully applied forwarding calls. It does not inspect operator
 names. Multiple reads, including forwarded reads, use a local memo reset on each
-invocation. Recursive and indirect calls, escaping demands and demands revisited
-inside a callee loop retain the shared runtime cell.
+invocation. Recursive and unknown indirect calls, escaping demands and unproved
+control retain the shared runtime cell. Proved local loops and lexical callbacks
+share invocation-local memos; their first use retains the ordinary provider
+scope.
+
+The proof follows available immutable Core across aliases, imports and compiled
+dependencies, and admits immutable compile-time captures without evaluating
+them. Ordinary emission still reads their current values and records executable
+dependencies. Names and source fixities do not select the optimization. Both
+codegen tiers enforce the same admission rule. Unsupported or exhausted proofs
+keep ordinary demand storage; source parsing, typing and nesting limits remain
+independent.
 
 Inlining records the consumed declaration in the caller's code artifact.
 Retained code checks its exact Core projection and transitive semantic reads,
@@ -396,6 +406,114 @@ no-LLVM backend, six guest laws, and a zero-findings analyzer. Combined release
 qualification and final artifact identities are recorded with the compiler
 milestone before completion is claimed.
 
+## Lowering explanations and bounded guarantee (12 October 2026)
+
+Task 039's isolated candidate extends the same source proof through available
+foreign bodies and immutable captures. Fully applied Boolean-shaped bodies with
+proved local control lower to branches in both codegen tiers. Alias names,
+custom fixities, source imports and compiled dependency archives select the
+ordinary checked body. The eager condition runs once; the deferred operand runs
+only on its selected path. Recursive/unknown control, partial application,
+escaping demands and exhausted proofs retain ordinary shared storage.
+
+`blotc build ENTRY OUTPUT --explain-demands` emits a `demand_lowering` JSON
+record. The project client accepts `explainDemands: true` when opening a
+compiler and returns the report in `stats.demandLowering`. Recording is disabled
+by default and does not select a lowering. Native callers without source
+identities receive unit IDs and spans with an empty filename.
+
+Reports contain at most 256 decisions, with up to 160 UTF-8 bytes per owned
+filename. Truncation is explicit and never splits a code point. `omitted` counts
+recording attempts beyond the bound. Decisions name the argument's source span,
+in UTF-8 byte offsets, and one of these storage forms:
+
+| Lowering   | Meaning                                        | Typical reason |
+| ---------- | ---------------------------------------------- | -------------- |
+| eliminated | The pending argument has no admitted use.      | unused         |
+| direct     | One admitted use executes at its source force. | proved_local   |
+| local_memo | Repeated uses share invocation-local state.    | repeated_local |
+| stored     | The ordinary shared runtime cell remains.      | escaping_use   |
+
+Other fallback reasons are `unknown_callee`, `unresolved_control`,
+`unavailable_body`, `unresolved_shape` and `inlining_limit`. A known partial
+application transports its pending argument into the returned closure and
+reports `escaping_use`. Distinct specialization decisions at one span remain
+distinct records. Generic storage emission does not overwrite a known reason. An
+exact-input rebuild owns a copy of the previous report with zero new work
+counters. Explained trivia edits regenerate spans. Explained compilations
+regenerate executable fragments to observe all sites; their cost includes that
+observation policy.
+
+The always-on work counters describe emitted construction/force sites and
+physical memo-local slots, not dynamic guest allocations. They are
+`demand_allocations`, `demand_local_memo_slots` (including an owning memo's root
+local), `demand_eliminated`, `demand_direct`, `demand_indirect_calls` and
+`demand_inline_nodes`. The last counts expression/pattern visits in admitted and
+declined inline proofs, including concrete forwarding preflight. Existing
+`demand_summary_*` counters describe summary construction, reuse and visits.
+Each proof shares its 96-node allowance across callees; local aliases/bindings,
+formal parameters and producer normalization remain separately bounded.
+
+The isolated task-039 LLVM Fast checkpoint is SHA-256
+`f6f2f57440b23f609f9e47aa412cc882082b204592d23718f793c8cb770243e1`, 41,155,832
+bytes, identity
+`8ac9b8fc96d5dd006a6d617e53ebed6143f2d5c3c7488985846d4722528f9bf2`. Its source
+tree is `bd7fdc04333acc67ad1b54fa0018dfe39dd0ec0d`, staged tree
+`32cb648d4e45906ad3f7692b0f8b05538cf4155e`, based on qualified `dd6a66a`. The
+source patch SHA-256 is
+`c30a3cfba260f3e0bc8d88a81a61af28acfd59a83358a29d97793391fd98721d`. Frozen
+artifacts and raw records are in the isolated
+`/var/tmp/blot2-demand-guarantee-039/build/bench/demand-guarantee/`.
+
+Focused native/OOM laws cover bounded reports, source ownership, byte equality,
+independent unchanged-output copies and failed publication. The release passes
+49 executed demand/callback laws plus eight unchanged compile budgets. They
+cover both codegen tiers, custom operators, imported forwarding and captures,
+archives, checkpoints, repeated/conditional uses, loop creation, providers,
+persistent aliases, cancellation, traps, recursion, unused type errors and
+failed-edit recovery. The isolated analyzer reports 345 files with zero
+findings. The subsequent combined full compiler gate passes at `46bf8b9`, with
+914 guest/client laws, eight unchanged budgets and 348 analyzer files/zero.
+
+Seven alternating release compiler pairs measure four functions per source:
+conjunction/disjunction chains and their 1,024-iteration loops. Predicates use
+distinct dynamic remainder divisors. Left-associative source operators keep
+256-operator chains within the unchanged parser nesting limit; that limit still
+rejects deeply parenthesized/right-nested source. Explicit controls use ordinary
+`if` and local rebinding. Source-only compilation has no implicit prelude/cache.
+All chain forms have zero demand construction, memo-slot and indirect-force
+sites, no table or linear memory, and zero guest memory throughout execution.
+
+| Operators | Candidate compile CPU ms | Explicit CPU ms | Requested bytes | Proof visits | Summary visits |
+| --------- | -----------------------: | --------------: | --------------: | -----------: | -------------: |
+| 1         |                    1.189 |           1.074 |         279,238 |           16 |             16 |
+| 8         |                    1.839 |           1.508 |         734,905 |          128 |             16 |
+| 64        |                    6.896 |           4.428 |       4,367,305 |        1,024 |             16 |
+| 256       |                   28.171 |          14.440 |      14,993,826 |        4,096 |             16 |
+
+Requested bytes are exactly equal to the incoming compiler for all eight source
+forms. The table separates source/compiler costs from guest behavior; direct
+lowering does not make checking a demand chain as cheap as checking its explicit
+control. Code size and peak allocation are in `chains/compiler-report.json`; the
+256-operator report retains 256 sites and omits 768 additional attempts.
+
+Three complete guest batches retain all 32 taken/skipped/loop cases, each with
+12 warm-ups and 31 alternating pairs on CPU 7. Median-of-three CPU ratios to
+explicit controls range from 0.9619 to 1.0170. Individual rounds/batches retain
+large short-call/JIT outliers (including 1.4498); none are discarded. The first
+identical-predicate/adaptive-one-call screen is rejected and preserved
+separately. Accepted programs, output hashes, Deno/harness pins and
+distributions are in `chains/manifest.json`, `guest-report-{1,2,3}.json` and
+`guest-summary.json`.
+
+Seven isolated cold public pairs on CPU 8 preserve all 13 Wasm identities,
+semantic and prepared counters, requested/peak bytes and zero teardown live
+bytes. CPU ratios span 0.98818–1.02373; no overall speedup is claimed. Seven
+synthetic pairs retain cross-compiler and fresh/retained/restart/edit byte
+equality. These reproducible controls do not establish the historical gdev
+latency target; that remains assigned to tasks 084/093 and their captured-input
+qualifications.
+
 ## Integrated qualification (11 October 2026)
 
 Implementation `b068dc9` passes the complete native gate, 763 guest/client laws,
@@ -403,3 +521,21 @@ all eight unchanged compile-allocation laws and the 323-file zero-findings
 analyzer. Shared release parity, current gdev execution, artifact pins and mixed
 CPU/allocation measurements are in the
 [resolved-body qualification](RESOLVED_BODIES.md#qualification-11-october-2026).
+
+## Integrated task-039 completion (12 October 2026)
+
+Implementation `46bf8b9` qualifies the standard LLVM Fast release
+`47021c966f75fbb6063b9de52d476fe944a8aa16dc6bc47aeae66cfbf4dd9095`. The complete
+native suite, 914 guest/client laws, eight unchanged allocation budgets and
+348-file zero-findings analyzer pass. The independent wire host verifies default
+null reporting, all opt-in source fields and unchanged executable bytes.
+
+Three complete final chain/loop batches through 256 operators preserve zero
+demand storage and Memory/table, with paired median-of-three ratios to explicit
+controls of 0.95096–1.01174. Requested compiler bytes increase by 76 over the
+isolated checkpoint; proof/summary counts and chain bytes remain exact. Public
+Wasm intentionally changes with the combined ownership subtraction. Exact
+source, identity, compiler/guest costs, retained/restart controls and preserved
+failures are in
+[FRONTEND_OWNERSHIP_QUALIFICATION](FRONTEND_OWNERSHIP_QUALIFICATION.md). The
+isolated checkpoint remains separate evidence.

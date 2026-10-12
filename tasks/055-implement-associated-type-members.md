@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete — implementation `46bf8b9`, qualified 12 October 2026.
 - **Dependencies:** [054](054-specify-associated-types-and-implementations.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 3 / associated
   type members. Sources:
@@ -25,11 +25,11 @@ contract evidence. Task 054 defines associated members and projection syntax.
 
 ## Implementation checklist
 
-- [ ] Add checked associated members/projections and substitute through generic
+- [x] Add checked associated members/projections and substitute through generic
       types, rows and function evidence.
-- [ ] Preserve scope and identity across imports/opaque boundaries; bound
+- [x] Preserve scope and identity across imports/opaque boundaries; bound
       recursive projection normalization and reject escapes.
-- [ ] Represent complete projection dependencies in portable interfaces and
+- [x] Represent complete projection dependencies in portable interfaces and
       specialization keys.
 
 ## Validation
@@ -49,20 +49,31 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Associated members and projections check and specialize consistently
+- [x] Associated members and projections check and specialize consistently
       across source and artifacts.
-- [ ] Invalid or escaping evidence is rejected with the specified diagnostics
+- [x] Invalid or escaping evidence is rejected with the specified diagnostics
       and bounded inference.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Implementation: `46bf8b9`; complete native suite, 914 guest/client laws, eight
+  unchanged allocation budgets, 348 analyzer files/zero; Zig 0.17.0. Regenerated
+  host parser, formatter and TreeSitter tooling pass.
+- Standard LLVM Fast release:
+  `47021c966f75fbb6063b9de52d476fe944a8aa16dc6bc47aeae66cfbf4dd9095`.
+  Source/portable origin, row-recipe forgery, independent generic binders,
+  congruent equality, nested substitution, OOM and failure/recovery/restart
+  controls pass. Known abstract storage reports `missing_implementation`; open
+  generic storage reports `missing_predicate`.
+- Final release screens retain fresh/restart/executable parity, exact no-feature
+  allocation counts/type nodes and bounded projection DAG work. No-feature
+  requested-byte growth is 0.029–0.160%; retained CPU overhead and named
+  allocation scopes are recorded rather than hidden.
+- Limits: abstract projections have no guessed runtime layout. Implementation
+  declarations, selection and member execution belong to dependent task 056.
+- Durable evidence:
+  [associated type qualification](../zig-native/ASSOCIATED_TYPES_QUALIFICATION.md)
+  and
+  [combined qualification](../zig-native/FRONTEND_OWNERSHIP_QUALIFICATION.md).

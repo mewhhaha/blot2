@@ -633,12 +633,12 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [032] — Own escaping values and persistent roots        | Complete    | [031]                                  |
 | [033] — Own suspended effects and cancellation          | Complete    | [032]                                  |
 | [034] — Reclaim cyclic ownership                        | Complete    | [033]                                  |
-| [035] — Remove the tracing runtime                      | Ready       | [034]                                  |
+| [035] — Remove the tracing runtime                      | In progress | [034]                                  |
 | [036] — Summarize demand control flow                   | Complete    | [007], [014]                           |
 | [037] — Lower loop aware local memos                    | Complete    | [036]                                  |
 | [038] — Eliminate demands through known callbacks       | Complete    | [037], [032]                           |
-| [039] — Guarantee and explain demand lowering           | Ready       | [038], [033]                           |
-| [040] — Fuse packed row producers and consumers         | Ready       | [002], [027]                           |
+| [039] — Guarantee and explain demand lowering           | Complete    | [038], [033]                           |
+| [040] — Fuse packed row producers and consumers         | In progress | [002], [027]                           |
 | [041] — Broaden numeric simd                            | Pending     | [040]                                  |
 | [042] — Specify ragged builders                         | Complete    | [011], [027]                           |
 | [043] — Implement ragged builders                       | Complete    | [042]                                  |
@@ -653,8 +653,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [052] — Implement opaque types and privacy              | Complete    | [051]                                  |
 | [053] — Qualify module cutoffs and wrapper erasure      | Pending     | [052], [024]                           |
 | [054] — Specify associated types and implementations    | Complete    | [052]                                  |
-| [055] — Implement associated type members               | Ready       | [054]                                  |
-| [056] — Implement declarations and evidence diagnostics | Pending     | [055]                                  |
+| [055] — Implement associated type members               | Complete    | [054]                                  |
+| [056] — Implement declarations and evidence diagnostics | In progress | [055]                                  |
 | [057] — Specify scoped effect identities                | Ready       | [052]                                  |
 | [058] — Implement effect instances and subtraction      | Pending     | [057]                                  |
 | [059] — Reject escaping capabilities                    | Pending     | [058]                                  |

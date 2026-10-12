@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — no completion is claimed.
 - **Dependencies:** [055](055-implement-associated-type-members.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 3 / implementation
   declarations and evidence. Sources:

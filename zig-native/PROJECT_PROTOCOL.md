@@ -159,6 +159,7 @@ It allows 30 s by default (1 to 300 s) for the hello and the open together.
 | `imports`          | array of `{prefix, root}`        | more directory aliases                                                     |
 | `dependencies`     | path or null                     | a `.blotdep` bundle from `blot dependencies`                               |
 | `profileBackend`   | boolean                          | detailed backend timings (default false)                                   |
+| `explainDemands`   | boolean                          | bounded demand-lowering report (default false)                             |
 | `codegenTier`      | `"optimized"` or `"development"` | default `"optimized"`; development skips optional scalar and vector passes |
 | `shareMachineCode` | boolean                          | prototype; default false                                                   |
 | `codegenWorkers`   | integer 1..16                    | default 1                                                                  |
@@ -266,6 +267,7 @@ the reference client rejects an empty or invalid module.
     "freshModules": 0,
     "cachedModules": 0,
     "restartCacheLoaded": false,
+    "demandLowering": null,
     "frontend": {},
     "backend": {},
     "optimization": {},
@@ -301,6 +303,12 @@ the revision.
   `backendTiming`, `workCounters`, `principals`, `refinements`,
   `selectedQueries` and `attemptStats`;
 - a boolean: `restartCacheLoaded`.
+
+`demandLowering` is null by default. With `explainDemands: true`, it is
+`{sites, omitted}`: up to 256 owned source-site decisions and a count of omitted
+recording attempts. Sites carry filename/truncation, unit, UTF8 byte span,
+lowering and reason. Reporting preserves executable bytes. See
+[DEMANDS.md](DEMANDS.md) for the decisions, bounds and retained span behavior.
 
 The objects are measurements for people, and their insides are not part of the
 contract. The reference client validates the four integers as nonnegative safe

@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — partial milestone `a686304`; no completion is
-  claimed.
+- **Status:** In progress — partial milestones `a686304` and `46bf8b9`; no
+  completion is claimed.
 - **Dependencies:** [023](023-narrow-literal-edit-invalidation.md)
 - **Originating requirements:** PLAN: Hill 6 / general body edits under 100 ms.
   Sources: [PLAN.md](../PLAN.md).
@@ -87,3 +87,14 @@ development and the scenarios below.
 - Durable record: [body interface cutoff](../zig-native/BODY_CUTOFF.md),
   [distributions](../zig-native/qualification/body-cutoff.csv) and
   [pins](../zig-native/qualification/body-cutoff-pins.json).
+
+### Qualified owned-body slice — 12 October 2026
+
+`46bf8b9` adds immutable leases and conservative replay with complete
+closed-row, nominal/field and evidence receipts. The full native/914-guest
+compiler gate, eight unchanged budgets and 348-file zero analyzer pass. Admitted
+deep-body edit CPU falls about 29–30%; population/retained-memory costs and
+cheap-body regressions remain explicit. Shared-callee and qualification
+followups remain isolated. General forms, relocation and the under-100-ms target
+keep this task open. See
+[combined qualification](../zig-native/FRONTEND_OWNERSHIP_QUALIFICATION.md).

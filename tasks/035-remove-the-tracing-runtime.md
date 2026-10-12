@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — no completion is claimed.
 - **Dependencies:** [034](034-reclaim-cyclic-ownership.md)
 - **Originating requirements:** PLAN: Earlier programs / qualified tracing
   replacement. Sources: [PLAN.md](../PLAN.md).
@@ -61,11 +61,15 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Partial implementation: `46bf8b9` qualifies checked results, complete
+  admission, frame-demand cache identity, scalar stores and unchanged variants.
+- Full compiler gate: complete native suite, 914 guest/client laws, eight
+  unchanged budgets; analyzer 348/zero; Zig 0.17.0. Nested discarded-Array
+  memory law preserves outer rows and roots/leases at 8/40/200 inner iterations.
+- Open gates: conservative partial paths still use tracing. Physical removal,
+  complete layout/scope coverage and CPU acceptance remain unfinished. The prior
+  measured cycle workload is about 5.65× the old tracing baseline. Later journal
+  experiments remain isolated; no completion or final speedup is claimed.
+- Durable record: [TRACING_REPLACEMENT](../zig-native/TRACING_REPLACEMENT.md)
+  and
+  [combined qualification](../zig-native/FRONTEND_OWNERSHIP_QUALIFICATION.md).

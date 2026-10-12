@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — no completion is claimed.
 - **Dependencies:** [002](002-close-packed-list-traversal-regression.md),
   [027](027-represent-ownership-in-resolved-ir.md)
 - **Originating requirements:** PLAN: Earlier programs / broader row fusion.

@@ -133,3 +133,326 @@ cost there. Neither is addressed by this task.
 - The frontend still rechecks every body of an edited module.
 - Executable fragments of transitive callers rebuild even when the callee's
   summaries are unchanged; finer executable dependencies are not recorded.
+
+## Owned frontend body facts (task 024 first slice)
+
+Retained preparations now own sparse checked-body records in
+[body_check_cache.zig](src/body_check_cache.zig), beside `Prepared`. Immutable,
+independently leased chunks share frozen type graphs from `dependency_snapshot`;
+`SchemeCopier` reconstructs fresh live types and rows. Expression facts,
+parameter bindings and anonymous closed-row certificates relocate by
+declaration-relative syntax positions and binding spellings. No source tree,
+solver ID, substitution history, scratch pointer or previous revision owner
+escapes into a new preparation.
+
+Admission compares exact declaration text, parsed syntax and declaration traits.
+Every consumed global interface must already be committed, with matching closed
+principal type, quantified binder positions, privacy, runtime kind, function
+status and external identity. Imported receipts also hash the producer's
+original declaration spelling from the current catalog; an equal type at an
+equal numeric slot does not admit a renamed producer. Canonical producer paths
+must keep their unit ordinals; symbol ordinals need not match. Active SCC
+members decline. The initial slice admits scalar literals, primitive U32/F32
+intrinsics, applications, typed lambdas, conditionals, products and collection
+literals over closed scalar/function/product/collection types. Annotations use
+builtin scalar types and plain function/product types. Inferred generic
+principals without residual obligations also qualify. Explicit generic
+annotations, predicates, nominal/opaque shapes, demands, effects, providers,
+operators, selected dispatch and additional metadata forms remain ordinary.
+Proof walks stop at 128 levels and 4096 nodes; exhaustion declines reuse.
+
+The scheduler still prepares annotations and dependencies and publishes ordinary
+SCC schemes. Only admitted expression elaboration is skipped. Lowering, staging
+and executable invalidation remain fresh. A callee body change with an unchanged
+interface can keep a consumer's checked facts; its current executable body and
+captures are still regenerated. Failed preparations and OOM never replace the
+last successful owner. An unchanged preparation retains independent leases to
+its immutable facts when needed; ordinary one-shot checks and editor queries
+capture no body records. These records are in-memory owners, not a new artifact
+wire schema.
+
+Focused native laws cover insertion of earlier AST/type nodes and new spellings,
+interface/privacy/runtime revocation, generic and recursive/demand fallback,
+snapshot/replay/copy allocation failures, original imported-name revocation, the
+actual proof limit, and linear owned payload growth. Executed-Wasm laws compare
+retained and fresh output across sibling body edits, insertions, imported
+producer renames, nested captures, numeric-array ownership, a failed revision
+and recovery. On the focused seven-body server insertion/edit, elaborations fall
+7 to 2 while all seven bodies lower and Wasm is fresh-identical.
+
+Before immutable chunk leases, the native parse/check/capture/lower growth law
+edits one scalar seed beneath 64/128/256 typed sibling functions. Elaboration
+falls 66/130/258 to 1; requested bytes fall 859332/1598032/2843784 to
+747352/1358640/2516232, and peak requested live bytes fall 340012/708304/1305387
+to 275592/560936/1095299. Owned payloads (excluding container capacity and hash
+buckets) are 42400/83992/167320 bytes; shared graph nodes are 265/521/1033.
+These are focused safe no-LLVM allocator measurements, not release CPU timings
+or whole-program acceptance.
+
+This remains a partial task-024 boundary: broad language-body admission, SCC and
+selected-evidence reuse, producer ordinal relocation and finer executable
+cutoffs are open. The earlier backend receipt limitations above still apply
+outside this frontend slice. Full integration and release measurements are
+root-owned and pending.
+
+In that initial implementation, the bare no-record control requests
+682880/1274904/2253124 bytes at those sizes. Fresh snapshot capture therefore
+adds 25-26% requested allocation; replay still requests 6.6-11.7% more than bare
+checking. Its per-preparation peak is lower, but the previous snapshot was
+allocated separately and is excluded from these phase peaks. SafeAllocator
+growth can also depend on bucket occupancy. These laws establish work reduction
+and bounded ownership, not net allocation or CPU improvement over the old
+compiler. Release comparisons and retained-session memory must account for the
+complete previous owner.
+
+### Immutable chunk leases and measured recapture subtraction
+
+A successful checked-fact replay now retains its immutable chunk directly in its
+unpublished preparation. Only newly elaborated eligible bodies are frozen.
+Chunks retain allocator provenance, and their graphs, names, source, facts and
+bindings survive independently of the previous revision. Failed preparations
+release all unpublished leases. The checker still reconstructs fresh live
+variables and rows; no live solver state is shared.
+
+Partial chunks compact when obsolete body bytes or bounded type-projection work
+dominate the currently leased bodies. This prevents successive edits from
+pinning a complete module-sized chunk for one surviving declaration in every
+generation. Compaction rebuilds immutable facts from current checked metadata;
+it does not re-elaborate admitted bodies or mutate earlier owners. Native laws
+replace all but one additional body successively across 32/64 generations:
+complete leased body/graph payload grows 19886/38894 to 39317/77177 bytes, with
+6/7 chunks, and stays below three times initial payload throughout. Another law
+removes a wide result graph while keeping larger scalar syntax payload;
+type-work accounting compacts that graph too. Publication and compaction are
+covered by exhaustive allocation failures, including unchanged previous lease
+counts.
+
+In the current safe no-LLVM growth law, bare checking requests
+682880/1276548/2253124 bytes for 64/128/256 siblings. Fresh capture requests
+861872/1603304/2859068; replay requests 587138/1097042/2008738, about 11-14%
+less than bare. Complete leased payload is 45126/88766/176190 bytes. Phase peaks
+still exclude the separately allocated previous owner; process memory is also
+measured below.
+
+The first LLVM/Fast candidate, which recaptured every reused body, was rejected
+on performance. Seven alternating pairs at 128/512/1024 one-application sibling
+functions reduced elaborations to 1.5 per edit but regressed edit wall medians
+by 9.7/11.0/10.9%. Populate regressed 5.1/17.3/21.2%. Its incoming binary
+SHA-256 is `bb85a4e090f23d1ca6c99eee13740f8e2725d3a657334ea6cf1db153a0ea3e56`;
+candidate is `4fa2f947a96e722faba74496192e14bad0308bfdac5bf5bfe09ce538f72a7227`.
+Build command: Zig 0.17.0, `taskset -c 5 deno task build:compiler`, standard
+Fast with LLVM enabled. Each sample populates one retained server and measures
+20 alternating insertion/seed edits. All cross-binary fresh/retained Wasm hashes
+and exported execution match. Raw distributions and negative pins are retained
+in `build/bench/frontend-body-reuse/paired` and `negative-first-slice.json`.
+
+A matched no-LLVM/Fast development screen of chunk leases brought simple-body
+edit wall times within about 1% of bare checking; it did not demonstrate a CPU
+gain. Five alternating pairs on CPU 6 with twelve primitive applications per
+sibling instead reduced edit CPU 35 to 31 ms at 64 siblings, and 69 to 62 ms at
+128. Wall medians were 35.67 to 31.77 and 70.21 to 62.17 ms. Populate remained
+about 20% slower; retained process RSS increased about 0.1/1.0 MiB, and process
+high-water memory fell about 0.4/0.3 MiB. These are development screens, not
+final LLVM qualification; they precede the explicit lease wrapper and
+generic-binder extension. Both binaries use
+`zig build install compiler-identity
+-Doptimize=fast -Dllvm=false`, and every
+module hash and executed result matches. Raw reports are in
+`build/bench/frontend-body-reuse/chunk-screen` and `deeper-screen`. Simple-body
+costs and capture admission remain performance work; no completion or blanket
+CPU improvement is claimed.
+
+Generic laws relocate inferred binders across inserted earlier type/syntax nodes
+and new spellings, specialize independent scalar/array consumers, and revoke a
+consumer when the generic result changes. Binder positions are canonical in
+public digests; frozen variables reconstruct as fresh current-store variables.
+Native generic replay has an allocation-failure sweep; executed-Wasm laws cover
+U32, F32 and owning array specializations, generic body edits, rejected
+revisions and recovery. Residual predicates and selected evidence still require
+further owned facts and authoritative fallback.
+
+### Current admission and portable identity extension
+
+Production capture now requires at least 64 admitted syntax nodes, matching the
+measured positive twelve-application class. The same bounded visitor first
+counts without allocating or hashing; skipped bodies check and execute
+ordinarily. Native boundary laws explicitly set a zero floor to exercise small
+proof shapes; actual Session/OOM and executed-Wasm laws use substantial bodies
+and verify the production policy. Final LLVM comparisons retain a simple-body
+control as well as the admitted deep-body class.
+
+Inferred generic type binders and symbolic callback rows relocate independently
+of previous solver ordinals. Public digests hash quantified type/row positions,
+row labels and closure-certificate counts. Reconstructed rows preserve the
+relationship between a callback input and its latent output function; a Foreign
+callback remains Foreign and executes exactly once. Other operation identities
+and residual predicates stay ordinary until their complete reads are owned.
+
+Monomorphic nominal and opaque passthrough/application facts also qualify.
+Chunks store owned original producer-unit/name, declaration-kind,
+privacy/opacity and storage-recipe receipts. Their frozen nominal nodes contain
+chunk-local indices; replay resolves those indices to current catalog identities
+rather than retaining previous AST or symbol ordinals. Producer paths still must
+keep their unit ordinals. Unknown or redacted original names decline. Local
+monomorphic annotation reads separately pin declaration kind, spelling, privacy
+and expanded type, so alias retargeting or privacy changes revoke the annotated
+body even if its old nominal still exists. Namespaced/imported type annotation
+aliases conservatively decline; inferred calls can qualify when the current
+nominal catalog is complete.
+
+Native laws insert earlier nominal/AST/type nodes and new spellings, compare
+fresh Wasm under exhaustive allocation failures, retarget local aliases, change
+alias privacy and change opaque storage from U32 to Array U32. Executed-Wasm
+laws exercise source and compiled imports, insertion/seed edits, and the opaque
+scalar-to-reference edit with 500 calls per lane. Storage edits re-elaborate
+consumers; lowering and ownership always use the current definitions.
+Constructor/projection operations, generic nominal parameters, explicit generic
+annotations, residual predicates and selected evidence remain ordinary. This
+checkpoint extends the admitted boundary and keeps task 024 active.
+
+### LLVM/Fast admission checkpoint
+
+The frozen source tree is `297dc9b0947449799597aec849a5bd4bfc825024`, compiler
+source subtree `c61cd0f717a73024f62bd084a0af483182b4d580`. Standard Zig 0.17.0
+`taskset -c 4 deno task build:compiler` produced SHA-256
+`c733afe3d7490033509e042c2182292cc751dacb824c20596db0e346e46eea86`, identity
+`bc90a393f2343cd489b6caeab315a61b79ad78ce3c0c169269d0164574558073`. Incoming is
+qualified `f184dde`, source tree `310d60ce85a8ebe26f3c9f4d48fc35811fd98a94`,
+binary `5c689ad5caad6952f1c4643f5c40e10d6e41bcf819bf016f751ac105d82020a1`. Both
+are LLVM/Fast builds.
+
+Seven alternating pairs on CPU 6 at 128/512/1024 siblings measure twenty warm
+insertion/seed edits per sample. Root builds occupied CPUs 0-3; raw environment,
+all samples, exact pins and limitations are in
+`build/bench/frontend-body-reuse/floor-qualification.json` and its referenced
+`floor-small-llvm`/`floor-deep-llvm` directories. Every fresh/retained
+cross-binary Wasm hash and exported result agrees.
+
+| Class                   | Edit CPU, incoming → candidate | Edit wall ratio | Populate wall ratio |
+| ----------------------- | ------------------------------ | --------------- | ------------------- |
+| Small, 128 siblings     | 1.5 → 1.5 ms                   | 1.009           | 0.990               |
+| Small, 512 siblings     | 6.5 → 6.5 ms                   | 0.994           | 0.983               |
+| Small, 1024 siblings    | 13.5 → 13.5 ms                 | 0.995           | 1.007               |
+| Admitted, 128 siblings  | 8.5 → 6.0 ms                   | 0.697           | 1.171               |
+| Admitted, 512 siblings  | 34.0 → 23.5 ms                 | 0.689           | 1.248               |
+| Admitted, 1024 siblings | 68.5 → 47.0 ms                 | 0.680           | 1.274               |
+
+The admitted twelve-application class improves steady edit CPU about 29-31%
+while first capture costs 17-27% wall time. Steady native-process RSS increases
+about 1.0/2.5/4.5 MiB; high-water memory changes by about -0.08/+0.19/+1.14 MiB.
+The small-body control retains ordinary elaboration and stays near parity, with
+about 0.5 MiB more process RSS. `/proc` CPU ticks are 10 ms, so first-populate
+CPU and the small edit samples are coarse; wall distributions remain recorded.
+
+The checkpoint passes 32 focused native tests (17 behavior/ownership/OOM laws
+and 15 suite anchors), five executed-Wasm laws, all eight unchanged allocation
+budgets and zig-analyzer 345 files with zero findings. Formatting and diff
+checks pass. Root owns combined full qualification. This is measured acceptance
+of the admitted slice; residual/selected evidence, generic nominal parameters
+and other ordinary fallback scopes above keep task 024 active.
+
+### Generic records, residual predicates and selected evidence follow-up
+
+The follow-up is based on qualified production `dd6a66a`. The earlier measured
+checkpoint and its binary remain immutable. This adds inferred generic nominal
+arguments, record parameter shapes and anonymous record values. Field names in
+the frozen graph are owned spellings; their numeric words are chunk-local
+indices, relocated through the current symbol pool. Public record interfaces are
+hashed in lexical field order, with bounded scans. Sparse projections and
+selected call signatures occupy side tables only for bodies that use them.
+Lowercase annotation variables follow the ordinary annotation rule; local
+monomorphic aliases still require their independent expansion/privacy receipt.
+
+Implicit associated and result-associated residual predicates are owned with
+frozen type/row graphs and declaration-relative source positions. Replaying a
+symbolic helper appends those requirements to the current solver. Qualified
+references instantiate their current principal rather than copying forwarded
+requirements a second time. Predicate kind, member, operator, quantified
+variables, rows and every type part participate in interface equality.
+
+Concrete selected evidence also records the complete set of matching associated
+members, including candidates rejected before the winner. Its digest pins
+original owner identity, member, binding identity, privacy, runtime mode and
+complete admitted interface. An insertion or interface change therefore revokes
+old solved caller types, including an implementation that acquires a Foreign
+row. Matching catalog keys must be unique, there can be at most 64 candidates,
+and all source candidates must already be complete. Active, late, unknown or
+exhausted evidence remains ordinary. Source operators additionally re-resolve
+the current fixity target before consuming facts; equal body syntax and equal
+function types do not admit a retargeted operator.
+
+Chunk compaction now weights reachable graph words, rows and owned field/nominal
+spellings, in addition to live body payload. A 16-generation law changes a
+4096-byte field spelling supplied by an uncached producer while preserving a
+larger scalar AST body. Each generation compacts the obsolete graph, and total
+leased payload stays below three times its initial size. Existing 32/64-
+generation replacement laws and allocation-failure laws remain in place.
+
+Focused qualification: Zig 0.17.0, Safe/no-LLVM native build, 38 native tests
+(23 behavior/ownership/OOM laws and 15 suite anchors); Fast/no-LLVM compiler,
+eight executed-Wasm laws and all eight unchanged compile-allocation budgets; 346
+analyzer files with zero findings. Executed laws cover generic opaque
+scalar/reference specialization, source and compiled opaque representation
+edits, reversed field spelling order with owning Array payloads, selected
+implementation body edits, Foreign-interface diagnostics and failed-edit
+recovery. Every successful retained module is compared byte-for-byte to fresh
+output, and failed diagnostics are compared to fresh diagnostics.
+
+The current Safe/no-LLVM, explicit-floor-zero growth control requests
+686696/1276548/2253124 bytes for bare checking at 64/128/256 siblings; fresh
+capture requests 887084/1653044/2983808, replay 591590/1097678/2010886. Complete
+leased payload is 54302/106646/211478 bytes. These phase measurements exclude
+the separately allocated previous owner and are not release CPU or whole-process
+memory qualification. Final matched LLVM/Fast costs are pending; the earlier
+checkpoint's measured gain cannot be attributed to this follow-up.
+
+Task 024 remains active. Explicit qualifications, shared `callee_use`
+predicates, other effect-operation identities, namespaces in type annotations,
+curried type-constructor heads and unsupported expression/pattern forms remain
+ordinary. SCC and late-edge inference remain authoritative. Producer unit
+ordinal relocation and the general under-100-ms target also remain open. No
+standalone full compiler gate or completion record is claimed here.
+
+### Closed-row certificate review correction
+
+A separate correction to the frozen follow-up replaces the certificate-count
+comparison with canonical constraints. Each closed-row entry names either its
+position among public row quantifiers or every structural path where its
+anonymous variable occurs in the raw binding type. Covariance closing returns a
+copy and leaves those raw paths available. Paths and constraint digests are
+sorted; numeric solver IDs and field-symbol ordinals are not interface keys.
+Unknown targets, more than 128 constraints/paths or exhausted traversal decline.
+
+Imported principal roots have already been closed. Their original producer
+therefore supplies a borrowed, independently computed certificate digest from
+its checked or portable raw binding type; only the digest survives capture.
+Source and compiled imports use the same rule. The interface-validation schema
+permits certificates to select different quantified rows, so the native law
+constructs equal-arity/equal-row-count schemes whose selected binder positions
+differ. It also distinguishes anonymous paths under identical closed public
+shapes and rejects an unrelated row target. All 39 focused native laws, eight
+executed-Wasm laws, eight unchanged budgets and 346 analyzer files/zero findings
+pass with this correction. The preceding frozen patch and binary remain
+unchanged; final release costs require the corrected candidate.
+
+### Integrated admitted-body milestone (12 October 2026)
+
+Implementation `46bf8b9` includes the owned immutable chunk floor, generic
+nominal/structural and selected/residual evidence slice, and corrected
+closed-row certificates. Native tests, 914 guest/client laws, eight unchanged
+budgets and 348 analyzer files/zero pass. The populated prefix-guard test
+snapshots cache contents rather than lease/map addresses and detects a
+deliberately changed fact.
+
+Final matched LLVM Fast
+`47021c966f75fbb6063b9de52d476fe944a8aa16dc6bc47aeae66cfbf4dd9095` versus
+`c0959e9a…80b060` measures admitted 128/512/1024-sibling edit CPU 8→6 /33.5→23.5
+/67→47 ms with 2.5 body elaborations. Population costs rise 25.3–37.7% wall,
+steady RSS .82–4.46 MiB; cheap-body wall rises 3.8–7.2%. These are
+combined-candidate limits, not the earlier isolated near-parity claim. Exact
+pins, memory deltas and controls are in
+[FRONTEND_OWNERSHIP_QUALIFICATION](FRONTEND_OWNERSHIP_QUALIFICATION.md).
+
+Task 024 remains open. Later shared-callee, explicit-qualification and portable
+origin/body-offer work is isolated and not in this release. General supported
+forms, producer-unit relocation and the under-100-ms target remain unfinished.
