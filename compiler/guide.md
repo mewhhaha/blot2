@@ -853,6 +853,11 @@ an open tail. A label applied to a free type variable, such as `State a`,
 reports `unsupported_polymorphic_effect_label`; symbolic generic labels require
 a later effect-identity representation.
 
+[Scoped effect identities](../zig-native/SCOPED_EFFECTS.md) specifies that next
+representation: symbolic family arguments, distinct same-typed capabilities and
+checked scope/capture lifetimes. Its proposed syntax remains design work for
+tasks058–059, separate from the executable behavior above.
+
 ## Qualified bindings
 
 An inferred generic function keeps the associated operations, members, fields,
