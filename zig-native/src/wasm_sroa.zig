@@ -10,7 +10,7 @@ const none = std.math.maxInt(u32);
 const Value = struct { id: u32 = 0, offset: u32 = 0, constant: ?u32 = null };
 const Node = struct { parent: u32, bad: bool = false, size: u32 = 0, allocation: bool = false, first_copy: u32 = none, last_store: u32 = 0, store_mask: u32 = 0, scope: usize = 0, fields: u32 = 0, used_fields: u16 = 0, journaled: bool = false, untyped: bool = false, reference_fields: u16 = 0, roots: u32 = 0, root_fields: u16 = 0, shared_roots: bool = false, nullable: bool = false, journal_carrier: bool = false, zero_fields: u16 = 0, nonzero_fields: u16 = 0, control_start: usize = 0, control_end: usize = 0 };
 const Event = struct { input: Value = .{}, stored: Value = .{}, destination: u32 = 0, field: u32 = 0, allocation: u32 = 0, fresh: bool = false, static_words: bool = false, loop_scope: usize = 0, nonzero: bool = false };
-const Control = struct { height: usize, result: u32, unreachable_: bool = false, identity: usize = 0, loop_: bool = false };
+const Control = struct { height: usize, result: u32, unreachable_: bool = false, entry_unreachable: bool = false, conditional: bool = false, has_else: bool = false, then_live: bool = false, has_exit: bool = false, identity: usize = 0, loop_: bool = false };
 pub const Output = ir.Body;
 const Analysis = struct {
     a: A,
@@ -281,7 +281,9 @@ const Analysis = struct {
                         return;
                     }
                     if (result != 0) self.nodes.items[result].control_start = at + 1;
-                    try self.controls.append(self.a, .{ .height = self.stack.items.len, .result = result, .identity = at + 1, .loop_ = inst.op == .loop });
+                    var entry_unreachable = false;
+                    if (self.controls.items.len != 0) entry_unreachable = self.controls.items[self.controls.items.len - 1].unreachable_;
+                    try self.controls.append(self.a, .{ .height = self.stack.items.len, .result = result, .identity = at + 1, .loop_ = inst.op == .loop, .conditional = inst.op == .if_, .entry_unreachable = entry_unreachable, .unreachable_ = entry_unreachable });
                 },
                 .else_ => {
                     if (self.controls.items.len == 0) {
@@ -289,8 +291,11 @@ const Analysis = struct {
                         return;
                     }
                     self.closeArm(at);
-                    self.controls.items[self.controls.items.len - 1].unreachable_ = false;
-                    self.controls.items[self.controls.items.len - 1].identity = at + 1;
+                    const control = &self.controls.items[self.controls.items.len - 1];
+                    control.then_live = !control.unreachable_;
+                    control.has_else = true;
+                    control.unreachable_ = control.entry_unreachable;
+                    control.identity = at + 1;
                 },
                 .end => {
                     if (self.controls.items.len == 0) {
@@ -299,6 +304,9 @@ const Analysis = struct {
                     }
                     self.closeArm(at);
                     const c = self.controls.pop().?;
+                    var exits = !c.unreachable_ or c.has_exit;
+                    if (c.conditional and !c.entry_unreachable and (!c.has_else or c.then_live)) exits = true;
+                    if (!exits and self.controls.items.len != 0) self.controls.items[self.controls.items.len - 1].unreachable_ = true;
                     if (c.result != 0) {
                         self.nodes.items[c.result].control_end = at + 1;
                         try self.push(.{ .id = c.result });
@@ -310,8 +318,11 @@ const Analysis = struct {
                         self.valid = false;
                         return;
                     }
-                    const c = self.controls.items[self.controls.items.len - 1 - inst.operand];
-                    if (c.result != 0) {
+                    const target = self.controls.items.len - 1 - inst.operand;
+                    const c = self.controls.items[target];
+                    const reachable = !self.controls.items[self.controls.items.len - 1].unreachable_;
+                    if (reachable and !c.loop_) self.controls.items[target].has_exit = true;
+                    if (reachable and c.result != 0) {
                         if (inst.op == .br_if) { // Keep conditional result transfers boxed.
                             if (self.stack.items.len != 0) self.escape(self.stack.items[self.stack.items.len - 1]);
                             self.nodes.items[self.root(c.result)].bad = true;
@@ -1693,4 +1704,63 @@ fn privateScalarConsumers(a: A) !void {
 test "private scalar callback consumers preserve fresh locals and decline unknown control effects targets through OOM" {
     try privateScalarConsumers(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, privateScalarConsumers, .{});
+}
+
+fn controlExitAllocation(module: *w.Module, f: u32, object: u32, value: w.Instruction) !void {
+    try module.emitSlice(f, &.{ .{ .op = .i32_const, .operand = 4 }, .{ .op = .call, .operand = module.arena.?.allocate_scalar }, .{ .op = .local_set, .operand = object }, .{ .op = .local_get, .operand = object }, value, .{ .op = .i32_store }, .{ .op = .local_get, .operand = object } });
+}
+fn controlExitShapes(a: A) !void {
+    var module = w.Module.init(a);
+    defer module.deinit();
+    _ = try module.ensureArena();
+    const outward = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+    const alternatives = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+    const reentry = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+    for ([_]u32{ outward, alternatives, reentry }) |f| try module.setParameterRoles(f, ir.packParameterRoles(&.{.scalar}));
+    for ([_]u32{ outward, alternatives }) |f| {
+        const first = try module.addLocal(f, .i32);
+        const second = try module.addLocal(f, .i32);
+        const joined = try module.addLocal(f, .i32);
+        try module.emitSlice(f, &.{ .{ .op = .block, .operand = @backingInt(w.ValueType.i32) }, .{ .op = .local_get }, .{ .op = .if_ }, .{ .op = .block, .operand = @backingInt(w.ValueType.i32) } });
+        try controlExitAllocation(&module, f, first, .{ .op = .i32_const, .operand = 42 });
+        try module.emitSlice(f, &.{ .{ .op = .br, .operand = 2 }, .{ .op = .end }, .{ .op = .br, .operand = 1 } });
+        if (f == alternatives) {
+            try module.emit(f, .{ .op = .else_ });
+            try controlExitAllocation(&module, f, second, .{ .op = .i32_const, .operand = 17 });
+            try module.emitSlice(f, &.{ .{ .op = .br, .operand = 1 }, .{ .op = .end }, .{ .op = .i32_const } });
+        } else {
+            try module.emit(f, .{ .op = .end });
+            try controlExitAllocation(&module, f, second, .{ .op = .i32_const, .operand = 17 });
+        }
+        try module.emitSlice(f, &.{ .{ .op = .end }, .{ .op = .local_set, .operand = joined }, .{ .op = .local_get, .operand = joined }, .{ .op = .i32_load } });
+    }
+    const index = try module.addLocal(reentry, .i32);
+    const total = try module.addLocal(reentry, .i32);
+    const previous = try module.addLocal(reentry, .i32);
+    const current = try module.addLocal(reentry, .i32);
+    const saved = try module.addLocal(reentry, .i32);
+    try controlExitAllocation(&module, reentry, previous, .{ .op = .i32_const, .operand = 41 });
+    try module.emitSlice(reentry, &.{ .{ .op = .drop }, .{ .op = .block }, .{ .op = .loop }, .{ .op = .local_get, .operand = index }, .{ .op = .local_get }, .{ .op = .i32_ge_u }, .{ .op = .br_if, .operand = 1 } });
+    try controlExitAllocation(&module, reentry, current, .{ .op = .local_get, .operand = index });
+    try module.emitSlice(reentry, &.{
+        .{ .op = .drop },                          .{ .op = .local_get, .operand = previous }, .{ .op = .local_set, .operand = saved },
+        .{ .op = .local_get, .operand = current }, .{ .op = .local_set, .operand = previous }, .{ .op = .local_get, .operand = total },
+        .{ .op = .local_get, .operand = saved },   .{ .op = .i32_load },                       .{ .op = .i32_add },
+        .{ .op = .local_get, .operand = current }, .{ .op = .i32_load },                       .{ .op = .i32_add },
+        .{ .op = .local_set, .operand = total },   .{ .op = .local_get, .operand = index },    .{ .op = .i32_const, .operand = 1 },
+        .{ .op = .i32_add },                       .{ .op = .local_set, .operand = index },    .{ .op = .br },
+        .{ .op = .end },                           .{ .op = .end },                            .{ .op = .local_get, .operand = total },
+    });
+    for ([_]u32{ outward, alternatives, reentry }) |f| {
+        const before = try a.dupe(w.Instruction, module.functions.items[f].instructions.items);
+        defer a.free(before);
+        var result = (try run(a, &module, &module.functions.items[f])) orelse return error.TestUnexpectedResult;
+        defer result.deinit(a);
+        for (result.instructions.items) |inst| try std.testing.expect(inst.op != .call or inst.operand != module.arena.?.allocate_scalar);
+        try std.testing.expectEqualSlices(w.Instruction, before, module.functions.items[f].instructions.items);
+    }
+}
+test "scalar replacement joins nested outward exits and preserves loop backedge snapshots through OOM" {
+    try controlExitShapes(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, controlExitShapes, .{});
 }

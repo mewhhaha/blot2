@@ -231,6 +231,13 @@ const Bounds = struct {
             if (id < builtins.len) try require(value.tag == builtins[id] and value.a == 0 and value.b == 0 and value.c == 0);
             if (id >= builtins.len) try require(value.tag != .absent);
             switch (value.tag) {
+                .instance_selection => {
+                    try require(value.a == self.m.unit and value.b != 0);
+                    try index(self.m.types.extra.len, value.c);
+                    try require(self.m.types.extra[value.c] == 2);
+                    try self.listTypes(.{ .start = value.c + 1, .len = 2 });
+                    for (self.m.types.nominalArguments(value)) |choice| try require(self.m.types.node(choice).tag == .scoped);
+                },
                 .scoped => {
                     try self.ty(value.a);
                     try require(self.m.types.node(value.a).tag == .nominal and value.c != 0);
@@ -311,6 +318,7 @@ const Bounds = struct {
         if (instance.decl == 0) return require(instance.unit == 0);
         if (instance.unit == 0) {
             try self.ty(instance.decl);
+            if (self.m.types.node(instance.decl).tag == .instance_selection) return;
             try require(self.m.types.node(instance.decl).tag == .variable);
             for (self.m.bindings) |binding_| {
                 if (binding_.kind != .parameter or binding_.ty >= self.m.types.nodes.len) continue;
@@ -993,7 +1001,7 @@ fn listRoles(m: *const core.Module, type_roles: []u8, core_roles: []u8) BoundsEr
             try mark(type_roles, @intCast(@as(usize, n.a) + i * 2), 1, .symbol);
             try mark(type_roles, @intCast(@as(usize, n.a) + i * 2 + 1), 1, .type_);
         },
-        .nominal, .projection => {
+        .nominal, .projection, .instance_selection => {
             try mark(type_roles, n.c, 1, .count);
             try mark(type_roles, n.c + 1, m.types.extra[n.c], .type_);
             if (n.tag == .projection) try mark(type_roles, n.c + 1 + m.types.extra[n.c], 1, .symbol);
@@ -1098,6 +1106,7 @@ const Graph = struct {
                         for (m.contract_members) |member| if (member.contract.unit == v.a and member.contract.decl == v.b and member.name == name and member.kind == .defined_type) break :blk self.vertex(.type_, member.root);
                         break :blk null;
                     },
+                    .instance_selection => if (slot < 2) self.vertex(.type_, m.types.extra[v.c + 1 + slot]) else null,
                     .scoped => switch (slot) {
                         0 => self.vertex(.type_, v.a),
                         1 => if (v.b == 0) self.vertex(.type_, v.c) else null,

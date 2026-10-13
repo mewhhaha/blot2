@@ -889,9 +889,17 @@ Unit operation from either input; each argument retains its own identity, even
 when the inputs share a family or payload. For example,
 `fn (left: State a) => fn (right: State b) => right.get ()` preserves `right` in
 its result row. The complete header form is
-`(left: State a) -> ((right: State b) -> b ! {right.get})`. Other multi-input
-bodies, selected identities, hidden capture/store contracts and mixed-owner
-State pairs remain unsupported. See
+`(left: State a) -> ((right: State b) -> b ! {right.get})`.
+
+A local `if flag then left else right` may select capabilities with the same
+family and payload. Its aliases retain one selected identity; handling that
+value subtracts its operation, while independent roots or another selection keep
+their own requirements. Its footprint includes both possible owners. This
+bounded form must be evaluated once in the active scope callback and reach that
+scope's owner. A factory may resolve a symbolic payload while keeping that
+identity. Repeated callback/loop selection and public generic selection schemes
+still reject. Other multi-input bodies, hidden capture/store contracts and
+mixed-owner State pairs remain unsupported. See
 [qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
 
 ## Qualified bindings

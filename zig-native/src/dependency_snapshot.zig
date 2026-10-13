@@ -79,6 +79,7 @@ const Projector = struct {
             return id;
         }
         const value: T.Node = switch (original.tag) {
+            .instance_selection => return error.DependencyLimit,
             .scoped => if (original.b == 0) .{ .tag = .scoped, .a = try self.projectType(original.a, depth + 1), .c = try self.projectType(original.c, depth + 1) } else return error.DependencyLimit,
             .variable => blk: {
                 const index = self.variable_count;

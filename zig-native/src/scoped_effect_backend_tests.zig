@@ -363,3 +363,17 @@ test "scoped effect paired input identities survive owned lowering emission and 
     try emit(a, &module);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
 }
+
+fn lowerSelectionAndRelease(allocator: std.mem.Allocator) !void {
+    var module = try lowerText(allocator, @import("check_effect_tests.zig").selection_source);
+    defer module.deinit(allocator);
+    try validation.validate(allocator, &module, .{ .units = &.{&module} });
+}
+test "scoped effect selection terms survive owned lowering emission and OOM" {
+    var module = try lowerText(a, @import("check_effect_tests.zig").selection_source);
+    defer module.deinit(a);
+    try validation.validate(a, &module, .{ .units = &.{&module} });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lowerSelectionAndRelease, .{});
+    try emit(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+}

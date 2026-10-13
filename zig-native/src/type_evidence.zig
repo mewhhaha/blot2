@@ -293,7 +293,7 @@ pub const Store = struct {
         };
         const n = source.node(ty);
         switch (n.tag) {
-            .scoped => return error.UnresolvedType,
+            .scoped, .instance_selection => return error.UnresolvedType,
             .unit => return types.unit,
             .boolean => return types.boolean,
             .u32 => return types.u32_type,
@@ -581,7 +581,7 @@ pub const Store = struct {
             return true;
         }
         const same = switch (n.tag) {
-            .scoped => false,
+            .scoped, .instance_selection => false,
             .absent, .projection => false,
             .unit => concrete.tag == .unit,
             .boolean => concrete.tag == .boolean,

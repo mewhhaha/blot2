@@ -14,7 +14,7 @@ pub const boolean: Id = 2;
 pub const u32_type: Id = 3;
 pub const f32_type: Id = 4;
 pub const never: Id = 5;
-pub const Tag = enum(u8) { absent, unit, boolean, u32, f32, never, variable, function, product, record, nominal, array, list, cursor, demand, type_constructor, resolver, provider, state_provider, projection, scoped };
+pub const Tag = enum(u8) { absent, unit, boolean, u32, f32, never, variable, function, product, record, nominal, array, list, cursor, demand, type_constructor, resolver, provider, state_provider, projection, scoped, instance_selection };
 pub const Node = struct {
     tag: Tag,
     // Owned structural certificate, kept in the existing three padding bytes.
@@ -241,7 +241,7 @@ pub const Store = struct {
                 height = @max(height, child_height);
             },
             .projection => return 0,
-            .nominal => for (self.nominalArguments(n)) |child| {
+            .nominal, .instance_selection => for (self.nominalArguments(n)) |child| {
                 const child_height = self.closedHeight(child);
                 if (child_height == 0) return 0;
                 height = @max(height, child_height);
@@ -326,11 +326,33 @@ pub const Store = struct {
         if (instance.unit != 0 or instance.decl == 0) return instance;
         const bound = try self.resolveDepth(instance.decl, at, depth + 1);
         const value = self.node(bound);
-        if (value.tag == .variable) return .{ .unit = 0, .decl = bound };
+        if (value.tag == .variable or value.tag == .instance_selection) return .{ .unit = 0, .decl = bound };
         if (value.tag != .scoped) return error.TypeMismatch;
         return .{ .unit = value.b, .decl = value.c };
     }
+    pub fn instanceSelection(self: *Store, identity: NominalIdentity, arguments: []const Id) Error!Id {
+        if (identity.unit == 0 or identity.decl == 0 or arguments.len != 2) return error.TypeMismatch;
+        for (arguments) |argument| if (argument >= self.nodes.items.len or self.node(argument).tag != .scoped) return error.TypeMismatch;
+        if (self.nodes.items.len > 65_536) return error.TypeLimit;
+        for (self.nodes.items, 0..) |value, index| {
+            if (value.tag != .instance_selection or value.a != identity.unit or value.b != identity.decl) continue;
+            const choices = self.nominalArguments(value);
+            // Payload writes do not create a new value identity. Each origin
+            // retains its descriptor separately from its exact owner term.
+            var same = true;
+            for (choices, arguments) |choice, argument| {
+                const old = self.node(choice);
+                const next = self.node(argument);
+                same = same and old.b == next.b and old.c == next.c;
+            }
+            if (same) return @intCast(index);
+        }
+        return self.nominalLike(.instance_selection, identity, arguments);
+    }
     pub fn nominal(self: *Store, identity: NominalIdentity, arguments: []const Id) Error!Id {
+        return self.nominalLike(.nominal, identity, arguments);
+    }
+    fn nominalLike(self: *Store, tag: Tag, identity: NominalIdentity, arguments: []const Id) Error!Id {
         if (arguments.len >= std.math.maxInt(u32) or self.extra.items.len > std.math.maxInt(u32) - arguments.len - 1) return error.TypeLimit;
         const owned = try self.allocator.dupe(Id, arguments);
         defer self.allocator.free(owned);
@@ -338,7 +360,7 @@ pub const Store = struct {
         try self.extra.ensureUnusedCapacity(self.allocator, owned.len + 1);
         self.extra.appendAssumeCapacity(@intCast(owned.len));
         self.extra.appendSliceAssumeCapacity(owned);
-        return self.add(.{ .tag = .nominal, .a = identity.unit, .b = identity.decl, .c = start });
+        return self.add(.{ .tag = tag, .a = identity.unit, .b = identity.decl, .c = start });
     }
     /// Symbolic associated output. The tail word is the original member name;
     /// arguments use the ordinary owned span so substitution shares the graph.
@@ -362,7 +384,7 @@ pub const Store = struct {
         return self.extra.items[value.c + 1 + self.extra.items[value.c]];
     }
     pub fn nominalArguments(self: *const Store, value: Node) []const Id {
-        std.debug.assert(value.tag == .nominal or value.tag == .projection);
+        std.debug.assert(value.tag == .nominal or value.tag == .projection or value.tag == .instance_selection);
         return self.extra.items[value.c + 1 ..][0..self.extra.items[value.c]];
     }
     pub fn recordField(self: *const Store, value: Node, index: usize) Field {
@@ -552,7 +574,7 @@ pub const Store = struct {
                     break :blk &children;
                 },
                 .product => self.list(.{ .start = n.a, .len = n.b }),
-                .nominal, .projection => self.nominalArguments(n),
+                .nominal, .projection, .instance_selection => self.nominalArguments(n),
                 .record => blk: {
                     if (n.b > pending.len - count) return null;
                     for (0..n.b) |i| pending[count + i] = self.recordField(n, i).ty;
@@ -742,7 +764,7 @@ pub const Store = struct {
                 }
                 return if (changed) self.record(fields.items) else id;
             },
-            .nominal, .projection => {
+            .nominal, .projection, .instance_selection => {
                 var args: std.ArrayList(Id) = .empty;
                 defer args.deinit(self.allocator);
                 var changed = false;
@@ -759,6 +781,7 @@ pub const Store = struct {
                 }
                 if (!changed) return id;
                 if (value.tag == .projection) return self.projection(.{ .unit = value.a, .decl = value.b }, self.projectionMember(value), args.items);
+                if (value.tag == .instance_selection) return self.instanceSelection(.{ .unit = value.a, .decl = value.b }, args.items);
                 return self.nominal(.{ .unit = value.a, .decl = value.b }, args.items);
             },
             else => return id,
@@ -814,7 +837,7 @@ pub const Store = struct {
                 .record => for (0..value.b) |i| {
                     try pending.append(scratch_allocator, self.recordField(value, i).ty);
                 },
-                .nominal, .projection => try pending.appendSlice(scratch_allocator, self.nominalArguments(value)),
+                .nominal, .projection, .instance_selection => try pending.appendSlice(scratch_allocator, self.nominalArguments(value)),
                 else => {},
             }
         }
@@ -1062,7 +1085,7 @@ pub const Store = struct {
                     if (a.b != b.b) return false;
                     for (self.list(.{ .start = a.a, .len = a.b }), self.list(.{ .start = b.a, .len = b.b })) |av, bv| try pending.append(scratch_allocator, .{ .a = av, .b = bv });
                 },
-                .nominal, .projection => {
+                .nominal, .projection, .instance_selection => {
                     if (a.a != b.a or a.b != b.b) return false;
                     if (a.tag == .projection and self.projectionMember(a) != self.projectionMember(b)) return false;
                     const aa = self.nominalArguments(a);
@@ -1175,10 +1198,12 @@ pub const Store = struct {
                     try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a });
                 },
                 .scoped => {
-                    if (an.b == 0) {
+                    if (an.b == 0 and self.node(an.c).tag == .variable) {
                         if (bn.b != 0 or an.c != bn.c) try pending.append(scratch_allocator, .{ .a = an.c, .b = b });
-                    } else if (bn.b == 0) {
+                    } else if (bn.b == 0 and self.node(bn.c).tag == .variable) {
                         try pending.append(scratch_allocator, .{ .a = bn.c, .b = a });
+                    } else if (an.b == 0 and bn.b == 0) {
+                        try pending.append(scratch_allocator, .{ .a = an.c, .b = bn.c });
                     } else if (an.b != bn.b or an.c != bn.c) return self.mismatch(reporter, a, b);
                     try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a });
                 },
@@ -1195,7 +1220,7 @@ pub const Store = struct {
                         if (!try self.equalSymbolic(al, bl)) return self.mismatch(reporter, a, b);
                     }
                 },
-                .nominal => {
+                .nominal, .instance_selection => {
                     if (an.a != bn.a or an.b != bn.b) return self.mismatch(reporter, a, b);
                     // Enqueue numeric child IDs before solving another pair.
                     // Pending-work growth does not mutate Store.extra; these
@@ -1275,7 +1300,7 @@ pub const Store = struct {
                 .record => for (0..value.b) |i| {
                     try pending.append(temporary, self.recordField(value, i).ty);
                 },
-                .nominal, .projection => try pending.appendSlice(temporary, self.nominalArguments(value)),
+                .nominal, .projection, .instance_selection => try pending.appendSlice(temporary, self.nominalArguments(value)),
                 else => {},
             }
         }
@@ -1311,7 +1336,7 @@ pub const Store = struct {
                 .state_provider => for ([_]Id{ n.a, n.b, n.c }) |child| try pending.append(self.allocator, .{ .root = child }),
                 .product => for (self.list(.{ .start = n.a, .len = n.b })) |child| try pending.append(self.allocator, .{ .root = child }),
                 .record => for (0..n.b) |at| try pending.append(self.allocator, .{ .root = self.recordField(n, at).ty }),
-                .nominal => for (self.nominalArguments(n)) |child| try pending.append(self.allocator, .{ .root = child }),
+                .nominal, .instance_selection => for (self.nominalArguments(n)) |child| try pending.append(self.allocator, .{ .root = child }),
                 else => {},
             }
         }
@@ -1606,7 +1631,7 @@ pub const Store = struct {
                 .record => for (0..value.b) |i| {
                     try pending.append(temporary, .{ .id = self.recordField(value, i).ty, .at = at, .depth = work.depth + 1 });
                 },
-                .nominal, .projection => for (self.nominalArguments(value)) |child| {
+                .nominal, .projection, .instance_selection => for (self.nominalArguments(value)) |child| {
                     try pending.append(temporary, .{ .id = child, .at = at, .depth = work.depth + 1 });
                 },
                 else => {},
@@ -1708,13 +1733,14 @@ pub const Store = struct {
                 }
                 return self.record(fields.items);
             },
-            .nominal, .projection => {
+            .nominal, .projection, .instance_selection => {
                 const prior = try self.allocator.dupe(Id, self.nominalArguments(value));
                 defer self.allocator.free(prior);
                 var args: std.ArrayList(Id) = .empty;
                 defer args.deinit(self.allocator);
                 for (prior) |child| try args.append(self.allocator, try self.substituteDepth(child, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1));
                 if (value.tag == .projection) return self.projection(.{ .unit = value.a, .decl = value.b }, self.projectionMember(value), args.items);
+                if (value.tag == .instance_selection) return self.instanceSelection(.{ .unit = value.a, .decl = value.b }, args.items);
                 return self.nominal(.{ .unit = value.a, .decl = value.b }, args.items);
             },
             else => return root,
@@ -2679,4 +2705,69 @@ fn capabilityParameterLaw(allocator: std.mem.Allocator) !void {
 test "capability identity parameters freshen resolve precise rows and revoke on rollback" {
     try capabilityParameterLaw(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, capabilityParameterLaw, .{});
+}
+
+/// Physical keys copy a selection's stable atom rather than retaining a type edge.
+/// Semantic rows retain the owned edge for footprint and equality proofs.
+pub fn selectionAtom(source: anytype, original: NominalIdentity) NominalIdentity {
+    if (original.unit != 0 or original.decl == 0) return original;
+    const value = source.node(original.decl);
+    if (value.tag != .instance_selection) return original;
+    return .{ .unit = value.a, .decl = value.b };
+}
+
+fn selectionIdentityLaw(allocator: std.mem.Allocator) !void {
+    var store = try Store.initWithOptions(allocator, .{ .closed_graphs = true });
+    defer store.deinit();
+    const descriptor = try store.nominal(.{ .unit = 1, .decl = 23 }, &.{u32_type});
+    const left = try store.scoped(descriptor, .{ .unit = 1, .decl = 31 });
+    const right = try store.scoped(descriptor, .{ .unit = 1, .decl = 32 });
+    const term = try store.instanceSelection(.{ .unit = 1, .decl = 50 }, &.{ left, right });
+    try std.testing.expectEqual(term, try store.instanceSelection(.{ .unit = 1, .decl = 50 }, &.{ left, right }));
+    const other = try store.instanceSelection(.{ .unit = 1, .decl = 51 }, &.{ left, right });
+    const selected = try store.scoped(descriptor, .{ .unit = 0, .decl = term });
+    const independent = try store.scoped(descriptor, .{ .unit = 0, .decl = other });
+    try std.testing.expect(!try store.equalSymbolic(selected, independent));
+    const formal = try store.capabilityParameter(descriptor);
+    try store.unify(formal, selected);
+    try std.testing.expect(try store.equalSymbolic(try store.resolve(formal, 0), selected));
+    const supplied = try store.internScopedOperation(.{ .unit = 1, .decl = 24 }, .{ .unit = 0, .decl = term }, &.{u32_type});
+    const original = try store.internScopedOperation(.{ .unit = 1, .decl = 24 }, .{ .unit = 1, .decl = 31 }, &.{u32_type});
+    const selected_row = try store.effects.row(&.{supplied}, .closed);
+    const original_row = try store.effects.row(&.{original}, .closed);
+    const payload = try store.fresh();
+    const symbolic_descriptor = try store.nominal(.{ .unit = 1, .decl = 23 }, &.{payload});
+    const symbolic_left = try store.scoped(symbolic_descriptor, .{ .unit = 1, .decl = 31 });
+    const symbolic_right = try store.scoped(symbolic_descriptor, .{ .unit = 1, .decl = 32 });
+    const symbolic_term = try store.instanceSelection(.{ .unit = 1, .decl = 52 }, &.{ symbolic_left, symbolic_right });
+    const symbolic_selected = try store.scoped(symbolic_descriptor, .{ .unit = 0, .decl = symbolic_term });
+    const symbolic_operation = try store.internScopedOperation(.{ .unit = 1, .decl = 24 }, .{ .unit = 0, .decl = symbolic_term }, &.{payload});
+    const symbolic_row = try store.effects.row(&.{symbolic_operation}, .closed);
+    try store.unify(payload, u32_type);
+    const normalized = try store.resolve(symbolic_selected, 0);
+    const normalized_term = store.node(normalized).c;
+    const normalized_row = try store.resolveEffects(symbolic_row, 0);
+    try std.testing.expectEqual(normalized_term, store.operation(store.rowLabels(normalized_row)[0]).instance.decl);
+    const copied = try store.substitute(normalized, &.{}, &.{});
+    try std.testing.expectEqual(normalized_term, store.node(copied).c);
+    try std.testing.expectEqual(symbolic_term, normalized_term);
+    try std.testing.expectError(error.TypeMismatch, store.instanceSelection(.{ .unit = 1, .decl = 50 }, &.{ u32_type, right }));
+    const swapped = try store.instanceSelection(.{ .unit = 1, .decl = 50 }, &.{ right, left });
+    try std.testing.expect(swapped != term);
+    try std.testing.expectEqual(normalized_term, store.node(try store.resolve(symbolic_selected, 0)).c);
+    const mark_ = store.mark();
+    try store.unifyEffects(selected_row, selected_row);
+    try std.testing.expectEqual(NominalIdentity{ .unit = 1, .decl = 50 }, selectionAtom(&store, .{ .unit = 0, .decl = term }));
+    try std.testing.expectEqualSlices(Id, &.{ left, right }, store.nominalArguments(store.node(term)));
+    store.unifyEffects(selected_row, original_row) catch |err| {
+        if (err == error.OutOfMemory) return err;
+        try std.testing.expectEqual(error.EffectMismatch, err);
+        try std.testing.expectEqualDeep(mark_, store.mark());
+        return;
+    };
+    return error.TestUnexpectedResult;
+}
+test "selected identity terms preserve alias edges and reject independent roots transactionally through OOM" {
+    try selectionIdentityLaw(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, selectionIdentityLaw, .{});
 }

@@ -1428,3 +1428,79 @@ test "scoped effect paired capability binders retain each selected input row" {
     try pairLaw(a);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, pairLaw, .{});
 }
+
+pub const selection_source = scoped_state_header ++
+    \\entry const answer = fn flag => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+    \\  let selected = if flag then left else right
+    \\  let alias = selected
+    \\  let (state, result) = do (@effect.state selected.get selected.set 41):
+    \\    use alias.set 42
+    \\    return alias.get ()
+    \\  return result
+    \\))
+;
+fn selectionLaw(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, selection_source, null);
+}
+test "scoped effect selection retains one rigid value and both reachable owners" {
+    try selectionLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, selectionLaw, .{});
+}
+
+test "scoped effect selection cannot discharge independent roots or expose either origin" {
+    try checkScopedSource(a, scoped_state_header ++
+        \\entry const bad = fn flag => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => if flag then left else right))
+    , .capability_escape);
+    try checkScopedSource(a, scoped_state_header ++
+        \\entry const bad = fn flag => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+        \\  let selected = if flag then left else right
+        \\  let independent = if flag then left else right
+        \\  use nested <- do (@effect.state selected.get selected.set 7):
+        \\    return independent.get ()
+        \\  let (state, result) = nested
+        \\  return result
+        \\))
+    , .capability_escape);
+    try checkScopedSource(a, scoped_state_header ++
+        \\entry const bad = fn flag => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+        \\  let selected = if flag then left else right
+        \\  return fn () => do:
+        \\    let (state, result) = do (@effect.state selected.get selected.set 7):
+        \\      return selected.get ()
+        \\    return result
+        \\))
+    , .capability_escape);
+}
+test "scoped effect selection in repeated callbacks remains conservative" {
+    try checkScopedSource(a, scoped_state_header ++
+        \\entry const bad = fn flag => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+        \\  for index in 0..2:
+        \\    let selected = if flag then left else right
+        \\  return 42
+        \\))
+    , .effect_identity_scope);
+    try checkScopedSource(a, scoped_state_header ++
+        \\entry const bad = fn flag => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+        \\  let later = fn () => if flag then left else right
+        \\  return 42
+        \\))
+    , .effect_identity_scope);
+}
+
+pub const symbolic_selection_source = scoped_state_header ++
+    \\const read = fn (state: State a) => state.get ()
+    \\entry const answer = fn initial => @effect.scope (fn (left: State a) => @effect.scope (fn (right: State a) => do:
+    \\  let selected = if #True then left else right
+    \\  let (state, result) = do (@effect.state selected.get selected.set initial):
+    \\    use selected.set 7
+    \\    return read selected
+    \\  return result
+    \\))
+;
+fn symbolicSelectionLaw(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, symbolic_selection_source, null);
+}
+test "scoped effect selected symbolic payload normalization preserves the same instance edge" {
+    try symbolicSelectionLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, symbolicSelectionLaw, .{});
+}

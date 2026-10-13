@@ -1267,7 +1267,7 @@ const Generator = struct {
                     @memset(instances[0..key.count], .{ .unit = 0, .decl = 0 });
                     has_instances = true;
                 }
-                instances[key.count] = layout.mappedInstance(.{ .unit = input.b, .decl = input.c }, mappings);
+                instances[key.count] = types.selectionAtom(self.unit(source).types, layout.mappedInstance(.{ .unit = input.b, .decl = input.c }, mappings));
             } else if (has_instances) {
                 instances[key.count] = .{ .unit = 0, .decl = 0 };
             }

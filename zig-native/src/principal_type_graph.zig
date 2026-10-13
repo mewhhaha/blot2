@@ -385,6 +385,7 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
             }
             const node = self.source.node(root);
             const result = switch (node.tag) {
+                .instance_selection => return error.TypeLimit,
                 .variable => blk: {
                     if (self.variables.get(node.a)) |known| break :blk known;
                     const fresh = try self.destination.fresh();

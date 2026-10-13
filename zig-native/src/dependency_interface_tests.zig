@@ -880,3 +880,53 @@ test "scoped public claim wire rejects unknown values after the admitted maximum
     @memcpy(bytes[payload - 32 .. payload], &format.digest(bytes[payload..]));
     try std.testing.expectError(error.InvalidArtifact, format.decode(Contract, a, bytes, key));
 }
+
+test "scoped selection graph edges survive dependency relocation and reject owned cycles" {
+    const a = std.testing.allocator;
+    const source = try std.mem.replaceOwned(u8, a, @import("check_effect_tests.zig").selection_source, "entry const answer", "const answer");
+    defer a.free(source);
+    const bytes = try artifact(a, source);
+    defer a.free(bytes);
+    var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &frozen);
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(a);
+    _ = try pool.intern(a, "prior-name");
+    try relink.relink(a, &frozen, &pool, &.{2});
+    const module = &frozen.modules[0].core;
+    const bounds = @import("frozen_core_validation.zig");
+    try bounds.validate(a, module, .{ .units = &.{module} });
+    var count: usize = 0;
+    for (module.types.nodes, 0..) |term, index| {
+        if (term.tag != .instance_selection) continue;
+        count += 1;
+        try std.testing.expectEqual(@as(u32, 2), term.a);
+        const choice = module.types.extra[term.c + 1];
+        const root = for (module.types.nodes, 0..) |node, node_index| {
+            if (node.tag == .scoped and node.b == 0 and node.c == index) break node_index;
+        } else return error.TestUnexpectedResult;
+        module.types.extra[term.c + 1] = @intCast(root);
+        try std.testing.expectError(error.InvalidArtifact, bounds.validate(a, module, .{ .units = &.{module} }));
+        module.types.extra[term.c + 1] = choice;
+    }
+    try std.testing.expect(count != 0);
+    try bounds.validate(a, module, .{ .units = &.{module} });
+}
+
+fn symbolicSelectionArtifactLaw(allocator: std.mem.Allocator) !void {
+    const source = try std.mem.replaceOwned(u8, allocator, @import("check_effect_tests.zig").symbolic_selection_source, "entry const answer", "const answer");
+    defer allocator.free(source);
+    const bytes = try artifact(allocator, source);
+    defer allocator.free(bytes);
+    var frozen = try format.decode(D.FrozenDependency, allocator, bytes, key);
+    defer format.deinit(allocator, &frozen);
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    try relink.relink(allocator, &frozen, &pool, &.{2});
+    const module = &frozen.modules[0].core;
+    try @import("frozen_core_validation.zig").validate(allocator, module, .{ .units = &.{module} });
+}
+test "scoped selected symbolic factories publish owned dependency graphs" {
+    try symbolicSelectionArtifactLaw(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, symbolicSelectionArtifactLaw, .{});
+}

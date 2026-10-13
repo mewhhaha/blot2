@@ -254,7 +254,7 @@ const Frontier = struct {
                     break :blk local[0..1];
                 },
                 .product => store.list(.{ .start = node.a, .len = node.b }),
-                .nominal, .projection => store.nominalArguments(node),
+                .nominal, .projection, .instance_selection => store.nominalArguments(node),
                 .record => blk: {
                     if (node.b > stack.len - len) {
                         self.overflow = true;
@@ -452,12 +452,19 @@ fn identityFrontierScenario(a: Allocator) !void {
     const operation = try store.internScopedOperation(.{ .unit = 2, .decl = 8 }, instance, &.{types.u32_type});
     const row = try store.effects.row(&.{ operation, operation }, .closed);
     const callback = try store.functionWithEffects(types.unit, types.u32_type, row);
+    const other = try store.capabilityParameter(descriptor);
+    const selection = try store.instanceSelection(.{ .unit = 2, .decl = 50 }, &.{ input, other });
+    const selected_operation = try store.internScopedOperation(.{ .unit = 2, .decl = 8 }, .{ .unit = 0, .decl = selection }, &.{types.u32_type});
+    const selected_row = try store.effects.row(&.{selected_operation}, .closed);
+    const selected_callback = try store.functionWithEffects(types.unit, types.u32_type, selected_row);
+    try queue.add(a, true);
     try queue.add(a, true);
     try queue.add(a, true);
     queue.observe(&store);
     while (queue.take(0)) |_| {}
     try queue.watch(a, &store, 0, &.{input}, false, false);
     try queue.watch(a, &store, 1, &.{callback}, false, false);
+    try queue.watch(a, &store, 2, &.{selected_callback}, false, false);
     const unrelated = try store.fresh();
     try store.unify(unrelated, types.boolean);
     queue.observe(&store);
@@ -466,6 +473,12 @@ fn identityFrontierScenario(a: Allocator) !void {
     queue.observe(&store);
     try std.testing.expectEqual(@as(?usize, 0), queue.take(0));
     try std.testing.expectEqual(@as(?usize, 1), queue.take(0));
+    try std.testing.expectEqual(@as(?usize, 2), queue.take(0));
+    try std.testing.expectEqual(null, queue.take(0));
+    try queue.watch(a, &store, 2, &.{selected_callback}, false, false);
+    try store.unify(other, try store.scoped(descriptor, .{ .unit = 2, .decl = 41 }));
+    queue.observe(&store);
+    try std.testing.expectEqual(@as(?usize, 2), queue.take(0));
     try std.testing.expectEqual(null, queue.take(0));
 }
 test "variable worklist watches capability parameter and operation instance binder edges" {

@@ -332,3 +332,42 @@ The combined `ae001bb` checkpoint passes the complete native/guest/OOM gate and
 release comparisons. See [merged qualification](CONTINUATION_QUALIFICATION.md)
 for exact pins, the repaired revert regression and final measurements. Later
 prototypes remain separate.
+
+## Local selected identity boundary
+
+An `if` in the active fresh-scope callback may select two same-family capability
+values. The owned selection term carries its source atom and both origin edges.
+Aliases preserve this exact term; handling it subtracts only its operations.
+Another selection or an original root retains its own requirements. Escape,
+residual-row and storage checks inspect both possible lifetimes. Nested ordinary
+callbacks and loops cannot create a selection, and a selection must reach the
+current fresh owner. Public generative selection schemes remain unsupported.
+
+Payload substitution keeps the same owner term. A reduced symbolic factory first
+exposed an exact Core operation/capability edge mismatch at dependency
+validation: full payload graph comparison incorrectly gave a resolved copy a new
+selection identity. Interning now compares the exact ordered owner terms, while
+each scoped value retains its own payload descriptor. The native artifact law
+covers encoding, decoding, relocation and exact Core validation under allocation
+failure. The original failed fixture and logs are preserved outside the source
+tree.
+
+Four executed matrix groups cover parameter and complete-header helpers in both
+codegen tiers, source and compiled imports, symbolic factories, concrete U32/F32
+payloads, generic identity aliases, independent roots/selections, sync and JSPI,
+rejection recovery, retained edits/reverts and byte-exact checkpoint rollback.
+Native checking, lowering, emission, type normalization and worklist traversal
+include allocation-failure laws; corrupted selection cycles reject. The selected
+matrix and eight unchanged compile budgets pass. This is a focused boundary;
+root owns full combined compiler qualification.
+
+General multi-input bodies, fresh invocation substitution for public generative
+selection schemes, aggregate/capture/result/store contracts across demands,
+providers and computations, opaque/associated footprint transport and generic
+storage/lifetime contracts remain open. Neither 058 nor 059 is complete.
+
+Final analyzer control checks 370 files with zero findings. Identical pinned
+fanout/prelude inputs and fresh equal-length restart-cache paths request exactly
+16,104,444 bytes in 53,920 allocations before and after this slice, with 18,504
+type nodes and identical work counters. This establishes ordinary allocation
+parity; CPU and combined retained qualification belong to the root gate.

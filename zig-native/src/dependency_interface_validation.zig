@@ -43,6 +43,7 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
     try require(owner.graph.nodes.len >= 6 and owner.graph.rows.len != 0 and owner.graph.operations.len >= 2);
     for ([_]T.Tag{ .absent, .unit, .boolean, .u32, .f32, .never }, owner.graph.nodes[0..6]) |tag, node| try require(node.tag == tag and node.a == 0 and node.b == 0 and node.c == 0);
     for (owner.graph.nodes) |node| switch (node.tag) {
+        .instance_selection => return error.InvalidArtifact,
         .scoped => {
             try ty(owner, node.a);
             try ty(owner, node.c);

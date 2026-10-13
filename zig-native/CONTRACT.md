@@ -499,6 +499,9 @@ Each snapshot stores only its demanded fields. Demand propagates backwards
 through every alias/carry edge to a fixed point; all source field values are
 read before destination writes. Dropped fields still evaluate their operands.
 The pass transforms an assembly copy, preserving retained symbolic fragments.
+Block results include only reachable fallthroughs and branches to that block.
+Outward exits stay unreachable through skipped enclosing frames; alternate arms
+restore their entry reachability. A loop backedge never proves a normal exit.
 Empty constructor cells carry exact symbolic tag/zero-payload facts; replacing
 one never depends on mutable module data or pointer-looking scalar bits. A
 private tagged join needs mutually exclusive producers and a common enclosing

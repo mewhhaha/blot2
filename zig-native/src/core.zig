@@ -178,7 +178,7 @@ pub const Types = struct {
         return self.extra[value.c + 1 + self.extra[value.c]];
     }
     pub fn nominalArguments(self: *const Types, value: T.Node) []const T.Id {
-        std.debug.assert(value.tag == .nominal or value.tag == .projection);
+        std.debug.assert(value.tag == .nominal or value.tag == .projection or value.tag == .instance_selection);
         return self.extra[value.c + 1 ..][0..self.extra[value.c]];
     }
     pub fn recordField(self: *const Types, value: T.Node, index: usize) T.Field {
@@ -765,7 +765,7 @@ const Builder = struct {
                 const span = try self.saveTypes(fields.items);
                 break :blk .{ .tag = .record, .a = span.start, .b = original.b };
             },
-            .nominal, .projection => blk: {
+            .nominal, .projection, .instance_selection => blk: {
                 var arguments: std.ArrayList(T.Id) = .empty;
                 defer arguments.deinit(allocator);
                 const source_arguments = self.checked.types.nominalArguments(original);

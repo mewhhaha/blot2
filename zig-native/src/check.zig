@@ -4643,6 +4643,10 @@ const Engine = struct {
     }
     const FootprintBoundary = struct { exiting: ?Identity = null, storage_depth: ?usize = null };
     fn identityFootprint(self: *Engine, identity: Identity, boundary: FootprintBoundary) T.Error!bool {
+        if (identity.unit == 0 and identity.decl != 0 and self.types.node(identity.decl).tag == .instance_selection) {
+            var remaining: usize = 65_536;
+            return self.scopeFootprintDepth(identity.decl, 0, &remaining, &.{}, boundary);
+        }
         if (boundary.storage_depth) |depth| {
             if (identity.unit == 0 and identity.decl == 0) return false;
             for (self.scope_lifetimes.items[0..depth]) |capability| {
@@ -4665,7 +4669,14 @@ const Engine = struct {
         switch (value.tag) {
             .variable => return !inList(inherited, resolved),
             .scoped => {
+                if (value.b == 0 and self.types.node(value.c).tag == .instance_selection) return self.scopeFootprintDepth(value.c, depth + 1, remaining, inherited, boundary);
                 return self.identityFootprint(.{ .unit = value.b, .decl = value.c }, boundary);
+            },
+            .instance_selection => {
+                const choices = self.types.nominalArguments(value);
+                const left = choices[0];
+                const right = choices[1];
+                return try self.scopeFootprintDepth(left, depth + 1, remaining, inherited, boundary) or try self.scopeFootprintDepth(right, depth + 1, remaining, inherited, boundary);
             },
             .unit, .boolean, .u32, .f32, .never => return false,
             .array, .list, .cursor => return self.scopeFootprintDepth(value.a, depth + 1, remaining, inherited, boundary),
@@ -4963,7 +4974,11 @@ const Engine = struct {
         const exiting: Identity = .{ .unit = self.unit, .decl = lambda.a };
         const footprint = try self.scopedClosureResult(lambda.b, signature.b, exiting, inherited, &footprint_budget) orelse try self.scopeFootprintDepth(signature.b, 0, &footprint_budget, inherited, .{ .exiting = exiting });
         var residual_owner = false;
-        for (self.types.rowLabels(residual)) |label| residual_owner = residual_owner or std.meta.eql(self.types.operation(label).instance, exiting);
+        for (self.types.rowLabels(residual)) |label| {
+            const instance = self.types.operation(label).instance;
+            residual_owner = residual_owner or std.meta.eql(instance, exiting);
+            if (instance.unit == 0 and instance.decl != 0 and self.types.node(instance.decl).tag == .instance_selection) residual_owner = residual_owner or try self.scopeFootprintDepth(instance.decl, 0, &footprint_budget, inherited, .{ .exiting = exiting });
+        }
         if (footprint or residual_owner) try self.diagnostic(.capability_escape, id);
         try self.effect_scopes.append(self.allocator, .{ .node = id, .callback = callback, .parameter = lambda.a, .capability = capability, .result = signature.b, .body_effects = signature.c });
         self.effect_scope_ids[id] = @intCast(self.effect_scopes.items.len);
@@ -8347,6 +8362,9 @@ const Engine = struct {
                 const contextual = expected != 0 and required_arrow.tag == .function;
                 const contextual_capability = contextual and self.types.node(try self.types.resolve(required_arrow.a, 0)).tag == .scoped;
                 const scoped = node.a == self.scoped_parameter;
+                const saved_selection_parameter = self.scoped_parameter;
+                if (!scoped) self.scoped_parameter = 0;
+                defer self.scoped_parameter = saved_selection_parameter;
                 const descriptor = if (!scoped) try self.capabilityDescriptorAnnotation(parameter.annotation) else null;
                 const symbolic_capability = descriptor != null or contextual_capability;
                 const element_ty = if (scoped) self.scoped_parameter_type else if (contextual) required_arrow.a else if (descriptor) |family| try self.types.capabilityParameter(family) else if (parameter.is_unit) T.unit else try self.types.fresh();
@@ -8521,6 +8539,25 @@ const Engine = struct {
                 try self.constrain(condition, T.boolean, node.a);
                 const left = try self.expression(node.b);
                 const right = try self.expression(node.c);
+                if (self.active_effect_scopes != 0) {
+                    const left_root = try self.types.resolve(left, 0);
+                    const right_root = try self.types.resolve(right, 0);
+                    const left_capability = self.types.node(left_root);
+                    const right_capability = self.types.node(right_root);
+                    if (left_capability.tag == .scoped and right_capability.tag == .scoped and !try self.types.equalSymbolic(left_root, right_root)) {
+                        const current = self.types.node(self.scoped_parameter_type);
+                        var selection_budget: usize = 65_536;
+                        const boundary: FootprintBoundary = .{ .exiting = .{ .unit = current.b, .decl = current.c } };
+                        const contains_current = try self.scopeFootprintDepth(left_root, 0, &selection_budget, &.{}, boundary) or try self.scopeFootprintDepth(right_root, 0, &selection_budget, &.{}, boundary);
+                        if (self.scoped_parameter == 0 or self.loop_stack.items.len != 0 or !contains_current) {
+                            try self.diagnostic(.effect_identity_scope, id);
+                            break :blk left_root;
+                        }
+                        try self.constrain(left_capability.a, right_capability.a, id);
+                        const term = try self.types.instanceSelection(.{ .unit = self.unit, .decl = id }, &.{ left_root, right_root });
+                        break :blk try self.types.scoped(left_capability.a, .{ .unit = 0, .decl = term });
+                    }
+                }
                 try self.constrain(left, right, id);
                 break :blk if (left == T.never) right else left;
             },
@@ -10903,6 +10940,7 @@ const SchemeCopier = struct {
         if (self.associated) try self.destination.chargeProjection();
         const node = self.source.node(id);
         const result = switch (node.tag) {
+            .instance_selection => return error.TypeLimit,
             .scoped => if (node.b == 0) try self.destination.scoped(try self.copy(node.a, depth + 1), .{ .unit = 0, .decl = try self.copy(node.c, depth + 1) }) else return error.TypeLimit,
             .absent, .unit, .boolean, .u32, .f32, .never => id,
             .array, .list, .cursor => try self.destination.sequence(node.tag, try self.copy(node.a, depth + 1)),

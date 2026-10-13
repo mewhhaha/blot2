@@ -304,7 +304,7 @@ pub const Store = struct {
         switch (n.tag) {
             .unit, .boolean, .u32, .f32, .never => return root,
             .variable => return erased,
-            .absent, .projection => return error.UnresolvedType,
+            .absent, .projection, .instance_selection => return error.UnresolvedType,
             .scoped => return self.intern(.nominal, std.math.maxInt(u32), capability_layout_decl, &.{}),
             .type_constructor => return self.intern(.type_constructor, n.a, n.b, &.{}),
             .array, .list, .cursor, .resolver => return self.intern(switch (n.tag) {
@@ -357,7 +357,7 @@ pub const Store = struct {
             defer self.allocator.free(source_arguments);
             const identity = source.operation(label).identity;
             for (source_arguments) |argument| try arguments.append(self.allocator, try self.fromSolverDepth(source, argument, depth + 1, budget));
-            try labels.append(self.allocator, self.effects.internOperationInstance(identity, arguments.items, source.operation(label).instance) catch |err| return effectError(err));
+            try labels.append(self.allocator, self.effects.internOperationInstance(identity, arguments.items, types.selectionAtom(source, source.operation(label).instance)) catch |err| return effectError(err));
         }
         return self.effects.internRow(labels.items) catch |err| return effectError(err);
     }
@@ -491,7 +491,7 @@ pub const Store = struct {
         switch (n.tag) {
             .unit, .boolean, .u32, .f32, .never => return ty,
             .variable => return if (allow_erased) erased else error.UnresolvedType,
-            .absent, .projection => return error.UnresolvedType,
+            .absent, .projection, .instance_selection => return error.UnresolvedType,
             .scoped => return self.intern(.nominal, std.math.maxInt(u32), capability_layout_decl, &.{}),
             .array => return self.intern(.array, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),
             .list => return self.intern(.list, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),
@@ -593,7 +593,7 @@ pub const Store = struct {
         for (module.types.rowLabels(row)) |label| {
             arguments.clearRetainingCapacity();
             for (module.types.operationArguments(label)) |argument| try arguments.append(self.allocator, try self.fromTypeDepth(module, argument, mappings, rows, depth + 1, allow_erased));
-            const mapped = self.effects.internOperationInstance(module.types.operation(label).identity, arguments.items, mappedInstance(module.types.operation(label).instance, mappings)) catch |err| return effectError(err);
+            const mapped = self.effects.internOperationInstance(module.types.operation(label).identity, arguments.items, types.selectionAtom(module.types, mappedInstance(module.types.operation(label).instance, mappings))) catch |err| return effectError(err);
             try labels.append(self.allocator, mapped);
         }
         try labels.appendSlice(self.allocator, self.effects.view().rowLabels(suffix));

@@ -6533,6 +6533,12 @@ const ClosureRegion = struct {
             }
         }
         const result = switch (node.tag) {
+            .instance_selection => blk: {
+                const choices = source.nominalArguments(node);
+                const left = try self.importType(scope, choices[0], depth + 1);
+                const right = try self.importType(scope, choices[1], depth + 1);
+                break :blk try self.solver.instanceSelection(.{ .unit = node.a, .decl = node.b }, &.{ left, right });
+            },
             .absent => return error.UnresolvedType,
             .unit, .boolean, .u32, .f32, .never => ty,
             .variable => try self.solver.fresh(),
@@ -7457,7 +7463,7 @@ const ClosureRegion = struct {
                                 parts.mask[slot] = true;
                             } else parts.has_private = true;
                         },
-                        .absent, .projection, .scoped => return false,
+                        .absent, .projection, .scoped, .instance_selection => return false,
                         .unit, .boolean, .u32, .f32, .never, .type_constructor => {},
                         .array, .list, .cursor, .resolver => try pending.append(self.scratch_allocator, .{ .ty = node.a }),
                         .function, .demand, .provider => {

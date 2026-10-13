@@ -26,6 +26,7 @@ fn target(map: []const u32, value: anytype) void {
 fn typeUnits(nodes: []T.Node, names: []const u32, units: []const u32) void {
     for (nodes) |*node| switch (node.tag) {
         .scoped => node.b = unit(units, node.b),
+        .instance_selection => node.a = unit(units, node.a),
         .nominal, .projection, .type_constructor => {
             node.a = unit(units, node.a);
             if (node.a != 0 and node.a != std.math.maxInt(u32) and node.b & T.opaque_name_bit != 0) node.b = T.opaque_name_bit | symbol(names, node.b & ~T.opaque_name_bit);

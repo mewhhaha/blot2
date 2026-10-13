@@ -4,8 +4,9 @@
 
 - **Status:** In progress — direct scopes, scoped requests, symbolic rows and
   exact generic capability/callback contracts, dependent arrow headers and exact
-  two-input capability member helpers are implemented. General multi-input
-  bodies, selected identities and general capture contracts remain open; see
+  two-input capability member helpers and bounded local selected identities are
+  implemented. General multi-input bodies, generative selection schemes and
+  general capture contracts remain open; see
   [qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
 - **Dependencies:** [057](057-specify-scoped-effect-identities.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / effect

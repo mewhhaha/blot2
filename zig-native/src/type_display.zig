@@ -36,6 +36,7 @@ fn render(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, depth: usize, bu
     if (!stable) root = try engine.types.resolve(ty, 0);
     const node = engine.types.node(root);
     switch (node.tag) {
+        .instance_selection => try text(engine, bytes, "@selection"),
         .scoped => {
             try render(engine, bytes, node.a, depth + 1, budget, stable);
             try text(engine, bytes, " @scope");
