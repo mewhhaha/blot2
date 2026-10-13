@@ -432,3 +432,61 @@ The standalone maximum-binder/mask test lacked suite registration; it was not
 covered by its earlier empty focused filter. Checker/emitter/artifact laws did
 execute. Its separately tested registration amendment is queued for the next
 invocation batch; no source is changed after the frozen gate.
+
+## Multi-input Unit invocation footprints
+
+The owned formal summary also proves one direct Unit invocation of a selected
+input. It records that input's ordinal, preserves ordinary shadowing and ignores
+unused inputs. Source classification and frozen Core admission require the exact
+callable reference and Unit argument; captures, stores and intermediate calls do
+not acquire this contract. Existing single/two-input contracts retain their
+ordinary representation and hashes.
+
+Generic scoped callback rows may recover erased payload arguments only from an
+already bound exact owner and matching operation evidence. Wrong owners, unbound
+owners and contradictory payloads decline. Repeated written labels keep their
+multiplicity: two providers discharge two occurrences of one owner; one provider
+leaves a residual row and rejects escape.
+
+Four executed groups cover parameter and complete-arrow syntax, both codegen
+tiers, source/compiled imports, reordered/repeated owners, callback-first and
+shadowed ordinals, U32/F32 payloads, sync/JSPI rejection recovery, proof loss,
+checkpoint restore and retained edits/reverts. Alongside product/selection/pair
+controls and unchanged budgets, all 22 guest groups pass. Registered native laws
+cover checking, lowering, emission, exact-owner inference and artifact admission
+with allocation failure and corrupted callback masks/kinds. The maximum-16
+domain law is now explicitly imported into the suite; its earlier unregistered
+filter was not coverage. Analyzer checks 370 files with zero findings.
+
+The invocation kind occupies existing padding. Identical pinned ordinary
+fanout/prelude inputs and fresh equal-length cache paths request 16,123,214
+bytes in 53,920 allocations before/after, with identical peak bytes, type/work
+counters and Wasm. Root owns combined release/retained qualification. General
+value-owner graphs, result/capture/store recipes,
+demands/providers/computations, public generative selection schemes and
+opaque/associated contracts remain open; neither 058 nor 059 is complete.
+
+## Named record constructor footprints
+
+The same formal-retention proof now covers pure record constructors, including
+shorthand fields and nested mixtures of records/products. Source field values
+must be exact formals or scalar constants; decoded Core proves the same retained
+parameter mask. No new field, type tag or allocation owner is introduced.
+Nominal constructors, intermediate calls, captures and stores remain unproved.
+
+The shared aggregate matrix adds two record groups rather than duplicating its
+test harness. Source/compiled imports, both tiers, repeated/reordered fields,
+shadowing, precise younger-owner omission, U32/F32, JSPI rejection recovery,
+edits/reverts and checkpoint/proof-loss rollback pass. All 24 focused guest
+groups and unchanged budgets pass. Three registered native laws cover checking,
+lowering/emission and frozen admission with OOM and forged retained-field masks.
+Analyzer checks 370 files with zero findings.
+
+Identical pinned ordinary fanout/prelude inputs and fresh equal-length cache
+roots request 16,123,204 bytes in 53,920 allocations before/after, with
+identical peak bytes, type/work counters and Wasm. The initial measurement could
+not execute its copied baseline binary because executable permissions were
+missing; that run is preserved as incomplete, and the corrected comparison uses
+new fresh caches. Root owns combined qualification. The general boundaries
+listed above remain open; this is an aggregate relationship, not a general
+capture/store contract.

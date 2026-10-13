@@ -8,8 +8,8 @@ const ir = @import("runtime_ir.zig");
 const A = std.mem.Allocator;
 const none = std.math.maxInt(u32);
 const Value = struct { id: u32 = 0, offset: u32 = 0, constant: ?u32 = null };
-const Node = struct { parent: u32, bad: bool = false, size: u32 = 0, allocation: bool = false, first_copy: u32 = none, last_store: u32 = 0, store_mask: u32 = 0, scope: usize = 0, fields: u32 = 0, used_fields: u16 = 0, journaled: bool = false, untyped: bool = false, reference_fields: u16 = 0, roots: u32 = 0, root_fields: u16 = 0, shared_roots: bool = false, nullable: bool = false, journal_carrier: bool = false, zero_fields: u16 = 0, nonzero_fields: u16 = 0, control_start: usize = 0, control_end: usize = 0 };
-const Event = struct { input: Value = .{}, stored: Value = .{}, destination: u32 = 0, field: u32 = 0, allocation: u32 = 0, fresh: bool = false, static_words: bool = false, loop_scope: usize = 0, nonzero: bool = false };
+const Node = struct { parent: u32, copies: u8 = 0, empty: bool = false, bad: bool = false, size: u32 = 0, allocation: bool = false, first_copy: u32 = none, last_store: u32 = 0, store_mask: u32 = 0, scope: usize = 0, fields: u32 = 0, used_fields: u16 = 0, journaled: bool = false, untyped: bool = false, reference_fields: u16 = 0, roots: u32 = 0, root_fields: u16 = 0, shared_roots: bool = false, nullable: bool = false, journal_carrier: bool = false, zero_fields: u16 = 0, nonzero_fields: u16 = 0, control_start: usize = 0, control_end: usize = 0 };
+const Event = struct { input: Value = .{}, stored: Value = .{}, destination: u32 = 0, field: u32 = 0, allocation: u32 = 0, fresh: bool = false, static_words: bool = false, empty: bool = false, loop_scope: usize = 0, nonzero: bool = false };
 const Control = struct { height: usize, result: u32, unreachable_: bool = false, entry_unreachable: bool = false, conditional: bool = false, has_else: bool = false, then_live: bool = false, has_exit: bool = false, identity: usize = 0, loop_: bool = false };
 pub const Output = ir.Body;
 const Analysis = struct {
@@ -85,6 +85,12 @@ const Analysis = struct {
         return if (self.stack.items.len > floor) self.stack.pop().? else .{};
     }
     fn copy(self: *Analysis, at: usize, dst: u32, v: Value) void {
+        // Only an exact empty constructor, propagated through a single write,
+        // can cross a nested producer loop without holding a live child.
+        const empty = v.id != 0 and v.offset == 0 and self.nodes.items[v.id].empty;
+        self.events[at].empty = empty;
+        self.nodes.items[dst].copies = @min(self.nodes.items[dst].copies + 1, 2);
+        self.nodes.items[dst].empty = empty and self.nodes.items[dst].copies == 1;
         self.join(dst, v);
         self.events[at].input = v;
         self.events[at].destination = dst;
@@ -146,6 +152,7 @@ const Analysis = struct {
                         const id = try self.add(!self.owning, 8);
                         self.nodes.items[id].reference_fields = 2;
                         self.nodes.items[id].zero_fields = 2;
+                        self.nodes.items[id].empty = true;
                         self.events[at].allocation = id;
                         self.events[at].field = tag;
                         self.events[at].static_words = true;
@@ -415,7 +422,8 @@ const Analysis = struct {
     }
     // A single constructor allocation, or an immutable alternative, produces
     // one value per enclosing loop activation. All aliases stay in that same
-    // loop and no nested loop can revisit the producer. Their reference slots
+    // loop and no nested loop can revisit a live producer. Exact empty returns
+    // can leave completed inner loops. Their reference slots
     // therefore retain the same value until every admitted alias is consumed.
     // Carries/snapshots outside that activation keep independent roots.
     fn shareFieldRoots(self: *Analysis, instructions: []const w.Instruction) void {
@@ -432,11 +440,6 @@ const Analysis = struct {
             const end = candidate.control_end - 1;
             const activation = self.events[start].loop_scope;
             var admitted = true;
-            for (instructions[start..end]) |inst| if (inst.op == .loop) {
-                admitted = false;
-                break;
-            };
-            if (!admitted) continue;
             var allocations: usize = 0;
             var statics: usize = 0;
             for (self.events, 0..) |event, at| {
@@ -445,12 +448,15 @@ const Analysis = struct {
                         admitted = false;
                         break;
                     }
-                    if (event.static_words) statics += 1 else allocations += 1;
+                    if (event.static_words) statics += 1 else {
+                        allocations += 1;
+                        if (event.loop_scope != activation) admitted = false;
+                    }
                 }
                 if ((event.input.id != 0 and self.root(event.input.id) == family) or
                     (event.destination != 0 and self.root(event.destination) == family))
                 {
-                    if (event.loop_scope != activation) {
+                    if (event.loop_scope != activation and !event.empty) {
                         admitted = false;
                         break;
                     }
@@ -1763,4 +1769,73 @@ fn controlExitShapes(a: A) !void {
 test "scalar replacement joins nested outward exits and preserves loop backedge snapshots through OOM" {
     try controlExitShapes(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, controlExitShapes, .{});
+}
+
+fn completedEmptyProducers(a: A) !void {
+    var module = w.Module.init(a);
+    defer module.deinit();
+    const arena = try module.ensureArena();
+    const address = try module.dataWords(&.{ 1, 0 });
+    for (0..5) |scenario| {
+        const f = try module.addTypedFunction(&.{ .i32, .i32 }, .i32, .scalar);
+        try module.setParameterRoles(f, ir.packParameterRoles(&.{ .reference, .scalar }));
+        const cell = try module.addLocal(f, .i32);
+        const empty = try module.addLocal(f, .i32);
+        const alias = try module.addLocal(f, .i32);
+        const merged = try module.addLocal(f, .i32);
+        var buffer: [ir.max_annotations]ir.Instruction = undefined;
+        const facts = ir.annotations(&.{ .scalar, .reference }, .unknown, &buffer);
+        try module.emitSlice(f, &.{ .{ .op = .block, .operand = @backingInt(w.ValueType.i32) }, .{ .op = .block }, .{ .op = .loop }, .{ .op = .local_get, .operand = 1 }, .{ .op = .if_ } });
+        if (scenario != 3) {
+            var static_facts: [ir.max_annotations]ir.Instruction = undefined;
+            const fields = ir.annotations(&.{ .scalar, .reference }, .unknown, &static_facts);
+            var rest: ir.Ownership = @bitCast(fields[fields.len - 1].operand);
+            rest.chunk = 15;
+            fields[fields.len - 1].operand = @bitCast(rest);
+            try module.emitSlice(f, &.{
+                .{ .op = .ownership, .operand = @bitCast(ir.Ownership{ .kind = .words, .chunk = 14, .roles = 1 }) },
+                .{ .op = .ownership, .operand = @bitCast(ir.Ownership{ .kind = .words, .chunk = 15 }) },
+            });
+            try module.emitSlice(f, fields);
+        }
+        try module.emitSlice(f, &.{ .{ .op = .i32_const, .operand = address }, .{ .op = .local_set, .operand = empty }, .{ .op = .local_get, .operand = empty }, .{ .op = .local_set, .operand = alias }, .{ .op = .local_get, .operand = alias }, .{ .op = .br, .operand = 3 }, .{ .op = .end } });
+        if (scenario != 1) try module.emitSlice(f, &.{ .{ .op = .br, .operand = 1 }, .{ .op = .end }, .{ .op = .end } });
+        try module.emitSlice(f, facts);
+        try module.emitSlice(f, &.{
+            .{ .op = .i32_const, .operand = 8 },    .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = cell },
+            .{ .op = .local_get, .operand = cell }, .{ .op = .i32_const },                       .{ .op = .i32_store },
+            .{ .op = .local_get, .operand = cell }, .{ .op = .local_get },                       .{ .op = .i32_store, .operand = 4 },
+            .{ .op = .local_get, .operand = cell },
+        });
+        if (scenario == 1) try module.emitSlice(f, &.{ .{ .op = .br, .operand = 2 }, .{ .op = .end }, .{ .op = .end } });
+        try module.emitSlice(f, &.{ .{ .op = .end }, .{ .op = .local_set, .operand = merged } });
+        if (scenario == 2) try module.emitSlice(f, &.{ .{ .op = .block }, .{ .op = .loop } });
+        try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = merged }, .{ .op = .i32_load, .operand = 4 }, .{ .op = .drop } });
+        if (scenario == 2) try module.emitSlice(f, &.{ .{ .op = .br, .operand = 1 }, .{ .op = .end }, .{ .op = .end } });
+        try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = merged }, .{ .op = .i32_load } });
+        const before = try a.dupe(w.Instruction, module.functions.items[f].instructions.items);
+        defer a.free(before);
+        const maybe_out = try runWithRoots(a, &module, &module.functions.items[f], scenario != 4);
+        var allocations: usize = 1;
+        var slots: usize = 0;
+        if (maybe_out) |body| {
+            var out = body;
+            defer out.deinit(a);
+            allocations = 0;
+            for (out.instructions.items) |inst| {
+                if (inst.op == .call and inst.operand == arena.allocate) allocations += 1;
+                if (inst.op == .ownership) {
+                    const fact: ir.Ownership = @bitCast(inst.operand);
+                    if (fact.kind == .scope and fact.chunk == 3) slots += 1;
+                }
+            }
+        }
+        try std.testing.expectEqual(@as(usize, @intFromBool(scenario != 0)), allocations);
+        if (scenario == 0) try std.testing.expectEqual(@as(usize, 1), slots);
+        try std.testing.expectEqualSlices(w.Instruction, before, module.functions.items[f].instructions.items);
+    }
+}
+test "completed nested empty producers share one root while reentered producers active nested uses raw words and disabled owners decline through OOM" {
+    try completedEmptyProducers(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, completedEmptyProducers, .{});
 }

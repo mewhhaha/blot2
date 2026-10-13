@@ -1556,3 +1556,66 @@ test "scoped effect product summaries omit unused younger owners precisely" {
         \\)
     , null);
 }
+
+pub const parameter_invocation_source = scoped_state_header ++
+    \\const invoke = fn (left: State a) => fn (right: State b) => fn (callback: Unit -> U32 ! {left.get, right.get | e}) => callback ()
+    \\entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+    \\  use outer <- do (@effect.state left.get left.set 7):
+    \\    use inner <- do (@effect.state right.get right.set 100):
+    \\      return invoke left right (fn () => do:
+    \\        use a <- left.get ()
+    \\        use b <- right.get ()
+    \\        return @u32.add a b
+    \\      )
+    \\    let (state, result) = inner
+    \\    return result
+    \\  let (state, result) = outer
+    \\  return result
+    \\))
+;
+fn parameterInvocationLaw(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, parameter_invocation_source, null);
+}
+test "scoped effect multiple input invocation summaries preserve exact callback rows" {
+    try parameterInvocationLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, parameterInvocationLaw, .{});
+}
+
+pub const record_footprint_source = scoped_state_header ++
+    \\const pack = fn first => fn second => {selected: second, nested: {first}, repeated: first}
+    \\entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+    \\  let borrowed = pack left right
+    \\  use outer <- do (@effect.state left.get left.set 7):
+    \\    use inner <- do (@effect.state right.get right.set 100):
+    \\      use a <- borrowed.selected.get ()
+    \\      use b <- borrowed.nested.first.get ()
+    \\      use c <- borrowed.repeated.get ()
+    \\      return @u32.add a (@u32.add b c)
+    \\    let (state, result) = inner
+    \\    return result
+    \\  let (state, result) = outer
+    \\  return result
+    \\))
+;
+fn recordFootprintLaw(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, record_footprint_source, null);
+}
+test "scoped effect record constructors retain exact named input footprints" {
+    try recordFootprintLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, recordFootprintLaw, .{});
+    try checkScopedSource(a, scoped_state_header ++
+        \\const pack = fn first => fn second => {second, nested: {first}}
+        \\entry const bad = fn () => @effect.scope (fn (state: State U32) => pack state 42)
+    , .capability_escape);
+    try checkScopedSource(a, scoped_state_header ++
+        \\const keep = fn unused => fn retained => {retained, count: 42}
+        \\entry const answer = fn () => @effect.scope (fn (older: State U32) => do:
+        \\  let borrowed = @effect.scope (fn (younger: State U32) => keep younger older)
+        \\  use handled <- do (@effect.state borrowed.retained.get borrowed.retained.set 7):
+        \\    use value <- borrowed.retained.get ()
+        \\    return @u32.add value borrowed.count
+        \\  let (state, result) = handled
+        \\  return result
+        \\)
+    , null);
+}

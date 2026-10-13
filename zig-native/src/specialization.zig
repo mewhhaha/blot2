@@ -380,6 +380,46 @@ pub const Service = struct {
         var argument_ids: std.ArrayList(u32) = .empty;
         defer argument_ids.deinit(self.allocator);
         for (source.rowLabels(source_row)) |label| {
+            const source_operation = source.operation(label);
+            const bound_instance = layout.mappedInstance(source_operation.instance, mappings.items);
+            // Capability layouts erase their payload. An already bound owner
+            // selects exact operation evidence that can supply that payload;
+            // neither a static label nor an unbound identity may guess it.
+            if (source_operation.instance.unit == 0 and source_operation.instance.decl != 0 and bound_instance.unit != 0) {
+                var selected_arguments: ?u32 = null;
+                for (actuals, used) |actual, consumed| {
+                    if (consumed) continue;
+                    const operation = self.layouts.effects.view().operation(actual);
+                    if (!std.meta.eql(operation.identity, source_operation.identity) or !std.meta.eql(operation.instance, bound_instance)) continue;
+                    const arguments = self.layouts.effects.view().operationArguments(actual);
+                    if (arguments.len != source.operationArguments(label).len) continue;
+                    if (selected_arguments) |prior| {
+                        for (0..arguments.len) |index| {
+                            const first = self.layouts.effects.view().operationArguments(prior)[index];
+                            const next = self.layouts.effects.view().operationArguments(actual)[index];
+                            const first_evidence = self.toEvidence(first) catch |err| {
+                                if (err == error.OutOfMemory) return error.OutOfMemory;
+                                return self.decline(unit_id, span, .unresolved_type);
+                            };
+                            const next_evidence = self.toEvidence(next) catch |err| {
+                                if (err == error.OutOfMemory) return error.OutOfMemory;
+                                return self.decline(unit_id, span, .unresolved_type);
+                            };
+                            if (first_evidence != next_evidence) return self.decline(unit_id, span, .unresolved_type);
+                        }
+                    } else selected_arguments = actual;
+                }
+                const actual = selected_arguments orelse return self.decline(unit_id, span, .unresolved_type);
+                for (source.operationArguments(label), 0..) |argument, index| {
+                    // Mapping may grow effect/layout stores; reload their view.
+                    const concrete = self.layouts.effects.view().operationArguments(actual)[index];
+                    _ = self.toEvidence(concrete) catch |err| {
+                        if (err == error.OutOfMemory) return error.OutOfMemory;
+                        return self.decline(unit_id, span, .unresolved_type);
+                    };
+                    try self.mapTypeDepth(unit_id, mappings, rows, argument, concrete, span, 0);
+                }
+            }
             argument_ids.clearRetainingCapacity();
             for (source.operationArguments(label)) |argument| {
                 const concrete = try self.codeLayoutWithRows(unit_id, argument, mappings.items, rows.items, span);
@@ -449,3 +489,70 @@ pub const Service = struct {
         }
     }
 };
+
+fn scopedRowPayloadLaw(allocator: Allocator) !void {
+    var source = try types.Store.init(allocator);
+    defer source.deinit();
+    const payload = try source.fresh();
+    const instance = try source.fresh();
+    const identity: types.NominalIdentity = .{ .unit = 1, .decl = 22 };
+    const operation = try source.internScopedOperation(identity, .{ .unit = 0, .decl = instance }, &.{payload});
+    const row = try source.effects.row(&.{operation}, .closed);
+    var module = std.mem.zeroes(core.Module);
+    module.unit = 1;
+    module.types = .{ .nodes = source.nodes.items, .extra = source.extra.items, .operations = source.operations.items, .effects = .{ .rows = source.effects.rows.items, .labels = source.effects.labels.items } };
+    const units = [_]core.Module{module};
+    var evaluator = try core_eval.Session.init(allocator, &units);
+    defer evaluator.deinit();
+    var layouts = try layout.Store.init(allocator);
+    defer layouts.deinit();
+    var semantic = try type_evidence.Store.init(allocator);
+    defer semantic.deinit();
+    var bridge = try layout_bridge.Store.init(allocator, &layouts, &semantic);
+    defer bridge.deinit();
+    var stats: refinement_receipt.Stats = .{};
+    var regions: usize = 0;
+    var service: Service = .{ .allocator = allocator, .units = &units, .evaluator = &evaluator, .layouts = &layouts, .bridge = &bridge, .refinement_stats = &stats, .refinement_regions = &regions };
+    const owner: types.NominalIdentity = .{ .unit = 2, .decl = 17 };
+    const actual = try layouts.effects.internOperationInstance(identity, &.{types.u32_type}, owner);
+    const actual_row = try layouts.effects.internRow(&.{actual});
+    var mappings: std.ArrayList(Mapping) = .empty;
+    defer mappings.deinit(allocator);
+    var rows: std.ArrayList(RowMapping) = .empty;
+    defer rows.deinit(allocator);
+    try appendMapping(allocator, &mappings, .{ .variable = instance, .layout = layout.erased, .instance = owner });
+    try service.mapRow(1, &mappings, &rows, row, actual_row, .{ .start = 0, .end = 0 }, false);
+    const mapped = for (mappings.items) |mapping| {
+        if (mapping.variable == payload) break mapping.layout;
+    } else return error.TestUnexpectedResult;
+    try std.testing.expectEqual(types.u32_type, mapped);
+    mappings.shrinkRetainingCapacity(1);
+    const wrong = try layouts.effects.internOperationInstance(identity, &.{types.f32_type}, .{ .unit = 2, .decl = 18 });
+    const wrong_row = try layouts.effects.internRow(&.{wrong});
+    service.mapRow(1, &mappings, &rows, row, wrong_row, .{ .start = 0, .end = 0 }, false) catch |err| {
+        if (err == error.OutOfMemory) return err;
+        try std.testing.expectEqual(error.Declined, err);
+        try std.testing.expectEqual(@as(usize, 1), mappings.items.len);
+        const conflicting = try layouts.effects.internOperationInstance(identity, &.{types.f32_type}, owner);
+        const conflicting_row = try layouts.effects.internRow(&.{ actual, conflicting });
+        service.mapRow(1, &mappings, &rows, row, conflicting_row, .{ .start = 0, .end = 0 }, false) catch |failure| {
+            if (failure == error.OutOfMemory) return failure;
+            try std.testing.expectEqual(error.Declined, failure);
+            try std.testing.expectEqual(@as(usize, 1), mappings.items.len);
+            mappings.clearRetainingCapacity();
+            service.mapRow(1, &mappings, &rows, row, actual_row, .{ .start = 0, .end = 0 }, false) catch |unbound| {
+                if (unbound == error.OutOfMemory) return unbound;
+                try std.testing.expectEqual(error.Declined, unbound);
+                try std.testing.expectEqual(@as(usize, 0), mappings.items.len);
+                return;
+            };
+            return error.TestUnexpectedResult;
+        };
+        return error.TestUnexpectedResult;
+    };
+    return error.TestUnexpectedResult;
+}
+test "scoped callback row payload inference requires exact prebound owners and rejects ambiguity through OOM" {
+    try scopedRowPayloadLaw(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, scopedRowPayloadLaw, .{});
+}

@@ -969,3 +969,80 @@ test "pure product footprint claims survive artifact ownership and reject forged
     try std.testing.expectEqual(@as(usize, 1), tested);
     try admission.validatePrelude(a, &frozen, parameter_footprint_producer, "std/prelude.blot");
 }
+
+const parameter_invocation_producer =
+    \\type State a is effect = {get: Unit -> a, set: a -> Unit}
+    \\const invoke = fn (left: State a) => fn (right: State b) => fn (callback: Unit -> U32 ! {left.get, right.get | e}) => callback ()
+;
+fn parameterInvocationArtifactLaw(allocator: std.mem.Allocator) !void {
+    const bytes = try artifact(allocator, parameter_invocation_producer);
+    defer allocator.free(bytes);
+    var frozen = try format.decode(D.FrozenDependency, allocator, bytes, key);
+    defer format.deinit(allocator, &frozen);
+    try admission.validatePrelude(allocator, &frozen, parameter_invocation_producer, "std/prelude.blot");
+}
+test "Unit callback footprint claims survive artifacts and reject forged invocation contracts" {
+    const a = std.testing.allocator;
+    try parameterInvocationArtifactLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, parameterInvocationArtifactLaw, .{});
+    const bytes = try artifact(a, parameter_invocation_producer);
+    defer a.free(bytes);
+    var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &frozen);
+    const module = &frozen.modules[0];
+    var tested: usize = 0;
+    for (module.interface.bindings, 0..) |*binding, index| {
+        if (binding.capability_parameters.kind != .invoke_unit) continue;
+        tested += 1;
+        const original = binding.capability_parameters;
+        binding.capability_parameters.mask = 1;
+        try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, parameter_invocation_producer, "std/prelude.blot"));
+        module.core.bindings[index].capability_parameters = binding.capability_parameters;
+        try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, parameter_invocation_producer, "std/prelude.blot"));
+        binding.capability_parameters = original;
+        binding.capability_parameters.kind = .product;
+        module.core.bindings[index].capability_parameters = binding.capability_parameters;
+        try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, parameter_invocation_producer, "std/prelude.blot"));
+        binding.capability_parameters.kind = .invalid;
+        try std.testing.expectError(error.InvalidArtifact, validation.validate(&module.interface, frozen.symbols.len, frozen.modules.len));
+        binding.capability_parameters = original;
+        module.core.bindings[index].capability_parameters = original;
+    }
+    try std.testing.expectEqual(@as(usize, 1), tested);
+    try admission.validatePrelude(a, &frozen, parameter_invocation_producer, "std/prelude.blot");
+}
+
+const record_footprint_producer =
+    \\const pack = fn first => fn second => {selected: second, nested: {first}, repeated: first}
+;
+fn recordFootprintArtifactLaw(allocator: std.mem.Allocator) !void {
+    const bytes = try artifact(allocator, record_footprint_producer);
+    defer allocator.free(bytes);
+    var frozen = try format.decode(D.FrozenDependency, allocator, bytes, key);
+    defer format.deinit(allocator, &frozen);
+    try admission.validatePrelude(allocator, &frozen, record_footprint_producer, "std/prelude.blot");
+}
+test "record footprint claims survive owned artifacts and reject forged retained fields" {
+    const a = std.testing.allocator;
+    try recordFootprintArtifactLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, recordFootprintArtifactLaw, .{});
+    const bytes = try artifact(a, record_footprint_producer);
+    defer a.free(bytes);
+    var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &frozen);
+    const module = &frozen.modules[0];
+    var tested: usize = 0;
+    for (module.interface.bindings, 0..) |*binding, index| {
+        if (!binding.capability_parameters.present()) continue;
+        tested += 1;
+        const original = binding.capability_parameters;
+        binding.capability_parameters.mask = 1;
+        try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, record_footprint_producer, "std/prelude.blot"));
+        module.core.bindings[index].capability_parameters = binding.capability_parameters;
+        try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, record_footprint_producer, "std/prelude.blot"));
+        binding.capability_parameters = original;
+        module.core.bindings[index].capability_parameters = original;
+    }
+    try std.testing.expectEqual(@as(usize, 1), tested);
+    try admission.validatePrelude(a, &frozen, record_footprint_producer, "std/prelude.blot");
+}

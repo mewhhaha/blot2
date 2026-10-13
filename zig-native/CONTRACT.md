@@ -506,9 +506,13 @@ Empty constructor cells carry exact symbolic tag/zero-payload facts; replacing
 one never depends on mutable module data or pointer-looking scalar bits. A
 private tagged join needs mutually exclusive producers and a common enclosing
 loop activation before field aliases can share an owning root. Other admitted
-joins keep independent field roots. Checked nonempty field-read facts admit an
-absent zero alternative in private tuple/record copies; unmarked reads, unknown
-uses, incomplete initialization and escapes retain their ordinary values.
+joins keep independent field roots. Completed nested loops may transfer exact
+empty constructors through single-write aliases before the live producer runs.
+Live producers and child uses inside nested loops retain independent roots; raw
+literal words and disabled owning mode grant no exception. Checked nonempty
+field-read facts admit an absent zero alternative in private tuple/record
+copies; unmarked reads, unknown uses, incomplete initialization and escapes
+retain their ordinary values.
 
 Compiler-only collection carriers may disappear in owning mode when their exact
 scalar/reference fields duplicate the journal and contain no demand memo roots.

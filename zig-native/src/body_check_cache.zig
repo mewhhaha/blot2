@@ -675,7 +675,8 @@ const InterfaceProof = struct {
         hashWord(&hash, @intFromBool(binding.named_function));
         hashWord(&hash, @backingInt(binding.capability_flow));
         if (binding.capability_parameters.present()) {
-            hashWord(&hash, 0x50465001); // parameter footprint v1
+            hashWord(&hash, 0x50465002); // parameter footprint v2
+            hashWord(&hash, @backingInt(binding.capability_parameters.kind));
             hashWord(&hash, binding.capability_parameters.arity());
             hashWord(&hash, binding.capability_parameters.result());
         }
@@ -718,7 +719,8 @@ const InterfaceProof = struct {
             contract_hash.update(&digest);
             hashWord(&contract_hash, @backingInt(binding.capability_flow));
             if (binding.capability_parameters.present()) {
-                hashWord(&contract_hash, 0x50465001); // parameter footprint v1
+                hashWord(&contract_hash, 0x50465002); // parameter footprint v2
+                hashWord(&contract_hash, @backingInt(binding.capability_parameters.kind));
                 hashWord(&contract_hash, binding.capability_parameters.arity());
                 hashWord(&contract_hash, binding.capability_parameters.result());
             }
@@ -822,7 +824,8 @@ pub fn associatedDigest(source: F.Source, catalog: Catalog, tree: *const ast.Tre
         hashWord(&hash, @intFromBool(binding.named_function));
         hashWord(&hash, @backingInt(binding.capability_flow));
         if (binding.capability_parameters.present()) {
-            hashWord(&hash, 0x50465001); // parameter footprint v1
+            hashWord(&hash, 0x50465002); // parameter footprint v2
+            hashWord(&hash, @backingInt(binding.capability_parameters.kind));
             hashWord(&hash, binding.capability_parameters.arity());
             hashWord(&hash, binding.capability_parameters.result());
         }

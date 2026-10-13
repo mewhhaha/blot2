@@ -898,12 +898,15 @@ their own requirements. Its footprint includes both possible owners. This
 bounded form must be evaluated once in the active scope callback and reach that
 scope's owner. A factory may resolve a symbolic payload while keeping that
 identity. Repeated callback/loop selection and public generic selection schemes
-still reject. Pure named helpers may construct nested products from up to 16
-parameters and scalar constants, such as
-`fn first => fn second => (second, first)`. Their owned result footprint records
-every retained input; unused inputs add no result footprint. Captures, stores
-and other helper bodies still reject capability arguments. Other hidden
-capture/store contracts and mixed-owner State pairs remain unsupported. See
+still reject. Pure named helpers may construct nested products or records from
+up to 16 parameters and scalar constants, such as
+`fn first => fn second => {second, nested: (first, 42)}`. Their owned result
+footprint records every retained input; unused inputs add no result footprint. A
+named helper may also directly invoke one callback with Unit, such as
+`fn unused => fn run => fn other => run ()`. Its contract retains the selected
+callback's exact operation row. Captures, stores and other helper bodies still
+reject capability arguments. Other hidden capture/store contracts and
+mixed-owner State pairs remain unsupported. See
 [qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
 
 ## Qualified bindings

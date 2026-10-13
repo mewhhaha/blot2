@@ -4764,7 +4764,12 @@ const Engine = struct {
                 parameters = self.bindings.items[binding].capability_parameters;
             }
         }
-        if (parameters.present()) return parameters.valid() and supplied < parameters.arity();
+        if (contract != .unknown and parameters.kind == .invoke_unit) parameters = .{};
+        if (parameters.present()) {
+            if (!parameters.valid() or supplied >= parameters.arity()) return false;
+            if (parameters.kind == .invoke_unit and parameters.result() & (@as(u16, 1) << @intCast(supplied)) != 0) return self.types.node(try self.types.resolve(argument, 0)).tag == .function;
+            return true;
+        }
         switch (contract) {
             .unknown => return false,
             .identity => return supplied == 0,
@@ -11539,7 +11544,8 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     try engine.effectHeaders();
     for (engine.bindings.items) |*binding| if (binding.kind == .global and binding.named_function) {
         binding.capability_flow = engine.capabilityFlowContract(tree.valueDecl(binding.declaration).body, tree.valueDecl(binding.declaration).annotation);
-        binding.capability_parameters = @import("capability_flow.zig").parameterSource(tree, tree.valueDecl(binding.declaration).body);
+        const parameters = @import("capability_flow.zig").parameterSource(tree, tree.valueDecl(binding.declaration).body);
+        if (binding.capability_flow == .unknown or parameters.kind == .product) binding.capability_parameters = parameters;
     };
     try engine.dataBodies();
     engine.prepareOpaqueStorage();

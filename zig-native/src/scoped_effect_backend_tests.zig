@@ -38,10 +38,12 @@ fn lowerText(allocator: std.mem.Allocator, text: []const u8) !core.Module {
 fn emit(allocator: std.mem.Allocator, module: *const core.Module) !void {
     var result = try backend.compile(allocator, &.{module.*}, 1);
     defer result.deinit(allocator);
+    if (result.diagnostic) |item| std.debug.print("scoped emission diagnostic {s} at {d}\n", .{ @tagName(item.code), item.span.start });
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
     // Creation occurs only when the generated guest runs. No live authority
     // exists in evaluator values, snapshots or a successful constant receipt.
+    if (result.constant_steps != 0) std.debug.print("scoped emission constant steps {d}\n", .{result.constant_steps});
     try std.testing.expectEqual(0, result.constant_steps);
 }
 test "scoped effect lowering and guest emission release every failed allocation" {
@@ -401,6 +403,57 @@ test "scoped effect pure product input footprints validate exact bodies and rele
     }
     try std.testing.expectEqual(@as(usize, 1), contracts);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, lowerParameterFootprintsAndRelease, .{});
+    try emit(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+}
+
+fn lowerParameterInvocationAndRelease(allocator: std.mem.Allocator) !void {
+    var module = try lowerText(allocator, @import("check_effect_tests.zig").parameter_invocation_source);
+    defer module.deinit(allocator);
+    try validation.validate(allocator, &module, .{ .units = &.{&module} });
+}
+test "scoped effect multiple input invocation claims validate callback ordinals and OOM" {
+    var module = try lowerText(a, @import("check_effect_tests.zig").parameter_invocation_source);
+    defer module.deinit(a);
+    try validation.validate(a, &module, .{ .units = &.{&module} });
+    var contracts: usize = 0;
+    for (module.bindings) |*binding| {
+        if (binding.capability_parameters.kind != .invoke_unit) continue;
+        contracts += 1;
+        const original = binding.capability_parameters;
+        binding.capability_parameters.mask = 1;
+        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
+        binding.capability_parameters = original;
+        binding.capability_parameters.kind = .product;
+        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
+        binding.capability_parameters = original;
+    }
+    try std.testing.expectEqual(@as(usize, 1), contracts);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lowerParameterInvocationAndRelease, .{});
+    try emit(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+}
+
+fn lowerRecordFootprintsAndRelease(allocator: std.mem.Allocator) !void {
+    var module = try lowerText(allocator, @import("check_effect_tests.zig").record_footprint_source);
+    defer module.deinit(allocator);
+    try validation.validate(allocator, &module, .{ .units = &.{&module} });
+}
+test "scoped effect record constructors validate exact retained fields and release OOM" {
+    var module = try lowerText(a, @import("check_effect_tests.zig").record_footprint_source);
+    defer module.deinit(a);
+    try validation.validate(a, &module, .{ .units = &.{&module} });
+    var contracts: usize = 0;
+    for (module.bindings) |*binding| {
+        if (!binding.capability_parameters.present()) continue;
+        contracts += 1;
+        const original = binding.capability_parameters;
+        binding.capability_parameters.mask = 1;
+        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
+        binding.capability_parameters = original;
+    }
+    try std.testing.expectEqual(@as(usize, 1), contracts);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lowerRecordFootprintsAndRelease, .{});
     try emit(a, &module);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
 }

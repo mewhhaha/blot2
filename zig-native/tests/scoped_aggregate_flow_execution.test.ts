@@ -58,8 +58,44 @@ entry const shadowed = fn () => @effect.scope (fn (older: State U32) => do:
 const escaping = `import {State, pack} from "./state"
 entry const bad = fn () => @effect.scope (fn (state: State U32) => pack state 42 7)
 `;
-for (const codegenTier of ["optimized", "development"] as const) {
-  Deno.test(`owned parameter product footprints preserve imported capabilities and lifetimes (${codegenTier})`, async () => {
+const variants = [{
+  shape: "product",
+  library,
+  main,
+  body: "(third, (first, second), first)",
+  changedBody: "(third, (second, first), second)",
+  lostBody:
+    "do:\n  let saved = first\n  return (third, (saved, second), first)",
+}, {
+  shape: "record",
+  library: library.replace(
+    "(third, (first, second), first)",
+    "{selected: third, nested: {first, second}, repeated: first}",
+  ).replace("(retained, 42)", "{retained, count: 42}").replace(
+    "(same, 1)",
+    "{retained: same, count: 1}",
+  ),
+  main: main.replaceAll(
+    "let (selected, (first, second), repeated)",
+    "let {selected, nested: {first, second}, repeated}",
+  ).replaceAll("let (borrowed, count)", "let {retained: borrowed, count}"),
+  body: "{selected: third, nested: {first, second}, repeated: first}",
+  changedBody:
+    "{selected: third, nested: {first: second, second: first}, repeated: second}",
+  lostBody:
+    "do:\n  let saved = first\n  return {selected: third, nested: {first: saved, second}, repeated: first}",
+}];
+const cases = variants.flatMap((variant) =>
+  (["optimized", "development"] as const).map((codegenTier) => ({
+    ...variant,
+    codegenTier,
+  }))
+);
+for (
+  const { shape, library, main, body, changedBody, lostBody, codegenTier }
+    of cases
+) {
+  Deno.test(`owned parameter ${shape} footprints preserve imported capabilities and lifetimes (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir({
       prefix: "blot-scoped-product-",
     });
@@ -141,10 +177,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
           const changed = await compiler.build({
             sources: {
               ...sources,
-              [dependency]: library.replace(
-                "(third, (first, second), first)",
-                "(third, (second, first), second)",
-              ),
+              [dependency]: library.replace(body, changedBody),
             },
           });
           assert(changed.success, JSON.stringify(changed));
@@ -172,10 +205,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
           const lost = await compiler.build({
             sources: {
               ...sources,
-              [dependency]: library.replace(
-                "(third, (first, second), first)",
-                "do:\n  let saved = first\n  return (third, (saved, second), first)",
-              ),
+              [dependency]: library.replace(body, lostBody),
             },
           });
           assert(!lost.success);

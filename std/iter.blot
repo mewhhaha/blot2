@@ -103,13 +103,14 @@ const Windows.next = fn (state: Windows [i, a]) => do:
   let buffer = state.buffer
   for ever:
     if buffer.length == state.width:
-      let rest = @list.slice buffer 1 (state.width - 1)
-      return #Some (buffer, #Windows { width: state.width, cursor, buffer: rest })
+      break
     use step <- cursor.next
     let #Some (value, rest) = step else:
       return #Nothing
     buffer := [...self, value]
     cursor := rest
+  let rest = @list.slice buffer 1 (state.width - 1)
+  return #Some (buffer, #Windows { width: state.width, cursor, buffer: rest })
 
 const fold_left = fn reduce => fn initial => fn values => do:
   let state = initial

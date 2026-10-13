@@ -89,9 +89,12 @@ pub fn pairMemberSource(tree: *const ast.Tree, pool: *const @import("symbols.zig
     return null;
 }
 
-/// Owned relationship between formal inputs and a pure aggregate result. Zero
-/// means unknown. No source/type IDs or active authority enter this summary.
+/// Owned formal relationship: a product retains input values; Unit invocation
+/// returns the selected callback's result. Zero means unknown. No source/type
+/// IDs or active authority enter this summary.
+pub const ParameterResult = enum(u8) { product, invoke_unit, invalid };
 pub const Parameters = struct {
+    kind: ParameterResult = .product,
     mask: u16 = 0,
     inputs: u8 = 0,
 
@@ -105,11 +108,14 @@ pub const Parameters = struct {
         return self.inputs;
     }
     pub fn valid(self: Parameters) bool {
+        if (self.kind == .invalid) return false;
         const inputs = self.arity();
-        if (inputs == 0) return self.result() == 0;
+        if (inputs == 0) return self.kind == .product and self.result() == 0;
         if (inputs > 16) return false;
         const available: u32 = (@as(u32, 1) << @intCast(inputs)) - 1;
-        return self.result() & ~available == 0;
+        if (self.result() & ~available != 0) return false;
+        if (self.kind == .invoke_unit) return @popCount(self.result()) == 1;
+        return true;
     }
     pub fn present(self: Parameters) bool {
         return self.arity() != 0;
@@ -130,10 +136,20 @@ pub fn parameterSource(tree: *const ast.Tree, initial: ast.Id) Parameters {
         expression = lambda.b;
     }
     expression = unwrap(tree, expression) orelse return .{};
-    if (count == 0 or tree.node(expression).tag != .product) return .{};
+    if (count == 0) return .{};
     var remaining: usize = 4096;
-    const result = sourceParameters(tree, expression, names[0..count], &remaining, 0) orelse return .{};
-    return .init(@intCast(count), result);
+    const value = tree.node(expression);
+    if (value.tag == .product or (value.tag == .record and value.a == 0)) {
+        const result = sourceParameters(tree, expression, names[0..count], &remaining, 0) orelse return .{};
+        return .init(@intCast(count), result);
+    }
+    if (count < 2 or value.tag != .apply) return .{};
+    const argument = unwrap(tree, value.b) orelse return .{};
+    if (tree.node(argument).tag != .unit) return .{};
+    const callee = unwrap(tree, value.a) orelse return .{};
+    if (tree.node(callee).tag != .name) return .{};
+    const target = sourceParameters(tree, callee, names[0..count], &remaining, 0) orelse return .{};
+    return .{ .kind = .invoke_unit, .inputs = @intCast(count), .mask = target };
 }
 fn sourceParameters(tree: *const ast.Tree, initial: ast.Id, names: []const @import("symbols.zig").Symbol, remaining: *usize, depth: usize) ?u16 {
     if (remaining.* == 0 or depth >= 64) return null;
@@ -141,16 +157,14 @@ fn sourceParameters(tree: *const ast.Tree, initial: ast.Id, names: []const @impo
     const source_id = unwrap(tree, initial) orelse return null;
     const value = tree.node(source_id);
     switch (value.tag) {
-        .name => {
-            var index = names.len;
-            while (index != 0) {
-                index -= 1;
-                if (value.a == names[index]) return @as(u16, 1) << @intCast(index);
-            }
-            return null;
+        .name => return parameterName(value.a, names),
+        .field => {
+            if (value.b == 0) return parameterName(value.a, names);
+            return sourceParameters(tree, value.b, names, remaining, depth + 1);
         },
         .integer, .float, .boolean, .unit => return 0,
-        .product => {
+        .product, .record => {
+            if (value.tag == .record and value.a != 0) return null;
             var result: u16 = 0;
             for (tree.children(source_id)) |child| result |= sourceParameters(tree, child, names, remaining, depth + 1) orelse return null;
             return result;
@@ -158,16 +172,35 @@ fn sourceParameters(tree: *const ast.Tree, initial: ast.Id, names: []const @impo
         else => return null,
     }
 }
+fn parameterName(name: @import("symbols.zig").Symbol, names: []const @import("symbols.zig").Symbol) ?u16 {
+    var index = names.len;
+    while (index != 0) {
+        index -= 1;
+        if (name == names[index]) return @as(u16, 1) << @intCast(index);
+    }
+    return null;
+}
 
-/// A decoded claim proves only a pure product of inputs/constants. Bounds and
-/// exact parameter references are checked before traversing every child.
+/// A decoded claim proves a product of inputs/constants or one Unit callback
+/// invocation. Bounds and exact parameter references precede every child read.
 pub fn parameterCore(module: anytype, body: anytype, summary: Parameters) bool {
     if (!summary.valid() or !summary.present() or !body.is_function or body.parameters.len != summary.arity()) return false;
     if (body.parameters.start > module.parameters.len or body.parameters.len > module.parameters.len - body.parameters.start) return false;
-    if (body.root == 0 or body.root >= module.nodes.len or module.nodes[body.root].tag != .product) return false;
+    if (body.root == 0 or body.root >= module.nodes.len) return false;
+    const root = module.nodes[body.root];
     var remaining: usize = 4096;
-    const result = coreParameters(module, body.root, module.parameters[body.parameters.start..][0..body.parameters.len], &remaining, 0) orelse return false;
-    return result == summary.result();
+    const parameters = module.parameters[body.parameters.start..][0..body.parameters.len];
+    if (summary.kind == .product) {
+        if (root.tag != .product and root.tag != .record) return false;
+        const result = coreParameters(module, body.root, parameters, &remaining, 0) orelse return false;
+        return result == summary.result();
+    }
+    if (root.tag != .apply or root.b == 0 or root.b >= module.nodes.len) return false;
+    const argument = module.nodes[root.b];
+    if (argument.tag != .constant or argument.ty != @import("types.zig").unit or argument.a != 0) return false;
+    if (root.a == 0 or root.a >= module.nodes.len or module.nodes[root.a].tag != .reference) return false;
+    const target = coreParameters(module, root.a, parameters, &remaining, 0) orelse return false;
+    return target == summary.result();
 }
 fn coreParameters(module: anytype, source_id: u32, parameters: anytype, remaining: *usize, depth: usize) ?u16 {
     if (remaining.* == 0 or depth >= 64 or source_id == 0 or source_id >= module.nodes.len) return null;
@@ -188,7 +221,7 @@ fn coreParameters(module: anytype, source_id: u32, parameters: anytype, remainin
                 else => return null,
             }
         },
-        .product => {
+        .product, .record => {
             if (value.a > module.extra.len or value.b > module.extra.len - value.a) return null;
             var result: u16 = 0;
             for (module.extra[value.a..][0..value.b]) |child| result |= coreParameters(module, child, parameters, remaining, depth + 1) orelse return null;
@@ -207,4 +240,9 @@ test "parameter footprint domains preserve the maximum binder and reject forged 
     try std.testing.expect(Parameters.init(3, 5).valid());
     try std.testing.expect(Parameters.init(3, 0).present());
     try std.testing.expect(!Parameters.init(0, 0).present());
+    try std.testing.expect((Parameters{ .kind = .invoke_unit, .inputs = 16, .mask = 0x8000 }).valid());
+    try std.testing.expect(!(Parameters{ .kind = .invoke_unit, .inputs = 3, .mask = 3 }).valid());
+    try std.testing.expect(!(Parameters{ .kind = .invoke_unit, .inputs = 3 }).valid());
+    try std.testing.expect(!(Parameters{ .kind = .invoke_unit }).valid());
+    try std.testing.expect(!(Parameters{ .kind = .invalid, .inputs = 3, .mask = 1 }).valid());
 }

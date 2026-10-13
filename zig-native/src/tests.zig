@@ -312,6 +312,8 @@ test {
     _ = @import("check_shared_scheme_tests.zig");
     _ = @import("dispatch_explanation.zig");
     _ = @import("dispatch_explanation_tests.zig");
+    _ = @import("capability_flow.zig");
+    _ = @import("specialization.zig");
     _ = @import("specialization_origin_tests.zig");
     _ = @import("resolved_flow.zig");
     _ = @import("resolved_body.zig");
