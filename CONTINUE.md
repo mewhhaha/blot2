@@ -7,11 +7,12 @@ their separate owner decisions.
 
 ## Qualified main
 
-Latest compiler implementation: `6a57437`. Latest design: `07cbc62` (057).
-045/046 are complete: ordinary rolling fold/monoid/group windows and opaque
-persistent AVL summary build/get/query/set/concat. 057's scoped-effect design is
-complete; 058–059 are not implemented. Earlier completed milestones remain in
-the task index and durable records.
+Latest iteration tooling: `9080f6b`; compiler semantics: `6a57437`. Latest
+design: `07cbc62` (057). 045/046 are complete: ordinary rolling
+fold/monoid/group windows and opaque persistent AVL summary
+build/get/query/set/concat. 057's scoped-effect design is complete; 058–059 are
+not implemented. Earlier completed milestones remain in the task index and
+durable records.
 
 - Qualified tree: `885c7d8a8461d404990a309d89d095fceb24e85f`; compiler source:
   `b9d9208f0938ab2111a913328a8b0992792623c3`. LLVM/Fast SHA:
@@ -88,6 +89,16 @@ merged costs separate.
 
 ## Build and validation
 
+- `9080f6b` qualifies the faster gate: 1,508 native laws, 973 guest/client
+  tests, 894 exhaustive allocation-failure sweeps and zero analyzer findings
+  across 360 files. The full gate takes 743.57 s, down from 958.76 s before the
+  six later iteration improvements. The source and binary hashes still matched
+  when continuation resumed on 13 October. See
+  [iteration costs](zig-native/ITERATION_COST.md#six-implemented-improvements).
+- Use `deno task test:compiler:dev --native-filter="name"` for focused work;
+  `--native-suite=syntax`, `types` or `runtime` selects a smaller native root.
+  Add `--native-llvm` for expensive failure sweeps. The production-budget stress
+  case is explicit in `deno task test:compiler:stress`.
 - Check `zig version` before each build batch; use Zig 0.17.0.
 - Incremental:`deno task build:compiler:dev` uses Safe/noLLVM;
   release:`deno task build:compiler` uses LLVM/Fast. See
