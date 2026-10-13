@@ -92,3 +92,9 @@ development and the scenarios below.
   acceptance criteria remain open.
 - Durable record:
   [prototype qualification](../zig-native/NUMERIC_PROOF_QUALIFICATION.md).
+
+The isolated proof-kind/header checkpoint is `40af0cf7`, with 35 focused native
+tests, all eight unchanged compilation budgets and 379 analyzer files at zero.
+It owns positional public recipes and rejects data-kind/storage misuse. It still
+grants no runtime proof authority. Exact pins, costs and unfinished boundaries
+are in [proof qualification](../zig-native/NUMERIC_PROOF_QUALIFICATION.md).

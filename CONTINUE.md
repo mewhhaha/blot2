@@ -83,18 +83,16 @@ merged pins separately; freeze source during qualification.
   batch. General parameter/capture/result/store footprints, invocation binders,
   opaque/associated boundaries and lifetime contracts remain open.
 - **070:** `/var/tmp/blot2-erased-proofs-070`, with staged base `d55ab1cd`, owns
-  unmerged native proof syntax, exact typed value terms and public-contract
-  validation. Patch/pins/remaining work:
-  `build/bench/continuation-20261013/proof-consistency-foundation/` (patch
-  SHA-256 `41db5de726d60c51c05763e2aa0c63a4b1da95b6208f055fa2a18363f9243439`).
-  Focused native 26/26, full syntax 41/41, frontend 23/23, editor and analyzer
-  377 files zero. Bounded SCC consistency replaces quadratic closure: 256
-  requirements validate in 4,902 charged visits instead of exhausting 65,536.
-  This is not a full compiler qualification. Keep ordinary data types and value
-  identities separate; future 058/059 footprint contracts can reuse that value
-  owner. Distinct proof-kind checking, constructor guards, compiled-body
-  authority, erasure and checker integration remain unfinished. Frontend/editor
-  syntax is implemented only in the isolated prototype. See
+  unmerged syntax, exact value terms, positional public contracts, a separate
+  proof kind and conservative source checking. Frozen tree `40af0cf7`, patch
+  SHA-256 `25d154417cb7e71fb9acbc8fc27e3d34503b016326f873e80c6bcdac469c610a`:
+  `build/bench/continuation-20261013/proof-kind-foundation/`. Focused native
+  35/35, full syntax and all eight unchanged compile budgets pass; analyzer 379
+  files zero. Earlier frontend/editor checks remain preserved. Bounded SCC
+  consistency checks 256 requirements in 4,902 charged visits. Constructor
+  guards, exact body/call authority, compiled transport, proof results, erasure
+  and full qualification remain open. Never infer authority from the kind marker
+  or bridge it through Unit. See
   [proof qualification](zig-native/NUMERIC_PROOF_QUALIFICATION.md). 071 waits
   for 070.
 - **086:** Sparse inspection/shared scratch/primitive growth and shape-only
