@@ -127,7 +127,7 @@ pub const Service = struct {
     fn internFunction(self: *Service, argument: layout.Id, result: layout.Id, row: u32) Error!layout.Id {
         return self.layouts.internWithEffects(.function, argument, result, row, &.{}) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(1, .{ .start = 0, .end = 0 }, .complexity);
     }
-    pub fn named(self: *Service, key: code_artifacts.Key) Error!ResolvedBody {
+    pub fn named(self: *Service, key: code_artifacts.Key, instances: []const types.NominalIdentity) Error!ResolvedBody {
         const unit_id = key.target.unit;
         const source = self.unit(unit_id);
         const body = source.body(key.target.binding).?;
@@ -143,9 +143,9 @@ pub const Service = struct {
             const n = source.types.node(ty);
             if (n.tag != .function) return self.decline(unit_id, body.span, .unresolved_type);
             try self.mapTypeDepth(unit_id, &mappings, &rows, n.a, scalar_type, body.span, 0);
-            if (index == 0 and key.instance.unit != 0) {
+            if (index < instances.len and instances[index].unit != 0) {
                 const input = source.types.node(n.a);
-                if (input.tag == .scoped and input.b == 0) try appendMapping(self.allocator, &mappings, .{ .variable = input.c, .layout = layout.erased, .instance = key.instance });
+                if (input.tag == .scoped and input.b == 0) try appendMapping(self.allocator, &mappings, .{ .variable = input.c, .layout = layout.erased, .instance = instances[index] });
             }
             source_rows[index] = n.c;
             ty = n.b;

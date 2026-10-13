@@ -696,6 +696,11 @@ pub const Module = struct {
         if (options.current) |current| try current.recordInputs(self, &passes.summaries);
         var matcher: ?@import("optimized_bodies.zig").Matcher = if (options.previous != null and options.current != null) try .init(self.allocator, options.previous.?, options.current.?) else null;
         defer if (matcher) |*matches| matches.deinit();
+        if (options.stats) |stats| if (matcher) |matches| {
+            stats.match_candidates = matches.candidates;
+            stats.match_work = matches.work;
+            stats.match_budget_exhausted = matches.budget_exhausted;
+        };
         var parallel = try @import("runtime_parallel.zig").Batch.run(self.allocator, options.io, &passes, code, if (matcher) |*matches| matches else null, options.workers);
         defer if (parallel) |*batch| batch.deinit();
         if (options.stats) |stats| if (parallel) |batch| {

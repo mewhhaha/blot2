@@ -37,6 +37,16 @@ See [retained edit cost](../zig-native/RETAINED_EDIT_COST.md). Remaining: about
 constant evaluation (task 086's area) and about 27 ms in fragment lookup,
 assembly and journal freezing.
 
+The 13 October isolated collection-length path removes 220 inference regions and
+170,960 scopes per captured revision. LLVM/Fast seven-pair edit CPU falls
+1232.855→961.714 ms, with exact Wasm and source fuel; fresh/revert CPU also
+falls. The optimizer invalidation worklist separately restores 2,862/2,864
+retained body matches. Combined qualification is still required. These
+current-snapshot improvements do not establish the historical target or complete
+task 093. See
+[collection shape members](../zig-native/COLLECTION_SHAPE_MEMBERS.md) and
+[retained assembly](../zig-native/RETAINED_ASSEMBLY_WORKLIST.md).
+
 ## Implementation checklist
 
 - [x] Attribute the residual inference regions and the lookup, capture and

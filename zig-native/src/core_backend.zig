@@ -150,6 +150,7 @@ const Generator = struct {
     row_keys: substitution_keys.Store,
     template_keys: substitution_keys.Store,
     static_keys: substitution_keys.Store,
+    instance_arguments: @import("instance_arguments.zig").Store = .{},
     template_catalog: std.ArrayList(CapturedTemplate) = .empty,
     template_instances: std.AutoHashMapUnmanaged(CapturedTemplate, u32) = .empty,
     serialized: std.AutoHashMapUnmanaged(SerializedKey, u32) = .empty,
@@ -322,6 +323,7 @@ const Generator = struct {
         self.row_keys.deinit();
         self.template_keys.deinit();
         self.static_keys.deinit();
+        self.instance_arguments.deinit(self.allocator);
         self.template_catalog.deinit(self.allocator);
         self.template_instances.deinit(self.allocator);
         self.serialized.deinit(self.allocator);
@@ -1252,37 +1254,54 @@ const Generator = struct {
     fn signature(self: *Generator, target: core.BindingRef, ty: types.Id, source: u32, mappings: []const Mapping, rows: []const RowMapping, span: core.Span, complete: bool) Error!Key {
         var key: Key = .{ .target = try self.normalize(source, target) };
         var current = ty;
+        var instances: [max_parameters]types.NominalIdentity = undefined;
+        var has_instances = false;
         const producer = self.unit(key.target.unit).body(key.target.binding);
         const limit: usize = if (producer) |body| if (body.parameters.len == 0) max_parameters else body.parameters.len else max_parameters;
         while (self.unit(source).types.node(current).tag == .function and key.count < limit) {
             if (key.count == max_parameters) return self.decline(source, span, .complexity);
             const n = self.unit(source).types.node(current);
-            if (key.count == 0) {
-                const input = self.unit(source).types.node(n.a);
-                if (input.tag == .scoped) key.instance = layout.mappedInstance(.{ .unit = input.b, .decl = input.c }, mappings);
+            const input = self.unit(source).types.node(n.a);
+            if (input.tag == .scoped) {
+                if (!has_instances) {
+                    @memset(instances[0..key.count], .{ .unit = 0, .decl = 0 });
+                    has_instances = true;
+                }
+                instances[key.count] = layout.mappedInstance(.{ .unit = input.b, .decl = input.c }, mappings);
+            } else if (has_instances) {
+                instances[key.count] = .{ .unit = 0, .decl = 0 };
             }
             key.parameters[key.count] = if (complete) try self.typeLayout(source, n.a, mappings, span) else try self.codeLayoutWithRows(source, n.a, mappings, rows, span);
             key.effects[key.count] = self.layouts.rowFromType(self.unit(source), n.c, mappings, rows, !complete) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(source, span, .unresolved_type);
             key.count += 1;
             current = n.b;
         }
+        if (has_instances) key.instance_arguments = self.instance_arguments.intern(self.allocator, instances[0..key.count]) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(source, span, .complexity);
         key.result = if (complete) try self.typeLayout(source, current, mappings, span) else try self.codeLayoutWithRows(source, current, mappings, rows, span);
         return key;
     }
     fn seedNamedInstance(self: *Generator, key: Key, mappings: *std.ArrayList(Mapping)) Error!void {
-        if (key.instance.unit == 0) return;
+        if (key.instance_arguments == 0) return;
         const source = self.unit(key.target.unit);
-        const root = source.types.node(source.binding(key.target.binding).ty);
-        if (root.tag != .function) return;
-        const input = source.types.node(root.a);
-        if (input.tag != .scoped or input.b != 0) return;
-        for (mappings.items) |entry| if (entry.variable == input.c) {
-            if (!std.meta.eql(entry.instance, key.instance)) return self.decline(key.target.unit, source.binding(key.target.binding).span, .unresolved_type);
-            return;
-        };
-        if (mappings.capacity == 0) try mappings.ensureTotalCapacityPrecise(self.allocator, 4);
-        try mappings.append(self.allocator, .{ .variable = input.c, .layout = layout.erased, .instance = key.instance });
+        var root = source.binding(key.target.binding).ty;
+        for (self.instance_arguments.get(key.instance_arguments)) |instance| {
+            const arrow = source.types.node(root);
+            if (arrow.tag != .function) return self.decline(key.target.unit, source.binding(key.target.binding).span, .unresolved_type);
+            root = arrow.b;
+            const input = source.types.node(arrow.a);
+            if (input.tag != .scoped or input.b != 0 or instance.unit == 0) continue;
+            var found = false;
+            for (mappings.items) |entry| if (entry.variable == input.c) {
+                if (!std.meta.eql(entry.instance, instance)) return self.decline(key.target.unit, source.binding(key.target.binding).span, .unresolved_type);
+                found = true;
+                break;
+            };
+            if (found) continue;
+            if (mappings.capacity == 0) try mappings.ensureTotalCapacityPrecise(self.allocator, 4);
+            try mappings.append(self.allocator, .{ .variable = input.c, .layout = layout.erased, .instance = instance });
+        }
     }
+
     fn specializer(self: *Generator) Allocator.Error!specialization.Service {
         return .{ .timing = &self.work_timing, .allocator = self.allocator, .units = self.units, .evaluator = &self.evaluator, .layouts = &self.layouts, .bridge = try self.representationBridge(), .refinement_stats = &self.refinement_stats, .refinement_regions = &self.work.refinement_regions, .cache = .{ .context = self, .lookup = lookupRefinement, .record = recordRefinement } };
     }
@@ -1431,7 +1450,7 @@ const Generator = struct {
             return function_id;
         }
         var service = try self.specializer();
-        var resolved = service.named(key) catch |err| return self.specializationFailure(service, err);
+        var resolved = service.named(key, self.instance_arguments.get(key.instance_arguments)) catch |err| return self.specializationFailure(service, err);
         defer resolved.deinit(self.allocator);
         const emitter = try self.allocator.create(Emitter);
         emitter.* = .{ .generator = self, .unit_id = unit_id, .function_id = function_id, .provider_local = key.count, .mappings = resolved.mappings.items, .row_mappings = resolved.rows.items, .factory_template = key.template_result };
@@ -3668,7 +3687,7 @@ const Emitter = struct {
             key.templates = g.template_keys.intern(entries.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .complexity);
             key.template_result = true;
             var service = try g.specializer();
-            var resolved = service.named(key) catch |err| return g.specializationFailure(service, err);
+            var resolved = service.named(key, g.instance_arguments.get(key.instance_arguments)) catch |err| return g.specializationFailure(service, err);
             defer resolved.deinit(g.allocator);
             try mappings.appendSlice(g.allocator, resolved.mappings.items);
             try rows.appendSlice(g.allocator, resolved.rows.items);

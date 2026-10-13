@@ -884,8 +884,14 @@ effects must still be handled before their owner's scope exits. A direct source
 closure may be written to a trusted local `@effect.state` cell installed inside
 every captured capability's lifetime. Older cells, ordinary provider overrides
 and unknown captures reject; a lambda does not inherit handlers from where it
-was constructed. Multiple capability inputs, selected identities, hidden
-capture/store contracts and mixed-owner State pairs remain unsupported. See
+was constructed. Fully applied helpers with two capability inputs may read a
+Unit operation from either input; each argument retains its own identity, even
+when the inputs share a family or payload. For example,
+`fn (left: State a) => fn (right: State b) => right.get ()` preserves `right` in
+its result row. The complete header form is
+`(left: State a) -> ((right: State b) -> b ! {right.get})`. Other multi-input
+bodies, selected identities, hidden capture/store contracts and mixed-owner
+State pairs remain unsupported. See
 [qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
 
 ## Qualified bindings

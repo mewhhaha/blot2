@@ -134,7 +134,7 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
     };
     for (owner.bindings) |binding| {
         try require(binding.name < symbol_count);
-        try require(@backingInt(binding.capability_flow) <= @backingInt(@import("capability_flow.zig").Contract.invoke_with_capability));
+        try require(@backingInt(binding.capability_flow) <= @backingInt(@import("capability_flow.zig").Contract.member_second_unit));
         try ty(owner, binding.ty);
         try scheme(owner, binding.scheme);
         if (binding.capability_flow != .unknown) {

@@ -5,6 +5,88 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 
+Deno.test("shape only member calls retain method edits open elements and captured callback behavior", async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-shape-member-" });
+  const entry = `${directory}/main.blot`;
+  const prelude = `${directory}/prelude.blot`;
+  const library = await Deno.readTextFile(
+    new URL("../../std/prelude.blot", import.meta.url),
+  );
+  try {
+    for (const codegenTier of ["development", "optimized"] as const) {
+      const options = {
+        executable,
+        entry,
+        prelude,
+        codegenTier,
+        cacheDirectory: false as const,
+      };
+      const retained = await createZigProjectCompiler(options);
+      try {
+        for (
+          const [sibling, extra, count] of [[1, 0, 2], [2, 0, 2], [3, 1, 3], [
+            4,
+            -1,
+            0,
+          ], [5, 0, 2]]
+        ) {
+          let body = "@array.length values";
+          if (extra === 1) body = `@u32.add 1 (${body})`;
+          if (extra === -1) body = "missing_name";
+          const sources = {
+            [prelude]:
+              `${library}\nconst Array.measure: Array a -> U32 = fn values => ${body}\n`,
+            [entry]: `
+const make = fn seed => {holes: #[], callback: fn value => @u32.add seed value}
+const rows = #[make 11, make 22]
+const measured = do:
+  let total = 0
+  for index in 0..8:
+    total := @u32.add total rows.measure
+  return total
+entry const answer = measured
+entry const callback = fn (value: U32) => rows[0].callback value
+entry const sibling = ${sibling}
+`,
+          };
+          const fresh = await createZigProjectCompiler(options);
+          try {
+            const expected = await fresh.build({ sources });
+            const actual = await retained.build({ sources });
+            assert.equal(actual.success, expected.success);
+            if (!actual.success || !expected.success) {
+              assert.equal(extra, -1, JSON.stringify(expected));
+              assert.ok(!actual.success && !expected.success);
+              assert.deepEqual(actual.diagnostics, expected.diagnostics);
+              continue;
+            }
+            assert.notEqual(extra, -1);
+            assert.deepEqual(actual.bytes, expected.bytes);
+            assert.equal(
+              actual.stats.nativeWorkSteps,
+              expected.stats.nativeWorkSteps,
+            );
+            const guest = await instantiateGuest(actual.bytes);
+            try {
+              assert.equal(guest.read("answer"), count * 8);
+              assert.equal(guest.call("callback", 31), 42);
+              assert.equal(guest.read("sibling"), sibling);
+            } finally {
+              await guest.dispose();
+            }
+          } finally {
+            await fresh.dispose();
+          }
+        }
+      } finally {
+        await retained.dispose();
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 Deno.test("array member receipts preserve executed sibling, method, input and failed edits", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-member-receipts-" });
   const entry = `${directory}/main.blot`;

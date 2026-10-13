@@ -943,13 +943,13 @@ test "body check cache owns inferred local associated requirements" {
     defer fresh.deinit(a);
     var expected = try compile(a, &fresh);
     defer expected.deinit(a);
-    try compare(a, &before.bodies, changed, expected.bytes, 2);
-    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 2) });
+    try compare(a, &before.bodies, changed, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 1) });
     const empty: cache.Cache = .{};
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, changed, expected.bytes, fresh.elaborations });
     const edited = try std.mem.replaceOwned(u8, a, source, "@u32.add left right", "@u32.sub left right");
     defer a.free(edited);
-    try parity(source, edited, 2);
+    try parity(source, edited, 1);
     const candidate = try a.print("const Bool.add = fn (left: Bool) => fn (right: Bool) => left\n{s}", .{source});
     defer a.free(candidate);
     var candidate_fresh = try prepare(a, candidate, null);
@@ -1013,13 +1013,13 @@ test "body check cache relocates declared local qualification origins" {
     defer fresh.deinit(a);
     var expected = try compile(a, &fresh);
     defer expected.deinit(a);
-    try compare(a, &before.bodies, inserted, expected.bytes, 2);
-    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 2) });
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
     const empty: cache.Cache = .{};
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
     const edited = try std.mem.replaceOwned(u8, a, source, "@u32.add left right", "@u32.sub left right");
     defer a.free(edited);
-    try parity(source, edited, 2);
+    try parity(source, edited, 1);
 }
 
 test "body check cache declines large local requirement receipts without changing results" {
@@ -1195,19 +1195,19 @@ test "body check cache restores shared requirements inside local principals" {
     defer fresh.deinit(a);
     var expected = try compile(a, &fresh);
     defer expected.deinit(a);
-    try compare(a, &before.bodies, inserted, expected.bytes, 2);
-    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 2) });
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
     const empty: cache.Cache = .{};
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
     const edited = try std.mem.replaceOwned(u8, a, source, "@u32.add left right", "@u32.sub left right");
     defer a.free(edited);
-    try parity(source, edited, 2);
+    try parity(source, edited, 1);
     const added = try a.print("const Bool.add = fn (left: Bool) => fn (right: Bool) => left\n{s}", .{source});
     defer a.free(added);
-    try parity(source, added, 6);
+    try parity(source, added, 5);
     const unqualified = try std.mem.replaceOwned(u8, a, source, "fn value => @type.call \"add\" value value", "fn value => value");
     defer a.free(unqualified);
-    try parity(source, unqualified, 6);
+    try parity(source, unqualified, 5);
 }
 
 test "body check cache Foreign arrow receipts survive allocation failures and interface changes" {
@@ -1266,4 +1266,181 @@ test "body check cache owns generic array indexing through allocation failures" 
     const edited = try std.mem.replaceOwned(u8, a, source, "const seed = 0", "const seed = 1");
     defer a.free(edited);
     try parity(source, edited, 1);
+}
+
+test "body check cache restores generic explicit field templates" {
+    const source = "const extract = fn value => (value).item\nentry const run = fn (value: U32) => extract {tail: 3.0, item: value}\nentry const packed = fn (value: U32) => extract {item: #[value], head: 2}\n";
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("extract") != null);
+    const inserted = try a.print("const earlier_spelling = {{head: 3.0, tail: 2}}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
+    const empty: cache.Cache = .{};
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
+    const candidate = try a.print("const U32.item = fn (value: U32) => value\n{s}", .{source});
+    defer a.free(candidate);
+    try parity(source, candidate, 4);
+}
+
+test "body check cache restores field requirements in local principals" {
+    const source = "const extract = fn value => do:\n  let local = fn amount => (amount).item\n  return local value\nentry const run = fn (value: U32) => extract {tail: 3.0, item: value}\nentry const packed = fn (value: U32) => extract {item: #[value], head: 2}\n";
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("extract") != null);
+    const inserted = try a.print("const earlier_spelling = {{head: 3.0, tail: 2}}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
+    const empty: cache.Cache = .{};
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
+}
+
+test "body check cache restores generic dotted templates through allocation failures" {
+    const source = "const extract = fn value => value.item.count\nconst scoped = fn value => do:\n  let local = fn amount => amount.item.count\n  return local value\nentry const run = fn (value: U32) => extract {tail: 3.0, item: {count: value, ignored: 2}}\nentry const packed = fn (value: U32) => scoped {item: {ignored: 2.0, count: #[value]}, head: 2}\n";
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("extract") != null);
+    try std.testing.expect(before.bodies.find("scoped") != null);
+    const inserted = try a.print("const earlier_spelling = {{head: 3.0, tail: 2}}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
+    const empty: cache.Cache = .{};
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
+    const candidate = try a.print("const U32.count = fn (value: U32) => value\n{s}", .{source});
+    defer a.free(candidate);
+    try parity(source, candidate, 5);
+}
+
+test "body check cache owns if let pattern scopes and predecessor joins" {
+    const source =
+        \\type Maybe a is data = #None | #Some a
+        \\const choose = fn (value: Maybe U32) => do:
+        \\  let result = 2
+        \\  if let #Some amount = value:
+        \\    result := @u32.add amount 1
+        \\  else:
+        \\    result := 3
+        \\  return result
+        \\const pack = fn (value: Maybe (Array U32)) => do:
+        \\  let result = #[2]
+        \\  if let #Some amount = value:
+        \\    result := amount
+        \\  return result
+        \\entry const run = fn (value: U32) => choose (#Some value)
+        \\entry const empty = fn () => choose #None
+        \\entry const packed = fn (value: U32) => pack (#Some #[value])
+    ;
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("choose") != null);
+    try std.testing.expect(before.bodies.find("pack") != null);
+    const inserted = try a.print("const earlier_spelling = {{head: 3.0, tail: 2}}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
+    const empty: cache.Cache = .{};
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
+    const changed = try std.mem.replaceOwned(u8, a, source, "result := 3", "result := 4");
+    defer a.free(changed);
+    try parity(source, changed, 1);
+}
+
+test "body check cache owns pure collection unary and value pattern recipes" {
+    const source =
+        \\const marker = 2
+        \\const copied = fn value => @array.identity (@array.set (@array.concat (@array.prepend (@array.append #[value] 1) 2) (@array.fill 2 value)) 0 value)
+        \\const listed = fn value => @list.from_array (@array.slice (@array.from_list (@list.append [value] value)) 0 1)
+        \\const generated = fn value => @array.generate 2 (fn (index: U32) => @u32.add value index)
+        \\const projected = fn (value: U32) => @product.get (3.0, value) 1
+        \\const negative = fn (value: F32) => -value
+        \\const selected = fn (value: U32) => do:
+        \\  if let ^marker = value:
+        \\    return 1
+        \\  return 0
+        \\entry const run = fn (value: U32) => copied value
+        \\entry const scalar = fn (value: U32) => @array.get (generated value) 1
+        \\entry const count = fn (value: U32) => @list.length (listed value)
+        \\entry const pair = fn (value: U32) => projected value
+        \\entry const fraction = fn (value: F32) => negative value
+        \\entry const matched = fn (value: U32) => selected value
+    ;
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    for ([_][]const u8{ "copied", "listed", "generated", "projected", "negative", "selected" }) |name| try std.testing.expect(before.bodies.find(name) != null);
+    const inserted = try a.print("const earlier_spelling = {{head: 3.0, tail: 2}}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
+    const empty: cache.Cache = .{};
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
+    const changed = try std.mem.replaceOwned(u8, a, source, "const marker = 2", "const marker = 3");
+    defer a.free(changed);
+    try parity(source, changed, 1);
+}
+
+fn nominalCoreOrderReplay(allocator: A, previous: *const cache.Cache, source: []const u8, expected_core: *const core.Module, expected: []const u8) !void {
+    var output = try prepare(allocator, source, previous);
+    defer output.deinit(allocator);
+    try std.testing.expect(@import("structural.zig").equal(expected_core.types, output.module.types));
+    var result = try compile(allocator, &output);
+    defer result.deinit(allocator);
+    try std.testing.expectEqualSlices(u8, expected, result.bytes);
+}
+
+test "body check cache preserves monomorphic nominal Core ordering on a third revision" {
+    const source =
+        \\const marker = 60.0
+        \\type Walk is data = #Walk {yaw: F32}
+        \\type Flight is data = #Flight {vy: F32}
+        \\type Robot is data = #Walking Walk | #Flying Flight
+        \\const encode = fn (current: Robot) => case current of
+        \\  #Walking walk => #[walk.yaw, marker]
+        \\  #Flying flight => #[flight.vy, marker]
+        \\entry const schema = marker
+    ;
+    var first = try prepare(a, source, null);
+    defer first.deinit(a);
+    const edited = try std.mem.replaceOwned(u8, a, source, "marker = 60.0", "marker = 61.0");
+    defer a.free(edited);
+    var second = try prepare(a, edited, &first.bodies);
+    defer second.deinit(a);
+    var third = try prepare(a, source, &second.bodies);
+    defer third.deinit(a);
+    var fresh = try prepare(a, source, null);
+    defer fresh.deinit(a);
+    try std.testing.expect(@import("structural.zig").equal(fresh.module.types, third.module.types));
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    var actual = try compile(a, &third);
+    defer actual.deinit(a);
+    try std.testing.expectEqualSlices(u8, expected.bytes, actual.bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, nominalCoreOrderReplay, .{ &second.bodies, source, &fresh.module, expected.bytes });
+    const changed_recipe = try std.mem.replaceOwned(u8, a, source, "#Walk {yaw: F32}", "#Walk {yaw: F32, extra: U32}");
+    defer a.free(changed_recipe);
+    var revoked = try prepare(a, changed_recipe, &second.bodies);
+    defer revoked.deinit(a);
+    try std.testing.expect(revoked.elaborations > third.elaborations);
 }

@@ -361,6 +361,7 @@ const Generator = struct {
     row_keys: substitutions.Store,
     template_keys: substitutions.Store,
     static_keys: substitutions.Store,
+    instance_arguments: @import("instance_arguments.zig").Store = .{},
     template_catalog: std.ArrayList(artifacts.CapturedTemplate) = .empty,
     runtime_operations: runtime_operations.Store,
     instances: std.AutoHashMapUnmanaged(artifacts.Key, u32) = .empty,
@@ -416,7 +417,8 @@ const Generator = struct {
         try std.testing.expect(closure_node != 0);
         try result.template_catalog.append(a, .{ .unit = 1, .node = closure_node, .captures = result.physical, .templates = 0, .has_environment = true, .evidence = types.f32_type, .rows = result.row_key });
         try result.template_catalog.append(a, .{ .unit = 1, .node = closure_node, .captures = result.physical, .templates = result.template_key, .has_environment = true, .computation = true, .evidence = types.f32_type, .rows = result.row_key });
-        const named: artifacts.Key = .{ .target = fixture.factory, .count = 1, .result = result.function_shape, .templates = result.template_key, .template_result = true };
+        const instance_key = try result.instance_arguments.intern(a, &.{ .{ .unit = 1, .decl = 41 }, .{ .unit = 1, .decl = 42 } });
+        const named: artifacts.Key = .{ .instance_arguments = instance_key, .target = fixture.factory, .count = 1, .result = result.function_shape, .templates = result.template_key, .template_result = true };
         try result.instances.put(a, named, 0);
         try result.template_results.put(a, named, 2);
         const closure: artifacts.ClosureKey = .{ .unit = 1, .catalog = 0, .ty = result.function_shape, .captures = result.physical, .templates = result.template_key, .evidence = types.f32_type, .rows = result.row_key, .parameter_template = 1, .template_result = true };
@@ -456,6 +458,7 @@ const Generator = struct {
         self.row_keys.deinit();
         self.template_keys.deinit();
         self.static_keys.deinit();
+        self.instance_arguments.deinit(a);
         self.template_catalog.deinit(a);
         self.runtime_operations.deinit();
         self.instances.deinit(a);
@@ -501,6 +504,15 @@ fn verify(pool: *const artifacts.Pools, fixture: *const Fixture, physical: u32, 
     try std.testing.expectEqual(template_key, pool.captures[1].templates);
     try std.testing.expectEqual(row_key, pool.captures[1].rows);
     try std.testing.expectEqual(@as(usize, 6), pool.functions.len);
+    var instance_key: u32 = 0;
+    for (pool.functions) |function| {
+        switch (function.request) {
+            .named => |key| instance_key = key.instance_arguments,
+            else => {},
+        }
+    }
+    try std.testing.expect(instance_key != 0);
+    try std.testing.expectEqualDeep(&[_]types.NominalIdentity{ .{ .unit = 1, .decl = 41 }, .{ .unit = 1, .decl = 42 } }, pool.instance_arguments.get(instance_key));
     try std.testing.expectEqual(@as(?u32, 2), pool.functions[0].result_template);
     try std.testing.expectEqual(@as(?u32, 2), pool.functions[1].result_template);
     try std.testing.expectEqual(@as(u32, 32), pool.serialized[0].address);
@@ -539,6 +551,7 @@ test "artifact pools survive evaluator layout template identity teardown with ph
     generator.template_catalog.items[1].templates = 0;
     generator.template_keys.entries.items[0].value = 99;
     generator.row_keys.entries.items[1].value = 99;
+    generator.instance_arguments.values.items[0].decl = 99;
     @memset(generator.runtime_operations.entries.items[0].key, 0);
     generator.deinit();
     live = false;

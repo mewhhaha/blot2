@@ -1403,3 +1403,28 @@ test "scoped effect complete arrow context preserves explicit parameter constrai
         \\entry const answer = 42
     , .type_mismatch);
 }
+
+pub const pair_source = scoped_state_header ++
+    \\const first = fn (left: State a) => fn (right: State b) => left.get ()
+    \\const second: (left: State a) -> ((right: State b) -> b ! {right.get}) = fn x => fn y => y.get ()
+    \\entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+    \\  use outer <- do (@effect.state left.get left.set 7):
+    \\    use inner <- do (@effect.state right.get right.set 100):
+    \\      use a <- first left right
+    \\      use b <- second left right
+    \\      use c <- first right left
+    \\      use d <- second right left
+    \\      return @u32.add (@u32.add a b) (@u32.add c d)
+    \\    let (state, result) = inner
+    \\    return result
+    \\  let (state, result) = outer
+    \\  return result
+    \\))
+;
+fn pairLaw(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, pair_source, null);
+}
+test "scoped effect paired capability binders retain each selected input row" {
+    try pairLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, pairLaw, .{});
+}

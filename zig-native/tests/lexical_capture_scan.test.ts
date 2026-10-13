@@ -13,24 +13,32 @@ const prelude = `${repo}std/prelude.blot`;
 const table = (count: number, shared: boolean) => {
   const items = Array.from(
     { length: count },
-    (_, index) => shared ? `make shared ${index}` : `make ${index}`,
+    (_, index) => {
+      if (shared) return `make shared ${index}`;
+      return `make ${index}`;
+    },
   ).join(", ");
-  return shared
-    ? `const make = fn (base: Array U32) => fn (captured: U32) => fn (value: U32) => @u32.add base[0] (@u32.add captured value)
+  let make =
+    "const make = fn (captured: U32) => fn (value: U32) => @u32.add captured value";
+  let capture = "";
+  if (shared) {
+    make =
+      "const make = fn (base: Array U32) => fn (captured: U32) => fn (value: U32) => @u32.add base[0] (@u32.add captured value)";
+    capture = "  let shared = #[1, 2]\n";
+  }
+  return `${make}
 entry const answer: U32 = do:
-  let shared = #[1, 2]
-  let table = #[${items}]
-  return table.length
-`
-    : `const make = fn (captured: U32) => fn (value: U32) => @u32.add captured value
-entry const answer: U32 = do:
-  let table = #[${items}]
-  return table.length
+${capture}  let table = #[${items}]
+  return table.capture_count
 `;
 };
 Deno.test("lexical capture keys project only reachable scopes in wide closure tables", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-lexical-scan-" });
   const entry = `${directory}/main.blot`;
+  // Keep ordinary member inference active: exact generic length bodies can
+  // now prove that they need no element or lexical capture interfaces.
+  const library = await Deno.readTextFile(prelude) +
+    "\nconst Array.capture_count = fn values => @u32.add 0 (@array.length values)\n";
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
@@ -41,7 +49,7 @@ Deno.test("lexical capture keys project only reachable scopes in wide closure ta
     for (const shared of [false, true]) {
       for (const count of [8, 32, 96]) {
         const result = await compiler.build({
-          sources: { [entry]: table(count, shared) },
+          sources: { [entry]: table(count, shared), [prelude]: library },
         });
         assert(result.success, JSON.stringify(result));
         const counters = result.stats.workCounters as Record<string, number>;

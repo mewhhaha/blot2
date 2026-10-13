@@ -239,3 +239,45 @@ An initial plain128 slowdown did not repeat across five further pairs. Root's
 combined release gate remains separate; general residuals, mutation/control
 forms and total edit performance keep024/053 open. See
 [BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
+
+### Isolated generic explicit fields —13 October 2026
+
+Implicit field requirements now own exact variable-receiver templates and
+complete member-catalog reads through the existing global/local principal graph.
+Concrete physical paths retain complete variant checks; no header/schema grows.
+65 body native laws,29 body guests,8 unchanged budgets and371-file zero analyzer
+pass in isolation, including global/local capture/replay OOM, source/compiled
+owning payloads, method value/effect edits and rejected-field recovery.
+Safe/noLLVM64/128 retained CPU79.375→63.125 /151.875→119.375ms; population rises
+14–15%, retained RSS1096/644KiB, plain controls remain near parity. Root's
+combined release gate remains separate. Generic dotted/declared/projected
+fields, other residual/control forms and total edit performance keep024/053
+open. See [BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
+
+### Isolated generic dotted templates —13 October 2026
+
+Unqualified parameter/local dotted roots now own direct field requirements and
+zero-tag variable steps through existing path receipts and complete member
+reads. Concrete/method-path guards remain.19 focused dotted laws cover
+global/local fresh/replay/population OOM and candidate revocation;29 body guests
+plus8 budgets and371-file zero analyzer pass, with both source/compiled field
+syntaxes. Safe/noLLVM64/128 retained CPU79.375→62.5 /153.75→120ms, population
+rises14%/7%, retained RSS252/88KiB and plain controls stay at parity. Root owns
+the combined release gate. Qualified/projected/declared fields, other
+residual/control forms and total edit acceptance keep024/053 open. See
+[BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
+
+### Isolated compatible pure forms —13 October 2026
+
+One bundle adds if-let, scalar negation, value patterns, product projection and
+pure Array/List operations through existing facts/closures/joins. No schema
+grows.68 native body laws qualify through65 initial passes and focused reruns of
+three updated work counters (Array.concat now reuses);30 body guests,8 budgets
+and371-file zero analyzer pass. Source/compiled callback/control/owning/variant/
+value-pattern/failed-edit and population/replay OOM laws pass. Safe/noLLVM64/128
+if-let retained CPU70.625→63.75 /135→120ms; collection67.5→59.375 /
+131.25→114.375ms. Population costs rise17–36%; plain controls stay near parity.
+Root owns combined release qualification. A bounded owned source-Core fragment
+is the next architectural experiment; whole-module copying is rejected. The
+remaining proof/control/effect/evidence classes and total edit target
+keep024/053 open. See [BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).

@@ -846,6 +846,19 @@ and completed transitive lifetime checks. Unsealed or saturated tables decline,
 including the same-position optimizer path. Semantic interface stability never
 certifies executable consumers. See [the qualification](EXECUTABLE_QUERIES.md).
 
+Same-position optimizer invalidation scans local observations once, then walks
+callee-to-caller edges until every changed dependency has invalidated its
+callers. The shared bounded relocation budget charges graph storage and visits;
+exhaustion clears positional admission and unfinished candidates remain misses.
+The worklist changes neither ownership-context admission nor transitive input
+proofs. See [retained assembly qualification](RETAINED_ASSEMBLY_WORKLIST.md).
+
+An exact pure generic collection-length body may execute without reconstructing
+open element interfaces. Its checked body and header establish that
+independence; ordinary method reads, invocation and fuel remain required. This
+grants no element authority. See
+[collection shape members](COLLECTION_SHAPE_MEMBERS.md).
+
 Portable principal and optimizer records travel in typed sections that name one
 claim, kind, schema and interpretation version. Decoding validates every
 ordinal, evidence edge, body operand, control frame and record/input

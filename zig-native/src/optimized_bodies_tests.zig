@@ -487,3 +487,116 @@ test "symbolic optimizer inputs include checked parameter roles even when encode
     try std.testing.expectEqualSlices(u8, fresh, reused);
     try std.testing.expectEqual(@as(usize, 0), stats.reused);
 }
+
+fn checkLongInvalidation(a: std.mem.Allocator, old: *const retained.Capture, current: *const retained.Capture) !void {
+    var matcher = try retained.Matcher.init(a, old, current);
+    defer matcher.deinit();
+    for (0..192) |id| try std.testing.expect(!matcher.matches(id));
+    for (192..199) |id| try std.testing.expect(matcher.matches(id));
+    try std.testing.expect(matcher.work <= 1_000_000);
+    try std.testing.expect(matcher.candidates >= 199);
+    try std.testing.expectEqual(@as(u32, 1), old.entries.items[191].source.instructions.items[1].operand);
+    try std.testing.expectEqual(@as(u32, 2), current.entries.items[191].source.instructions.items[1].operand);
+}
+
+test "bounded optimizer invalidation retains unrelated bodies across long reverse call chains through OOM" {
+    const a = std.testing.allocator;
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    for (0..199) |_| _ = try module.addFunction(&.{.i32}, .i32);
+    for (0..191) |id| {
+        try module.functions.items[id].instructions.appendNTimes(a, .{ .op = .nop }, 64);
+        try module.emitSlice(@intCast(id), &.{ .{ .op = .local_get }, .{ .op = .call, .operand = @intCast(id + 1) } });
+    }
+    for (191..199) |id| try module.emitSlice(@intCast(id), &.{ .{ .op = .local_get }, .{ .op = .i32_const, .operand = @intCast(id - 190) }, .{ .op = .i32_add } });
+    var old: retained.Capture = .{ .allocator = a };
+    defer old.deinit();
+    const before = try module.assembleWithOptions(.{ .current = &old });
+    defer a.free(before);
+    try std.testing.expect(old.queries_complete);
+    var unchanged: retained.Capture = .{ .allocator = a };
+    defer unchanged.deinit();
+    var stats: retained.Stats = .{};
+    const identical = try assemble(a, &module, &old, &unchanged, &stats);
+    defer a.free(identical);
+    try std.testing.expectEqualSlices(u8, before, identical);
+    try std.testing.expectEqual(@as(usize, 199), stats.reused);
+    try std.testing.expectEqual(@as(usize, 0), stats.match_budget_exhausted);
+    module.functions.items[191].instructions.items[1].operand = 2;
+    var current: retained.Capture = .{ .allocator = a };
+    defer current.deinit();
+    const fresh = try module.assembleWithOptions(.{ .current = &current });
+    defer a.free(fresh);
+    try checkLongInvalidation(a, &old, &current);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, checkLongInvalidation, .{ &old, &current });
+    var reused: retained.Capture = .{ .allocator = a };
+    defer reused.deinit();
+    stats = .{};
+    const changed = try assemble(a, &module, &old, &reused, &stats);
+    defer a.free(changed);
+    try std.testing.expectEqualSlices(u8, fresh, changed);
+    try std.testing.expectEqual(@as(usize, 7), stats.reused);
+    try std.testing.expectEqual(@as(usize, 192), stats.optimized);
+    try std.testing.expect(stats.match_work <= 1_000_000);
+    module.functions.items[191].instructions.items[1].operand = 1;
+    var reverted: retained.Capture = .{ .allocator = a };
+    defer reverted.deinit();
+    stats = .{};
+    const restored = try assemble(a, &module, &current, &reverted, &stats);
+    defer a.free(restored);
+    try std.testing.expectEqualSlices(u8, before, restored);
+    try std.testing.expectEqual(@as(usize, 7), stats.reused);
+}
+
+fn fallbackReuse(a: std.mem.Allocator) !void {
+    const ir = @import("runtime_ir.zig");
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    const arena = try module.ensureArena();
+    const field = try module.addTypedFunction(&.{}, .i32, .scalar);
+    const object = try module.addLocal(field, .i32);
+    var annotations: [ir.max_annotations]ir.Instruction = undefined;
+    try module.emitSlice(field, ir.annotations(&.{.reference}, .unknown, &annotations));
+    try module.emitSlice(field, &.{
+        .{ .op = .i32_const, .operand = 4 },      .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = object },
+        .{ .op = .local_get, .operand = object }, .{ .op = .i32_const },                       .{ .op = .i32_store },
+        .{ .op = .i32_const, .operand = 7 },
+    });
+    const dynamic = try module.addTypedFunction(&.{.i32}, .i32, .reference);
+    try module.setParameterRoles(dynamic, ir.packParameterRoles(&.{.scalar}));
+    try module.emitSlice(dynamic, &.{ .{ .op = .local_get }, .{ .op = .call, .operand = arena.allocate } });
+    const changed = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+    try module.setParameterRoles(changed, ir.packParameterRoles(&.{.scalar}));
+    try module.emitSlice(changed, &.{ .{ .op = .local_get }, .{ .op = .i32_const, .operand = 1 }, .{ .op = .i32_add } });
+    var old: retained.Capture = .{ .allocator = a };
+    defer old.deinit();
+    const before = try module.assembleWithOptions(.{ .current = &old });
+    defer a.free(before);
+    try std.testing.expect(!old.roots and old.queries_complete);
+    module.functions.items[changed].instructions.items[1].operand = 2;
+    var current: retained.Capture = .{ .allocator = a };
+    defer current.deinit();
+    var stats: retained.Stats = .{};
+    const reused = try assemble(a, &module, &old, &current, &stats);
+    defer a.free(reused);
+    const fresh = try module.assemble();
+    defer a.free(fresh);
+    try std.testing.expectEqualSlices(u8, fresh, reused);
+    try std.testing.expect(!current.roots and current.queries_complete);
+    try std.testing.expectEqual(@as(usize, 1), stats.optimized);
+    try std.testing.expectEqual(module.functions.items.len - 1, stats.reused);
+    var matcher = try retained.Matcher.init(a, &old, &current);
+    defer matcher.deinit();
+    try std.testing.expect(matcher.matches(field) and matcher.matches(dynamic) and !matcher.matches(changed));
+    var instructions = current.entries.items[dynamic].source.instructions.items;
+    if (current.output(dynamic)) |optimized| instructions = optimized.instructions.items;
+    var heap = false;
+    for (instructions) |inst| if (inst.op == .call and inst.operand == arena.allocate) {
+        heap = true;
+    };
+    try std.testing.expect(heap);
+}
+test "late ordinary fallback reuses matching plain bodies while retaining owning storage through OOM" {
+    try fallbackReuse(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, fallbackReuse, .{});
+}

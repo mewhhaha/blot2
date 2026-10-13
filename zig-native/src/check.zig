@@ -4753,6 +4753,7 @@ const Engine = struct {
             .identity => return supplied == 0,
             .invoke_unit => return supplied == 0 and self.types.node(try self.types.resolve(argument, 0)).tag == .function,
             .member_unit => return supplied == 0 and self.types.node(try self.types.resolve(argument, 0)).tag == .scoped,
+            .member_first_unit, .member_second_unit => return supplied < 2 and self.types.node(try self.types.resolve(argument, 0)).tag == .scoped,
             .invoke_with_capability => {
                 const value = self.types.node(try self.types.resolve(argument, 0));
                 if (supplied == 0) return value.tag == .scoped;
@@ -4858,7 +4859,8 @@ const Engine = struct {
         if (basic != .unknown) return basic;
         const member = @import("capability_flow.zig").memberSource(self.tree, self.pool, source);
         const curried = @import("capability_flow.zig").curriedUnitSource(self.tree, source);
-        if (!member and !curried) return .unknown;
+        const pair = @import("capability_flow.zig").pairMemberSource(self.tree, self.pool, source);
+        if (!member and !curried and pair == null) return .unknown;
         var head = source;
         while (self.tree.node(head).tag == .group) head = self.tree.node(head).a;
         const lambda = self.tree.node(head);
@@ -4871,6 +4873,20 @@ const Engine = struct {
             }
         }
         if (self.capabilityFamilyAnnotation(family_annotation) == null) return .unknown;
+        if (pair) |index| {
+            const inner = self.tree.node(lambda.b);
+            var second_annotation = self.tree.parameter(inner.a).annotation;
+            if (second_annotation == 0 and annotation_ != 0) {
+                const result = self.tree.node(self.tree.node(annotation_).b);
+                if (result.tag == .type_function) {
+                    const input = self.tree.node(result.a);
+                    if (input.tag == .type_binder) second_annotation = input.b;
+                }
+            }
+            if (self.capabilityFamilyAnnotation(second_annotation) == null) return .unknown;
+            if (index == 0) return .member_first_unit;
+            return .member_second_unit;
+        }
         if (curried) return .invoke_with_capability;
         return .member_unit;
     }
@@ -7574,6 +7590,23 @@ const Engine = struct {
         for (body.owner.field_names, fields) |name, *field| field.* = self.pool.lookup(name) orelse return null;
         var copier: SchemeCopier = .{ .field_mapping = fields, .allocator = self.allocator, .source = .{ .frozen = &body.owner.graph }, .destination = &self.types, .fresh_rows = true, .fresh_variables = true, .nominal_mapping = &identities };
         defer copier.deinit();
+        // Ordinary constructor patterns share the current catalog payload.
+        // Replaying a frozen copy would introduce an extra nominal/record root
+        // and change Core's ordered type graph on the next exact revision.
+        for (body.constructors, constructors) |old, current| {
+            const syntax = self.tree.node(shape.ids[old.position]);
+            if (syntax.tag != .pattern_constructor) continue;
+            const constructor = self.constructors.items[current];
+            if (constructor.scheme.variables.len != 0 or constructor.scheme.row_variables.len != 0) continue;
+            if (syntax.b != 0) {
+                const payload_position = std.mem.findScalar(ast.Id, shape.ids, syntax.b) orelse return null;
+                const payload_type = body.facts[payload_position].ty;
+                var payload = constructor.payload;
+                const payload_shape = self.types.node(self.types.head(payload, 0));
+                if (!self.nominals.items[constructor.nominal].is_opaque and payload_shape.tag == .record and self.tree.node(syntax.b).tag != .pattern_record) payload = try self.canonicalRecordType(payload_shape);
+                if (payload_type != 0) try copier.mapping.put(self.allocator, payload_type, payload);
+            }
+        }
         const field_plans = try self.allocator.alloc(Projection, body.fields.len);
         defer self.allocator.free(field_plans);
         for (body.fields, field_plans) |field, *plan| {
@@ -7724,6 +7757,11 @@ const Engine = struct {
         return value;
     }
     fn bodyProjectionPlan(self: *Engine, receiver: T.Id, nominal: Identity, field: symbols.Symbol, tags: []const u32) T.Error!?Projection {
+        if (tags.len == 0) {
+            const shape = self.types.node(self.types.head(receiver, 0));
+            if (nominal.unit != 0 or nominal.decl != 0 or shape.tag != .variable) return null;
+            return .{ .nominal = nominal, .field = field, .variants = .{} };
+        }
         var variants: std.ArrayList(u32) = .empty;
         defer variants.deinit(self.allocator);
         for (tags) |tag| {

@@ -580,7 +580,7 @@ pub fn interfaceDigest(source: F.Source, binding: check.Binding, obligations: []
     return proof.interface(binding, obligations);
 }
 fn supportedPredicate(value: T.Obligation) bool {
-    return (value.kind == .dispatch or value.kind == .result_dispatch) and !value.explicit and value.identity.unit == 0 and value.identity.decl == 0 and value.qualification_span == null and value.qualification_unit == 0;
+    return (value.kind == .dispatch or value.kind == .result_dispatch or (value.kind == .field and value.other == 0)) and !value.explicit and value.identity.unit == 0 and value.identity.decl == 0 and value.qualification_span == null and value.qualification_unit == 0;
 }
 fn declaredPredicate(value: T.Obligation) bool {
     return (value.kind == .dispatch or value.kind == .result_dispatch or value.kind == .type_rep) and value.explicit and value.identity.unit == 0 and value.identity.decl == 0 and value.qualification_span != null and value.qualification_unit != 0;
@@ -842,7 +842,7 @@ fn appendSchemeMembers(a: A, members: *std.ArrayList([]u8), scheme: T.Scheme, ob
     budget.* -= 1;
     for (obligations[scheme.obligations.start..][0..scheme.obligations.len]) |predicate| {
         if (supportedPredicate(predicate) or declaredPredicate(predicate)) {
-            if (predicate.kind == .dispatch or predicate.kind == .result_dispatch) try appendMember(a, members, catalog.pool.get(predicate.name));
+            if (predicate.kind == .dispatch or predicate.kind == .result_dispatch or predicate.kind == .field) try appendMember(a, members, catalog.pool.get(predicate.name));
         } else if (sharedPredicate(predicate, catalog.unit)) {
             const values = catalog.values orelse return false;
             if (predicate.identity.decl >= values.bindings.len) return false;
@@ -952,6 +952,11 @@ const Walker = struct {
                 if (!try self.visit(node.b, depth + 1)) return false;
                 return self.visit(node.c, depth + 1);
             },
+            .unary => {
+                if (!std.mem.eql(u8, self.pool.get(node.a), "-")) return false;
+                self.text(self.pool.get(node.a));
+                return self.visit(node.b, depth + 1);
+            },
             .field_access => {
                 self.text(self.pool.get(node.b));
                 return self.visit(node.a, depth + 1);
@@ -995,7 +1000,7 @@ const Walker = struct {
             .pattern_row, .pattern_product, .pattern_record => for (self.tree.children(id)) |child| {
                 if (!try self.visit(child, depth + 1)) return false;
             },
-            .pattern_name, .constructor_ref => self.text(self.pool.get(node.a)),
+            .pattern_name, .pattern_value, .constructor_ref => self.text(self.pool.get(node.a)),
             .pattern_constructor => {
                 self.text(self.pool.get(node.a));
                 return self.visit(node.b, depth + 1);
@@ -1009,6 +1014,11 @@ const Walker = struct {
                 if (!try self.visit(node.a, depth + 1)) return false;
                 if (!try self.visit(node.b, depth + 1)) return false;
                 return self.visit(node.c, depth + 1);
+            },
+            .if_let_stmt => {
+                if (!try self.visit(node.a, depth + 1)) return false;
+                if (!try self.visit(node.b, depth + 1)) return false;
+                for (self.tree.extra.items[node.c..][0..2]) |part| if (!try self.visit(part, depth + 1)) return false;
             },
             .record => {
                 self.text(self.pool.get(node.a));
@@ -1029,7 +1039,13 @@ const Walker = struct {
             },
             .intrinsic => {
                 const name = self.pool.get(node.a);
-                if (!std.mem.startsWith(u8, name, "@u32.") and !std.mem.startsWith(u8, name, "@f32.") and !std.mem.eql(u8, name, "@type.call") and !std.mem.eql(u8, name, "@type.result")) return false;
+                if (!std.mem.startsWith(u8, name, "@u32.") and !std.mem.startsWith(u8, name, "@f32.") and !std.mem.eql(u8, name, "@type.call") and !std.mem.eql(u8, name, "@type.result") and !std.mem.eql(u8, name, "@product.get")) {
+                    const collection = @import("collection_ops.zig").lookup(name) orelse return false;
+                    switch (collection.op) {
+                        .cursor, .cursor_has, .cursor_value, .cursor_advance => return false,
+                        else => {},
+                    }
+                }
                 self.text(name);
             },
             .integer, .float, .boolean => self.word(node.a),
@@ -1323,6 +1339,13 @@ fn publishChunk(a: A, cache: *Cache, owner: *Chunk) !void {
     for (owner.bodies) |*body| try cache.retain(a, body);
 }
 
+fn genericAccessRoot(checked: *const check.Checked, id: ast.Id) bool {
+    const target = checked.resolved[id];
+    if (target == 0) return false;
+    const binding = checked.bindings[target];
+    return (binding.kind == .parameter or binding.kind == .local) and binding.scheme.obligations.len == 0;
+}
+
 fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []const u8, checked: *const check.Checked, root: ast.Id, shape: Syntax, names: ?ExternalNames, annotations: ?AnnotationLookup) !?Body {
     var recipes: RecipeMemo = .{};
     const catalog: Catalog = .{ .recipes = &recipes, .unit = checked.unit, .pool = pool, .nominals = checked.nominals, .constructors = checked.constructors, .patterns = .{ .store = &checked.parameter_patterns }, .values = .{ .bindings = checked.bindings, .tree = tree, .names = names, .annotations = annotations } };
@@ -1356,12 +1379,15 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
         }
         // Qualified references instantiate their current principal below;
         // copying their forwarded requirements too would duplicate predicates.
-        if (tree.node(predicate.source).tag == .name or tree.node(predicate.source).tag == .binary) {
+        const generic_path = predicate.kind == .field and tree.node(predicate.source).tag == .name and checked.access_paths[predicate.source].len != 0 and genericAccessRoot(checked, predicate.source);
+        if (!generic_path and (tree.node(predicate.source).tag == .name or tree.node(predicate.source).tag == .binary)) {
             const target = checked.resolved[predicate.source];
             if (target == 0 or checked.bindings[target].scheme.obligations.len == 0 or (predicate.kind == .callee_use and checked.bindings[target].kind != .local and predicate.identity.decl != target)) return null;
             continue;
         }
-        if (predicate.kind == .callee_use or tree.node(predicate.source).tag != .apply) return null;
+        if (predicate.kind == .field) {
+            if (tree.node(predicate.source).tag != .field_access and !generic_path) return null;
+        } else if (predicate.kind == .callee_use or tree.node(predicate.source).tag != .apply) return null;
         const source_position = position(shape.ids, predicate.source) orelse return null;
         try predicates.ensureUnusedCapacity(a, 1);
         const name = try a.dupe(u8, pool.get(predicate.name));
@@ -1408,7 +1434,13 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
                 if (projection >= checked.projection_catalog.len) return null;
                 const step = checked.projection_catalog[projection];
                 const variants = checked.types.list(step.variants);
-                if (variants.len == 0 or variants.len % 2 != 0 or variants.len / 2 > 4096 - field_tags.items.len or pool.get(step.field).len == 0) return null;
+                if (variants.len % 2 != 0 or variants.len / 2 > 4096 - field_tags.items.len or pool.get(step.field).len == 0) return null;
+                if (variants.len == 0) {
+                    const receiver = checked.types.node(checked.types.head(types[index], 0));
+                    if (step.nominal.unit != 0 or step.nominal.decl != 0 or receiver.tag != .variable or !genericAccessRoot(checked, id)) return null;
+                    needs_selection = true;
+                    try appendMember(a, &members, pool.get(step.field));
+                }
                 const start: u32 = @intCast(field_tags.items.len);
                 var offset: usize = 0;
                 while (offset < variants.len) : (offset += 2) try field_tags.append(a, variants[offset]);
@@ -1420,7 +1452,13 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             if (tree.node(id).tag != .field_access) return null;
             const field = checked.projection_catalog[field_id];
             const variants = checked.types.list(field.variants);
-            if (variants.len == 0 or variants.len % 2 != 0 or variants.len / 2 > 4096 - field_tags.items.len) return null;
+            if (variants.len % 2 != 0 or variants.len / 2 > 4096 - field_tags.items.len) return null;
+            if (variants.len == 0) {
+                const receiver = checked.types.node(checked.types.head(checked.expr_types[tree.node(id).a], 0));
+                if (field.nominal.unit != 0 or field.nominal.decl != 0 or receiver.tag != .variable or field.field != tree.node(id).b) return null;
+                needs_selection = true;
+                try appendMember(a, &members, pool.get(field.field));
+            }
             const start: u32 = @intCast(field_tags.items.len);
             var offset: usize = 0;
             while (offset < variants.len) : (offset += 2) try field_tags.append(a, variants[offset]);

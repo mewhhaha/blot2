@@ -44,6 +44,7 @@ comptime {
     _ = @import("runtime_operation_tests.zig");
     _ = @import("runtime_operation_backend_tests.zig");
     _ = @import("scoped_effect_backend_tests.zig");
+    _ = @import("instance_arguments.zig");
     _ = @import("module_relink_tests.zig");
     _ = @import("unit_coverage_tests.zig");
     _ = @import("layout_bridge.zig");

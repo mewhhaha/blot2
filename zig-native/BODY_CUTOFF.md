@@ -1019,3 +1019,103 @@ General residual projection/receiver/update/effect ownership, other control
 forms, LLVM/captured-project acceptance and the under100ms total target remain
 open for024/053. Generic field templates still need exact current plans before
 admission; an empty physical variant list cannot be treated as a concrete path.
+
+### Isolated generic explicit fields —13 October 2026
+
+Implicit field predicates with no secondary operand now participate in complete
+interface and member-catalog proofs. An explicit postfix field may own an empty
+projection template only when its receiver remains a plain variable, its nominal
+identity is zero and its spelling matches the source selector. Replay
+reconstructs that same generic template; concrete projections still require
+their complete variant tags and current physical slots. Global and local
+principals retain the field roots, signatures, spelling and current selection
+reads through existing owners. No receipt header or graph schema grows.
+
+Two new native laws exercise global and local requirements through every
+fresh/retained capture/replay allocation failure, exact byte equality and
+unselected candidate insertion. Executed source/compiled laws preserve current
+record and nominal slots, scalar/owning payload changes and local field scopes.
+Selected method body edits change results; a selected Foreign interface fails a
+pure consumer, and missing fields/rejected edits recover and revert. The full
+body-only native family passes65 laws;29 body guests plus8 unchanged budgets and
+371-file zero analyzer pass. Root owns combined release qualification.
+
+CPU5 Safe/noLLVM64/128 field retained CPU79.375→63.125 /151.875→119.375ms
+(paired0.795/0.783), elaborations66.5/130.5→2.5. Population70→80 /130→150ms
+(paired1.143/1.154), retained RSS+1096/+644KiB. Plain retained
+controls53.75→53.75 /103.75→103.75ms have paired1.0/1.006. Three alternating
+pairs, two warmups and 16 edits/reverts per workload verify exact hashes and
+executed results. Initial and final48-sample distributions, immutable binaries
+and pins remain under `build/bench/task024-generic-fields/`.
+
+Generic dotted templates, projected receivers, declared field requirements,
+receiver/update/user-operation residuals and other control forms remain
+conservative exclusions. LLVM/captured-project acceptance and the under100ms
+total target keep024/053 open. Empty templates are admitted as generic evidence,
+never as concrete physical paths.
+
+### Isolated generic dotted templates —13 October 2026
+
+Generic dotted paths now own their direct field predicates and zero-tag steps
+through the existing sparse path receipt. Every empty step requires a plain
+variable receiver, zero nominal identity and an unqualified parameter/local
+root. Qualified principals remain declined for generic paths so their forwarded
+requirements cannot be mistaken for direct projection requirements. Concrete
+steps retain their existing tag, nominal and physical-slot guards. The complete
+member catalog covers every generic step. No header/schema grows.
+
+Nineteen focused dotted laws include the prior concrete owning paths and method
+exclusion, plus global/local two-step generic paths through every fresh/retained
+capture/replay allocation failure and unselected candidate insertion. The
+source/compiled field law now executes both postfix and dotted forms, including
+local principals, current slots, owning payloads, method body/effect changes,
+rejected fields, recovery and revert.29 body guests plus8 unchanged budgets and
+371-file zero analyzer pass. The inherited65-law family qualified the explicit
+field basis; this delta ran targeted dotted controls. Root owns the next
+combined full compiler gate.
+
+CPU5 Safe/noLLVM64/128 dotted retained CPU79.375→62.5 /153.75→120ms
+(paired0.781/0.780), elaborations66.5/130.5→2.5. Population70→80 /140→150ms
+(paired1.143/1.071), retained RSS+252/+88KiB. Plain retained50.625→50.625 /
+98.75→98.75ms has paired1.0. Three alternating pairs, two warmups and16 edits/
+reverts produce48 samples with exact hashes and executed results. Immutable
+binaries and pins remain under `build/bench/task024-generic-paths/`.
+
+Qualified generic roots, projected/declared fields, receiver/update/user-effect
+residuals, remaining control forms and LLVM/captured-project/total-edit
+acceptance keep024/053 open. This closes ordinary variable-root dotted fields.
+
+### Isolated compatible pure forms —13 October 2026
+
+One syntax bundle admits ordinary if-let scopes/joins, scalar negation, value
+patterns, product projection and the shared pure Array/List operation class. The
+collection registry supplies operation names/arity; cursor operations remain
+ordinary. Existing expression types, references, projections, closures and
+merges already own the required lowering facts. No header/schema or persistent
+solver state is added. This is the last small compatible syntax bundle before
+evaluating one bounded source-Core recipe for broader forms.
+
+Native if-let and collection/value-pattern laws cover scalar/owning joins,
+fallthrough, captures, changed value patterns and every fresh/retained capture/
+replay allocation failure. Source/compiled executions cover active/fallback
+callback traces, variant-tag insertion, owning results, negation, collection
+operations, product/value patterns, rejected edits, correction and revert.
+The68-law body family passed65 laws initially; the three failures expected an
+Array.concat body to remain ordinary. Updating those work counters for the new
+admission and rerunning all three laws (including their OOM and negative reads)
+passes. No semantic mismatch occurred.30 body guests plus8 unchanged budgets and
+371-file zero analyzer pass. Root owns the combined full compiler gate.
+
+CPU5 Safe/noLLVM64/128 if-let retained70.625→63.75 /135→120ms
+(paired0.903/0.889), elaborations66.5/130.5→2.5. Population60→80 /110→150ms
+(paired1.333/1.364), retained RSS−52/+1100KiB. Collection retained67.5→59.375
+/131.25→114.375ms (paired0.872/0.871), the same elaboration reduction;
+population60→70 /110→140ms (paired1.167/1.364), retained RSS+644/+1088KiB. Plain
+controls are near parity. Initial if-let and two final48-sample distributions
+remain under `build/bench/task024-if-let/`, with immutable binaries/logs/pins.
+
+The remaining eligibility/acceptance inventory and architectural comparison are
+in `build/bench/task024-architecture/REMAINING.md`. Whole Checked/module copying
+is rejected. Qualified/projected/declared fields, receiver/update/demand/loop/
+user-effect/implementation proof owners and total edit acceptance keep024/053
+open; the proposed broader source-Core path remains a prototype.

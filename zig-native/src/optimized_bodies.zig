@@ -20,6 +20,10 @@ pub const Stats = struct {
     /// Stores that contradict an allocation's checked word roles (see
     /// `wasm_lifetimes.Summaries.role_conflicts`).
     role_conflicts: usize = 0,
+    /// Exact optimizer matching work, bounded independently of source fuel.
+    match_candidates: usize = 0,
+    match_work: usize = 0,
+    match_budget_exhausted: usize = 0,
 };
 const Entry = struct {
     source: ir.Function,
@@ -182,17 +186,23 @@ pub const Matcher = struct {
     arena_same: bool,
     relocated: []?ir.Body,
     prior_ids: []?usize,
+    candidates: usize = 0,
+    work: usize = 0,
+    budget_exhausted: usize = 0,
 
     pub fn init(a: A, old: *const Capture, current: *const Capture) A.Error!Matcher {
         const same = try a.alloc(bool, current.entries.items.len);
         errdefer a.free(same);
-        for (same, current.entries.items, 0..) |*match, entry, id| match.* = id < old.entries.items.len and samePosition(old.entries.items[id].source, entry.source);
+        const arena_same = old.tier == current.tier and old.roots == current.roots and old.needs_roots == current.needs_roots and old.root_slots == current.root_slots and (old.arena != null) == (current.arena != null);
+        if (arena_same and old.queries_complete and old.queries.limits.lookup_work != 0) {
+            for (same, current.entries.items, 0..) |*match, entry, id| match.* = id < old.entries.items.len and samePosition(old.entries.items[id].source, entry.source);
+        } else @memset(same, false);
         const relocated = try a.alloc(?ir.Body, current.entries.items.len);
         errdefer a.free(relocated);
         @memset(relocated, null);
         const prior_ids = try a.alloc(?usize, current.entries.items.len);
         @memset(prior_ids, null);
-        var self: Matcher = .{ .allocator = a, .old = old, .current = current, .same = same, .arena_same = old.tier == current.tier and old.roots == current.roots and old.needs_roots == current.needs_roots and old.root_slots == current.root_slots and (old.arena != null) == (current.arena != null), .relocated = relocated, .prior_ids = prior_ids };
+        var self: Matcher = .{ .allocator = a, .old = old, .current = current, .same = same, .arena_same = arena_same, .relocated = relocated, .prior_ids = prior_ids };
         errdefer {
             for (relocated) |*body| if (body.*) |*owned| owned.deinit(a);
             a.free(prior_ids);
@@ -322,8 +332,14 @@ pub const Matcher = struct {
     /// Positional equality is only a shortcut after complete transitive facts
     /// settle. Changed imports/globals or ownership facts invalidate callers,
     /// including recursive components, even when all numeric operands stayed.
-    fn preparePositions(self: *Matcher, walk: *@import("runtime_body_relocation.zig").Walk) void {
+    fn preparePositions(self: *Matcher, walk: *@import("runtime_body_relocation.zig").Walk) A.Error!void {
         if (!std.meta.eql(self.old.arena, self.current.arena)) {
+            @memset(self.same, false);
+            return;
+        }
+        // Charge before allocating graph storage. Each input and dependency is
+        // examined once; a changed callee enqueues every still-admitted caller.
+        if (!walk.spend(self.same.len)) {
             @memset(self.same, false);
             return;
         }
@@ -354,42 +370,80 @@ pub const Matcher = struct {
                 else => {},
             };
         }
-        var changed = true;
-        while (changed) {
-            changed = false;
-            for (self.current.entries.items, self.same) |entry, *same| {
-                if (!same.*) continue;
-                if (!walk.spend(entry.source.instructions.items.len +| 1)) {
+        var changed = false;
+        for (self.same) |same| if (!same) {
+            changed = true;
+            break;
+        };
+        if (!changed) return;
+        const Edge = struct { caller: u32, next: u32 };
+        const absent = std.math.maxInt(u32);
+        const heads = try self.allocator.alloc(u32, self.same.len);
+        defer self.allocator.free(heads);
+        @memset(heads, absent);
+        var edges: std.ArrayList(Edge) = .empty;
+        defer edges.deinit(self.allocator);
+        var pending: std.ArrayList(u32) = .empty;
+        defer pending.deinit(self.allocator);
+        for (self.current.entries.items, 0..) |entry, id| {
+            if (!self.same[id]) continue;
+            for (entry.source.instructions.items) |inst| {
+                if (inst.op != .call and !inst.table_reference) continue;
+                if (!walk.spend(1)) {
                     @memset(self.same, false);
                     return;
                 }
-                for (entry.source.instructions.items) |inst| {
-                    if (inst.op != .call and !inst.table_reference) continue;
-                    if (inst.operand >= self.same.len or !self.same[inst.operand]) {
-                        same.* = false;
-                        changed = true;
-                        break;
-                    }
+                if (inst.operand >= self.same.len) {
+                    self.same[id] = false;
+                    break;
                 }
+                const next: u32 = @intCast(edges.items.len);
+                try edges.append(self.allocator, .{ .caller = @intCast(id), .next = heads[inst.operand] });
+                heads[inst.operand] = next;
+            }
+        }
+        for (self.same, 0..) |same, id| if (!same) try pending.append(self.allocator, @intCast(id));
+        while (pending.pop()) |callee| {
+            var edge = heads[callee];
+            while (edge != absent) {
+                if (!walk.spend(1)) {
+                    @memset(self.same, false);
+                    return;
+                }
+                const item = edges.items[edge];
+                if (self.same[item.caller]) {
+                    self.same[item.caller] = false;
+                    try pending.append(self.allocator, item.caller);
+                }
+                edge = item.next;
             }
         }
     }
     fn findRelocations(self: *Matcher) A.Error!void {
+        if (!self.old.queries_complete or self.old.queries.limits.lookup_work == 0) return;
         const relocation = @import("runtime_body_relocation.zig");
         var walk: relocation.Walk = .{};
-        defer walk.deinit(self.allocator);
-        self.preparePositions(&walk);
+        const budget = walk.remaining;
+        defer {
+            self.work = budget - walk.remaining;
+            self.budget_exhausted = @intFromBool(walk.remaining == 0);
+            walk.deinit(self.allocator);
+        }
+        try self.preparePositions(&walk);
         var missing = false;
         for (self.prior_ids, 0..) |*prior, id| {
+            self.candidates += 1;
             if (self.matchesPosition(&walk, id)) prior.* = id else missing = true;
         }
         if (!missing) return;
-        if (!self.old.queries_complete) return;
         for (self.current.entries.items, self.prior_ids, 0..) |entry, *prior, id| {
             if (prior.* != null) continue;
+            if (walk.remaining == 0) return;
             var candidates = self.old.queries.candidates(relocation.hash(entry.source), .newest_first);
             candidates.remaining = @min(candidates.remaining, 64);
             while (candidates.next()) |position| {
+                if (walk.remaining == 0) return;
+                self.candidates += 1;
                 const record = self.old.queries.records.items[position];
                 if (record.key.tier != self.current.tier) continue;
                 if (!self.summarySame(record.dependencies, entry)) continue;

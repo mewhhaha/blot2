@@ -286,3 +286,44 @@ official release archive SHA-256 is
 installed executable SHA-256 is
 `6de5f5c0f6d2e281ad2643d3874b66cf240fa77140c5346b670889483982b0c7`. Full
 combined qualification and CPU measurement remain separate.
+
+## Ordered capability input boundary
+
+Fully applied two-input member helpers preserve both arguments' instance terms
+in parameter order. Exact first/second Unit-member flow claims are checked
+against owned Core bodies, including the selected parameter binding and both
+scoped input types. Implementation shadowing selects the inner binder. Source
+and compiled interfaces carry the same claim; unknown bodies cannot borrow
+authority merely because their ordinary headers match.
+
+Specialization keys refer to an owned instance-argument pool. Ordered, swapped
+and repeated terms remain distinct. Ordinary function keys use zero and create
+no pool storage. Published backend metadata copies the pool and survives
+producer mutation and teardown. Scoped executable imports still decline until
+their binder terms can be relocated; no guest authority enters portable
+metadata.
+
+Four executed matrix groups cover parameter and complete-header forms in both
+codegen tiers, source/compiled imports, same-family owners, swapped/repeated
+inputs, shadowing, mixed U32/F32 payloads, sync/JSPI, rejection recovery,
+checkpoints, edits and proof-loss/unhandled-owner rollback. Native checking,
+lowering, emission, ordered interning and complete snapshot
+publication/replacement laws include allocation failure. The focused batch
+passes34 scoped guest groups and all8 unchanged compile budgets;370 analyzer
+files report zero findings. The activation fixture prerequisite was generated
+and its revocation law then passed.
+
+With identical source/prelude bytes and fresh equal-length cache paths, ordinary
+fanout128 requests16,104,454 bytes in53,920 allocations, versus16,136,398 bytes
+in the previous slice. Type nodes remain18,504. All inference/solver counters
+remain equal; metadata copied bytes fall360 because ordinary specialization keys
+shrink. These are allocation controls, not a CPU or full combined qualification
+claim.
+
+Remaining058/059 boundaries are owned value-flow identity terms for selections
+and aliases; general parameter/capture/result/store footprints across
+aggregates, demands, providers and computations; fresh invocation binder
+substitution through generative/captured generic calls; opaque/associated
+boundaries carrying those footprints; and generic storage/lifetime contracts
+with exact row subtraction. Arbitrary multi-input bodies remain conservative.
+Neither task is complete.

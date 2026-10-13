@@ -17,7 +17,7 @@ const Allocator = std.mem.Allocator;
 const Hash = std.crypto.hash.Blake3;
 const IdentityMetadata = runtime_identity.Metadata;
 pub const max_parameters = 16;
-pub const Key = struct { instance: @import("types.zig").NominalIdentity = .{ .unit = 0, .decl = 0 }, target: core.BindingRef, parameters: [max_parameters]layout.Id = @splat(1), count: u8 = 0, result: layout.Id = 1, effects: [max_parameters]u32 = @splat(0), templates: substitution_keys.Id = 0, template_result: bool = false };
+pub const Key = struct { instance_arguments: u32 = 0, target: core.BindingRef, parameters: [max_parameters]layout.Id = @splat(1), count: u8 = 0, result: layout.Id = 1, effects: [max_parameters]u32 = @splat(0), templates: substitution_keys.Id = 0, template_result: bool = false };
 pub const ClosureKey = struct { unit: u32, catalog: u32, ty: layout.Id, captures: layout.Id, templates: substitution_keys.Id = 0, evidence: u32 = 0, rows: substitution_keys.Id = 0, parameter_template: u32 = 0, template_result: bool = false, static_values: substitution_keys.Id = 0 };
 pub const CapturedTemplate = struct { unit: u32 = 0, node: core.Id, captures: layout.Id, templates: substitution_keys.Id, has_environment: bool, computation: bool = false, evidence: u32 = 0, rows: substitution_keys.Id = 0 };
 pub const CallableKey = struct { target: core.BindingRef, ty: layout.Id, applied: u32 = 0 };
@@ -204,6 +204,7 @@ pub const Pools = struct {
     rows: Substitutions,
     templates: Substitutions,
     static_values: Substitutions = .{ .entries = &.{}, .spans = &.{} },
+    instance_arguments: @import("instance_arguments.zig").Owned = .{},
     captures: []CapturedTemplate,
     bridge: ?Bridge = null,
     field_locations: []FieldLocation,
@@ -261,6 +262,7 @@ pub const Pools = struct {
         self.rows.deinit(allocator);
         self.templates.deinit(allocator);
         self.static_values.deinit(allocator);
+        self.instance_arguments.deinit(allocator);
         free(leases, allocator, .captures, self.captures);
         if (self.bridge) |*bridge| bridge.deinit(allocator);
         free(leases, allocator, .field_locations, self.field_locations);
@@ -896,6 +898,8 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
     errdefer templates.deinit(allocator);
     var static_values = try Substitutions.capture(allocator, &generator.static_keys);
     errdefer static_values.deinit(allocator);
+    var instance_arguments = try generator.instance_arguments.copyOwned(allocator);
+    errdefer instance_arguments.deinit(allocator);
     const captures = try shared.dupe(.captures, CapturedTemplate, generator.template_catalog.items, if (previous) |old| old.captures else null);
     var bridge: ?Bridge = if (generator.representation_bridge) |*store| try Bridge.capture(allocator, store) else null;
     errdefer if (bridge) |*value| value.deinit(allocator);
@@ -1031,6 +1035,7 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
         .rows = rows,
         .templates = templates,
         .static_values = static_values,
+        .instance_arguments = instance_arguments,
         .captures = captures,
         .bridge = bridge,
         .field_locations = field_locations,

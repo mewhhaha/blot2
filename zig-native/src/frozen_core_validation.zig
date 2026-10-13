@@ -358,21 +358,27 @@ const Bounds = struct {
                 try require(value.kind == .global and value.body_id != 0);
                 const body = self.m.bodies[value.body_id];
                 const curried = value.capability_flow == .invoke_with_capability;
+                const pair = value.capability_flow == .member_first_unit or value.capability_flow == .member_second_unit;
                 var arity: u32 = 1;
-                if (curried) arity = 2;
+                if (curried or pair) arity = 2;
                 try require(body.is_function and body.parameters.len == arity and body.root != 0);
                 try range(self.m.parameters.len, body.parameters.start, body.parameters.len);
                 var input_index = body.parameters.start;
+                if (pair) for (self.m.parameters[body.parameters.start..][0..2]) |entry| {
+                    try self.ty(entry.ty);
+                    try require(self.m.types.node(entry.ty).tag == .scoped);
+                };
                 if (curried) {
                     try self.ty(self.m.parameters[input_index].ty);
                     try require(self.m.types.node(self.m.parameters[input_index].ty).tag == .scoped);
                     input_index += 1;
                 }
+                if (value.capability_flow == .member_second_unit) input_index += 1;
                 const input_binding = self.m.parameters[input_index].binding;
                 try self.node(body.root, false);
                 const root = self.m.node(body.root);
                 var returned = root;
-                if (value.capability_flow == .invoke_unit or value.capability_flow == .member_unit or curried) {
+                if (value.capability_flow == .invoke_unit or value.capability_flow == .member_unit or curried or pair) {
                     try require(root.tag == .apply);
                     try self.node(root.a, false);
                     try self.node(root.b, false);
@@ -380,7 +386,7 @@ const Bounds = struct {
                     try require(argument.tag == .constant and argument.ty == T.unit and argument.a == 0);
                     returned = self.m.node(root.a);
                 }
-                if (value.capability_flow == .member_unit) {
+                if (value.capability_flow == .member_unit or pair) {
                     try require(returned.tag == .operation_value);
                     try index(self.m.operation_values.len, returned.a);
                     const selected = self.m.operation_values[returned.a];

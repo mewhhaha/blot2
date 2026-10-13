@@ -838,3 +838,45 @@ test "implementation compiled symbolic operation heads preserve selected method 
     try compiledSymbolicImplementation(a, bytes);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, compiledSymbolicImplementation, .{bytes});
 }
+
+const paired_capability_producer =
+    \\type State a is effect = {get: Unit -> a, set: a -> Unit}
+    \\const first = fn (left: State a) => fn (right: State b) => left.get ()
+    \\const second = fn (left: State a) => fn (right: State b) => right.get ()
+;
+test "scoped paired public claims admit the maximum and reject forged selected binders" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, paired_capability_producer);
+    defer a.free(bytes);
+    var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &frozen);
+    try admission.validatePrelude(a, &frozen, paired_capability_producer, "std/prelude.blot");
+    const producer = &frozen.modules[0];
+    var found: usize = 0;
+    for (producer.interface.bindings, 0..) |*binding, index| {
+        if (binding.capability_flow != .member_second_unit) continue;
+        found += 1;
+        binding.capability_flow = .member_first_unit;
+        try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, paired_capability_producer, "std/prelude.blot"));
+        // A coordinated forged public and private claim still cannot replace
+        // the body's exact selected input reference.
+        producer.core.bindings[index].capability_flow = .member_first_unit;
+        try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, paired_capability_producer, "std/prelude.blot"));
+        binding.capability_flow = .member_second_unit;
+        producer.core.bindings[index].capability_flow = .member_second_unit;
+    }
+    try std.testing.expectEqual(@as(usize, 1), found);
+    try admission.validatePrelude(a, &frozen, paired_capability_producer, "std/prelude.blot");
+}
+test "scoped public claim wire rejects unknown values after the admitted maximum" {
+    const a = std.testing.allocator;
+    const Contract = @import("capability_flow.zig").Contract;
+    const bytes = try format.encode(a, key, Contract.member_second_unit);
+    defer a.free(bytes);
+    try std.testing.expectEqual(Contract.member_second_unit, try format.decode(Contract, a, bytes, key));
+    const payload = bytes.len - 4;
+    std.mem.writeInt(u32, bytes[payload..][0..4], @backingInt(Contract.member_second_unit) + 1, .little);
+    // Recompute integrity so rejection tests the enum domain, not its digest.
+    @memcpy(bytes[payload - 32 .. payload], &format.digest(bytes[payload..]));
+    try std.testing.expectError(error.InvalidArtifact, format.decode(Contract, a, bytes, key));
+}

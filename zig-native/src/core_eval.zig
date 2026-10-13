@@ -4166,6 +4166,8 @@ pub const Session = struct {
         if (arrow.tag != .function) return self.failNode(owner, source, .type_mismatch);
         const expected = try self.projectType(owner, source, module.typeOf(source), frame.mappings.items, frame.row_mappings.items);
         if (actual == 0) {
+            if (try self.shapeOnlyArrayMember(owner, source, target_, receiver, expected)) |function|
+                return self.applyValue(owner, source, function, receiver, frame.providers);
             const function = try self.partialArrayMember(owner, source, target_, receiver, expected);
             return self.applyValue(owner, source, function, receiver, frame.providers);
         }
@@ -4182,6 +4184,37 @@ pub const Session = struct {
         else
             try self.typedView(owner, source, function, full);
         return self.applyValue(owner, source, typed, receiver, frame.providers);
+    }
+    /// An exact generic length body observes the container, not any element
+    /// interface or captured callable. Keep its ordinary invocation and fuel.
+    fn shapeOnlyArrayMember(self: *Session, owner: usize, source: core.Id, target_: Target, receiver: ValueId, expected: type_evidence.Id) Error!?ValueId {
+        const ordinary = Options{};
+        if (self.options.max_steps != ordinary.max_steps or self.options.max_values != ordinary.max_values or self.options.max_children != ordinary.max_children or self.options.max_depth != ordinary.max_depth or self.options.max_call_depth != ordinary.max_call_depth or self.options.max_type_depth != ordinary.max_type_depth or self.options.max_summary_transitions != ordinary.max_summary_transitions) return null;
+        if (expected != 0 and self.evidence.node(expected).tag != .u32) return null;
+        const module = &self.units[target_.unit];
+        const body = module.body(target_.binding) orelse return null;
+        if (body.runtime or !body.is_function or body.parameters.len != 1 or body.scheme.variables.len != 1 or body.scheme.row_variables.len != 0 or body.scheme.obligations.len != 0) return null;
+        const arrow = module.types.node(body.scheme.root);
+        if (arrow.tag != .function or arrow.b != types.u32_type or arrow.c != 0) return null;
+        const parameter = module.types.node(arrow.a);
+        const kind = self.valueInfo(receiver).kind;
+        if (parameter.tag != .array or kind != .array) {
+            if (parameter.tag != .list or kind != .list) return null;
+        }
+        if (module.types.node(parameter.a).tag != .variable or module.types.list(body.scheme.variables)[0] != parameter.a) return null;
+        const root = module.node(body.root);
+        if (root.tag != .array_op or root.c != @backingInt(core.ArrayOp.length) or root.b != 1 or root.ty != types.u32_type) return null;
+        const operand = module.extra[root.a];
+        if (module.node(operand).tag != .reference) return null;
+        const reference = module.reference(operand);
+        const input = module.bodyParameters(body)[0];
+        if (reference.unit != 0 or reference.binding != input.binding or module.typeOf(operand) != input.ty) return null;
+        const body_parameter = module.types.node(input.ty);
+        if (body_parameter.tag != parameter.tag or module.types.node(body_parameter.a).tag != .variable) return null;
+        const function = try self.richValue(.{ .unit = self.unitId(target_.unit), .binding = target_.binding });
+        const header = self.closureInfo(function);
+        if (header.origin != .named or header.applied != 0 or header.mappings.len != 0 or header.row_mappings.len != 0 or self.valueInfo(function).len != 0) return null;
+        return try self.makeClosure(owner, source, header, &.{});
     }
     fn partialNamedView(self: *Session, owner: usize, source: core.Id, function: ValueId, mappings: []const type_evidence.Mapping, rows: []const type_evidence.RowMapping) Error!ValueId {
         if (mappings.len == 0 and rows.len == 0) return function;
@@ -12161,4 +12194,69 @@ fn memberPrincipalScenario(a: Allocator) !void {
 test "constant receipt member judgments pin actual principal lookup outcomes and OOM" {
     try memberPrincipalScenario(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, memberPrincipalScenario, .{});
+}
+
+fn shapeMemberScenario(allocator: Allocator, module: *const core.Module) !void {
+    for ([_][]const u8{ "count_array", "count_list" }) |name| {
+        const target_ = semanticTestTarget(module, name);
+        const source = module.body(target_.binding).?.root;
+        var expected_steps: usize = 0;
+        for ([_]bool{ false, true }) |fast| {
+            var session = try Session.init(allocator, &.{module.*});
+            defer session.deinit();
+            const empty = try session.makeAggregate(0, source, .array, 0, 0, &.{});
+            var kind: ValueKind = .array;
+            if (std.mem.eql(u8, name, "count_list")) kind = .list;
+            const receiver = try session.makeAggregate(0, source, kind, 0, 0, &.{ empty, empty });
+            try std.testing.expectEqual(@as(type_evidence.Id, 0), session.valueEvidence(receiver));
+            var function: ValueId = undefined;
+            if (fast) {
+                function = (try session.shapeOnlyArrayMember(0, source, target_, receiver, types.u32_type)) orelse return error.ExpectedShapeMember;
+                try std.testing.expectEqual(@as(u64, 0), session.counters.inference_regions);
+            } else {
+                function = try session.partialArrayMember(0, source, target_, receiver, types.u32_type);
+                try std.testing.expect(session.counters.inference_regions != 0);
+            }
+            const result = try session.applyValue(0, source, function, receiver, 0);
+            try std.testing.expect(result == .value);
+            const answer = session.valueScalar(result.value) orelse return error.ExpectedScalar;
+            try std.testing.expectEqual(@as(u32, 2), answer.bits);
+            if (fast) try std.testing.expectEqual(expected_steps, session.steps) else expected_steps = session.steps;
+        }
+    }
+}
+test "shape only generic collection members preserve ordinary answers fuel and allocation failure" {
+    var module = try bodyRecipeLower(
+        \\entry const count_array: Array a -> U32 = fn values => @array.length values
+        \\entry const count_list: List a -> U32 = fn values => @list.length values
+    );
+    defer module.deinit(std.testing.allocator);
+    try shapeMemberScenario(std.testing.allocator, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, shapeMemberScenario, .{&module});
+}
+
+test "shape only member proofs retain changed bodies typed inputs effects and resource limits" {
+    const allocator = std.testing.allocator;
+    var module = try bodyRecipeLower(
+        \\entry const generic: Array a -> U32 = fn values => @array.length values
+        \\entry const concrete: Array U32 -> U32 = fn values => @array.length values
+        \\entry const changed: Array a -> U32 = fn values => @u32.add 1 (@array.length values)
+        \\entry const foreign: Array a -> U32 ! {Foreign} = fn values => @array.length values
+    );
+    defer module.deinit(allocator);
+    var session = try Session.init(allocator, &.{module});
+    defer session.deinit();
+    const target_ = semanticTestTarget(&module, "generic");
+    const source = module.body(target_.binding).?.root;
+    const receiver = try session.makeAggregate(0, source, .array, 0, 0, &.{});
+    for ([_][]const u8{ "concrete", "changed", "foreign" }) |name|
+        try std.testing.expectEqual(@as(?ValueId, null), try session.shapeOnlyArrayMember(0, source, semanticTestTarget(&module, name), receiver, types.u32_type));
+    try std.testing.expectEqual(@as(?ValueId, null), try session.shapeOnlyArrayMember(0, source, target_, receiver, types.f32_type));
+    inline for (.{ "max_steps", "max_values", "max_children", "max_depth", "max_call_depth", "max_type_depth", "max_summary_transitions" }) |field| {
+        const original = @field(session.options, field);
+        @field(session.options, field) = original - 1;
+        try std.testing.expectEqual(@as(?ValueId, null), try session.shapeOnlyArrayMember(0, source, target_, receiver, types.u32_type));
+        @field(session.options, field) = original;
+    }
+    try std.testing.expect((try session.shapeOnlyArrayMember(0, source, target_, receiver, types.u32_type)) != null);
 }
