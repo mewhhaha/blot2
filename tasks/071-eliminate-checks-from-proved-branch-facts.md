@@ -17,7 +17,9 @@ Remove redundant checks from valid branch facts and erase proof representation.
 
 ## Starting point
 
-Task 070 supplies sound witnesses and task 026 resolved control flow.
+Task 070 supplies sound witnesses and task 026 resolved control flow. The
+[proof design](../zig-native/ERASED_PROOFS.md) defines dominated edges, exact
+value versions, joins, loop limits and arithmetic rules.
 [wasm_control_flow.zig](../zig-native/src/wasm_control_flow.zig),
 [runtime_ir.zig](../zig-native/src/runtime_ir.zig) and emission currently
 preserve ordinary bounds/trap checks.
@@ -39,6 +41,8 @@ before the local milestone commit. Use the
 [shared validation](README.md#shared-validation) commands for focused
 development and the scenarios below.
 
+- Apply the complete guard/rebinding/wrap/trap-order matrix in the proof design,
+  including no-feature controls and required-evidence budget rejection.
 - Compare guarded and witness-backed accesses with unproved cases across
   branches, loops, rebinding and imported helpers.
 - Test false/contradictory assumptions, overflow, boundary indices and side

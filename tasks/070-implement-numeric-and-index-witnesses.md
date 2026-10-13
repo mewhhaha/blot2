@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — no completion is claimed.
 - **Dependencies:** [069](069-specify-bounded-erased-proofs.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 9 / explicit
   witnesses. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
@@ -16,7 +16,9 @@ evidence.
 
 ## Starting point
 
-Task 069 defines proof forms; [types.zig](../zig-native/src/types.zig),
+Task 069 defines
+[proof forms and acceptance examples](../zig-native/ERASED_PROOFS.md);
+[types.zig](../zig-native/src/types.zig),
 [type_evidence.zig](../zig-native/src/type_evidence.zig) and
 [dependency_format.zig](../zig-native/src/dependency_format.zig) need the
 corresponding checked evidence representation.
@@ -38,6 +40,9 @@ before the local milestone commit. Use the
 [shared validation](README.md#shared-validation) commands for focused
 development and the scenarios below.
 
+- Apply the complete soundness/ownership/import acceptance matrix in the design;
+  proof kinds cannot instantiate ordinary data polymorphism, and complete public
+  result recipes cannot capture local value identities.
 - Test valid index/length witnesses at zero, boundaries and maximum U32,
   including wrap-sensitive arithmetic.
 - Reject forged constructors, contradictory claims and witnesses reused after

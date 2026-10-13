@@ -605,6 +605,11 @@ Public compiler CPU rises 4–6%; captured fresh/edit/revert rises about 9–12%
 [The merged qualification](../zig-native/CONTINUATION_QUALIFICATION.md)
 preserves source/binary pins, distributions, failed gates and remaining scope.
 
+The documentation-only [erased proof design](../zig-native/ERASED_PROOFS.md)
+completes [069]. It settles exact value identities, checked constructors, proof
+kinds, finite arithmetic/branch rules, portable admission, erasure and bounded
+fallback. Tasks [070]–[071] implement and qualify that proposal.
+
 ## Task index
 
 Dependency numbers below link to their task files. All tasks are initially open.
@@ -679,8 +684,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [066] — Specify typed staging                           | Pending     | [053], [065]                           |
 | [067] — Implement typed code and descriptors            | Pending     | [066]                                  |
 | [068] — Implement hygienic generation and reuse         | Pending     | [067], [024]                           |
-| [069] — Specify bounded erased proofs                   | Ready       | [056]                                  |
-| [070] — Implement numeric and index witnesses           | Pending     | [069]                                  |
+| [069] — Specify bounded erased proofs                   | Complete    | [056]                                  |
+| [070] — Implement numeric and index witnesses           | Ready       | [069]                                  |
 | [071] — Eliminate checks from proved branch facts       | Pending     | [070], [026]                           |
 | [072] — Specify structured concurrency                  | Pending     | [059], [062]                           |
 | [073] — Implement scoped tasks and cancellation         | Pending     | [072], [035]                           |

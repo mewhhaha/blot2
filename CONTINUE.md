@@ -62,9 +62,11 @@ gate. Preserve isolated, rejected and merged pins separately.
   whole-module coverage and CPU acceptance remain open. Three ownership guest
   batches keep 131,072 committed bytes; async-scalar CPU ratios vary
   1.2844/1.0963/1.0194, so they do not close performance qualification.
-- **069:** a reviewed design draft is in
-  `build/bench/continuation-20261013/ERASED_PROOFS.draft.md`; finish its durable
-  publication and task record now that 056 is qualified, then begin 070.
+- **069/070:** 069's [erased proof design](zig-native/ERASED_PROOFS.md) is
+  complete; 070 is ready. Implement the distinct proof kind, exact value
+  operands, checked constructors, explicit public contracts and complete
+  boundary validation. 071 then handles automatic branch facts/check
+  elimination. Neither is implemented.
 
 ## Validation and iteration
 

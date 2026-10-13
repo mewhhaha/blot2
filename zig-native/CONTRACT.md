@@ -718,11 +718,11 @@ global, else the top-level declaration), naming that declaration and the budget.
 The partially inferred engine is discarded; no other diagnostic from that module
 is kept. Rejected modules may have empty declaration catalogs; project export
 handling must preserve the diagnostic without assuming sentinel entries exist.
-The budget is not a project or CLI setting.
-The `budget-fixture` test executable runs these same CLI and server paths with
-a build-local 256-step default and a distinct compiler identity. Routine guest
-laws use it for rejection and recovery; `deno task test:compiler:stress` keeps
-the production million-step exhaustion regression.
+The budget is not a project or CLI setting. The `budget-fixture` test executable
+runs these same CLI and server paths with a build-local 256-step default and a
+distinct compiler identity. Routine guest laws use it for rejection and
+recovery; `deno task test:compiler:stress` keeps the production million-step
+exhaustion regression.
 
 ## Semantic and backend boundaries
 
@@ -962,3 +962,12 @@ views and flat tuple bindings remain scoped to that live collection; no interior
 pointer becomes a source or captured value. Constructor body reads participate
 in retained and portable validity. See
 [the cursor boundary](LIST_TRAVERSAL.md#private-packed-cursor-checkpoint).
+
+## Planned erased proof ownership
+
+[Bounded erased proofs](ERASED_PROOFS.md) specifies tasks 069–071. This is a
+future checked representation: body-owned immutable value/proof graphs, exact
+formal substitution, complete body/control-flow admission, transactional
+retained invalidation and no proof runtime storage. Optional limits retain
+checks; required evidence never guesses. The current compiler does not yet
+implement this proof surface.

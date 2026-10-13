@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** Complete — durable design and acceptance matrix published.
 - **Dependencies:**
   [056](056-implement-declarations-and-evidence-diagnostics.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 9 / erased proofs.
@@ -25,13 +25,13 @@ facts, but numeric proof witnesses are a new feature.
 
 ## Implementation checklist
 
-- [ ] Define witness syntax, proposition forms, introduction/use rules and
+- [x] Define witness syntax, proposition forms, introduction/use rules and
       arithmetic semantics including U32 wrap and range bounds.
-- [ ] Specify branch fact scope, joins, invalidation, contradictions and
+- [x] Specify branch fact scope, joins, invalidation, contradictions and
       forbidden evidence forging/escape.
-- [ ] Bound solver work and define conservative fallback, diagnostics, artifact
+- [x] Bound solver work and define conservative fallback, diagnostics, artifact
       transport and complete runtime erasure.
-- [ ] Provide check-removal examples where necessary traps are preserved.
+- [x] Provide check-removal examples where necessary traps are preserved.
 
 ## Validation
 
@@ -47,20 +47,22 @@ change.
 
 ## Acceptance criteria
 
-- [ ] Durable witness and branch-fact rules settle semantics, representation,
+- [x] Durable witness and branch-fact rules settle semantics, representation,
       diagnostics and limits.
-- [ ] Tasks 070–071 have precise soundness, erasure and bounded-cost acceptance
+- [x] Tasks 070–071 have precise soundness, erasure and bounded-cost acceptance
       examples.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Design follows qualified implementation declarations at `10fab46`; the local
+  documentation milestone contains this record and the durable specification.
+- Validation: `deno fmt --no-config --check` on changed Markdown, local link
+  audit, and review against the current guide, ownership contract and scoped
+  value-binder design. No compiler source or executable fixture changes.
+- Comparison: no performance claim; tasks 070–071 must measure checking cost,
+  erasure and retained invalidation on the specified positive/negative matrix.
+- Remaining limitations: the proof syntax is a proposal until 070–071 implement
+  it; no proof acceptance or runtime check elimination is claimed here.
+- Durable record: [bounded erased proofs](../zig-native/ERASED_PROOFS.md).
