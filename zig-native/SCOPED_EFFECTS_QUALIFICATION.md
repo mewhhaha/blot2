@@ -421,3 +421,14 @@ bytes before and 16,123,210 after, in 53,920 allocations with identical
 type/work counters. No new grammar is introduced; this boundary uses existing
 lambda/product syntax. General value-owner recipes, nonstructural captures and
 generative public schemes remain separate work.
+
+Root merged this boundary as `5378347` after the complete frozen gate: 1,693
+native, 1,068 guest/client, 1,040 complete OOM sweeps plus two expected-error
+laws, and 375 analyzer files with zero findings. Captured CPU ratios against
+`121eb59` are 1.0047/1.0073/1.0002, with exact Wasm/fuel. Public requested bytes
+increase 10,448–19,228 and peak 4,412–8,092. See the
+[combined qualification](CONTINUATION_QUALIFICATION.md) for all pins and costs.
+The standalone maximum-binder/mask test lacked suite registration; it was not
+covered by its earlier empty focused filter. Checker/emitter/artifact laws did
+execute. Its separately tested registration amendment is queued for the next
+invocation batch; no source is changed after the frozen gate.

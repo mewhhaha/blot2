@@ -6,30 +6,32 @@ artifacts; tasks 082/083 still require their distinct owner decisions.
 
 ## Qualified main
 
-Compiler `121eb59` adds selected effect identities and strict-zip scalarization.
-The latest full gate passes 1,688 native laws, 1,066 guest/client tests and
-1,036 complete allocation-failure sweeps plus two expected-error sweep laws;
-analyzer zero across 375 files.
+Compiler `5378347` adds precise capability dependencies through pure product
+helpers, following selected identities and strict-zip scalarization. The latest
+full gate passes 1,693 native laws, 1,068 guest/client tests and 1,040 complete
+allocation-failure sweeps plus two expected-error sweep laws; analyzer zero
+across 375 files.
 [Merged qualification](zig-native/CONTINUATION_QUALIFICATION.md) records exact
 behavior, failed/regressed runs and final measurements. There are 67 complete, 7
 in progress and 26 pending tasks: 33 remain open.
 
-- Frozen tree `7b19d7a427ab1cf2a798b60a07cf585ce85d6e12`; native source
-  `adb955cc7c88209bc738b6246ec44bf83610a04c`.
+- Frozen tree `2a33efd3d26cfc4d2962caff4cfba752bfef6640`; native source
+  `77ce61121fb82567643514669d71ea1d1a2e5ef4`.
 - LLVM/Fast SHA-256:
-  `9414b47707e14fd2818453a643113d275a497271e7d967fd4fc241d77b9b6642`. Main's
+  `88dcaa76609f7381de8ad79c10be5378bd79037ed4d6060c9a2e1b5d81f9b16a`. Main's
   ignored executable and compressed bundle match. Immutable evidence:
-  `build/bench/continuation-20261013/selected-qualified-pins.json`.
+  `build/bench/continuation-20261013/footprints-qualified-pins.json`.
 - The preceding `ae001bb` batch's seven captured pairs against `38e822d`: fresh
   2225.518→1950.672 ms; edit 1247.822→906.212 ms; revert 1147.918→813.715 ms.
   Paired ratios 0.8767/0.7266/0.7084; exact Wasm and source fuel. Public CPU
   stays near parity, and all 62 packed-width outputs remain exact. Final task
   084 targets remain unmet.
-- Latest seven captured pairs against `ae001bb` remain near parity: paired
-  fresh/edit/revert CPU ratios 0.9980/0.9973/0.9988. Thirteen public programs
-  and all 62 packed-width outputs retain exact Wasm. The release handshake and
-  an independent fresh configure agree on compiler identity. Never copy another
-  worktree's Zig configure cache as a qualification shortcut.
+- Latest seven captured pairs against `121eb59` show paired fresh/edit/revert
+  CPU ratios 1.0047/1.0073/1.0002. This feature adds a small measured cost.
+  Thirteen public programs and all 62 packed-width outputs retain exact Wasm.
+  The release handshake and an independent fresh configure agree on compiler
+  identity. Never copy another worktree's Zig configure cache as a qualification
+  shortcut.
 - Exact checked length bodies avoid 220 inference regions and element/capture
   interface reconstruction. The bounded optimizer worklist reuses 2,862/2,864
   bodies. A replay fix preserves monomorphic pattern-payload roots; strict
@@ -73,10 +75,12 @@ merged pins separately; freeze source during qualification.
   improve allocations and remain rejected.
 - **058/059:** Selected identity terms are merged and fully qualified. A generic
   factory's `InvalidArtifact` failure was repaired by preserving exact origins
-  across payload normalization; artifact validation remains exact. Active
-  `/var/tmp/blot2-generative-effects-058` develops pure product parameter
-  footprints with checked Core validation. General
-  parameter/capture/result/store footprints, invocation binders,
+  across payload normalization; artifact validation remains exact. Pure product
+  parameter footprints and exact private Core validation are now merged. Active
+  `/var/tmp/blot2-generative-effects-058` develops multi-input callback
+  invocation; its emission/OOM checks pass, executed qualification is ongoing.
+  Add the separately frozen standalone-test registration amendment in that next
+  batch. General parameter/capture/result/store footprints, invocation binders,
   opaque/associated boundaries and lifetime contracts remain open.
 - **070:** `/var/tmp/blot2-erased-proofs-070`, with staged base `d55ab1cd`, owns
   unmerged native proof syntax, exact typed value terms and public-contract
@@ -124,8 +128,8 @@ Before compiler commits, run `deno task test:compiler` and zero-finding
 Use `deno fmt --no-config` for files under `zig-native/`. Stage intended files
 only; separate implementation and qualification-record commits.
 
-The latest gate took 933.29s: release build 203.61s, native compilation 298.96s,
-native execution 396.76s and guests 21.39s. Focused preflight catches
+The latest gate took 918.64s: release build 210.40s, native compilation 282.18s,
+native execution 390.87s and guests 21.20s. Focused preflight catches
 integration failures cheaply. Preserve exhaustive OOM coverage. Full native
 execution stays LLVM; noLLVM reduces focused rebuild cost.
 [Iteration costs](zig-native/ITERATION_COST.md) retain earlier improvements.

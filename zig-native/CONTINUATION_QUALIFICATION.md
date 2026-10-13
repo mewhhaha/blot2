@@ -537,3 +537,58 @@ Evidence under `build/bench/continuation-20261013/`:
 `selected-runtime-repeat.json` and `selected-adapters-ownership.jsonl`. Tasks
 024/035/047/058/086/093 remain open. Later window, footprint and
 [numeric-proof](NUMERIC_PROOF_QUALIFICATION.md) prototypes are separate.
+
+## Pure product capability dependencies, 13 October 2026
+
+Local `5378347d13b4dca9924335b73517252f9751a860` is frozen tree
+`2a33efd3d26cfc4d2962caff4cfba752bfef6640`, native source
+`77ce61121fb82567643514669d71ea1d1a2e5ef4`, based on `12e737c`. Zig 0.17.0
+LLVM/Fast binary SHA-256 is
+`88dcaa76609f7381de8ad79c10be5378bd79037ed4d6060c9a2e1b5d81f9b16a`; compiler
+identity is `e7a53c2c2601822fc21c6ef9a330f072b258939b8a7a06b02a8dacd036f71bad`.
+Patch SHA-256 is
+`c78232fe253b5ab19a36d36c5409c3ea6584e367fbabe7007c9e0f1a1d9eaa99`. The release
+handshake matches an independent clean configure; main's executable and
+compressed bundle match that immutable binary.
+
+Pure named helpers carry an owned mask of at most sixteen formal inputs through
+nested products and constants. Exact private Core references validate decoded
+claims, including coordinated interface/body tampering. Present summaries have
+an explicit digest domain; absent summaries retain prior hashes. This permits
+precise discard/return lifetimes without granting authority to unknown captures,
+nonstructural calls, stores or general generative schemes.
+
+The full frozen gate passes **1,693 native tests, 1,068 guest/client tests,
+1,040 complete allocation-failure sweeps plus two expected-error laws, and zero
+analyzer findings across 375 files**. Total 918.64 seconds: release 210.40,
+native compilation 282.18, native execution 390.87 and guests 21.20. The
+standalone maximum-binder/mask test in capability_flow.zig was discovered to
+lack suite registration; it is excluded from this coverage claim. The executed
+checker, emitter and artifact-forgery laws did run. Its separate registration
+amendment belongs to the next batch; the frozen qualified source stays intact.
+
+Seven alternating captured-project pairs against `121eb59`, on CPU 6, preserve
+fresh/retained and cross-compiler Wasm and 70,330 source steps:
+
+| Phase  | Control CPU ms | Candidate CPU ms | Median paired ratio |   Ratio range |
+| ------ | -------------: | ---------------: | ------------------: | ------------: |
+| Fresh  |       1957.040 |         1965.854 |              1.0047 | 1.0002–1.0102 |
+| Edit   |        910.228 |          916.744 |              1.0073 | 1.0052–1.0115 |
+| Revert |        815.505 |          816.032 |              1.0002 | 0.9978–1.0031 |
+
+This is a feature qualification with a small measured compiler cost. Thirteen
+public programs, seven pairs each, retain exact Wasm/fuel and zero teardown. CPU
+ratios span 0.9965–1.0117; requested allocation increases 10,448–19,228 bytes
+and peak increases 4,412–8,092. All 62 packed modules and the complete adapter
+module are byte-identical. Boundary-oracle runtime controls pass; previous
+strict-zip allocation evidence therefore remains applicable. No new runtime
+improvement is claimed.
+
+Evidence: `build/bench/continuation-20261013/footprints-qualified-pins.json`,
+`footprints-handshake-identity.json`, `footprints-full-gate.log`,
+`footprints-gate/`, `footprints-analyzer.log`,
+`footprints-measurement-summary.json`, `captured-footprints/`,
+`public-footprints/`, `footprints-packed/equality.json` and
+`footprints-runtime.json`. Tasks 058/059 and the other 31 open tasks remain
+open. The next invocation slice, window experiment, sparse body replay and proof
+checker remain isolated.
