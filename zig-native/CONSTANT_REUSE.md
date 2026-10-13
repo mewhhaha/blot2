@@ -1,8 +1,8 @@
 # Approved constant receipts
 
 The owner approved this design and requested implementation on12 October2026.
-Task086 is in progress. A focused constant-slot receipt slice is implemented in
-an isolated worktree; whole-task qualification is pending.
+Task086 is in progress. Primitive constant-slot receipts are qualified on main;
+broader constant authority and whole-task qualification remain pending.
 
 ## Current evidence
 
@@ -177,16 +177,50 @@ Task086 remains open.
 ## Merged checkpoint, 13 October 2026
 
 Local `10fab46` qualifies this admitted slice with 1,624 native laws, 1,030
-executed guests, 977 exhaustive failure sweeps and zero analyzer findings across
-373 files. [Merged qualification](CONTINUATION_QUALIFICATION.md) records the
-exact source/binary pins, measured costs and still-open scope. Isolated clocks
-above remain separate from the final combined release measurements.
+executed guests, 975 complete failure sweeps plus two expected-error laws, and
+zero analyzer findings across 373 files.
+[Merged qualification](CONTINUATION_QUALIFICATION.md) records the exact
+source/binary pins, measured costs and still-open scope. Isolated clocks above
+remain separate from the final combined release measurements.
 
 Local `b145c5e` qualifies sparse inspection and request-shared graph scratch
-with 1,651 native tests, 1,043 guests, 1,002 exhaustive failure sweeps and zero
-findings across 374 files. The large-snapshot constant workload improves from
-18.005 to 15.158 ms median retained CPU; the small control is near parity.
-Captured project constants still have no receipt activity. The
+with 1,651 native tests, 1,043 guests, 1,000 complete failure sweeps plus two
+expected-error laws, and zero findings across 374 files. The large-snapshot
+constant workload improves from 18.005 to 15.158 ms median retained CPU; the
+small control is near parity. Captured project constants still have no receipt
+activity. The
 [combined qualification](CONTINUATION_QUALIFICATION.md#child-fields-and-retained-graphs-13-october-2026)
 records exact pins, counter semantics and the unrelated retained compiler
-regression. Growth and broader inference/query/data authority remain in 086.
+regression.
+
+## Primitive growth receipts, 13 October 2026
+
+Local `38e822d` admits primitive Array/List growth within an otherwise complete
+value-only receipt. The tape owns a mutation serial and the final root buffer's
+offset/capacity at the end of this constant. Later constants cannot alter that
+captured frontier. Replay reserves the same buffer and charges temporary value
+and child debt before its allocation-free publication. Scalar results retain the
+serial without a root frontier. This adds no space to the event record.
+
+Growth into old child spans, mixed member-query tapes, unobserved nested growth,
+saturated serials and nonprimitive graphs decline. Escaping typed-view inputs
+and inference/query budget transitions retain their existing rejection. The
+existing 4,096-view observation bound is unchanged: the measured 4,096-element
+source crosses it and uses ordinary evaluation.
+
+Seven alternating LLVM pairs cover population and six edits at four sizes, 392
+samples total. Retained median CPU is 1.630→1.172 ms at 512 elements and
+3.710→1.746 ms at 2,048; median paired ratios are 0.7187 and 0.4718. Population
+ratios are 1.0336 and 1.0560. The 32-element control is near parity; the
+4,096-element fallback costs 1.0362 times retained CPU. Every output and source
+fuel count matches a fresh compile. An initial partial experiment incorrectly
+expected reuse at 4,096; its preserved debugger trace identifies the existing
+view bound, and the final measurement explicitly includes that fallback.
+
+The combined compiler passes 1,664 native tests, 1,053 guests, 1,011 complete
+failure sweeps and two expected-error sweep laws, with 374 files/zero analyzer
+findings. Captured project compilation is near parity and still has no
+constant-receipt activity. [Merged qualification](CONTINUATION_QUALIFICATION.md)
+records final source/binary pins and all measured costs. Compound graphs,
+inference/query publication, escaping views and portable data authority remain
+open in 086.

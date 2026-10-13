@@ -595,14 +595,16 @@ also adds `zig-native/tests/list_span_execution.test.ts`.
 
 ## Latest local compiler checkpoint
 
-Compiler `b145c5e` extends [024], [047], [058] and [086]; [056] was completed at
-`10fab46`. The latest full gate passes 1,651 native laws, 1,043 guests and 1,002
-exhaustive allocation failure sweeps; the analyzer has zero findings across 374
-files. The pipeline now uses zero per-call objects. Packed-width Wasm is
+Compiler `38e822d` extends [024], [047], [058] and [086]; [056] was completed at
+`10fab46`. The latest full gate passes 1,664 native laws, 1,053 guests and 1,011
+complete allocation-failure sweeps plus two expected-error sweep laws; the
+analyzer has zero findings across 374 files. Enumerate/zip and the pipeline now
+use zero per-call objects in the measured scalar workloads. Packed-width Wasm is
 unchanged from the prior boxed-reference qualification. Strict/window state,
-complete capability flows and dominant constant retention remain open. Against
-`10fab46`, captured retained CPU rises about 5%; public compiler CPU rises
-0–3.6%. Large-snapshot primitive constant reuse improves about 16%.
+complete capability flows and dominant constant retention remain open. Captured
+compilation is near parity against `b145c5e`; earlier regressions remain.
+Growing primitive constants improve retained CPU about 28–53% at 512–2,048
+elements, with 3–6% population cost and ordinary fallback at 4,096.
 [The merged qualification](../zig-native/CONTINUATION_QUALIFICATION.md)
 preserves source/binary pins, distributions, failed gates and remaining scope.
 

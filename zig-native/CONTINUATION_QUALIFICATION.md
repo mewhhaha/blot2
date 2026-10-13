@@ -82,8 +82,9 @@ exposed a duplicate generation change after rollback. The repair also adds the
 missing symbolic-argument frontier law. The repaired preflight passes 67 type
 laws, 19 worklist/harness laws, all 1,030 guest/client tests, and the analyzer
 with zero findings across 373 files. The final full gate passes **1,624 native
-laws, 1,030 guest/client tests and 977 exhaustive allocation-failure sweeps**.
-The unchanged frozen tree and binary were checked again after the gate.
+laws, 1,030 guest/client tests and 975 complete allocation-failure sweeps** plus
+two expected-error sweep laws. The unchanged frozen tree and binary were checked
+again after the gate.
 
 Tree-sitter generation/corpus/highlights/examples and six editor checks pass.
 Deno checking, formatter tests and packaging dry run pass. No package is
@@ -198,10 +199,10 @@ The first gate passed 1,649 of 1,651 native tests. A forged cycle fixture had
 kept a newly introduced identity claim after replacing its body; a Foreign-row
 fixture still rejected a now-supported explicit result annotation. Correcting
 only those two fixtures passes all 30 focused laws and the complete retry:
-**1,651 native tests, 1,043 guest/client tests, 1,002 exhaustive
-allocation-failure sweeps and zero findings across 374 analyzer files**. The
-source tree and release hash were verified after the gate. Four
-local/packaged/standalone/CLI API tests also pass.
+**1,651 native tests, 1,043 guest/client tests, 1,000 complete
+allocation-failure sweeps, two expected-error sweep laws and zero findings
+across 374 analyzer files**. The source tree and release hash were verified
+after the gate. Four local/packaged/standalone/CLI API tests also pass.
 
 The failed gate took 880.62 seconds, including a 212.88-second release build.
 The successful retry took 682.24 seconds: release reuse 0.05, native compilation
@@ -271,3 +272,101 @@ qualification remains applicable without claiming a new packed improvement.
 Raw measurements: `captured-next/pairs.json`, `public-next/results.json`,
 `next-constant-pairs.json`, `next-runtime/`, `next-packed/equality.json` and
 `next-measurement-summary.json`. Tasks 024/035/047/058/086/093 remain open.
+
+## Growth, scalar callbacks and complete arrows, 13 October 2026
+
+Local `38e822d` is frozen tree `52b6c36abad5f25f589fb0a6ba0e17d0e681f090`,
+native source `101404d4442bfa27373199d1a7885ad6cffaaa62`, based on `59fcd6b`.
+Its LLVM/Fast binary SHA-256 is
+`bbf4fb62168a056aa3b55b439c2a509cd0781e2d691f000a809e09ec1bcbd9a3`; patch
+SHA-256 is `892eef28f57c6b245435af5b4471cd96c3723302bda92d469f60d6ba5c77f576`.
+The control is the qualified `b145c5e` binary above. Raw paths below remain
+under ignored `build/bench/continuation-20261013/`.
+
+Body recipes add shared local declarations, explicit Foreign arrows and array
+index operations. Complete scoped arrows now have parser, checker, formatter and
+editor support, including grouping that distinguishes a returned arrow's
+invocation row from its producer's row. Bounded private scalar callback
+expansion exposes additional child allocations to the existing optimizer.
+Constant receipts preserve primitive collection growth and exact buffer debt.
+[Body cutoff](BODY_CUTOFF.md),
+[scoped effects](SCOPED_EFFECTS_QUALIFICATION.md),
+[private callbacks](PRIVATE_SCALAR_CONSUMERS.md) and
+[constant reuse](CONSTANT_REUSE.md) define the admitted cases and rejections.
+
+The frozen combined gate passes **1,664 native tests and 1,053 guest/client
+tests**, with **zero findings across 374 analyzer files**. All 1,011 ordinary
+allocation-failure sweeps complete. Two additional profiler records are the
+harness laws that intentionally return `UnexpectedScenarioError`; they correctly
+report `completed: false`. The aggregate timing file counts 1,013 records.
+Source tree, native subtree, patch and release binary hashes match after the
+gate. The gate took 889.65 seconds: release build 200.39, native compilation
+280.54, native execution 375.67 and guest/client tests 20.56. These are separate
+costs; guest execution accounts for about 2% of the full gate.
+
+Before the full gate, 943 native guest tests and the focused budget group pass.
+Frontend tests pass 18 with one existing ignored test; both new arrow tests run.
+The regenerated Baba parser matches checked-in output. Official tree-sitter
+0.27.1 passes seven corpus cases, fifteen highlight fixtures, example parses and
+six editor configuration tests. A development invocation without positional
+guest files runs only smoke tests; `following-all-guests-preflight.log` records
+that smaller run. The actual 943-test preflight is
+`following-native-guests-preflight.log`.
+
+Seven alternating captured-project pairs use the same 93-unit snapshot and a
+fresh byte/source-fuel oracle for each phase. CPU 6 is pinned; other isolated
+work and filesystem caches remain uncontrolled. Results stay near parity:
+
+| Phase  | Control median CPU | Candidate median CPU | Median paired ratio |
+| ------ | -----------------: | -------------------: | ------------------: |
+| Fresh  |       2,228.430 ms |         2,233.960 ms |              1.0040 |
+| Edit   |       1,253.996 ms |         1,253.111 ms |              1.0009 |
+| Revert |       1,153.501 ms |         1,152.476 ms |              1.0021 |
+
+Paired ranges are 0.9999–1.0069, 0.9987–1.0059 and 0.9984–1.0063 respectively.
+Earlier regressions remain; this batch does not recover them. Captured constants
+still have zero receipt/index activity. Thirteen public programs, seven pairs
+each, keep exact Wasm, source fuel and requested/peak allocation counts, with
+zero teardown and CPU ratios 0.9832–1.0005.
+
+Growing primitive constants use seven alternating pairs, population and six
+edits per size: 392 samples. Every phase preserves fresh bytes and source fuel.
+
+| Elements | Retained CPU before→after | Retained paired ratio | Population paired ratio |
+| -------: | ------------------------: | --------------------: | ----------------------: |
+|       32 |            1.035→1.002 ms |                0.9665 |                  0.9937 |
+|      512 |            1.630→1.172 ms |                0.7187 |                  1.0336 |
+|    2,048 |            3.710→1.746 ms |                0.4718 |                  1.0560 |
+|    4,096 |            6.565→6.802 ms |                1.0362 |                  1.0479 |
+
+The 2,048-element retained ratio spans 0.4493–0.5626. At 4,096, the existing
+typed-view observation bound declines receipt capture; its overhead is retained
+in the result. Initial partial samples and a debugger trace preserve the
+incorrect earlier expectation of reuse at that size. Existing constant-scratch
+controls have 196 samples: retained ratios are 1.0034 with 64 old values and
+0.9759 with 32,768. These smaller changes do not establish a general speedup.
+
+Ten iterator workloads use 4,096 rows, 31 alternating pairs, twenty warmups and
+sixteen calls per sample. Profiling copies count objects separately from CPU on
+ordinary Wasm. The additional callback admission gives:
+
+| Adapter    | Objects before→after | Requested payload before→after | CPU ratio |
+| ---------- | -------------------: | -----------------------------: | --------: |
+| enumerate  |              8,192→0 |                 49,152→0 bytes |    0.0460 |
+| zip        |              4,096→0 |                 24,576→0 bytes |    0.0344 |
+| zip_strict |        49,158→45,062 |          376,880→360,496 bytes |    0.9082 |
+| windows    |        81,894→81,894 |      1,277,540→1,277,540 bytes |    1.0049 |
+
+Range/map/filter/take/pipeline retain zero objects; takeWhile retains two
+predicate-creation objects. Their CPU ratios span 0.9962–1.0088. Answers pass,
+committed guest memory stays 131,072 bytes, roots/leases finish at zero and
+journal reset retains 4,096 bytes. All 62 packed width/type outputs are exactly
+the prior qualified Wasm, preserving the existing boxed-reference evidence.
+
+Raw evidence: `following-qualified-pins.json`, `following-gate/`,
+`following-final-analyzer.log`, `following-measurement-summary.json`,
+`captured-following/pairs.json`, `public-following/results.json`,
+`following-growth-pairs.json`, `following-constant-pairs.json`,
+`following-runtime/` and `following-packed/equality.json`. Tasks
+024/035/047/058/086/093 remain open. Later optimizer matching and capability
+input prototypes are separate from this frozen checkpoint.

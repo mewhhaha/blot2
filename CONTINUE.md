@@ -6,26 +6,30 @@ artifacts; tasks 082/083 still require their distinct owner decisions.
 
 ## Qualified main
 
-Compiler `b145c5e` extends 024/047/058/086; `10fab46` completed 056. The latest
-full gate passes 1,651 native laws, 1,043 guest/client tests and 1,002
-exhaustive allocation-failure sweeps; analyzer zero across 374 files.
+Compiler `38e822d` extends 024/047/058/086; `10fab46` completed 056. The latest
+full gate passes 1,664 native laws, 1,053 guest/client tests and 1,011 complete
+allocation-failure sweeps plus two expected-error sweep laws; analyzer zero
+across 374 files.
 [Merged qualification](zig-native/CONTINUATION_QUALIFICATION.md) records exact
 behavior, failures and final measurements.
 
-- Frozen tree: `a576172aa23e937ee5abdad6326a056adc880203`; native source:
-  `dda64a9fad2855179f5846d8774477b217398ad3`.
+- Frozen tree: `52b6c36abad5f25f589fb0a6ba0e17d0e681f090`; native source:
+  `101404d4442bfa27373199d1a7885ad6cffaaa62`.
 - LLVM/Fast SHA-256:
-  `b47b376058beecb41c22703a8e360985259fe79d878a7e3545e97e3a1d73faab`. Immutable
+  `bbf4fb62168a056aa3b55b439c2a509cd0781e2d691f000a809e09ec1bcbd9a3`. Immutable
   binary/logs/pins: `build/bench/continuation-20261013/`.
-- Pipeline objects 36,870→0, requested payload 294,960→0 bytes, guest CPU ratio
-  0.0121 against `10fab46`. All 62 packed-width outputs retain exact qualified
-  Wasm. Strict/window and callback allocations remain 047.
-- Seven captured pairs regress about 5% edit/revert against `10fab46`; public
-  programs add 0–3.6% CPU. Backend assembly adds about 47 ms. Both binaries
-  optimize all 2,864 functions with zero retained reuse; investigation is
-  active. Constant receipts/indexes still have zero activity in that capture.
-- Shared graph scratch improves the large-snapshot primitive constant workload
-  about 16%; small-snapshot controls remain near parity.
+- Enumerate/zip objects 8,192/4,096→0 against `b145c5e`; the pipeline retains
+  zero objects. All 62 packed-width outputs retain exact qualified Wasm. Strict
+  zip still uses 45,062 objects and windows 81,894 at 4,096 rows.
+- Seven captured pairs remain near parity against `b145c5e`; all 13 public
+  outputs and allocation counts match. Earlier compiler regressions remain. A
+  diagnostic found that repeated whole-graph matching exhausts its work budget
+  before it can reuse 2,863 unchanged bodies. The bounded worklist repair is
+  isolated and under qualification.
+- Growing primitive constants improve retained CPU about 28% at 512 elements and
+  53% at 2,048, with 3–6% population cost. At 4,096 elements the existing
+  typed-view limit declines reuse and costs about 4% more. Captured constants
+  still have zero receipt/index activity.
 - The unrelated `deno.lock` change belongs to existing work. Preserve it.
 
 ## Active work
@@ -34,31 +38,30 @@ Agents own isolated worktrees; root reviews immutable deltas and runs one
 combined full gate per commit-ready batch. Main source stays frozen during each
 gate. Preserve isolated, rejected and merged pins separately.
 
-- **024:** `/tmp/blot2-task024-completion`. Through imported-head checkpoint
-  `cc6e5e4e` is merged. Shared-local, Foreign-arrow and index deltas through
-  `c3cbfce9` are in the following integration tree. Generic explicit-field
-  checkpoint `35dab36f` is frozen separately with focused/OOM/guest evidence.
-  General body coverage and 093's 100ms goal remain open; 053 depends on full
-  024. Its inactive cache moved intact to
+- **024:** `/tmp/blot2-task024-completion`. Shared-local, Foreign-arrow and
+  index deltas through `c3cbfce9` are merged. Generic explicit/dotted-field
+  checkpoints `35dab36f`/`f72b7d91` are frozen separately with focused/OOM/guest
+  evidence. Investigate one bounded owned source-Core fragment per declaration
+  to replace the growing syntax whitelist. General body coverage and 093's 100ms
+  goal remain open; 053 depends on full 024. Its inactive cache moved intact to
   `/var/tmp/blot2-task024-cache-preserved/zig-cache`; the original path is a
   symlink. Use `TMPDIR=/var/tmp` to avoid filling the 16 GiB `/tmp` tmpfs.
-- **047:** Child-state checkpoint `f67f836c` from
-  `/var/tmp/blot2-adapter-children-047` is merged. Private callback elimination
-  is being measured in `/var/tmp/blot2-adapter-cost-047`; it stays separate
-  until frozen and reviewed. Then investigate zero optimized-body reuse on the
-  actual captured workflow. Preserve boxed references and all-width comparisons.
-- **058/059:** `/var/tmp/blot2-generative-effects-058`. Through tenth checkpoint
-  `3bcadb54` is merged, including public flow, parameter transport, curried
-  callbacks and trusted local storage. Eleventh complete-arrow patch is frozen
-  under `/var/tmp/blot2-generative-058-checkpoints/complete-arrow/arrow.patch`
-  and integrated into following. Multiple inputs, selected identity and hidden
-  capture/store contracts remain open. Keep later slices separate.
-- **086:** Sparse graph inspection and request-shared scratch are merged.
-  `/var/tmp/blot2-constant-growth-20261013` freezes primitive collection growth
-  at `d624723e`; following includes its delta. Focused/OOM/guest tests and
-  analyzer pass. Release retained ratios at 32/512/2048 elements are
-  0.9766/0.7210/0.4650; 4096 hits the existing typed-view limit and costs about
-  3% more. Captured edits remain near parity with no constant activity. Largest
+- **047:** Private child state and scalar callback checkpoint `07924a7e` are
+  merged. `/var/tmp/blot2-retained-matcher-047` owns the bounded optimizer
+  matching repair on exact tree `52b6c36a`. Its prototype reuses 2,862 of 2,864
+  bodies on the actual captured edit; release qualification is pending. Preserve
+  boxed references and all-width comparisons.
+- **058/059:** `/var/tmp/blot2-generative-effects-058`. Through the eleventh
+  complete-arrow checkpoint is merged. The twelfth multiple-input member slice
+  is frozen under
+  `/var/tmp/blot2-generative-058-checkpoints/paired-capability/pair.patch`.
+  General selected identity terms, invocation binders, capture/result/store
+  footprints, opaque boundaries and lifetime contracts remain open. Keep later
+  slices separate.
+- **086:** Sparse graph inspection, shared scratch and primitive collection
+  growth are merged. `/var/tmp/blot2-selected-inference-20261013` contains
+  diagnostic-only instrumentation for repeated partial Array-member queries; do
+  not merge its logging or use its Safe clocks as release evidence. Largest
   captured constant still consumes 57,019/70,330 source steps and 227 inference
   observations; compound graphs, query/view publication and portable authority
   remain open.
@@ -72,13 +75,11 @@ gate. Preserve isolated, rejected and merged pins separately.
   boundary validation. 071 then handles automatic branch facts/check
   elimination. Neither is implemented.
 
-The next integration is `/var/tmp/blot2-continuation-following-20261013`, based
-on `7cb2b3e` plus all of the qualified `b145c5e` patch. It includes both stale
-fixture repairs, primitive growth, the three additional 024 slices and complete
-scoped arrows. Combined focused guests/budgets, frontend and analyzer pass; its
-full gate has not run. Close scope after the private callback delta and qualify
-the frozen combined release. Do not reapply its whole base onto main; take the
-difference from qualified tree `a576172a`.
+`/var/tmp/blot2-continuation-following-20261013` is the frozen, fully qualified
+source of `38e822d`, based on `59fcd6b`. Preserve it. The next integration
+should start from current main and take only later isolated deltas, including
+the 024 generic-field paths, 058 multiple-input work and the optimizer matching
+repair.
 
 ## Validation and iteration
 
@@ -95,11 +96,10 @@ Before compiler commits, run the full `deno task test:compiler` and
 Use `deno fmt --no-config` for Zig-directory Markdown. Stage intended files
 only; separate implementation and qualification-record commits.
 
-The latest successful gate took 682.24s: release reuse 0.05s, native compile
-280.89s, native run 370.03s and guests 18.93s. The preceding failed gate built
-the exact release in 212.88s; two test-only repairs preserved that binary.
-Focused preflight catches integration failures cheaply. Full native execution
-stays LLVM; noLLVM is useful for compiling changed focused code.
+The latest successful gate took 889.65s: release build 200.39s, native compile
+280.54s, native run 375.67s and guests 20.56s. Focused preflight catches
+integration failures cheaply. Full native execution stays LLVM; noLLVM is useful
+for compiling changed focused code.
 [Iteration costs](zig-native/ITERATION_COST.md) retain earlier measured
 improvements. CI's pinned analyzer installer was checked locally; no remote
 workflow has been triggered.
