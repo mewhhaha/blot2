@@ -123,18 +123,18 @@ pub const ImportedCatalog = struct {
     pub fn declaration(self: ImportedCatalog, id: BindingId) SourceDeclaration {
         if (self.frozen) |owner| {
             const value = owner.bindings[id];
-            return .{ .private = value.private, .name = value.name, .declaration = 0, .kind = value.kind, .capability_flow = value.capability_flow, .named_function = value.named_function, .external = value.external };
+            return .{ .private = value.private, .name = value.name, .declaration = 0, .kind = value.kind, .capability_flow = value.capability_flow, .capability_parameters = value.capability_parameters, .named_function = value.named_function, .external = value.external };
         }
         return sourceDeclaration(self.producer.?.bindings[id]);
     }
     pub fn interface(self: ImportedCatalog, id: BindingId) SchemeInterface {
         if (self.frozen) |owner| {
             const value = owner.bindings[id];
-            return .{ .types = .{ .frozen = &owner.graph }, .scheme = value.scheme, .capability_flow = value.capability_flow, .named_function = value.named_function, .obligations = owner.obligations, .callees = .{ .frozen = owner } };
+            return .{ .types = .{ .frozen = &owner.graph }, .scheme = value.scheme, .capability_flow = value.capability_flow, .capability_parameters = value.capability_parameters, .named_function = value.named_function, .obligations = owner.obligations, .callees = .{ .frozen = owner } };
         }
         const owner = self.producer.?;
         const value = owner.bindings[id];
-        return .{ .types = .{ .store = &owner.types }, .scheme = value.scheme, .capability_flow = value.capability_flow, .named_function = value.named_function, .obligations = owner.obligations, .callees = .{ .live = owner } };
+        return .{ .types = .{ .store = &owner.types }, .scheme = value.scheme, .capability_flow = value.capability_flow, .capability_parameters = value.capability_parameters, .named_function = value.named_function, .obligations = owner.obligations, .callees = .{ .live = owner } };
     }
 };
 /// Static imports cannot carry principal source-body interfaces.
@@ -164,10 +164,11 @@ pub const SchemeSummary = struct {
     shareable: bool = false,
 };
 pub const CapabilityFlow = @import("capability_flow.zig").Contract;
-pub const Binding = struct { capability_flow: CapabilityFlow = .unknown, operation_ref: u32 = 0, private: bool = false, name: symbols.Symbol, declaration: ast.Id, owner: ast.Id, kind: Kind, named_function: bool = false, ty: T.Id, scheme: T.Scheme = .{}, external: ?ExternalTarget = null, predecessor: BindingId = 0, summary: SchemeSummary = .{} };
+pub const Binding = struct { capability_flow: CapabilityFlow = .unknown, capability_parameters: @import("capability_flow.zig").Parameters = .{}, operation_ref: u32 = 0, private: bool = false, name: symbols.Symbol, declaration: ast.Id, owner: ast.Id, kind: Kind, named_function: bool = false, ty: T.Id, scheme: T.Scheme = .{}, external: ?ExternalTarget = null, predecessor: BindingId = 0, summary: SchemeSummary = .{} };
 /// An immutable interface borrows only semantic tables, never a source body.
 pub const SchemeInterface = struct {
     capability_flow: CapabilityFlow = .unknown,
+    capability_parameters: @import("capability_flow.zig").Parameters = .{},
     named_function: bool = false,
     types: F.Source,
     scheme: T.Scheme,
@@ -187,12 +188,12 @@ pub const Callees = union(enum) {
             .live => |owner| {
                 if (binding == 0 or binding >= owner.bindings.len) return null;
                 const value = owner.bindings[binding];
-                return .{ .types = .{ .store = &owner.types }, .scheme = value.scheme, .capability_flow = value.capability_flow, .named_function = value.named_function, .obligations = owner.obligations, .callees = self };
+                return .{ .types = .{ .store = &owner.types }, .scheme = value.scheme, .capability_flow = value.capability_flow, .capability_parameters = value.capability_parameters, .named_function = value.named_function, .obligations = owner.obligations, .callees = self };
             },
             .frozen => |owner| {
                 if (binding == 0 or binding >= owner.bindings.len) return null;
                 const value = owner.bindings[binding];
-                return .{ .types = .{ .frozen = &owner.graph }, .scheme = value.scheme, .capability_flow = value.capability_flow, .named_function = value.named_function, .obligations = owner.obligations, .callees = self };
+                return .{ .types = .{ .frozen = &owner.graph }, .scheme = value.scheme, .capability_flow = value.capability_flow, .capability_parameters = value.capability_parameters, .named_function = value.named_function, .obligations = owner.obligations, .callees = self };
             },
         }
     }
@@ -207,10 +208,10 @@ pub const ImportedBinding = struct {
     expose: bool = true,
 };
 /// Declaration facts admitted only by the owned source-validation API.
-pub const SourceHeader = struct { capability_flow: CapabilityFlow = .unknown, name: symbols.Symbol = 0, namespace: symbols.Symbol = 0, member: symbols.Symbol = 0, target: ExternalTarget, named_function: bool = false, origin: ast.Id, expose: bool = true };
-pub const SourceDeclaration = struct { capability_flow: CapabilityFlow = .unknown, private: bool = false, name: symbols.Symbol, declaration: ast.Id, kind: Kind, named_function: bool, external: ?ExternalTarget };
+pub const SourceHeader = struct { capability_flow: CapabilityFlow = .unknown, capability_parameters: @import("capability_flow.zig").Parameters = .{}, name: symbols.Symbol = 0, namespace: symbols.Symbol = 0, member: symbols.Symbol = 0, target: ExternalTarget, named_function: bool = false, origin: ast.Id, expose: bool = true };
+pub const SourceDeclaration = struct { capability_flow: CapabilityFlow = .unknown, capability_parameters: @import("capability_flow.zig").Parameters = .{}, private: bool = false, name: symbols.Symbol, declaration: ast.Id, kind: Kind, named_function: bool, external: ?ExternalTarget };
 pub fn sourceDeclaration(binding: Binding) SourceDeclaration {
-    return .{ .private = binding.private, .name = binding.name, .declaration = binding.declaration, .kind = binding.kind, .capability_flow = binding.capability_flow, .named_function = binding.named_function, .external = binding.external };
+    return .{ .private = binding.private, .name = binding.name, .declaration = binding.declaration, .kind = binding.kind, .capability_flow = binding.capability_flow, .capability_parameters = binding.capability_parameters, .named_function = binding.named_function, .external = binding.external };
 }
 /// Shared borrowed declaration payloads. No value schemes, obligations or bodies.
 pub const DeclarationCatalog = struct { types: F.Source, parameter_patterns: F.Patterns, nominals: []const Nominal, constructors: []const Constructor, effect_families: []const EffectFamily, effect_templates: []const EffectTemplate, associated: []const Associated, unit: u32, contracts: []const Contract = &.{}, contract_predicates: []const T.Obligation = &.{}, contract_members: []const ContractMember = &.{}, implementations: []const Implementation = &.{}, implementation_predicates: []const T.Obligation = &.{}, implementation_members: []const ImplementationMember = &.{} };
@@ -1123,7 +1124,7 @@ const Engine = struct {
             return;
         }
         const binding = self.external_targets.get(imported.target) orelse fresh: {
-            const fresh = try self.addBinding(.{ .name = if (imported.namespace == 0) imported.name else imported.member, .declaration = imported.origin, .owner = imported.origin, .kind = .external, .ty = try self.types.fresh(), .capability_flow = imported.capability_flow, .named_function = imported.named_function, .external = imported.target });
+            const fresh = try self.addBinding(.{ .name = if (imported.namespace == 0) imported.name else imported.member, .declaration = imported.origin, .owner = imported.origin, .kind = .external, .ty = try self.types.fresh(), .capability_flow = imported.capability_flow, .capability_parameters = imported.capability_parameters, .named_function = imported.named_function, .external = imported.target });
             try self.external_targets.put(self.allocator, imported.target, fresh);
             break :fresh fresh;
         };
@@ -1190,7 +1191,7 @@ const Engine = struct {
             try self.obligations.append(self.allocator, .{ .ty = try copier.copy(constraint.ty, 0), .kind = constraint.kind, .source = origin, .name = constraint.name, .result = if (constraint.result == 0) 0 else try copier.copy(constraint.result, 0), .other = if (constraint.other == 0) 0 else try copier.copy(constraint.other, 0), .signature = if (constraint.signature == 0) 0 else try copier.copy(constraint.signature, 0), .operator = constraint.operator, .identity = identity, .explicit = constraint.explicit, .qualification_span = constraint.qualification_span, .qualification_unit = constraint.qualification_unit });
         }
         const principal: T.Scheme = .{ .root = root, .variables = try self.types.saveList(variables.items), .row_variables = row_variables, .closed_rows = closed_rows, .obligations = .{ .start = start, .len = @intCast(self.obligations.items.len - start) } };
-        const binding = try self.addBinding(.{ .name = name, .declaration = origin, .owner = origin, .kind = .external, .ty = root, .scheme = principal, .capability_flow = interface.capability_flow, .named_function = interface.named_function, .external = target });
+        const binding = try self.addBinding(.{ .name = name, .declaration = origin, .owner = origin, .kind = .external, .ty = root, .scheme = principal, .capability_flow = interface.capability_flow, .capability_parameters = interface.capability_parameters, .named_function = interface.named_function, .external = target });
         self.bindings.items[binding].summary = try self.summarize(principal);
         try self.external_targets.put(self.allocator, target, binding);
         return binding;
@@ -1890,7 +1891,7 @@ const Engine = struct {
                 const definition = if (@TypeOf(imported) == SourceCatalog) imported.declarations[method.binding] else imported.declaration(method.binding);
                 if (definition.private) continue;
                 const target = definition.external orelse ExternalTarget{ .unit = producer.unit, .binding = method.binding };
-                if (@TypeOf(imported) == SourceCatalog) try self.importHeader(.{ .target = target, .capability_flow = definition.capability_flow, .named_function = definition.named_function, .origin = imported.origin, .expose = false }) else if (self.source_validation) try self.importHeader(.{ .target = target, .capability_flow = definition.capability_flow, .named_function = definition.named_function, .origin = imported.origin, .expose = false }) else try self.importBinding(.{ .target = target, .interface = imported.interface(method.binding), .origin = imported.origin, .expose = false });
+                if (@TypeOf(imported) == SourceCatalog) try self.importHeader(.{ .target = target, .capability_flow = definition.capability_flow, .capability_parameters = definition.capability_parameters, .named_function = definition.named_function, .origin = imported.origin, .expose = false }) else if (self.source_validation) try self.importHeader(.{ .target = target, .capability_flow = definition.capability_flow, .capability_parameters = definition.capability_parameters, .named_function = definition.named_function, .origin = imported.origin, .expose = false }) else try self.importBinding(.{ .target = target, .interface = imported.interface(method.binding), .origin = imported.origin, .expose = false });
                 const binding = self.external_targets.get(target).?;
                 var present = false;
                 for (self.associated.items) |prior| if (prior.identity.unit == method.identity.unit and prior.identity.decl == method.identity.decl and prior.member == method.member and prior.binding == binding) {
@@ -4755,10 +4756,15 @@ const Engine = struct {
             source = value.a;
         }
         var contract = self.capabilityFlowContract(source, 0);
+        var parameters = @import("capability_flow.zig").parameterSource(self.tree, source);
         if (self.tree.node(source).tag == .name) {
             const binding = self.resolved[source];
-            if (binding != 0) contract = self.bindings.items[binding].capability_flow;
+            if (binding != 0) {
+                contract = self.bindings.items[binding].capability_flow;
+                parameters = self.bindings.items[binding].capability_parameters;
+            }
         }
+        if (parameters.present()) return parameters.valid() and supplied < parameters.arity();
         switch (contract) {
             .unknown => return false,
             .identity => return supplied == 0,
@@ -7564,7 +7570,7 @@ const Engine = struct {
             catalog = self.bodyCatalog();
             catalog.recipes = &recipes;
             const current = self.bindings.items[binding];
-            if (current.kind != old.kind or current.private != old.private or current.named_function != old.named_function or current.capability_flow != old.capability_flow or (current.external == null) != (old.external == null)) return null;
+            if (current.kind != old.kind or current.private != old.private or current.named_function != old.named_function or current.capability_flow != old.capability_flow or !std.meta.eql(current.capability_parameters, old.capability_parameters) or (current.external == null) != (old.external == null)) return null;
             if (current.kind == .global) {
                 const state = self.global_states.get(binding) orelse return null;
                 if (state.state != .complete or state.on_stack or self.tree.valueDecl(current.declaration).runtime != old.runtime) return null;
@@ -11044,7 +11050,7 @@ fn rejectedSource(allocator: Allocator, diagnostics: []const Diagnostic) !Checke
 fn rejectNumericSource(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool, imports: []const ImportedBinding, catalogs: []const ImportedCatalog, unit: u32, options: ModuleOptions) !Checked {
     var headers: std.ArrayList(SourceHeader) = .empty;
     defer headers.deinit(allocator);
-    for (imports) |imported| try headers.append(allocator, .{ .name = imported.name, .namespace = imported.namespace, .member = imported.member, .target = imported.target, .capability_flow = imported.interface.capability_flow, .named_function = imported.interface.named_function, .origin = imported.origin, .expose = imported.expose });
+    for (imports) |imported| try headers.append(allocator, .{ .name = imported.name, .namespace = imported.namespace, .member = imported.member, .target = imported.target, .capability_flow = imported.interface.capability_flow, .capability_parameters = imported.interface.capability_parameters, .named_function = imported.interface.named_function, .origin = imported.origin, .expose = imported.expose });
     var owned_declarations: std.ArrayList([]SourceDeclaration) = .empty;
     defer {
         for (owned_declarations.items) |declarations| allocator.free(declarations);
@@ -11527,12 +11533,13 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     for (catalogs) |imported| try engine.importCatalog(imported);
     for (source_catalogs) |imported| try engine.importCatalog(imported);
     for (imports) |imported| {
-        if (engine.source_validation) try engine.importHeader(.{ .name = imported.name, .namespace = imported.namespace, .member = imported.member, .target = imported.target, .capability_flow = imported.interface.capability_flow, .named_function = imported.interface.named_function, .origin = imported.origin, .expose = imported.expose }) else try engine.importBinding(imported);
+        if (engine.source_validation) try engine.importHeader(.{ .name = imported.name, .namespace = imported.namespace, .member = imported.member, .target = imported.target, .capability_flow = imported.interface.capability_flow, .capability_parameters = imported.interface.capability_parameters, .named_function = imported.interface.named_function, .origin = imported.origin, .expose = imported.expose }) else try engine.importBinding(imported);
     }
     for (headers) |imported| try engine.importHeader(imported);
     try engine.effectHeaders();
     for (engine.bindings.items) |*binding| if (binding.kind == .global and binding.named_function) {
         binding.capability_flow = engine.capabilityFlowContract(tree.valueDecl(binding.declaration).body, tree.valueDecl(binding.declaration).annotation);
+        binding.capability_parameters = @import("capability_flow.zig").parameterSource(tree, tree.valueDecl(binding.declaration).body);
     };
     try engine.dataBodies();
     engine.prepareOpaqueStorage();

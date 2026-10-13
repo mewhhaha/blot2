@@ -377,3 +377,30 @@ test "scoped effect selection terms survive owned lowering emission and OOM" {
     try emit(a, &module);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
 }
+
+fn lowerParameterFootprintsAndRelease(allocator: std.mem.Allocator) !void {
+    var module = try lowerText(allocator, @import("check_effect_tests.zig").parameter_footprint_source);
+    defer module.deinit(allocator);
+    try validation.validate(allocator, &module, .{ .units = &.{&module} });
+}
+test "scoped effect pure product input footprints validate exact bodies and release OOM" {
+    var module = try lowerText(a, @import("check_effect_tests.zig").parameter_footprint_source);
+    defer module.deinit(a);
+    try validation.validate(a, &module, .{ .units = &.{&module} });
+    var contracts: usize = 0;
+    for (module.bindings) |*binding| {
+        if (!binding.capability_parameters.present()) continue;
+        contracts += 1;
+        const original = binding.capability_parameters;
+        binding.capability_parameters = .init(original.arity(), 1);
+        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
+        binding.capability_parameters = original;
+        binding.capability_parameters = .init(17, original.result());
+        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
+        binding.capability_parameters = original;
+    }
+    try std.testing.expectEqual(@as(usize, 1), contracts);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lowerParameterFootprintsAndRelease, .{});
+    try emit(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+}

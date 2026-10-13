@@ -343,6 +343,7 @@ const Bounds = struct {
         for (self.m.bindings, 0..) |value, id| {
             try enumValue(check.Kind, value.kind);
             try enumValue(check.CapabilityFlow, value.capability_flow);
+            try require(value.capability_parameters.valid());
             try self.ty(value.ty);
             try self.scheme(value.scheme);
             try self.publicSlots(value.public_variables, value.scheme.variables, false);
@@ -362,6 +363,10 @@ const Bounds = struct {
             try index(self.m.bodies.len, value.body_id);
             if (id != 0 and value.kind != .external) try require((value.target.binding == id or (value.kind == .local and value.target.binding == 0)) and (value.target.unit == 0 or value.target.unit == self.m.unit));
             if (value.body_id != 0) try require(value.kind == .global and self.m.bodies[value.body_id].binding == id);
+            if (value.capability_parameters.present()) {
+                try require(value.kind == .global and value.body_id != 0);
+                try require(@import("capability_flow.zig").parameterCore(self.m, self.m.bodies[value.body_id], value.capability_parameters));
+            }
             if (value.capability_flow != .unknown) {
                 try require(value.kind == .global and value.body_id != 0);
                 const body = self.m.bodies[value.body_id];

@@ -327,7 +327,7 @@ fn freezeMode(allocator: Allocator, tree: *const ast.Tree, checked: *const check
     }
     for (checked.bindings, result.bindings, 0..) |old, *value, id| {
         value.* = if (!principal_only or retained[id])
-            .{ .capability_flow = if (old.external == null) old.capability_flow else .unknown, .private = old.private, .name = old.name, .kind = old.kind, .named_function = old.named_function, .ty = try projector.projectType(old.ty, 0), .scheme = try projector.projectScheme(old.scheme), .external = old.external }
+            .{ .capability_flow = if (old.external == null) old.capability_flow else .unknown, .capability_parameters = if (old.external == null) old.capability_parameters else .{}, .private = old.private, .name = old.name, .kind = old.kind, .named_function = old.named_function, .ty = try projector.projectType(old.ty, 0), .scheme = try projector.projectScheme(old.scheme), .external = old.external }
         else
             .{ .private = old.private, .name = 0, .kind = old.kind, .named_function = false, .ty = 0, .scheme = .{}, .external = null };
     }

@@ -220,6 +220,7 @@ pub const Binding = struct {
     scheme: bool,
     named_function: bool,
     capability_flow: check.CapabilityFlow = .unknown,
+    capability_parameters: @import("capability_flow.zig").Parameters = .{},
     runtime: bool,
     external: ?check.ExternalTarget,
     interface: Digest,
@@ -673,6 +674,11 @@ const InterfaceProof = struct {
         hashWord(&hash, @intFromBool(binding.private));
         hashWord(&hash, @intFromBool(binding.named_function));
         hashWord(&hash, @backingInt(binding.capability_flow));
+        if (binding.capability_parameters.present()) {
+            hashWord(&hash, 0x50465001); // parameter footprint v1
+            hashWord(&hash, binding.capability_parameters.arity());
+            hashWord(&hash, binding.capability_parameters.result());
+        }
         hashWord(&hash, @intFromBool(binding.kind == .global and values.tree.valueDecl(binding.declaration).runtime));
         const name = self.catalog.pool.get(binding.name);
         hashWord(&hash, @intCast(name.len));
@@ -707,10 +713,15 @@ const InterfaceProof = struct {
         }
         const digest = self.interface(principal_binding, obligations) orelse return null;
         var contract_digest = digest;
-        if (binding.capability_flow != .unknown) {
+        if (binding.capability_flow != .unknown or binding.capability_parameters.present()) {
             var contract_hash: std.crypto.hash.Blake3 = .init(.{});
             contract_hash.update(&digest);
             hashWord(&contract_hash, @backingInt(binding.capability_flow));
+            if (binding.capability_parameters.present()) {
+                hashWord(&contract_hash, 0x50465001); // parameter footprint v1
+                hashWord(&contract_hash, binding.capability_parameters.arity());
+                hashWord(&contract_hash, binding.capability_parameters.result());
+            }
             contract_hash.final(&contract_digest);
         }
         if (binding.kind != .external) return contract_digest;
@@ -810,6 +821,11 @@ pub fn associatedDigest(source: F.Source, catalog: Catalog, tree: *const ast.Tre
         hashWord(&hash, @intFromBool(binding.private));
         hashWord(&hash, @intFromBool(binding.named_function));
         hashWord(&hash, @backingInt(binding.capability_flow));
+        if (binding.capability_parameters.present()) {
+            hashWord(&hash, 0x50465001); // parameter footprint v1
+            hashWord(&hash, binding.capability_parameters.arity());
+            hashWord(&hash, binding.capability_parameters.result());
+        }
         hashWord(&hash, @intFromBool(binding.kind == .global and tree.valueDecl(binding.declaration).runtime));
         const name = catalog.pool.get(binding.name);
         hashWord(&hash, @intCast(name.len));
@@ -1536,7 +1552,7 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
                 try old_bindings.ensureUnusedCapacity(a, 1);
                 const name = try a.dupe(u8, pool.get(old.name));
                 index = old_bindings.items.len;
-                bindings.appendAssumeCapacity(.{ .name = name, .kind = old.kind, .private = old.private, .declaration = declaration orelse 0, .owner = owner orelse 0, .ty = old.ty, .scheme = old.scheme.root != 0, .named_function = old.named_function, .capability_flow = old.capability_flow, .runtime = old.kind == .global and tree.valueDecl(old.declaration).runtime, .external = old.external, .interface = digest.? });
+                bindings.appendAssumeCapacity(.{ .name = name, .kind = old.kind, .private = old.private, .declaration = declaration orelse 0, .owner = owner orelse 0, .ty = old.ty, .scheme = old.scheme.root != 0, .named_function = old.named_function, .capability_flow = old.capability_flow, .capability_parameters = old.capability_parameters, .runtime = old.kind == .global and tree.valueDecl(old.declaration).runtime, .external = old.external, .interface = digest.? });
                 old_bindings.appendAssumeCapacity(old_id);
             }
             fact.binding = @intCast(index.? + 1);
@@ -1660,7 +1676,7 @@ fn captureLocal(a: A, checked: *const check.Checked, pool: *const symbols.Pool, 
     try bindings.ensureUnusedCapacity(a, 1);
     try old_bindings.ensureUnusedCapacity(a, 1);
     const name = try a.dupe(u8, pool.get(old.name));
-    bindings.appendAssumeCapacity(.{ .name = name, .kind = old.kind, .private = old.private, .declaration = declaration, .owner = owner, .ty = old.ty, .scheme = old.scheme.root != 0, .named_function = old.named_function, .capability_flow = old.capability_flow, .runtime = false, .external = null, .interface = @splat(0) });
+    bindings.appendAssumeCapacity(.{ .name = name, .kind = old.kind, .private = old.private, .declaration = declaration, .owner = owner, .ty = old.ty, .scheme = old.scheme.root != 0, .named_function = old.named_function, .capability_flow = old.capability_flow, .capability_parameters = old.capability_parameters, .runtime = false, .external = null, .interface = @splat(0) });
     old_bindings.appendAssumeCapacity(id);
     return @intCast(old_bindings.items.len);
 }

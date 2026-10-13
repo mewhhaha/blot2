@@ -104,7 +104,7 @@ pub const CheckedProject = struct {
     }
     pub fn interface(self: *const CheckedProject, target: check.ExternalTarget) check.SchemeInterface {
         const producer = &self.module(target.unit).checked;
-        return .{ .types = .{ .store = &producer.types }, .scheme = producer.bindings[target.binding].scheme, .capability_flow = producer.bindings[target.binding].capability_flow, .named_function = producer.bindings[target.binding].named_function, .obligations = producer.obligations, .callees = .{ .live = producer } };
+        return .{ .types = .{ .store = &producer.types }, .scheme = producer.bindings[target.binding].scheme, .capability_flow = producer.bindings[target.binding].capability_flow, .capability_parameters = producer.bindings[target.binding].capability_parameters, .named_function = producer.bindings[target.binding].named_function, .obligations = producer.obligations, .callees = .{ .live = producer } };
     }
 };
 
@@ -183,7 +183,7 @@ const Engine = struct {
     }
     fn headerImport(self: *const Engine, target: check.ExternalTarget, origin: ast.Id) check.SourceHeader {
         std.debug.assert(self.source_validation);
-        return .{ .target = target, .origin = origin, .capability_flow = self.catalogModule(target.unit).?.declaration(target.binding).capability_flow, .named_function = self.catalogModule(target.unit).?.declaration(target.binding).named_function };
+        return .{ .target = target, .origin = origin, .capability_flow = self.catalogModule(target.unit).?.declaration(target.binding).capability_flow, .capability_parameters = self.catalogModule(target.unit).?.declaration(target.binding).capability_parameters, .named_function = self.catalogModule(target.unit).?.declaration(target.binding).named_function };
     }
     fn deinitSourceModules(self: *Engine) void {
         for (self.source_modules) |*item| if (item.*) |*module_| {

@@ -1504,3 +1504,55 @@ test "scoped effect selected symbolic payload normalization preserves the same i
     try symbolicSelectionLaw(a);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, symbolicSelectionLaw, .{});
 }
+
+pub const parameter_footprint_source = scoped_state_header ++
+    \\const pack = fn first => fn second => fn third => (third, (first, second), first)
+    \\entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+    \\  let (selected, (first, second), repeated) = pack left right right
+    \\  use outer <- do (@effect.state left.get left.set 7):
+    \\    use inner <- do (@effect.state right.get right.set 100):
+    \\      use a <- selected.get ()
+    \\      use b <- first.get ()
+    \\      use c <- second.get ()
+    \\      use d <- repeated.get ()
+    \\      return @u32.add (@u32.add a b) (@u32.add c d)
+    \\    let (state, result) = inner
+    \\    return result
+    \\  let (state, result) = outer
+    \\  return result
+    \\))
+;
+fn parameterFootprintLaw(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, parameter_footprint_source, null);
+}
+test "scoped effect pure product helpers retain every exact input footprint" {
+    try parameterFootprintLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, parameterFootprintLaw, .{});
+    try checkScopedSource(a, scoped_state_header ++
+        \\const pack = fn first => fn second => (second, first)
+        \\entry const bad = fn () => @effect.scope (fn (state: State U32) => pack state 42)
+    , .capability_escape);
+    try checkScopedSource(a, scoped_state_header ++
+        \\const pack = fn first => fn second => do:
+        \\  let saved = first
+        \\  return (second, saved)
+        \\entry const bad = fn () => @effect.scope (fn (state: State U32) => do:
+        \\  let borrowed = pack state 42
+        \\  return 42
+        \\)
+    , .capability_escape);
+}
+
+test "scoped effect product summaries omit unused younger owners precisely" {
+    try checkScopedSource(a, scoped_state_header ++
+        \\const keep = fn unused => fn retained => (retained, 42)
+        \\entry const answer = fn () => @effect.scope (fn (older: State U32) => do:
+        \\  let (borrowed, count) = @effect.scope (fn (younger: State U32) => keep younger older)
+        \\  use handled <- do (@effect.state borrowed.get borrowed.set 7):
+        \\    use value <- borrowed.get ()
+        \\    return @u32.add value count
+        \\  let (state, result) = handled
+        \\  return result
+        \\)
+    , null);
+}

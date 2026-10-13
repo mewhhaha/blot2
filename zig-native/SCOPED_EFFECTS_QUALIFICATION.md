@@ -239,7 +239,7 @@ ordinary providers and returned state negatives. Native laws cover handler
 shadowing, construction-time frame rejection and checking/lowering/emission
 allocation failure. The focused batch passes36 executed groups and all8
 unchanged compile budgets; the analyzer reports369 files and zero findings.
-Fixed-path fanout128 requests16,136,290 bytes in53,920 allocations with exactly
+Fixed-path fanout128 requests16,136,290 bytes in 53,920 allocations with exactly
 equal work counters before and after this slice. Full combined qualification and
 CPU measurement remain separate.
 
@@ -274,7 +274,7 @@ Final controls pass38 executed guest groups,8 unchanged compile budgets and19
 source frontend/formatter groups. Native scoped and complete-arrow laws include
 allocation-failure recovery;369 analyzer files have zero findings. Fresh Safe/
 noLLVM controls with isolated equal-length restart-cache directories request
-exactly16,136,392 bytes in53,920 allocations with18,504 type nodes and equal
+exactly16,136,392 bytes in 53,920 allocations with18,504 type nodes and equal
 work counters before and after this slice. A restored CLI checkpoint must not be
 compared with a fresh run; an early mixed-state comparison was discarded.
 
@@ -309,12 +309,12 @@ inputs, shadowing, mixed U32/F32 payloads, sync/JSPI, rejection recovery,
 checkpoints, edits and proof-loss/unhandled-owner rollback. Native checking,
 lowering, emission, ordered interning and complete snapshot
 publication/replacement laws include allocation failure. The focused batch
-passes34 scoped guest groups and all8 unchanged compile budgets;370 analyzer
+passes34 scoped guest groups and all 8 unchanged compile budgets;370 analyzer
 files report zero findings. The activation fixture prerequisite was generated
 and its revocation law then passed.
 
 With identical source/prelude bytes and fresh equal-length cache paths, ordinary
-fanout128 requests16,104,454 bytes in53,920 allocations, versus16,136,398 bytes
+fanout128 requests16,104,454 bytes in 53,920 allocations, versus16,136,398 bytes
 in the previous slice. Type nodes remain18,504. All inference/solver counters
 remain equal; metadata copied bytes fall360 because ordinary specialization keys
 shrink. These are allocation controls, not a CPU or full combined qualification
@@ -379,3 +379,45 @@ files. Seven captured-project pairs and thirteen public programs retain output
 parity and near-parity compiler CPU. Exact source/binary pins and measurements
 are in [merged qualification](CONTINUATION_QUALIFICATION.md). Later parameter
 footprints remain isolated and unqualified.
+
+## Owned parameter product footprints
+
+Pure named constructors of nested products carry an owned formal-input summary:
+up to 16 inputs and the exact mask of inputs retained in the result. Scalar
+constants contribute no input. Source classification and frozen Core validation
+both reject captures, calls, stores or unproved body nodes; Core references must
+select the declared parameter bindings. Inner binders preserve ordinary
+shadowing. This is a separate relationship from data type variables and effect
+rows.
+
+Checked/source/principal/Core bindings and immutable interface snapshots carry
+the summary by value. Body-reuse evidence hashes its explicit domain marker,
+arity and mask; absent summaries preserve prior digests. Dependency admission
+compares the public claim with the exact private Core body. Interface-only and
+coordinated interface/Core forgeries reject. Pure product helpers can combine
+live capabilities inside their scopes or discard a younger input while returning
+an older input; publishing a retained younger owner still rejects. Unknown
+helper bodies continue to decline authority transfers.
+
+Two executed groups cover both codegen tiers, source/compiled helpers, repeated
+and reordered owners, nested products, mixed U32/F32 inputs, shadowing, precise
+nested lifetimes, sync/JSPI rejection recovery, edits/reverts, checkpoint
+restore and proof-loss rollback. Native checking, lowering, emission and
+artifact encode/decode/admission laws include allocation failure and corrupted
+input masks.
+
+Measured representation cost is explicit: most binding records grow 4 bytes and
+SchemeInterface grows 8, while the captured body-cache binding remains 88 bytes.
+An attempted 3-byte encoding produces the same actual layouts and was removed.
+With pinned identical ordinary fanout/prelude inputs and isolated fresh caches,
+requested bytes grow 18,760 with no extra allocations, types or solver work. All
+eight existing compilation budgets remain unchanged and pass. Root owns combined
+release/retained qualification; neither 058 nor 059 is complete.
+
+Final focused controls pass the product and selection guests plus all 8
+unchanged budgets (14 groups), scoped native laws, artifact/OOM laws and 370
+analyzer files with zero findings. Pinned ordinary fanout requests 16,104,450
+bytes before and 16,123,210 after, in 53,920 allocations with identical
+type/work counters. No new grammar is introduced; this boundary uses existing
+lambda/product syntax. General value-owner recipes, nonstructural captures and
+generative public schemes remain separate work.

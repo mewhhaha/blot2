@@ -47,7 +47,7 @@ pub const Op = enum(u8) { none, add, sub, mul, div, rem, equal, not_equal, less,
 pub const Node = struct { tag: Tag, op: Op = .none, ty: T.Id = 0, a: u32 = 0, b: u32 = 0, c: u32 = 0 };
 /// Keep source inference provenance after callback inputs are concretized.
 pub const Parameter = struct { binding: BindingId, ty: T.Id, span: Span, inferred: bool = false };
-pub const Binding = struct { capability_flow: checked_types.CapabilityFlow = .unknown, private: bool = false, initializer: Id = 0, kind: checked_types.Kind, ty: T.Id, scheme: T.Scheme, public_variables: T.List = .{}, public_rows: T.List = .{}, has_explicit: bool = false, body_id: BodyId = 0, target: BindingRef, span: Span };
+pub const Binding = struct { capability_flow: checked_types.CapabilityFlow = .unknown, capability_parameters: @import("capability_flow.zig").Parameters = .{}, private: bool = false, initializer: Id = 0, kind: checked_types.Kind, ty: T.Id, scheme: T.Scheme, public_variables: T.List = .{}, public_rows: T.List = .{}, has_explicit: bool = false, body_id: BodyId = 0, target: BindingRef, span: Span };
 pub const RuntimeName = struct { binding: BindingId, point: u32 };
 /// Original declaration reads survive executable branch/value elimination.
 pub const DeclarationDependencies = struct { references: List = .{}, members: List = .{}, runtime_metadata: Id = 0 };
@@ -2642,7 +2642,7 @@ const Builder = struct {
             for (self.checked.obligations[value.scheme.obligations.start..][0..value.scheme.obligations.len]) |requirement| {
                 has_explicit = has_explicit or requirement.explicit or (requirement.kind == .callee_use and self.checked.bindings[requirement.identity.decl].summary.has_explicit);
             }
-            try self.bindings.append(self.allocator, .{ .capability_flow = if (value.kind == .global) value.capability_flow else .unknown, .private = value.private, .kind = value.kind, .ty = try self.projectType(value.ty, 0), .scheme = try self.projectScheme(value.scheme), .public_variables = try self.projectPublic(value.summary.public_variables, false), .public_rows = try self.projectPublic(value.summary.public_rows, true), .has_explicit = has_explicit, .target = if (i == 0) .{ .binding = 0 } else self.target(@intCast(i)), .span = self.tree.span(value.declaration) });
+            try self.bindings.append(self.allocator, .{ .capability_flow = if (value.kind == .global) value.capability_flow else .unknown, .capability_parameters = if (value.kind == .global) value.capability_parameters else .{}, .private = value.private, .kind = value.kind, .ty = try self.projectType(value.ty, 0), .scheme = try self.projectScheme(value.scheme), .public_variables = try self.projectPublic(value.summary.public_variables, false), .public_rows = try self.projectPublic(value.summary.public_rows, true), .has_explicit = has_explicit, .target = if (i == 0) .{ .binding = 0 } else self.target(@intCast(i)), .span = self.tree.span(value.declaration) });
         }
     }
     fn projectedTypeList(self: *Builder, source: T.List) Error!T.List {

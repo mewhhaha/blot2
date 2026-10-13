@@ -138,7 +138,8 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
         try require(@backingInt(binding.capability_flow) <= @backingInt(@import("capability_flow.zig").Contract.member_second_unit));
         try ty(owner, binding.ty);
         try scheme(owner, binding.scheme);
-        if (binding.capability_flow != .unknown) {
+        try require(binding.capability_parameters.valid());
+        if (binding.capability_flow != .unknown or binding.capability_parameters.present()) {
             try require(binding.external == null and binding.named_function);
             try require(binding.scheme.root != 0 and owner.graph.nodes[binding.scheme.root].tag == .function);
         }

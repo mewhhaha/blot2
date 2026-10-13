@@ -930,3 +930,42 @@ test "scoped selected symbolic factories publish owned dependency graphs" {
     try symbolicSelectionArtifactLaw(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, symbolicSelectionArtifactLaw, .{});
 }
+
+const parameter_footprint_producer =
+    \\const pack = fn first => fn second => fn third => (third, (first, second), first)
+    \\const keep = fn unused => fn retained => (retained, 42)
+    \\const grouped = fn first => (fn second => (first, second))
+;
+fn parameterFootprintArtifactLaw(allocator: std.mem.Allocator) !void {
+    const bytes = try artifact(allocator, parameter_footprint_producer);
+    defer allocator.free(bytes);
+    var frozen = try format.decode(D.FrozenDependency, allocator, bytes, key);
+    defer format.deinit(allocator, &frozen);
+    try admission.validatePrelude(allocator, &frozen, parameter_footprint_producer, "std/prelude.blot");
+}
+test "pure product footprint claims survive artifact ownership and reject forged parameter masks" {
+    const a = std.testing.allocator;
+    try parameterFootprintArtifactLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, parameterFootprintArtifactLaw, .{});
+    const bytes = try artifact(a, parameter_footprint_producer);
+    defer a.free(bytes);
+    var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &frozen);
+    const module = &frozen.modules[0];
+    var tested: usize = 0;
+    for (module.interface.bindings, 0..) |*binding, index| {
+        if (binding.capability_parameters.arity() != 3) continue;
+        tested += 1;
+        const original = binding.capability_parameters;
+        binding.capability_parameters = .init(3, 1);
+        try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, parameter_footprint_producer, "std/prelude.blot"));
+        module.core.bindings[index].capability_parameters = binding.capability_parameters;
+        try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, parameter_footprint_producer, "std/prelude.blot"));
+        binding.capability_parameters = .init(17, original.result());
+        try std.testing.expectError(error.InvalidArtifact, validation.validate(&module.interface, frozen.symbols.len, frozen.modules.len));
+        binding.capability_parameters = original;
+        module.core.bindings[index].capability_parameters = original;
+    }
+    try std.testing.expectEqual(@as(usize, 1), tested);
+    try admission.validatePrelude(a, &frozen, parameter_footprint_producer, "std/prelude.blot");
+}

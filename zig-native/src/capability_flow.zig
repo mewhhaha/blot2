@@ -88,3 +88,123 @@ pub fn pairMemberSource(tree: *const ast.Tree, pool: *const @import("symbols.zig
     if (receiver == left.name) return 0;
     return null;
 }
+
+/// Owned relationship between formal inputs and a pure aggregate result. Zero
+/// means unknown. No source/type IDs or active authority enter this summary.
+pub const Parameters = struct {
+    mask: u16 = 0,
+    inputs: u8 = 0,
+
+    pub fn init(inputs: u8, mask: u16) Parameters {
+        return .{ .mask = mask, .inputs = inputs };
+    }
+    pub fn result(self: Parameters) u16 {
+        return self.mask;
+    }
+    pub fn arity(self: Parameters) u8 {
+        return self.inputs;
+    }
+    pub fn valid(self: Parameters) bool {
+        const inputs = self.arity();
+        if (inputs == 0) return self.result() == 0;
+        if (inputs > 16) return false;
+        const available: u32 = (@as(u32, 1) << @intCast(inputs)) - 1;
+        return self.result() & ~available == 0;
+    }
+    pub fn present(self: Parameters) bool {
+        return self.arity() != 0;
+    }
+};
+
+pub fn parameterSource(tree: *const ast.Tree, initial: ast.Id) Parameters {
+    var names: [16]@import("symbols.zig").Symbol = undefined;
+    var count: usize = 0;
+    var expression = unwrap(tree, initial) orelse return .{};
+    while (tree.node(expression).tag == .lambda) {
+        if (count == names.len) return .{};
+        const lambda = tree.node(expression);
+        const parameter = tree.parameter(lambda.a);
+        if (parameter.name == 0 or parameter.demanded or parameter.is_unit) return .{};
+        names[count] = parameter.name;
+        count += 1;
+        expression = lambda.b;
+    }
+    expression = unwrap(tree, expression) orelse return .{};
+    if (count == 0 or tree.node(expression).tag != .product) return .{};
+    var remaining: usize = 4096;
+    const result = sourceParameters(tree, expression, names[0..count], &remaining, 0) orelse return .{};
+    return .init(@intCast(count), result);
+}
+fn sourceParameters(tree: *const ast.Tree, initial: ast.Id, names: []const @import("symbols.zig").Symbol, remaining: *usize, depth: usize) ?u16 {
+    if (remaining.* == 0 or depth >= 64) return null;
+    remaining.* -= 1;
+    const source_id = unwrap(tree, initial) orelse return null;
+    const value = tree.node(source_id);
+    switch (value.tag) {
+        .name => {
+            var index = names.len;
+            while (index != 0) {
+                index -= 1;
+                if (value.a == names[index]) return @as(u16, 1) << @intCast(index);
+            }
+            return null;
+        },
+        .integer, .float, .boolean, .unit => return 0,
+        .product => {
+            var result: u16 = 0;
+            for (tree.children(source_id)) |child| result |= sourceParameters(tree, child, names, remaining, depth + 1) orelse return null;
+            return result;
+        },
+        else => return null,
+    }
+}
+
+/// A decoded claim proves only a pure product of inputs/constants. Bounds and
+/// exact parameter references are checked before traversing every child.
+pub fn parameterCore(module: anytype, body: anytype, summary: Parameters) bool {
+    if (!summary.valid() or !summary.present() or !body.is_function or body.parameters.len != summary.arity()) return false;
+    if (body.parameters.start > module.parameters.len or body.parameters.len > module.parameters.len - body.parameters.start) return false;
+    if (body.root == 0 or body.root >= module.nodes.len or module.nodes[body.root].tag != .product) return false;
+    var remaining: usize = 4096;
+    const result = coreParameters(module, body.root, module.parameters[body.parameters.start..][0..body.parameters.len], &remaining, 0) orelse return false;
+    return result == summary.result();
+}
+fn coreParameters(module: anytype, source_id: u32, parameters: anytype, remaining: *usize, depth: usize) ?u16 {
+    if (remaining.* == 0 or depth >= 64 or source_id == 0 or source_id >= module.nodes.len) return null;
+    remaining.* -= 1;
+    const value = module.nodes[source_id];
+    switch (value.tag) {
+        .reference => {
+            if (value.a >= module.references.len) return null;
+            const reference = module.references[value.a];
+            if (reference.unit != 0 and reference.unit != module.unit) return null;
+            for (parameters, 0..) |parameter, index| if (reference.binding == parameter.binding) return @as(u16, 1) << @intCast(index);
+            return null;
+        },
+        .constant => {
+            if (value.ty >= module.types.nodes.len) return null;
+            switch (module.types.nodes[value.ty].tag) {
+                .unit, .boolean, .u32, .f32 => return 0,
+                else => return null,
+            }
+        },
+        .product => {
+            if (value.a > module.extra.len or value.b > module.extra.len - value.a) return null;
+            var result: u16 = 0;
+            for (module.extra[value.a..][0..value.b]) |child| result |= coreParameters(module, child, parameters, remaining, depth + 1) orelse return null;
+            return result;
+        },
+        else => return null,
+    }
+}
+
+test "parameter footprint domains preserve the maximum binder and reject forged masks" {
+    const std = @import("std");
+    try std.testing.expect(Parameters.init(16, 0xffff).valid());
+    try std.testing.expect(!Parameters.init(17, 1).valid());
+    try std.testing.expect(!Parameters.init(0, 1).valid());
+    try std.testing.expect(!Parameters.init(1, 2).valid());
+    try std.testing.expect(Parameters.init(3, 5).valid());
+    try std.testing.expect(Parameters.init(3, 0).present());
+    try std.testing.expect(!Parameters.init(0, 0).present());
+}

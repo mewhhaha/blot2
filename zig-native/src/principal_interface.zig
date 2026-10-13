@@ -14,7 +14,7 @@ pub const Constructor = struct { private: bool = false, identity: Identity, nomi
 pub const Associated = struct { identity: Identity, member: u32, operator: T.Operator, binding: u32 };
 pub const EffectFamily = struct { private: bool = false, identity: Identity, name: u32, callable: bool = false, parameters: T.List = .{}, variables: T.List = .{}, patterns: T.List = .{}, parameter_names: T.List = .{}, operations: T.List = .{} };
 pub const EffectTemplate = struct { identity: Identity, family: u32, name: u32, parameter: T.Id, result: T.Id };
-pub const Binding = struct { capability_flow: @import("capability_flow.zig").Contract = .unknown, private: bool = false, name: u32, kind: Kind, named_function: bool, ty: T.Id, scheme: T.Scheme, external: ?ExternalTarget };
+pub const Binding = struct { capability_flow: @import("capability_flow.zig").Contract = .unknown, capability_parameters: @import("capability_flow.zig").Parameters = .{}, private: bool = false, name: u32, kind: Kind, named_function: bool, ty: T.Id, scheme: T.Scheme, external: ?ExternalTarget };
 /// A named, erased bundle of ordinary qualified predicates. Lists belong to
 /// the interface type/pattern tables; predicates index contract_predicates.
 pub const ContractMember = struct { contract: Identity, name: u32, kind: enum { defined_type, abstract_type, value }, root: T.Id = 0 };
