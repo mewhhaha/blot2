@@ -592,3 +592,77 @@ Evidence: `build/bench/continuation-20261013/footprints-qualified-pins.json`,
 `footprints-runtime.json`. Tasks 058/059 and the other 31 open tasks remain
 open. The next invocation slice, window experiment, sparse body replay and proof
 checker remain isolated.
+
+## Callback and record footprints; completed window producers, 13 October 2026
+
+Local `0d77afc91aedd8046050c2295c2e1d63b6a8f933` is frozen tree
+`6ccad03d86cf095786689121cbc888a1cd54ebdb`, native source
+`971d1a215326ce2e86db54ada1f11ef892f9f7c6`, based on `2992c80`. Patch SHA-256:
+`2b5dc018980b31b2942729bd72f9f4e14e8fb443b9886409dfe05bd21eb7bb80`. Zig 0.17.0
+LLVM/Fast executable SHA-256:
+`b4fb67ca4eab5de4dfb923cab4b0c24c759b484f5817453fe4d19af8e26793a8`; identity
+`826b02f2ad66e81b9f971120797935f7d5ecf4b10fa70534d0bcb54b663528c9`. Independent
+clean configure, server handshake, main's executable and its compressed bundle
+match. Source and patch hashes remain unchanged after testing.
+
+Owned parameter recipes now describe a direct Unit callback invocation and
+nested records/products. Exact callback ordinals, private body references and
+retained field masks validate across dependency artifacts. Generic callback
+payloads are recovered only from an already-bound exact owner and matching
+operation evidence; ambiguity declines. Repeated row labels retain their
+multiplicity. The standalone maximum-16 domain law is now registered.
+
+Window production yields after its filling loop. Scalar replacement admits only
+exact empty constructor aliases across completed nested producer loops; real
+allocations and nonempty uses must retain the same outer activation. Reentered
+producers, active inner uses, raw pointer words and disabled ownership decline.
+The optimized artifact domain advances to v24. Wider no-gain root variants
+remain excluded and preserved.
+
+The frozen full gate passes **1,701 native tests, 1,075 guest/client tests,
+1,050 complete OOM sweeps plus two expected-error harness laws, and 375 analyzer
+files with zero findings**. Total 911.55s: release 203.27, native compilation
+280.31, native execution 392.46, guests 21.50. Focused integration preflight
+passed before freezing. The expected harness errors each exercise one failed
+scenario with zero discovered allocations; they are not incomplete feature
+sweeps.
+
+Seven alternating captured-project pairs against `5378347`, on CPU 6, use each
+compiler's own pinned standard library. Retained/fresh oracles and
+cross-compiler Wasm are exact, with 70,330 source steps:
+
+| Phase  | Control CPU ms | Candidate CPU ms | Median paired ratio |   Ratio range |
+| ------ | -------------: | ---------------: | ------------------: | ------------: |
+| Fresh  |       1959.049 |         1969.134 |              1.0049 | 1.0010–1.0125 |
+| Edit   |        913.947 |          919.545 |              1.0074 | 0.9947–1.0131 |
+| Revert |        814.800 |          818.481 |              1.0051 | 0.9928–1.0084 |
+
+This is a feature qualification with a small measured compiler cost. Thirteen
+public programs, seven pairs each, retain exact Wasm/fuel, requested allocation,
+peak memory and zero teardown. Public CPU ratios span 0.9924–1.0103. All 62
+packed U32/F32 record/tuple width outputs match prior qualified modules exactly.
+The initial benchmark launch used an incorrect PATH and exited before executing
+any measurement; its log is preserved separately.
+
+At 4,096 rows, windows fall **81,894→77,800 objects** and **1,277,540→1,244,788
+payload bytes**. Root stores increase 143,315→155,598 because the explicit break
+carries roots; reserve events fall 167,888→163,795. Strict zip remains at zero
+objects/bytes/stores and 4,099 reserve events. Boundary oracles pass; roots and
+leases finish at zero, journal reset retains 4,096 bytes and committed guest
+memory stays 131,072 bytes. Counters use separate instrumented copies, leaving
+runtime clocks unaffected.
+
+The root 31-pair window runtime is 9.064938→9.004063 ms, ratio 0.9933, near
+parity. The isolated slice's three earlier ratios were 0.9788/0.9714/0.9966; all
+are retained. The allocation reduction is established; a broad runtime win is
+not. Remaining window fold, cursor and semantic-buffer work keeps 047 open.
+Generative public contracts and general capture/store relationships keep 058/059
+open. There are still 33 open tasks.
+
+Evidence under `build/bench/continuation-20261013/`:
+`invocation-qualified-pins.json`, `invocation-handshake-identity.json`,
+`invocation-full-gate.log`, `invocation-gate/`, `invocation-analyzer.log`,
+`invocation-oom-summary.json`, `invocation-measurement-summary.json`,
+`captured-invocation/`, `public-invocation/`, `invocation-packed/equality.json`,
+`invocation-runtime.json`, and `invocation-{control,candidate}-ownership.jsonl`.
+The frozen worktree is `/var/tmp/blot2-continuation-invocation-20261013`.

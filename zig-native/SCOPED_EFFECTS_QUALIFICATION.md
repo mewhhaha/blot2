@@ -490,3 +490,12 @@ missing; that run is preserved as incomplete, and the corrected comparison uses
 new fresh caches. Root owns combined qualification. The general boundaries
 listed above remain open; this is an aggregate relationship, not a general
 capture/store contract.
+
+Root merged invocation and record footprints as `0d77afc` after the complete
+combined gate: 1,701 native, 1,075 guest/client, 1,050 complete OOM sweeps plus
+two expected-error harness laws, and 375 analyzer files with zero findings. The
+maximum-16 footprint domain law is now registered. Captured paired CPU ratios
+against `5378347` are 1.0049/1.0074/1.0051; public allocations and all Wasm
+controls are unchanged. Exact pins and the accompanying window change are in
+[combined qualification](CONTINUATION_QUALIFICATION.md). Later member-closure
+capture work is separate; tasks 058/059 remain open.

@@ -69,16 +69,16 @@ development and the scenarios below.
 
 ## Completion evidence
 
-`121eb59` passes the full gate: 1,688 native tests, 1,066 guests, 1,036 complete
+`0d77afc` passes the full gate: 1,701 native tests, 1,075 guests, 1,050 complete
 OOM sweeps plus two expected-error harness laws, and 375 analyzer files with
-zero findings. Strict zip falls 45,062→0 objects and 2.899→0.030 ms at 4,096
-rows; earlier range/map/filter/take/enumerate/zip/pipeline elimination remains.
-All 62 packed U32/F32 record/tuple width outputs exactly match the previously
-qualified all-width comparison. Windows remains at 81,894 objects; independent
-runtime ratios 1.0264 and 0.9868 establish no improvement.
+zero findings. Strict zip retains zero objects. Narrow completed-empty-producer
+handling reduces windows at 4,096 rows from 81,894 to 77,800 objects and
+1,277,540 to 1,244,788 payload bytes. Root stores increase; the combined release
+runtime ratio 0.9933 is near parity. All 62 packed width/type outputs remain
+exact.
 
-[The current merged record](../zig-native/CONTINUATION_QUALIFICATION.md) pins
-source/binary, allocations, runtime/compiler costs and limits. The
-[original record](../zig-native/ITERATOR_CONSTANTS_QUALIFICATION.md) is
-preserved. Further explicit root-lifetime experiments remain isolated. No
-broader completion or push is claimed.
+[The merged record](../zig-native/CONTINUATION_QUALIFICATION.md) pins source,
+binary, allocations, runtime/compiler costs and limits. Remaining inner fold,
+step/cursor and semantic-buffer allocations keep task 047 open. The separate
+window-fold experiments and all rejected variants remain preserved. No broader
+completion or push is claimed.

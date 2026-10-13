@@ -64,13 +64,15 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Partial checkpoint: `121eb59`; task 058 remains in progress.
-- Validation: merged full gate passes 1,688 native laws, 1,066 guests, 1,036
-  complete OOM sweeps plus two expected-error harness laws and zero analyzer
-  findings across 375 files.
-- Comparison and remaining limits: general multi-input footprints, generative
-  selection schemes and full escape graphs remain open; current runtime/compiler
-  costs are recorded in the
-  [merged qualification](../zig-native/CONTINUATION_QUALIFICATION.md).
+- Partial checkpoint: `0d77afc`; task 058 remains in progress.
+- Validation: full gate passes 1,701 native laws, 1,075 guests, 1,050 complete
+  OOM sweeps plus two expected-error harness laws and zero analyzer findings
+  across 375 files.
+- Pure product/record helpers and multi-input Unit callback invocation preserve
+  exact input owners, row multiplicity and decoded private-body validation.
+  General capture/result/store graphs and public generative schemes stay open.
+- Captured fresh/edit/revert CPU ratios are 1.0049/1.0074/1.0051 against the
+  preceding product-only checkpoint. Public outputs and allocations are exact;
+  see [merged qualification](../zig-native/CONTINUATION_QUALIFICATION.md).
 - Durable record:
   [scoped effects](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).

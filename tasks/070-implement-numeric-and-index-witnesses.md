@@ -93,8 +93,10 @@ development and the scenarios below.
 - Durable record:
   [prototype qualification](../zig-native/NUMERIC_PROOF_QUALIFICATION.md).
 
-The isolated proof-kind/header checkpoint is `40af0cf7`, with 35 focused native
-tests, all eight unchanged compilation budgets and 379 analyzer files at zero.
-It owns positional public recipes and rejects data-kind/storage misuse. It still
-grants no runtime proof authority. Exact pins, costs and unfinished boundaries
-are in [proof qualification](../zig-native/NUMERIC_PROOF_QUALIFICATION.md).
+The isolated source body/call checkpoint is `7cfa6e5d`, with 41 numeric-proof
+native laws, 41 full syntax laws, eight unchanged compilation budgets and 380
+analyzer files at zero. Constructor and local-call metadata preserves exact
+value versions, prior operands and lexical owners with bounded shared work.
+Runtime guards, compiled authority and erasure remain unfinished. Exact pins and
+limits are in
+[proof qualification](../zig-native/NUMERIC_PROOF_QUALIFICATION.md).

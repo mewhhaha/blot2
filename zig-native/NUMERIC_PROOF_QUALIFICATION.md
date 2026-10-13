@@ -5,11 +5,11 @@ Task 070 is in progress. The isolated source in
 not part of the qualified main compiler. [The design](ERASED_PROOFS.md) remains
 the acceptance contract.
 
-Frozen tree `40af0cf79b7c59c1128283b14b342b78929c9236`, base tree
+Frozen tree `7cfa6e5d212c040b1853e7dca117ab5c01a6746f`, base tree
 `d55ab1cd300936b92ec48fc607b7e74e234f0d9e`, patch SHA-256
-`25d154417cb7e71fb9acbc8fc27e3d34503b016326f873e80c6bcdac469c610a`. Patch, file
+`9448b407d7c4158ecd636804f113678b49cb7ff8ac973f5c8c6b44b2f6fabde8`. Patch, file
 hashes and pins are under ignored
-`build/bench/continuation-20261013/proof-kind-foundation/`. Earlier syntax,
+`build/bench/continuation-20261013/proof-call-foundation/`. Earlier syntax,
 consistency and positional-header checkpoints remain preserved separately.
 
 The native and Baba parsers accept six intrinsic proof annotations with bounded
@@ -39,26 +39,38 @@ complement edges preserve equality substitution in AddFits; eighty unsigned
 boundary cases agree with direct U32 mathematics.
 
 The separate erased-proof kind cannot instantiate ordinary data variables,
-associated equations, operation type arguments or stored payloads. The source
-checker owns public contracts and diagnoses invalid operands, scope errors and
-contradictions. Explicit unused proof parameters check. A marker alone cannot
-authorize proof calls or results; those paths, runtime layout and compiled
-admission remain conservative until exact body evidence is connected. Ordinary
-annotations allocate no proof tables, and there is no Unit representation
-bridge.
+associated equations, operation type arguments or stored payloads. Checked
+constructors now own exact operands, lexical owners and ordered argument nodes.
+Exact aliases preserve values; rebindings create new versions, and collection
+lengths retain their exact collection. A known-false constructor remains
+recorded for its required runtime trap. Source metadata survives
+AST/checker-owner teardown and grants no executable authority by itself.
 
-Zig 0.17.0 focused checks pass 35 native tests, including complete allocation
-failure sweeps. The full native syntax suite and all eight unchanged compilation
-budgets pass through the development harness, which rebuilds the compiler and
-runs transport smoke tests. Analyzer reports zero findings across 379 files.
-Logs: `proof-kind-checker-{native,controls,analyzer}.log`. Earlier frontend
-syntax/format/parser checks pass 23 tests; tree-sitter 0.27.1 passes seven
-corpus cases, sixteen highlight fixtures and four example parses. That unchanged
-frontend evidence remains `proof-frontend-full.log` and `proof-editor.log`.
+Complete explicit local headers now substitute prior ordinary arguments into
+proof requirements. Direct local calls accept exact witness aliases and
+forwarded proof parameters; other collections, rebound indexes, wrong relations,
+Unit and captured witnesses reject. A function type cannot authorize another
+contract through an unchecked callable alias. Proof results and imported
+contracts remain conservative. Every metadata table and repeated consistency
+check consumes bounded shared work; two large requirement instantiations exhaust
+the same 10,000-visit budget. Ordinary annotations allocate no proof tables, and
+there is no Unit representation bridge.
 
-Remaining work includes checked constructor guards and trap ordering, exact
-body/call evidence, public proof result admission, compiled introduction and
-consumer authority, closure escape rejection, runtime erasure, complete
+Zig 0.17.0 focused checks pass 41 numeric-proof native tests, including complete
+allocation failure sweeps, plus the separate complete syntax suite's 41 tests.
+All eight unchanged compilation budgets pass through the dev build/transport
+smoke harness. Analyzer reports zero findings across 380 files. Logs:
+`proof-calls-{all-native,full-syntax,controls,analyzer}.log`. A command
+combining the syntax suite and name filter covered only six tests; the complete
+focused commands were subsequently run separately and both logs are preserved.
+Earlier frontend syntax/format/parser checks pass 23 tests; tree-sitter 0.27.1
+passes seven corpus cases, sixteen highlight fixtures and four example parses.
+That unchanged frontend evidence remains `proof-frontend-full.log` and
+`proof-editor.log`.
+
+Remaining work includes executable constructor guards and trap ordering, exact
+Core body/call admission, public proof results, compiled introduction and
+consumer authority, complete closure escape handling, runtime erasure, complete
 diagnostics and the full source/compiled acceptance matrix. No full compiler
 gate, release qualification or task completion is claimed for this prototype.
 Task 071 remains dependent on 070.

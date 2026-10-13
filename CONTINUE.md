@@ -6,32 +6,31 @@ artifacts; tasks 082/083 still require their distinct owner decisions.
 
 ## Qualified main
 
-Compiler `5378347` adds precise capability dependencies through pure product
-helpers, following selected identities and strict-zip scalarization. The latest
-full gate passes 1,693 native laws, 1,068 guest/client tests and 1,040 complete
-allocation-failure sweeps plus two expected-error sweep laws; analyzer zero
-across 375 files.
+Compiler `0d77afc` adds multi-input callback and record capability footprints,
+and reduces window allocations. The latest full gate passes 1,701 native laws,
+1,075 guest/client tests and 1,050 complete allocation-failure sweeps plus two
+expected-error harness laws; analyzer zero across 375 files.
 [Merged qualification](zig-native/CONTINUATION_QUALIFICATION.md) records exact
 behavior, failed/regressed runs and final measurements. There are 67 complete, 7
 in progress and 26 pending tasks: 33 remain open.
 
-- Frozen tree `2a33efd3d26cfc4d2962caff4cfba752bfef6640`; native source
-  `77ce61121fb82567643514669d71ea1d1a2e5ef4`.
+- Frozen tree `6ccad03d86cf095786689121cbc888a1cd54ebdb`; native source
+  `971d1a215326ce2e86db54ada1f11ef892f9f7c6`.
 - LLVM/Fast SHA-256:
-  `88dcaa76609f7381de8ad79c10be5378bd79037ed4d6060c9a2e1b5d81f9b16a`. Main's
+  `b4fb67ca4eab5de4dfb923cab4b0c24c759b484f5817453fe4d19af8e26793a8`. Main's
   ignored executable and compressed bundle match. Immutable evidence:
-  `build/bench/continuation-20261013/footprints-qualified-pins.json`.
+  `build/bench/continuation-20261013/invocation-qualified-pins.json`.
 - The preceding `ae001bb` batch's seven captured pairs against `38e822d`: fresh
   2225.518→1950.672 ms; edit 1247.822→906.212 ms; revert 1147.918→813.715 ms.
   Paired ratios 0.8767/0.7266/0.7084; exact Wasm and source fuel. Public CPU
   stays near parity, and all 62 packed-width outputs remain exact. Final task
   084 targets remain unmet.
-- Latest seven captured pairs against `121eb59` show paired fresh/edit/revert
-  CPU ratios 1.0047/1.0073/1.0002. This feature adds a small measured cost.
-  Thirteen public programs and all 62 packed-width outputs retain exact Wasm.
-  The release handshake and an independent fresh configure agree on compiler
-  identity. Never copy another worktree's Zig configure cache as a qualification
-  shortcut.
+- Latest seven captured pairs against `5378347` show paired fresh/edit/revert
+  CPU ratios 1.0049/1.0074/1.0051. The feature adds a small measured cost.
+  Thirteen public programs and all 62 packed-width outputs retain exact Wasm;
+  public allocation and peak bytes are unchanged. Each side uses its own pinned
+  standard library. Release handshake and independent fresh configure agree on
+  identity. Never copy another worktree's Zig configure cache.
 - Exact checked length bodies avoid 220 inference regions and element/capture
   interface reconstruction. The bounded optimizer worklist reuses 2,862/2,864
   bodies. A replay fix preserves monomorphic pattern-payload roots; strict
@@ -43,10 +42,11 @@ in progress and 26 pending tasks: 33 remain open.
   scoped member checkpoint is included. General body/effect coverage remains
   open.
 - Enumerate/zip objects remain zero. Strict zip falls 45,062→0 objects and
-  2.899→0.030 ms at 4,096 rows. Windows still uses 81,894 objects; two runtime
-  batches give ratios 1.0264 and 0.9868, so no window win is claimed. Growing
-  primitive constants retain the earlier 28–53% retained CPU win at 512–2,048
-  elements; captured constants still have zero receipt activity.
+  2.899→0.030 ms at 4,096 rows. Windows falls 81,894→77,800 objects and
+  1,277,540→1,244,788 payload bytes; root stores increase. Root runtime ratio
+  0.9933 is near parity. Remaining window state and traversal costs stay open.
+  Growing primitive constants retain the earlier 28–53% retained CPU win at
+  512–2,048 elements; captured constants still have zero receipt activity.
 - Preserve the unrelated `deno.lock` change (SHA-256
   `9ca792a967d134b10168500f68a576a67008431574b7007e14978d22d7e4e781`).
 
@@ -66,34 +66,35 @@ merged pins separately; freeze source during qualification.
   pattern-payload repair and controls. Original syntax checkpoints remain in
   `/tmp/blot2-task024-completion`. Its inactive cache is preserved in
   `/var/tmp/blot2-task024-cache-preserved/zig-cache` through a symlink.
-- **047:** The retained optimizer worklist and structured control-frame exit
-  reachability are merged and fully qualified. Preserve frozen
-  `/var/tmp/blot2-iterator-remainder-047`. Active
-  `/var/tmp/blot2-iterator-windows-047` investigates explicit published root
-  lifetimes; parameter representation alone grants no ownership authority.
-  Windows remains unresolved. Prior owner-sharing/cost-prefix screens did not
-  improve allocations and remain rejected.
-- **058/059:** Selected identity terms are merged and fully qualified. A generic
-  factory's `InvalidArtifact` failure was repaired by preserving exact origins
-  across payload normalization; artifact validation remains exact. Pure product
-  parameter footprints and exact private Core validation are now merged. Active
-  `/var/tmp/blot2-generative-effects-058` develops multi-input callback
-  invocation; its emission/OOM checks pass, executed qualification is ongoing.
-  Add the separately frozen standalone-test registration amendment in that next
-  batch. General parameter/capture/result/store footprints, invocation binders,
-  opaque/associated boundaries and lifetime contracts remain open.
-- **070:** `/var/tmp/blot2-erased-proofs-070`, with staged base `d55ab1cd`, owns
-  unmerged syntax, exact value terms, positional public contracts, a separate
-  proof kind and conservative source checking. Frozen tree `40af0cf7`, patch
-  SHA-256 `25d154417cb7e71fb9acbc8fc27e3d34503b016326f873e80c6bcdac469c610a`:
-  `build/bench/continuation-20261013/proof-kind-foundation/`. Focused native
-  35/35, full syntax and all eight unchanged compile budgets pass; analyzer 379
-  files zero. Earlier frontend/editor checks remain preserved. Bounded SCC
-  consistency checks 256 requirements in 4,902 charged visits. Constructor
-  guards, exact body/call authority, compiled transport, proof results, erasure
-  and full qualification remain open. Never infer authority from the kind marker
-  or bridge it through Unit. See
-  [proof qualification](zig-native/NUMERIC_PROOF_QUALIFICATION.md). 071 waits
+- **047:** The retained optimizer worklist, structured control-frame exits and
+  narrow completed-empty-producer rule are merged and qualified. Preserve frozen
+  `/var/tmp/blot2-iterator-remainder-047` and
+  `/var/tmp/blot2-iterator-windows-047`. Active
+  `/var/tmp/blot2-iterator-window-fold-047` attributes the remaining 77,800
+  window allocations. Replacing the diagnostic inner fold alone removes 28,658
+  objects but increases payload bytes; that is not an accepted improvement.
+- **058/059:** Selected identities, pure aggregate parameter footprints and
+  multi-input Unit callback invocation are merged and qualified, including
+  standalone footprint-domain suite registration. Source and compiled helpers
+  preserve exact owners, row multiplicity and record fields. Active
+  `/var/tmp/blot2-generative-effects-058` develops exact member-closure captures
+  in a separate post-record checkpoint. General parameter/capture/result/store
+  graphs, invocation binders, opaque/associated boundaries and generative public
+  contracts remain open.
+- **070:** `/var/tmp/blot2-erased-proofs-070`, staged base `d55ab1cd`, owns
+  unmerged syntax, public recipes, proof kind and exact source body/call checks.
+  Frozen tree `7cfa6e5d`, patch SHA-256
+  `9448b407d7c4158ecd636804f113678b49cb7ff8ac973f5c8c6b44b2f6fabde8`:
+  `build/bench/continuation-20261013/proof-call-foundation/`. Focused numeric
+  laws 41/41, separate full syntax suite 41/41, all eight unchanged budgets and
+  380 analyzer files zero. Constructors retain exact aliases, rebindings,
+  ordered operands and false guards as owned source metadata. Direct explicit
+  local proof calls match complete prior argument recipes; type-only function
+  aliases cannot grant another contract. Repeated consistency checks share the
+  body work budget. Core guard lowering is newer, isolated work. Runtime guard
+  execution, compiled authority, proof results, erasure and full qualification
+  remain open. Never bridge the proof kind through Unit. See
+  [proof qualification](zig-native/NUMERIC_PROOF_QUALIFICATION.md); 071 waits
   for 070.
 - **086:** Sparse inspection/shared scratch/primitive growth and shape-only
   length calls are merged. The largest captured constant still uses
@@ -107,8 +108,9 @@ merged pins separately; freeze source during qualification.
 `/var/tmp/blot2-continuation-selected-20261013` is the frozen qualified source
 of `121eb59`, based on `ab4ab86`. Preserve it, the previous
 `/var/tmp/blot2-continuation-later-20261013` and the older fully qualified
-`/var/tmp/blot2-continuation-following-20261013`. Start the next integration
-from current main and apply only later isolated deltas.
+`/var/tmp/blot2-continuation-following-20261013`. The latest frozen source is
+`/var/tmp/blot2-continuation-invocation-20261013`, based on `2992c80`. Start the
+next integration from current main and apply only later isolated deltas.
 
 ## Validation and iteration
 
@@ -126,8 +128,8 @@ Before compiler commits, run `deno task test:compiler` and zero-finding
 Use `deno fmt --no-config` for files under `zig-native/`. Stage intended files
 only; separate implementation and qualification-record commits.
 
-The latest gate took 918.64s: release build 210.40s, native compilation 282.18s,
-native execution 390.87s and guests 21.20s. Focused preflight catches
+The latest gate took 911.55s: release build 203.27s, native compilation 280.31s,
+native execution 392.46s and guests 21.50s. Focused preflight catches
 integration failures cheaply. Preserve exhaustive OOM coverage. Full native
 execution stays LLVM; noLLVM reduces focused rebuild cost.
 [Iteration costs](zig-native/ITERATION_COST.md) retain earlier improvements.
