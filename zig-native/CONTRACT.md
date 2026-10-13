@@ -713,6 +713,10 @@ The partially inferred engine is discarded; no other diagnostic from that module
 is kept. Rejected modules may have empty declaration catalogs; project export
 handling must preserve the diagnostic without assuming sentinel entries exist.
 The budget is not a project or CLI setting.
+The `budget-fixture` test executable runs these same CLI and server paths with
+a build-local 256-step default and a distinct compiler identity. Routine guest
+laws use it for rejection and recovery; `deno task test:compiler:stress` keeps
+the production million-step exhaustion regression.
 
 ## Semantic and backend boundaries
 

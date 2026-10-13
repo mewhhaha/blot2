@@ -14,8 +14,18 @@ deno task test:compiler
 Without Deno, build in this directory with
 `zig build install compiler-identity -Doptimize=fast`. Run native tests with
 `zig build test -Doptimize=safe`; the runner sets the fixture working directory.
-Use `zig build install -Doptimize=debug -fincremental --prefix zig-out-dev` for
-incremental development of the compiler itself.
+Use `deno task test:compiler:dev` from the root for incremental Safe/noLLVM
+development and focused laws. `zig build test-compile -Doptimize=safe` builds
+the native test binary separately.
+`zig build test -Doptimize=safe
+-Doom-profile=true -Dtest-force-run=true --summary all`
+reports allocation-failure sweep timings while running the full suite.
+
+For smaller native builds, use `-Dtest-suite=syntax`, `types` or `runtime` with
+`test` or `test-compile`. The default `all` remains the complete production
+suite. `deno task test:compiler:dev --native-suite types` selects an incremental
+Safe/noLLVM check; add `--native-llvm` for faster execution of long fault
+sweeps.
 
 `blotc build ENTRY OUTPUT.wasm --prelude std/prelude.blot --std-root std`
 compiles a project. `dependencies ENTRY OUTPUT.blotdep` produces reusable typed

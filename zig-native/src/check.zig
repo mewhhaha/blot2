@@ -54,7 +54,8 @@ pub const EditorCapture = struct {
     namespace: symbols.Symbol = 0,
     context: ?@import("hole_diagnostics.zig").Snapshot = null,
 };
-pub const ModuleOptions = struct { editor: ?EditorMarker = null, purity_origins: ModuleOrigins = .{}, builtin_catalog: bool = false, prelude_unit: u32 = 0, inherited_fixities: []const ImportedFixity = &.{}, max_inference_transitions: usize = 1_000_000, associated_remaining: ?*usize = null, body_source: []const u8 = &.{}, retained_bodies: ?*@import("body_check_cache.zig").Cache = null, previous_bodies: ?*const @import("body_check_cache.zig").Cache = null, body_external_names: ?@import("body_check_cache.zig").ExternalNames = null };
+const default_inference_budget = if (@hasDecl(@import("root"), "compiler_defaults")) @import("root").compiler_defaults.inference_budget else 1_000_000;
+pub const ModuleOptions = struct { editor: ?EditorMarker = null, purity_origins: ModuleOrigins = .{}, builtin_catalog: bool = false, prelude_unit: u32 = 0, inherited_fixities: []const ImportedFixity = &.{}, max_inference_transitions: usize = default_inference_budget, associated_remaining: ?*usize = null, body_source: []const u8 = &.{}, retained_bodies: ?*@import("body_check_cache.zig").Cache = null, previous_bodies: ?*const @import("body_check_cache.zig").Cache = null, body_external_names: ?@import("body_check_cache.zig").ExternalNames = null };
 /// Private differential control. This changes execution, never semantic module
 /// options or any retained-artifact key. Ordinary public entrypoints leave it off.
 pub const AliasGlobalStats = struct { attempts: usize = 0, admitted: usize = 0, declined: usize = 0, frames: usize = 0, peak_frames: usize = 0 };

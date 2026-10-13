@@ -1,7 +1,7 @@
 {
   "tasks": {
     "build:compiler": "deno run --allow-read --allow-write --allow-run=zig scripts/build_compiler.ts",
-    "build:compiler:dev": "cd zig-native && zig build install -Doptimize=safe -Dllvm=false -fincremental --prefix zig-out-dev",
+    "build:compiler:dev": "deno run --allow-read --allow-write --allow-run=zig scripts/build_compiler.ts --dev",
     "blot": "deno run --allow-read --allow-write --allow-run --allow-env=HOME,XDG_CACHE_HOME,BPM_CACHE_DIR compiler/cli.ts",
     "bpm": "deno run --allow-read --allow-write --allow-run=git --allow-env=HOME,XDG_CACHE_HOME,BPM_CACHE_DIR compiler/bpm.ts",
     "test:bpm": "deno test --allow-read --allow-write --allow-run compiler/packages.test.ts compiler/cli_packages.test.ts compiler/bpm.test.ts -- zig-native/zig-out/bin/blotc",
@@ -13,9 +13,12 @@
     "bench:compile": "deno run --allow-all scripts/bench_compile.ts",
     "test:editor": "deno test --allow-read=editor scripts/helix_languages.test.ts",
     "test:native": "cd zig-native && zig build test -Doptimize=safe",
-    "test:guest": "deno task package:pack && deno test --allow-read --allow-write --allow-run --allow-env=BLOT_CLIENT_TEST_AMBIENT zig-native/tests compiler/*.test.ts -- zig-native/zig-out/bin/blotc",
+    "test:guest": "deno run --allow-read --allow-write --allow-run=zig,deno scripts/test_compiler.ts --guest",
     "test:zig-project": "deno test --allow-read --allow-write --allow-run --allow-env=BLOT_CLIENT_TEST_AMBIENT zig-native/tests/zig_project_transport.test.ts zig-native/tests/zig_project_client.test.ts -- zig-native/zig-out/bin/blotc",
-    "test:compiler": "deno task build:compiler && deno task test:native && deno task test:guest",
+    "test:compiler": "deno run --allow-read --allow-write --allow-run=zig,deno scripts/test_compiler.ts",
+    "test:compiler:dev": "deno run --allow-read --allow-write --allow-run=zig,deno scripts/test_compiler.ts --dev",
+    "test:compiler:stress": "deno task build:compiler && deno test --allow-read --allow-write --allow-run zig-native/tests/stage_chain_budget.stress.ts -- zig-native/zig-out/bin/blotc",
+    "test:compiler:tasks": "deno test --allow-read --allow-write --allow-run=zig,deno --allow-env=ZIG scripts/test_compiler.test.ts scripts/compiler_fingerprint.test.ts",
     "test": "deno task test:editor && deno task test:compiler",
     "check": "deno fmt --check mod.ts deno.json compiler scripts .github && deno check mod.ts compiler/cli.ts compiler/installed_cli.ts scripts/*.ts && deno task lint:zig && deno task test",
     "lint:zig": "deno run --allow-env=ZIG_ANALYZER --allow-read --allow-run scripts/lint_zig.ts",

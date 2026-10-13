@@ -1,4 +1,5 @@
 const std = @import("std");
+const TestSuite = enum { all, syntax, types, runtime };
 
 pub fn build(b: *std.Build) void {
     if (comptime @import("builtin").zig_version.order(.{ .major = 0, .minor = 17, .patch = 0 }) == .lt)
@@ -10,6 +11,7 @@ pub fn build(b: *std.Build) void {
     const artifact_replay = b.option(bool, "artifact-replay", "Private owned backend reconstruction gate") orelse false;
     const identity = b.addOptions();
     identity.addOption(bool, "artifact_replay", artifact_replay);
+    identity.addOption(usize, "inference_budget", 1_000_000);
     var compiler_digest = @import("compiler_fingerprint.zig").digest(b, target, optimize, use_llvm) catch @panic("Cannot read compiler source identity");
     if (artifact_replay) {
         var hash = std.crypto.hash.sha2.Sha256.init(.{});
@@ -29,13 +31,41 @@ pub fn build(b: *std.Build) void {
     module.addOptions("compiler_identity", identity);
     const exe = b.addExecutable(.{ .name = "blotc", .root_module = module, .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
     b.installArtifact(exe);
+    // The ordinary CLI and server paths, with a small build-local budget.
+    // A distinct identity keeps fixture artifacts out of production caches.
+    const budget_identity = b.addOptions();
+    budget_identity.addOption(bool, "artifact_replay", false);
+    budget_identity.addOption(usize, "inference_budget", 256);
+    var budget_digest = @import("compiler_fingerprint.zig").digest(b, target, .safe, false) catch @panic("Cannot read budget fixture identity");
+    var budget_hash = std.crypto.hash.sha2.Sha256.init(.{});
+    budget_hash.update(&budget_digest);
+    budget_hash.update("inference-budget-fixture=256");
+    budget_hash.final(&budget_digest);
+    budget_identity.addOption([32]u8, "digest", budget_digest);
+    const budget_module = b.createModule(.{ .root_source_file = b.path("src/main.zig"), .target = target, .optimize = .safe });
+    budget_module.addOptions("compiler_identity", budget_identity);
+    const budget_fixture = b.addExecutable(.{ .name = "budget-fixture", .root_module = budget_module, .use_llvm = false });
+    const install_budget = b.addInstallArtifact(budget_fixture, .{});
+    b.step("budget-fixture", "Build the small-budget CLI/server regression fixture").dependOn(&install_budget.step);
+    const suite = b.option(TestSuite, "test-suite", "Native test subsystem (all, syntax, types, runtime)") orelse .all;
+    const test_source = switch (suite) {
+        .all => "src/production_suite.zig",
+        .syntax => "src/syntax_suite.zig",
+        .types => "src/types_suite.zig",
+        .runtime => "src/runtime_suite.zig",
+    };
     const tests = b.addTest(.{ .filters = b.option([]const []const u8, "test-filter", "filter") orelse &.{}, .root_module = b.createModule(.{
-        .root_source_file = b.path("src/production_suite.zig"),
+        .root_source_file = b.path(test_source),
         .target = target,
         .optimize = optimize,
     }), .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
+    const test_options = b.addOptions();
+    test_options.addOption(bool, "oom_profile", b.option(bool, "oom-profile", "Report allocation-failure sweep timings and counts") orelse false);
+    tests.root_module.addOptions("test_options", test_options);
+    b.step("test-compile", "Compile the native test suite without executing it").dependOn(&tests.step);
     const run_tests = b.addRunArtifact(tests);
     run_tests.setCwd(b.path(".."));
+    run_tests.has_side_effects = b.option(bool, "test-force-run", "Execute native tests even when their run is cached") orelse false;
     b.step("test", "Test the handwritten compiler").dependOn(&run_tests.step);
     const run = b.addRunArtifact(exe);
     run.addPassthruArgs();
@@ -44,7 +74,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/arena_fixture.zig"),
         .target = target,
         .optimize = optimize,
-    }) });
+    }), .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
     const generate_fixture = b.addRunArtifact(fixture);
     const fixture_file = generate_fixture.addOutputFileArg("arena-fixture.wasm");
     const install_fixture = b.addInstallFile(fixture_file, "arena-fixture.wasm");

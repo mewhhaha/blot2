@@ -33,6 +33,38 @@ raw executable requires `--prelude std/prelude.blot --std-root std`.
 `zig-native/zig-out-dev` for development. Release measurements use
 `deno task build:compiler`.
 
+For a quick development check, run `deno task test:compiler:dev`. It checks the
+project protocol, client and inference-budget recovery against the incremental
+Safe/noLLVM compiler. Select guest files and native laws when working on a
+particular area:
+
+```sh
+deno task test:compiler:dev --native-filter "test name" zig-native/tests/list_runtime.test.ts
+deno task test:compiler:dev --native-suite syntax
+deno task test:compiler:dev --native-suite types --native-llvm
+deno task test:compiler
+deno task test:compiler --oom-profile
+```
+
+The full gate runs the quick contract checks first, then the release build,
+native compilation, native execution and guest tests. Guest files use four
+workers; `--jobs 1` through `--jobs 4` selects bounded parallelism. Timings and
+logs are written to `build/bench/iteration`; `--timings-dir PATH` keeps a
+separate record. Cached native results are reported explicitly. `--oom-profile`
+executes every native law and records the ten slowest allocation-failure sweeps;
+`--force-native` reruns native laws without profiling. The full gate is required
+before compiler commits.
+
+Focused native checks default to incremental Safe/noLLVM. Select `syntax`,
+`types` or `runtime` with `--native-suite` to compile only that subsystem; `all`
+keeps every native law. For long-running fault sweeps, `--native-llvm` trades
+slower compilation for faster execution. The full gate retains LLVM and the
+complete production suite.
+
+Inference-budget rejection and recovery use a small-budget executable fixture.
+`deno task test:compiler:stress` separately checks the production million-step
+limit against an adversarial stage chain.
+
 ## Project API
 
 Keep a compiler open across edits to reuse unchanged syntax, typed modules,

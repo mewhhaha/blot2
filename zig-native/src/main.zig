@@ -39,7 +39,7 @@ const dependency_cli = @import("dependency_cli.zig");
 const compiler_identity = @import("compiler_identity");
 const restart_cache = @import("restart_cache.zig");
 /// Immutable executable defaults; individual compiler invocations own options.
-pub const compiler_defaults = .{ .artifact_replay = compiler_identity.artifact_replay };
+pub const compiler_defaults = .{ .artifact_replay = compiler_identity.artifact_replay, .inference_budget = compiler_identity.inference_budget };
 
 const Command = enum { lex, parse, check, build, dependencies, parse_project, check_project, build_project };
 const Stats = struct {

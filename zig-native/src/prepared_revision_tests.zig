@@ -202,65 +202,167 @@ fn unchangedSeed(allocator: std.mem.Allocator, fixture: *const Fixture, dependen
     defer allocator.free(after);
     try std.testing.expectEqualSlices(u8, fixture.seed, after);
 }
-fn revisions(allocator: std.mem.Allocator, fixture: *Fixture) !void {
-    try fixture.reset();
+test "prepared revisions independently own Core and runtime identity after rejected revision and source removal" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    var history = try PreparedHistory.init(&fixture);
+    defer history.deinit();
+    try preparationFailure(a, &history, .invalid);
+    try history.check();
+}
+test "prepared simultaneous revisions preserve prior emissions and seed across every failed allocation" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    const failures = @import("allocation_failures.zig");
+    try failures.checkAllAllocationFailures(a, dependencySetup, .{&fixture});
+    var history = try PreparedHistory.init(&fixture);
+    defer history.deinit();
+    // Each allocation transition is still swept. Immutable setup and earlier
+    // revisions use their own validating allocator, outside candidate sweeps.
+    for ([_]PreparationKind{ .first, .second, .invalid }) |kind| {
+        try failures.checkAllAllocationFailures(a, preparationFailure, .{ &history, kind });
+        try history.check();
+    }
+    for ([_]bool{ false, true }) |second| {
+        try failures.checkAllAllocationFailures(a, emissionFailure, .{ &history, second });
+        try history.check();
+    }
+}
+
+fn dependencySetup(allocator: std.mem.Allocator, fixture: *const Fixture) !void {
     var dependency = try format.decode(D.FrozenDependency, allocator, fixture.seed, key);
     defer format.deinit(allocator, &dependency);
+    // Fixture-specific validation and its scratch ownership remain exhaustive,
+    // rather than relying only on the generic wire-format failure tests.
     try closure.validate(allocator, &dependency);
-    var first = try prepareReady(allocator, fixture, &dependency);
-    defer first.deinit(allocator);
-    try std.testing.expectEqual(@as(usize, 4), first.units.len);
-    try std.testing.expectEqual(@as(usize, 1), first.cached);
-    try std.testing.expectEqualStrings(fixture.path, first.paths[first.entry - 1]);
-    try std.testing.expectEqualStrings(fixture.path, first.identity.view().owner(first.entry).?);
-    try fixture.dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = second_source });
-    var second = try prepareReady(allocator, fixture, &dependency);
-    defer second.deinit(allocator);
-    try std.testing.expect(first.identity.bytes.ptr != second.identity.bytes.ptr);
-    try std.testing.expect(first.units[first.entry - 1].nodes.ptr != second.units[second.entry - 1].nodes.ptr);
-    try std.testing.expectEqual(dependency.modules[0].core.nodes.ptr, first.units[0].nodes.ptr);
-    try std.testing.expectEqual(dependency.modules[0].core.nodes.ptr, second.units[0].nodes.ptr);
-    try fixture.dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = invalid_source });
-    var third = partial.prepare(allocator, std.testing.io, fixture.path, null, .{ .prelude_path = fixture.prelude_path }, &dependency) catch |err| {
-        if (err != error.OutOfMemory) return err;
-        // The third candidate's allocation failure must not damage either live
-        // prepared revision. Emission uses the independent validating backing
-        // allocator because the injected allocator is now intentionally failing.
-        try unchangedSeed(a, fixture, &dependency);
-        try fixture.removeSources();
-        try checkEmission(a, &first, fixture.first_expected);
-        try checkEmission(a, &second, fixture.second_expected);
-        return error.OutOfMemory;
+    try unchangedSeed(allocator, fixture, &dependency);
+}
+
+const PreparedHistory = struct {
+    fixture: *Fixture,
+    dependency: D.FrozenDependency,
+    first: partial.Prepared,
+    second: partial.Prepared,
+    initial: [32]u8,
+
+    fn init(fixture: *Fixture) !PreparedHistory {
+        try fixture.reset();
+        var dependency = try format.decode(D.FrozenDependency, a, fixture.seed, key);
+        errdefer format.deinit(a, &dependency);
+        try closure.validate(a, &dependency);
+        var first = try prepareReady(a, fixture, &dependency);
+        errdefer first.deinit(a);
+        try fixture.dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = second_source });
+        var second = try prepareReady(a, fixture, &dependency);
+        errdefer second.deinit(a);
+        try std.testing.expectEqual(@as(usize, 4), first.units.len);
+        try std.testing.expectEqual(@as(usize, 1), first.cached);
+        try std.testing.expectEqualStrings(fixture.path, first.paths[first.entry - 1]);
+        try std.testing.expectEqualStrings(fixture.path, first.identity.view().owner(first.entry).?);
+        try std.testing.expect(first.identity.bytes.ptr != second.identity.bytes.ptr);
+        try std.testing.expect(first.units[first.entry - 1].nodes.ptr != second.units[second.entry - 1].nodes.ptr);
+        try std.testing.expectEqual(dependency.modules[0].core.nodes.ptr, first.units[0].nodes.ptr);
+        try std.testing.expectEqual(dependency.modules[0].core.nodes.ptr, second.units[0].nodes.ptr);
+        var history: PreparedHistory = .{ .fixture = fixture, .dependency = dependency, .first = first, .second = second, .initial = undefined };
+        history.initial = history.stamp();
+        return history;
+    }
+    fn deinit(self: *PreparedHistory) void {
+        self.second.deinit(a);
+        self.first.deinit(a);
+        format.deinit(a, &self.dependency);
+    }
+    fn check(self: *const PreparedHistory) !void {
+        try self.checkUnchanged();
+        try unchangedSeed(a, self.fixture, &self.dependency);
+        try checkEmission(a, &self.first, self.fixture.first_expected);
+        try checkEmission(a, &self.second, self.fixture.second_expected);
+    }
+    fn checkUnchanged(self: *const PreparedHistory) !void {
+        try std.testing.expectEqualSlices(u8, &self.initial, &self.stamp());
+    }
+    fn stamp(self: *const PreparedHistory) [32]u8 {
+        return metadata.stamp(.{ self.dependency, emissionStamp(&self.first), emissionStamp(&self.second) });
+    }
+};
+
+fn emissionStamp(prepared: *const partial.Prepared) [32]u8 {
+    // Every input consumed by Prepared.emit; frontend body caches are unused.
+    return metadata.stamp(.{ prepared.units, prepared.identity, prepared.unit_order, prepared.paths, prepared.cached, prepared.borrowed, prepared.entry_imports, prepared.entry_implicit_prelude, prepared.entry, prepared.prelude, prepared.source_mode, prepared.source_bytes, prepared.stats });
+}
+
+const PreparationKind = enum { first, second, invalid, deferred };
+fn preparationFailure(allocator: std.mem.Allocator, history: *PreparedHistory, kind: PreparationKind) !void {
+    const fixture = history.fixture;
+    try fixture.reset();
+    const text = switch (kind) {
+        .first => source,
+        .second => second_source,
+        .invalid => invalid_source,
+        .deferred => deferred_witness_source,
     };
-    defer third.deinit(allocator);
-    switch (third) {
-        .ready => return error.TestUnexpectedResult,
+    try fixture.dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = text });
+    var candidate = partial.prepare(allocator, std.testing.io, fixture.path, null, .{ .prelude_path = fixture.prelude_path }, &history.dependency) catch |err| {
+        try fixture.removeSources();
+        if (kind == .invalid or kind == .deferred) {
+            try history.check();
+        } else {
+            // Preparation only receives the seed, never either prior owner.
+            // Check immutable inputs on each fault and source-free bytes after
+            // the sweep instead of recompiling both priors at every position.
+            try history.checkUnchanged();
+        }
+        return err;
+    };
+    defer candidate.deinit(allocator);
+    try fixture.removeSources();
+    switch (candidate) {
+        .ready => |*prepared| {
+            try std.testing.expect(kind != .invalid);
+            var units: usize = 4;
+            if (kind == .deferred) units = 2;
+            try std.testing.expectEqual(units, prepared.units.len);
+            try std.testing.expectEqual(@as(usize, 1), prepared.cached);
+            try std.testing.expectEqualStrings(fixture.path, prepared.paths[prepared.entry - 1]);
+            try std.testing.expectEqualStrings(fixture.path, prepared.identity.view().owner(prepared.entry).?);
+            try std.testing.expect(prepared.identity.bytes.ptr != history.first.identity.bytes.ptr);
+            try std.testing.expect(prepared.identity.bytes.ptr != history.second.identity.bytes.ptr);
+            try std.testing.expect(prepared.units[prepared.entry - 1].nodes.ptr != history.first.units[history.first.entry - 1].nodes.ptr);
+            try std.testing.expect(prepared.units[prepared.entry - 1].nodes.ptr != history.second.units[history.second.entry - 1].nodes.ptr);
+            try std.testing.expectEqual(history.dependency.modules[0].core.nodes.ptr, prepared.units[0].nodes.ptr);
+            if (kind == .deferred) {
+                var result = try prepared.emit(a);
+                defer result.deinit(a);
+                try checkDeferredWitness(&result, fixture);
+            } else {
+                var expected = fixture.first_expected;
+                if (kind == .second) expected = fixture.second_expected;
+                try checkEmission(a, prepared, expected);
+            }
+        },
         .rejected => |result| {
+            try std.testing.expectEqual(PreparationKind.invalid, kind);
             try std.testing.expectEqualStrings("integer_range", result.result.diagnostic.?.code);
             try std.testing.expectEqualStrings(fixture.path, result.diagnostic_filename.?);
             try std.testing.expectEqual(@as(usize, 0), result.result.stats.body_elaborations);
             try std.testing.expectEqual(@as(usize, 0), result.result.compiled.bytes.len);
         },
     }
-    try unchangedSeed(allocator, fixture, &dependency);
-    // Deleting every source file makes any accidental source/loader lookup by
-    // emission fail. All frontend and inference owners were already destroyed.
-    try fixture.removeSources();
-    try checkEmission(allocator, &first, fixture.first_expected);
-    try checkEmission(allocator, &second, fixture.second_expected);
-    // Repeating after independent emission must preserve both retained bodies.
-    try checkEmission(allocator, &first, fixture.first_expected);
-    try unchangedSeed(allocator, fixture, &dependency);
+    try history.checkUnchanged();
 }
-test "prepared revisions independently own Core and runtime identity after rejected revision and source removal" {
-    var fixture = try Fixture.init();
-    defer fixture.deinit();
-    try revisions(a, &fixture);
-}
-test "prepared simultaneous revisions preserve prior emissions and seed across every failed allocation" {
-    var fixture = try Fixture.init();
-    defer fixture.deinit();
-    try @import("allocation_failures.zig").checkAllAllocationFailures(a, revisions, .{&fixture});
+
+fn emissionFailure(allocator: std.mem.Allocator, history: *PreparedHistory, second: bool) !void {
+    var prepared = &history.first;
+    var expected = history.fixture.first_expected;
+    if (second) {
+        prepared = &history.second;
+        expected = history.fixture.second_expected;
+    }
+    checkEmission(allocator, prepared, expected) catch |err| {
+        try history.checkUnchanged();
+        return err;
+    };
+    try history.checkUnchanged();
 }
 
 const deferred_witness_source = "entry const failure = @type.same (@panic \"left witness\") (@panic \"right witness\")\n";
@@ -274,56 +376,51 @@ fn checkDeferredWitness(result: *const partial.Result, fixture: *const Fixture) 
     try std.testing.expectEqual(@as(usize, 0), result.result.compiled.constant_steps);
     try std.testing.expectEqual(@as(usize, 0), result.result.compiled.bytes.len);
 }
-fn deferredWitnessRevision(allocator: std.mem.Allocator, fixture: *Fixture) !void {
-    try fixture.reset();
-    var dependency = try format.decode(D.FrozenDependency, allocator, fixture.seed, key);
-    defer format.deinit(allocator, &dependency);
-    try closure.validate(allocator, &dependency);
-    var first = try prepareReady(allocator, fixture, &dependency);
-    defer first.deinit(allocator);
-    try fixture.dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = second_source });
-    var second = try prepareReady(allocator, fixture, &dependency);
-    defer second.deinit(allocator);
-    try fixture.dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = deferred_witness_source });
-    // Frontend lowering succeeds. Entry/witness validation belongs to emission
-    // and must still diagnose after every source/frontend owner disappears.
-    var rejected = prepareReady(allocator, fixture, &dependency) catch |err| {
-        try fixture.removeSources();
-        try checkEmission(a, &first, fixture.first_expected);
-        try checkEmission(a, &second, fixture.second_expected);
-        try unchangedSeed(a, fixture, &dependency);
-        return err;
-    };
-    var rejected_alive = true;
-    defer if (rejected_alive) rejected.deinit(allocator);
-    try fixture.removeSources();
-    var failure = rejected.emit(allocator) catch |err| {
-        try checkEmission(a, &first, fixture.first_expected);
-        try checkEmission(a, &second, fixture.second_expected);
-        try unchangedSeed(a, fixture, &dependency);
-        return err;
-    };
-    defer failure.deinit(allocator);
-    // A failed emitted candidate owns its message/path independently from its
-    // Prepared. Retain it while emitting earlier revisions more than once.
-    rejected.deinit(allocator);
-    rejected_alive = false;
-    try checkDeferredWitness(&failure, fixture);
-    try checkEmission(allocator, &first, fixture.first_expected);
-    try checkEmission(allocator, &second, fixture.second_expected);
-    try checkEmission(allocator, &first, fixture.first_expected);
-    try unchangedSeed(allocator, fixture, &dependency);
-    try checkDeferredWitness(&failure, fixture);
-}
 test "prepared deferred witness rejection owns diagnostics after teardown and preserves earlier revisions and seed" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
-    try deferredWitnessRevision(a, &fixture);
+    var history = try PreparedHistory.init(&fixture);
+    defer history.deinit();
+    try fixture.dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = deferred_witness_source });
+    // Frontend lowering succeeds. Entry/witness validation belongs to emission
+    // and must still diagnose after every source/frontend owner disappears.
+    var candidate = try prepareReady(a, &fixture, &history.dependency);
+    var candidate_alive = true;
+    defer if (candidate_alive) candidate.deinit(a);
+    try fixture.removeSources();
+    var failure = try candidate.emit(a);
+    defer failure.deinit(a);
+    candidate.deinit(a);
+    candidate_alive = false;
+    try checkDeferredWitness(&failure, &fixture);
+    try history.check();
+    try history.check();
+    try checkDeferredWitness(&failure, &fixture);
 }
 test "prepared deferred witness candidates preserve earlier revisions through every preparation and emission allocation failure" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
-    try @import("allocation_failures.zig").checkAllAllocationFailures(a, deferredWitnessRevision, .{&fixture});
+    var history = try PreparedHistory.init(&fixture);
+    defer history.deinit();
+    const failures = @import("allocation_failures.zig");
+    try failures.checkAllAllocationFailures(a, preparationFailure, .{ &history, PreparationKind.deferred });
+    try fixture.reset();
+    try fixture.dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = deferred_witness_source });
+    var candidate = try prepareReady(a, &fixture, &history.dependency);
+    defer candidate.deinit(a);
+    try fixture.removeSources();
+    try failures.checkAllAllocationFailures(a, deferredEmissionFailure, .{ &history, &candidate });
+}
+
+fn deferredEmissionFailure(allocator: std.mem.Allocator, history: *PreparedHistory, candidate: *const partial.Prepared) !void {
+    var failure = candidate.emit(allocator) catch |err| {
+        try history.check();
+        return err;
+    };
+    defer failure.deinit(allocator);
+    try checkDeferredWitness(&failure, history.fixture);
+    try history.check();
+    try checkDeferredWitness(&failure, history.fixture);
 }
 
 const retained = @import("retained_revision.zig");
@@ -479,5 +576,72 @@ test "retained history keeps prior ownership through error correction revert and
 test "retained candidate allocation failures leave seed and successful prior Core and capture unchanged" {
     var fixture = try retainedFixture();
     defer fixture.deinit();
-    try @import("allocation_failures.zig").checkAllAllocationFailures(a, retainedRevisions, .{&fixture});
+    const failures = @import("allocation_failures.zig");
+    try failures.checkAllAllocationFailures(a, retainedSetup, .{&fixture});
+    try restoreRetained(&fixture, retained_first);
+    const admitted = try format.decode(D.FrozenDependency, a, fixture.seed, key);
+    var session = retained.Session.init(a, admitted, .{ .prelude_path = fixture.prelude_path });
+    defer session.deinit();
+    var first = try session.revise(std.testing.io, fixture.path, null, .{ .prelude_path = fixture.prelude_path });
+    defer first.deinit(a);
+    try checkRetainedResult(&first, fixture.first_expected);
+    try failures.checkAllAllocationFailures(a, retainedCandidateFailure, .{ &fixture, &session });
+}
+
+fn restoreRetained(fixture: *Fixture, text: []const u8) !void {
+    try fixture.reset();
+    try fixture.dir.dir.writeFile(std.testing.io, .{ .sub_path = "prelude.blot", .data = retained_prelude });
+    try fixture.dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = text });
+}
+
+fn retainedSetup(allocator: std.mem.Allocator, fixture: *Fixture) !void {
+    try restoreRetained(fixture, retained_first);
+    var admitted = try format.decode(D.FrozenDependency, allocator, fixture.seed, key);
+    var admitted_alive = true;
+    defer if (admitted_alive) format.deinit(allocator, &admitted);
+    try closure.validate(allocator, &admitted);
+    var session = retained.Session.init(allocator, admitted, .{ .prelude_path = fixture.prelude_path });
+    admitted_alive = false;
+    defer session.deinit();
+    var first = try session.revise(std.testing.io, fixture.path, null, .{ .prelude_path = fixture.prelude_path });
+    defer first.deinit(allocator);
+    try checkRetainedResult(&first, fixture.first_expected);
+    try fixture.removeSources();
+    try checkCurrent(&session, fixture, fixture.first_expected);
+}
+
+fn retainedCandidateFailure(allocator: std.mem.Allocator, fixture: *Fixture, session: *retained.Session) !void {
+    try restoreRetained(fixture, retained_second);
+    const core_stamp = metadata.stamp(session.current.?.prepared.units);
+    const body_stamp = metadata.stamp(session.current.?.artifacts.emission.instructions);
+    // Existing owners keep their original allocator. Only the candidate uses
+    // the injector; discard releases it before restoring the Session allocator.
+    // commit is allocation-free and the integrated law above exercises it.
+    session.allocator = allocator;
+    defer session.allocator = a;
+    var candidate = session.prepareRevision(std.testing.io, fixture.path, null, .{ .prelude_path = fixture.prelude_path }) catch |err| {
+        try fixture.removeSources();
+        try std.testing.expectEqual(@as(usize, 1), session.revisions);
+        try std.testing.expectEqualSlices(u8, &core_stamp, &metadata.stamp(session.current.?.prepared.units));
+        try std.testing.expectEqualSlices(u8, &body_stamp, &metadata.stamp(session.current.?.artifacts.emission.instructions));
+        try checkCurrent(session, fixture, fixture.first_expected);
+        return err;
+    };
+    defer candidate.deinit();
+    const ready = switch (candidate) {
+        .ready => |ready| ready,
+        .rejected => return error.TestUnexpectedResult,
+    };
+    const result = ready.result().?;
+    try checkRetainedResult(result, fixture.second_expected);
+    const counts = result.result.compiled.reuse;
+    try std.testing.expect(counts.reused_named + counts.reused_closures > 0);
+    try std.testing.expect(counts.fresh_named > 0);
+    try fixture.removeSources();
+    try std.testing.expect(session.discard(ready));
+    try std.testing.expectEqual(@as(usize, 1), session.revisions);
+    try std.testing.expectEqualSlices(u8, &core_stamp, &metadata.stamp(session.current.?.prepared.units));
+    try std.testing.expectEqualSlices(u8, &body_stamp, &metadata.stamp(session.current.?.artifacts.emission.instructions));
+    try checkCurrent(session, fixture, fixture.first_expected);
+    try checkRetainedResult(result, fixture.second_expected);
 }

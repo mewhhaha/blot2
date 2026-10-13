@@ -3,9 +3,30 @@
 //! growth through allocate/copy/free so every required allocation is injectable
 //! and the successful discovery run has the same indices as failure runs.
 const std = @import("std");
+const profile = @import("allocation_failure_profile.zig");
 
 pub fn checkAllAllocationFailures(backing: std.mem.Allocator, comptime test_fn: anytype, extra_args: anytype) !void {
     var adapter: Deterministic = .{ .backing = backing };
+    if (comptime profile.enabled) {
+        var measurement = profile.Measurement.start("deterministic", @intFromPtr(&test_fn), @returnAddress());
+        defer measurement.finish();
+        const Args = @Tuple(@typeInfo(std.meta.ArgsTuple(@TypeOf(test_fn))).@"struct".field_types[1..]);
+        const Measured = struct {
+            fn run(allocator: std.mem.Allocator, args: Args, counters: *profile.Measurement) !void {
+                counters.runs += 1;
+                // std.testing supplies its FailingAllocator directly; observe
+                // the existing discovery run without another scenario call.
+                const failing: *std.testing.FailingAllocator = @ptrCast(@alignCast(allocator.ptr));
+                defer if (counters.runs == 1) {
+                    counters.allocations = failing.alloc_index;
+                };
+                try @call(.auto, test_fn, .{allocator} ++ args);
+            }
+        };
+        try std.testing.checkAllAllocationFailures(adapter.allocator(), Measured.run, .{ extra_args, &measurement });
+        measurement.completed = true;
+        return;
+    }
     try std.testing.checkAllAllocationFailures(adapter.allocator(), test_fn, extra_args);
 }
 
@@ -15,14 +36,20 @@ pub fn checkAllAllocationFailures(backing: std.mem.Allocator, comptime test_fn: 
 /// must propagate, and all paths must balance their complete allocation traffic.
 pub fn checkObservedConcurrentFailures(backing: std.mem.Allocator, comptime test_fn: anytype, extra_args: anytype) !void {
     var adapter: Deterministic = .{ .backing = backing };
+    var measurement: profile.Measurement = undefined;
+    if (comptime profile.enabled) measurement = profile.Measurement.start("concurrent", @intFromPtr(&test_fn), @returnAddress());
+    defer if (comptime profile.enabled) measurement.finish();
     var observed: usize = 0;
     for (0..4) |_| {
+        if (comptime profile.enabled) measurement.runs += 1;
         var probe = std.testing.FailingAllocator.init(adapter.allocator(), .{});
         try @call(.auto, test_fn, .{probe.allocator()} ++ extra_args);
         try std.testing.expectEqual(probe.allocated_bytes, probe.freed_bytes);
         observed = @max(observed, probe.alloc_index);
+        if (comptime profile.enabled) measurement.allocations = observed;
     }
     for (0..observed) |index| {
+        if (comptime profile.enabled) measurement.runs += 1;
         var probe = std.testing.FailingAllocator.init(adapter.allocator(), .{ .fail_index = index });
         if (@call(.auto, test_fn, .{probe.allocator()} ++ extra_args)) |_| {
             try std.testing.expect(!probe.has_induced_failure);
@@ -32,6 +59,7 @@ pub fn checkObservedConcurrentFailures(backing: std.mem.Allocator, comptime test
         }
         try std.testing.expectEqual(probe.allocated_bytes, probe.freed_bytes);
     }
+    if (comptime profile.enabled) measurement.completed = true;
 }
 
 const Deterministic = struct {

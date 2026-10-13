@@ -9,10 +9,11 @@ concurrency:
   group: compiler-${{ github.ref }}
   cancel-in-progress: true
 env:
-  # Reviewed zig-analyzer revision. Bump it deliberately: a newer revision can
-  # add rules that fail the lint:zig gate.
-  ZIG_ANALYZER_REPOSITORY: https://github.com/mewhhaha/zig-analyzer
+  # Reviewed release from this revision, including its patched Zig backend.
+  # Bump the archive and checksum together when adopting new lint rules.
   ZIG_ANALYZER_COMMIT: 756bfd5c3e94b2197b08ce79ce1e7b5d110c0508
+  ZIG_ANALYZER_VERSION: 0.17.0-1
+  ZIG_ANALYZER_SHA256: 398b48dfbf71cf7eba40cfff277db5b1680c701feffa2fdbe3178dcf525c94d3
 jobs:
   test:
     runs-on: ubuntu-24.04
@@ -46,22 +47,22 @@ jobs:
         id: analyzer
         uses: actions/cache@v4
         with:
-          path: ~/zig-analyzer
-          key: zig-analyzer-${{ runner.os }}-${{ env.ZIG_ANALYZER_COMMIT }}
-      - name: Build zig-analyzer
+          path: ~/.cache/blot-tools/zig-analyzer-${{ env.ZIG_ANALYZER_VERSION }}-x86_64-linux
+          key: zig-analyzer-${{ runner.os }}-${{ env.ZIG_ANALYZER_COMMIT }}-${{ env.ZIG_ANALYZER_SHA256 }}
+      - name: Install zig-analyzer
         if: steps.analyzer.outputs.cache-hit != 'true'
         shell: bash
         run: |
-          git clone "$ZIG_ANALYZER_REPOSITORY" "$HOME/zig-analyzer"
-          git -C "$HOME/zig-analyzer" checkout --detach "$ZIG_ANALYZER_COMMIT"
-          test "$(git -C "$HOME/zig-analyzer" rev-parse HEAD)" = "$ZIG_ANALYZER_COMMIT"
-          cd "$HOME/zig-analyzer"
-          zig build -Doptimize=fast
-          zig build backend
+          archive="$RUNNER_TEMP/zig-analyzer.tar.xz"
+          curl --fail --location --retry 3 "https://github.com/mewhhaha/zig-analyzer/releases/download/v$ZIG_ANALYZER_VERSION/zig-analyzer-$ZIG_ANALYZER_VERSION-x86_64-linux.tar.xz" -o "$archive"
+          printf '%s  %s\n' "$ZIG_ANALYZER_SHA256" "$archive" | sha256sum --check
+          mkdir -p "$HOME/.cache/blot-tools"
+          tar -xJf "$archive" -C "$HOME/.cache/blot-tools"
       - name: Verify zig-analyzer
         shell: bash
         run: |
-          "$HOME/zig-analyzer/zig-out/bin/zig-analyzer" doctor
-          echo "ZIG_ANALYZER=$HOME/zig-analyzer/zig-out/bin/zig-analyzer" >> "$GITHUB_ENV"
+          analyzer="$HOME/.cache/blot-tools/zig-analyzer-$ZIG_ANALYZER_VERSION-x86_64-linux/bin/zig-analyzer"
+          "$analyzer" doctor
+          echo "ZIG_ANALYZER=$analyzer" >> "$GITHUB_ENV"
       - run: deno task check
       - run: deno publish --dry-run --allow-dirty
