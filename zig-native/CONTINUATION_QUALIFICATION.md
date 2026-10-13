@@ -1,8 +1,9 @@
 # Implementation and iterator continuation
 
-This merged checkpoint implements task 056 and extends tasks 024, 047, 058 and
-086 at local commit `10fab46`. The full gate passes. The broader tasks and task
-084's iteration targets remain open.
+Local `b145c5e` extends the qualified `10fab46` checkpoint with private child
+fields, scoped capability contracts, body reuse and shared constant scratch.
+Both full gates pass. The later qualification appears below; the broader tasks
+and task 084's iteration targets remain open.
 
 ## Frozen inputs
 
@@ -163,3 +164,110 @@ Raw evidence: `qualified-batch3/`, `public-batch3/`,
 `measurement-summary-batch3.json` and `ownership-repeat-summary-batch3.json`.
 Earlier batch-1/2 samples keep their original pins. A guest-runtime improvement
 and a passing gate do not close compiler iteration targets 084/086/093.
+
+## Child fields and retained graphs, 13 October 2026
+
+Local `b145c5e` is frozen tree `a576172aa23e937ee5abdad6326a056adc880203`,
+native source `dda64a9fad2855179f5846d8774477b217398ad3`, based on `7cb2b3e`.
+Its LLVM/Fast binary SHA-256 is
+`b47b376058beecb41c22703a8e360985259fe79d878a7e3545e97e3a1d73faab`; the patch
+SHA-256 is `5a3ca96435f71b5554030503554df9c0137f5ff68e5c51f221b8dc1af8651745`.
+The comparison is the qualified `10fab46` binary pinned above. All later raw
+paths below are under the same ignored `build/bench/continuation-20261013/`.
+
+Body recipes now preserve declared local qualifications, producer-unit/binding
+relocation and imported type heads. Capability contracts preserve exact public
+identity/Unit invocation, generic parameter transport, curried callbacks and
+trusted local State storage. A smaller initial specialization mapping allocation
+restores the existing allocation budgets. Complete dependent-arrow annotations,
+multiple inputs, selected identities and general hidden stores remain outside
+this checkpoint. [Body cutoff](BODY_CUTOFF.md) and
+[scoped qualification](SCOPED_EFFECTS_QUALIFICATION.md) retain the isolated laws
+and boundaries.
+
+[Private child fields](PRIVATE_CHILD_FIELDS.md) remove proved aggregate and
+journal-only carrier allocations, with bounded per-loop root-cost admission.
+Escapes, unknown ownership and unprofitable strict/window loops retain ordinary
+storage. Constant graph inspection uses sparse pages, and successive receipts
+share their request-owned matching/materialization scratch. This changes
+bookkeeping cost, not receipt authority: only the existing primitive payloads
+and scalar ready reads are admitted. Collection-growth receipts are a separate,
+unmerged follow-up at this checkpoint.
+
+The first gate passed 1,649 of 1,651 native tests. A forged cycle fixture had
+kept a newly introduced identity claim after replacing its body; a Foreign-row
+fixture still rejected a now-supported explicit result annotation. Correcting
+only those two fixtures passes all 30 focused laws and the complete retry:
+**1,651 native tests, 1,043 guest/client tests, 1,002 exhaustive
+allocation-failure sweeps and zero findings across 374 analyzer files**. The
+source tree and release hash were verified after the gate. Four
+local/packaged/standalone/CLI API tests also pass.
+
+The failed gate took 880.62 seconds, including a 212.88-second release build.
+The successful retry took 682.24 seconds: release reuse 0.05, native compilation
+280.89, native execution 370.03 and guests 18.93. Test-only fingerprint
+exclusion preserved the measured release binary across both fixture repairs.
+Commands, failure logs, full timing records and post-gate pins remain in
+`next-full-gate.log`, `next-repaired-gate/` and `next-qualified-pins.json`.
+
+Seven alternating captured-project pairs use the same 93-unit input manifest and
+independent fresh comparisons for every compiler/phase. CPU 6 was pinned; other
+isolated work and filesystem caches remained uncontrolled.
+
+| Phase  | Control median CPU | Candidate median CPU | Median paired ratio |
+| ------ | -----------------: | -------------------: | ------------------: |
+| Fresh  |       2,218.216 ms |         2,220.961 ms |              1.0262 |
+| Edit   |       1,214.444 ms |         1,263.002 ms |              1.0486 |
+| Revert |       1,089.874 ms |         1,151.709 ms |              1.0577 |
+
+Fresh ratios span 0.9873–1.0382, edit 1.0268–1.0777 and revert 1.0412–1.0759.
+The paired median is computed from pairs and can differ from the ratio of
+independent medians. Backend assembly adds about 47 ms on edits/reverts. Both
+pins report 2,864 optimized functions, zero reused bodies and one ownership-role
+conflict; the reason for zero reuse is under investigation. Constant receipt and
+index activity remain zero in this capture. Thirteen public programs, seven
+pairs each, cost 1.0000–1.0357 times control CPU. Peak requested storage is
+unchanged and teardown is zero; requested allocation increases 176–943,445
+bytes. These results retain a compiler regression, not an iteration-speed win.
+
+The constant-scratch workload has 196 samples: sixteen expensive primitive
+constants, seven alternating pairs, population and six edits at two unrelated
+snapshot sizes. With 32,768 old values, retained median CPU falls 18.005→15.158
+ms; median paired ratio is 0.8419, range 0.8266–0.8670. Population is near
+parity at 0.9971. Graph-index payload on the first edit falls 8,288,176→529,662
+bytes and later edits 7,876,016→510,342. All sixteen receipts replay 2,608
+source steps. With only 64 old values, retained CPU is near parity at 1.0052;
+later index accounting rises 27,056→68,838 bytes because the new counter also
+includes shared mapping/order buffer capacity. These are requested scratch
+payloads, not RSS. An earlier development comparison using the wrong compiler
+path is explicitly invalid and supplies no performance claim.
+
+Ten iterator workloads use 4,096 rows, 31 alternating pairs, 20 warmups and
+sixteen calls per sample. Physical profiling copies count objects separately
+from CPU measured on ordinary Wasm. The final combined binary preserves the
+isolated allocation reductions:
+
+| Adapter           | Objects before→after | CPU ratio |
+| ----------------- | -------------------: | --------: |
+| range             |             12,290→0 |    0.0384 |
+| map               |             24,580→0 |    0.0192 |
+| filter            |             20,484→0 |    0.0345 |
+| take              |             12,292→0 |    0.0252 |
+| take_while        |             14,345→2 |    0.0169 |
+| enumerate         |         32,772→8,192 |    0.3185 |
+| zip               |         22,537→4,096 |    0.2647 |
+| zip_strict        |        49,158→49,158 |    1.0226 |
+| windows           |        81,894→81,894 |    1.0217 |
+| map/take pipeline |             36,870→0 |    0.0121 |
+
+The pipeline's requested payload falls 294,960→0 bytes. TakeWhile's two
+allocations belong to predicate creation. Every answer passes; committed guest
+memory remains 131,072 bytes, roots/leases finish at zero and journal reset
+retains one 4 KiB page. Strict/window controls keep their allocation counts and
+show about 2% higher measured CPU. All 62 packed width/type Wasm files are
+byte-identical to the previously qualified pin, so the earlier boxed-reference
+qualification remains applicable without claiming a new packed improvement.
+
+Raw measurements: `captured-next/pairs.json`, `public-next/results.json`,
+`next-constant-pairs.json`, `next-runtime/`, `next-packed/equality.json` and
+`next-measurement-summary.json`. Tasks 024/035/047/058/086/093 remain open.

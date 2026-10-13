@@ -133,11 +133,14 @@ value-only tape. This is a follow-up candidate, not qualified task completion.
 
 Receipt counters report immutable owner payload bytes (record array plus owned
 event/source/input slices), record lookup comparisons, reachable graph values
-examined and known dense graph-index bytes. Payload bytes exclude the shared
-evaluator snapshot and allocator overhead. Index bytes exclude semantic
-interning, graph-order capacity and type/row mapping buffers; they isolate the
-full-snapshot indexes used by non-scalar transport. These counters supplement
-requested/peak solver and scratch accounting, not whole-process RSS.
+examined and known graph-index bytes. Payload bytes exclude the shared evaluator
+snapshot and allocator overhead. The current index counter charges new capacity
+across all twelve shared graph matching/materialization buffers, including graph
+order and type/row maps, plus sparse inspection-page payload. It excludes
+semantic interning and hash-table headers. Earlier dense-index measurements
+excluded those mapping/order capacities, so small-workload counter increases can
+reflect broader accounting. These counters supplement requested/peak solver and
+scratch accounting, not whole-process RSS.
 
 Executed partial Array-member judgments have a separate selected-query receipt
 boundary. A ready method and its existing syntax recipe must contain at least 64
@@ -178,3 +181,12 @@ executed guests, 977 exhaustive failure sweeps and zero analyzer findings across
 373 files. [Merged qualification](CONTINUATION_QUALIFICATION.md) records the
 exact source/binary pins, measured costs and still-open scope. Isolated clocks
 above remain separate from the final combined release measurements.
+
+Local `b145c5e` qualifies sparse inspection and request-shared graph scratch
+with 1,651 native tests, 1,043 guests, 1,002 exhaustive failure sweeps and zero
+findings across 374 files. The large-snapshot constant workload improves from
+18.005 to 15.158 ms median retained CPU; the small control is near parity.
+Captured project constants still have no receipt activity. The
+[combined qualification](CONTINUATION_QUALIFICATION.md#child-fields-and-retained-graphs-13-october-2026)
+records exact pins, counter semantics and the unrelated retained compiler
+regression. Growth and broader inference/query/data authority remain in 086.
