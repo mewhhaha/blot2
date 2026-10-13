@@ -560,3 +560,66 @@ test "static constructor bits are exact symbolic facts with bounded zero referen
     facts[4].table_reference = true;
     try std.testing.expect(staticConstructor(&facts, 4) == null);
 }
+
+/// A checked read from a nonempty product/record or boxed nominal. Its logical
+/// value cannot be the absent zero arm of an enclosing tagged alternative.
+pub fn nonzeroRead() Instruction {
+    return .{ .op = .ownership, .operand = @bitCast(Ownership{ .kind = .rest, .chunk = 14, .roles = 1 }) };
+}
+pub fn hasNonzeroRead(instructions: []const Instruction, at: usize) bool {
+    return at != 0 and at < instructions.len and (instructions[at].op == .i32_load or instructions[at].op == .f32_load) and instructions[at - 1].op == .ownership and instructions[at - 1].operand == nonzeroRead().operand;
+}
+
+/// Compiler GC carriers duplicate roots already held by the owning journal.
+pub fn journalCarrier() Instruction {
+    return .{ .op = .ownership, .operand = @bitCast(Ownership{ .kind = .rest, .chunk = 13, .roles = 1 }) };
+}
+pub fn hasJournalCarrier(instructions: []const Instruction, at: usize) bool {
+    const run = allocationAnnotations(instructions, at);
+    if (run.len == 0 or at < run.len + 2) return false;
+    const marker = instructions[at - run.len - 2];
+    return marker.op == .ownership and marker.operand == journalCarrier().operand;
+}
+
+/// A relocated static address belongs to the module, outside the managed heap.
+/// Mutable static cache edges have their existing module-owned root slots.
+pub fn immortalReference() Instruction {
+    return .{ .op = .ownership, .operand = @bitCast(Ownership{ .kind = .rest, .chunk = 12, .roles = 1 }) };
+}
+pub fn hasImmortalReference(instructions: []const Instruction, at: usize) bool {
+    return at != 0 and at < instructions.len and instructions[at].op == .i32_const and !instructions[at].table_reference and instructions[at - 1].op == .ownership and instructions[at - 1].operand == immortalReference().operand;
+}
+
+test "private field facts are exact opcode bounded annotations" {
+    var read = [_]Instruction{ nonzeroRead(), .{ .op = .i32_load } };
+    try std.testing.expect(hasNonzeroRead(&read, 1));
+    try std.testing.expect(!hasNonzeroRead(&read, 0));
+    try std.testing.expect(!hasNonzeroRead(&read, read.len));
+    read[1].op = .f32_load;
+    try std.testing.expect(hasNonzeroRead(&read, 1));
+    read[1].op = .i32_const;
+    try std.testing.expect(!hasNonzeroRead(&read, 1));
+    read[1].op = .i32_load;
+    read[0].operand ^= 64;
+    try std.testing.expect(!hasNonzeroRead(&read, 1));
+    var static = [_]Instruction{ immortalReference(), .{ .op = .i32_const, .operand = 8192 } };
+    try std.testing.expect(hasImmortalReference(&static, 1));
+    try std.testing.expect(!hasImmortalReference(&static, static.len));
+    static[1].table_reference = true;
+    try std.testing.expect(!hasImmortalReference(&static, 1));
+    static[1].table_reference = false;
+    static[0].operand ^= 64;
+    try std.testing.expect(!hasImmortalReference(&static, 1));
+    var carrier = [_]Instruction{
+        journalCarrier(),
+        .{ .op = .ownership, .operand = @bitCast(Ownership{ .kind = .words, .roles = @backingInt(Role.reference) }) },
+        .{ .op = .ownership, .operand = @bitCast(Ownership{ .kind = .rest, .roles = 4 }) },
+        .{ .op = .i32_const, .operand = 4 },
+        .{ .op = .call },
+    };
+    try std.testing.expect(hasJournalCarrier(&carrier, 4));
+    try std.testing.expect(!hasJournalCarrier(&carrier, 3));
+    try std.testing.expect(!hasJournalCarrier(&carrier, carrier.len + 1));
+    carrier[0].operand ^= 64;
+    try std.testing.expect(!hasJournalCarrier(&carrier, 4));
+}

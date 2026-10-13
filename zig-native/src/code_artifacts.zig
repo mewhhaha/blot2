@@ -17,7 +17,7 @@ const Allocator = std.mem.Allocator;
 const Hash = std.crypto.hash.Blake3;
 const IdentityMetadata = runtime_identity.Metadata;
 pub const max_parameters = 16;
-pub const Key = struct { target: core.BindingRef, parameters: [max_parameters]layout.Id = @splat(1), count: u8 = 0, result: layout.Id = 1, effects: [max_parameters]u32 = @splat(0), templates: substitution_keys.Id = 0, template_result: bool = false };
+pub const Key = struct { instance: @import("types.zig").NominalIdentity = .{ .unit = 0, .decl = 0 }, target: core.BindingRef, parameters: [max_parameters]layout.Id = @splat(1), count: u8 = 0, result: layout.Id = 1, effects: [max_parameters]u32 = @splat(0), templates: substitution_keys.Id = 0, template_result: bool = false };
 pub const ClosureKey = struct { unit: u32, catalog: u32, ty: layout.Id, captures: layout.Id, templates: substitution_keys.Id = 0, evidence: u32 = 0, rows: substitution_keys.Id = 0, parameter_template: u32 = 0, template_result: bool = false, static_values: substitution_keys.Id = 0 };
 pub const CapturedTemplate = struct { unit: u32 = 0, node: core.Id, captures: layout.Id, templates: substitution_keys.Id, has_environment: bool, computation: bool = false, evidence: u32 = 0, rows: substitution_keys.Id = 0 };
 pub const CallableKey = struct { target: core.BindingRef, ty: layout.Id, applied: u32 = 0 };

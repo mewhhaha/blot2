@@ -8,8 +8,8 @@ const ir = @import("runtime_ir.zig");
 const A = std.mem.Allocator;
 const none = std.math.maxInt(u32);
 const Value = struct { id: u32 = 0, offset: u32 = 0, constant: ?u32 = null };
-const Node = struct { parent: u32, bad: bool = false, size: u32 = 0, allocation: bool = false, first_copy: u32 = none, last_store: u32 = 0, store_mask: u32 = 0, scope: usize = 0, fields: u32 = 0, used_fields: u16 = 0, journaled: bool = false, untyped: bool = false, reference_fields: u16 = 0, roots: u32 = 0, root_fields: u16 = 0, shared_roots: bool = false, control_start: usize = 0, control_end: usize = 0 };
-const Event = struct { input: Value = .{}, destination: u32 = 0, field: u32 = 0, allocation: u32 = 0, fresh: bool = false, static_words: bool = false, loop_scope: usize = 0 };
+const Node = struct { parent: u32, bad: bool = false, size: u32 = 0, allocation: bool = false, first_copy: u32 = none, last_store: u32 = 0, store_mask: u32 = 0, scope: usize = 0, fields: u32 = 0, used_fields: u16 = 0, journaled: bool = false, untyped: bool = false, reference_fields: u16 = 0, roots: u32 = 0, root_fields: u16 = 0, shared_roots: bool = false, nullable: bool = false, journal_carrier: bool = false, zero_fields: u16 = 0, nonzero_fields: u16 = 0, control_start: usize = 0, control_end: usize = 0 };
+const Event = struct { input: Value = .{}, stored: Value = .{}, destination: u32 = 0, field: u32 = 0, allocation: u32 = 0, fresh: bool = false, static_words: bool = false, loop_scope: usize = 0, nonzero: bool = false };
 const Control = struct { height: usize, result: u32, unreachable_: bool = false, identity: usize = 0, loop_: bool = false };
 pub const Output = ir.Body;
 const Analysis = struct {
@@ -21,8 +21,10 @@ const Analysis = struct {
     constants: []?u32,
     constant_scopes: []?usize,
     defined_scopes: []?usize,
+    zero_locals: []const bool,
     valid: bool = true,
     owning: bool = false,
+    children: bool = false,
     fn add(self: *Analysis, bad: bool, size: u32) !u32 {
         const id: u32 = @intCast(self.nodes.items.len);
         try self.nodes.append(self.a, .{ .parent = id, .bad = bad, .size = size });
@@ -44,6 +46,10 @@ const Analysis = struct {
     }
     fn join(self: *Analysis, dst: u32, v: Value) void {
         const target = self.root(dst);
+        if (self.children and v.id == 0 and v.constant != null and v.constant.? == 0) {
+            self.nodes.items[target].nullable = true;
+            return;
+        }
         if (v.id == 0 or v.offset != 0) {
             self.nodes.items[target].bad = true;
             self.escape(v);
@@ -54,11 +60,15 @@ const Analysis = struct {
         const right = self.nodes.items[source];
         const left = &self.nodes.items[target];
         left.bad = left.bad or right.bad or (left.size != 0 and right.size != 0 and left.size != right.size);
-        if (left.size != 0 and right.size != 0 and left.reference_fields != right.reference_fields) left.bad = true;
+        if (left.size != 0 and right.size != 0 and (left.reference_fields != right.reference_fields or left.journal_carrier != right.journal_carrier)) left.bad = true;
         left.size = @max(left.size, right.size);
         left.reference_fields |= right.reference_fields;
         left.journaled = left.journaled or right.journaled;
         left.untyped = left.untyped or right.untyped;
+        left.nullable = left.nullable or right.nullable;
+        left.journal_carrier = left.journal_carrier or right.journal_carrier;
+        left.zero_fields |= right.zero_fields;
+        left.nonzero_fields |= right.nonzero_fields;
         self.nodes.items[source].parent = target;
     }
     fn push(self: *Analysis, v: Value) !void {
@@ -135,6 +145,7 @@ const Analysis = struct {
                     if (ir.staticConstructor(instructions, at)) |tag| {
                         const id = try self.add(!self.owning, 8);
                         self.nodes.items[id].reference_fields = 2;
+                        self.nodes.items[id].zero_fields = 2;
                         self.events[at].allocation = id;
                         self.events[at].field = tag;
                         self.events[at].static_words = true;
@@ -148,13 +159,18 @@ const Analysis = struct {
                     // A constant assignment in one arm does not dominate the
                     // other arm, the enclosing continuation, or an earlier use
                     // (locals start at zero). Keep those reads as ordinary locals.
-                    if (!self.dominates(self.defined_scopes[inst.operand])) self.escape(.{ .id = inst.operand + 1 });
+                    if (!self.dominates(self.defined_scopes[inst.operand])) {
+                        if (self.children) self.nodes.items[self.root(inst.operand + 1)].nullable = true else self.escape(.{ .id = inst.operand + 1 });
+                    }
                     try self.push(if (self.dominates(self.constant_scopes[inst.operand]) and self.constants[inst.operand] != null) .{ .constant = self.constants[inst.operand].? } else .{ .id = inst.operand + 1 });
                 },
                 .local_set, .local_tee => {
                     const value = self.pop();
                     if (!self.dominates(self.defined_scopes[inst.operand])) self.defined_scopes[inst.operand] = if (self.controls.items.len == 0) 0 else self.controls.items[self.controls.items.len - 1].identity;
-                    if (self.constants[inst.operand] != null) self.constant_scopes[inst.operand] = if (self.controls.items.len == 0) 0 else self.controls.items[self.controls.items.len - 1].identity;
+                    if (self.constants[inst.operand] != null) {
+                        self.constant_scopes[inst.operand] = 0;
+                        if (!self.zero_locals[inst.operand] and self.controls.items.len != 0) self.constant_scopes[inst.operand] = self.controls.items[self.controls.items.len - 1].identity;
+                    }
                     self.copy(at, inst.operand + 1, value);
                     // Allocation results are always captured immediately by
                     // the emitter; this local owns initialization stores.
@@ -187,16 +203,24 @@ const Analysis = struct {
                     const address = self.pop();
                     self.events[at].input = address;
                     self.events[at].field = address.offset +% inst.operand;
+                    self.events[at].nonzero = ir.hasNonzeroRead(instructions, at);
                     if (address.id != 0) self.nodes.items[address.id].first_copy = @min(self.nodes.items[address.id].first_copy, @as(u32, @intCast(at)));
                     if (address.id == 0 or self.events[at].field >= 64 or self.events[at].field % 4 != 0) self.escape(address);
                     try self.push(.{});
                 },
                 .i32_store, .f32_store => {
-                    self.escape(self.pop()); // An inner object can be removed on a subsequent pass.
+                    const stored = self.pop();
                     const address = self.pop();
+                    if (address.id == 0 or !self.nodes.items[self.root(address.id)].journal_carrier) self.escape(stored);
                     self.events[at].input = address;
+                    self.events[at].stored = stored;
                     self.events[at].field = address.offset +% inst.operand;
                     if (address.id != 0) {
+                        if (self.events[at].field < 64 and self.events[at].field % 4 == 0) {
+                            const bit = @as(u16, 1) << @intCast(self.events[at].field / 4);
+                            const group = &self.nodes.items[self.root(address.id)];
+                            if (stored.constant != null and stored.constant.? == 0) group.zero_fields |= bit else group.nonzero_fields |= bit;
+                        }
                         self.nodes.items[address.id].last_store = @intCast(at);
                         if (self.events[at].field < 64 and self.events[at].field % 4 == 0 and self.nodes.items[address.id].scope == (if (self.controls.items.len == 0) @as(usize, 0) else self.controls.items[self.controls.items.len - 1].identity)) self.nodes.items[address.id].store_mask |= @as(u32, 1) << @intCast(self.events[at].field / 4);
                     }
@@ -218,6 +242,7 @@ const Analysis = struct {
                             }
                             const id = try self.add(owns_fields, size.constant.?);
                             self.nodes.items[id].reference_fields = references;
+                            self.nodes.items[id].journal_carrier = self.children and self.owning and !owns_fields and ir.allocationAnnotations(instructions, at).len != 0 and ir.hasJournalCarrier(instructions, at);
                             self.nodes.items[id].untyped = callee.ownership != .allocate_scalar and ir.allocationAnnotations(instructions, at).len == 0;
                             self.events[at].allocation = id;
                             try self.push(.{ .id = id });
@@ -229,6 +254,12 @@ const Analysis = struct {
                         // This flag affects only the allocation being removed.
                         // Ordinary heap objects retain their marker call.
                         self.events[at].input = self.pop();
+                    } else if (self.owning and module.arena != null and (inst.operand == module.arena.?.collect or inst.operand == module.arena.?.recycle)) {
+                        for (0..callee.parameters.len) |parameter| {
+                            const input = self.pop();
+                            if (parameter + 1 != callee.parameters.len or input.id == 0 or !self.nodes.items[self.root(input.id)].journal_carrier) self.escape(input);
+                        }
+                        if (callee.result != .none) try self.push(.{});
                     } else try self.call(callee.parameters.len, callee.result);
                 },
                 .call_indirect => {
@@ -311,6 +342,26 @@ const Analysis = struct {
             const root_ = self.root(event.input.id);
             if (event.field >= self.nodes.items[root_].size) self.nodes.items[root_].bad = true;
         };
+        for (instructions, self.events) |inst, event| {
+            if ((inst.op != .i32_load and inst.op != .f32_load) or event.input.id == 0) continue;
+            const family = self.root(event.input.id);
+            if (self.nodes.items[family].journal_carrier or (self.nodes.items[family].nullable and !event.nonzero)) self.nodes.items[family].bad = true;
+        }
+        // Only a removed carrier may stop its stored children escaping. A
+        // malformed, incomplete or externally observed carrier retains every
+        // child address, including chains of compiler carriers.
+        var changed = true;
+        while (changed) {
+            changed = false;
+            for (self.events) |event| {
+                if (event.input.id == 0 or event.stored.id == 0 or !self.nodes.items[self.root(event.input.id)].journal_carrier or self.selected(event.input.id)) continue;
+                const child = self.root(event.stored.id);
+                if (!self.nodes.items[child].bad) {
+                    self.nodes.items[child].bad = true;
+                    changed = true;
+                }
+            }
+        }
     }
     fn selected(self: *Analysis, id: u32) bool {
         if (id == 0) return false;
@@ -330,7 +381,7 @@ const Analysis = struct {
         var pending: std.ArrayList(u32) = .empty;
         defer pending.deinit(self.a);
         for (self.events) |event| {
-            if (event.destination != 0 and !event.fresh and self.selected(event.destination)) {
+            if (event.destination != 0 and event.input.id != 0 and !event.fresh and self.selected(event.destination)) {
                 const index: u32 = @intCast(edges.items.len);
                 try edges.append(self.a, .{ .source = event.input.id, .next = heads[event.destination] });
                 heads[event.destination] = index;
@@ -357,12 +408,15 @@ const Analysis = struct {
     // therefore retain the same value until every admitted alias is consumed.
     // Carries/snapshots outside that activation keep independent roots.
     fn shareFieldRoots(self: *Analysis, instructions: []const w.Instruction) void {
-        for (self.nodes.items) |*node| node.root_fields = node.used_fields;
+        for (0..self.nodes.items.len) |id| {
+            const family = self.nodes.items[self.root(@intCast(id))];
+            self.nodes.items[id].root_fields = self.nodes.items[id].used_fields & ~(family.zero_fields & ~family.nonzero_fields);
+        }
         for (0..self.nodes.items.len) |id| {
             const candidate = self.nodes.items[id];
             if (candidate.control_start == 0 or candidate.control_end == 0 or !self.selected(@intCast(id))) continue;
             const family = self.root(@intCast(id));
-            if (self.nodes.items[family].shared_roots or self.nodes.items[family].reference_fields == 0) continue;
+            if (self.nodes.items[family].shared_roots or self.nodes.items[family].reference_fields == 0 or self.nodes.items[family].nullable) continue;
             const start = candidate.control_start - 1;
             const end = candidate.control_end - 1;
             const activation = self.events[start].loop_scope;
@@ -441,12 +495,10 @@ const Analysis = struct {
             for (0..self.nodes.items.len) |member| if (self.root(@intCast(member)) == family) {
                 fields |= self.nodes.items[member].used_fields;
             };
-            self.nodes.items[family].root_fields = fields;
+            self.nodes.items[family].root_fields = fields & ~(self.nodes.items[family].zero_fields & ~self.nodes.items[family].nonzero_fields);
             self.nodes.items[family].shared_roots = true;
         }
-        // A virtual tagged cell otherwise publishes every copied reference.
-        // Keep that unprofitable case boxed until its activation proof exists.
-        for (self.events) |event| if (event.static_words) {
+        if (!self.children) for (self.events) |event| if (event.static_words) {
             const family = self.root(event.allocation);
             if (self.nodes.items[family].reference_fields != 0 and !self.nodes.items[family].shared_roots) self.nodes.items[family].bad = true;
         };
@@ -475,7 +527,9 @@ fn copyFields(out: *Output, analysis: *Analysis, event: Event) !void {
     const count = analysis.nodes.items[analysis.root(event.destination)].size / 4;
     // All sources precede all stores: a loop/branch may permute aliases.
     const mask = analysis.nodes.items[event.destination].used_fields;
-    for (0..count) |i| if (mask & (@as(u16, 1) << @intCast(i)) != 0) try emit(out, a, .local_get, analysis.fieldLocal(event.input.id, @intCast(i)));
+    for (0..count) |i| if (mask & (@as(u16, 1) << @intCast(i)) != 0) {
+        if (event.input.id == 0) try emit(out, a, .i32_const, 0) else try emit(out, a, .local_get, analysis.fieldLocal(event.input.id, @intCast(i)));
+    };
     var i = count;
     while (i != 0) {
         i -= 1;
@@ -554,7 +608,137 @@ fn emitProjectedCall(out: *Output, analysis: *Analysis, function: *const w.Funct
         try out.instructions.append(a, copy);
     }
 }
-fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []const w.ValueType, instructions: []const w.Instruction, owning: bool) !?Output {
+const ReferenceProof = enum { zero, immortal, frame_owned };
+fn constantReferenceLocals(a: A, proof: ReferenceProof, module: *const w.Module, parameters: usize, count: usize, instructions: []const w.Instruction) ![]bool {
+    const zeros = try a.alloc(bool, count);
+    errdefer a.free(zeros);
+    @memset(zeros, true);
+    const heads = try a.alloc(u32, count);
+    defer a.free(heads);
+    @memset(heads, none);
+    const Edge = struct { destination: u32, next: u32 };
+    var edges: std.ArrayList(Edge) = .empty;
+    defer edges.deinit(a);
+    var pending: std.ArrayList(u32) = .empty;
+    defer pending.deinit(a);
+    for (0..parameters) |id| {
+        zeros[id] = false;
+        try pending.append(a, @intCast(id));
+    }
+    const zero = none - 1;
+    var stack: std.ArrayList(u32) = .empty;
+    defer stack.deinit(a);
+    const Frame = struct {
+        height: usize,
+        result: bool,
+        first: u32 = none,
+        else_: bool = false,
+        branched: bool = false,
+        fn floor(frames: []const @This()) usize {
+            if (frames.len == 0) return 0;
+            return frames[frames.len - 1].height;
+        }
+    };
+    var controls: std.ArrayList(Frame) = .empty;
+    defer controls.deinit(a);
+    var prefix = true;
+    var scope_open = false;
+    for (instructions, 0..) |inst, at| {
+        var destination: ?u32 = null;
+        switch (inst.op) {
+            .ownership => {
+                const fact: ir.Ownership = @bitCast(inst.operand);
+                if (fact.kind == .scope and fact.chunk == 3) destination = fact.roles;
+                if (fact.kind == .scope and fact.chunk <= 2) scope_open = true;
+            },
+            .i32_const => {
+                var value: u32 = none;
+                if (!inst.table_reference and (inst.operand == 0 or (proof != .zero and ir.hasImmortalReference(instructions, at)))) value = zero;
+                try stack.append(a, value);
+            },
+            .local_get => try stack.append(a, inst.operand),
+            .local_set, .local_tee => {
+                const floor = Frame.floor(controls.items);
+                var source: u32 = none;
+                if (stack.items.len > floor) source = stack.pop().?;
+                if (source < count) {
+                    try edges.append(a, .{ .destination = inst.operand, .next = heads[source] });
+                    heads[source] = @intCast(edges.items.len - 1);
+                } else if (source != zero) destination = inst.operand;
+                if (inst.op == .local_tee) try stack.append(a, inst.operand);
+            },
+            .block, .loop, .if_ => {
+                prefix = false;
+                if (inst.op == .if_ and stack.items.len != 0) _ = stack.pop();
+                try controls.append(a, .{ .height = stack.items.len, .result = inst.operand != 0 and inst.operand != @backingInt(w.ValueType.none) });
+            },
+            .else_, .end => {
+                if (controls.items.len == 0) {
+                    stack.clearRetainingCapacity();
+                    continue;
+                }
+                const frame = &controls.items[controls.items.len - 1];
+                var result: u32 = none;
+                if (frame.result and stack.items.len > frame.height) result = stack.items[stack.items.len - 1];
+                stack.shrinkRetainingCapacity(frame.height);
+                if (inst.op == .else_) {
+                    frame.first = result;
+                    frame.else_ = true;
+                } else {
+                    if ((frame.else_ and frame.first != result) or frame.branched) result = none;
+                    const produces = frame.result;
+                    _ = controls.pop();
+                    if (produces) try stack.append(a, result);
+                }
+            },
+            .br, .br_if, .return_, .unreachable_ => {
+                for (controls.items) |*frame| frame.branched = true;
+                if (inst.op == .br_if) {
+                    if (stack.items.len != 0) _ = stack.pop();
+                } else {
+                    const floor = Frame.floor(controls.items);
+                    stack.shrinkRetainingCapacity(floor);
+                }
+            },
+            else => {
+                var arity: usize = ir.fixed(inst.op).arity;
+                var result = ir.fixed(inst.op).result;
+                var owned = false;
+                if (inst.op == .call or inst.op == .call_import or inst.op == .call_indirect) {
+                    const callee = ir.call(module, inst);
+                    arity = callee.parameters.len + @intFromBool(callee.selector);
+                    result = callee.result;
+                    owned = proof == .frame_owned and prefix and !scope_open and inst.op == .call and ir.allocationAnnotations(instructions, at).len != 0 and (callee.ownership == .allocate or callee.ownership == .allocate_scalar or callee.ownership == .allocate_typed);
+                } else if (inst.op == .global_get) result = module.globals.items[inst.operand].scalar.machine();
+                const floor = Frame.floor(controls.items);
+                const available = stack.items.len - floor;
+                stack.shrinkRetainingCapacity(stack.items.len - @min(arity, available));
+                if (result != .none) {
+                    var value: u32 = none;
+                    if (owned) value = zero;
+                    try stack.append(a, value);
+                }
+            },
+        }
+        if (destination) |id| if (zeros[id]) {
+            zeros[id] = false;
+            try pending.append(a, id);
+        };
+    }
+    while (pending.pop()) |source| {
+        var edge = heads[source];
+        while (edge != none) {
+            const value = edges.items[edge];
+            if (zeros[value.destination]) {
+                zeros[value.destination] = false;
+                try pending.append(a, value.destination);
+            }
+            edge = value.next;
+        }
+    }
+    return zeros;
+}
+fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []const w.ValueType, instructions: []const w.Instruction, owning: bool, children: bool) !?Output {
     const events = try a.alloc(Event, instructions.len);
     defer a.free(events);
     @memset(events, .{});
@@ -577,7 +761,18 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
         if (!writes[inst.operand]) constants[inst.operand] = value else if (constants[inst.operand] != value) constants[inst.operand] = null;
         writes[inst.operand] = true;
     };
-    var analysis: Analysis = .{ .a = a, .events = events, .constants = constants, .constant_scopes = constant_scopes, .defined_scopes = defined_scopes, .owning = owning };
+    const zeros = blk: {
+        if (children) break :blk try constantReferenceLocals(a, .zero, module, function.parameters.len, local_count, instructions);
+        const disabled = try a.alloc(bool, local_count);
+        @memset(disabled, false);
+        break :blk disabled;
+    };
+    defer a.free(zeros);
+    for (zeros, 0..) |zero, id| if (zero) {
+        constants[id] = 0;
+        constant_scopes[id] = 0;
+    };
+    var analysis: Analysis = .{ .a = a, .events = events, .constants = constants, .constant_scopes = constant_scopes, .defined_scopes = defined_scopes, .zero_locals = zeros, .owning = owning, .children = children };
     defer analysis.nodes.deinit(a);
     defer analysis.stack.deinit(a);
     defer analysis.controls.deinit(a);
@@ -632,6 +827,22 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
             try emit(&out, a, .ownership, @bitCast(ir.Ownership{ .kind = .scope, .chunk = 3, .roles = @intCast(slot) }));
         }
     }
+    const zero_slots = try a.alloc(bool, local_count);
+    defer a.free(zero_slots);
+    @memset(zero_slots, false);
+    for (instructions) |inst| if (inst.op == .ownership) {
+        const fact: ir.Ownership = @bitCast(inst.operand);
+        if (fact.kind == .scope and fact.chunk == 3) zero_slots[fact.roles] = true;
+    };
+    for (instructions) |inst| {
+        if (inst.op == .local_get or inst.op == .local_set or inst.op == .local_tee) zero_slots[inst.operand] = false;
+        if (inst.op == .ownership) {
+            const fact: ir.Ownership = @bitCast(inst.operand);
+            if (fact.kind != .scope or fact.chunk != 4) continue;
+            const value = fact.roles >> 13;
+            if (!zeros[value] and !analysis.selected(value + 1)) zero_slots[fact.roles & 8191] = false;
+        }
+    }
     var planned_locals = std.math.add(usize, function.parameters.len, out.locals.items.len) catch return error.OutOfMemory;
     for (instructions, 0..) |inst, at| {
         if (inst.op != .call_indirect) continue;
@@ -647,6 +858,7 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
     for (instructions, events) |inst, event| {
         if (inst.op == .ownership) {
             const scope: ir.Ownership = @bitCast(inst.operand);
+            if (scope.kind == .scope and ((scope.chunk == 3 and zero_slots[scope.roles]) or (scope.chunk == 4 and zero_slots[scope.roles & 8191]))) continue;
             if (scope.kind == .call_result and event.field != 0) continue;
             // This anonymous slot owns only the removed scalar object. Carry
             // slots and scope boundaries keep their original clearing/order.
@@ -658,6 +870,7 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
         }
         if (analysis.selected(event.allocation)) {
             if (event.static_words) {
+                out.instructions.shrinkRetainingCapacity(out.instructions.items.len - 4);
                 const mask = analysis.nodes.items[event.allocation].used_fields;
                 const words = analysis.nodes.items[analysis.root(event.allocation)].size / 4;
                 for (0..words) |field| {
@@ -692,25 +905,133 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
     }
     return out;
 }
+// Private copies need no extra edge when every publication is zero, static,
+// or an initial allocation still owned by the enclosing function frame.
+// Machine access to a reserved slot keeps it. Scalar-looking addresses grant
+// no static/ownership fact; all writes and parallel copies participate.
+fn pruneFieldRoots(a: A, module: *const w.Module, owning: bool, parameters: usize, body: *Output) !void {
+    const count = std.math.add(usize, parameters, body.locals.items.len) catch return error.OutOfMemory;
+    var proof: ReferenceProof = .immortal;
+    if (owning) proof = .frame_owned;
+    const covered = try constantReferenceLocals(a, proof, module, parameters, count, body.instructions.items);
+    defer a.free(covered);
+    const slots = try a.alloc(bool, count);
+    defer a.free(slots);
+    @memset(slots, false);
+    for (body.instructions.items) |inst| if (inst.op == .ownership) {
+        const fact: ir.Ownership = @bitCast(inst.operand);
+        if (fact.kind == .scope and fact.chunk == 3) slots[fact.roles] = true;
+    };
+    for (body.instructions.items) |inst| {
+        if (inst.op == .local_get or inst.op == .local_set or inst.op == .local_tee) slots[inst.operand] = false;
+        if (inst.op == .ownership) {
+            const fact: ir.Ownership = @bitCast(inst.operand);
+            if (fact.kind == .scope and fact.chunk == 4 and !covered[fact.roles >> 13]) slots[fact.roles & 8191] = false;
+        }
+    }
+    var position: usize = 0;
+    for (body.instructions.items) |inst| {
+        if (inst.op == .ownership) {
+            const fact: ir.Ownership = @bitCast(inst.operand);
+            if (fact.kind == .scope and ((fact.chunk == 3 and slots[fact.roles]) or (fact.chunk == 4 and slots[fact.roles & 8191]))) continue;
+        }
+        body.instructions.items[position] = inst;
+        position += 1;
+    }
+    body.instructions.shrinkRetainingCapacity(position);
+}
 pub fn run(a: A, module: *const w.Module, function: *const w.Function) !?Output {
     return runWithRoots(a, module, function, false);
 }
+const Cost = struct {
+    const Budget = struct { allocations: usize = 0, publications: usize = 0 };
+    // Cost admission is bounded independently of source nesting. Functions
+    // beyond this budget keep the established scalar/activation optimization.
+    scopes: [65]Budget = @splat(.{}),
+    loops: usize = 0,
+    valid: bool = true,
+};
+fn costs(module: *const w.Module, instructions: []const w.Instruction) Cost {
+    var value: Cost = .{};
+    var controls: [256]usize = undefined;
+    var depth: usize = 0;
+    var current: usize = 0;
+    for (instructions, 0..) |inst, at| {
+        switch (inst.op) {
+            .block, .loop, .if_ => {
+                if (depth == controls.len) {
+                    value.valid = false;
+                    return value;
+                }
+                controls[depth] = current;
+                depth += 1;
+                if (inst.op == .loop) {
+                    value.loops += 1;
+                    if (value.loops == value.scopes.len) {
+                        value.valid = false;
+                        return value;
+                    }
+                    current = value.loops;
+                }
+            },
+            .end => {
+                if (depth == 0) {
+                    value.valid = false;
+                    return value;
+                }
+                depth -= 1;
+                current = controls[depth];
+            },
+            else => {},
+        }
+        if (inst.op == .call and module.arena.?.isAllocation(inst.operand) and !ir.hasJournalCarrier(instructions, at)) value.scopes[current].allocations += 1;
+        if (inst.op == .ownership) {
+            const fact: ir.Ownership = @bitCast(inst.operand);
+            if (fact.kind == .scope and fact.chunk == 4) value.scopes[current].publications += 1;
+        }
+    }
+    return value;
+}
 pub fn runWithRoots(a: A, module: *const w.Module, function: *const w.Function, owning: bool) !?Output {
+    var output = try runMode(a, module, function, owning, true) orelse return null;
+    const before = costs(module, function.instructions.items);
+    const after = costs(module, output.instructions.items);
+    // Admit the journal tradeoff independently in each unchanged loop. A
+    // one-time allocation cannot pay for extra publications on every pull.
+    var admitted = before.valid and after.valid and before.loops == after.loops;
+    if (admitted) for (before.scopes, after.scopes) |left, right| {
+        if (right.allocations > left.allocations or (right.publications > left.publications and right.publications - left.publications >= 2 * (left.allocations - right.allocations))) {
+            admitted = false;
+            break;
+        }
+    };
+    if (!admitted) {
+        output.deinit(a);
+        return runMode(a, module, function, owning, false);
+    }
+    return output;
+}
+fn runMode(a: A, module: *const w.Module, function: *const w.Function, owning: bool, children: bool) !?Output {
     if (module.arena == null) return null;
     var output: ?Output = null;
     errdefer if (output) |*out| out.deinit(a);
-    for (0..4) |_| {
+    var previous_allocations: usize = std.math.maxInt(usize);
+    var rounds: usize = 0;
+    while (children or rounds < 4) {
+        rounds += 1;
         const locals = if (output) |out| out.locals.items else function.locals.items;
         const instructions = if (output) |out| out.instructions.items else function.instructions.items;
         var allocations: usize = 0;
         for (instructions, 0..) |inst, i| if (inst.op == .call and module.arena.?.isAllocation(inst.operand) and i != 0 and instructions[i - 1].op == .i32_const and instructions[i - 1].operand <= 64) {
             allocations += 1;
         };
-        if (allocations == 0) break;
-        const next = try pass(a, module, function, locals, instructions, owning) orelse break;
+        if (allocations == 0 or allocations >= previous_allocations) break;
+        previous_allocations = allocations;
+        const next = try pass(a, module, function, locals, instructions, owning, children) orelse break;
         if (output) |*out| out.deinit(a);
         output = next;
     }
+    if (output) |*body| try pruneFieldRoots(a, module, owning, function.parameters.len, body);
     return output;
 }
 
@@ -860,7 +1181,11 @@ fn journaledScalarSnapshots(a: A) !void {
                 try std.testing.expect(inst.op != .call);
                 if (inst.op == .ownership and @as(ir.Ownership, @bitCast(inst.operand)).kind == .scope) scope_count += 1;
             }
-            try std.testing.expectEqual(scopes.len - 1, scope_count);
+            try std.testing.expectEqual(@as(usize, 1), scope_count);
+            for (body.instructions.items) |inst| if (inst.op == .ownership) {
+                const fact: ir.Ownership = @bitCast(inst.operand);
+                if (fact.kind == .scope) try std.testing.expectEqual(@as(u4, 2), fact.chunk);
+            };
         }
         try std.testing.expectEqualSlices(w.Instruction, before, module.functions.items[function].instructions.items);
     }
@@ -1117,4 +1442,147 @@ fn staticConstructorFields(a: A) !void {
 test "exact static constructor fields join private allocated alternatives without publishing identities" {
     try staticConstructorFields(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, staticConstructorFields, .{});
+}
+
+fn checkedAbsentFields(a: A) !void {
+    for (0..6) |scenario| {
+        var module = w.Module.init(a);
+        defer module.deinit();
+        const arena = try module.ensureArena();
+        const f = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+        const object = try module.addLocal(f, .i32);
+        const saved = try module.addLocal(f, .i32);
+        const observer = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+        try module.emit(observer, .{ .op = .i32_const, .operand = 9 });
+        try module.emitSlice(f, &.{ .{ .op = .local_get }, .{ .op = .if_ } });
+        var facts: [ir.max_annotations]ir.Instruction = undefined;
+        try module.emitSlice(f, ir.annotations(&.{ .scalar, .scalar }, .unknown, &facts));
+        try module.emitSlice(f, &.{
+            .{ .op = .i32_const, .operand = 8 },      .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = object },
+            .{ .op = .local_get, .operand = object }, .{ .op = .i32_const, .operand = 8192 },      .{ .op = .i32_store },
+        });
+        if (scenario != 5) try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = object }, .{ .op = .f32_const, .operand = 0x80000000 }, .{ .op = .f32_store, .operand = 4 } });
+        try module.emitSlice(f, &.{
+            .{ .op = .local_get, .operand = object }, .{ .op = .local_set, .operand = saved },
+            .{ .op = .else_ },                        .{ .op = .i32_const },
+            .{ .op = .local_set, .operand = saved },  .{ .op = .end },
+            .{ .op = .local_get },                    .{ .op = .if_, .operand = @backingInt(w.ValueType.i32) },
+        });
+        if (scenario == 3) try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = saved }, .{ .op = .call, .operand = observer }, .{ .op = .drop } });
+        try module.emit(f, .{ .op = .local_get, .operand = saved });
+        var marker = ir.nonzeroRead();
+        if (scenario == 2) marker.operand ^= 64;
+        if (scenario != 0) try module.emit(f, marker);
+        var offset: u32 = 4;
+        if (scenario == 4) offset = 8;
+        try module.emitSlice(f, &.{ .{ .op = .f32_load, .operand = offset }, .{ .op = .i32_reinterpret_f32 }, .{ .op = .else_ }, .{ .op = .i32_const }, .{ .op = .end } });
+        const before = try a.dupe(w.Instruction, module.functions.items[f].instructions.items);
+        defer a.free(before);
+        var out = try runWithRoots(a, &module, &module.functions.items[f], true);
+        defer if (out) |*body| body.deinit(a);
+        try std.testing.expectEqual(scenario == 1, out != null);
+        if (out) |body| for (body.instructions.items) |inst| {
+            try std.testing.expect(inst.op != .f32_load and !(inst.op == .call and arena.isAllocation(inst.operand)));
+        };
+        try std.testing.expectEqualSlices(w.Instruction, before, module.functions.items[f].instructions.items);
+    }
+}
+test "checked private absent fields preserve nullable copies bits and conservative fallback through OOM" {
+    try checkedAbsentFields(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, checkedAbsentFields, .{});
+}
+
+fn journalCarrierFields(a: A) !void {
+    for (0..8) |scenario| {
+        var module = w.Module.init(a);
+        defer module.deinit();
+        const arena = try module.ensureArena();
+        const f = try module.addTypedFunction(&.{}, .i32, .scalar);
+        const child = try module.addLocal(f, .i32);
+        const carrier = try module.addLocal(f, .i32);
+        const observer = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+        try module.emit(observer, .{ .op = .i32_const, .operand = 9 });
+        var facts: [ir.max_annotations]ir.Instruction = undefined;
+        try module.emitSlice(f, ir.annotations(&.{.scalar}, .unknown, &facts));
+        try module.emitSlice(f, &.{
+            .{ .op = .i32_const, .operand = 4 },     .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = child },
+            .{ .op = .local_get, .operand = child }, .{ .op = .i32_const, .operand = 42 },        .{ .op = .i32_store },
+        });
+        if (scenario != 1) try module.emit(f, ir.journalCarrier());
+        var role: ir.Role = .reference;
+        if (scenario == 3) role = .value;
+        try module.emitSlice(f, ir.annotations(&.{ role, .scalar }, .unknown, &facts));
+        try module.emitSlice(f, &.{
+            .{ .op = .i32_const, .operand = 8 },       .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = carrier },
+            .{ .op = .local_get, .operand = carrier }, .{ .op = .local_get, .operand = child },     .{ .op = .i32_store },
+        });
+        if (scenario != 6) try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = carrier }, .{ .op = .i32_const }, .{ .op = .i32_store, .operand = 4 } });
+        if (scenario == 4) try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = carrier }, .{ .op = .call, .operand = observer }, .{ .op = .drop } });
+        if (scenario == 5) try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = carrier }, .{ .op = .i32_load }, .{ .op = .i32_load }, .{ .op = .drop } });
+        if (scenario == 7) {
+            try module.emitSlice(f, &.{ .{ .op = .i32_const }, .{ .op = .local_get, .operand = carrier } });
+        } else try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = carrier }, .{ .op = .i32_const } });
+        try module.emitSlice(f, &.{ .{ .op = .i32_const }, .{ .op = .call, .operand = arena.collect }, .{ .op = .drop }, .{ .op = .local_get, .operand = carrier }, .{ .op = .call, .operand = arena.recycle }, .{ .op = .i32_const } });
+        const before = try a.dupe(w.Instruction, module.functions.items[f].instructions.items);
+        defer a.free(before);
+        var out = try runWithRoots(a, &module, &module.functions.items[f], scenario != 2);
+        defer if (out) |*body| body.deinit(a);
+        try std.testing.expectEqual(scenario == 0, out != null);
+        if (out) |body| for (body.instructions.items) |inst| {
+            try std.testing.expect(!(inst.op == .call and arena.isAllocation(inst.operand)));
+        };
+        try std.testing.expectEqualSlices(w.Instruction, before, module.functions.items[f].instructions.items);
+    }
+}
+test "private journal carriers decline unknown escaped read incomplete and unowned children through OOM" {
+    try journalCarrierFields(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, journalCarrierFields, .{});
+}
+
+fn permanentReferenceFlows(a: A) !void {
+    for (0..10) |scenario| {
+        var module = w.Module.init(a);
+        defer module.deinit();
+        const arena = try module.ensureArena();
+        var code: std.ArrayList(w.Instruction) = .empty;
+        defer code.deinit(a);
+        var annotated: [ir.max_annotations]ir.Instruction = undefined;
+        if (scenario == 0) {
+            try code.appendSlice(a, &.{ .{ .op = .local_get, .operand = 2 }, .{ .op = .local_set, .operand = 1 }, .{ .op = .local_get, .operand = 1 }, .{ .op = .local_set, .operand = 2 } });
+        } else if (scenario <= 3) {
+            if (scenario != 2) try code.append(a, ir.immortalReference());
+            try code.append(a, .{ .op = .i32_const, .operand = 8192, .table_reference = scenario == 3 });
+            try code.append(a, .{ .op = .local_set, .operand = 1 });
+        } else if (scenario <= 7) {
+            if (scenario == 6) try code.append(a, .{ .op = .ownership, .operand = @bitCast(ir.Ownership{ .kind = .scope }) });
+            if (scenario == 7) try code.appendSlice(a, &.{ .{ .op = .local_get }, .{ .op = .if_ } });
+            if (scenario != 5) try code.appendSlice(a, ir.annotations(&.{.scalar}, .unknown, &annotated));
+            try code.appendSlice(a, &.{ .{ .op = .i32_const, .operand = 4 }, .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = 1 } });
+            if (scenario == 6) try code.append(a, .{ .op = .ownership, .operand = @bitCast(ir.Ownership{ .kind = .scope, .chunk = 1 }) });
+            if (scenario == 7) try code.append(a, .{ .op = .end });
+        } else if (scenario == 8) {
+            try code.appendSlice(a, &.{ .{ .op = .local_get }, .{ .op = .local_set, .operand = 1 } });
+        } else {
+            // Parallel copies keep the stack origins; the unknown parameter
+            // poisons only its destination and all subsequent copies of it.
+            try code.appendSlice(a, &.{ .{ .op = .i32_const }, .{ .op = .local_get }, .{ .op = .local_set, .operand = 2 }, .{ .op = .local_set, .operand = 1 } });
+        }
+        if (scenario != 0 and scenario != 9) try code.appendSlice(a, &.{ .{ .op = .local_get, .operand = 1 }, .{ .op = .local_set, .operand = 2 } });
+        const zeros = try constantReferenceLocals(a, .zero, &module, 1, 3, code.items);
+        defer a.free(zeros);
+        const permanent = try constantReferenceLocals(a, .immortal, &module, 1, 3, code.items);
+        defer a.free(permanent);
+        const owned = try constantReferenceLocals(a, .frame_owned, &module, 1, 3, code.items);
+        defer a.free(owned);
+        try std.testing.expectEqual(scenario == 0 or scenario == 9, zeros[1]);
+        try std.testing.expectEqual(scenario == 0 or scenario == 1 or scenario == 9, permanent[1]);
+        try std.testing.expectEqual(scenario == 0 or scenario == 1 or scenario == 4 or scenario == 9, owned[1]);
+        try std.testing.expectEqual(scenario == 0, zeros[2]);
+        try std.testing.expectEqual(scenario == 0 or scenario == 1, permanent[2]);
+        try std.testing.expectEqual(scenario == 0 or scenario == 1 or scenario == 4, owned[2]);
+    }
+}
+test "permanent reference copies require symbolic static or enclosing frame ownership through OOM" {
+    try permanentReferenceFlows(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, permanentReferenceFlows, .{});
 }

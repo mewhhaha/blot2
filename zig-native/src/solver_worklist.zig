@@ -223,6 +223,15 @@ const Frontier = struct {
                     }
                     @memcpy(stack[len..][0..arguments.len], arguments);
                     len += arguments.len;
+                    const instance = store.operation(label).instance;
+                    if (instance.unit == 0 and instance.decl != 0) {
+                        if (len == stack.len) {
+                            self.overflow = true;
+                            return;
+                        }
+                        stack[len] = instance.decl;
+                        len += 1;
+                    }
                 }
             }
             var local: [3]types.Id = undefined;
@@ -235,7 +244,12 @@ const Frontier = struct {
                     local = .{ node.a, node.b, node.c };
                     break :blk &local;
                 },
-                .array, .list, .cursor, .resolver, .demand, .provider, .scoped => blk: {
+                .scoped => blk: {
+                    local = .{ node.a, node.c, 0 };
+                    if (node.b == 0) break :blk local[0..2];
+                    break :blk local[0..1];
+                },
+                .array, .list, .cursor, .resolver, .demand, .provider => blk: {
                     local[0] = node.a;
                     break :blk local[0..1];
                 },
@@ -425,4 +439,36 @@ fn operationFrontierScenario(a: Allocator) !void {
 test "variable worklist watches symbolic operation arguments scoped payloads and associated projections" {
     try operationFrontierScenario(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, operationFrontierScenario, .{});
+}
+
+fn identityFrontierScenario(a: Allocator) !void {
+    var store = try types.Store.initWithOptions(a, .{ .closed_graphs = true });
+    defer store.deinit();
+    var queue: Queue = .{};
+    defer queue.deinit(a);
+    const descriptor = try store.nominal(.{ .unit = 2, .decl = 7 }, &.{types.u32_type});
+    const input = try store.capabilityParameter(descriptor);
+    const instance: types.NominalIdentity = .{ .unit = 0, .decl = store.node(input).c };
+    const operation = try store.internScopedOperation(.{ .unit = 2, .decl = 8 }, instance, &.{types.u32_type});
+    const row = try store.effects.row(&.{ operation, operation }, .closed);
+    const callback = try store.functionWithEffects(types.unit, types.u32_type, row);
+    try queue.add(a, true);
+    try queue.add(a, true);
+    queue.observe(&store);
+    while (queue.take(0)) |_| {}
+    try queue.watch(a, &store, 0, &.{input}, false, false);
+    try queue.watch(a, &store, 1, &.{callback}, false, false);
+    const unrelated = try store.fresh();
+    try store.unify(unrelated, types.boolean);
+    queue.observe(&store);
+    try std.testing.expectEqual(null, queue.take(0));
+    try store.unify(input, try store.scoped(descriptor, .{ .unit = 2, .decl = 40 }));
+    queue.observe(&store);
+    try std.testing.expectEqual(@as(?usize, 0), queue.take(0));
+    try std.testing.expectEqual(@as(?usize, 1), queue.take(0));
+    try std.testing.expectEqual(null, queue.take(0));
+}
+test "variable worklist watches capability parameter and operation instance binder edges" {
+    try identityFrontierScenario(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, identityFrontierScenario, .{});
 }

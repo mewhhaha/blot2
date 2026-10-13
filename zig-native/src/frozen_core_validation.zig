@@ -233,7 +233,7 @@ const Bounds = struct {
             switch (value.tag) {
                 .scoped => {
                     try self.ty(value.a);
-                    try require(self.m.types.node(value.a).tag == .nominal and value.b == self.m.unit and value.c != 0);
+                    try require(self.m.types.node(value.a).tag == .nominal and value.c != 0);
                     try self.scopedInstance(.{ .unit = value.b, .decl = value.c });
                 },
                 .absent, .unit, .boolean, .u32, .f32, .never, .variable => {},
@@ -309,6 +309,16 @@ const Bounds = struct {
     }
     fn scopedInstance(self: Bounds, instance: T.NominalIdentity) BoundsError!void {
         if (instance.decl == 0) return require(instance.unit == 0);
+        if (instance.unit == 0) {
+            try self.ty(instance.decl);
+            try require(self.m.types.node(instance.decl).tag == .variable);
+            for (self.m.bindings) |binding_| {
+                if (binding_.kind != .parameter or binding_.ty >= self.m.types.nodes.len) continue;
+                const input = self.m.types.node(binding_.ty);
+                if (input.tag == .scoped and input.b == 0 and input.c == instance.decl) return;
+            }
+            return error.InvalidArtifact;
+        }
         try require(instance.unit == self.m.unit);
         for (self.m.nodes) |node_| {
             if (node_.tag != .effect_scope or node_.a >= self.m.nodes.len) continue;
@@ -324,6 +334,7 @@ const Bounds = struct {
     fn catalogs(self: Bounds) BoundsError!void {
         for (self.m.bindings, 0..) |value, id| {
             try enumValue(check.Kind, value.kind);
+            try enumValue(check.CapabilityFlow, value.capability_flow);
             try self.ty(value.ty);
             try self.scheme(value.scheme);
             try self.publicSlots(value.public_variables, value.scheme.variables, false);
@@ -343,6 +354,44 @@ const Bounds = struct {
             try index(self.m.bodies.len, value.body_id);
             if (id != 0 and value.kind != .external) try require((value.target.binding == id or (value.kind == .local and value.target.binding == 0)) and (value.target.unit == 0 or value.target.unit == self.m.unit));
             if (value.body_id != 0) try require(value.kind == .global and self.m.bodies[value.body_id].binding == id);
+            if (value.capability_flow != .unknown) {
+                try require(value.kind == .global and value.body_id != 0);
+                const body = self.m.bodies[value.body_id];
+                const curried = value.capability_flow == .invoke_with_capability;
+                var arity: u32 = 1;
+                if (curried) arity = 2;
+                try require(body.is_function and body.parameters.len == arity and body.root != 0);
+                try range(self.m.parameters.len, body.parameters.start, body.parameters.len);
+                var input_index = body.parameters.start;
+                if (curried) {
+                    try self.ty(self.m.parameters[input_index].ty);
+                    try require(self.m.types.node(self.m.parameters[input_index].ty).tag == .scoped);
+                    input_index += 1;
+                }
+                const input_binding = self.m.parameters[input_index].binding;
+                try self.node(body.root, false);
+                const root = self.m.node(body.root);
+                var returned = root;
+                if (value.capability_flow == .invoke_unit or value.capability_flow == .member_unit or curried) {
+                    try require(root.tag == .apply);
+                    try self.node(root.a, false);
+                    try self.node(root.b, false);
+                    const argument = self.m.node(root.b);
+                    try require(argument.tag == .constant and argument.ty == T.unit and argument.a == 0);
+                    returned = self.m.node(root.a);
+                }
+                if (value.capability_flow == .member_unit) {
+                    try require(returned.tag == .operation_value);
+                    try index(self.m.operation_values.len, returned.a);
+                    const selected = self.m.operation_values[returned.a];
+                    try self.node(selected.capability, false);
+                    returned = self.m.node(selected.capability);
+                }
+                try require(returned.tag == .reference);
+                try index(self.m.references.len, returned.a);
+                const target = self.m.references[returned.a];
+                try require((target.unit == 0 or target.unit == self.m.unit) and target.binding == input_binding);
+            }
         }
         for (self.m.bodies, 0..) |value, id| {
             try self.binding(value.binding, id == 0);
@@ -1043,7 +1092,12 @@ const Graph = struct {
                         for (m.contract_members) |member| if (member.contract.unit == v.a and member.contract.decl == v.b and member.name == name and member.kind == .defined_type) break :blk self.vertex(.type_, member.root);
                         break :blk null;
                     },
-                    .array, .list, .cursor, .resolver, .scoped => if (slot == 0) self.vertex(.type_, v.a) else null,
+                    .scoped => switch (slot) {
+                        0 => self.vertex(.type_, v.a),
+                        1 => if (v.b == 0) self.vertex(.type_, v.c) else null,
+                        else => null,
+                    },
+                    .array, .list, .cursor, .resolver => if (slot == 0) self.vertex(.type_, v.a) else null,
                     .demand, .provider => switch (slot) {
                         0 => self.vertex(.type_, v.a),
                         1 => if (m.types.effects.rows.len == 0) null else self.vertex(.row, v.c),

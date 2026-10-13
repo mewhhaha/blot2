@@ -502,9 +502,29 @@ The pass transforms an assembly copy, preserving retained symbolic fragments.
 Empty constructor cells carry exact symbolic tag/zero-payload facts; replacing
 one never depends on mutable module data or pointer-looking scalar bits. A
 private tagged join needs mutually exclusive producers and a common enclosing
-loop activation before field aliases can share an owning root. Nested producer
-loops, older activation aliases, unknown uses and escapes keep ordinary storage.
-Unproved tagged joins retain their cells rather than multiply root publications.
+loop activation before field aliases can share an owning root. Other admitted
+joins keep independent field roots. Checked nonempty field-read facts admit an
+absent zero alternative in private tuple/record copies; unmarked reads, unknown
+uses, incomplete initialization and escapes retain their ordinary values.
+
+Compiler-only collection carriers may disappear in owning mode when their exact
+scalar/reference fields duplicate the journal and contain no demand memo roots.
+Only the root argument of collect/recycle is admitted. Observed, incomplete,
+unknown or escaping carriers preserve all their stored children. Removed empty
+constructor facts are consumed with their static address, so a later pass cannot
+reinterpret the inserted scalar tag as another static cell.
+
+Copied field slots need no additional edge if every publication is zero, an
+explicit relocated static address, or an annotated initial allocation held by
+the enclosing function frame before any source scope or control starts. This
+proof follows all writes, branch results and parallel copies. It never infers
+static or reference identity from scalar bits. Machine-observed slots stay.
+
+Nested child replacement proceeds while allocation sites strictly decrease.
+Admission bounds loops and control nesting and compares added root publications
+against removed allocation sites in each unchanged loop. One-time allocations
+and cadence-only carrier allocations do not pay for per-pull journal traffic.
+An unprofitable candidate keeps the established scalar/activation optimization.
 Direct loop patterns containing only bindings, wildcards and products need no
 failure blocks; their local definitions dominate the loop body. Patterns with
 runtime tests retain the failure path. Generic iterator lowering still creates

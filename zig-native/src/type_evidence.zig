@@ -371,6 +371,8 @@ pub const Store = struct {
                 if (selection.remaining.* == 0) return error.EvidenceLimit;
                 selection.remaining.* -= 1;
             }
+            const instance = source.operation(label).instance;
+            if (instance.unit == 0 and instance.decl != 0) return error.UnresolvedType;
             arguments.clearRetainingCapacity();
             for (source.operationArguments(label)) |argument| try arguments.append(allocator, try self.projectDepth(source, argument, mappings, rows, depth + 1, budget, retained, memo, height, resolver));
             try labels.append(allocator, try self.effects.internOperationInstance(source.operation(label).identity, arguments.items, source.operation(label).instance));
@@ -1002,4 +1004,21 @@ fn rowSubstitutionScenario(allocator: Allocator) !void {
 test "type and row substitutions have separate namespaces and transactional matching" {
     try rowSubstitutionScenario(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, rowSubstitutionScenario, .{});
+}
+
+test "unresolved capability instance terms cannot become closed row evidence" {
+    const allocator = std.testing.allocator;
+    var solver = try types.Store.init(allocator);
+    defer solver.deinit();
+    var evidence = try Store.init(allocator);
+    defer evidence.deinit();
+    const capability = try solver.capabilityParameter(try solver.nominal(.{ .unit = 2, .decl = 7 }, &.{types.u32_type}));
+    const label = try solver.internScopedOperation(.{ .unit = 2, .decl = 8 }, .{ .unit = 0, .decl = solver.node(capability).c }, &.{types.u32_type});
+    const row = try solver.effects.row(&.{ label, label }, .closed);
+    try std.testing.expectError(error.UnresolvedType, evidence.projectEffects(&solver, row, &.{}, &.{}));
+    try solver.unify(capability, try solver.scoped(solver.node(capability).a, .{ .unit = 2, .decl = 40 }));
+    const resolved = try solver.resolveEffects(row, 0);
+    const closed = try evidence.projectEffects(&solver, resolved, &.{}, &.{});
+    try std.testing.expectEqual(2, evidence.effects.view().rowLabels(closed).len);
+    try std.testing.expectEqual(types.NominalIdentity{ .unit = 2, .decl = 40 }, evidence.effects.view().operation(evidence.effects.view().rowLabels(closed)[0]).instance);
 }

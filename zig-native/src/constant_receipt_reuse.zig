@@ -14,7 +14,9 @@ pub const State = struct {
     old: *const artifacts.Pools,
     gate: admission.Gate,
     semantic: ?importer.Importer = null,
+    scratch: ?graph.QueryScratch = null,
     pub fn deinit(self: *State) void {
+        if (self.scratch) |*buffers| buffers.deinit();
         if (self.semantic) |*maps| maps.deinit();
         self.gate.deinit();
     }
@@ -279,44 +281,39 @@ pub const State = struct {
         var plan = found.plan orelse return self.reject(g, .graph);
         defer plan.deinit(self.allocator);
         session.constant_stats.graph_values_examined += plan.order.len;
-        // Dense graph indexes are private proof scratch. Report their known
-        // allocation widths separately from transported values and receipts.
-        session.constant_stats.graph_index_bytes += self.old.evaluator.values.len + self.old.evaluator.evidence.nodes.len;
+        // Inspection uses sparse visitation pages; transport buffers are shared
+        // across this request. Neither index grants receipt authority.
+        session.constant_stats.graph_index_bytes += found.stats.inspection_index_bytes;
         const semantic = try self.pairedImporter();
-        const seeds = try self.allocator.alloc(u32, self.old.evaluator.values.len);
-        session.constant_stats.graph_index_bytes += seeds.len * @sizeOf(u32);
-        defer self.allocator.free(seeds);
-        @memset(seeds, 0);
+        if (self.scratch == null) self.scratch = .{ .allocator = self.allocator };
+        const buffers = &self.scratch.?;
+        const bytes_before = buffers.payloadBytes();
+        defer session.constant_stats.graph_index_bytes += buffers.payloadBytes() - bytes_before;
+        const seeds = buffers.begin(&plan, g) catch |err| {
+            if (err == error.OutOfMemory) return error.OutOfMemory;
+            return self.reject(g, .imported);
+        };
         for (record.events) |event| switch (event) {
             .work, .member => {},
             .read => |read| {
                 const current = (session.readyConstantAnchor(read.target)).?;
-                session.constant_stats.graph_index_bytes += seeds.len * (@sizeOf(usize) + @sizeOf(u32)) + session.values.items.len * @sizeOf(u32) + plan.order.len * @sizeOf(u32);
-                const matched = plan.matchInto(g, semantic, read.value, current, seeds) catch |err| {
+                const matched = plan.matchIntoWithScratch(g, semantic, read.value, current, seeds, buffers) catch |err| {
                     if (err == error.OutOfMemory) return error.OutOfMemory;
                     return self.reject(g, .imported);
                 };
                 if (!matched) return self.reject(g, .read);
             },
         };
-        const positions = try self.allocator.alloc(bool, self.old.evaluator.children.len);
-        session.constant_stats.graph_index_bytes += positions.len * @sizeOf(bool);
-        defer self.allocator.free(positions);
-        @memset(positions, false);
-        for (plan.order) |id| if (seeds[id] != 0) {
-            const info = self.old.evaluator.values[id];
-            @memset(positions[info.start..][0..info.len], true);
-        };
+        // Constant admission allows one primitive collection root and scalar
+        // reads. Its only child span is the root's; no pool-wide union index is
+        // needed to count transported storage. Broader graphs need their own
+        // complete span proof before this boundary can admit them.
         var values: usize = 0;
-        var children: usize = 0;
         for (plan.order) |id| if (seeds[id] == 0) {
             values += 1;
-            const info = self.old.evaluator.values[id];
-            for (positions[info.start..][0..info.len]) |*present| if (!present.*) {
-                present.* = true;
-                children += 1;
-            };
         };
+        var children: usize = 0;
+        if (seeds[record.value] == 0) children = self.old.evaluator.values[record.value].len;
         if (values > total.values or children > total.children) return self.reject(g, .resource);
         var owned = try record.clone(self.allocator);
         @memcpy(@constCast(owned.inputs.types), inputs.types);
@@ -326,12 +323,11 @@ pub const State = struct {
         try session.constant_records.ensureUnusedCapacity(self.allocator, 1);
         const before_values = session.values.items.len;
         const before_children = session.children.items.len;
-        session.constant_stats.graph_index_bytes += seeds.len * (@sizeOf(u32) + @sizeOf(bool)) + self.old.evaluator.children.len * @sizeOf(u32) + plan.order.len * @sizeOf(u32);
-        const mapped = plan.materializeReachableMapped(g, semantic, seeds) catch |err| {
+        const storage: graph.Plan.QueryStorage = .{ .values_before = 0, .values_added = 0, .children_added = 0, .exact = false };
+        const mapped = plan.materializeReceiptWithScratch(g, semantic, seeds, storage, buffers) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
             return self.reject(g, .imported);
         };
-        defer self.allocator.free(mapped);
         const added_values = session.values.items.len - before_values;
         const added_children = session.children.items.len - before_children;
         std.debug.assert(added_values <= total.values and added_children <= total.children);

@@ -862,14 +862,26 @@ preserve its identity; its operations must be handled before exit. Generic scope
 factories may use symbolic family payloads such as `State a`; returning the same
 inherited payload shape retains its original lifetime. A longer-lived outer
 capability may pass through an inner scope in structural data; only the exiting
-owner is forbidden in that result. Primitive and structural data may return;
-callable, demand, provider, nominal and unresolved results or transferred
-arguments conservatively reject. Direct source closures may return when a
-bounded capture proof excludes the exiting owner; unknown captures still reject.
-A direct anonymous adapter whose whole body invokes its callback may borrow a
-capturing callable with a structural result. Generic capability contracts,
-selected identities and mixed-owner State pairs remain unsupported. See
-[qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
+owner is forbidden in that result. Primitive and
+structural data may return; callable, demand, provider, nominal and unresolved
+results or transferred arguments conservatively reject. Direct source closures
+may return when a bounded capture proof excludes the exiting owner; unknown
+captures still reject. A direct anonymous
+adapter whose whole body invokes its callback may borrow a capturing callable
+with a structural result. Exact generic identity and Unit callback helpers own
+validated public flow contracts. A single annotated capability parameter may
+read a Unit operation through source or compiled helpers, for example
+`fn (state: State a) -> a ! {state.get} => state.get ()`; calls substitute the
+argument's exact identity in that row. Exact curried callback helpers also
+preserve it, for example
+`fn (state: State a) => fn (callback: Unit -> a ! {state.get | e}) => callback ()`.
+The callback's remaining effects must still be handled before their owner's
+scope exits. A direct source closure may be written to a trusted local
+`@effect.state` cell installed inside every captured capability's lifetime.
+Older cells, ordinary provider overrides and unknown captures reject; a lambda
+does not inherit handlers from where it was constructed. General dependent
+arrows, selected identities, hidden capture/store contracts and mixed-owner State pairs remain
+unsupported. See [qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
 
 ## Qualified bindings
 

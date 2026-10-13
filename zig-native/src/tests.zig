@@ -17,6 +17,7 @@ comptime {
     _ = @import("body_cutoff_tests.zig");
     _ = @import("constant_receipt_tests.zig");
     _ = @import("body_check_cache_tests.zig");
+    _ = @import("body_check_cache.zig");
     _ = @import("refinement_receipt.zig");
     _ = @import("selected_query.zig");
     _ = @import("principal_query.zig");

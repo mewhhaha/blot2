@@ -104,7 +104,7 @@ pub const CheckedProject = struct {
     }
     pub fn interface(self: *const CheckedProject, target: check.ExternalTarget) check.SchemeInterface {
         const producer = &self.module(target.unit).checked;
-        return .{ .types = .{ .store = &producer.types }, .scheme = producer.bindings[target.binding].scheme, .named_function = producer.bindings[target.binding].named_function, .obligations = producer.obligations, .callees = .{ .live = producer } };
+        return .{ .types = .{ .store = &producer.types }, .scheme = producer.bindings[target.binding].scheme, .capability_flow = producer.bindings[target.binding].capability_flow, .named_function = producer.bindings[target.binding].named_function, .obligations = producer.obligations, .callees = .{ .live = producer } };
     }
 };
 
@@ -126,7 +126,7 @@ pub fn diagnosticModuleOrigin(context: ?*const anyopaque, allocator: Allocator, 
 }
 
 const Engine = struct {
-    previous_bodies: []const @import("body_check_cache.zig").Cache = &.{},
+    previous_bodies: std.StringHashMapUnmanaged(?*const @import("body_check_cache.zig").Cache) = .empty,
     retain_bodies: bool = false,
     allocator: Allocator,
     source: *project.Project,
@@ -183,7 +183,7 @@ const Engine = struct {
     }
     fn headerImport(self: *const Engine, target: check.ExternalTarget, origin: ast.Id) check.SourceHeader {
         std.debug.assert(self.source_validation);
-        return .{ .target = target, .origin = origin, .named_function = self.catalogModule(target.unit).?.declaration(target.binding).named_function };
+        return .{ .target = target, .origin = origin, .capability_flow = self.catalogModule(target.unit).?.declaration(target.binding).capability_flow, .named_function = self.catalogModule(target.unit).?.declaration(target.binding).named_function };
     }
     fn deinitSourceModules(self: *Engine) void {
         for (self.source_modules) |*item| if (item.*) |*module_| {
@@ -284,11 +284,9 @@ const Engine = struct {
             .typed => |typed| {
                 const tree = &self.source.unit(unit).tree;
                 if (typed.bindings.len > 4096) return null;
+                var budget: usize = 4096;
                 for (typed.bindings) |binding| {
-                    if (binding.kind != .global) continue;
-                    const declaration = tree.valueDecl(binding.declaration);
-                    if (declaration.where_node == 0 or !std.meta.eql(span, tree.span(declaration.where_node))) continue;
-                    return cache.qualificationDigest(self.source.symbols.get(binding.name), binding.private, declaration.runtime, tree.span(binding.declaration), span);
+                    if (cache.sourceQualificationDigest(tree, &self.source.symbols, binding, span, &budget)) |digest| return digest;
                 }
                 return null;
             },
@@ -307,7 +305,43 @@ const Engine = struct {
                         owner = @intCast(index);
                     }
                 }
-                const index = owner orelse return null;
+                const index = owner orelse {
+                    // Public snapshots redact local names and schemes. Frozen
+                    // Core still owns declared clause spans and local binders.
+                    const core = &compiled.core;
+                    if (core.bindings.len > 4096 or core.obligations.len > 4096) return null;
+                    var declaration: ?u32 = null;
+                    var remaining: usize = 4096;
+                    for (core.bindings) |local| {
+                        if (remaining == 0) return null;
+                        remaining -= 1;
+                        if (local.kind != .local) continue;
+                        var declared = false;
+                        for (core.obligations[local.scheme.obligations.start..][0..local.scheme.obligations.len]) |predicate| {
+                            if (remaining == 0) return null;
+                            remaining -= 1;
+                            if (!predicate.explicit or predicate.qualification_unit != unit or !std.meta.eql(predicate.qualification_span, @as(?ast.Span, span))) continue;
+                            if (predicate.span.start < span.start or predicate.span.end > span.end or predicate.span.start > predicate.span.end) continue;
+                            declared = true;
+                        }
+                        if (!declared) continue;
+                        for (core.bindings, 0..) |enclosing, enclosing_index| {
+                            if (remaining == 0) return null;
+                            remaining -= 1;
+                            if (enclosing.kind != .global or enclosing.body_id == 0 or enclosing.body_id >= core.bodies.len) continue;
+                            if (span.start < enclosing.span.start or span.end > enclosing.span.end or local.span.start < enclosing.span.start or local.span.end > enclosing.span.end) continue;
+                            if (declaration) |prior| if (prior != enclosing_index) return null;
+                            declaration = @intCast(enclosing_index);
+                        }
+                    }
+                    const enclosing_index = declaration orelse return null;
+                    if (enclosing_index >= frozen.bindings.len) return null;
+                    const enclosing = core.bindings[enclosing_index];
+                    const body = core.bodies[enclosing.body_id];
+                    if (body.binding != enclosing_index) return null;
+                    const principal = frozen.bindings[enclosing_index];
+                    return cache.localQualificationDigest(self.source.symbols.get(principal.name), principal.private, body.runtime, enclosing.span, span);
+                };
                 if (index >= compiled.core.bindings.len) return null;
                 const binding = compiled.core.bindings[index];
                 if (binding.kind != .global or binding.body_id == 0 or binding.body_id >= compiled.core.bodies.len) return null;
@@ -318,6 +352,16 @@ const Engine = struct {
             },
             .source => return null,
         }
+    }
+    fn originalUnitOrigin(context: *const anyopaque, unit: u32) ?@import("body_check_cache.zig").Digest {
+        const self: *const Engine = @ptrCast(@alignCast(context));
+        if (unit == 0 or unit > self.source.units.items.len) return null;
+        var hash: std.crypto.hash.Blake3 = .init(.{});
+        hash.update("body original module");
+        hash.update(self.source.filename(unit));
+        var digest: @import("body_check_cache.zig").Digest = undefined;
+        hash.final(&digest);
+        return digest;
     }
     fn originalBindingName(context: *const anyopaque, target: check.ExternalTarget) ?[]const u8 {
         const self: *const Engine = @ptrCast(@alignCast(context));
@@ -471,8 +515,8 @@ const Engine = struct {
         var options: check.ModuleOptions = .{ .associated_remaining = &self.associated_remaining, .purity_origins = .{ .context = self.source, .lookup = moduleOrigin, .source_available = moduleSourceAvailable }, .builtin_catalog = unit == self.source.prelude_unit, .prelude_unit = self.source.prelude_unit, .inherited_fixities = inherited_fixities.items };
         if (self.retain_bodies and self.editor == null) options.retained_bodies = &self.result.body_caches[unit - 1];
         options.body_source = self.source.unit(unit).source;
-        options.body_external_names = .{ .context = self, .lookup = originalBindingName, .closed_rows = originalBindingClosedRows, .qualification = originalQualification };
-        if (unit <= self.previous_bodies.len) options.previous_bodies = &self.previous_bodies[unit - 1];
+        options.body_external_names = .{ .context = self, .lookup = originalBindingName, .unit_origin = originalUnitOrigin, .closed_rows = originalBindingClosedRows, .qualification = originalQualification };
+        if (self.previous_bodies.get(self.source.filename(unit))) |cached| options.previous_bodies = cached;
         if (self.editor) |query| {
             options.max_inference_transitions = query.budget.remaining;
             if (query.unit == unit) options.editor = query.marker;
@@ -489,7 +533,6 @@ const Engine = struct {
             var checked = try check.checkModuleWithPrivateExecution(self.allocator, tree, &self.source.symbols, imports.items, catalogs.items, unit, options, self.execution);
             var transferred = false;
             defer if (!transferred) checked.deinit(self.allocator);
-            if (self.retain_bodies and self.editor == null) try @import("body_check_cache.zig").captureInto(self.allocator, tree, &self.source.symbols, options.body_source, &checked, options.body_external_names, &self.result.body_caches[unit - 1]);
             if (self.editor) |query| {
                 _ = query.budget.spend(@intCast(checked.counters.inference_steps));
                 if (checked.initializer_rejected) query.budget.exhausted = true;
@@ -597,16 +640,18 @@ pub fn checkProjectRetainingBodies(allocator: Allocator, source: *project.Projec
 
 fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: check.PrivateExecution, previous: ?entry_cutoff.Previous, editor: ?EditorQuery, retain_bodies: bool) !CheckedProject {
     var engine: Engine = .{ .allocator = allocator, .source = source, .result = .{}, .execution = execution, .editor = editor, .retain_bodies = retain_bodies };
-    if (previous) |old| {
-        var owners_match = old.names.owners.len == source.units.items.len;
-        if (owners_match) for (source.units.items, 1..) |_, unit| {
-            if (!std.mem.eql(u8, old.names.owner(@intCast(unit)) orelse "", source.filename(@intCast(unit)))) {
-                owners_match = false;
-                break;
-            }
-        };
-        if (owners_match) engine.previous_bodies = old.bodies;
-    }
+    defer engine.previous_bodies.deinit(allocator);
+    if (previous) |old| if (old.bodies.len == old.names.owners.len) {
+        // Bodies remain borrowed from the accepted revision. Filename offers
+        // relocate modules independently of loader discovery order.
+        for (old.bodies, 1..) |*body, unit| {
+            const filename = old.names.owner(@intCast(unit)) orelse continue;
+            const entry = try engine.previous_bodies.getOrPut(allocator, filename);
+            if (entry.found_existing) {
+                entry.value_ptr.* = null;
+            } else entry.value_ptr.* = body;
+        }
+    };
     errdefer engine.result.deinit(allocator);
     defer {
         for (engine.diagnostics.items) |diagnostic| {

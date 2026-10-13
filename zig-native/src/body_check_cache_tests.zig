@@ -35,11 +35,12 @@ fn prepareMode(allocator: A, source: []const u8, previous: ?*const cache.Cache, 
     try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
     var owned: cache.Cache = .{ .minimum_nodes = 0 };
     errdefer owned.deinit(allocator);
-    var checked = try check.checkModuleWithOptions(allocator, &tree, &pool, &.{}, &.{}, 1, .{ .builtin_catalog = true, .body_source = source, .previous_bodies = previous, .retained_bodies = &owned });
+    var retained_bodies: ?*cache.Cache = null;
+    if (retain) retained_bodies = &owned;
+    var checked = try check.checkModuleWithOptions(allocator, &tree, &pool, &.{}, &.{}, 1, .{ .builtin_catalog = true, .body_source = source, .previous_bodies = previous, .retained_bodies = retained_bodies });
     defer checked.deinit(allocator);
     for (checked.diagnostics) |issue| std.debug.print("body cache {s}: {s}\n", .{ @tagName(issue.code), issue.message() });
     try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
-    if (retain) try cache.captureInto(allocator, &tree, &pool, source, &checked, null, &owned);
     return .{ .bodies = owned, .module = try core.lower(allocator, &tree, &pool, &checked), .elaborations = checked.body_elaborations };
 }
 fn compile(allocator: A, output: *const Output) !backend.Result {
@@ -199,36 +200,51 @@ test "body check cache exhausted syntax proof preserves ordinary checking" {
     try std.testing.expectEqual(@as(usize, 1), retained.elaborations);
 }
 
-const ImportedReceipt = struct { name: []const u8, closed_rows: cache.Digest };
+const ImportedReceipt = struct { name: []const u8, closed_rows: cache.Digest, unit: u32 = 2, binding: u32 = 1, origin: ?cache.Digest = null };
 fn importedClosedRows(context: *const anyopaque, target: check.ExternalTarget) ?cache.Digest {
-    if (target.unit != 2 or target.binding != 1) return null;
     const receipt: *const ImportedReceipt = @ptrCast(@alignCast(context));
+    if (target.unit != receipt.unit or target.binding != receipt.binding) return null;
     return receipt.closed_rows;
 }
 fn importedName(context: *const anyopaque, target: check.ExternalTarget) ?[]const u8 {
-    if (target.unit != 2 or target.binding != 1) return null;
     const receipt: *const ImportedReceipt = @ptrCast(@alignCast(context));
+    if (target.unit != receipt.unit or target.binding != receipt.binding) return null;
     return receipt.name;
 }
 fn importedConsumer(allocator: A, original_name: []const u8, previous: ?*const cache.Cache) !Output {
+    return importedConsumerAt(allocator, original_name, 2, false, null, previous);
+}
+fn importedUnitOrigin(context: *const anyopaque, unit: u32) ?cache.Digest {
+    const receipt: *const ImportedReceipt = @ptrCast(@alignCast(context));
+    if (unit != receipt.unit) return null;
+    return receipt.origin;
+}
+fn importedConsumerAt(allocator: A, original_name: []const u8, unit: u32, inserted: bool, origin: ?cache.Digest, previous: ?*const cache.Cache) !Output {
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
-    const producer_source = try allocator.print("const {s} = fn (x: U32) -> U32 => x\n", .{original_name});
+    var prefix: []const u8 = "";
+    var target: u32 = 1;
+    if (inserted) {
+        prefix = "const earlier = 7\n";
+        target = 2;
+    }
+    const producer_source = try allocator.print("{s}const {s} = fn (x: U32) -> U32 => x\n", .{ prefix, original_name });
     defer allocator.free(producer_source);
     var producer_tokens = try lexer.lex(allocator, producer_source);
     defer producer_tokens.deinit(allocator);
     var producer_tree = try parser.parse(allocator, producer_source, producer_tokens.tokens.items, &pool);
     defer producer_tree.deinit(allocator);
-    var producer = try check.checkModuleWithOptions(allocator, &producer_tree, &pool, &.{}, &.{}, 2, .{ .builtin_catalog = true });
+    var producer = try check.checkModuleWithOptions(allocator, &producer_tree, &pool, &.{}, &.{}, unit, .{ .builtin_catalog = true });
     defer producer.deinit(allocator);
     const source = "entry const run = fn (x: U32) -> U32 => exposed x\nconst untouched = 7\n";
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
     var tree = try parser.parse(allocator, source, tokens.tokens.items, &pool);
     defer tree.deinit(allocator);
-    const imported = check.ImportedBinding{ .origin = 0, .name = pool.lookup("exposed").?, .target = .{ .unit = 2, .binding = 1 }, .interface = .{ .types = .{ .store = &producer.types }, .scheme = producer.bindings[1].scheme, .named_function = true, .obligations = producer.obligations } };
-    const receipt: ImportedReceipt = .{ .name = original_name, .closed_rows = cache.closedRowsDigest(.{ .store = &producer.types }, producer.bindings[1].ty, producer.bindings[1].scheme, &pool).? };
-    const names: cache.ExternalNames = .{ .context = @ptrCast(&receipt), .lookup = importedName, .closed_rows = importedClosedRows };
+    const imported = check.ImportedBinding{ .origin = 0, .name = pool.lookup("exposed").?, .target = .{ .unit = unit, .binding = target }, .interface = .{ .types = .{ .store = &producer.types }, .scheme = producer.bindings[target].scheme, .named_function = true, .obligations = producer.obligations } };
+    const receipt: ImportedReceipt = .{ .name = original_name, .unit = unit, .binding = target, .origin = origin, .closed_rows = cache.closedRowsDigest(.{ .store = &producer.types }, producer.bindings[target].ty, producer.bindings[target].scheme, &pool).? };
+    var names: cache.ExternalNames = .{ .context = @ptrCast(&receipt), .lookup = importedName, .closed_rows = importedClosedRows };
+    if (origin != null) names.unit_origin = importedUnitOrigin;
     var bodies: cache.Cache = .{ .minimum_nodes = 0 };
     errdefer bodies.deinit(allocator);
     var checked = try check.checkModuleWithOptions(allocator, &tree, &pool, &.{imported}, &.{}, 1, .{ .builtin_catalog = true, .body_source = source, .previous_bodies = previous, .body_external_names = names, .retained_bodies = &bodies });
@@ -976,20 +992,35 @@ test "body check cache owns local result directed requirements" {
     try parity(source, edited, 1);
 }
 
-test "body check cache leaves declared local qualification origins ordinary" {
+test "body check cache relocates declared local qualification origins" {
     const source =
         \\const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right
-        \\const twice = fn (value: U32) => do:
+        \\const F32.add = fn (left: F32) => fn (right: F32) => @f32.add left right
+        \\const Array.add = fn (left: Array U32) => fn (right: Array U32) => @array.concat left right
+        \\const twice = fn value => do:
+        \\  let identity: a -> a where { type_rep a } = fn amount => amount
         \\  let local: a -> a where { associated "add" a a a } = fn amount => @type.call "add" amount amount
-        \\  return local value
-        \\entry const run = fn (value: U32) => twice value
+        \\  return identity (local value)
+        \\entry const unsigned = fn (value: U32) => twice value
+        \\entry const floating = fn (value: F32) => twice value
+        \\entry const packed = fn (value: U32) => twice #[value, @u32.add value 1]
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
-    try std.testing.expect(before.bodies.find("twice") == null);
+    try std.testing.expect(before.bodies.find("twice") != null);
+    const inserted = try a.print("const earlier_spelling = {{ tail: 3.0, head: 2 }}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 2);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 2) });
+    const empty: cache.Cache = .{};
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
     const edited = try std.mem.replaceOwned(u8, a, source, "@u32.add left right", "@u32.sub left right");
     defer a.free(edited);
-    try parity(source, edited, 3);
+    try parity(source, edited, 2);
 }
 
 test "body check cache declines large local requirement receipts without changing results" {
@@ -1008,4 +1039,136 @@ test "body check cache declines large local requirement receipts without changin
     const changed = try std.mem.replaceOwned(u8, a, source.items, "const seed = 2", "const seed = 3");
     defer a.free(changed);
     try parity(source.items, changed, 2);
+}
+
+test "body check cache local qualification routes require exact bounded source clauses" {
+    const source =
+        \\const untouched = fn value => value
+        \\const wrapper = fn value => do:
+        \\  let local: a -> a where { type_rep a } = fn amount => amount
+        \\  return local value
+    ;
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(a);
+    var tokens = try lexer.lex(a, source);
+    defer tokens.deinit(a);
+    var tree = try parser.parse(a, source, tokens.tokens.items, &pool);
+    defer tree.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var checked = try check.checkModuleWithOptions(a, &tree, &pool, &.{}, &.{}, 1, .{ .builtin_catalog = true });
+    defer checked.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    var enclosing: ?check.Binding = null;
+    var unrelated: ?check.Binding = null;
+    var origin: ?@import("ast.zig").Span = null;
+    for (checked.bindings) |binding| {
+        if (binding.kind == .global) {
+            if (std.mem.eql(u8, pool.get(binding.name), "wrapper")) enclosing = binding;
+            if (std.mem.eql(u8, pool.get(binding.name), "untouched")) unrelated = binding;
+        }
+        if (binding.kind == .local) for (checked.obligations[binding.scheme.obligations.start..][0..binding.scheme.obligations.len]) |predicate| {
+            if (predicate.explicit) origin = predicate.qualification_span;
+        };
+    }
+    const span = origin orelse return error.TestUnexpectedResult;
+    var complete: usize = 4096;
+    try std.testing.expect(cache.sourceQualificationDigest(&tree, &pool, enclosing.?, span, &complete) != null);
+    try std.testing.expect(complete < 4096);
+    var none: usize = 0;
+    try std.testing.expect(cache.sourceQualificationDigest(&tree, &pool, enclosing.?, span, &none) == null);
+    try std.testing.expectEqual(@as(usize, 0), none);
+    var shallow: usize = 1;
+    try std.testing.expect(cache.sourceQualificationDigest(&tree, &pool, enclosing.?, span, &shallow) == null);
+    try std.testing.expectEqual(@as(usize, 0), shallow);
+    var altered: usize = 4096;
+    try std.testing.expect(cache.sourceQualificationDigest(&tree, &pool, enclosing.?, .{ .start = span.start + 1, .end = span.end }, &altered) == null);
+    var wrong: usize = 4096;
+    try std.testing.expect(cache.sourceQualificationDigest(&tree, &pool, unrelated.?, span, &wrong) == null);
+}
+
+fn importedOrdinalReplay(allocator: A, previous: *const cache.Cache, origin: cache.Digest) !void {
+    var output = try importedConsumerAt(allocator, "first", 3, true, origin, previous);
+    defer output.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), output.elaborations);
+    var found = false;
+    for (output.module.bindings) |binding| if (binding.kind == .external) {
+        try std.testing.expectEqual(@as(u32, 3), binding.target.unit);
+        try std.testing.expectEqual(@as(u32, 2), binding.target.binding);
+        found = true;
+    };
+    try std.testing.expect(found);
+}
+
+test "body check cache relocates imported ordinals only with exact original module authority" {
+    const origin: cache.Digest = @splat(7);
+    var before = try importedConsumerAt(a, "first", 2, false, origin, null);
+    defer before.deinit(a);
+    try importedOrdinalReplay(a, &before.bodies, origin);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, importedOrdinalReplay, .{ &before.bodies, origin });
+    var renamed = try importedConsumerAt(a, "second", 3, true, origin, &before.bodies);
+    defer renamed.deinit(a);
+    try std.testing.expectEqual(@as(usize, 1), renamed.elaborations);
+    var replaced = try importedConsumerAt(a, "first", 3, true, @splat(8), &before.bodies);
+    defer replaced.deinit(a);
+    try std.testing.expectEqual(@as(usize, 1), replaced.elaborations);
+    var missing = try importedConsumerAt(a, "first", 3, true, null, &before.bodies);
+    defer missing.deinit(a);
+    try std.testing.expectEqual(@as(usize, 1), missing.elaborations);
+}
+
+fn importedAnnotationConsumer(allocator: A, concrete: bool, renamed: bool, previous: ?*const cache.Cache) !Output {
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var element: []const u8 = "a";
+    if (concrete) element = "U32";
+    const producer_source = try allocator.print("type Wrapper a is data = #Wrapper {{value: a, owning: Array U32}}\ntype Alias a = Wrapper {s}\ntype Twin a = Wrapper a\n", .{element});
+    defer allocator.free(producer_source);
+    var producer_tokens = try lexer.lex(allocator, producer_source);
+    defer producer_tokens.deinit(allocator);
+    var producer_tree = try parser.parse(allocator, producer_source, producer_tokens.tokens.items, &pool);
+    defer producer_tree.deinit(allocator);
+    var producer = try check.checkModuleWithOptions(allocator, &producer_tree, &pool, &.{}, &.{}, 2, .{ .builtin_catalog = true });
+    defer producer.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), producer.diagnostics.len);
+    const source = "entry const hold = fn (value: Imported U32) => value\n";
+    var tokens = try lexer.lex(allocator, source);
+    defer tokens.deinit(allocator);
+    var tree = try parser.parse(allocator, source, tokens.tokens.items, &pool);
+    defer tree.deinit(allocator);
+    var original_name: []const u8 = "Alias";
+    if (renamed) original_name = "Twin";
+    var target: ?u32 = null;
+    for (producer.nominals, 0..) |nominal, index| if (std.mem.eql(u8, pool.get(nominal.name), original_name)) {
+        target = @intCast(index);
+    };
+    const imported: check.ImportedCatalog = .{ .producer = &producer, .name = pool.lookup("Imported").?, .kind = .nominal, .index = target.?, .origin = 0 };
+    const complete: check.ImportedCatalog = .{ .producer = &producer, .kind = .catalog, .index = 0, .origin = 0 };
+    var bodies: cache.Cache = .{ .minimum_nodes = 0 };
+    errdefer bodies.deinit(allocator);
+    var checked = try check.checkModuleWithOptions(allocator, &tree, &pool, &.{}, &.{ complete, imported }, 1, .{ .builtin_catalog = true, .body_source = source, .previous_bodies = previous, .retained_bodies = &bodies });
+    defer checked.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    try std.testing.expect(bodies.find("hold") != null);
+    try std.testing.expectEqual(@as(usize, 1), bodies.find("hold").?.type_reads.len);
+    return .{ .bodies = bodies, .module = try core.lower(allocator, &tree, &pool, &checked), .elaborations = checked.body_elaborations };
+}
+fn importedAnnotationReplay(allocator: A, previous: *const cache.Cache, elaborations: usize) !void {
+    var output = try importedAnnotationConsumer(allocator, false, false, previous);
+    defer output.deinit(allocator);
+    try std.testing.expectEqual(elaborations, output.elaborations);
+}
+test "body check cache imported annotation recipes own original heads through allocation failures" {
+    var before = try importedAnnotationConsumer(a, false, false, null);
+    defer before.deinit(a);
+    try importedAnnotationReplay(a, &before.bodies, 0);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, importedAnnotationReplay, .{ &before.bodies, @as(usize, 0) });
+    const empty: cache.Cache = .{};
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, importedAnnotationReplay, .{ &empty, @as(usize, 1) });
+    var concrete = try importedAnnotationConsumer(a, true, false, &before.bodies);
+    defer concrete.deinit(a);
+    // Both instantiated heads are Wrapper U32. The generic recipes differ.
+    try std.testing.expectEqual(@as(usize, 1), concrete.elaborations);
+    var renamed = try importedAnnotationConsumer(a, false, true, &before.bodies);
+    defer renamed.deinit(a);
+    try std.testing.expectEqual(@as(usize, 1), renamed.elaborations);
 }

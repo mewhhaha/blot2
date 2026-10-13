@@ -106,7 +106,10 @@ fn requirement(scan: *visibility.Scan, owner: *const PI.Interface, predicate: T.
 
 pub fn storageContracts(owner: *const PI.Interface, implementation: *const core.Module) Error!void {
     try require(owner.bindings.len <= implementation.bindings.len);
-    for (owner.bindings, 0..) |binding, index| try require(binding.private == implementation.bindings[index].private);
+    for (owner.bindings, 0..) |binding, index| {
+        try require(binding.private == implementation.bindings[index].private);
+        if (binding.ty != 0 and binding.external == null) try require(binding.capability_flow == implementation.bindings[index].capability_flow);
+    }
     try require(owner.nominals.len == implementation.nominals.len);
     for (owner.nominals, implementation.nominals) |public, private| {
         try require(std.meta.eql(public.identity, private.identity) and public.private == private.private and public.is_opaque == private.is_opaque);

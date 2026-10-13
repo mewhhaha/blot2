@@ -103,7 +103,7 @@ Zig0.17.0, Safe/noLLVM, CPU4 for development:
   proof.
 - The lifecycle fixture proves retained identity is inactive before teardown on
   success and failure, with zero journal roots and leases.
-- Zig analyzer:368 files, zero findings.
+- Zig analyzer:369 files, zero findings.
 
 The full LLVM/compiler gate belongs to the combined qualification. This slice
 was developed against staged source tree
@@ -146,3 +146,96 @@ executed guests, 977 exhaustive failure sweeps and zero analyzer findings across
 373 files. [Merged qualification](CONTINUATION_QUALIFICATION.md) records the
 exact source/binary pins, measured costs and still-open scope. Isolated clocks
 above remain separate from the final combined release measurements.
+
+## Owned public flow boundary
+
+Public principal interfaces and immutable Core now own two small footprint
+relationships for a single input binder: identity returns binder0; invoke_unit
+invokes binder0 with Unit and returns its result. Their bodies have no capture
+or storage sink. Source producers infer only exact direct forms; frozen Core
+validation checks the body against the claim, and module abstraction validation
+requires the public and implementation claims to match. The portable structural
+schema digest includes this field. Source/compiled catalogs and retained body
+interface digests preserve it; execution owner handles remain guest local.
+
+The two executed public-flow groups cover U32/F32 capabilities, captured callbacks,
+sync/JSPI, rejection recovery, source/compiled dependencies, checkpoints, an
+escaping identity result, and a retained helper edit that loses its flow proof
+while preserving its ordinary a -> a header. Native body-forgery and checking,
+lowering/emission allocation-failure laws cover the same boundary. Twenty-one
+focused scoped guest groups pass. No full combined gate or additional CPU claim
+is made here.
+
+This boundary does not complete general symbolic capability parameters, dependent
+arrows, selected capability terms, or arbitrary hidden capture/store contracts.
+Unknown helpers and opaque callable results continue to reject conservatively.
+
+## Quantified capability parameter boundary
+
+An ordinary explicit effect-family parameter owns a quantified identity-variable
+edge separately from its family payload. Schemes freshen that edge with the
+parameter's operation rows; checking constrains it to the argument's identity.
+Function result annotations can name the parameter operation, for example
+`fn (state: State a) -> a ! {state.get} => state.get ()`. Exact Unit member
+invocation has a public no-capture/no-store claim, validated against immutable
+Core and its selected parameter. Other helpers remain conservative.
+
+Principal/Core projection and import copy identity edges into each receiving
+owner. Code specialization keys include the checked first capability input's
+lexical instance; that owned fact seeds semantic inference independently of
+physical layouts. Unresolved instances cannot become closed row evidence, and
+ambiguous row-only instance inference declines. These projections publish no
+semantic cache receipt. Named fragment import declines until a binder relocation
+proof exists. The implementation serializes neither a live authority handle nor
+active permission.
+
+Two executed groups cover separate same-typed State owners, U32/F32 payloads,
+written parameter rows, source/compiled imports, sync/JSPI, rejection recovery,
+retained edits, revert, checkpoint byte parity, and a same-header helper edit
+that loses its flow claim. The focused regression batch has32 executed groups.
+Native allocation-failure laws cover identity freshening, precise repeated rows,
+rollback rerouting, owned principal copying, worklist wakeups, checking/lowering/
+emission, and storage rejection. Frozen validation rejects substituted binder
+edges and body claims; closed evidence rejects unresolved instances. Solver
+regressions and the analyzer pass. No combined gate or new CPU claim is made.
+
+Complete dependent arrows, selections, general callback/capture contracts, and
+precise same-lifetime State stores remain open in058/059.
+
+## Curried callback boundary
+
+The exact helper `fn (state: State a) => fn (callback: Unit -> a ! {state.get | e}) => callback ()`
+owns a two-binder invocation claim. Immutable Core validation checks its exact
+Unit invocation and callback binder; source and compiled interfaces preserve
+that claim. Named, inline and demand specialization seed the first capability's
+identity before matching callback rows. Extra callback effects retain their
+owners; an unhandled exiting owner produces `capability_escape`. Partially
+applying an identity helper does not license later arguments to an unknown sink.
+
+Two executed groups exercise separate same-family owners, U32/F32 payloads,
+source/compiled imports, sync/JSPI/rejection recovery, retained edits, checkpoint
+parity, unmatched callback requirements and rollback after proof loss. Native
+checking/lowering/emission allocation-failure laws and forged-claim validation
+cover this boundary. General dependent arrows, selections, hidden capture/store
+contracts and precise same-lifetime stores remain open. This slice makes no
+additional CPU claim or full combined qualification claim.
+
+## Local State lifetime boundary
+
+A direct source closure may be stored in the nearest trusted `@effect.state`
+cell when that installation lies within every captured capability's lifetime.
+The checker retains a bounded scope-lifetime stack and exact handler keys;
+ordinary providers shadow the storage proof. Lambda bodies do not inherit
+construction-time frames. Unknown callable captures, opaque sinks and hidden
+generic storage contracts remain conservative. Scope exit still rejects a
+returned stored closure or aggregate containing one.
+
+Two executed groups cover source/compiled imported declarations, stored captures
+across JSPI suspension, rejection recovery, checkpoint parity, older cells,
+ordinary providers and returned state negatives. Native laws cover handler
+shadowing, construction-time frame rejection and checking/lowering/emission
+allocation failure. The focused batch passes36 executed groups and all8 unchanged
+compile budgets; the analyzer reports369 files and zero findings. Fixed-path
+fanout128 requests16,136,290 bytes in53,920 allocations with exactly equal work
+counters before and after this slice. Full combined qualification and CPU
+measurement remain separate.

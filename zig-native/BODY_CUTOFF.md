@@ -788,3 +788,140 @@ executed guests, 977 exhaustive failure sweeps and zero analyzer findings across
 373 files. [Merged qualification](CONTINUATION_QUALIFICATION.md) records the
 exact source/binary pins, measured costs and still-open scope. Isolated clocks
 above remain separate from the final combined release measurements.
+
+### Isolated declared local qualifications —13 October 2026
+
+Written associated/result-selection and `type_rep` local principals now keep
+exact clause authority through replay. Owned predicate origins store spans
+relative to the enclosing declaration; replay restores the current unit and
+source span before instantiation. Empty representation names remain zero.
+The origin digest names the original enclosing global, its privacy/runtime
+flags and the exact local where position, with a distinct local-clause tag.
+It contains no local spelling, solver ID or module-global node ID.
+
+A bounded source walker validates the exact where node. Compiled producer
+lookup finds the declared local Core principal and its unique enclosing global;
+public snapshots can keep redacting private local names/schemes. Missing,
+ambiguous, unsupported or exhausted routes decline reuse. The source and
+compiled routes share the same digest without changing any artifact schema or
+body/receipt header. The public-interface check still validates each predicate's
+kind, four type roots and member name, and complete candidate reads precede
+selection. Producer binding/unit ordinal changes still force ordinary checking.
+
+Focused Safe/noLLVM validation passes54 existing body-cache laws, including
+fresh/population and retained allocation-failure sweeps, followed by the added
+exact-clause/budget law. All23 body guest laws and eight unchanged budgets pass;
+371 Zig files have zero analyzer findings. U32/F32/owning Array native controls,
+source and compiled exported local origins, earlier AST/type/spelling edits,
+selected body edits, wrong clauses, missing references, Foreign rejection and
+recovery retain fresh-identical bytes or diagnostics and executed results.
+
+Against exact local-requirement checkpoint
+`51a2f752db3ec27d98f45925c95fa155bd2b0d1e`, three alternating CPU5 pairs with
+two warmups and16 hot edits/reverts measure declared64/128 CPU94.375→81.875 /
+183.75→158.125ms; paired median ratios.8733/.8557. Elaborations69.5/133.5→5.5.
+Plain controls remain near parity. Declared population CPU rises37–44%; steady
+RSS rises roughly1.1/1.7MiB. Root's combined gate ran concurrently, so these
+Safe/noLLVM numbers are development measurements. Immutable binaries,48samples,
+exact pins and logs live in ignored `build/bench/task024-declared-local/` in
+`/tmp/blot2-task024-completion`.
+
+Task024 and053 remain open for shared local callee edges, field/receiver/update/
+effect residuals, imported annotation heads, producer ordinal relocation,
+general scoped/control forms and the total edit target. Parent integration owns
+full-gate and LLVM/Fast acceptance; this checkpoint is reviewable, not an
+accepted overall milestone.
+
+
+### Isolated producer ordinal relocation —13 October 2026
+
+Body offers now resolve the accepted revision's borrowed cache by canonical
+producer filename, independently of current loader order. A request-local map
+owns only its directory; prior body leases stay with the accepted revision.
+Missing or ambiguous old filenames offer nothing. Current checking still
+precedes every replay and executable lowering/relinking remains fresh.
+
+Project checking supplies a32-byte digest of each original loaded module
+filename. Nominal recipes, applied annotation reads, associated candidate
+catalogs, imported principals and declared qualification authority bind that
+origin. Imported values also bind their original declaration name. Numerical
+unit/binding targets are current execution data: replay resolves current
+nominals by exact origin/name and current value bindings by the unchanged body
+spelling, then validates the complete interface and candidate reads. A different
+producer with an equal interface revokes reuse. Standalone callers without a
+project dictionary retain their exact ordinal authority. No artifact schema or
+dense body-fact header changes; each distinct owned nominal read grows32bytes.
+
+All57 focused native body-cache laws pass. Native imported-target
+relocation/OOM controls verify rebuilt unit/binding
+references and original-module/name revocation. A real retained revision sweep
+adds a module and earlier producer declarations, compares fresh bytes, discards
+every failed/complete candidate, preserves the successful publication and
+retries/commits. All24 body guest laws plus eight unchanged budgets pass, with
+source and compiled module insertion/deletion, declaration renumbering, scalar
+aliases, explicit local origins, associated selection, dotted nominal payloads,
+owning Array results, selected executable edits, equal-interface producer
+retargets, failed edits and recovery.371 Zig files remain at zero findings.
+
+Against exact declared-local checkpoint
+`ade73b43129ffe9822d3a11a0e814d3cd2406ad4`, three alternating CPU5 Safe/noLLVM
+pairs with two warmups and16 hot edits/reverts measure producer64/128 CPU
+172.5→156.875 /341.875→312.5ms; paired median ratios.9161/.9139. Elaborations
+66/130→2. Plain controls stay near parity. Producer population CPU rises11%;
+steady RSS falls roughly1.0/1.4MiB in these samples.48samples, immutable binaries,
+exact source/binary pins and logs remain in ignored `build/bench/task024-ordinals/`
+in `/tmp/blot2-task024-completion`. These are development measurements with
+other qualification work concurrent, not captured-project or release acceptance.
+
+Producer ordinal relocation is implemented for admitted receipts. Shared local
+callee edges, other residual predicates, imported annotation heads, broader
+scoped/control forms, full-gate/LLVM qualification and the total under100ms edit
+target keep024 and053 open. Canonical filenames identify the current retained
+project; these receipts do not provide cross-checkout identity.
+
+
+### Isolated imported annotation heads and bounded recipe proofs —13 October 2026
+
+Body capture now finishes inside the checker, while its exact nominal-name
+lookup still exists. Capture and replay resolve direct imports, imported aliases
+and namespace heads through that same lookup. The existing sparse type read
+owns the original declaration/recipe digest; an imported alias binds its original
+name and module origin even when its instantiated result matches another alias.
+No annotation-name table, Checked/Body/Fact header or artifact schema is added.
+The redundant project-level capture is removed. Legacy explicit capture remains
+conservative without a resolver. Unsupported lookup or recipe proofs decline.
+
+Initial admission reduced elaborations but doubled retained CPU: complete
+generic nominal recipes were proved repeatedly. A fixed64-entry body-local memo
+now reuses only complete recipe digests at the exact recursion depth, retaining
+the full original proof debit. Exhausted depth/budget declines; a full memo
+computes uncached. The memo allocates nothing, owns no solver values and never
+persists in a receipt. Replay resets it and refreshes its catalog after checker
+mutations while resolving referenced globals. Capture uses completed immutable
+facts. The original regression, quick repair comparison and final samples are
+preserved separately.
+
+Focused validation covers59 native body-cache laws, including fresh/population
+and retained allocation failures, exact imported alias-name/recipe revocation,
+memo depth/budget/capacity controls and successful-publication retry. All25 body
+guest laws plus eight unchanged budgets pass;371 Zig files have zero analyzer
+findings. Source and compiled direct/alias/namespace heads retain fresh-identical
+bytes, owning Array results, missing-head diagnostics and recovery through
+module/producer renumbering. Native controls reject `Alias a = Wrapper U32`
+after `Alias a = Wrapper a` even when this use remains `Wrapper U32`; the broader
+module cutoff can separately avoid body work for that equal current result.
+
+Against exact ordinal checkpoint
+`8879a15b28ad6414b755f9b6bdea968025503fb8`, three alternating CPU5 Safe/noLLVM
+pairs with two warmups and16 hot edits/reverts measure imported-head64/128 CPU
+115.625→108.125 /223.75→208.125ms; paired median ratios.9243/.9354. Elaborations
+66/130→2. Plain controls stay near parity. Head population CPU rises15–17%;
+steady RSS rises540/1,748KiB. Immutable binaries, the un-memoized regression,
+quick comparison, final48samples, exact pins and logs remain in ignored
+`build/bench/task024-imported-heads/` in `/tmp/blot2-task024-completion`.
+These concurrent Safe/noLLVM measurements diagnose development costs; release,
+captured-project and combined full-gate acceptance belong to the parent.
+
+Imported annotation heads are covered for admitted recipes. Shared local callee
+requirements, other residual predicates, broader scoped/control forms and the
+total under100ms edit target keep024 and053 open.

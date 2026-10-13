@@ -205,15 +205,17 @@ fn graphScenario(allocator: Allocator) !void {
         // Emission resources use the same clock. Gaps preserve their insertion
         // between metadata events rather than flattening parent/child ranges.
         context.clock += 2;
-        var mappings = [_]layout.Mapping{.{ .variable = 17, .layout = types.f32_type }};
+        var mappings = [_]layout.Mapping{.{ .variable = 17, .layout = types.f32_type, .instance = .{ .unit = 1, .decl = 23 } }};
         var rows = [_]layout.RowMapping{ .{ .variable = 0, .row = 0 }, .{ .variable = 1, .row = layout.unknown_row } };
         var templates = [_]substitutions.Entry{.{ .variable = 9, .value = 1 }};
         try parent.solved(&mappings, &rows, &templates);
         // Surviving substitutions cannot borrow an emitter's temporary arrays.
         mappings[0].layout = types.u32_type;
+        mappings[0].instance.decl = 24;
         rows[0].row = layout.unknown_row;
         templates[0].value = 8;
         try std.testing.expectEqual(types.f32_type, context.jobs.items[0].mappings[0].layout);
+        try std.testing.expectEqual(@as(u32, 23), context.jobs.items[0].mappings[0].instance.decl);
         try std.testing.expectEqual(@as(u32, 0), context.jobs.items[0].rows[0].row);
         try std.testing.expectEqual(layout.unknown_row, context.jobs.items[0].rows[1].row);
         try std.testing.expectEqual(@as(u32, 1), context.jobs.items[0].templates[0].value);

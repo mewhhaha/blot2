@@ -569,6 +569,7 @@ const Generator = struct {
     }
     fn emitValue(self: *Generator, function_id: u32, value: Value) Error!void {
         if (value.scalar == .pointer or value.scalar == .array_u32 or value.scalar == .array_f32) {
+            try self.module.emit(function_id, ir.immortalReference());
             try self.module.emitReference(function_id, .{ .op = .i32_const, .operand = value.bits }, .static_address);
         } else try self.module.emit(function_id, .{ .op = if (value.scalar == .f32) .f32_const else .i32_const, .operand = value.bits });
     }
@@ -1256,6 +1257,10 @@ const Generator = struct {
         while (self.unit(source).types.node(current).tag == .function and key.count < limit) {
             if (key.count == max_parameters) return self.decline(source, span, .complexity);
             const n = self.unit(source).types.node(current);
+            if (key.count == 0) {
+                const input = self.unit(source).types.node(n.a);
+                if (input.tag == .scoped) key.instance = layout.mappedInstance(.{ .unit = input.b, .decl = input.c }, mappings);
+            }
             key.parameters[key.count] = if (complete) try self.typeLayout(source, n.a, mappings, span) else try self.codeLayoutWithRows(source, n.a, mappings, rows, span);
             key.effects[key.count] = self.layouts.rowFromType(self.unit(source), n.c, mappings, rows, !complete) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(source, span, .unresolved_type);
             key.count += 1;
@@ -1263,6 +1268,20 @@ const Generator = struct {
         }
         key.result = if (complete) try self.typeLayout(source, current, mappings, span) else try self.codeLayoutWithRows(source, current, mappings, rows, span);
         return key;
+    }
+    fn seedNamedInstance(self: *Generator, key: Key, mappings: *std.ArrayList(Mapping)) Error!void {
+        if (key.instance.unit == 0) return;
+        const source = self.unit(key.target.unit);
+        const root = source.types.node(source.binding(key.target.binding).ty);
+        if (root.tag != .function) return;
+        const input = source.types.node(root.a);
+        if (input.tag != .scoped or input.b != 0) return;
+        for (mappings.items) |entry| if (entry.variable == input.c) {
+            if (!std.meta.eql(entry.instance, key.instance)) return self.decline(key.target.unit, source.binding(key.target.binding).span, .unresolved_type);
+            return;
+        };
+        if (mappings.capacity == 0) try mappings.ensureTotalCapacityPrecise(self.allocator, 4);
+        try mappings.append(self.allocator, .{ .variable = input.c, .layout = layout.erased, .instance = key.instance });
     }
     fn specializer(self: *Generator) Allocator.Error!specialization.Service {
         return .{ .timing = &self.work_timing, .allocator = self.allocator, .units = self.units, .evaluator = &self.evaluator, .layouts = &self.layouts, .bridge = try self.representationBridge(), .refinement_stats = &self.refinement_stats, .refinement_regions = &self.work.refinement_regions, .cache = .{ .context = self, .lookup = lookupRefinement, .record = recordRefinement } };
@@ -1516,6 +1535,7 @@ const Generator = struct {
         var words: std.ArrayList(u32) = .empty;
         defer words.deinit(self.allocator);
         for (mappings) |mapping| {
+            if (mapping.instance.decl != 0) continue;
             const actual = self.toEvidence(mapping.layout) catch |err| switch (err) {
                 error.UnresolvedType => continue,
                 error.OutOfMemory => return error.OutOfMemory,
@@ -1959,7 +1979,7 @@ const Generator = struct {
             const actual = self.toEvidence(concrete) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
             try arguments.append(self.allocator, actual);
         }
-        const semantic_label = self.evaluator.evidence.effects.internOperationInstance(operation.identity, arguments.items, operation.instance) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
+        const semantic_label = self.evaluator.evidence.effects.internOperationInstance(operation.identity, arguments.items, layout.mappedInstance(operation.instance, mappings)) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
         return semantic_label;
     }
     fn operationLayoutLabel(self: *Generator, operation_type: layout.Id, unit_id: u32, span: core.Span) Error!type_evidence.Effects.Label {
@@ -3752,6 +3772,7 @@ const Emitter = struct {
             var next_rows: std.ArrayList(RowMapping) = .empty;
             defer next_mappings.deinit(g.allocator);
             defer next_rows.deinit(g.allocator);
+            try g.seedNamedInstance(key, &next_mappings);
             for (target.bodyParameters(body), 0..) |parameter, i| {
                 try g.mapTypeDepth(key.target.unit, &next_mappings, &next_rows, parameter.ty, key.parameters[i], body.span, 0);
             }
@@ -3825,6 +3846,7 @@ const Emitter = struct {
         var rows: std.ArrayList(RowMapping) = .empty;
         defer mappings.deinit(g.allocator);
         defer rows.deinit(g.allocator);
+        try g.seedNamedInstance(key, &mappings);
         for (source.bodyParameters(body), 0..) |parameter, i| try g.mapTypeDepth(key.target.unit, &mappings, &rows, parameter.ty, key.parameters[i], body.span, 0);
         try g.mapTypeDepth(key.target.unit, &mappings, &rows, source.typeOf(body.root), key.result, body.span, 0);
         if (!try self.demandCallShapes(key.target.unit, &shape, mappings.items, rows.items, 0)) return .{ .reason = .unresolved_control };
@@ -3854,6 +3876,7 @@ const Emitter = struct {
         var rows: std.ArrayList(RowMapping) = .empty;
         defer mappings.deinit(g.allocator);
         defer rows.deinit(g.allocator);
+        try g.seedNamedInstance(key, &mappings);
         for (source.bodyParameters(body), 0..) |parameter, i| {
             try g.mapTypeDepth(key.target.unit, &mappings, &rows, parameter.ty, key.parameters[i], body.span, 0);
         }
@@ -4068,6 +4091,7 @@ const Emitter = struct {
         };
         if ((facts.inline_cost orelse return null) > (if (expose_data) @as(u16, 64) else 4) or self.hasErasedType(key.result, 0)) return null;
         for (key.parameters[0..key.count]) |ty| if (self.hasErasedType(ty, 0) or g.layouts.node(ty).tag == .demand) return null;
+        try g.seedNamedInstance(key, mappings);
         var source_type = source.binding(key.target.binding).ty;
         for (key.parameters[0..key.count], 0..) |ty, i| {
             const arrow = source.types.node(source_type);
@@ -4271,6 +4295,7 @@ const Emitter = struct {
             i -= 1;
             full = try g.internLayoutWithEffects(.function, key.parameters[i], full, key.effects[i], &.{});
         }
+        try g.seedNamedInstance(key, &mappings);
         var source_type = source.binding(key.target.binding).ty;
         for (key.parameters[0..key.count], 0..) |parameter_type, index| {
             const arrow = source.types.node(source_type);
@@ -4406,6 +4431,7 @@ const Emitter = struct {
         }
     }
     fn referenceConstant(self: *Emitter, value: u32, role: artifact_emitter.Role) Error!void {
+        if (role == .static_address) try self.generator.module.emit(self.function_id, ir.immortalReference());
         try self.generator.module.emitReference(self.function_id, .{ .op = .i32_const, .operand = value }, role);
     }
     fn emitUnguarded(self: *Emitter, op: wasm.Op, operand: u32) Error!void {
@@ -4659,7 +4685,7 @@ const Emitter = struct {
             terminator.chunk = 15;
             run[run.len - 1].operand = @bitCast(terminator);
             for (run) |fact| try self.generator.module.emit(self.function_id, fact);
-            try self.referenceConstant(address, .static_address);
+            try self.generator.module.emitReference(self.function_id, .{ .op = .i32_const, .operand = address }, .static_address);
             return;
         }
         var payload = if (n.b == 0) null else try self.capture(n.b, depth);
@@ -4847,14 +4873,14 @@ const Emitter = struct {
         const size = if (need_size) try self.temporary(.i32) else null;
         if (wrapped) {
             try self.emit(.local_get, owner);
-            try self.emit(.i32_load, 4);
+            try self.nonzeroLoad(.i32_load, 4);
             try self.emit(.local_set, container);
         }
         if (variants.len == 1) {
             const variant = variants[0];
             if (wrapped) {
                 try self.emit(.local_get, owner);
-                try self.emit(.i32_load, 0);
+                try self.nonzeroLoad(.i32_load, 0);
                 try self.emit(.i32_const, variant.tag);
                 try self.emit(.i32_ne, 0);
                 try self.emit(.if_, 0);
@@ -4876,7 +4902,7 @@ const Emitter = struct {
         for (variants, 0..) |variant, variant_index| {
             if (wrapped) {
                 try self.emit(.local_get, owner);
-                try self.emit(.i32_load, 0);
+                try self.nonzeroLoad(.i32_load, 0);
                 try self.emit(.i32_const, variant.tag);
                 try self.emit(.i32_eq, 0);
                 try self.emit(.if_, 0);
@@ -4902,6 +4928,10 @@ const Emitter = struct {
         try self.emit(.unreachable_, 0);
         try self.emit(.end, 0);
         return .{ .owner = owner, .container = container, .offset = offset, .size = size, .wrapped = wrapped };
+    }
+    fn nonzeroLoad(self: *Emitter, op: wasm.Op, offset: u32) Error!void {
+        try self.generator.module.emit(self.function_id, ir.nonzeroRead());
+        try self.emit(op, offset);
     }
     fn loadLocation(self: *Emitter, place: Location, scalar_: Scalar) Error!void {
         if (place.list_index) |index| if (place.row_words != 0) return self.readListRow(place.owner, index, place.row_words, null, null);
@@ -4954,7 +4984,12 @@ const Emitter = struct {
         }
         const owner = try self.capture(n.a, depth);
         const place = try self.location(owner, n.b, id, false);
-        try self.loadLocation(place, try self.scalar(id));
+        try self.emit(.local_get, place.container);
+        try self.emit(.local_get, place.offset);
+        try self.emit(.i32_add, 0);
+        var load: wasm.Op = .i32_load;
+        if ((try self.scalar(id)).machine() == .f32) load = .f32_load;
+        try self.nonzeroLoad(load, 0);
     }
     /// Selecting one scalar field from an already constructed packed row needs
     /// no extracted box. Producer evaluation and the original bounds check
@@ -7680,7 +7715,7 @@ const Emitter = struct {
             const semantic = g.toEvidence(physical) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.decline(self.unit_id, span, .unresolved_type);
             try arguments.append(g.allocator, semantic);
         }
-        return g.evaluator.evidence.effects.internOperationInstance(.{ .unit = operation_descriptor.a, .decl = operation_descriptor.b }, arguments.items, .{ .unit = wrapper.b, .decl = wrapper.c }) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.decline(self.unit_id, span, .unresolved_type);
+        return g.evaluator.evidence.effects.internOperationInstance(.{ .unit = operation_descriptor.a, .decl = operation_descriptor.b }, arguments.items, layout.mappedInstance(.{ .unit = wrapper.b, .decl = wrapper.c }, self.mappings)) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.decline(self.unit_id, span, .unresolved_type);
     }
     fn prepareProvider(self: *Emitter, id: core.Id) Error!ProviderPlan {
         std.debug.assert(self.preparing);
@@ -8981,6 +9016,12 @@ const Emitter = struct {
             };
         }
         roles[position] = .reference;
+        var journaled = memo_count == 0;
+        for (roles) |role| if (role != .scalar and role != .reference) {
+            journaled = false;
+            break;
+        };
+        if (journaled) try g.module.emit(self.function_id, ir.journalCarrier());
         const root = try self.allocate(@intCast(roles.len * 4), .{ .words = roles });
         for (carries, 0..) |carry, index| {
             const value = self.locals.get(carry.iteration) orelse return g.fail(self.unit_id, id, .unsupported);
@@ -9428,7 +9469,7 @@ const Emitter = struct {
             const machine = try self.patternMachine(child_pattern.ty, child_pattern.span);
             const local = try g.module.addLocal(self.function_id, machine);
             try self.emit(.local_get, value_local);
-            try self.emit(if (machine == .f32) .f32_load else .i32_load, @intCast((if (order.len == 0) index else order[index]) * 4));
+            try self.nonzeroLoad(if (machine == .f32) .f32_load else .i32_load, @intCast((if (order.len == 0) index else order[index]) * 4));
             try self.emit(.local_set, local);
             try self.matchPattern(source, child, local, failure_label, depth + 1);
         }
@@ -9459,7 +9500,7 @@ const Emitter = struct {
                     const machine = try self.patternMachine(child.ty, child.span);
                     const local = try g.module.addLocal(self.function_id, machine);
                     try self.emit(.local_get, value_local);
-                    try self.emit(if (machine == .f32) .f32_load else .i32_load, 0);
+                    try self.nonzeroLoad(if (machine == .f32) .f32_load else .i32_load, 0);
                     try self.emit(.local_set, local);
                     try self.matchPattern(source, p.b, local, failure_label, depth + 1);
                 } else if (unit_.pattern(p.b).tag == .product) {
@@ -9479,7 +9520,7 @@ const Emitter = struct {
                 }
                 _ = try g.module.ensureArena();
                 try self.emit(.local_get, value_local);
-                try self.emit(.i32_load, 0);
+                try self.nonzeroLoad(.i32_load, 0);
                 try self.emit(.i32_const, metadata.tag);
                 try self.emit(.i32_ne, 0);
                 try self.emit(.br_if, self.labels - 1 - failure_label);
@@ -9488,7 +9529,7 @@ const Emitter = struct {
                     const machine = try self.patternMachine(payload.ty, payload.span);
                     const local = try g.module.addLocal(self.function_id, machine);
                     try self.emit(.local_get, value_local);
-                    try self.emit(if (machine == .f32) .f32_load else .i32_load, 4);
+                    try self.nonzeroLoad(if (machine == .f32) .f32_load else .i32_load, 4);
                     try self.emit(.local_set, local);
                     try self.matchPattern(source, p.b, local, failure_label, depth + 1);
                 }

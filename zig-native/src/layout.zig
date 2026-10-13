@@ -13,7 +13,12 @@ pub const capability_layout_decl: u32 = 7;
 pub const unknown_row: u32 = std.math.maxInt(u32);
 pub const Tag = enum(u8) { invalid, unit, boolean, u32, f32, never, product, record, nominal, array, list, cursor, function, demand, type_constructor, resolver, erased, provider, state_provider };
 pub const Node = struct { tag: Tag, a: u32 = 0, b: u32 = 0, c: u32 = 0 };
-pub const Mapping = struct { variable: types.Id, layout: Id };
+pub const Mapping = struct { variable: types.Id, layout: Id, instance: types.NominalIdentity = .{ .unit = 0, .decl = 0 } };
+pub fn mappedInstance(original: types.NominalIdentity, mappings: []const Mapping) types.NominalIdentity {
+    if (original.unit != 0 or original.decl == 0) return original;
+    for (mappings) |mapping| if (mapping.variable == original.decl and mapping.instance.decl != 0) return mapping.instance;
+    return original;
+}
 pub const RowMapping = struct { variable: u32, row: evidence.Effects.Id };
 pub const Error = Allocator.Error || error{ UnresolvedType, LayoutLimit, TypeMismatch };
 pub const Store = struct {
@@ -588,7 +593,7 @@ pub const Store = struct {
         for (module.types.rowLabels(row)) |label| {
             arguments.clearRetainingCapacity();
             for (module.types.operationArguments(label)) |argument| try arguments.append(self.allocator, try self.fromTypeDepth(module, argument, mappings, rows, depth + 1, allow_erased));
-            const mapped = self.effects.internOperationInstance(module.types.operation(label).identity, arguments.items, module.types.operation(label).instance) catch |err| return effectError(err);
+            const mapped = self.effects.internOperationInstance(module.types.operation(label).identity, arguments.items, mappedInstance(module.types.operation(label).instance, mappings)) catch |err| return effectError(err);
             try labels.append(self.allocator, mapped);
         }
         try labels.appendSlice(self.allocator, self.effects.view().rowLabels(suffix));

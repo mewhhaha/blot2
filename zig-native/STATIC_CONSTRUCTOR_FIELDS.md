@@ -79,3 +79,6 @@ executed guests, 977 exhaustive failure sweeps and zero analyzer findings across
 373 files. [Merged qualification](CONTINUATION_QUALIFICATION.md) records the
 exact source/binary pins, measured costs and still-open scope. Isolated clocks
 above remain separate from the final combined release measurements.
+
+The subsequent [private child-field checkpoint](PRIVATE_CHILD_FIELDS.md) records
+its separate source boundary, broader elimination and cold compiler tradeoff.

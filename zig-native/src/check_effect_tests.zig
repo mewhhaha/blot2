@@ -901,7 +901,6 @@ test "source Foreign annotation and callback row publication release every faile
 test "sealed Foreign annotations keep exact negative admission and ordinary shadowing" {
     const cases = [_]struct { source: []const u8, code: check.Code }{
         .{ .source = "const invalid=fn (value:U32 ! {Foreign}) => value\n", .code = .invalid_effect_annotation },
-        .{ .source = "const invalid=fn () -> U32 ! {Foreign} => 42\n", .code = .invalid_effect_annotation },
         .{ .source = "const invalid=fn (io:U32 -> U32 ! {Missing}) => io\n", .code = .unknown_effect },
         .{ .source = "const invalid=fn (io:U32 -> U32 ! {Foreign U32}) => io\n", .code = .type_arity },
         .{ .source = "effect Read:Unit -> U32 ! {Foreign}\n", .code = .operation_signature },
@@ -922,7 +921,7 @@ test "sealed Foreign annotations keep exact negative admission and ordinary shad
         if (checked.diagnostics[0].code != item.code) std.debug.print("FOREIGN_NEGATIVE expected {s} actual {s}\n", .{ @tagName(item.code), @tagName(checked.diagnostics[0].code) });
         try std.testing.expectEqual(item.code, checked.diagnostics[0].code);
     }
-    const text = "type Foreign is data = #Foreign\nconst Foreign=42\nconst read=fn (io:U32 -> U32 ! {Foreign})=>io 1\n";
+    const text = "type Foreign is data = #Foreign\nconst Foreign=42\nconst read=fn (io:U32 -> U32 ! {Foreign})=>io 1\nconst result=fn () -> U32 ! {Foreign} => 42\n";
     var tokens = try lexer.lex(a, text);
     defer tokens.deinit(a);
     var pool: symbols.Pool = .{};
@@ -932,9 +931,16 @@ test "sealed Foreign annotations keep exact negative admission and ordinary shad
     var checked = try check.check(a, &tree, &pool);
     defer checked.deinit(a);
     try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
-    for (checked.bindings) |binding| if (binding.kind == .global and binding.name == pool.lookup("read").?) {
-        try std.testing.expectEqualSlices(u32, &.{T.foreign_operation}, checked.types.rowLabels(checked.types.node(binding.scheme.root).c));
-    };
+    for (checked.bindings) |binding| {
+        if (binding.kind != .global) continue;
+        if (binding.name != pool.lookup("read").? and binding.name != pool.lookup("result").?) continue;
+        const signature = checked.types.node(binding.scheme.root);
+        try std.testing.expectEqualSlices(u32, &.{T.foreign_operation}, checked.types.rowLabels(signature.c));
+        if (binding.name == pool.lookup("result").?) {
+            try std.testing.expectEqual(T.unit, signature.a);
+            try std.testing.expectEqual(T.u32_type, signature.b);
+        }
+    }
 }
 
 fn symbolicWrittenRows(allocator: std.mem.Allocator) !void {
@@ -1236,4 +1242,116 @@ fn abstractReadAliasLaw(allocator: std.mem.Allocator) !void {
 test "symbolic operation aliases with abstract Read contracts retain argument closure" {
     try abstractReadAliasLaw(a);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, abstractReadAliasLaw, .{});
+}
+
+const parameter_store_source = scoped_state_header ++
+    \\type Save a is effect = {keep: (Unit -> a) -> Unit}
+    \\const invalid = fn (s: State U32) => Save.keep U32 (fn () => do:
+    \\  let (state, result) = do (@effect.state s.get s.set 0):
+    \\    return 42
+    \\  return result
+    \\)
+    \\entry const answer = 42
+;
+fn parameterStoreRejected(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, parameter_store_source, .capability_escape);
+}
+test "scoped effect symbolic capability parameters cannot hide captures in static storage operations" {
+    try parameterStoreRejected(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, parameterStoreRejected, .{});
+}
+
+test "scoped effect callback rows retain unmatched owner requirements at scope exit" {
+    try checkScopedSource(a, scoped_state_header ++
+        \\const apply = fn (s: State a) => fn (callback: Unit -> a ! {s.get | e}) => callback ()
+        \\entry const invalid = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+        \\  use nested <- do (@effect.state left.get left.set 7):
+        \\    return apply left (fn () => right.get ())
+        \\  let (state, result) = nested
+        \\  return result
+        \\))
+    , .capability_escape);
+}
+
+test "scoped effect partially applied identity cannot hide a storage sink" {
+    try checkScopedSource(a, scoped_state_header ++
+        \\type Save a is effect = {keep: (Unit -> a) -> Unit}
+        \\const identity = fn value => value
+        \\const save = fn callback => Save.keep U32 callback
+        \\entry const invalid = fn () => @effect.scope (fn (s: State U32) => (identity save) (fn () => do (@effect.state s.get s.set 0):
+        \\  return 42
+        \\))
+    , .capability_escape);
+}
+
+pub const local_store_source = scoped_state_header ++
+    \\type Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}
+    \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
+    \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
+    \\    use Box.set (fn () => do:
+    \\      let (state, value) = do (@effect.state s.get s.set 7):
+    \\        return s.get ()
+    \\      return value
+    \\    )
+    \\    use callback <- Box.get ()
+    \\    return callback ()
+    \\  return result
+    \\)
+;
+fn localStateStorageLaw(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, local_store_source, null);
+}
+test "scoped effect local State cells may store longer lived source captures" {
+    try localStateStorageLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, localStateStorageLaw, .{});
+}
+
+test "scoped effect older State cells reject younger source captures" {
+    try checkScopedSource(a, scoped_state_header ++
+        \\entry const invalid = fn () => @effect.scope (fn (cell: State (Unit -> U32)) => do:
+        \\  let (stored, result) = do (@effect.state cell.get cell.set (fn () => 0)):
+        \\    return @effect.scope (fn (s: State U32) => do:
+        \\      use cell.set (fn () => do:
+        \\        let (state, value) = do (@effect.state s.get s.set 7):
+        \\          return s.get ()
+        \\        return value
+        \\      )
+        \\      return 42
+        \\    )
+        \\  return result
+        \\)
+    , .capability_escape);
+}
+
+test "scoped effect ordinary provider shadowing cannot license a State storage lifetime" {
+    try checkScopedSource(a, scoped_state_header ++
+        \\type Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}
+        \\entry const invalid = fn () => @effect.scope (fn (s: State U32) => do:
+        \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
+        \\    return do (@effect.provider Box.set (fn callback => ())):
+        \\      use Box.set (fn () => do:
+        \\        let (state, value) = do (@effect.state s.get s.set 7):
+        \\          return s.get ()
+        \\        return value
+        \\      )
+        \\      return 42
+        \\  return result
+        \\)
+    , .capability_escape);
+}
+
+test "scoped effect closures do not inherit construction time State handlers" {
+    try checkScopedSource(a, scoped_state_header ++
+        \\type Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}
+        \\entry const invalid = fn () => @effect.scope (fn (s: State U32) => do:
+        \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
+        \\    let later = fn () => Box.set (fn () => do:
+        \\      let (state, value) = do (@effect.state s.get s.set 7):
+        \\        return s.get ()
+        \\      return value
+        \\    )
+        \\    return 42
+        \\  return result
+        \\)
+    , .capability_escape);
 }

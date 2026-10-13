@@ -109,6 +109,56 @@ fn appendType(fixture: *Fixture, node: @import("types.zig").Node) !void {
     fixture.units[0].types.nodes = nodes;
 }
 
+fn graphSource(seed: []const u8, sibling: []const u8) ![]u8 {
+    var expression = try a.dupe(u8, "1");
+    defer a.free(expression);
+    for (0..80) |_| {
+        const next = try a.print("@u32.add 1 ({s})", .{expression});
+        a.free(expression);
+        expression = next;
+    }
+    return a.print(
+        \\entry const seed = {s}
+        \\const first = #[{s}, 11]
+        \\const middle = #[@u32.add seed ({s}), seed]
+        \\const last = #[{s}, 12]
+        \\entry const run = fn () => @u32.add seed (@u32.add (@array.get first 0) (@u32.add (@array.get middle 0) (@array.get last 0)))
+        \\entry const sibling = {s}
+        \\
+    , .{ seed, expression, expression, expression, sibling });
+}
+fn replayGraphs(allocator: std.mem.Allocator, fixture: *const Fixture, previous: *const backend.Result, expected: *const backend.Result, hits: usize) !void {
+    var result = try fixture.compile(allocator, previous, true);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expectEqualSlices(u8, expected.bytes, result.bytes);
+    try std.testing.expectEqual(expected.constant_steps, result.constant_steps);
+    try std.testing.expectEqual(hits, result.constant_receipts.reused);
+    try std.testing.expectEqual(@as(usize, 0), result.constant_receipts.scalar_reused);
+    try std.testing.expect(result.constant_receipts.graph_index_bytes > 0);
+}
+test "constant receipts reset shared graph scratch after hits misses and allocation failure" {
+    const original = try graphSource("2", "1");
+    defer a.free(original);
+    var before = try Fixture.init(original);
+    defer before.deinit();
+    var initial = try before.compile(a, null, true);
+    defer initial.deinit(a);
+    try std.testing.expect(initial.diagnostic == null);
+    for ([_][]const u8{ "2", "3" }, [_]usize{ 3, 2 }) |seed, hits| {
+        const source = try graphSource(seed, "2");
+        defer a.free(source);
+        var after = try Fixture.init(source);
+        defer after.deinit();
+        var fresh = try after.compile(a, null, false);
+        defer fresh.deinit(a);
+        try replayGraphs(a, &after, &initial, &fresh, hits);
+        try @import("allocation_failures.zig").checkAllAllocationFailures(a, replayGraphs, .{ &after, &initial, &fresh, hits });
+        // Failure sweeps leave the immutable producer available for retry.
+        try replayGraphs(a, &after, &initial, &fresh, hits);
+    }
+}
+
 test "constant receipts prove duplicate closed type tails and reject forged tails" {
     const original = try makeSource("2", "1");
     defer a.free(original);

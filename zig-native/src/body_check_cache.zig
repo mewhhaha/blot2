@@ -12,19 +12,42 @@ pub const Digest = [32]u8;
 pub const ExternalNames = struct {
     context: *const anyopaque,
     lookup: *const fn (*const anyopaque, check.ExternalTarget) ?[]const u8,
+    unit_origin: ?*const fn (*const anyopaque, u32) ?Digest = null,
     closed_rows: ?*const fn (*const anyopaque, check.ExternalTarget) ?Digest = null,
     qualification: ?*const fn (*const anyopaque, u32, ast.Span) ?Digest = null,
+};
+pub const AnnotationLookup = struct {
+    context: *const anyopaque,
+    lookup: *const fn (*const anyopaque, []const u8) ?usize,
 };
 pub const Values = struct {
     bindings: []const check.Binding,
     tree: *const ast.Tree,
     names: ?ExternalNames = null,
+    annotations: ?AnnotationLookup = null,
     ready: ?struct {
         context: *const anyopaque,
         lookup: *const fn (*const anyopaque, check.BindingId) bool,
     } = null,
 };
+/// One body's immutable recipe proofs. Depth and proof debit stay exact;
+/// entries never cross a checker mutation or persist in a receipt.
+pub const RecipeMemo = struct {
+    const Entry = struct { index: usize, depth: usize, cost: usize, digest: Digest };
+    entries: [64]Entry = undefined,
+    len: usize = 0,
+    fn lookup(self: *const RecipeMemo, index: usize, depth: usize) ?Entry {
+        for (self.entries[0..self.len]) |entry| if (entry.index == index and entry.depth == depth) return entry;
+        return null;
+    }
+    fn save(self: *RecipeMemo, index: usize, depth: usize, cost: usize, digest: Digest) void {
+        if (self.len == self.entries.len) return;
+        self.entries[self.len] = .{ .index = index, .depth = depth, .cost = cost, .digest = digest };
+        self.len += 1;
+    }
+};
 pub const Catalog = struct {
+    recipes: ?*RecipeMemo = null,
     unit: u32,
     pool: *const symbols.Pool,
     nominals: []const check.Nominal,
@@ -35,12 +58,33 @@ pub const Catalog = struct {
         for (self.nominals, 0..) |nominal, index| if (std.meta.eql(nominal.identity, value)) return index;
         return null;
     }
+    pub fn unitOrigin(self: Catalog, unit: u32) ?Digest {
+        if (unit != 0) if (self.values) |values| if (values.names) |names| if (names.unit_origin) |lookup| return lookup(names.context, unit);
+        // Standalone module callers have no project dictionary. Preserve their
+        // exact ordinal authority rather than inventing a portable origin.
+        var hash: std.crypto.hash.Blake3 = .init(.{});
+        hashWord(&hash, unit);
+        var digest: Digest = undefined;
+        hash.final(&digest);
+        return digest;
+    }
+    pub fn namedOrigin(self: Catalog, origin: Digest, name: []const u8) ?usize {
+        var found: ?usize = null;
+        for (self.nominals, 0..) |nominal, index| {
+            if (!std.mem.eql(u8, self.pool.get(nominal.name), name)) continue;
+            const current = self.unitOrigin(nominal.identity.unit) orelse return null;
+            if (!std.mem.eql(u8, &origin, &current)) continue;
+            if (found != null) return null;
+            found = index;
+        }
+        return found;
+    }
     pub fn named(self: Catalog, unit: u32, name: []const u8) ?usize {
         for (self.nominals, 0..) |nominal, index| if (nominal.identity.unit == unit and std.mem.eql(u8, self.pool.get(nominal.name), name)) return index;
         return null;
     }
 };
-pub const NominalRead = struct { unit: u32, name: []u8, digest: Digest };
+pub const NominalRead = struct { unit: u32, origin: Digest, name: []u8, digest: Digest };
 pub const TypeRead = struct { position: u32, digest: Digest };
 pub fn nominalDigest(source: F.Source, catalog: Catalog, index: usize) ?Digest {
     var budget: usize = 4096;
@@ -48,6 +92,12 @@ pub fn nominalDigest(source: F.Source, catalog: Catalog, index: usize) ?Digest {
 }
 fn nominalDigestAt(source: F.Source, catalog: Catalog, index: usize, depth: usize, budget: *usize) ?Digest {
     if (depth >= 128 or budget.* == 0) return null;
+    if (catalog.recipes) |memo| if (memo.lookup(index, depth)) |entry| {
+        if (entry.cost > budget.*) return null;
+        budget.* -= entry.cost;
+        return entry.digest;
+    };
+    const available = budget.*;
     budget.* -= 1;
     const nominal = catalog.nominals[index];
     if (nominal.name == 0 or nominal.alias != 0) return null;
@@ -59,7 +109,8 @@ fn nominalDigestAt(source: F.Source, catalog: Catalog, index: usize, depth: usiz
     if (nominal.is_opaque and storage.kind == .unknown) return null;
     var hash: std.crypto.hash.Blake3 = .init(.{});
     hashWord(&hash, @backingInt(ast.Tag.data_decl));
-    hashWord(&hash, nominal.identity.unit);
+    const origin = catalog.unitOrigin(nominal.identity.unit) orelse return null;
+    hash.update(&origin);
     hash.update(catalog.pool.get(nominal.name));
     hashWord(&hash, @intFromBool(nominal.private));
     hashWord(&hash, @intFromBool(nominal.is_opaque));
@@ -86,6 +137,7 @@ fn nominalDigestAt(source: F.Source, catalog: Catalog, index: usize, depth: usiz
     }
     var digest: Digest = undefined;
     hash.final(&digest);
+    if (catalog.recipes) |memo| memo.save(index, depth, available - budget.*, digest);
     return digest;
 }
 fn parameterHash(source: F.Source, catalog: Catalog, nominal: check.Nominal, hash: *std.crypto.hash.Blake3, depth: usize, budget: *usize) bool {
@@ -124,16 +176,22 @@ fn patternHash(source: F.Source, patterns: F.Patterns, id: u32, variables: []con
     return true;
 }
 pub fn annotationDigest(source: F.Source, catalog: Catalog, name: []const u8) ?Digest {
-    // Namespaced and imported aliases need their own owned name-resolution
-    // receipt. Local annotations have a complete current catalog.
-    const index = catalog.named(catalog.unit, name) orelse return null;
-    const nominal = catalog.nominals[index];
+    var index: ?usize = null;
+    if (catalog.values) |values| if (values.annotations) |annotations| {
+        index = annotations.lookup(annotations.context, name);
+        if (index == null) return null;
+    };
+    if (index == null) index = catalog.named(catalog.unit, name);
+    const resolved = index orelse return null;
+    if (resolved >= catalog.nominals.len) return null;
+    const nominal = catalog.nominals[resolved];
     if (nominal.alias != 0) {
         var budget: usize = 4096;
         var alias_hash: std.crypto.hash.Blake3 = .init(.{});
         hashWord(&alias_hash, @backingInt(ast.Tag.type_alias_decl));
-        hashWord(&alias_hash, nominal.identity.unit);
-        alias_hash.update(name);
+        const origin = catalog.unitOrigin(nominal.identity.unit) orelse return null;
+        alias_hash.update(&origin);
+        alias_hash.update(catalog.pool.get(nominal.name));
         hashWord(&alias_hash, @intFromBool(nominal.private));
         hashWord(&alias_hash, nominal.parameters.len);
         if (!parameterHash(source, catalog, nominal, &alias_hash, 0, &budget)) return null;
@@ -142,7 +200,7 @@ pub fn annotationDigest(source: F.Source, catalog: Catalog, name: []const u8) ?D
         alias_hash.final(&digest);
         return digest;
     }
-    const digest = nominalDigest(source, catalog, index) orelse return null;
+    const digest = nominalDigest(source, catalog, resolved) orelse return null;
     var hash: std.crypto.hash.Blake3 = .init(.{});
     hashWord(&hash, @backingInt(T.Tag.nominal));
     hash.update(&digest);
@@ -161,6 +219,7 @@ pub const Binding = struct {
     ty: T.Id,
     scheme: bool,
     named_function: bool,
+    capability_flow: check.CapabilityFlow = .unknown,
     runtime: bool,
     external: ?check.ExternalTarget,
     interface: Digest,
@@ -562,6 +621,8 @@ const InterfaceProof = struct {
             hashWord(&hash, @intFromBool(predicate.explicit));
             if (predicate.explicit) {
                 const origin = self.qualificationOrigin(binding, predicate) orelse return null;
+                const unit_origin = self.catalog.unitOrigin(predicate.qualification_unit) orelse return null;
+                hash.update(&unit_origin);
                 hash.update(&origin);
             }
             const name = self.catalog.pool.get(predicate.name);
@@ -593,11 +654,8 @@ const InterfaceProof = struct {
         return null;
     }
     fn qualificationOwner(self: *InterfaceProof, owner: check.Binding, span: ast.Span) ?Digest {
-        if (owner.kind != .global) return null;
         const values = self.catalog.values orelse return null;
-        const declaration = values.tree.valueDecl(owner.declaration);
-        if (declaration.where_node == 0 or !std.meta.eql(span, values.tree.span(declaration.where_node))) return null;
-        return qualificationDigest(self.catalog.pool.get(owner.name), owner.private, declaration.runtime, values.tree.span(owner.declaration), span);
+        return sourceQualificationDigest(values.tree, self.catalog.pool, owner, span, &self.budget);
     }
     fn callee(self: *InterfaceProof, id: check.BindingId, obligations: []const T.Obligation) ?Digest {
         const values = self.catalog.values orelse return null;
@@ -614,14 +672,11 @@ const InterfaceProof = struct {
         hashWord(&hash, @backingInt(binding.kind));
         hashWord(&hash, @intFromBool(binding.private));
         hashWord(&hash, @intFromBool(binding.named_function));
+        hashWord(&hash, @backingInt(binding.capability_flow));
         hashWord(&hash, @intFromBool(binding.kind == .global and values.tree.valueDecl(binding.declaration).runtime));
         const name = self.catalog.pool.get(binding.name);
         hashWord(&hash, @intCast(name.len));
         hash.update(name);
-        if (binding.external) |target| {
-            hashWord(&hash, target.unit);
-            hashWord(&hash, target.binding);
-        }
         const summary = binding.summary;
         hashWord(&hash, summary.flat_size);
         hashWord(&hash, @intFromBool(summary.shareable));
@@ -651,19 +706,53 @@ const InterfaceProof = struct {
             principal_binding.scheme.closed_rows = .{};
         }
         const digest = self.interface(principal_binding, obligations) orelse return null;
-        if (binding.kind != .external) return digest;
+        var contract_digest = digest;
+        if (binding.capability_flow != .unknown) {
+            var contract_hash: std.crypto.hash.Blake3 = .init(.{});
+            contract_hash.update(&digest);
+            hashWord(&contract_hash, @backingInt(binding.capability_flow));
+            contract_hash.final(&contract_digest);
+        }
+        if (binding.kind != .external) return contract_digest;
         const dictionary = names orelse return null;
         const name = dictionary.lookup(dictionary.context, binding.external orelse return null) orelse return null;
         if (name.len == 0) return null;
         var hash: std.crypto.hash.Blake3 = .init(.{});
-        hash.update(&digest);
+        hash.update(&contract_digest);
         if (certificates) |certificate| hash.update(&certificate);
+        const origin = self.catalog.unitOrigin((binding.external orelse return null).unit) orelse return null;
+        hash.update(&origin);
+        hashWord(&hash, @intCast(name.len));
         hash.update(name);
         var result: Digest = undefined;
         hash.final(&result);
         return result;
     }
 };
+/// Local clause authority is the enclosing original global and exact where
+/// position. Private local spellings are not needed by portable public schemes.
+pub fn localQualificationDigest(name: []const u8, private: bool, runtime: bool, root: ast.Span, span: ast.Span) ?Digest {
+    const enclosing = qualificationDigest(name, private, runtime, root, span) orelse return null;
+    var hash: std.crypto.hash.Blake3 = .init(.{});
+    hash.update(&enclosing);
+    hashWord(&hash, @backingInt(ast.Tag.let_stmt));
+    var digest: Digest = undefined;
+    hash.final(&digest);
+    return digest;
+}
+pub fn sourceQualificationDigest(tree: *const ast.Tree, pool: *const symbols.Pool, owner: check.Binding, span: ast.Span, budget: *usize) ?Digest {
+    if (owner.kind != .global) return null;
+    const declaration = tree.valueDecl(owner.declaration);
+    const root = tree.span(owner.declaration);
+    const name = pool.get(owner.name);
+    if (declaration.where_node != 0 and std.meta.eql(span, tree.span(declaration.where_node))) return qualificationDigest(name, owner.private, declaration.runtime, root, span);
+    if (span.start < root.start or span.end > root.end or span.start > span.end) return null;
+    var walker: Walker = .{ .a = std.heap.page_allocator, .tree = tree, .pool = pool, .start = root.start, .materialize = false, .max_nodes = budget.*, .qualification = span };
+    const complete = walker.visit(owner.declaration, 0) catch return null;
+    budget.* -= walker.count;
+    if (!complete or !walker.found_qualification) return null;
+    return localQualificationDigest(name, owner.private, declaration.runtime, root, span);
+}
 /// Canonical source/compiled origin route; source offsets are declaration local.
 pub fn qualificationDigest(name: []const u8, private: bool, runtime: bool, root: ast.Span, span: ast.Span) ?Digest {
     if (name.len == 0 or span.start < root.start or span.end > root.end or span.start > span.end) return null;
@@ -705,7 +794,8 @@ pub fn associatedDigest(source: F.Source, catalog: Catalog, tree: *const ast.Tre
         const binding = bindings[entry.binding];
         const interface = readDigest(source, binding, obligations, names, catalog) orelse return null;
         var hash: std.crypto.hash.Blake3 = .init(.{});
-        hashWord(&hash, entry.identity.unit);
+        const origin = catalog.unitOrigin(entry.identity.unit) orelse return null;
+        hash.update(&origin);
         if (entry.identity.unit == 0) {
             hashWord(&hash, entry.identity.decl);
         } else {
@@ -719,11 +809,8 @@ pub fn associatedDigest(source: F.Source, catalog: Catalog, tree: *const ast.Tre
         hashWord(&hash, @backingInt(binding.kind));
         hashWord(&hash, @intFromBool(binding.private));
         hashWord(&hash, @intFromBool(binding.named_function));
+        hashWord(&hash, @backingInt(binding.capability_flow));
         hashWord(&hash, @intFromBool(binding.kind == .global and tree.valueDecl(binding.declaration).runtime));
-        if (binding.external) |target| {
-            hashWord(&hash, target.unit);
-            hashWord(&hash, target.binding);
-        }
         const name = catalog.pool.get(binding.name);
         hashWord(&hash, @intCast(name.len));
         hash.update(name);
@@ -774,6 +861,9 @@ const Walker = struct {
     start: u32,
     count: usize = 0,
     materialize: bool = true,
+    max_nodes: usize = 4096,
+    qualification: ?ast.Span = null,
+    found_qualification: bool = false,
     fn word(self: *Walker, value: u32) void {
         if (self.materialize) hashWord(&self.hash, value);
     }
@@ -781,12 +871,19 @@ const Walker = struct {
         if (self.materialize) self.hash.update(value);
     }
     fn visit(self: *Walker, id: ast.Id, depth: usize) A.Error!bool {
-        if (id == 0) return true;
-        if (depth >= 128 or self.count >= 4096) return false;
+        if (id == 0 or self.found_qualification) return true;
+        if (depth >= 128 or self.count >= self.max_nodes) return false;
         const node = self.tree.node(id);
         const span = self.tree.span(id);
         if (span.start < self.start) return false;
         self.count += 1;
+        if (self.qualification) |requested| {
+            if (span.start > requested.start or span.end < requested.end) return true;
+            if (node.tag == .where_clause and std.meta.eql(span, requested)) {
+                self.found_qualification = true;
+                return true;
+            }
+        }
         if (self.materialize) try self.ids.append(self.a, id);
         self.word(@backingInt(node.tag));
         self.word(span.start - self.start);
@@ -849,7 +946,11 @@ const Walker = struct {
             },
             .let_stmt => {
                 const binding = self.tree.binding(id);
-                if (binding.where_node != 0) return false;
+                if (binding.where_node != 0) {
+                    const pattern = self.tree.node(binding.pattern);
+                    if (pattern.tag != .pattern_name) return false;
+                }
+                if (!try self.visit(binding.where_node, depth + 1)) return false;
                 if (!try self.visit(binding.annotation, depth + 1)) return false;
                 if (!try self.visit(binding.value, depth + 1)) return false;
                 if (!try self.visit(binding.pattern, depth + 1)) return false;
@@ -945,6 +1046,9 @@ pub fn capture(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
 /// The checker has already retained successful replays. Freeze only newly
 /// elaborated bodies, and publish each immutable chunk after complete ownership.
 pub fn captureInto(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []const u8, checked: *const check.Checked, names: ?ExternalNames, cache: *Cache) !void {
+    return captureIntoResolved(a, tree, pool, text, checked, names, null, cache);
+}
+pub fn captureIntoResolved(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []const u8, checked: *const check.Checked, names: ?ExternalNames, annotations: ?AnnotationLookup, cache: *Cache) !void {
     // Selected implementation dependencies need their complete proof/read
     // owner. The ordinary body receipt has no implementation admission lane.
     if (checked.implementations.len != 0 or checked.member_templates.len != 0) return;
@@ -964,7 +1068,7 @@ pub fn captureInto(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text:
         const shape = try syntax(a, tree, pool, root) orelse continue;
         defer a.free(shape.ids);
         if (shape.ids.len < cache.minimum_nodes) continue;
-        if (try captureBody(a, tree, pool, text, checked, root, shape, names)) |body| {
+        if (try captureBody(a, tree, pool, text, checked, root, shape, names, annotations)) |body| {
             var owned = body;
             errdefer owned.deinit(a);
             try bodies.append(a, body);
@@ -983,14 +1087,14 @@ pub fn captureInto(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text:
         for (body.predicates) |predicate| try roots.appendSlice(a, &.{ predicate.value.ty, predicate.value.other, predicate.value.result, predicate.value.signature });
         try rows.appendSlice(a, body.closed_rows);
     }
-    const owner = freezeChunk(a, tree, pool, checked, &bodies, roots.items, rows.items) catch |err| {
+    const owner = freezeChunk(a, tree, pool, checked, names, &bodies, roots.items, rows.items) catch |err| {
         if (err == error.OutOfMemory) return err;
         return;
     } orelse return;
     try publishChunk(a, cache, owner);
 }
-fn freezeChunk(a: A, tree: *const ast.Tree, checked_pool: *const symbols.Pool, checked: *const check.Checked, bodies: *std.ArrayList(Body), roots: []T.Id, rows: []u32) !?*Chunk {
-    const catalog: Catalog = .{ .unit = checked.unit, .pool = checked_pool, .nominals = checked.nominals, .constructors = checked.constructors, .patterns = .{ .store = &checked.parameter_patterns } };
+fn freezeChunk(a: A, tree: *const ast.Tree, checked_pool: *const symbols.Pool, checked: *const check.Checked, names: ?ExternalNames, bodies: *std.ArrayList(Body), roots: []T.Id, rows: []u32) !?*Chunk {
+    const catalog: Catalog = .{ .unit = checked.unit, .pool = checked_pool, .nominals = checked.nominals, .constructors = checked.constructors, .patterns = .{ .store = &checked.parameter_patterns }, .values = .{ .bindings = checked.bindings, .tree = tree, .names = names } };
     var schemes: std.ArrayList(T.Scheme) = .empty;
     defer schemes.deinit(a);
     for (bodies.items) |body| for (body.local_schemes) |local| {
@@ -1033,9 +1137,10 @@ fn freezeChunk(a: A, tree: *const ast.Tree, checked_pool: *const symbols.Pool, c
         if (slot == null) {
             try nominals.ensureUnusedCapacity(a, 1);
             const digest = nominalDigest(.{ .store = &checked.types }, catalog, index) orelse return error.DependencyLimit;
+            const origin = catalog.unitOrigin(nominal.identity.unit) orelse return error.DependencyLimit;
             const owned_name = try a.dupe(u8, name);
             slot = nominals.items.len;
-            nominals.appendAssumeCapacity(.{ .unit = nominal.identity.unit, .name = owned_name, .digest = digest });
+            nominals.appendAssumeCapacity(.{ .unit = nominal.identity.unit, .origin = origin, .name = owned_name, .digest = digest });
         }
         // This graph's nominal namespace is chunk-local. AST and symbol IDs
         // become current identities only through the independently owned reads.
@@ -1201,8 +1306,9 @@ fn publishChunk(a: A, cache: *Cache, owner: *Chunk) !void {
     for (owner.bodies) |*body| try cache.retain(a, body);
 }
 
-fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []const u8, checked: *const check.Checked, root: ast.Id, shape: Syntax, names: ?ExternalNames) !?Body {
-    const catalog: Catalog = .{ .unit = checked.unit, .pool = pool, .nominals = checked.nominals, .constructors = checked.constructors, .patterns = .{ .store = &checked.parameter_patterns }, .values = .{ .bindings = checked.bindings, .tree = tree, .names = names } };
+fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []const u8, checked: *const check.Checked, root: ast.Id, shape: Syntax, names: ?ExternalNames, annotations: ?AnnotationLookup) !?Body {
+    var recipes: RecipeMemo = .{};
+    const catalog: Catalog = .{ .recipes = &recipes, .unit = checked.unit, .pool = pool, .nominals = checked.nominals, .constructors = checked.constructors, .patterns = .{ .store = &checked.parameter_patterns }, .values = .{ .bindings = checked.bindings, .tree = tree, .names = names, .annotations = annotations } };
     const global = checked.resolved[root];
     if (global == 0 or interfaceDigest(.{ .store = &checked.types }, checked.bindings[global], checked.obligations, catalog) == null) return null;
     var facts: std.ArrayList(Fact) = .empty;
@@ -1375,7 +1481,7 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
                 try old_bindings.ensureUnusedCapacity(a, 1);
                 const name = try a.dupe(u8, pool.get(old.name));
                 index = old_bindings.items.len;
-                bindings.appendAssumeCapacity(.{ .name = name, .kind = old.kind, .private = old.private, .declaration = declaration orelse 0, .owner = owner orelse 0, .ty = old.ty, .scheme = old.scheme.root != 0, .named_function = old.named_function, .runtime = old.kind == .global and tree.valueDecl(old.declaration).runtime, .external = old.external, .interface = digest.? });
+                bindings.appendAssumeCapacity(.{ .name = name, .kind = old.kind, .private = old.private, .declaration = declaration orelse 0, .owner = owner orelse 0, .ty = old.ty, .scheme = old.scheme.root != 0, .named_function = old.named_function, .capability_flow = old.capability_flow, .runtime = old.kind == .global and tree.valueDecl(old.declaration).runtime, .external = old.external, .interface = digest.? });
                 old_bindings.appendAssumeCapacity(old_id);
             }
             fact.binding = @intCast(index.? + 1);
@@ -1407,9 +1513,14 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
         var local = old.scheme;
         local.obligations = .{ .start = @intCast(predicates.items.len), .len = old.scheme.obligations.len };
         for (checked.obligations[old.scheme.obligations.start..][0..old.scheme.obligations.len]) |predicate| {
-            // Inferred flat associated requirements have complete type/name
-            // and candidate reads. Declared or shared local origins need more.
-            if (!supportedPredicate(predicate) or local_requirement_budget == 0) return null;
+            // Flat local requirements have complete type/name and candidate
+            // reads. Written clauses retain declaration-relative origins.
+            if ((!supportedPredicate(predicate) and !declaredPredicate(predicate)) or local_requirement_budget == 0) return null;
+            if (predicate.explicit) {
+                const origin = predicate.qualification_span orelse return null;
+                const root_span = tree.span(root);
+                if (predicate.qualification_unit != checked.unit or origin.start < root_span.start or origin.end > root_span.end or origin.start > origin.end) return null;
+            }
             local_requirement_budget -= 1;
             const source_position = position(shape.ids, predicate.source) orelse return null;
             var proof: std.crypto.hash.Blake3 = .init(.{});
@@ -1419,6 +1530,11 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             var value = predicate;
             value.name = 0;
             value.source = 0;
+            if (value.qualification_span) |*origin| {
+                origin.start -= tree.span(root).start;
+                origin.end -= tree.span(root).start;
+                value.qualification_unit = 0;
+            }
             predicates.appendAssumeCapacity(.{ .value = value, .position = source_position, .name = name, .local = true });
         }
         try local_schemes.append(a, .{ .binding = @intCast(index + 1), .principal = local });
@@ -1481,7 +1597,54 @@ fn captureLocal(a: A, checked: *const check.Checked, pool: *const symbols.Pool, 
     try bindings.ensureUnusedCapacity(a, 1);
     try old_bindings.ensureUnusedCapacity(a, 1);
     const name = try a.dupe(u8, pool.get(old.name));
-    bindings.appendAssumeCapacity(.{ .name = name, .kind = old.kind, .private = old.private, .declaration = declaration, .owner = owner, .ty = old.ty, .scheme = old.scheme.root != 0, .named_function = old.named_function, .runtime = false, .external = null, .interface = @splat(0) });
+    bindings.appendAssumeCapacity(.{ .name = name, .kind = old.kind, .private = old.private, .declaration = declaration, .owner = owner, .ty = old.ty, .scheme = old.scheme.root != 0, .named_function = old.named_function, .capability_flow = old.capability_flow, .runtime = false, .external = null, .interface = @splat(0) });
     old_bindings.appendAssumeCapacity(id);
     return @intCast(old_bindings.items.len);
+}
+
+test "body check cache recipe memo preserves exact depth budget and exhaustion guards" {
+    const allocator = std.testing.allocator;
+    const text = "type Token is data = #Token U32\n";
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tokens = try @import("lexer.zig").lex(allocator, text);
+    defer tokens.deinit(allocator);
+    var tree = try @import("parser.zig").parse(allocator, text, tokens.tokens.items, &pool);
+    defer tree.deinit(allocator);
+    var checked = try check.checkModuleWithOptions(allocator, &tree, &pool, &.{}, &.{}, 1, .{ .builtin_catalog = true });
+    defer checked.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    var memo: RecipeMemo = .{};
+    var catalog: Catalog = .{ .unit = 1, .pool = &pool, .nominals = checked.nominals, .constructors = checked.constructors, .patterns = .{ .store = &checked.parameter_patterns }, .recipes = &memo };
+    const index = catalog.named(1, "Token").?;
+    const source: F.Source = .{ .store = &checked.types };
+    var complete: usize = 4096;
+    const digest = nominalDigestAt(source, catalog, index, 0, &complete).?;
+    const cost = 4096 - complete;
+    try std.testing.expect(cost > 0);
+    var exact = cost;
+    try std.testing.expectEqual(digest, nominalDigestAt(source, catalog, index, 0, &exact).?);
+    try std.testing.expectEqual(@as(usize, 0), exact);
+    var short = cost - 1;
+    try std.testing.expect(nominalDigestAt(source, catalog, index, 0, &short) == null);
+    var different_depth: usize = 4096;
+    try std.testing.expectEqual(digest, nominalDigestAt(source, catalog, index, 1, &different_depth).?);
+    try std.testing.expectEqual(@as(usize, 2), memo.len);
+    var exhausted: usize = 4096;
+    try std.testing.expect(nominalDigestAt(source, catalog, index, 128, &exhausted) == null);
+    catalog.recipes = null;
+    var bare: usize = 4096;
+    try std.testing.expectEqual(digest, nominalDigestAt(source, catalog, index, 0, &bare).?);
+    try std.testing.expectEqual(complete, bare);
+    var bare_short = cost - 1;
+    try std.testing.expect(nominalDigestAt(source, catalog, index, 0, &bare_short) == null);
+    catalog.recipes = &memo;
+    for (2..64) |depth| {
+        var remaining: usize = 4096;
+        try std.testing.expectEqual(digest, nominalDigestAt(source, catalog, index, depth, &remaining).?);
+    }
+    try std.testing.expectEqual(memo.entries.len, memo.len);
+    var overflow: usize = 4096;
+    try std.testing.expectEqual(digest, nominalDigestAt(source, catalog, index, 64, &overflow).?);
+    try std.testing.expectEqual(memo.entries.len, memo.len);
 }

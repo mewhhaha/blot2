@@ -2,9 +2,9 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — conservative direct-scope result/argument/store
-  guards reject unsupported authority transfers. Owned footprint contracts and
-  precise hidden escape proofs remain open; see
+- **Status:** In progress — direct-scope guards, exact owned public flow contracts
+  and trusted local State lifetime proofs reject unsupported authority transfers.
+  General footprint contracts and precise hidden escape proofs remain open; see
   [qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
 - **Dependencies:** [058](058-implement-effect-instances-and-subtraction.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / capability

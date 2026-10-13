@@ -78,8 +78,9 @@ pub const Rewrite = struct {
         switch (n.tag) {
             .scoped => {
                 const descriptor = try self.ty(n.a, memo, depth + 1);
-                if (descriptor == n.a) return id;
-                return self.store.scoped(descriptor, .{ .unit = n.b, .decl = n.c });
+                const identity = if (n.b == 0) try self.ty(n.c, memo, depth + 1) else n.c;
+                if (descriptor == n.a and identity == n.c) return id;
+                return self.store.scoped(descriptor, .{ .unit = n.b, .decl = identity });
             },
             .function => {
                 const a = try self.ty(n.a, memo, depth + 1);
@@ -157,7 +158,9 @@ pub const Rewrite = struct {
             const arguments = try self.store.allocator.dupe(T.Id, self.store.operationArguments(label.*));
             defer self.store.allocator.free(arguments);
             for (arguments) |*argument| argument.* = try self.ty(argument.*, memo, depth + 1);
-            const next = try self.store.internScopedOperation(operation.identity, operation.instance, arguments);
+            var instance = operation.instance;
+            if (instance.unit == 0 and instance.decl != 0) instance.decl = try self.ty(instance.decl, memo, depth + 1);
+            const next = try self.store.internScopedOperation(operation.identity, instance, arguments);
             changed = changed or next != label.*;
             label.* = next;
         }

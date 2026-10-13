@@ -15,6 +15,12 @@ const Allocator = std.mem.Allocator;
 const Mapping = layout.Mapping;
 const RowMapping = layout.RowMapping;
 const EvidenceRoot = refinement_receipt.Root;
+// Small scalar bodies usually own a few mappings. Start with four slots;
+// subsequent growth still follows ArrayList's ordinary amortized policy.
+fn appendMapping(a: Allocator, mappings: *std.ArrayList(Mapping), value: Mapping) Allocator.Error!void {
+    if (mappings.capacity == 0) try mappings.ensureTotalCapacityPrecise(a, 4);
+    try mappings.append(a, value);
+}
 pub const Error = Allocator.Error || error{Declined};
 pub const Failure = struct { unit: u32, span: core.Span, code: enum { unresolved_type, complexity, evaluation } };
 pub const Record = struct {
@@ -62,7 +68,22 @@ pub const PhysicalProjection = struct {
             entry.layout = concrete;
             return;
         };
-        try self.mappings.append(self.allocator, .{ .variable = variable, .layout = concrete });
+        try appendMapping(self.allocator, self.mappings, .{ .variable = variable, .layout = concrete });
+    }
+};
+const OwnedProjection = struct {
+    unit: u32,
+    mappings: []const Mapping,
+    physical: core_eval.CodeProjection,
+    fn mapping(context: *anyopaque, solver: *types.Store, variable: types.Id, root: types.Id) (types.Error || error{UnresolvedType})!void {
+        const self: *@This() = @ptrCast(@alignCast(context));
+        try self.physical.mapping(self.physical.context, solver, variable, root);
+    }
+    fn instance(context: *anyopaque, unit: u32, variable: types.Id) ?types.NominalIdentity {
+        const self: *@This() = @ptrCast(@alignCast(context));
+        if (unit != self.unit) return null;
+        for (self.mappings) |entry| if (entry.variable == variable and entry.instance.unit != 0) return entry.instance;
+        return null;
     }
 };
 pub const Service = struct {
@@ -122,6 +143,10 @@ pub const Service = struct {
             const n = source.types.node(ty);
             if (n.tag != .function) return self.decline(unit_id, body.span, .unresolved_type);
             try self.mapTypeDepth(unit_id, &mappings, &rows, n.a, scalar_type, body.span, 0);
+            if (index == 0 and key.instance.unit != 0) {
+                const input = source.types.node(n.a);
+                if (input.tag == .scoped and input.b == 0) try appendMapping(self.allocator, &mappings, .{ .variable = input.c, .layout = layout.erased, .instance = key.instance });
+            }
             source_rows[index] = n.c;
             ty = n.b;
         }
@@ -147,13 +172,15 @@ pub const Service = struct {
         var shapes: std.ArrayList(Mapping) = .empty;
         defer shapes.deinit(self.allocator);
         var partial: PhysicalProjection = .{ .allocator = self.allocator, .layouts = self.layouts, .mappings = &shapes };
-        const projection = self.code_projection orelse core_eval.CodeProjection{ .context = &partial, .mapping = PhysicalProjection.mapping };
+        var owned_projection: OwnedProjection = .{ .unit = unit_id, .mappings = mappings.items, .physical = self.code_projection orelse core_eval.CodeProjection{ .context = &partial, .mapping = PhysicalProjection.mapping } };
+        const projection: core_eval.CodeProjection = .{ .context = &owned_projection, .mapping = OwnedProjection.mapping, .instance = OwnedProjection.instance };
         const timing = if (self.timing) |work| work.enter(.specialization) else null;
         defer if (timing) |scope| scope.deinit();
         self.refinement_stats.requests += 1;
         var seeds: std.ArrayList(type_evidence.Mapping) = .empty;
         defer seeds.deinit(self.allocator);
         for (mappings.items) |mapping| {
+            if (mapping.instance.decl != 0) continue;
             const evidence = self.toEvidence(mapping.layout) catch |err| switch (err) {
                 error.UnresolvedType => continue,
                 error.OutOfMemory => return error.OutOfMemory,
@@ -171,7 +198,9 @@ pub const Service = struct {
         const bridge = self.bridge;
         const result_handle = bridge.toCodeExpectation(@fromBackingInt(@intCast(expected))) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
         const result = @backingInt(result_handle);
-        const enabled = self.cache != null and captures.len == 0 and self.code_projection == null and self.evaluator.receipt_tape == null;
+        var has_instances = false;
+        for (mappings.items) |entry| has_instances = has_instances or entry.instance.decl != 0;
+        const enabled = !has_instances and self.cache != null and captures.len == 0 and self.code_projection == null and self.evaluator.receipt_tape == null;
         const cached = if (enabled) try self.cache.?.lookup(self.cache.?.context, root, bridge.partialView(), result, seeds.items, row_seeds.items) else null;
         var solved = cached orelse fresh: {
             self.refinement_regions.* += 1;
@@ -248,7 +277,7 @@ pub const Service = struct {
                 mapping.layout = self.layouts.mergePartial(mapping.layout, concrete) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
                 return;
             };
-            try mappings.append(self.allocator, .{ .variable = ty, .layout = concrete });
+            try appendMapping(self.allocator, mappings, .{ .variable = ty, .layout = concrete });
             return;
         }
         if (n.tag == .projection) {
@@ -296,7 +325,7 @@ pub const Service = struct {
                 mapping.layout = concrete;
                 return;
             };
-            try mappings.append(self.allocator, .{ .variable = ty, .layout = concrete });
+            try appendMapping(self.allocator, mappings, .{ .variable = ty, .layout = concrete });
             return;
         }
         const valid = switch (n.tag) {
@@ -358,11 +387,17 @@ pub const Service = struct {
                 try argument_ids.append(self.allocator, semantic);
             }
             const identity = source.operation(label).identity;
-            var found = false;
+            const source_instance = source.operation(label).instance;
+            const instance = layout.mappedInstance(source_instance, mappings.items);
+            const unbound_instance = instance.unit == 0 and instance.decl != 0;
+            var selected: ?usize = null;
             for (actuals, 0..) |actual, index| {
                 if (used[index]) continue;
                 const operation = self.layouts.effects.view().operation(actual);
-                if (!std.meta.eql(identity, operation.identity) or !std.meta.eql(source.operation(label).instance, operation.instance)) continue;
+                if (!std.meta.eql(identity, operation.identity)) continue;
+                if (unbound_instance) {
+                    if (operation.instance.unit == 0 or operation.instance.decl == 0) continue;
+                } else if (!std.meta.eql(instance, operation.instance)) continue;
                 const arguments = self.layouts.effects.view().operationArguments(actual);
                 if (arguments.len != argument_ids.items.len) continue;
                 var same = true;
@@ -371,12 +406,15 @@ pub const Service = struct {
                     same = same and semantic == wanted;
                 }
                 if (same) {
-                    used[index] = true;
-                    found = true;
-                    break;
+                    if (selected) |prior| {
+                        if (!std.meta.eql(self.layouts.effects.view().operation(actuals[prior]).instance, operation.instance)) return self.decline(unit_id, span, .unresolved_type);
+                    } else selected = index;
+                    if (!unbound_instance) break;
                 }
             }
-            if (!found) return self.decline(unit_id, span, .unresolved_type);
+            const index = selected orelse return self.decline(unit_id, span, .unresolved_type);
+            used[index] = true;
+            if (unbound_instance) try appendMapping(self.allocator, mappings, .{ .variable = source_instance.decl, .layout = layout.erased, .instance = self.layouts.effects.view().operation(actuals[index]).instance });
         }
         var suffix: std.ArrayList(u32) = .empty;
         defer suffix.deinit(self.allocator);

@@ -164,3 +164,66 @@ const Sequence.next = fn (cursor: Sequence) => case cursor of
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+Deno.test("private child state keeps chained forks saved values and window snapshots across pressure", async () => {
+  await compileAndRun(
+    `
+import * as iter from "std/iter"
+const head = fn values => @cursor.value (@list.cursor values)
+const third = fn values => @cursor.value (@cursor.advance (@cursor.advance (@list.cursor values)))
+entry const chained = fn count => do:
+  let cursor = iter.enumerate (iter.take (count / 2) (iter.map (fn value => value + 7) (iter.filter (fn value => value % 2 == 0) (iter.range 0 count))))
+  let saved = cursor.next
+  let #Some ((index, first), rest) = saved else:
+    return 999
+  let total = 0
+  for (_, value) in rest:
+    let garbage = @array.generate 8192 identity
+    total := self + value
+  let #Some ((_, again), _) = cursor.next else:
+    return 999
+  return index + first + again + total
+entry const references = fn (seed: U32) => do:
+  let values = @array.generate 4 (fn index => #[seed + index, index])
+  let cursor = iter.take 3 (iter.filter (fn (value: Array U32) => value.length == 2) (iter.map identity values))
+  let saved = cursor.next
+  let #Some (first, rest) = saved else:
+    return 999
+  let total = 0
+  for value in rest:
+    let garbage = @array.generate 8192 identity
+    total := self + value[0] + value.length
+  let #Some (again, _) = cursor.next else:
+    return 999
+  return total + first[0] + first.length + again[0] + again.length
+entry const windows = fn count => do:
+  let cursor = iter.windows 3 (iter.range 0 count)
+  let saved = cursor.next
+  let #Some (first, rest) = saved else:
+    return 999
+  let total = 0
+  for window in rest:
+    let garbage = @array.generate 8192 identity
+    total := self + head window
+  let #Some (second, _) = rest.next else:
+    return head first + total + third first + 100
+  return third first + head second + total
+`,
+    (guest) => {
+      for (const count of [0, 1, 2, 3, 4, 17, 65]) {
+        const length = Math.floor(count / 2);
+        let chained = 999;
+        if (length !== 0) chained = length * (length + 6) + 7;
+        assert.equal(guest.call("chained", count), chained);
+        let windows = 999;
+        if (count === 3) windows = 102;
+        if (count > 3) windows = 3 + (count - 3) * (count - 2) / 2;
+        assert.equal(guest.call("windows", count), windows);
+      }
+      for (const seed of [1, 7, 41]) {
+        assert.equal(guest.call("references", seed), 4 * seed + 11);
+      }
+    },
+    { stdRoot },
+  );
+});

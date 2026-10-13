@@ -193,6 +193,8 @@ pub const Store = struct {
         var height: u8 = 0;
         for (self.effects.list(r.labels)) |label| {
             if (label >= self.operations.items.len) return 0;
+            const instance = self.operations.items[label].instance;
+            if (instance.unit == 0 and instance.decl != 0) return 0;
             for (self.list(self.operations.items[label].arguments)) |arg| {
                 const argument_height = self.closedHeight(arg);
                 if (argument_height == 0) return 0;
@@ -219,6 +221,7 @@ pub const Store = struct {
                 }
             },
             .scoped, .array, .list, .cursor, .resolver => {
+                if (n.tag == .scoped and n.b == 0) return 0;
                 height = self.closedHeight(n.a);
                 if (height == 0) return 0;
             },
@@ -310,9 +313,22 @@ pub const Store = struct {
         const span = try self.saveList(words.items);
         return self.add(.{ .tag = .record, .a = span.start, .b = @intCast(fields.len) });
     }
-    /// Lexical identity only. Dynamic authority is created by scope execution.
+    /// A concrete instance names a lexical scope; unit0 with nonzero decl
+    /// names an owned identity-variable type edge. Dynamic authority is created
+    /// only by scope execution, never by a solver binder.
     pub fn scoped(self: *Store, descriptor: Id, instance: NominalIdentity) Error!Id {
         return self.add(.{ .tag = .scoped, .a = descriptor, .b = instance.unit, .c = instance.decl });
+    }
+    pub fn capabilityParameter(self: *Store, descriptor: Id) Error!Id {
+        return self.scoped(descriptor, .{ .unit = 0, .decl = try self.fresh() });
+    }
+    fn resolveInstance(self: *Store, instance: NominalIdentity, at: Cursor, depth: usize) Error!NominalIdentity {
+        if (instance.unit != 0 or instance.decl == 0) return instance;
+        const bound = try self.resolveDepth(instance.decl, at, depth + 1);
+        const value = self.node(bound);
+        if (value.tag == .variable) return .{ .unit = 0, .decl = bound };
+        if (value.tag != .scoped) return error.TypeMismatch;
+        return .{ .unit = value.b, .decl = value.c };
     }
     pub fn nominal(self: *Store, identity: NominalIdentity, arguments: []const Id) Error!Id {
         if (arguments.len >= std.math.maxInt(u32) or self.extra.items.len > std.math.maxInt(u32) - arguments.len - 1) return error.TypeLimit;
@@ -507,6 +523,12 @@ pub const Store = struct {
                     if (arguments.len > pending.len - count) return null;
                     @memcpy(pending[count..][0..arguments.len], arguments);
                     count += arguments.len;
+                    const instance = self.operation(label).instance;
+                    if (instance.unit == 0 and instance.decl != 0) {
+                        if (count == pending.len) return null;
+                        pending[count] = instance.decl;
+                        count += 1;
+                    }
                 }
                 if (row_.tail == .variable and !certificate.add(.{ .variable = row_.tail.variable, .last = self.effects.variables.items[row_.tail.variable].last, .effect = true })) return null;
             }
@@ -516,7 +538,12 @@ pub const Store = struct {
                     children = .{ n.a, n.b, 0 };
                     break :blk children[0..2];
                 },
-                .scoped, .array, .list, .cursor, .resolver, .demand, .provider => blk: {
+                .scoped => blk: {
+                    children = .{ n.a, n.c, 0 };
+                    if (n.b == 0) break :blk children[0..2];
+                    break :blk children[0..1];
+                },
+                .array, .list, .cursor, .resolver, .demand, .provider => blk: {
                     children[0] = n.a;
                     break :blk children[0..1];
                 },
@@ -654,8 +681,9 @@ pub const Store = struct {
         switch (value.tag) {
             .scoped => {
                 const child = try self.resolveDepth(value.a, position, depth + 1);
-                if (child == value.a) return id;
-                return self.scoped(child, .{ .unit = value.b, .decl = value.c });
+                const instance = try self.resolveInstance(.{ .unit = value.b, .decl = value.c }, position, depth + 1);
+                if (child == value.a and instance.unit == value.b and instance.decl == value.c) return id;
+                return self.scoped(child, instance);
             },
             .variable => return self.variableView(value.a, position),
             .function => {
@@ -768,12 +796,20 @@ pub const Store = struct {
             if (self.closedHeight(id) != 0) continue;
             const value = self.node(id);
             if (value.tag == .function or value.tag == .demand or value.tag == .provider)
-                for (self.rowLabels(value.c)) |label| try pending.appendSlice(scratch_allocator, self.operationArguments(label));
+                for (self.rowLabels(value.c)) |label| {
+                    try pending.appendSlice(scratch_allocator, self.operationArguments(label));
+                    const instance = self.operation(label).instance;
+                    if (instance.unit == 0 and instance.decl != 0) try pending.append(scratch_allocator, instance.decl);
+                };
             switch (value.tag) {
                 .variable => if (value.a == variable) return true,
                 .function => try pending.appendSlice(scratch_allocator, &.{ value.a, value.b }),
                 .product => try pending.appendSlice(scratch_allocator, self.list(.{ .start = value.a, .len = value.b })),
-                .scoped, .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(scratch_allocator, value.a),
+                .scoped => {
+                    try pending.append(scratch_allocator, value.a);
+                    if (value.b == 0) try pending.append(scratch_allocator, value.c);
+                },
+                .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(scratch_allocator, value.a),
                 .state_provider => try pending.appendSlice(scratch_allocator, &.{ value.a, value.b, value.c }),
                 .record => for (0..value.b) |i| {
                     try pending.append(scratch_allocator, self.recordField(value, i).ty);
@@ -858,7 +894,7 @@ pub const Store = struct {
         for (0..row_.labels.len) |index| {
             const label = self.effects.list(row_.labels)[index];
             const operation_ = self.operation(label);
-            var closed = true;
+            var closed = operation_.instance.unit != 0 or operation_.instance.decl == 0;
             for (self.list(operation_.arguments)) |argument| {
                 const height = self.closedHeight(argument);
                 if (height == 0) closed = false;
@@ -881,8 +917,9 @@ pub const Store = struct {
                 }
                 if (argument_changed) arguments.appendAssumeCapacity(resolved);
             }
+            const instance = try self.resolveInstance(operation_.instance, at, depth + 1);
             var next = label;
-            if (argument_changed) next = try self.internResolvedOperation(operation_.identity, operation_.instance, arguments.items, true);
+            if (argument_changed or !std.meta.eql(instance, operation_.instance)) next = try self.internResolvedOperation(operation_.identity, instance, if (argument_changed) arguments.items else self.list(operation_.arguments), true);
             if (!changed and next != label) {
                 try labels.ensureTotalCapacity(self.allocator, row_.labels.len);
                 labels.appendSliceAssumeCapacity(self.effects.list(row_.labels)[0..index]);
@@ -916,7 +953,7 @@ pub const Store = struct {
     }
     pub fn internScopedOperation(self: *Store, identity: NominalIdentity, instance: NominalIdentity, arguments: []const Id) Error!Effects.Label {
         if (identity.unit == 0 and identity.decl == 1 and (instance.unit != 0 or instance.decl != 0)) return error.TypeMismatch;
-        return self.internOperationMode(identity, instance, arguments, true);
+        return self.internOperationMode(identity, try self.resolveInstance(instance, 0, 0), arguments, true);
     }
     fn internOperationMode(self: *Store, identity: NominalIdentity, instance: NominalIdentity, arguments: []const Id, symbolic: bool) Error!Effects.Label {
         var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
@@ -1007,6 +1044,8 @@ pub const Store = struct {
                         for (self.effects.list(br.labels)) |v| bc += @intFromBool(v == label);
                         if (ac != bc) return false;
                         for (self.operationArguments(label)) |argument| try pending.append(scratch_allocator, .{ .a = argument, .b = argument });
+                        const instance = self.operation(label).instance;
+                        if (instance.unit == 0 and instance.decl != 0) try pending.append(scratch_allocator, .{ .a = instance.decl, .b = instance.decl });
                     }
                     if (a.tag == .function) try pending.append(scratch_allocator, .{ .a = a.b, .b = b.b });
                     try pending.append(scratch_allocator, .{ .a = a.a, .b = b.a });
@@ -1015,6 +1054,7 @@ pub const Store = struct {
                 .state_provider => try pending.appendSlice(scratch_allocator, &.{ .{ .a = a.a, .b = b.a }, .{ .a = a.b, .b = b.b }, .{ .a = a.c, .b = b.c } }),
                 .scoped => {
                     if (a.b != b.b or a.c != b.c) return false;
+                    if (a.b == 0) try pending.append(scratch_allocator, .{ .a = a.c, .b = b.c });
                     try pending.append(scratch_allocator, .{ .a = a.a, .b = b.a });
                 },
                 .type_constructor => if (a.a != b.a or a.b != b.b) return false,
@@ -1135,7 +1175,11 @@ pub const Store = struct {
                     try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a });
                 },
                 .scoped => {
-                    if (an.b != bn.b or an.c != bn.c) return self.mismatch(reporter, a, b);
+                    if (an.b == 0) {
+                        if (bn.b != 0 or an.c != bn.c) try pending.append(scratch_allocator, .{ .a = an.c, .b = b });
+                    } else if (bn.b == 0) {
+                        try pending.append(scratch_allocator, .{ .a = bn.c, .b = a });
+                    } else if (an.b != bn.b or an.c != bn.c) return self.mismatch(reporter, a, b);
                     try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a });
                 },
                 .type_constructor => if (an.a != bn.a or an.b != bn.b) return self.mismatch(reporter, a, b),
@@ -1213,12 +1257,20 @@ pub const Store = struct {
             if (entry.found_existing) continue;
             const value = self.node(id);
             if (value.tag == .function or value.tag == .demand or value.tag == .provider)
-                for (self.rowLabels(value.c)) |label| try pending.appendSlice(temporary, self.operationArguments(label));
+                for (self.rowLabels(value.c)) |label| {
+                    try pending.appendSlice(temporary, self.operationArguments(label));
+                    const instance = self.operation(label).instance;
+                    if (instance.unit == 0 and instance.decl != 0) try pending.append(temporary, instance.decl);
+                };
             switch (value.tag) {
                 .variable => try values.append(self.allocator, id),
                 .function => try pending.appendSlice(temporary, &.{ value.a, value.b }),
                 .product => try pending.appendSlice(temporary, self.list(.{ .start = value.a, .len = value.b })),
-                .scoped, .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(temporary, value.a),
+                .scoped => {
+                    try pending.append(temporary, value.a);
+                    if (value.b == 0) try pending.append(temporary, value.c);
+                },
+                .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(temporary, value.a),
                 .state_provider => try pending.appendSlice(temporary, &.{ value.a, value.b, value.c }),
                 .record => for (0..value.b) |i| {
                     try pending.append(temporary, self.recordField(value, i).ty);
@@ -1596,8 +1648,10 @@ pub const Store = struct {
                 argument_changed = argument_changed or next != argument;
                 try arguments.append(scratch, next);
             }
+            var instance = operation_.instance;
+            if (instance.unit == 0 and instance.decl != 0) instance.decl = try self.substituteDepth(instance.decl, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1);
             var next = label;
-            if (argument_changed) next = try self.internResolvedOperation(operation_.identity, operation_.instance, arguments.items, true);
+            if (argument_changed or !std.meta.eql(instance, operation_.instance)) next = try self.internResolvedOperation(operation_.identity, instance, arguments.items, true);
             changed = changed or next != label;
             try labels.append(scratch, next);
         }
@@ -1627,7 +1681,12 @@ pub const Store = struct {
         if (depth >= 1024) return error.TypeLimit;
         const value = self.node(root);
         switch (value.tag) {
-            .scoped => return self.scoped(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), .{ .unit = value.b, .decl = value.c }),
+            .scoped => {
+                const descriptor = try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1);
+                var instance: NominalIdentity = .{ .unit = value.b, .decl = value.c };
+                if (instance.unit == 0) instance.decl = try self.substituteDepth(instance.decl, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1);
+                return self.scoped(descriptor, instance);
+            },
             .function => return self.functionWithEffects(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substituteDepth(value.b, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substitutedRow(value.c, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1)),
             .product => {
                 var fields: std.ArrayList(Id) = .empty;
@@ -2581,4 +2640,43 @@ test "scoped effect identity survives normalization and preserves multiplicity" 
 }
 test "scoped effect identity releases every failed allocation" {
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, scopedOperationIdentityLaw, .{});
+}
+
+fn capabilityParameterLaw(allocator: std.mem.Allocator) !void {
+    var store = try Store.initWithOptions(allocator, .{ .closed_graphs = true });
+    defer store.deinit();
+    const descriptor = try store.nominal(.{ .unit = 1, .decl = 7 }, &.{u32_type});
+    const parameter = try store.capabilityParameter(descriptor);
+    const term = store.node(parameter);
+    try std.testing.expect(!try store.equalClosed(parameter, parameter));
+    const read = try store.internScopedOperation(.{ .unit = 1, .decl = 8 }, .{ .unit = term.b, .decl = term.c }, &.{u32_type});
+    const latent = try store.effects.row(&.{ read, read }, .closed);
+    const signature = try store.functionWithEffects(parameter, u32_type, latent);
+    const variables = try store.freeVariables(signature);
+    defer allocator.free(variables);
+    try std.testing.expectEqualSlices(Id, &.{term.c}, variables);
+    const first_variable = try store.fresh();
+    const second_variable = try store.fresh();
+    const first = try store.substitute(signature, variables, &.{first_variable});
+    const second = try store.substitute(signature, variables, &.{second_variable});
+    try std.testing.expectEqual(first_variable, store.node(store.node(first).a).c);
+    try std.testing.expectEqual(second_variable, store.operation(store.rowLabels(store.node(second).c)[0]).instance.decl);
+    const left = try store.scoped(descriptor, .{ .unit = 1, .decl = 30 });
+    const right = try store.scoped(descriptor, .{ .unit = 1, .decl = 31 });
+    const point = store.mark();
+    try store.unify(store.node(first).a, left);
+    const resolved = store.node(try store.resolve(first, 0));
+    const labels = store.rowLabels(resolved.c);
+    try std.testing.expectEqual(2, labels.len);
+    try std.testing.expectEqual(NominalIdentity{ .unit = 1, .decl = 30 }, store.operation(labels[0]).instance);
+    try std.testing.expectEqual(NominalIdentity{ .unit = 0, .decl = second_variable }, store.operation(store.rowLabels(store.node(second).c)[0]).instance);
+    store.rollback(point);
+    try store.unify(store.node(first).a, right);
+    const rerouted = store.node(try store.resolve(first, 0));
+    try std.testing.expectEqual(NominalIdentity{ .unit = 1, .decl = 31 }, store.operation(store.rowLabels(rerouted.c)[0]).instance);
+    try std.testing.expectError(error.TypeMismatch, store.unify(left, right));
+}
+test "capability identity parameters freshen resolve precise rows and revoke on rollback" {
+    try capabilityParameterLaw(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, capabilityParameterLaw, .{});
 }

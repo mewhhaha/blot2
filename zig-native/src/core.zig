@@ -47,7 +47,7 @@ pub const Op = enum(u8) { none, add, sub, mul, div, rem, equal, not_equal, less,
 pub const Node = struct { tag: Tag, op: Op = .none, ty: T.Id = 0, a: u32 = 0, b: u32 = 0, c: u32 = 0 };
 /// Keep source inference provenance after callback inputs are concretized.
 pub const Parameter = struct { binding: BindingId, ty: T.Id, span: Span, inferred: bool = false };
-pub const Binding = struct { private: bool = false, initializer: Id = 0, kind: checked_types.Kind, ty: T.Id, scheme: T.Scheme, public_variables: T.List = .{}, public_rows: T.List = .{}, has_explicit: bool = false, body_id: BodyId = 0, target: BindingRef, span: Span };
+pub const Binding = struct { capability_flow: checked_types.CapabilityFlow = .unknown, private: bool = false, initializer: Id = 0, kind: checked_types.Kind, ty: T.Id, scheme: T.Scheme, public_variables: T.List = .{}, public_rows: T.List = .{}, has_explicit: bool = false, body_id: BodyId = 0, target: BindingRef, span: Span };
 pub const RuntimeName = struct { binding: BindingId, point: u32 };
 /// Original declaration reads survive executable branch/value elimination.
 pub const DeclarationDependencies = struct { references: List = .{}, members: List = .{}, runtime_metadata: Id = 0 };
@@ -775,7 +775,7 @@ const Builder = struct {
                 const span = try self.saveTypes(arguments.items);
                 break :blk .{ .tag = original.tag, .a = original.a, .b = original.b, .c = span.start };
             },
-            .scoped => .{ .tag = .scoped, .a = try self.projectType(original.a, depth + 1), .b = original.b, .c = original.c },
+            .scoped => .{ .tag = .scoped, .a = try self.projectType(original.a, depth + 1), .b = original.b, .c = if (original.b == 0) try self.projectType(original.c, depth + 1) else original.c },
             .array, .list, .cursor, .resolver => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1) },
             .demand, .provider => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1), .c = try self.projectRow(original.c, depth + 1) },
             .state_provider => .{ .tag = .state_provider, .a = try self.projectType(original.a, depth + 1), .b = try self.projectType(original.b, depth + 1), .c = try self.projectType(original.c, depth + 1) },
@@ -795,6 +795,10 @@ const Builder = struct {
         self.effect_variable_map[variable] = id + 1;
         return id;
     }
+    fn projectInstance(self: *Builder, original: T.NominalIdentity, depth: usize) Error!T.NominalIdentity {
+        if (original.unit != 0 or original.decl == 0) return original;
+        return .{ .unit = 0, .decl = try self.projectType(original.decl, depth + 1) };
+    }
     fn projectOperation(self: *Builder, label: T.Effects.Label, depth: usize) Error!T.Effects.Label {
         var scratch_buffer: [256]u8 align(@alignOf(usize)) = undefined;
         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
@@ -808,7 +812,7 @@ const Builder = struct {
         const arguments = try self.saveTypes(values.items);
         if (self.effect_operations.items.len == std.math.maxInt(u32)) return error.CoreLimit;
         const id: u32 = @intCast(self.effect_operations.items.len);
-        try self.effect_operations.append(self.allocator, .{ .identity = source.identity, .arguments = arguments, .instance = source.instance });
+        try self.effect_operations.append(self.allocator, .{ .identity = source.identity, .arguments = arguments, .instance = try self.projectInstance(source.instance, depth + 1) });
         self.effect_operation_map[label] = id;
         return id;
     }
@@ -1465,7 +1469,7 @@ const Builder = struct {
             const use = self.checked.operation_uses[operation - 1];
             if (use.template == 0 or use.template >= self.checked.effect_templates.len) return error.CoreLimit;
             const catalog: u32 = @intCast(self.operation_values.items.len);
-            const metadata: OperationValue = .{ .identity = self.checked.effect_templates[use.template].identity, .arguments = try self.projectedTypeList(use.arguments), .signature = try self.projectType(use.signature, 0), .instance = use.instance, .capability = if (use.capability_binding != 0) try self.projectedReference(source, use.capability_binding, try self.projectType(self.checked.bindings[use.capability_binding].ty, 0), use.node) else if (use.capability == 0) 0 else try self.expression(use.capability, depth + 1) };
+            const metadata: OperationValue = .{ .identity = self.checked.effect_templates[use.template].identity, .arguments = try self.projectedTypeList(use.arguments), .signature = try self.projectType(use.signature, 0), .instance = try self.projectInstance(use.instance, 0), .capability = if (use.capability_binding != 0) try self.projectedReference(source, use.capability_binding, try self.projectType(self.checked.bindings[use.capability_binding].ty, 0), use.node) else if (use.capability == 0) 0 else try self.expression(use.capability, depth + 1) };
             try self.operation_values.append(self.allocator, metadata);
             const operation_ty = if (use.call == .value) ty else metadata.signature;
             const operation_node = try self.make(source, .{ .tag = .operation_value, .ty = operation_ty, .a = catalog });
@@ -2638,7 +2642,7 @@ const Builder = struct {
             for (self.checked.obligations[value.scheme.obligations.start..][0..value.scheme.obligations.len]) |requirement| {
                 has_explicit = has_explicit or requirement.explicit or (requirement.kind == .callee_use and self.checked.bindings[requirement.identity.decl].summary.has_explicit);
             }
-            try self.bindings.append(self.allocator, .{ .private = value.private, .kind = value.kind, .ty = try self.projectType(value.ty, 0), .scheme = try self.projectScheme(value.scheme), .public_variables = try self.projectPublic(value.summary.public_variables, false), .public_rows = try self.projectPublic(value.summary.public_rows, true), .has_explicit = has_explicit, .target = if (i == 0) .{ .binding = 0 } else self.target(@intCast(i)), .span = self.tree.span(value.declaration) });
+            try self.bindings.append(self.allocator, .{ .capability_flow = if (value.kind == .global) value.capability_flow else .unknown, .private = value.private, .kind = value.kind, .ty = try self.projectType(value.ty, 0), .scheme = try self.projectScheme(value.scheme), .public_variables = try self.projectPublic(value.summary.public_variables, false), .public_rows = try self.projectPublic(value.summary.public_rows, true), .has_explicit = has_explicit, .target = if (i == 0) .{ .binding = 0 } else self.target(@intCast(i)), .span = self.tree.span(value.declaration) });
         }
     }
     fn projectedTypeList(self: *Builder, source: T.List) Error!T.List {

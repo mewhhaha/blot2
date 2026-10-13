@@ -123,18 +123,18 @@ pub const ImportedCatalog = struct {
     pub fn declaration(self: ImportedCatalog, id: BindingId) SourceDeclaration {
         if (self.frozen) |owner| {
             const value = owner.bindings[id];
-            return .{ .private = value.private, .name = value.name, .declaration = 0, .kind = value.kind, .named_function = value.named_function, .external = value.external };
+            return .{ .private = value.private, .name = value.name, .declaration = 0, .kind = value.kind, .capability_flow = value.capability_flow, .named_function = value.named_function, .external = value.external };
         }
         return sourceDeclaration(self.producer.?.bindings[id]);
     }
     pub fn interface(self: ImportedCatalog, id: BindingId) SchemeInterface {
         if (self.frozen) |owner| {
             const value = owner.bindings[id];
-            return .{ .types = .{ .frozen = &owner.graph }, .scheme = value.scheme, .named_function = value.named_function, .obligations = owner.obligations, .callees = .{ .frozen = owner } };
+            return .{ .types = .{ .frozen = &owner.graph }, .scheme = value.scheme, .capability_flow = value.capability_flow, .named_function = value.named_function, .obligations = owner.obligations, .callees = .{ .frozen = owner } };
         }
         const owner = self.producer.?;
         const value = owner.bindings[id];
-        return .{ .types = .{ .store = &owner.types }, .scheme = value.scheme, .named_function = value.named_function, .obligations = owner.obligations, .callees = .{ .live = owner } };
+        return .{ .types = .{ .store = &owner.types }, .scheme = value.scheme, .capability_flow = value.capability_flow, .named_function = value.named_function, .obligations = owner.obligations, .callees = .{ .live = owner } };
     }
 };
 /// Static imports cannot carry principal source-body interfaces.
@@ -163,9 +163,11 @@ pub const SchemeSummary = struct {
     /// Only schemes made of position-independent obligations are shared.
     shareable: bool = false,
 };
-pub const Binding = struct { operation_ref: u32 = 0, private: bool = false, name: symbols.Symbol, declaration: ast.Id, owner: ast.Id, kind: Kind, named_function: bool = false, ty: T.Id, scheme: T.Scheme = .{}, external: ?ExternalTarget = null, predecessor: BindingId = 0, summary: SchemeSummary = .{} };
+pub const CapabilityFlow = @import("capability_flow.zig").Contract;
+pub const Binding = struct { capability_flow: CapabilityFlow = .unknown, operation_ref: u32 = 0, private: bool = false, name: symbols.Symbol, declaration: ast.Id, owner: ast.Id, kind: Kind, named_function: bool = false, ty: T.Id, scheme: T.Scheme = .{}, external: ?ExternalTarget = null, predecessor: BindingId = 0, summary: SchemeSummary = .{} };
 /// An immutable interface borrows only semantic tables, never a source body.
 pub const SchemeInterface = struct {
+    capability_flow: CapabilityFlow = .unknown,
     named_function: bool = false,
     types: F.Source,
     scheme: T.Scheme,
@@ -185,12 +187,12 @@ pub const Callees = union(enum) {
             .live => |owner| {
                 if (binding == 0 or binding >= owner.bindings.len) return null;
                 const value = owner.bindings[binding];
-                return .{ .types = .{ .store = &owner.types }, .scheme = value.scheme, .named_function = value.named_function, .obligations = owner.obligations, .callees = self };
+                return .{ .types = .{ .store = &owner.types }, .scheme = value.scheme, .capability_flow = value.capability_flow, .named_function = value.named_function, .obligations = owner.obligations, .callees = self };
             },
             .frozen => |owner| {
                 if (binding == 0 or binding >= owner.bindings.len) return null;
                 const value = owner.bindings[binding];
-                return .{ .types = .{ .frozen = &owner.graph }, .scheme = value.scheme, .named_function = value.named_function, .obligations = owner.obligations, .callees = self };
+                return .{ .types = .{ .frozen = &owner.graph }, .scheme = value.scheme, .capability_flow = value.capability_flow, .named_function = value.named_function, .obligations = owner.obligations, .callees = self };
             },
         }
     }
@@ -205,10 +207,10 @@ pub const ImportedBinding = struct {
     expose: bool = true,
 };
 /// Declaration facts admitted only by the owned source-validation API.
-pub const SourceHeader = struct { name: symbols.Symbol = 0, namespace: symbols.Symbol = 0, member: symbols.Symbol = 0, target: ExternalTarget, named_function: bool = false, origin: ast.Id, expose: bool = true };
-pub const SourceDeclaration = struct { private: bool = false, name: symbols.Symbol, declaration: ast.Id, kind: Kind, named_function: bool, external: ?ExternalTarget };
+pub const SourceHeader = struct { capability_flow: CapabilityFlow = .unknown, name: symbols.Symbol = 0, namespace: symbols.Symbol = 0, member: symbols.Symbol = 0, target: ExternalTarget, named_function: bool = false, origin: ast.Id, expose: bool = true };
+pub const SourceDeclaration = struct { capability_flow: CapabilityFlow = .unknown, private: bool = false, name: symbols.Symbol, declaration: ast.Id, kind: Kind, named_function: bool, external: ?ExternalTarget };
 pub fn sourceDeclaration(binding: Binding) SourceDeclaration {
-    return .{ .private = binding.private, .name = binding.name, .declaration = binding.declaration, .kind = binding.kind, .named_function = binding.named_function, .external = binding.external };
+    return .{ .private = binding.private, .name = binding.name, .declaration = binding.declaration, .kind = binding.kind, .capability_flow = binding.capability_flow, .named_function = binding.named_function, .external = binding.external };
 }
 /// Shared borrowed declaration payloads. No value schemes, obligations or bodies.
 pub const DeclarationCatalog = struct { types: F.Source, parameter_patterns: F.Patterns, nominals: []const Nominal, constructors: []const Constructor, effect_families: []const EffectFamily, effect_templates: []const EffectTemplate, associated: []const Associated, unit: u32, contracts: []const Contract = &.{}, contract_predicates: []const T.Obligation = &.{}, contract_members: []const ContractMember = &.{}, implementations: []const Implementation = &.{}, implementation_predicates: []const T.Obligation = &.{}, implementation_members: []const ImplementationMember = &.{} };
@@ -655,6 +657,8 @@ const Engine = struct {
     scoped_parameter: ast.Id = 0,
     scoped_parameter_type: T.Id = 0,
     active_effect_scopes: usize = 0,
+    scope_lifetimes: std.ArrayList(T.Id) = .empty,
+    storage_frames: std.ArrayList(struct { read: T.Effects.Label, write: T.Effects.Label = 0, depth: usize }) = .empty,
     effect_runners: std.ArrayList(EffectRunner) = .empty,
     effect_runner_ids: []u32 = &.{},
     provider_blocks: std.ArrayList(ProviderBlock) = .empty,
@@ -1117,7 +1121,7 @@ const Engine = struct {
             return;
         }
         const binding = self.external_targets.get(imported.target) orelse fresh: {
-            const fresh = try self.addBinding(.{ .name = if (imported.namespace == 0) imported.name else imported.member, .declaration = imported.origin, .owner = imported.origin, .kind = .external, .ty = try self.types.fresh(), .named_function = imported.named_function, .external = imported.target });
+            const fresh = try self.addBinding(.{ .name = if (imported.namespace == 0) imported.name else imported.member, .declaration = imported.origin, .owner = imported.origin, .kind = .external, .ty = try self.types.fresh(), .capability_flow = imported.capability_flow, .named_function = imported.named_function, .external = imported.target });
             try self.external_targets.put(self.allocator, imported.target, fresh);
             break :fresh fresh;
         };
@@ -1184,7 +1188,7 @@ const Engine = struct {
             try self.obligations.append(self.allocator, .{ .ty = try copier.copy(constraint.ty, 0), .kind = constraint.kind, .source = origin, .name = constraint.name, .result = if (constraint.result == 0) 0 else try copier.copy(constraint.result, 0), .other = if (constraint.other == 0) 0 else try copier.copy(constraint.other, 0), .signature = if (constraint.signature == 0) 0 else try copier.copy(constraint.signature, 0), .operator = constraint.operator, .identity = identity, .explicit = constraint.explicit, .qualification_span = constraint.qualification_span, .qualification_unit = constraint.qualification_unit });
         }
         const principal: T.Scheme = .{ .root = root, .variables = try self.types.saveList(variables.items), .row_variables = row_variables, .closed_rows = closed_rows, .obligations = .{ .start = start, .len = @intCast(self.obligations.items.len - start) } };
-        const binding = try self.addBinding(.{ .name = name, .declaration = origin, .owner = origin, .kind = .external, .ty = root, .scheme = principal, .named_function = interface.named_function, .external = target });
+        const binding = try self.addBinding(.{ .name = name, .declaration = origin, .owner = origin, .kind = .external, .ty = root, .scheme = principal, .capability_flow = interface.capability_flow, .named_function = interface.named_function, .external = target });
         self.bindings.items[binding].summary = try self.summarize(principal);
         try self.external_targets.put(self.allocator, target, binding);
         return binding;
@@ -1884,7 +1888,7 @@ const Engine = struct {
                 const definition = if (@TypeOf(imported) == SourceCatalog) imported.declarations[method.binding] else imported.declaration(method.binding);
                 if (definition.private) continue;
                 const target = definition.external orelse ExternalTarget{ .unit = producer.unit, .binding = method.binding };
-                if (@TypeOf(imported) == SourceCatalog) try self.importHeader(.{ .target = target, .named_function = definition.named_function, .origin = imported.origin, .expose = false }) else if (self.source_validation) try self.importHeader(.{ .target = target, .named_function = definition.named_function, .origin = imported.origin, .expose = false }) else try self.importBinding(.{ .target = target, .interface = imported.interface(method.binding), .origin = imported.origin, .expose = false });
+                if (@TypeOf(imported) == SourceCatalog) try self.importHeader(.{ .target = target, .capability_flow = definition.capability_flow, .named_function = definition.named_function, .origin = imported.origin, .expose = false }) else if (self.source_validation) try self.importHeader(.{ .target = target, .capability_flow = definition.capability_flow, .named_function = definition.named_function, .origin = imported.origin, .expose = false }) else try self.importBinding(.{ .target = target, .interface = imported.interface(method.binding), .origin = imported.origin, .expose = false });
                 const binding = self.external_targets.get(target).?;
                 var present = false;
                 for (self.associated.items) |prior| if (prior.identity.unit == method.identity.unit and prior.identity.decl == method.identity.decl and prior.member == method.member and prior.binding == binding) {
@@ -4619,7 +4623,7 @@ const Engine = struct {
             const function = self.types.node(try self.types.resolve(ty, 0));
             const lazy = function.tag == .function and self.types.node(self.types.head(function.a, 0)).tag == .demand;
             const argument = try self.checkArgument(syntax.b, lazy);
-            if (self.active_effect_scopes != 0 and try self.scopeFootprint(argument, 0)) try self.diagnostic(.capability_escape, syntax.b);
+            if (self.active_effect_scopes != 0 and try self.scopeFootprint(argument, 0) and !try self.localStateStore(syntax.a, syntax.b, argument)) try self.diagnostic(.capability_escape, syntax.b);
             self.demand_calls[application] = lazy;
             if (lazy) self.demand_types[application] = function.a;
             const result = try self.types.fresh();
@@ -4633,9 +4637,22 @@ const Engine = struct {
     // opaque and unresolved results retain an unknown footprint.
     fn scopeFootprint(self: *Engine, root: T.Id, depth: usize) T.Error!bool {
         var remaining: usize = 65_536;
-        return self.scopeFootprintDepth(root, depth, &remaining, &.{}, null);
+        return self.scopeFootprintDepth(root, depth, &remaining, &.{}, .{});
     }
-    fn scopeFootprintDepth(self: *Engine, root: T.Id, depth: usize, remaining: *usize, inherited: []const T.Id, exiting: ?Identity) T.Error!bool {
+    const FootprintBoundary = struct { exiting: ?Identity = null, storage_depth: ?usize = null };
+    fn identityFootprint(self: *Engine, identity: Identity, boundary: FootprintBoundary) T.Error!bool {
+        if (boundary.storage_depth) |depth| {
+            if (identity.unit == 0 and identity.decl == 0) return false;
+            for (self.scope_lifetimes.items[0..depth]) |capability| {
+                const value = self.types.node(try self.types.resolve(capability, 0));
+                if (value.tag == .scoped and value.b == identity.unit and value.c == identity.decl) return false;
+            }
+            return true;
+        }
+        if (boundary.exiting) |owner| return std.meta.eql(owner, identity);
+        return true;
+    }
+    fn scopeFootprintDepth(self: *Engine, root: T.Id, depth: usize, remaining: *usize, inherited: []const T.Id, boundary: FootprintBoundary) T.Error!bool {
         if (depth >= 128 or remaining.* == 0) {
             try self.diagnostic(.capability_analysis_limit, self.owner);
             return true;
@@ -4646,19 +4663,18 @@ const Engine = struct {
         switch (value.tag) {
             .variable => return !inList(inherited, resolved),
             .scoped => {
-                if (exiting) |owner| return value.b == owner.unit and value.c == owner.decl;
-                return true;
+                return self.identityFootprint(.{ .unit = value.b, .decl = value.c }, boundary);
             },
             .unit, .boolean, .u32, .f32, .never => return false,
-            .array, .list, .cursor => return self.scopeFootprintDepth(value.a, depth + 1, remaining, inherited, exiting),
+            .array, .list, .cursor => return self.scopeFootprintDepth(value.a, depth + 1, remaining, inherited, boundary),
             .product => {
                 const children = try self.allocator.dupe(T.Id, self.types.list(.{ .start = value.a, .len = value.b }));
                 defer self.allocator.free(children);
-                for (children) |child| if (try self.scopeFootprintDepth(child, depth + 1, remaining, inherited, exiting)) return true;
+                for (children) |child| if (try self.scopeFootprintDepth(child, depth + 1, remaining, inherited, boundary)) return true;
                 return false;
             },
             .record => {
-                for (0..value.b) |index| if (try self.scopeFootprintDepth(self.types.recordField(value, index).ty, depth + 1, remaining, inherited, exiting)) return true;
+                for (0..value.b) |index| if (try self.scopeFootprintDepth(self.types.recordField(value, index).ty, depth + 1, remaining, inherited, boundary)) return true;
                 return false;
             },
             else => return true,
@@ -4667,7 +4683,7 @@ const Engine = struct {
     // This proof is confined to the requesting expression's source. A named
     // helper needs a durable capture/store contract before its body can license
     // a transfer through an otherwise unchanged semantic interface.
-    fn closureCaptureFootprint(self: *Engine, source: ast.Id, closure: ast.Id, exiting: Identity, inherited: []const T.Id, remaining: *usize, depth: usize) T.Error!bool {
+    fn closureCaptureFootprint(self: *Engine, source: ast.Id, closure: ast.Id, boundary: FootprintBoundary, inherited: []const T.Id, remaining: *usize, depth: usize) T.Error!bool {
         if (source == 0) return false;
         if (depth >= 128 or remaining.* == 0) {
             try self.diagnostic(.capability_analysis_limit, self.owner);
@@ -4680,26 +4696,26 @@ const Engine = struct {
                 const binding = self.resolved[source];
                 if (binding == 0 or self.bindings.items[binding].owner == closure) return false;
                 const operation = self.bindings.items[binding].operation_ref;
-                if (operation != 0) return std.meta.eql(self.operation_uses.items[operation - 1].instance, exiting);
-                return self.scopeFootprintDepth(self.bindings.items[binding].ty, depth + 1, remaining, inherited, exiting);
+                if (operation != 0) return self.identityFootprint(self.operation_uses.items[operation - 1].instance, boundary);
+                return self.scopeFootprintDepth(self.bindings.items[binding].ty, depth + 1, remaining, inherited, boundary);
             },
             .intrinsic, .integer, .float, .string, .boolean, .unit => return false,
-            .group, .field_access, .return_stmt, .yield_stmt => return self.closureCaptureFootprint(value.a, closure, exiting, inherited, remaining, depth + 1),
-            .field, .unary, .operator_tail => return self.closureCaptureFootprint(value.b, closure, exiting, inherited, remaining, depth + 1),
-            .lambda => return self.closureCaptureFootprint(value.b, closure, exiting, inherited, remaining, depth + 1),
-            .apply, .index_access => return try self.closureCaptureFootprint(value.a, closure, exiting, inherited, remaining, depth + 1) or try self.closureCaptureFootprint(value.b, closure, exiting, inherited, remaining, depth + 1),
-            .binary => return try self.closureCaptureFootprint(value.b, closure, exiting, inherited, remaining, depth + 1) or try self.closureCaptureFootprint(value.c, closure, exiting, inherited, remaining, depth + 1),
-            .if_expr, .if_stmt => return try self.closureCaptureFootprint(value.a, closure, exiting, inherited, remaining, depth + 1) or try self.closureCaptureFootprint(value.b, closure, exiting, inherited, remaining, depth + 1) or try self.closureCaptureFootprint(value.c, closure, exiting, inherited, remaining, depth + 1),
+            .group, .field_access, .return_stmt, .yield_stmt => return self.closureCaptureFootprint(value.a, closure, boundary, inherited, remaining, depth + 1),
+            .field, .unary, .operator_tail => return self.closureCaptureFootprint(value.b, closure, boundary, inherited, remaining, depth + 1),
+            .lambda => return self.closureCaptureFootprint(value.b, closure, boundary, inherited, remaining, depth + 1),
+            .apply, .index_access => return try self.closureCaptureFootprint(value.a, closure, boundary, inherited, remaining, depth + 1) or try self.closureCaptureFootprint(value.b, closure, boundary, inherited, remaining, depth + 1),
+            .binary => return try self.closureCaptureFootprint(value.b, closure, boundary, inherited, remaining, depth + 1) or try self.closureCaptureFootprint(value.c, closure, boundary, inherited, remaining, depth + 1),
+            .if_expr, .if_stmt => return try self.closureCaptureFootprint(value.a, closure, boundary, inherited, remaining, depth + 1) or try self.closureCaptureFootprint(value.b, closure, boundary, inherited, remaining, depth + 1) or try self.closureCaptureFootprint(value.c, closure, boundary, inherited, remaining, depth + 1),
             .product, .array, .record, .block, .infix_chain => {
-                if (value.tag == .block and try self.closureCaptureFootprint(value.c, closure, exiting, inherited, remaining, depth + 1)) return true;
-                for (self.tree.children(source)) |child| if (try self.closureCaptureFootprint(child, closure, exiting, inherited, remaining, depth + 1)) return true;
+                if (value.tag == .block and try self.closureCaptureFootprint(value.c, closure, boundary, inherited, remaining, depth + 1)) return true;
+                for (self.tree.children(source)) |child| if (try self.closureCaptureFootprint(child, closure, boundary, inherited, remaining, depth + 1)) return true;
                 return false;
             },
             .let_stmt => {
                 const binding = self.tree.binding(source);
-                return try self.closureCaptureFootprint(binding.value, closure, exiting, inherited, remaining, depth + 1) or try self.closureCaptureFootprint(binding.fallback, closure, exiting, inherited, remaining, depth + 1);
+                return try self.closureCaptureFootprint(binding.value, closure, boundary, inherited, remaining, depth + 1) or try self.closureCaptureFootprint(binding.fallback, closure, boundary, inherited, remaining, depth + 1);
             },
-            .use_stmt, .iterator_bind => return self.closureCaptureFootprint(value.b, closure, exiting, inherited, remaining, depth + 1),
+            .use_stmt, .iterator_bind => return self.closureCaptureFootprint(value.b, closure, boundary, inherited, remaining, depth + 1),
             else => return true,
         }
     }
@@ -4714,7 +4730,68 @@ const Engine = struct {
         // Open ambient tails describe future caller permission, not a captured
         // value. Known labels and actual captures keep their exact owner.
         for (self.types.rowLabels(latent)) |label| if (std.meta.eql(self.types.operation(label).instance, exiting)) return true;
-        return try self.closureCaptureFootprint(closure.b, expression_, exiting, inherited, remaining, 0);
+        return try self.closureCaptureFootprint(closure.b, expression_, .{ .exiting = exiting }, inherited, remaining, 0);
+    }
+    fn capabilityFlowUse(self: *Engine, callee: ast.Id, argument: T.Id) T.Error!bool {
+        var source = callee;
+        while (self.tree.node(source).tag == .group) source = self.tree.node(source).a;
+        var supplied: usize = 0;
+        while (self.tree.node(source).tag == .apply or self.tree.node(source).tag == .group) {
+            const value = self.tree.node(source);
+            if (value.tag == .apply) supplied += 1;
+            source = value.a;
+        }
+        var contract = self.capabilityFlowContract(source);
+        if (self.tree.node(source).tag == .name) {
+            const binding = self.resolved[source];
+            if (binding != 0) contract = self.bindings.items[binding].capability_flow;
+        }
+        switch (contract) {
+            .unknown => return false,
+            .identity => return supplied == 0,
+            .invoke_unit => return supplied == 0 and self.types.node(try self.types.resolve(argument, 0)).tag == .function,
+            .member_unit => return supplied == 0 and self.types.node(try self.types.resolve(argument, 0)).tag == .scoped,
+            .invoke_with_capability => {
+                const value = self.types.node(try self.types.resolve(argument, 0));
+                if (supplied == 0) return value.tag == .scoped;
+                return supplied == 1 and value.tag == .function;
+            },
+        }
+    }
+    // Only a trusted State frame owns a local cell. Ordinary callbacks and
+    // construction-time handlers cannot establish a future storage lifetime.
+    fn localStateStore(self: *Engine, callee: ast.Id, argument_source: ast.Id, argument: T.Id) T.Error!bool {
+        var target = callee;
+        while (self.tree.node(target).tag == .group) target = self.tree.node(target).a;
+        var operation = self.operation_refs[target];
+        if (operation == 0 and self.tree.node(target).tag == .name) {
+            const binding = self.resolved[target];
+            if (binding != 0) operation = self.bindings.items[binding].operation_ref;
+        }
+        if (operation == 0) return false;
+        const use = self.operation_uses.items[operation - 1];
+        const signature = self.types.node(try self.types.resolve(use.signature, 0));
+        const labels = self.types.rowLabels(try self.types.resolveEffects(signature.c, 0));
+        if (labels.len != 1) return false;
+        var index = self.storage_frames.items.len;
+        while (index != 0) {
+            index -= 1;
+            const frame = self.storage_frames.items[index];
+            if (frame.read != labels[0] and frame.write != labels[0]) continue;
+            if (frame.write == 0 or frame.write != labels[0]) return false;
+            const boundary: FootprintBoundary = .{ .storage_depth = frame.depth };
+            var remaining: usize = 65_536;
+            const value = self.types.node(try self.types.resolve(argument, 0));
+            if (value.tag != .function) return !try self.scopeFootprintDepth(argument, 0, &remaining, &.{}, boundary);
+            var source = argument_source;
+            while (self.tree.node(source).tag == .group) source = self.tree.node(source).a;
+            const closure = self.tree.node(source);
+            if (closure.tag != .lambda) return false;
+            const latent = try self.types.resolveEffects(value.c, 0);
+            for (self.types.rowLabels(latent)) |label| if (try self.identityFootprint(self.types.operation(label).instance, boundary)) return false;
+            return !try self.closureCaptureFootprint(closure.b, source, boundary, &.{}, &remaining, 0);
+        }
+        return false;
     }
     fn intrinsicRead(self: *Engine, callee: ast.Id) bool {
         var source = callee;
@@ -4745,6 +4822,47 @@ const Engine = struct {
         if (self.tree.node(target).tag != .name) return false;
         const parameter = self.resolved[lambda.a];
         return parameter != 0 and self.resolved[target] == parameter;
+    }
+    fn capabilityFamilyAnnotation(self: *const Engine, original: ast.Id) ?u32 {
+        if (original == 0) return null;
+        var head = original;
+        while (self.tree.node(head).tag == .type_apply) head = self.tree.node(head).a;
+        const name = self.tree.node(head);
+        if (name.tag != .type_name) return null;
+        return self.effect_family_names.get(self.catalogKey(name.a));
+    }
+    fn capabilityDescriptorAnnotation(self: *Engine, original: ast.Id) T.Error!?T.Id {
+        const family_index = self.capabilityFamilyAnnotation(original) orelse return null;
+        const family = self.effect_families.items[family_index];
+        var head = original;
+        var syntax: std.ArrayList(ast.Id) = .empty;
+        defer syntax.deinit(self.allocator);
+        while (self.tree.node(head).tag == .type_apply) {
+            try syntax.append(self.allocator, self.tree.node(head).b);
+            head = self.tree.node(head).a;
+        }
+        if (syntax.items.len != family.parameters.len) {
+            try self.diagnostic(.type_arity, original);
+            return try self.types.fresh();
+        }
+        std.mem.reverse(ast.Id, syntax.items);
+        var arguments: std.ArrayList(T.Id) = .empty;
+        defer arguments.deinit(self.allocator);
+        for (syntax.items, self.parameter_patterns.list(family.patterns)) |source, pattern_| try arguments.append(self.allocator, try self.parameterArgument(pattern_, source, true, 0));
+        return try self.types.nominal(family.identity, arguments.items);
+    }
+    fn capabilityFlowContract(self: *const Engine, source: ast.Id) CapabilityFlow {
+        const basic = @import("capability_flow.zig").source(self.tree, source);
+        if (basic != .unknown) return basic;
+        const member = @import("capability_flow.zig").memberSource(self.tree, self.pool, source);
+        const curried = @import("capability_flow.zig").curriedUnitSource(self.tree, source);
+        if (!member and !curried) return .unknown;
+        var head = source;
+        while (self.tree.node(head).tag == .group) head = self.tree.node(head).a;
+        const lambda = self.tree.node(head);
+        if (self.capabilityFamilyAnnotation(self.tree.parameter(lambda.a).annotation) == null) return .unknown;
+        if (curried) return .invoke_with_capability;
+        return .member_unit;
     }
     fn effectScopeApplication(self: *Engine, id: ast.Id) T.Error!?T.Id {
         const application = self.tree.node(id);
@@ -4793,8 +4911,10 @@ const Engine = struct {
         const saved_type = self.scoped_parameter_type;
         self.scoped_parameter = lambda.a;
         self.scoped_parameter_type = capability;
+        try self.scope_lifetimes.append(self.allocator, capability);
         self.active_effect_scopes += 1;
         defer {
+            _ = self.scope_lifetimes.pop();
             self.scoped_parameter = saved_parameter;
             self.scoped_parameter_type = saved_type;
             self.active_effect_scopes -= 1;
@@ -4815,8 +4935,10 @@ const Engine = struct {
         defer self.allocator.free(inherited);
         var footprint_budget: usize = 65_536;
         const exiting: Identity = .{ .unit = self.unit, .decl = lambda.a };
-        const footprint = try self.scopedClosureResult(lambda.b, signature.b, exiting, inherited, &footprint_budget) orelse try self.scopeFootprintDepth(signature.b, 0, &footprint_budget, inherited, exiting);
-        if (footprint) try self.diagnostic(.capability_escape, id);
+        const footprint = try self.scopedClosureResult(lambda.b, signature.b, exiting, inherited, &footprint_budget) orelse try self.scopeFootprintDepth(signature.b, 0, &footprint_budget, inherited, .{ .exiting = exiting });
+        var residual_owner = false;
+        for (self.types.rowLabels(residual)) |label| residual_owner = residual_owner or std.meta.eql(self.types.operation(label).instance, exiting);
+        if (footprint or residual_owner) try self.diagnostic(.capability_escape, id);
         try self.effect_scopes.append(self.allocator, .{ .node = id, .callback = callback, .parameter = lambda.a, .capability = capability, .result = signature.b, .body_effects = signature.c });
         self.effect_scope_ids[id] = @intCast(self.effect_scopes.items.len);
         return signature.b;
@@ -5114,6 +5236,13 @@ const Engine = struct {
             defer self.allocator.free(arguments);
             for (arguments) |*argument| argument.* = try self.types.resolve(argument.*, 0);
             try labels.append(self.allocator, try self.types.internScopedOperation(.{ .unit = nominal_.a, .decl = nominal_.b }, instance, arguments));
+        }
+        const storage_count = self.storage_frames.items.len;
+        defer self.storage_frames.shrinkRetainingCapacity(storage_count);
+        if (self.active_effect_scopes != 0) {
+            var write: T.Effects.Label = 0;
+            if (provider_.tag == .state_provider) write = labels.items[1];
+            try self.storage_frames.append(self.allocator, .{ .read = labels.items[0], .write = write, .depth = self.scope_lifetimes.items.len });
         }
         const outer = try self.types.resolveEffects(old_ambient, 0);
         try labels.appendSlice(self.allocator, self.types.rowLabels(outer));
@@ -5865,6 +5994,34 @@ const Engine = struct {
             if (name.tag != .type_name) {
                 try self.diagnostic(.unknown_effect, label_source);
                 continue;
+            }
+            if (reverse.items.len == 0) {
+                if (self.lookup(name.a)) |binding| {
+                    if (self.bindings.items[binding].operation_ref != 0) {
+                        const signature = self.types.node(try self.types.resolve(self.bindings.items[binding].ty, 0));
+                        if (signature.tag == .function and self.types.rowLabels(signature.c).len == 1) {
+                            try labels.append(self.allocator, self.types.rowLabels(signature.c)[0]);
+                            continue;
+                        }
+                    }
+                }
+                const text = self.pool.get(name.a);
+                if (std.mem.findScalarLast(u8, text, '.')) |separator| {
+                    if (self.pool.lookup(text[0..separator])) |root_name| if (self.lookup(root_name)) |binding| {
+                        const capability = self.types.node(try self.types.resolve(self.bindings.items[binding].ty, 0));
+                        if (capability.tag == .scoped) {
+                            const descriptor = self.types.node(try self.types.resolve(capability.a, 0));
+                            if (descriptor.tag == .nominal) if (self.effect_family_identities.get(.{ .unit = descriptor.a, .decl = descriptor.b })) |family| {
+                                const member_name = self.pool.lookup(text[separator + 1 ..]);
+                                const template = if (member_name) |member_| self.effect_members.get(.{ .family = family, .member = member_ }) else null;
+                                if (template) |operation| {
+                                    try labels.append(self.allocator, try self.types.internScopedOperation(self.effect_templates.items[operation].identity, .{ .unit = capability.b, .decl = capability.c }, self.types.nominalArguments(descriptor)));
+                                    continue;
+                                }
+                            };
+                        }
+                    };
+                }
             }
             if (std.mem.eql(u8, self.pool.get(name.a), "Foreign")) {
                 if (reverse.items.len != 0) try self.diagnostic(.type_arity, label_source) else try labels.append(self.allocator, T.foreign_operation);
@@ -7272,8 +7429,18 @@ const Engine = struct {
     }
     /// Reconstruct owned live facts only after every direct interface read has
     /// committed. Active SCC members and unsupported shapes remain ordinary.
+    fn bodyAnnotations(self: *const Engine) @import("body_check_cache.zig").AnnotationLookup {
+        return .{ .context = self, .lookup = struct {
+            fn lookup(context: *const anyopaque, name: []const u8) ?usize {
+                const engine: *const Engine = @ptrCast(@alignCast(context));
+                const symbol = engine.pool.lookup(name) orelse return null;
+                const index = engine.nominal_names.get(engine.catalogKey(symbol)) orelse return null;
+                return index;
+            }
+        }.lookup };
+    }
     fn bodyCatalog(self: *Engine) @import("body_check_cache.zig").Catalog {
-        return .{ .unit = self.unit, .pool = self.pool, .nominals = self.nominals.items, .constructors = self.constructors.items, .patterns = .{ .store = &self.parameter_patterns }, .values = .{ .bindings = self.bindings.items, .tree = self.tree, .names = self.body_external_names, .ready = .{ .context = self, .lookup = struct {
+        return .{ .unit = self.unit, .pool = self.pool, .nominals = self.nominals.items, .constructors = self.constructors.items, .patterns = .{ .store = &self.parameter_patterns }, .values = .{ .bindings = self.bindings.items, .tree = self.tree, .names = self.body_external_names, .annotations = self.bodyAnnotations(), .ready = .{ .context = self, .lookup = struct {
             fn ready(context: *const anyopaque, binding: BindingId) bool {
                 const engine: *const Engine = @ptrCast(@alignCast(context));
                 return engine.calleeSettled(binding);
@@ -7292,12 +7459,14 @@ const Engine = struct {
         const shape = try C.syntax(self.allocator, self.tree, self.pool, root) orelse return null;
         defer self.allocator.free(shape.ids);
         if (!std.mem.eql(u8, &shape.digest, &body.syntax) or shape.ids.len != body.facts.len) return null;
-        const catalog = self.bodyCatalog();
+        var recipes: C.RecipeMemo = .{};
+        var catalog = self.bodyCatalog();
+        catalog.recipes = &recipes;
         var identities: std.AutoHashMapUnmanaged(Identity, Identity) = .empty;
         defer identities.deinit(self.allocator);
         for (body.nominals) |index| {
             const old = body.owner.nominals[index];
-            const current = catalog.named(old.unit, old.name) orelse return null;
+            const current = catalog.namedOrigin(old.origin, old.name) orelse return null;
             const digest = C.nominalDigest(.{ .store = &self.types }, catalog, current) orelse return null;
             if (!std.mem.eql(u8, &digest, &old.digest)) return null;
             try identities.put(self.allocator, .{ .unit = index + 1, .decl = 0 }, self.nominals.items[current].identity);
@@ -7314,13 +7483,16 @@ const Engine = struct {
             if (old.kind == .parameter or old.kind == .local) continue;
             const name = self.pool.lookup(old.name) orelse return null;
             const binding = try self.catalogBinding(name) orelse return null;
+            recipes.len = 0;
+            catalog = self.bodyCatalog();
+            catalog.recipes = &recipes;
             const current = self.bindings.items[binding];
-            if (current.kind != old.kind or current.private != old.private or current.named_function != old.named_function or !std.meta.eql(current.external, old.external)) return null;
+            if (current.kind != old.kind or current.private != old.private or current.named_function != old.named_function or current.capability_flow != old.capability_flow or (current.external == null) != (old.external == null)) return null;
             if (current.kind == .global) {
                 const state = self.global_states.get(binding) orelse return null;
                 if (state.state != .complete or state.on_stack or self.tree.valueDecl(current.declaration).runtime != old.runtime) return null;
             }
-            const digest = C.readDigest(.{ .store = &self.types }, current, self.obligations.items, self.body_external_names, self.bodyCatalog()) orelse return null;
+            const digest = C.readDigest(.{ .store = &self.types }, current, self.obligations.items, self.body_external_names, catalog) orelse return null;
             if (!std.mem.eql(u8, &digest, &old.interface)) return null;
             target.* = binding;
         }
@@ -7331,11 +7503,14 @@ const Engine = struct {
             const target = try discoveryReference(self, .operator, self.tree.node(id).a, 0, &.{}) orelse return null;
             if (target != mapped[fact.binding - 1]) return null;
         };
+        recipes.len = 0;
+        catalog = self.bodyCatalog();
+        catalog.recipes = &recipes;
         if (body.selection_digest) |old_digest| {
             for (self.associated.items) |entry| {
                 for (body.members) |member| if (std.mem.eql(u8, member, self.pool.get(entry.member)) and !self.calleeSettled(entry.binding)) return null;
             }
-            const digest = C.associatedDigest(.{ .store = &self.types }, self.bodyCatalog(), self.tree, self.associated.items, self.bindings.items, self.obligations.items, self.body_external_names, body.members) orelse return null;
+            const digest = C.associatedDigest(.{ .store = &self.types }, catalog, self.tree, self.associated.items, self.bindings.items, self.obligations.items, self.body_external_names, body.members) orelse return null;
             if (!std.mem.eql(u8, &digest, &old_digest)) return null;
         }
         const constructors = try self.allocator.alloc(u32, body.constructors.len);
@@ -7388,13 +7563,7 @@ const Engine = struct {
             for (variables, mapped_variables) |variable, *mapped_variable| mapped_variable.* = try copier.copy(variable, 0);
             const requirement_start: u32 = @intCast(self.obligations.items.len);
             for (body.predicates[frozen.obligations.start..][0..frozen.obligations.len]) |predicate| {
-                var value = predicate.value;
-                value.ty = try copier.copy(value.ty, 0);
-                value.other = try copier.copy(value.other, 0);
-                value.result = try copier.copy(value.result, 0);
-                value.signature = try copier.copy(value.signature, 0);
-                value.source = shape.ids[predicate.position];
-                value.name = self.pool.lookup(predicate.name) orelse return error.TypeLimit;
+                const value = try self.replayedBodyPredicate(&copier, shape.ids, predicate, span);
                 try self.obligations.append(self.allocator, value);
             }
             self.bindings.items[mapped[owned_scheme.binding - 1]].scheme = .{
@@ -7470,13 +7639,7 @@ const Engine = struct {
         };
         for (body.predicates) |predicate| {
             if (predicate.local) continue;
-            var value = predicate.value;
-            value.ty = try copier.copy(value.ty, 0);
-            value.other = try copier.copy(value.other, 0);
-            value.result = try copier.copy(value.result, 0);
-            value.signature = try copier.copy(value.signature, 0);
-            value.source = shape.ids[predicate.position];
-            value.name = self.pool.lookup(predicate.name) orelse return error.TypeLimit;
+            const value = try self.replayedBodyPredicate(&copier, shape.ids, predicate, span);
             try self.appendPending(.{ .owner = self.current, .direct = true, .value = value });
         }
         const ty = self.expr_types[declaration.body];
@@ -7484,6 +7647,23 @@ const Engine = struct {
         if (self.retained_bodies) |retained| try retained.retain(self.allocator, body);
         self.body_elaborations -= 1;
         return ty;
+    }
+    fn replayedBodyPredicate(self: *Engine, copier: *SchemeCopier, ids: []const ast.Id, predicate: @import("body_check_cache.zig").Predicate, root: ast.Span) T.Error!T.Obligation {
+        var value = predicate.value;
+        value.ty = try copier.copy(value.ty, 0);
+        value.other = try copier.copy(value.other, 0);
+        value.result = try copier.copy(value.result, 0);
+        value.signature = try copier.copy(value.signature, 0);
+        value.source = ids[predicate.position];
+        value.name = 0;
+        if (predicate.name.len != 0) value.name = self.pool.lookup(predicate.name) orelse return error.TypeLimit;
+        if (predicate.local and value.explicit) {
+            const origin = value.qualification_span orelse return error.TypeLimit;
+            if (origin.start > origin.end or origin.end > root.end - root.start) return error.TypeLimit;
+            value.qualification_span = .{ .start = root.start + origin.start, .end = root.start + origin.end };
+            value.qualification_unit = self.unit;
+        }
+        return value;
     }
     fn bodyProjectionPlan(self: *Engine, receiver: T.Id, nominal: Identity, field: symbols.Symbol, tags: []const u32) T.Error!?Projection {
         var variants: std.ArrayList(u32) = .empty;
@@ -8065,10 +8245,26 @@ const Engine = struct {
                 const parameter = self.tree.parameter(node.a);
                 if (parameter.where_node != 0) try self.diagnostic(.higher_rank_constraint, parameter.where_node);
                 const scoped = node.a == self.scoped_parameter;
-                const element_ty = if (scoped) self.scoped_parameter_type else if (parameter.is_unit) T.unit else try self.types.fresh();
-                if (!scoped and parameter.annotation != 0) try self.constrain(element_ty, try self.annotation(parameter.annotation), node.a);
-                const required = if (node.c != 0) try self.annotation(node.c) else 0;
+                const descriptor = if (!scoped) try self.capabilityDescriptorAnnotation(parameter.annotation) else null;
+                const symbolic_capability = descriptor != null;
+                const element_ty = if (scoped) self.scoped_parameter_type else if (descriptor) |family| try self.types.capabilityParameter(family) else if (parameter.is_unit) T.unit else try self.types.fresh();
+                if (!scoped and !symbolic_capability and parameter.annotation != 0) try self.constrain(element_ty, try self.annotation(parameter.annotation), node.a);
+                if (symbolic_capability) {
+                    try self.scope_lifetimes.append(self.allocator, element_ty);
+                    self.active_effect_scopes += 1;
+                }
+                defer if (symbolic_capability) {
+                    _ = self.scope_lifetimes.pop();
+                    self.active_effect_scopes -= 1;
+                };
                 const parameter_ty = if (parameter.demanded) try self.types.demandWithEffects(element_ty, try self.types.freshEffects()) else element_ty;
+                const saved_frames = self.storage_frames;
+                const has_frames = saved_frames.items.len != 0;
+                if (has_frames) self.storage_frames = .empty;
+                defer if (has_frames) {
+                    self.storage_frames.deinit(self.allocator);
+                    self.storage_frames = saved_frames;
+                };
                 const saved_ambient = self.ambient;
                 self.ambient = try self.types.freshEffects();
                 const latent = self.ambient;
@@ -8105,6 +8301,9 @@ const Engine = struct {
                     try self.env.append(self.allocator, .{ .name = parameter.name, .binding = binding });
                 }
                 self.expr_types[node.a] = parameter_ty;
+                const result_annotation = if (node.c != 0 and self.tree.node(node.c).tag == .type_effect) self.tree.node(node.c).a else node.c;
+                const required = if (result_annotation != 0) try self.annotation(result_annotation) else 0;
+                if (node.c != 0 and self.tree.node(node.c).tag == .type_effect) try self.constrainEffects(latent, try self.annotationEffects(self.tree.node(node.c).b), id);
                 var result = try self.expression(node.b);
                 if (required != 0) {
                     try self.constrain(result, required, id);
@@ -8176,7 +8375,7 @@ const Engine = struct {
                     return err;
                 };
                 self.exact_argument_types = saved_exact;
-                if (self.active_effect_scopes != 0 and try self.scopeFootprint(argument, 0) and !self.intrinsicRead(node.a) and !try self.directCallbackUse(node.a, argument)) try self.diagnostic(.capability_escape, node.b);
+                if (self.active_effect_scopes != 0 and try self.scopeFootprint(argument, 0) and !try self.capabilityFlowUse(node.a, argument) and !self.intrinsicRead(node.a) and !try self.directCallbackUse(node.a, argument) and !try self.localStateStore(node.a, node.b, argument)) try self.diagnostic(.capability_escape, node.b);
                 const parameter = argument;
                 self.demand_calls[id] = lazy;
                 if (lazy) self.demand_types[id] = function.a;
@@ -10550,7 +10749,9 @@ const SchemeCopier = struct {
         var args: std.ArrayList(T.Id) = .empty;
         defer args.deinit(self.allocator);
         for (self.source.list(operation.arguments)) |arg| try args.append(self.allocator, try self.copy(arg, depth + 1));
-        const result = try self.destination.internScopedOperation(operation.identity, operation.instance, args.items);
+        var instance = operation.instance;
+        if (instance.unit == 0 and instance.decl != 0) instance.decl = try self.copy(instance.decl, depth + 1);
+        const result = try self.destination.internScopedOperation(operation.identity, instance, args.items);
         try self.labels.put(self.allocator, label, result);
         return result;
     }
@@ -10587,7 +10788,7 @@ const SchemeCopier = struct {
         if (self.associated) try self.destination.chargeProjection();
         const node = self.source.node(id);
         const result = switch (node.tag) {
-            .scoped => return error.TypeLimit,
+            .scoped => if (node.b == 0) try self.destination.scoped(try self.copy(node.a, depth + 1), .{ .unit = 0, .decl = try self.copy(node.c, depth + 1) }) else return error.TypeLimit,
             .absent, .unit, .boolean, .u32, .f32, .never => id,
             .array, .list, .cursor => try self.destination.sequence(node.tag, try self.copy(node.a, depth + 1)),
             .demand => try self.destination.demandWithEffects(try self.copy(node.a, depth + 1), try self.copyRow(node.c, depth + 1)),
@@ -10690,7 +10891,7 @@ fn rejectedSource(allocator: Allocator, diagnostics: []const Diagnostic) !Checke
 fn rejectNumericSource(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool, imports: []const ImportedBinding, catalogs: []const ImportedCatalog, unit: u32, options: ModuleOptions) !Checked {
     var headers: std.ArrayList(SourceHeader) = .empty;
     defer headers.deinit(allocator);
-    for (imports) |imported| try headers.append(allocator, .{ .name = imported.name, .namespace = imported.namespace, .member = imported.member, .target = imported.target, .named_function = imported.interface.named_function, .origin = imported.origin, .expose = imported.expose });
+    for (imports) |imported| try headers.append(allocator, .{ .name = imported.name, .namespace = imported.namespace, .member = imported.member, .target = imported.target, .capability_flow = imported.interface.capability_flow, .named_function = imported.interface.named_function, .origin = imported.origin, .expose = imported.expose });
     var owned_declarations: std.ArrayList([]SourceDeclaration) = .empty;
     defer {
         for (owned_declarations.items) |declarations| allocator.free(declarations);
@@ -11027,6 +11228,8 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     errdefer engine.loop_carries.deinit(allocator);
     errdefer engine.loop_exits.deinit(allocator);
     defer engine.loop_stack.deinit(allocator);
+    defer engine.scope_lifetimes.deinit(allocator);
+    defer engine.storage_frames.deinit(allocator);
     defer engine.effect_family_names.deinit(allocator);
     defer engine.effect_family_identities.deinit(allocator);
     defer engine.effect_members.deinit(allocator);
@@ -11163,7 +11366,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
             try engine.diagnostic(.duplicate_name, id);
             continue;
         }
-        const binding = try engine.addBinding(.{ .private = tree.declarationTraits(id).private, .name = declaration.name, .declaration = id, .owner = id, .kind = .global, .named_function = tree.node(declaration.body).tag == .lambda and declaration.attributes.len == 0, .ty = try engine.types.fresh() });
+        const binding = try engine.addBinding(.{ .private = tree.declarationTraits(id).private, .name = declaration.name, .declaration = id, .owner = id, .kind = .global, .capability_flow = if (tree.node(declaration.body).tag == .lambda and declaration.attributes.len == 0) @import("capability_flow.zig").source(tree, declaration.body) else .unknown, .named_function = tree.node(declaration.body).tag == .lambda and declaration.attributes.len == 0, .ty = try engine.types.fresh() });
         try engine.globals.put(allocator, declaration.name, binding);
         try engine.global_states.put(allocator, binding, .{});
         engine.resolved[id] = binding;
@@ -11171,10 +11374,13 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     for (catalogs) |imported| try engine.importCatalog(imported);
     for (source_catalogs) |imported| try engine.importCatalog(imported);
     for (imports) |imported| {
-        if (engine.source_validation) try engine.importHeader(.{ .name = imported.name, .namespace = imported.namespace, .member = imported.member, .target = imported.target, .named_function = imported.interface.named_function, .origin = imported.origin, .expose = imported.expose }) else try engine.importBinding(imported);
+        if (engine.source_validation) try engine.importHeader(.{ .name = imported.name, .namespace = imported.namespace, .member = imported.member, .target = imported.target, .capability_flow = imported.interface.capability_flow, .named_function = imported.interface.named_function, .origin = imported.origin, .expose = imported.expose }) else try engine.importBinding(imported);
     }
     for (headers) |imported| try engine.importHeader(imported);
     try engine.effectHeaders();
+    for (engine.bindings.items) |*binding| if (binding.kind == .global and binding.named_function) {
+        binding.capability_flow = engine.capabilityFlowContract(tree.valueDecl(binding.declaration).body);
+    };
     try engine.dataBodies();
     engine.prepareOpaqueStorage();
     for (0..engine.contracts.items.len) |index| try engine.resolveContract(@intCast(index));
@@ -11389,5 +11595,12 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
         checked.deinit(allocator);
         return rejected;
     }
+    if (!source_validation and engine.editor_marker == null) if (engine.retained_bodies) |retained| {
+        // Keep exact annotation resolution request-local. The completed facts
+        // own only sparse recipe digests before this dictionary is released.
+        @import("body_check_cache.zig").captureIntoResolved(allocator, tree, pool, engine.body_source, &checked, engine.body_external_names, engine.bodyAnnotations(), retained) catch |err| {
+            if (err == error.OutOfMemory) return error.OutOfMemory;
+        };
+    };
     return checked;
 }

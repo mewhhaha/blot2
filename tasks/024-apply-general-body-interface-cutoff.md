@@ -159,3 +159,47 @@ edit CPU98.125→79.375 /188.125→152.5ms and elaborations69.5/133.5→5.5;
 population costs rise22–25%. Written/shared local origins, other residual kinds,
 relocation, full-gate/release acceptance and the total edit target keep024
 and053 open. See [BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
+
+
+### Isolated declared local qualifications —13 October 2026
+
+Written associated/result-selection and representation local principals now
+relocate exact where origins before current instantiation. Source and compiled
+producer authority routes use the enclosing original declaration and local
+clause position; portable snapshots and sparse receipt headers stay unchanged.
+Native fresh/retained/population OOM and exact bounded clause controls,23body
+guest laws, eight unchanged budgets and371-file zero analyzer pass. Matched
+Safe/noLLVM declared64/128 edit CPU94.375→81.875 /183.75→158.125ms; elaborations
+69.5/133.5→5.5. Population rises37–44%. Shared local edges, other residual kinds,
+producer ordinals, broader forms, release/full-gate acceptance and the total
+edit target keep024/053 open. See [BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
+
+
+### Isolated producer ordinal relocation —13 October 2026
+
+Borrowed body offers now resolve by canonical filename. Owned nominal reads
+and imported/associated/qualified principal receipts bind exact original module
+origins and declaration names, while replay reconstructs current unit/binding
+execution targets. Source and compiled insert/delete/renumber, equal-interface
+retarget revocation, owning payloads, retained revision/allocation failures,
+24body guest laws, eight budgets and371-file zero analyzer pass. Matched
+Safe/noLLVM producer64/128 CPU172.5→156.875 /341.875→312.5ms and elaborations
+66/130→2; population rises11%. Admitted producer ordinal relocation is covered;
+shared locals, imported annotation heads, broader forms, other residual kinds,
+full-gate/release acceptance and the total edit target keep024/053 open. See
+[BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
+
+
+### Isolated imported annotation heads and recipe proofs —13 October 2026
+
+Capture/replay now use the checker's exact current nominal-name lookup while it
+is alive. Sparse reads own original imported names and complete recipes through
+source/compiled direct imports, aliases and namespaces; no new persistent name
+table or receipt/archive header is added. A fixed body-local recipe memo retains
+exact depth and proof-budget guards and resets across checker mutations.
+59focused native/OOM laws,25body guests, eight budgets and371-file zero analyzer
+pass. Matched Safe/noLLVM head64/128 CPU115.625→108.125 /223.75→208.125ms and
+elaborations66/130→2; population rises15–17%. The rejected un-memoized regression
+is preserved. Shared local requirements, other residuals, broader forms,
+full-gate/release acceptance and the total edit target keep024/053 open. See
+[BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).

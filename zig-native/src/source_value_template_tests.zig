@@ -2609,3 +2609,41 @@ test "checked query importer backend keeps previous values slots and query memo 
     try std.testing.expectEqualSlices(u8, &old_values, &artifacts.stamp(initial.capture.?.metadata.pools.?.evaluator.values));
     try std.testing.expectEqualSlices(u8, &old_slots, &artifacts.stamp(initial.capture.?.metadata.pools.?.slots));
 }
+
+fn sparseInspectionScenario(allocator: Allocator, pools: *const artifacts.Pools, gate: *const gate_api.Gate, target: core.BindingRef) !void {
+    const found = try graph.Plan.inspect(allocator, pools, gate, target);
+    var plan = found.plan orelse return error.ExpectedPlan;
+    defer plan.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 3), plan.order.len);
+    try std.testing.expectEqual(@as(usize, 3), found.stats.values);
+    try std.testing.expect(found.stats.inspection_index_bytes < 8192);
+}
+
+test "source template inspection visits a small graph without indexing unrelated captured values" {
+    const source =
+        \\const padding: Array U32 = @array.generate 32768 (fn (index: U32) -> U32 => index)
+        \\const tiny: Array U32 = @array.generate 2 (fn (index: U32) -> U32 => if @u32.eq index 0 then 40 else 2)
+        \\entry const schema: U32 = 7
+        \\entry const answer: U32 = @u32.add (@array.length padding) (@array.get tiny 0)
+    ;
+    var before = try Fixture.init(source);
+    defer before.deinit();
+    var after = try Fixture.init(source);
+    defer after.deinit();
+    editSchema(&after);
+    var initial = try before.emit(a, .{ .retain_artifacts = true });
+    defer initial.deinit(a);
+    try successful(&initial);
+    const pools = &initial.capture.?.metadata.pools.?;
+    try std.testing.expect(pools.evaluator.values.len > 32768);
+    var gate = try gate_api.Gate.init(a, pools, after.units, after.names.view());
+    defer gate.deinit();
+    const target = after.target("tiny");
+    var measured: std.testing.FailingAllocator = .init(a, .{});
+    try sparseInspectionScenario(measured.allocator(), pools, &gate, target);
+    try std.testing.expect(measured.allocated_bytes < 8192);
+    try std.testing.expectEqual(measured.allocated_bytes, measured.freed_bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, sparseInspectionScenario, .{ pools, &gate, target });
+    // Failed inspections cannot leave visit colors attached to the old owner.
+    try sparseInspectionScenario(a, pools, &gate, target);
+}

@@ -7,6 +7,7 @@ const core = @import("core.zig");
 const backend = @import("core_backend.zig");
 const validation = @import("frozen_core_validation.zig");
 const a = std.testing.allocator;
+const T = @import("types.zig");
 const source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
@@ -187,6 +188,144 @@ test "scoped effect closure footprint survives lowering emission and failed allo
     defer module.deinit(a);
     try validation.validate(a, &module, .{ .units = &.{&module}, .source_length = closure_result_source.len });
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, lowerClosureResultAndRelease, .{});
+    try emit(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+}
+
+const flow_source =
+    \\type State a is effect = {get: Unit -> a, set: a -> Unit}
+    \\const identity = fn value => value
+    \\const invoke = fn callback => callback ()
+    \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
+    \\  let capability = identity s
+    \\  let (state, result) = do (@effect.state capability.get capability.set 7):
+    \\    return invoke (identity capability.get)
+    \\  return result
+    \\)
+;
+fn lowerFlowAndRelease(allocator: std.mem.Allocator) !void {
+    var module = try lowerText(allocator, flow_source);
+    defer module.deinit(allocator);
+    try validation.validate(allocator, &module, .{ .units = &.{&module} });
+}
+test "scoped effect public flow contracts validate bodies and release failed allocations" {
+    var module = try lowerText(a, flow_source);
+    defer module.deinit(a);
+    try validation.validate(a, &module, .{ .units = &.{&module} });
+    var identity_count: usize = 0;
+    var invoke_count: usize = 0;
+    for (module.bindings) |*binding| {
+        if (binding.capability_flow == .unknown) continue;
+        const original = binding.capability_flow;
+        switch (original) {
+            .identity => {
+                identity_count += 1;
+                binding.capability_flow = .invoke_unit;
+            },
+            .invoke_unit => {
+                invoke_count += 1;
+                binding.capability_flow = .identity;
+            },
+            .unknown, .member_unit, .invoke_with_capability => unreachable,
+        }
+        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
+        binding.capability_flow = original;
+    }
+    try std.testing.expectEqual(1, identity_count);
+    try std.testing.expectEqual(1, invoke_count);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lowerFlowAndRelease, .{});
+    try emit(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+}
+
+const parameter_source =
+    \\type State a is effect = {get: Unit -> a, set: a -> Unit}
+    \\const read = fn (s: State a) -> a ! {s.get} => s.get ()
+    \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
+    \\  let (state, result) = do (@effect.state s.get s.set 7):
+    \\    return read s
+    \\  return result
+    \\)
+;
+fn lowerParameterAndRelease(allocator: std.mem.Allocator) !void {
+    var module = try lowerText(allocator, parameter_source);
+    defer module.deinit(allocator);
+    try validation.validate(allocator, &module, .{ .units = &.{&module} });
+}
+test "scoped effect capability parameters preserve owned binders through lowering emission and OOM" {
+    var module = try lowerText(a, parameter_source);
+    defer module.deinit(a);
+    try validation.validate(a, &module, .{ .units = &.{&module} });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lowerParameterAndRelease, .{});
+    try emit(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+}
+
+test "scoped effect frozen capability parameters reject substituted binder edges and body claims" {
+    var module = try lowerText(a, parameter_source);
+    defer module.deinit(a);
+    try validation.validate(a, &module, .{ .units = &.{&module} });
+    var tested = false;
+    for (module.types.nodes) |*node| {
+        if (node.tag != .scoped or node.b != 0) continue;
+        const identity = node.c;
+        node.c = T.u32_type;
+        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
+        node.c = identity;
+        tested = true;
+        break;
+    }
+    try std.testing.expect(tested);
+    for (module.bindings) |*binding| {
+        if (binding.capability_flow != .member_unit) continue;
+        binding.capability_flow = .invoke_unit;
+        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
+        binding.capability_flow = .member_unit;
+        try validation.validate(a, &module, .{ .units = &.{&module} });
+        return;
+    }
+    return error.ExpectedParameterFlow;
+}
+
+const curried_source =
+    \\type State a is effect = {get: Unit -> a, set: a -> Unit}
+    \\const apply = fn (s: State a) => fn (callback: Unit -> a ! {s.get | e}) => callback ()
+    \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
+    \\  let (state, result) = do (@effect.state s.get s.set 7):
+    \\    return apply s (fn () => s.get ())
+    \\  return result
+    \\)
+;
+fn lowerCurriedAndRelease(allocator: std.mem.Allocator) !void {
+    var module = try lowerText(allocator, curried_source);
+    defer module.deinit(allocator);
+    try validation.validate(allocator, &module, .{ .units = &.{&module} });
+}
+test "scoped effect curried capability callback contracts survive lowering emission and OOM" {
+    var module = try lowerText(a, curried_source);
+    defer module.deinit(a);
+    try validation.validate(a, &module, .{ .units = &.{&module} });
+    for (module.bindings) |*binding| {
+        if (binding.capability_flow != .invoke_with_capability) continue;
+        binding.capability_flow = .invoke_unit;
+        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
+        binding.capability_flow = .invoke_with_capability;
+    }
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lowerCurriedAndRelease, .{});
+    try emit(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+}
+
+fn lowerLocalStoreAndRelease(allocator: std.mem.Allocator) !void {
+    var module = try lowerText(allocator, @import("check_effect_tests.zig").local_store_source);
+    defer module.deinit(allocator);
+    try validation.validate(allocator, &module, .{ .units = &.{&module} });
+}
+test "scoped effect local State storage releases capture roots on failed lowering and emission" {
+    var module = try lowerText(a, @import("check_effect_tests.zig").local_store_source);
+    defer module.deinit(a);
+    try validation.validate(a, &module, .{ .units = &.{&module} });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lowerLocalStoreAndRelease, .{});
     try emit(a, &module);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
 }

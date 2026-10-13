@@ -362,6 +362,9 @@ pub const Importer = struct {
         try self.bind(g);
         return switch (old_request) {
             .named => |old_key| blk: {
+                // Quantified capability substitutions are source-owned identity
+                // facts. This importer has no binder relocation proof for them.
+                if (old_key.instance.decl != 0) return error.Declined;
                 var key = old_key;
                 key.target = try self.target(key.target);
                 if (key.count > artifacts.max_parameters) return error.Declined;

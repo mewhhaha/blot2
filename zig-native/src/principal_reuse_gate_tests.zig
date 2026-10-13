@@ -987,6 +987,9 @@ test "equivalent validation rejects bounds-valid equal cycles without accepting 
         a.free(module.extra);
         module.extra = extra;
         module.nodes[id] = .{ .tag = .block, .ty = old_node.ty, .a = @intCast(old_len), .b = 1 };
+        // The forged body no longer proves identity flow. Keep its header
+        // conservative so bounds validation reaches the intended cycle check.
+        module.bindings[target(module, "builder").binding].capability_flow = .unknown;
         const views = [_]*const core.Module{module};
         try @import("frozen_core_validation.zig").validateBounds(module, .{ .units = &views, .symbol_count = before.names.view().symbols.len });
     }

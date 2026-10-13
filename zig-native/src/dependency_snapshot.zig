@@ -79,7 +79,7 @@ const Projector = struct {
             return id;
         }
         const value: T.Node = switch (original.tag) {
-            .scoped => return error.DependencyLimit,
+            .scoped => if (original.b == 0) .{ .tag = .scoped, .a = try self.projectType(original.a, depth + 1), .c = try self.projectType(original.c, depth + 1) } else return error.DependencyLimit,
             .variable => blk: {
                 const index = self.variable_count;
                 self.variable_count += 1;
@@ -136,14 +136,16 @@ const Projector = struct {
         if (depth >= 1024 or label == 0 or label >= self.effect_operation_map.len) return error.DependencyLimit;
         if (self.effect_operation_map[label] != 0) return self.effect_operation_map[label];
         const source = self.checked.types.operations.items[label];
-        if (source.instance.unit != 0 or source.instance.decl != 0) return error.DependencyLimit;
+        if (source.instance.unit != 0) return error.DependencyLimit;
+        var instance = source.instance;
+        if (instance.decl != 0) instance.decl = try self.projectType(instance.decl, depth + 1);
         var values: std.ArrayList(T.Id) = .empty;
         defer values.deinit(self.allocator);
         for (self.checked.types.list(source.arguments)) |argument| try values.append(self.allocator, try self.projectType(argument, depth + 1));
         const arguments = try self.saveTypes(values.items);
         if (self.effect_operations.items.len == std.math.maxInt(u32)) return error.DependencyLimit;
         const id: u32 = @intCast(self.effect_operations.items.len);
-        try self.effect_operations.append(self.allocator, .{ .identity = source.identity, .arguments = arguments, .instance = source.instance });
+        try self.effect_operations.append(self.allocator, .{ .identity = source.identity, .arguments = arguments, .instance = instance });
         self.effect_operation_map[label] = id;
         return id;
     }
@@ -324,7 +326,7 @@ fn freezeMode(allocator: Allocator, tree: *const ast.Tree, checked: *const check
     }
     for (checked.bindings, result.bindings, 0..) |old, *value, id| {
         value.* = if (!principal_only or retained[id])
-            .{ .private = old.private, .name = old.name, .kind = old.kind, .named_function = old.named_function, .ty = try projector.projectType(old.ty, 0), .scheme = try projector.projectScheme(old.scheme), .external = old.external }
+            .{ .capability_flow = if (old.external == null) old.capability_flow else .unknown, .private = old.private, .name = old.name, .kind = old.kind, .named_function = old.named_function, .ty = try projector.projectType(old.ty, 0), .scheme = try projector.projectScheme(old.scheme), .external = old.external }
         else
             .{ .private = old.private, .name = 0, .kind = old.kind, .named_function = false, .ty = 0, .scheme = .{}, .external = null };
     }

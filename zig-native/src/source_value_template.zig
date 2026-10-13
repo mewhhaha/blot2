@@ -14,6 +14,7 @@ pub const Reason = enum { none, source, slot, bounds, open_evidence, domain, own
 pub const RowPolicy = enum { empty_only, source_declared };
 pub const Stats = struct {
     values: usize = 0,
+    inspection_index_bytes: usize = 0,
     kinds: [@typeInfo(eval.ValueKind).@"enum".field_names.len]usize = @splat(0),
     unsupported_kinds: [@typeInfo(eval.ValueKind).@"enum".field_names.len]usize = @splat(0),
     open_evidence: usize = 0,
@@ -33,12 +34,41 @@ fn room(current: usize, added: usize) bool {
 fn range(start: usize, len: usize, total: usize) bool {
     return start <= total and len <= total - start;
 }
+/// Request-local visitation pages. Small graphs do not clear arrays sized to
+/// every value and type in an unrelated captured project. A page owns no IDs
+/// beyond its immutable pool; inspection destroys all pages on every exit.
+const VisitStates = struct {
+    const Page = [256]u8;
+    pages: std.AutoHashMapUnmanaged(u32, Page) = .empty,
+
+    fn deinit(self: *VisitStates, a: Allocator) void {
+        self.pages.deinit(a);
+    }
+    fn get(self: *const VisitStates, id: u32) u8 {
+        const page = self.pages.getPtr(id / 256) orelse return 0;
+        return page[id % 256];
+    }
+    fn put(self: *VisitStates, a: Allocator, id: u32, state: u8) Allocator.Error!void {
+        const entry = try self.pages.getOrPut(a, id / 256);
+        if (!entry.found_existing) entry.value_ptr.* = @splat(0);
+        entry.value_ptr.*[id % 256] = state;
+    }
+    fn finish(self: *VisitStates, id: u32, state: u8) void {
+        self.pages.getPtr(id / 256).?.*[id % 256] = state;
+    }
+    fn payloadBytes(self: *const VisitStates) usize {
+        // Allocated key/value payload capacity, excluding the hash table's
+        // header/metadata and allocator bookkeeping, like other index payloads.
+        return @as(usize, self.pages.capacity()) * (@sizeOf(u32) + @sizeOf(Page));
+    }
+};
+
 const Checker = struct {
     allocator: Allocator,
     pools: *const artifacts.Pools,
     gate: *const admission.Gate,
-    seen: []u8,
-    semantic: []u8,
+    seen: VisitStates = .{},
+    semantic: VisitStates = .{},
     order: std.ArrayList(eval.ValueId) = .empty,
     stats: Stats = .{},
     reason: Reason = .none,
@@ -76,7 +106,7 @@ const Checker = struct {
         }
         return false;
     }
-    fn row(self: *Checker, id: u32, depth: usize) bool {
+    fn row(self: *Checker, id: u32, depth: usize) Allocator.Error!bool {
         if (self.row_policy == .empty_only) return id == 0;
         // These are closed semantic rows used by already inferred callable
         // types. Runtime providers and compiler-generated operations remain
@@ -104,21 +134,21 @@ const Checker = struct {
                 };
                 if (!declared) return false;
             }
-            for (effects.arguments[args.start..][0..args.len]) |argument| if (!self.ty(argument, depth + 1)) return false;
+            for (effects.arguments[args.start..][0..args.len]) |argument| if (!(try self.ty(argument, depth + 1))) return false;
         }
         return true;
     }
-    fn ty(self: *Checker, id: u32, depth: usize) bool {
+    fn ty(self: *Checker, id: u32, depth: usize) Allocator.Error!bool {
         const view = self.pools.evaluator.evidence.view();
         if (id == 0 or id >= view.nodes.len or depth >= 128) return false;
-        if (self.semantic[id] == 2) return true;
-        if (self.semantic[id] == 1 or self.semantic[id] == 3) return false;
-        self.semantic[id] = 1;
+        if (self.semantic.get(id) == 2) return true;
+        if (self.semantic.get(id) == 1 or self.semantic.get(id) == 3) return false;
+        try self.semantic.put(self.allocator, id, 1);
         const n = view.nodes[id];
         const valid = switch (n.tag) {
             .unit, .boolean, .u32, .f32, .never => n.a == 0 and n.b == 0 and n.c == 0,
-            .function => self.ty(n.a, depth + 1) and self.ty(n.b, depth + 1) and self.row(n.c, depth + 1),
-            .array, .list, .cursor => n.b == 0 and n.c == 0 and self.ty(n.a, depth + 1),
+            .function => (try self.ty(n.a, depth + 1)) and (try self.ty(n.b, depth + 1)) and (try self.row(n.c, depth + 1)),
+            .array, .list, .cursor => n.b == 0 and n.c == 0 and (try self.ty(n.a, depth + 1)),
             .product, .record => list: {
                 if (n.c != 0) break :list false;
                 const words: usize = if (n.tag == .record) @as(usize, n.b) * 2 else n.b;
@@ -127,7 +157,7 @@ const Checker = struct {
                 for (children, 0..) |child, index| {
                     if (n.tag == .record and index % 2 == 0) {
                         if (self.pools.identity == null or child == 0 or child >= self.pools.identity.?.symbols.len) break :list false;
-                    } else if (!self.ty(child, depth + 1)) break :list false;
+                    } else if (!(try self.ty(child, depth + 1))) break :list false;
                 }
                 break :list true;
             },
@@ -135,12 +165,14 @@ const Checker = struct {
                 if (!self.nominal(n.a, n.b) or n.c >= view.extra.len) break :list false;
                 const count = view.extra[n.c];
                 if (!range(@as(usize, n.c) + 1, count, view.extra.len)) break :list false;
-                for (view.extra[n.c + 1 ..][0..count]) |child| if (!self.ty(child, depth + 1)) break :list false;
+                for (view.extra[n.c + 1 ..][0..count]) |child| if (!(try self.ty(child, depth + 1))) break :list false;
                 break :list true;
             },
             .absent, .demand, .type_constructor, .resolver, .provider, .state_provider => false,
         };
-        self.semantic[id] = if (valid) 2 else 3;
+        var final_state: u8 = 3;
+        if (valid) final_state = 2;
+        self.semantic.finish(id, final_state);
         return valid;
     }
     fn value(self: *Checker, id: eval.ValueId, depth: usize) Allocator.Error!void {
@@ -154,8 +186,8 @@ const Checker = struct {
             self.reject(.quota);
             return;
         }
-        if (self.seen[id] == 2) return;
-        if (self.seen[id] == 1) {
+        if (self.seen.get(id) == 2) return;
+        if (self.seen.get(id) == 1) {
             self.reject(.cycle);
             return;
         }
@@ -163,7 +195,7 @@ const Checker = struct {
             self.reject(.quota);
             return;
         }
-        self.seen[id] = 1;
+        try self.seen.put(self.allocator, id, 1);
         const info = snapshot.values[id];
         self.stats.values += 1;
         self.stats.kinds[@backingInt(info.kind)] += 1;
@@ -174,7 +206,7 @@ const Checker = struct {
                 .array, .list, .cursor, .product, .record, .nominal, .closure => self.stats.template_holes += 1,
                 else => self.reject(.open_evidence),
             }
-        } else if (!self.ty(semantic, 0)) {
+        } else if (!(try self.ty(semantic, 0))) {
             self.stats.unsupported_evidence += 1;
             self.reject(.domain);
         }
@@ -283,11 +315,11 @@ const Checker = struct {
                             self.stats.type_maps += meta.mappings.len;
                             self.stats.row_maps += meta.row_mappings.len;
                             for (snapshot.type_mappings[meta.mappings.start..][0..meta.mappings.len], 0..) |mapping, index| {
-                                if (mapping.variable == 0 or mapping.variable >= module.types.nodes.len or module.types.nodes[mapping.variable].tag != .variable or !self.ty(mapping.evidence, 0)) self.reject(.bounds);
+                                if (mapping.variable == 0 or mapping.variable >= module.types.nodes.len or module.types.nodes[mapping.variable].tag != .variable or !(try self.ty(mapping.evidence, 0))) self.reject(.bounds);
                                 for (snapshot.type_mappings[meta.mappings.start..][0..index]) |prior| if (prior.variable == mapping.variable) self.reject(.bounds);
                             }
                             for (snapshot.row_mappings[meta.row_mappings.start..][0..meta.row_mappings.len], 0..) |mapping, index| {
-                                if (mapping.variable >= module.types.effects.variable_count or !self.row(mapping.evidence, 0)) self.reject(.bounds);
+                                if (mapping.variable >= module.types.effects.variable_count or !(try self.row(mapping.evidence, 0))) self.reject(.bounds);
                                 for (snapshot.row_mappings[meta.row_mappings.start..][0..index]) |prior| if (prior.variable == mapping.variable) self.reject(.bounds);
                             }
                         }
@@ -313,7 +345,7 @@ const Checker = struct {
             }
         }
         for (snapshot.children[info.start..][0..info.len]) |child| try self.value(child, depth + 1);
-        self.seen[id] = 2;
+        self.seen.finish(id, 2);
         try self.order.append(self.allocator, id);
     }
 };
@@ -367,6 +399,16 @@ pub const QueryScratch = struct {
         self.child_ids.deinit(self.allocator);
         self.append_children.deinit(self.allocator);
         self.* = undefined;
+    }
+    /// Retained scratch payload, excluding allocator headers and capacity in
+    /// the source graph itself. Buffers grow monotonically within this owner.
+    pub fn payloadBytes(self: *const QueryScratch) usize {
+        var bytes: usize = 0;
+        inline for (.{ "anchors", "anchor_ids", "positions", "candidate", "inverse", "inverse_ids", "semantic", "types", "rows", "children", "child_ids", "append_children" }) |field| {
+            const buffer = @field(self, field);
+            bytes += buffer.capacity * @sizeOf(@TypeOf(buffer.items[0]));
+        }
+        return bytes;
     }
     fn bind(self: *QueryScratch, plan: *const Plan, g: anytype) Error!void {
         if (self.allocator.ptr != g.evaluator.allocator.ptr or self.allocator.vtable != g.evaluator.allocator.vtable or g.evaluator.units.ptr != plan.gate.units.ptr or g.evaluator.units.len != plan.gate.units.len) return error.Declined;
@@ -448,15 +490,12 @@ pub const Plan = struct {
         if (roots.len == 0 or gate.source_pools == null or gate.source_pools.? != pools or !gate.enabled) return .{ .reason = .owner, .stats = .{}, .plan = null };
         const snapshot = &pools.evaluator;
         if (snapshot.values.len == 0 or snapshot.value_evidence.len == 0 or snapshot.value_records.len == 0 or snapshot.values[0].kind != .scalar or snapshot.values[0].scalar != .unit or snapshot.values[0].len != 0 or snapshot.value_evidence[0] != 1 or snapshot.value_records[0] != 0 or snapshot.evidence.nodes.len <= 1 or !std.meta.eql(snapshot.evidence.nodes[1], evidence.Node{ .tag = .unit })) return .{ .reason = .bounds, .stats = .{}, .plan = null };
-        const seen = try a.alloc(u8, pools.evaluator.values.len);
-        defer a.free(seen);
-        @memset(seen, 0);
-        const semantic = try a.alloc(u8, pools.evaluator.evidence.nodes.len);
-        defer a.free(semantic);
-        @memset(semantic, 0);
-        var check: Checker = .{ .allocator = a, .pools = pools, .gate = gate, .seen = seen, .semantic = semantic, .row_policy = row_policy };
+        var check: Checker = .{ .allocator = a, .pools = pools, .gate = gate, .row_policy = row_policy };
         defer check.order.deinit(a);
+        defer check.seen.deinit(a);
+        defer check.semantic.deinit(a);
         for (roots) |root| try check.value(root, 0);
+        check.stats.inspection_index_bytes = check.seen.payloadBytes() + check.semantic.payloadBytes();
         if (check.reason != .none) return .{ .reason = check.reason, .stats = check.stats, .plan = null };
         return .{ .reason = .none, .stats = check.stats, .plan = .{ .pools = pools, .gate = gate, .root = roots[0], .order = try check.order.toOwnedSlice(a), .stats = check.stats, .row_policy = row_policy } };
     }

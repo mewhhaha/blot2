@@ -43,7 +43,11 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
     try require(owner.graph.nodes.len >= 6 and owner.graph.rows.len != 0 and owner.graph.operations.len >= 2);
     for ([_]T.Tag{ .absent, .unit, .boolean, .u32, .f32, .never }, owner.graph.nodes[0..6]) |tag, node| try require(node.tag == tag and node.a == 0 and node.b == 0 and node.c == 0);
     for (owner.graph.nodes) |node| switch (node.tag) {
-        .scoped => return error.InvalidArtifact,
+        .scoped => {
+            try ty(owner, node.a);
+            try ty(owner, node.c);
+            try require(node.b == 0 and owner.graph.nodes[node.c].tag == .variable and owner.graph.nodes[node.a].tag == .nominal);
+        },
         .absent, .unit, .boolean, .u32, .f32, .never => {},
         .variable => try require(node.b == 0 and node.c == 0),
         .function => {
@@ -103,7 +107,11 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
     }
     try require(owner.graph.rows[0].labels.len == 0 and owner.graph.rows[0].tail == .closed);
     for (owner.graph.operations) |operation| {
-        try require(operation.instance.unit == 0 and operation.instance.decl == 0);
+        try require(operation.instance.unit == 0);
+        if (operation.instance.decl != 0) {
+            try ty(owner, operation.instance.decl);
+            try require(owner.graph.nodes[operation.instance.decl].tag == .variable);
+        }
         try identity(operation.identity, symbol_count, unit_count);
         for (try list(owner, operation.arguments)) |argument| try ty(owner, argument);
     }
@@ -126,8 +134,13 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
     };
     for (owner.bindings) |binding| {
         try require(binding.name < symbol_count);
+        try require(@backingInt(binding.capability_flow) <= @backingInt(@import("capability_flow.zig").Contract.invoke_with_capability));
         try ty(owner, binding.ty);
         try scheme(owner, binding.scheme);
+        if (binding.capability_flow != .unknown) {
+            try require(binding.external == null and binding.named_function);
+            try require(binding.scheme.root != 0 and owner.graph.nodes[binding.scheme.root].tag == .function);
+        }
         if (binding.external) |target| {
             try units(target.unit, unit_count);
             try require(target.binding != 0);

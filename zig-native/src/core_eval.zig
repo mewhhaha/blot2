@@ -297,6 +297,7 @@ pub const RetainedCapture = struct {
 pub const CodeProjection = struct {
     context: *anyopaque,
     mapping: *const fn (*anyopaque, *types.Store, types.Id, types.Id) (types.Error || error{UnresolvedType})!void,
+    instance: ?*const fn (*anyopaque, u32, types.Id) ?types.NominalIdentity = null,
 };
 pub const ProofStats = struct { proof_published: usize = 0, proof_reused: usize = 0 };
 pub const DiagnosticContext = struct { identity: ?runtime_identity.View = null, entry: u32 = 0, prelude: u32 = 0, source_mode: bool = false };
@@ -6501,7 +6502,19 @@ const ClosureRegion = struct {
             .absent => return error.UnresolvedType,
             .unit, .boolean, .u32, .f32, .never => ty,
             .variable => try self.solver.fresh(),
-            .scoped => try self.solver.scoped(try self.importType(scope, node.a, depth + 1), .{ .unit = node.b, .decl = node.c }),
+            .scoped => blk: {
+                const descriptor = try self.importType(scope, node.a, depth + 1);
+                var instance: types.NominalIdentity = .{ .unit = node.b, .decl = node.c };
+                if (node.b == 0) {
+                    const identity = try self.importType(scope, node.c, depth + 1);
+                    instance.decl = identity;
+                    if (self.code_projection) |projection| if (projection.instance) |lookup| if (lookup(projection.context, self.session.unitId(owner), node.c)) |actual| {
+                        try self.unify(identity, try self.solver.scoped(descriptor, actual));
+                        instance = actual;
+                    };
+                }
+                break :blk try self.solver.scoped(descriptor, instance);
+            },
             .function => try self.solver.functionWithEffects(try self.importType(scope, node.a, depth + 1), try self.importType(scope, node.b, depth + 1), try self.importRow(scope, node.c, depth + 1)),
             .array, .list, .cursor => try self.solver.sequence(node.tag, try self.importType(scope, node.a, depth + 1)),
             .demand => try self.solver.demandWithEffects(try self.importType(scope, node.a, depth + 1), try self.importRow(scope, node.c, depth + 1)),
@@ -6553,7 +6566,9 @@ const ClosureRegion = struct {
         const arguments = try allocator.alloc(types.Id, original.len);
         defer allocator.free(arguments);
         for (original, arguments) |argument, *imported| imported.* = try self.importType(scope, argument, depth + 1);
-        const result = try self.solver.internScopedOperation(source.operation(label).identity, source.operation(label).instance, arguments);
+        var instance = source.operation(label).instance;
+        if (instance.unit == 0 and instance.decl != 0) instance.decl = try self.importType(scope, instance.decl, depth + 1);
+        const result = try self.solver.internScopedOperation(source.operation(label).identity, instance, arguments);
         try self.scratch.imported_labels.put(self.scratch_allocator, key, result);
         return result;
     }
@@ -8246,7 +8261,9 @@ const ClosureRegion = struct {
         if (operation.witness != 0 and !try self.sourceHeadProven(owner, module.typeOf(operation.witness), operation.witness_result)) {
             try self.appendConstraint(.{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(operation.witness), 0), .right = try self.importType(scope, operation.witness_result, 0), .result = 0, .kind = .type_head });
         }
-        try self.appendConstraint(.{ .scope = scope, .node = id, .left = signature, .right = try self.solver.product(arguments.items), .result = 0, .signature = signature, .identity = .{ .unit = if (operation.identity.unit == 0) self.session.unitId(owner) else operation.identity.unit, .decl = operation.identity.decl }, .instance = operation.instance, .kind = .effect_operation, .solved = self.building_principal and try self.sourceOperationProven(owner, operation) });
+        var instance = operation.instance;
+        if (instance.unit == 0 and instance.decl != 0) instance.decl = try self.importType(scope, instance.decl, 0);
+        try self.appendConstraint(.{ .scope = scope, .node = id, .left = signature, .right = try self.solver.product(arguments.items), .result = 0, .signature = signature, .identity = .{ .unit = if (operation.identity.unit == 0) self.session.unitId(owner) else operation.identity.unit, .decl = operation.identity.decl }, .instance = instance, .kind = .effect_operation, .solved = self.building_principal and try self.sourceOperationProven(owner, operation) });
     }
     fn sourceOperationProven(self: *ClosureRegion, owner: usize, operation: core.OperationValue) RegionError!bool {
         // A source-seeded exact instance already owns its row prefix. This

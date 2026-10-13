@@ -70,7 +70,10 @@ fn matches(allocator: std.mem.Allocator, source: *const T.Store, principal: T.Id
         const depth = item.depth + 1;
         switch (from.tag) {
             .scoped => {
-                if (from.b != to.b or from.c != to.c) return false;
+                if (from.b != to.b) return false;
+                if (from.b == 0) {
+                    try pending.append(allocator, .{ .pair = .{ .principal = from.c, .actual = to.c, .ambient = false }, .depth = depth });
+                } else if (from.c != to.c) return false;
                 try pending.append(allocator, .{ .pair = .{ .principal = from.a, .actual = to.a, .ambient = false }, .depth = depth });
             },
             .function => {
@@ -80,7 +83,12 @@ fn matches(allocator: std.mem.Allocator, source: *const T.Store, principal: T.Id
                 if (exact_binders and (!std.meta.eql(before.tail, after.tail) or before.cursor != after.cursor)) return false;
                 if (before.labels.len != after.labels.len or before.tail == .parameter or after.tail == .parameter) return false;
                 for (source.rowLabels(from.c), caller.rowLabels(to.c)) |left, right| {
-                    if (!std.meta.eql(source.operation(left).identity, caller.operation(right).identity) or !std.meta.eql(source.operation(left).instance, caller.operation(right).instance)) return false;
+                    if (!std.meta.eql(source.operation(left).identity, caller.operation(right).identity)) return false;
+                    const before_instance = source.operation(left).instance;
+                    const after_instance = caller.operation(right).instance;
+                    if (before_instance.unit == 0 and before_instance.decl != 0 and after_instance.unit == 0 and after_instance.decl != 0) {
+                        try pending.append(allocator, .{ .pair = .{ .principal = before_instance.decl, .actual = after_instance.decl, .ambient = false }, .depth = depth });
+                    } else if (!std.meta.eql(before_instance, after_instance)) return false;
                     const arguments = source.operationArguments(left);
                     const actuals = caller.operationArguments(right);
                     if (arguments.len != actuals.len or arguments.len > max_nodes -| pending.items.len) return false;
@@ -383,7 +391,7 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
                     try self.variables.put(self.allocator, node.a, fresh);
                     break :blk fresh;
                 },
-                .scoped => try self.destination.scoped(try self.ty(node.a, depth + 1), .{ .unit = node.b, .decl = node.c }),
+                .scoped => try self.destination.scoped(try self.ty(node.a, depth + 1), .{ .unit = node.b, .decl = if (node.b == 0) try self.ty(node.c, depth + 1) else node.c }),
                 .function => try self.destination.functionWithEffects(try self.ty(node.a, depth + 1), try self.ty(node.b, depth + 1), try self.row(node.c, depth + 1)),
                 .array, .list, .cursor => try self.destination.sequence(node.tag, try self.ty(node.a, depth + 1)),
                 .demand => try self.destination.demandWithEffects(try self.ty(node.a, depth + 1), try self.row(node.c, depth + 1)),
@@ -464,7 +472,9 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
             const arguments = try self.allocator.alloc(T.Id, old.len);
             defer self.allocator.free(arguments);
             for (old, arguments) |argument, *value| value.* = try self.ty(argument, depth + 1);
-            const result = try self.destination.internScopedOperation(operation.identity, operation.instance, arguments);
+            var instance = operation.instance;
+            if (instance.unit == 0 and instance.decl != 0) instance.decl = try self.ty(instance.decl, depth + 1);
+            const result = try self.destination.internScopedOperation(operation.identity, instance, arguments);
             try self.labels.put(self.allocator, original, result);
             return result;
         }
@@ -537,4 +547,29 @@ fn scopedPrincipalCopyLaw(allocator: std.mem.Allocator) !void {
 test "scoped effect principal copies preserve exact instance and reject different identity" {
     try scopedPrincipalCopyLaw(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, scopedPrincipalCopyLaw, .{});
+}
+
+fn parameterCopyLaw(allocator: std.mem.Allocator) !void {
+    var source = try T.Store.init(allocator);
+    defer source.deinit();
+    var destination = try T.Store.init(allocator);
+    defer destination.deinit();
+    const capability = try source.capabilityParameter(try source.nominal(.{ .unit = 9, .decl = 12 }, &.{T.u32_type}));
+    const identity = source.node(capability).c;
+    const label = try source.internScopedOperation(.{ .unit = 9, .decl = 13 }, .{ .unit = 0, .decl = identity }, &.{T.u32_type});
+    const signature = try source.functionWithEffects(capability, T.u32_type, try source.effects.row(&.{ label, label }, .closed));
+    _ = try destination.fresh();
+    var copy: Copy = .{ .allocator = allocator, .source = &source, .destination = &destination, .max_depth = 64, .max_nodes = 1024 };
+    defer copy.deinit();
+    const copied = try copy.ty(signature, 0);
+    const function = destination.node(copied);
+    const bound = destination.node(function.a).c;
+    try std.testing.expect(bound != identity);
+    try std.testing.expectEqual(T.Tag.variable, destination.node(bound).tag);
+    try std.testing.expectEqual(bound, destination.operation(destination.rowLabels(function.c)[0]).instance.decl);
+    try std.testing.expect(try matchesOpen(allocator, &source, signature, &destination, copied, 64, 1024));
+}
+test "capability parameter principal copies own shared identity edges and release failed allocations" {
+    try parameterCopyLaw(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, parameterCopyLaw, .{});
 }
