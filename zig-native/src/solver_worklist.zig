@@ -215,6 +215,15 @@ const Frontier = struct {
             if (node.tag == .function or node.tag == .demand or node.tag == .provider) {
                 const row = store.row(try store.resolveEffects(node.c, 0));
                 if (row.tail == .variable) self.add(@as(u64, row.tail.variable) * 2 + 1);
+                for (store.effects.list(row.labels)) |label| {
+                    const arguments = store.operationArguments(label);
+                    if (arguments.len > stack.len - len) {
+                        self.overflow = true;
+                        return;
+                    }
+                    @memcpy(stack[len..][0..arguments.len], arguments);
+                    len += arguments.len;
+                }
             }
             var local: [3]types.Id = undefined;
             const children: []const types.Id = switch (node.tag) {
@@ -226,12 +235,12 @@ const Frontier = struct {
                     local = .{ node.a, node.b, node.c };
                     break :blk &local;
                 },
-                .array, .list, .cursor, .resolver, .demand, .provider => blk: {
+                .array, .list, .cursor, .resolver, .demand, .provider, .scoped => blk: {
                     local[0] = node.a;
                     break :blk local[0..1];
                 },
                 .product => store.list(.{ .start = node.a, .len = node.b }),
-                .nominal => store.nominalArguments(node),
+                .nominal, .projection => store.nominalArguments(node),
                 .record => blk: {
                     if (node.b > stack.len - len) {
                         self.overflow = true;
@@ -373,4 +382,47 @@ test "variable worklist bounds broad frontiers and recycles refreshed watch stor
     queue.complete(0);
     queue.complete(1);
     try std.testing.expectEqual(@as(u32, 0), queue.heads.count());
+}
+
+fn operationFrontierScenario(a: Allocator) !void {
+    var store = try types.Store.initWithOptions(a, .{ .closed_graphs = true });
+    defer store.deinit();
+    var queue: Queue = .{};
+    defer queue.deinit(a);
+    const argument = try store.fresh();
+    const payload = try store.fresh();
+    const projected = try store.fresh();
+    const callback_row = try store.freshEffects();
+    const callback = try store.functionWithEffects(types.unit, argument, callback_row);
+    const operation = try store.internSymbolicOperation(.{ .unit = 2, .decl = 7 }, &.{callback});
+    const operation_row = try store.effects.row(&.{ operation, operation }, .closed);
+    const roots = [_]types.Id{
+        try store.functionWithEffects(types.unit, types.unit, operation_row),
+        try store.scoped(try store.nominal(.{ .unit = 2, .decl = 8 }, &.{payload}), .{ .unit = 2, .decl = 9 }),
+        try store.projection(.{ .unit = 2, .decl = 10 }, 11, &.{projected}),
+    };
+    for (roots) |_| try queue.add(a, true);
+    queue.observe(&store);
+    while (queue.take(0)) |_| {}
+    for (roots, 0..) |root, index| try queue.watch(a, &store, index, &.{root}, false, false);
+    const unrelated = try store.fresh();
+    try store.unify(unrelated, types.boolean);
+    queue.observe(&store);
+    try std.testing.expectEqual(null, queue.take(0));
+    for ([_]types.Id{ argument, payload, projected }, 0..) |variable, index| {
+        try store.unify(variable, types.u32_type);
+        queue.observe(&store);
+        try std.testing.expectEqual(@as(?usize, index), queue.take(0));
+        try std.testing.expectEqual(null, queue.take(0));
+    }
+    // A callback hidden inside an operation argument also owns an open row.
+    try store.unifyEffects(callback_row, try store.effects.row(&.{1}, .closed));
+    queue.observe(&store);
+    try std.testing.expectEqual(@as(?usize, 0), queue.take(0));
+    try std.testing.expectEqual(null, queue.take(0));
+}
+
+test "variable worklist watches symbolic operation arguments scoped payloads and associated projections" {
+    try operationFrontierScenario(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, operationFrontierScenario, .{});
 }

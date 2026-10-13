@@ -249,15 +249,34 @@ export type DispatchSide =
   | "builtin"
   | "right"
   | "destination"
-  | "receiver";
+  | "receiver"
+  | "implementation";
 export type DispatchOutcome =
+  | "head_mismatch"
+  | "requires_evidence"
+  | "incompatible_type"
+  | "incompatible_effect"
+  | "selected"
+  | "overlap"
+  | "limit"
   | "unknown_operand"
   | "no_member"
   | "incompatible"
   | "unsupported_scalar"
   | "result_mismatch";
+export interface ImplementationOrigin {
+  name: string | null;
+  path: string | null;
+  span: { start: number; end: number } | null;
+}
+export interface ImplementationStep {
+  member: string | null;
+  ty: string | null;
+  outcome: DispatchOutcome;
+}
 export interface DispatchCandidate {
   side: DispatchSide;
+  origin?: ImplementationOrigin;
   /** The candidate's type as diagnostics spell it; null for unnamed shapes. */
   operand: string | null;
   outcome: DispatchOutcome;
@@ -269,6 +288,7 @@ export interface DispatchExplanation {
   /** Member name such as `add` or `from`, when known. */
   member: string | null;
   candidates: DispatchCandidate[];
+  steps?: ImplementationStep[];
   truncated: boolean;
 }
 const sides = new Set<DispatchSide>([
@@ -277,8 +297,16 @@ const sides = new Set<DispatchSide>([
   "right",
   "destination",
   "receiver",
+  "implementation",
 ]);
 const outcomes = new Set<DispatchOutcome>([
+  "head_mismatch",
+  "requires_evidence",
+  "incompatible_type",
+  "incompatible_effect",
+  "selected",
+  "overlap",
+  "limit",
   "unknown_operand",
   "no_member",
   "incompatible",
@@ -305,19 +333,66 @@ export function readDispatchExplanation(value: unknown): DispatchExplanation {
   const raw = explanation.candidates;
   if (!Array.isArray(raw) || raw.length > 4) fail();
   if (typeof explanation.truncated !== "boolean") fail();
-  return {
+  const result: DispatchExplanation = {
     operation: text(explanation.operation),
     member: text(explanation.member),
     candidates: (raw as unknown[]).map((item) => {
       const candidate = object(item);
       if (!sides.has(candidate.side as DispatchSide)) fail();
       if (!outcomes.has(candidate.outcome as DispatchOutcome)) fail();
-      return {
+      const copied: DispatchCandidate = {
         side: candidate.side as DispatchSide,
         operand: text(candidate.operand),
         outcome: candidate.outcome as DispatchOutcome,
       };
+      if (candidate.origin !== undefined && candidate.origin !== null) {
+        const origin = object(candidate.origin);
+        let span: ImplementationOrigin["span"] = null;
+        if (origin.span !== null) {
+          const position = object(origin.span);
+          for (const offset of [position.start, position.end]) {
+            if (
+              typeof offset !== "number" || !Number.isInteger(offset) ||
+              offset < 0 || offset > 0xffffffff
+            ) fail();
+          }
+          if ((position.end as number) < (position.start as number)) fail();
+          span = {
+            start: position.start as number,
+            end: position.end as number,
+          };
+        }
+        copied.origin = {
+          name: text(origin.name),
+          path: text(origin.path),
+          span,
+        };
+      }
+      return copied;
     }),
     truncated: explanation.truncated as boolean,
   };
+  if (explanation.steps !== undefined) {
+    const steps = explanation.steps;
+    if (!Array.isArray(steps) || steps.length > 8) fail();
+    const checkedSteps = steps as unknown[];
+    if (checkedSteps.length !== 0) {
+      result.steps = checkedSteps.map((item) => {
+        const step = object(item);
+        if (!outcomes.has(step.outcome as DispatchOutcome)) fail();
+        return {
+          member: text(step.member),
+          ty: text(step.ty),
+          outcome: step.outcome as DispatchOutcome,
+        };
+      });
+    }
+  }
+  if (
+    (result.steps ||
+      result.candidates.some((candidate) =>
+        candidate.side === "implementation"
+      )) && encoder.encode(JSON.stringify(result)).length > 2048
+  ) fail();
+  return result;
 }

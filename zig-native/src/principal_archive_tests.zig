@@ -220,6 +220,37 @@ test "portable principal results own inferred types and effect rows through rest
 }
 
 const format = @import("dependency_format.zig");
+fn implementationRestart(allocator: std.mem.Allocator, fixture: *const Fixture, bytes: []const u8, expected: []const u8) !void {
+    var loaded = try archive.decode(allocator, compiler, bytes);
+    defer loaded.deinit();
+    const before = @import("code_artifacts.zig").stamp(loaded.principal.snapshot);
+    var actual = try fixture.emit(allocator, &loaded);
+    defer actual.deinit(allocator);
+    try std.testing.expect(actual.diagnostic == null);
+    try std.testing.expectEqualSlices(u8, expected, actual.bytes);
+    try std.testing.expectEqualSlices(u8, &before, &@import("code_artifacts.zig").stamp(loaded.principal.snapshot));
+}
+test "implementation checkpoints reconstruct selected proofs after source owners die and equations change" {
+    const original = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 = { type Item = U32, const first = fn value => value }\nimpl ArraySource a : Source (Array a) where { Source a } = { type Item = Source.Item a, const first = fn values => Source.first (@array.get values 0) }\nentry const answer: U32 = Source.first #[42]\n";
+    const bytes = blk: {
+        var initial = try Fixture.init(original);
+        defer initial.deinit();
+        var compiled = try initial.emit(a, null);
+        defer compiled.deinit(a);
+        try std.testing.expect(compiled.diagnostic == null);
+        break :blk try archive.encode(a, compiler, &compiled.capture.?);
+    };
+    defer a.free(bytes);
+    for ([_][]const u8{ original, "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 = { type Item = F32, const first = fn value => @u32.to_f32 value }\nimpl ArraySource a : Source (Array a) where { Source a } = { type Item = Source.Item a, const first = fn values => Source.first (@array.get values 0) }\nentry const answer: F32 = Source.first #[42]\n" }) |text| {
+        var fixture = try Fixture.init(text);
+        defer fixture.deinit();
+        var fresh = try fixture.emit(a, null);
+        defer fresh.deinit(a);
+        try std.testing.expect(fresh.diagnostic == null);
+        try implementationRestart(a, &fixture, bytes, fresh.bytes);
+        if (std.mem.eql(u8, text, original)) try @import("allocation_failures.zig").checkAllAllocationFailures(a, implementationRestart, .{ &fixture, bytes, fresh.bytes });
+    }
+}
 const portable = @import("portable_query.zig");
 const inputs = @import("principal_inputs.zig");
 const evidence = @import("type_evidence.zig");

@@ -114,6 +114,7 @@ pub fn compile(allocator: Allocator, source: []const u8, pool: *symbols.Pool, de
         switch (node.tag) {
             .import_decl => return error.ImportedConsumerUnsupported,
             .value_decl, .data_decl, .effect_type_decl, .effect_decl => try occupied.put(allocator, node.a, {}),
+            .implementation_decl => try occupied.put(allocator, tree.implementation(id).name, {}),
             else => {},
         }
         if (node.tag == .data_decl) for (tree.children(node.b)) |constructor| try occupied.put(allocator, tree.node(constructor).a, {});
@@ -135,6 +136,7 @@ pub fn compile(allocator: Allocator, source: []const u8, pool: *symbols.Pool, de
             .constructor => .constructor,
             .effect_family => .effect_family,
             .contract => .contract,
+            .implementation => .implementation,
             .value => unreachable,
         }, .index = exported.catalog, .origin = 0 });
     }

@@ -499,6 +499,12 @@ Each snapshot stores only its demanded fields. Demand propagates backwards
 through every alias/carry edge to a fixed point; all source field values are
 read before destination writes. Dropped fields still evaluate their operands.
 The pass transforms an assembly copy, preserving retained symbolic fragments.
+Empty constructor cells carry exact symbolic tag/zero-payload facts; replacing
+one never depends on mutable module data or pointer-looking scalar bits. A
+private tagged join needs mutually exclusive producers and a common enclosing
+loop activation before field aliases can share an owning root. Nested producer
+loops, older activation aliases, unknown uses and escapes keep ordinary storage.
+Unproved tagged joins retain their cells rather than multiply root publications.
 Direct loop patterns containing only bindings, wildcards and products need no
 failure blocks; their local definitions dominate the loop body. Patterns with
 runtime tests retain the failure path. Generic iterator lowering still creates

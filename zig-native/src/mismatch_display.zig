@@ -62,6 +62,12 @@ const Display = struct {
             if (index != 0) try self.append(", ");
             const operation = self.store.operation(label);
             if (!try self.nominal(operation.identity.unit, operation.identity.decl)) return false;
+            if (operation.instance.decl != 0) {
+                try self.append(" @scope");
+                try self.number(operation.instance.unit);
+                try self.append(":");
+                try self.number(operation.instance.decl);
+            }
             for (self.store.operationArguments(label)) |argument| {
                 try self.append(" (");
                 if (!try self.ty(argument, depth)) return false;
@@ -88,6 +94,13 @@ const Display = struct {
         }
         const value = self.store.node(id);
         switch (value.tag) {
+            .scoped => {
+                if (!try self.ty(value.a, depth - 1)) return false;
+                try self.append(" @scope");
+                try self.number(value.b);
+                try self.append(":");
+                try self.number(value.c);
+            },
             .unit => try self.append("Unit"),
             .boolean => try self.append("Bool"),
             .u32 => try self.append("U32"),

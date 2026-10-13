@@ -77,6 +77,16 @@ pub fn publicView(allocator: std.mem.Allocator, owner: *const PI.Interface) Erro
         for (owner.contract_members[contract.members.start..][0..contract.members.len]) |member| try allowed(&scan, member.root);
         for (owner.contract_predicates[contract.predicates.start..][0..contract.predicates.len]) |predicate| try requirement(&scan, owner, predicate);
     }
+    for (owner.implementations) |implementation| {
+        if (implementation.private) {
+            try require(implementation.name == 0 and implementation.head.len == 0 and implementation.members.len == 0 and implementation.predicates.len == 0);
+            continue;
+        }
+        try require(!scan.blocked.contains(implementation.contract));
+        for (owner.graph.extra[implementation.head.start..][0..implementation.head.len]) |root| try allowed(&scan, root);
+        for (owner.implementation_members[implementation.members.start..][0..implementation.members.len]) |member| try allowed(&scan, member.root);
+        for (owner.implementation_predicates[implementation.predicates.start..][0..implementation.predicates.len]) |predicate| try requirement(&scan, owner, predicate);
+    }
     for (owner.associated) |member| try require(member.binding < owner.bindings.len and !owner.bindings[member.binding].private);
 }
 fn allowed(scan: *visibility.Scan, ty: T.Id) Error!void {

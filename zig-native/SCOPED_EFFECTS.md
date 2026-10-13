@@ -5,9 +5,10 @@ This is the design for tasks
 [058](../tasks/058-implement-effect-instances-and-subtraction.md) and
 [059](../tasks/059-reject-escaping-capabilities.md). It extends the
 [current closed-family behavior](../compiler/guide.md#effect-families-and-scoped-state).
-The proposed syntax below is not implemented yet. Existing effect declarations,
-closed operations, providers, State runners and request handlers keep their
-behavior.
+The full design below remains the target. A direct annotated scope subset is
+implemented; see
+[its qualification and limits](SCOPED_EFFECTS_QUALIFICATION.md). Existing closed
+operations, providers, State runners and request handlers retain their behavior.
 
 ## Source surface
 

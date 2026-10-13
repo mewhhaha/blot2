@@ -60,7 +60,7 @@ export function parserSource(
     // Same-width markers preserve original CST text and source offsets.
     const topLevel = delimiters === 0 && indentation === 0;
     if (topLevel && declarationStart) {
-      if (["privatE", "opaquE", "exporT"].includes(token.text)) {
+      if (["privatE", "opaquE", "exporT", "impL"].includes(token.text)) {
         throw new SourceError(
           "reserved_declaration_marker",
           "Use ordinary declaration spellings",
@@ -81,6 +81,8 @@ export function parserSource(
         ) {
           replace(token.span.end - 1, token.span.end, "T");
           moduleDeclaration = true;
+        } else if (token.text === "impl") {
+          replace(token.span.end - 1, token.span.end, "L");
         } else if (token.text === "import") moduleDeclaration = true;
       }
     }

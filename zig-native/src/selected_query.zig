@@ -52,15 +52,15 @@ pub const Adapter = struct {
 };
 pub const Table = queries.Table(Adapter);
 /// Takes ownership even when an incomplete or saturated observation declines.
-pub fn remember(table: *Table, a: A, closure: eval.ClosureValue, owned: receipt.Record) A.Error!void {
+pub fn remember(table: *Table, a: A, closure: eval.ClosureValue, owned: receipt.Record) A.Error!?u32 {
     var origin = source(closure);
     if (owned.member) |member| origin = memberSource(member.target);
     var builder = Table.begin(a, .{ .source = origin, .input = owned.input, .expected = owned.expected, .options = owned.options, .depth = owned.depth });
     defer builder.abort();
     builder.read(owned);
     builder.stage(.{ .selected = owned.selected });
-    var candidate = builder.complete() orelse return;
+    var candidate = builder.complete() orelse return null;
     defer candidate.abort();
-    const prepared = try table.prepare(a, &candidate) orelse return;
-    _ = table.publish(prepared, &candidate);
+    const prepared = try table.prepare(a, &candidate) orelse return null;
+    return table.publish(prepared, &candidate).position;
 }

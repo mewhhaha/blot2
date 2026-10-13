@@ -15,6 +15,7 @@ export default grammar({
     [$.export_declaration, $.identifier],
     [$.private_binding, $.identifier],
     [$.private_effect_header, $.identifier],
+    [$.implementation_header, $.identifier],
     [$.entry_binding, $.identifier],
     [$.request_complete_header, $.identifier],
   ],
@@ -37,6 +38,7 @@ export default grammar({
         $.constructor_marker,
         $.where_clause,
         $.contract_header,
+        $.implementation_header,
         $.parenthesized,
         $.bracketed,
         $.array,
@@ -227,6 +229,18 @@ export default grammar({
     // keyword: `const where` and `fn where =>` remain ordinary identifiers.
     where_clause: ($) => prec(4, seq("where", $.braced)),
     contract_header: ($) => prec(4, seq("is", "contract", "=")),
+    implementation_header: ($) =>
+      prec(
+        4,
+        seq(
+          optional(alias("private", $.private_modifier)),
+          "impl",
+          field("name", $.type_identifier),
+          optional($._type_parameter),
+          repeat(seq("=>", "type", $._type_parameter)),
+          alias(":", $.separator),
+        ),
+      ),
 
     type_header: ($) =>
       prec.right(
@@ -349,7 +363,15 @@ export default grammar({
     intrinsic: (_) => token(/@[a-z_][A-Za-z0-9_]*(\.[a-z_][A-Za-z0-9_]*)*/),
     _identifier: (_) => /[a-z_][A-Za-z0-9_]*/,
     identifier: ($) =>
-      choice($._identifier, "complete", "entry", "private", "opaque", "export"),
+      choice(
+        $._identifier,
+        "complete",
+        "entry",
+        "private",
+        "opaque",
+        "export",
+        "impl",
+      ),
     type_identifier: (_) => /[A-Z][A-Za-z0-9_]*/,
     operator: (_) => choice(":=", "=>", "..", /[+\-*\/%=!<>|&^~?$]+/),
     separator: (_) => choice(":", ",", ";"),

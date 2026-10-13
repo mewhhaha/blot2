@@ -14,7 +14,7 @@ pub const boolean: Id = 2;
 pub const u32_type: Id = 3;
 pub const f32_type: Id = 4;
 pub const never: Id = 5;
-pub const Tag = enum(u8) { absent, unit, boolean, u32, f32, never, variable, function, product, record, nominal, array, list, cursor, demand, type_constructor, resolver, provider, state_provider, projection };
+pub const Tag = enum(u8) { absent, unit, boolean, u32, f32, never, variable, function, product, record, nominal, array, list, cursor, demand, type_constructor, resolver, provider, state_provider, projection, scoped };
 pub const Node = struct {
     tag: Tag,
     // Owned structural certificate, kept in the existing three padding bytes.
@@ -35,7 +35,7 @@ comptime {
 /// Opaque declarations use a relocated spelling handle rather than an AST ordinal.
 pub const opaque_name_bit: u32 = 0x80000000;
 pub const NominalIdentity = struct { unit: u32, decl: u32 };
-pub const Operation = struct { identity: NominalIdentity, arguments: List = .{} };
+pub const Operation = struct { identity: NominalIdentity, arguments: List = .{}, instance: NominalIdentity = .{ .unit = 0, .decl = 0 } };
 pub const foreign_operation: Effects.Label = 1;
 // Builtin operations occupy a compiler-owned unit outside source module IDs.
 pub const builtin_state_read: NominalIdentity = .{ .unit = std.math.maxInt(u32), .decl = 1 };
@@ -72,7 +72,9 @@ pub const Store = struct {
     has_projections: bool = false,
     projection_limit: usize = 1_000_000,
     projection_steps: usize = 0,
+    resolution_depth_limit: usize = 1024,
     projection_exhausted: bool = false,
+    associated_equations: std.AutoHashMapUnmanaged(Id, Id) = .empty,
     projection_resolution_types: u64 = 0,
     projection_resolution_rows: u64 = 0,
     projection_resolutions: std.AutoHashMapUnmanaged(ProjectionResolution, Id) = .empty,
@@ -127,6 +129,7 @@ pub const Store = struct {
         self.variable_views.deinit(self.allocator);
         self.resolved.deinit(self.allocator);
         self.projection_resolutions.deinit(self.allocator);
+        self.associated_equations.deinit(self.allocator);
         self.composites.deinit(self.allocator);
         self.occurs_seen.deinit(self.allocator);
         self.effects.deinit();
@@ -184,30 +187,38 @@ pub const Store = struct {
         const n = self.node(id);
         return if (n.closed_generation == self.closed_generation) n.closed_height else 0;
     }
-    fn closedRow(self: *const Store, id: Effects.Id) bool {
+    fn closedRowHeight(self: *const Store, id: Effects.Id) u8 {
         const r = self.effects.node(id);
-        if (r.tail != .closed) return false;
+        if (r.tail != .closed) return 0;
+        var height: u8 = 0;
         for (self.effects.list(r.labels)) |label| {
-            if (label >= self.operations.items.len) return false;
-            for (self.list(self.operations.items[label].arguments)) |arg| if (self.closedHeight(arg) == 0) return false;
+            if (label >= self.operations.items.len) return 0;
+            for (self.list(self.operations.items[label].arguments)) |arg| {
+                const argument_height = self.closedHeight(arg);
+                if (argument_height == 0) return 0;
+                height = @max(height, argument_height);
+            }
         }
-        return true;
+        if (height == std.math.maxInt(u8)) return 0;
+        return height + 1;
     }
     fn closedNodeHeight(self: *const Store, n: Node) u8 {
         var height: u8 = 0;
         switch (n.tag) {
             .absent, .variable => return 0,
             .function, .demand, .provider => {
-                if (!self.closedRow(n.c)) return 0;
+                const row_height = self.closedRowHeight(n.c);
+                if (row_height == 0) return 0;
                 height = self.closedHeight(n.a);
                 if (height == 0) return 0;
+                height = @max(height, row_height);
                 if (n.tag == .function) {
                     const result = self.closedHeight(n.b);
                     if (result == 0) return 0;
                     height = @max(height, result);
                 }
             },
-            .array, .list, .cursor, .resolver => {
+            .scoped, .array, .list, .cursor, .resolver => {
                 height = self.closedHeight(n.a);
                 if (height == 0) return 0;
             },
@@ -299,6 +310,10 @@ pub const Store = struct {
         const span = try self.saveList(words.items);
         return self.add(.{ .tag = .record, .a = span.start, .b = @intCast(fields.len) });
     }
+    /// Lexical identity only. Dynamic authority is created by scope execution.
+    pub fn scoped(self: *Store, descriptor: Id, instance: NominalIdentity) Error!Id {
+        return self.add(.{ .tag = .scoped, .a = descriptor, .b = instance.unit, .c = instance.decl });
+    }
     pub fn nominal(self: *Store, identity: NominalIdentity, arguments: []const Id) Error!Id {
         if (arguments.len >= std.math.maxInt(u32) or self.extra.items.len > std.math.maxInt(u32) - arguments.len - 1) return error.TypeLimit;
         const owned = try self.allocator.dupe(Id, arguments);
@@ -372,6 +387,12 @@ pub const Store = struct {
         return .{ .nodes = self.nodes.items.len, .extra = self.extra.items.len, .variables = self.variables.items.len, .versions = self.versions.items.len, .operations = self.operations.items.len, .effects = self.effects.mark() };
     }
     pub fn rollback(self: *Store, point: Mark) void {
+        if (self.associated_equations.count() != 0) {
+            var entries = self.associated_equations.iterator();
+            while (entries.next()) |entry| {
+                if (entry.key_ptr.* >= point.nodes or entry.value_ptr.* >= point.nodes) _ = self.associated_equations.remove(entry.key_ptr.*);
+            }
+        }
         self.invalidateClosedGraphs();
         resolution_cache.tick(&self.mutation_epoch);
         while (self.versions.items.len > point.versions) {
@@ -387,6 +408,9 @@ pub const Store = struct {
         self.variables.shrinkRetainingCapacity(point.variables);
         self.operations.shrinkRetainingCapacity(point.operations);
         self.effects.rollback(point.effects);
+        // The type generation was already revoked above. A later row read
+        // must not announce this same rollback as another physical change.
+        self.closed_effect_physical_epoch = self.effects.physical_epoch;
     }
     /// Raw writes preserve arbitrary histories for the reference oracle. Normal
     /// checker writes go through unify, including an occurs check.
@@ -410,6 +434,14 @@ pub const Store = struct {
         }
         return null;
     }
+    /// The caller supplies a complete selected proof. Both roots belong to this
+    /// solver; freezing resolves the equation and retains no mutable lookup.
+    pub fn bindAssociated(self: *Store, projection_: Id, result: Id) Error!void {
+        try self.chargeProjection();
+        if (self.node(projection_).tag != .projection) return error.TypeMismatch;
+        try self.associated_equations.put(self.allocator, projection_, result);
+        self.mutation_epoch +|= 1;
+    }
     pub fn head(self: *const Store, root: Id, at: Cursor) Id {
         var id = root;
         var position = at;
@@ -419,6 +451,9 @@ pub const Store = struct {
             const write = self.replacement(variable.a, position) orelse break;
             id = write.replacement;
             position = write.position + 1;
+        }
+        if (self.associated_equations.count() != 0) {
+            if (self.associated_equations.get(id)) |equation| id = equation;
         }
         const value = self.node(id);
         return if (value.tag == .variable) self.variable_views.get((@as(u64, value.a) << 32) | position) orelse id else id;
@@ -467,6 +502,12 @@ pub const Store = struct {
             }
             if (n.tag == .function or n.tag == .demand or n.tag == .provider) {
                 const row_ = self.row(n.c);
+                for (self.rowLabels(n.c)) |label| {
+                    const arguments = self.operationArguments(label);
+                    if (arguments.len > pending.len - count) return null;
+                    @memcpy(pending[count..][0..arguments.len], arguments);
+                    count += arguments.len;
+                }
                 if (row_.tail == .variable and !certificate.add(.{ .variable = row_.tail.variable, .last = self.effects.variables.items[row_.tail.variable].last, .effect = true })) return null;
             }
             var children: [3]Id = undefined;
@@ -475,7 +516,7 @@ pub const Store = struct {
                     children = .{ n.a, n.b, 0 };
                     break :blk children[0..2];
                 },
-                .array, .list, .cursor, .resolver, .demand, .provider => blk: {
+                .scoped, .array, .list, .cursor, .resolver, .demand, .provider => blk: {
                     children[0] = n.a;
                     break :blk children[0..1];
                 },
@@ -573,12 +614,15 @@ pub const Store = struct {
         return self.resolveNode(root, at, depth);
     }
     fn resolveNode(self: *Store, root: Id, at: Cursor, depth: usize) Error!Id {
+        if (self.associated_equations.count() != 0) {
+            if (self.associated_equations.get(root)) |equation| return self.resolveDepth(equation, at, depth + 1);
+        }
         if (self.has_projections) try self.chargeProjection();
         if (@import("builtin").is_test) self.resolution_steps += 1;
-        if (depth >= 1024) return error.TypeLimit;
+        if (depth >= self.resolution_depth_limit) return error.TypeLimit;
         const height = self.closedHeight(root);
         if (height != 0) {
-            if (depth + height > 1024) return error.TypeLimit;
+            if (depth + height > self.resolution_depth_limit) return error.TypeLimit;
             return root;
         }
         var id = root;
@@ -593,17 +637,31 @@ pub const Store = struct {
         if (id != root) {
             const selected_height = self.closedHeight(id);
             if (selected_height != 0) {
-                if (depth + selected_height > 1024) return error.TypeLimit;
+                if (depth + selected_height > self.resolution_depth_limit) return error.TypeLimit;
                 return id;
             }
         }
         const value = self.node(id);
+        defer if (self.use_closed_graphs and value.tag != .variable and self.closed_generation != std.math.maxInt(u16)) {
+            // Rollback revokes structural certificates. An ordinary traversal
+            // can prove an unchanged graph closed again, from its leaves up.
+            const refreshed = self.closedNodeHeight(value);
+            if (refreshed != 0) {
+                self.nodes.items[id].closed_height = refreshed;
+                self.nodes.items[id].closed_generation = self.closed_generation;
+            }
+        };
         switch (value.tag) {
+            .scoped => {
+                const child = try self.resolveDepth(value.a, position, depth + 1);
+                if (child == value.a) return id;
+                return self.scoped(child, .{ .unit = value.b, .decl = value.c });
+            },
             .variable => return self.variableView(value.a, position),
             .function => {
                 const parameter = try self.resolveDepth(value.a, position, depth + 1);
                 const result = try self.resolveDepth(value.b, position, depth + 1);
-                const effect_row = self.effects.resolve(value.c, position) catch |err| return effectError(err);
+                const effect_row = try self.resolveOperationRow(value.c, position, depth + 1);
                 if (parameter == value.a and result == value.b and effect_row == value.c) return id;
                 return self.functionWithEffects(parameter, result, effect_row);
             },
@@ -631,7 +689,7 @@ pub const Store = struct {
             },
             .demand, .provider => {
                 const child = try self.resolveDepth(value.a, position, depth + 1);
-                const effect_row = self.effects.resolve(value.c, position) catch |err| return effectError(err);
+                const effect_row = try self.resolveOperationRow(value.c, position, depth + 1);
                 return if (child == value.a and effect_row == value.c) id else if (value.tag == .provider) self.provider(child, effect_row) else self.demandWithEffects(child, effect_row);
             },
             .state_provider => {
@@ -709,11 +767,13 @@ pub const Store = struct {
             self.occurs_steps += 1;
             if (self.closedHeight(id) != 0) continue;
             const value = self.node(id);
+            if (value.tag == .function or value.tag == .demand or value.tag == .provider)
+                for (self.rowLabels(value.c)) |label| try pending.appendSlice(scratch_allocator, self.operationArguments(label));
             switch (value.tag) {
                 .variable => if (value.a == variable) return true,
                 .function => try pending.appendSlice(scratch_allocator, &.{ value.a, value.b }),
                 .product => try pending.appendSlice(scratch_allocator, self.list(.{ .start = value.a, .len = value.b })),
-                .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(scratch_allocator, value.a),
+                .scoped, .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(scratch_allocator, value.a),
                 .state_provider => try pending.appendSlice(scratch_allocator, &.{ value.a, value.b, value.c }),
                 .record => for (0..value.b) |i| {
                     try pending.append(scratch_allocator, self.recordField(value, i).ty);
@@ -725,13 +785,113 @@ pub const Store = struct {
         return false;
     }
     pub fn unifyEffects(self: *Store, left: Effects.Id, right: Effects.Id) Error!void {
-        self.effects.unify(left, right) catch |err| return effectError(err);
+        const point = self.mark();
+        errdefer self.rollback(point);
+        const a = try self.resolveEffects(left, 0);
+        const b = try self.resolveEffects(right, 0);
+        var symbolic = false;
+        for (self.rowLabels(a)) |label| symbolic = symbolic or try self.symbolicOperation(label);
+        for (self.rowLabels(b)) |label| symbolic = symbolic or try self.symbolicOperation(label);
+        if (!symbolic) {
+            self.effects.unify(a, b) catch |err| return effectError(err);
+            return;
+        }
+        const labels = try self.allocator.dupe(Effects.Label, self.rowLabels(a));
+        defer self.allocator.free(labels);
+        const candidates = try self.allocator.dupe(Effects.Label, self.rowLabels(b));
+        defer self.allocator.free(candidates);
+        for (labels) |label| {
+            var exact = false;
+            for (candidates) |candidate| exact = exact or candidate == label;
+            if (exact) continue;
+            const operation_ = self.operation(label);
+            var selected: ?Effects.Label = null;
+            for (candidates) |candidate| {
+                const other = self.operation(candidate);
+                if (!std.meta.eql(operation_.identity, other.identity) or !std.meta.eql(operation_.instance, other.instance) or operation_.arguments.len != other.arguments.len) continue;
+                const trial = self.mark();
+                const matched = self.unifyOperationArguments(label, candidate) catch |err| {
+                    self.rollback(trial);
+                    if (err == error.OutOfMemory or err == error.TypeLimit) return err;
+                    continue;
+                };
+                self.rollback(trial);
+                if (!matched) continue;
+                if (selected) |previous| {
+                    if (previous != candidate) return error.EffectMismatch;
+                } else selected = candidate;
+            }
+            if (selected) |candidate| _ = try self.unifyOperationArguments(label, candidate);
+        }
+        self.effects.unify(try self.resolveEffects(a, 0), try self.resolveEffects(b, 0)) catch |err| return effectError(err);
+    }
+    fn symbolicOperation(self: *const Store, label: Effects.Label) Error!bool {
+        for (self.operationArguments(label)) |argument| {
+            if (self.closedHeight(argument) != 0) continue;
+            if (!try self.equalClosed(argument, argument)) return true;
+        }
+        return false;
+    }
+    fn unifyOperationArguments(self: *Store, left: Effects.Label, right: Effects.Label) Error!bool {
+        if (!try self.symbolicOperation(left) and !try self.symbolicOperation(right)) return false;
+        const a = try self.allocator.dupe(Id, self.operationArguments(left));
+        defer self.allocator.free(a);
+        const b = try self.allocator.dupe(Id, self.operationArguments(right));
+        defer self.allocator.free(b);
+        for (a, b) |first, second| try self.unify(first, second);
+        return true;
     }
     pub fn freshEffects(self: *Store) Error!Effects.Id {
         return self.effects.fresh() catch |err| return effectError(err);
     }
     pub fn resolveEffects(self: *Store, effect_row: Effects.Id, at: Cursor) Error!Effects.Id {
-        return self.effects.resolve(effect_row, at) catch |err| return effectError(err);
+        if (self.use_closed_graphs) self.synchronizeClosedGraphs();
+        return self.resolveOperationRow(effect_row, at, 0);
+    }
+    fn resolveOperationRow(self: *Store, root: Effects.Id, at: Cursor, depth: usize) Error!Effects.Id {
+        if (depth >= 1024) return error.TypeLimit;
+        const id = self.effects.resolve(root, at) catch |err| return effectError(err);
+        const row_ = self.row(id);
+        var labels: std.ArrayList(Effects.Label) = .empty;
+        defer labels.deinit(self.allocator);
+        var changed = false;
+        for (0..row_.labels.len) |index| {
+            const label = self.effects.list(row_.labels)[index];
+            const operation_ = self.operation(label);
+            var closed = true;
+            for (self.list(operation_.arguments)) |argument| {
+                const height = self.closedHeight(argument);
+                if (height == 0) closed = false;
+                if (height != 0 and depth + 1 + height > self.resolution_depth_limit) return error.TypeLimit;
+            }
+            if (closed) {
+                if (changed) labels.appendAssumeCapacity(label);
+                continue;
+            }
+            var arguments: std.ArrayList(Id) = .empty;
+            defer arguments.deinit(self.allocator);
+            var argument_changed = false;
+            for (0..operation_.arguments.len) |offset| {
+                const argument = self.list(operation_.arguments)[offset];
+                const resolved = try self.resolveDepth(argument, at, depth + 1);
+                if (!argument_changed and resolved != argument) {
+                    try arguments.ensureTotalCapacity(self.allocator, operation_.arguments.len);
+                    arguments.appendSliceAssumeCapacity(self.list(operation_.arguments)[0..offset]);
+                    argument_changed = true;
+                }
+                if (argument_changed) arguments.appendAssumeCapacity(resolved);
+            }
+            var next = label;
+            if (argument_changed) next = try self.internResolvedOperation(operation_.identity, operation_.instance, arguments.items, true);
+            if (!changed and next != label) {
+                try labels.ensureTotalCapacity(self.allocator, row_.labels.len);
+                labels.appendSliceAssumeCapacity(self.effects.list(row_.labels)[0..index]);
+                changed = true;
+            }
+            if (changed) labels.appendAssumeCapacity(next);
+        }
+        if (!changed) return id;
+        return self.effects.rowAt(labels.items, row_.tail, row_.cursor) catch |err| return effectError(err);
     }
     pub fn row(self: *const Store, id: Effects.Id) Effects.Row {
         return self.effects.node(id);
@@ -745,9 +905,20 @@ pub const Store = struct {
     pub fn operationArguments(self: *const Store, label: Effects.Label) []const Id {
         return self.list(self.operation(label).arguments);
     }
-    /// Exact closed operation identity. These IDs are owned by this store;
-    /// import/publication must copy identities and arguments, then remap labels.
+    /// Closed operation identity; executable evidence must use this boundary.
     pub fn internOperation(self: *Store, identity: NominalIdentity, arguments: []const Id) Error!Effects.Label {
+        return self.internOperationMode(identity, .{ .unit = 0, .decl = 0 }, arguments, false);
+    }
+    /// Principal operation identity. Symbolic arguments belong to this solver
+    /// and must be substituted or copied with their enclosing scheme.
+    pub fn internSymbolicOperation(self: *Store, identity: NominalIdentity, arguments: []const Id) Error!Effects.Label {
+        return self.internOperationMode(identity, .{ .unit = 0, .decl = 0 }, arguments, true);
+    }
+    pub fn internScopedOperation(self: *Store, identity: NominalIdentity, instance: NominalIdentity, arguments: []const Id) Error!Effects.Label {
+        if (identity.unit == 0 and identity.decl == 1 and (instance.unit != 0 or instance.decl != 0)) return error.TypeMismatch;
+        return self.internOperationMode(identity, instance, arguments, true);
+    }
+    fn internOperationMode(self: *Store, identity: NominalIdentity, instance: NominalIdentity, arguments: []const Id, symbolic: bool) Error!Effects.Label {
         var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
         const scratch_allocator = scratch.allocator();
@@ -759,21 +930,26 @@ pub const Store = struct {
         defer resolved.deinit(scratch_allocator);
         for (borrowed) |argument| {
             const ty = try self.resolve(argument, 0);
-            if (!try self.equalClosed(ty, ty)) return error.TypeMismatch;
+            if (!symbolic and !try self.equalClosed(ty, ty)) return error.TypeMismatch;
             try resolved.append(scratch_allocator, ty);
         }
+        return self.internResolvedOperation(identity, instance, resolved.items, symbolic);
+    }
+    fn internResolvedOperation(self: *Store, identity: NominalIdentity, instance: NominalIdentity, resolved: []const Id, symbolic: bool) Error!Effects.Label {
+        const point = self.mark();
+        errdefer self.rollback(point);
         for (self.operations.items[1..], 1..) |candidate, index| {
-            if (!std.meta.eql(identity, candidate.identity)) continue;
+            if (!std.meta.eql(identity, candidate.identity) or !std.meta.eql(instance, candidate.instance)) continue;
             const old = self.list(candidate.arguments);
-            if (old.len != resolved.items.len) continue;
+            if (old.len != resolved.len) continue;
             var same = true;
-            for (old, resolved.items) |a, b| same = same and try self.equalClosed(a, b);
+            for (old, resolved) |a, b| same = same and try self.equalGraph(a, b, symbolic);
             if (same) return @intCast(index);
         }
         if (self.operations.items.len == none) return error.TypeLimit;
-        const span = try self.saveList(resolved.items);
+        const span = try self.saveList(resolved);
         const id: Effects.Label = @intCast(self.operations.items.len);
-        try self.operations.append(self.allocator, .{ .identity = identity, .arguments = span });
+        try self.operations.append(self.allocator, .{ .identity = identity, .arguments = span, .instance = instance });
         return id;
     }
     /// Read-only exact comparison. A variable or open latent row is not closed,
@@ -799,6 +975,11 @@ pub const Store = struct {
             if (self.has_projections) try @constCast(self).chargeProjection();
             if (symbolic) {
                 if (pair.a == pair.b) continue;
+            }
+            // Closed equality must inspect each leaf even for identical roots.
+            // Associated selections can share exponentially many paths to that
+            // leaf, so visit each pair once without treating identity as proof.
+            if (symbolic or self.has_projections) {
                 const entry = try seen.getOrPut(scratch_allocator, pair);
                 if (entry.found_existing) continue;
             }
@@ -825,12 +1006,17 @@ pub const Store = struct {
                         for (self.effects.list(ar.labels)) |v| ac += @intFromBool(v == label);
                         for (self.effects.list(br.labels)) |v| bc += @intFromBool(v == label);
                         if (ac != bc) return false;
+                        for (self.operationArguments(label)) |argument| try pending.append(scratch_allocator, .{ .a = argument, .b = argument });
                     }
                     if (a.tag == .function) try pending.append(scratch_allocator, .{ .a = a.b, .b = b.b });
                     try pending.append(scratch_allocator, .{ .a = a.a, .b = b.a });
                 },
                 .array, .list, .cursor, .resolver => try pending.append(scratch_allocator, .{ .a = a.a, .b = b.a }),
                 .state_provider => try pending.appendSlice(scratch_allocator, &.{ .{ .a = a.a, .b = b.a }, .{ .a = a.b, .b = b.b }, .{ .a = a.c, .b = b.c } }),
+                .scoped => {
+                    if (a.b != b.b or a.c != b.c) return false;
+                    try pending.append(scratch_allocator, .{ .a = a.a, .b = b.a });
+                },
                 .type_constructor => if (a.a != b.a or a.b != b.b) return false,
                 .product => {
                     if (a.b != b.b) return false;
@@ -879,23 +1065,41 @@ pub const Store = struct {
     /// Observe the failing resolved equation before transactional rollback.
     /// The reporter may copy diagnostics; it cannot change the solver.
     pub fn unifyWithReporter(self: *Store, left: Id, right: Id, reporter: ?MismatchReporter) Error!void {
+        return self.unifyMode(left, right, reporter, false);
+    }
+    pub fn unifyPattern(self: *Store, left: Id, right: Id) Error!void {
+        return self.unifyMode(left, right, null, true);
+    }
+    fn unifyMode(self: *Store, left: Id, right: Id, reporter: ?MismatchReporter, comptime associated: bool) Error!void {
         var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
         const scratch_allocator = scratch.allocator();
         const point = self.mark();
         errdefer self.rollback(point);
         const Pair = struct { a: Id, b: Id, effect_row: bool = false };
+        var seen: std.AutoHashMapUnmanaged(Pair, void) = .empty;
+        defer seen.deinit(scratch_allocator);
         var pending: std.ArrayList(Pair) = .empty;
         defer pending.deinit(scratch_allocator);
         try pending.append(scratch_allocator, .{ .a = left, .b = right });
+        const bounded = associated or self.has_projections;
         while (pending.pop()) |pair| {
+            if (bounded) try self.chargeProjection();
             if (pair.effect_row) {
+                if (bounded) {
+                    for (self.rowLabels(pair.a)) |_| try self.chargeProjection();
+                    for (self.rowLabels(pair.b)) |_| try self.chargeProjection();
+                }
                 try self.unifyEffects(pair.a, pair.b);
                 continue;
             }
             const a = try self.resolve(pair.a, 0);
             const b = try self.resolve(pair.b, 0);
             if (a == b or a == never or b == never) continue;
+            if (bounded) {
+                const found = try seen.getOrPut(scratch_allocator, .{ .a = a, .b = b });
+                if (found.found_existing) continue;
+            }
             const an = self.node(a);
             const bn = self.node(b);
             if (an.tag == .variable and bn.tag == .variable and an.a == bn.a) continue;
@@ -928,6 +1132,10 @@ pub const Store = struct {
                 .state_provider => {
                     try pending.append(scratch_allocator, .{ .a = an.c, .b = bn.c });
                     try pending.append(scratch_allocator, .{ .a = an.b, .b = bn.b });
+                    try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a });
+                },
+                .scoped => {
+                    if (an.b != bn.b or an.c != bn.c) return self.mismatch(reporter, a, b);
                     try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a });
                 },
                 .type_constructor => if (an.a != bn.a or an.b != bn.b) return self.mismatch(reporter, a, b),
@@ -1004,11 +1212,13 @@ pub const Store = struct {
             const entry = try seen.getOrPut(temporary, id);
             if (entry.found_existing) continue;
             const value = self.node(id);
+            if (value.tag == .function or value.tag == .demand or value.tag == .provider)
+                for (self.rowLabels(value.c)) |label| try pending.appendSlice(temporary, self.operationArguments(label));
             switch (value.tag) {
                 .variable => try values.append(self.allocator, id),
                 .function => try pending.appendSlice(temporary, &.{ value.a, value.b }),
                 .product => try pending.appendSlice(temporary, self.list(.{ .start = value.a, .len = value.b })),
-                .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(temporary, value.a),
+                .scoped, .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(temporary, value.a),
                 .state_provider => try pending.appendSlice(temporary, &.{ value.a, value.b, value.c }),
                 .record => for (0..value.b) |i| {
                     try pending.append(temporary, self.recordField(value, i).ty);
@@ -1045,7 +1255,7 @@ pub const Store = struct {
                 .projection => return true,
                 .function => try pending.appendSlice(self.allocator, &.{ .{ .root = n.a }, .{ .root = n.b }, .{ .root = n.c, .row = true } }),
                 .demand, .provider => try pending.appendSlice(self.allocator, &.{ .{ .root = n.a }, .{ .root = n.c, .row = true } }),
-                .array, .list, .cursor, .resolver => try pending.append(self.allocator, .{ .root = n.a }),
+                .scoped, .array, .list, .cursor, .resolver => try pending.append(self.allocator, .{ .root = n.a }),
                 .state_provider => for ([_]Id{ n.a, n.b, n.c }) |child| try pending.append(self.allocator, .{ .root = child }),
                 .product => for (self.list(.{ .start = n.a, .len = n.b })) |child| try pending.append(self.allocator, .{ .root = child }),
                 .record => for (0..n.b) |at| try pending.append(self.allocator, .{ .root = self.recordField(n, at).ty }),
@@ -1316,7 +1526,10 @@ pub const Store = struct {
             if (value.tag == .function or value.tag == .demand or value.tag == .provider) {
                 var row_ = self.effects.node(value.c);
                 var row_at = @max(at, row_.cursor);
-                while (row_.tail == .variable) {
+                while (true) {
+                    for (self.effects.list(row_.labels)) |label| for (self.operationArguments(label)) |argument|
+                        try pending.append(temporary, .{ .id = argument, .at = at, .depth = work.depth + 1 });
+                    if (row_.tail != .variable) break;
                     row_at = @max(row_at, row_.cursor);
                     const write = self.effects.replacementAt(row_.tail.variable, row_at) orelse break;
                     row_ = self.effects.node(write.replacement);
@@ -1332,7 +1545,7 @@ pub const Store = struct {
                 .product => for (self.list(.{ .start = value.a, .len = value.b })) |child| {
                     try pending.append(temporary, .{ .id = child, .at = at, .depth = work.depth + 1 });
                 },
-                .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(temporary, .{ .id = value.a, .at = at, .depth = work.depth + 1 }),
+                .scoped, .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(temporary, .{ .id = value.a, .at = at, .depth = work.depth + 1 }),
                 .state_provider => {
                     try pending.append(temporary, .{ .id = value.a, .at = at, .depth = work.depth + 1 });
                     try pending.append(temporary, .{ .id = value.b, .at = at, .depth = work.depth + 1 });
@@ -1364,13 +1577,33 @@ pub const Store = struct {
         defer copied.deinit(scratch.allocator());
         return self.substituteDepth(root, old, fresh_ids, old_rows, fresh_rows, &copied, scratch.allocator(), 0);
     }
-    fn substitutedRow(self: *Store, effect_row: Effects.Id, old: []const u32, replacements: []const Effects.Id) Error!Effects.Id {
-        if (self.has_projections) {
-            try self.chargeProjection();
-            for (self.rowLabels(effect_row)) |_| try self.chargeProjection();
+    fn substitutedRow(self: *Store, root: Effects.Id, old: []const Id, fresh_ids: []const Id, old_rows: []const u32, fresh_rows: []const Effects.Id, copied: *std.AutoHashMapUnmanaged(Id, Id), scratch: std.mem.Allocator, depth: usize) Error!Effects.Id {
+        if (self.has_projections) try self.chargeProjection();
+        const row_ = self.row(root);
+        var labels: std.ArrayList(Effects.Label) = .empty;
+        defer labels.deinit(scratch);
+        var changed = false;
+        for (0..row_.labels.len) |index| {
+            const label = self.effects.list(row_.labels)[index];
+            if (self.has_projections) try self.chargeProjection();
+            const operation_ = self.operation(label);
+            var arguments: std.ArrayList(Id) = .empty;
+            defer arguments.deinit(scratch);
+            var argument_changed = false;
+            for (0..operation_.arguments.len) |offset| {
+                const argument = self.list(operation_.arguments)[offset];
+                const next = try self.substituteDepth(argument, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1);
+                argument_changed = argument_changed or next != argument;
+                try arguments.append(scratch, next);
+            }
+            var next = label;
+            if (argument_changed) next = try self.internResolvedOperation(operation_.identity, operation_.instance, arguments.items, true);
+            changed = changed or next != label;
+            try labels.append(scratch, next);
         }
-        var result = effect_row;
-        for (old, replacements) |variable, replacement_id| result = self.effects.substitute(result, variable, replacement_id) catch |err| return effectError(err);
+        var result = root;
+        if (changed) result = self.effects.rowAt(labels.items, row_.tail, row_.cursor) catch |err| return effectError(err);
+        for (old_rows, fresh_rows) |variable, replacement_id| result = self.effects.substitute(result, variable, replacement_id) catch |err| return effectError(err);
         return result;
     }
     // A type graph is a DAG. Repeated children must retain sharing during
@@ -1394,7 +1627,8 @@ pub const Store = struct {
         if (depth >= 1024) return error.TypeLimit;
         const value = self.node(root);
         switch (value.tag) {
-            .function => return self.functionWithEffects(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substituteDepth(value.b, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substitutedRow(value.c, old_rows, fresh_rows)),
+            .scoped => return self.scoped(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), .{ .unit = value.b, .decl = value.c }),
+            .function => return self.functionWithEffects(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substituteDepth(value.b, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substitutedRow(value.c, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1)),
             .product => {
                 var fields: std.ArrayList(Id) = .empty;
                 defer fields.deinit(self.allocator);
@@ -1402,8 +1636,8 @@ pub const Store = struct {
                 return self.product(fields.items);
             },
             .array, .list, .cursor => return self.sequence(value.tag, try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1)),
-            .demand => return self.demandWithEffects(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substitutedRow(value.c, old_rows, fresh_rows)),
-            .provider => return self.provider(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substitutedRow(value.c, old_rows, fresh_rows)),
+            .demand => return self.demandWithEffects(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substitutedRow(value.c, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1)),
+            .provider => return self.provider(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substitutedRow(value.c, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1)),
             .state_provider => return self.stateProvider(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substituteDepth(value.b, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substituteDepth(value.c, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1)),
             .resolver => return self.resolver(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1)),
             .record => {
@@ -1729,13 +1963,14 @@ test "type and row replacements share one history cursor through function and de
     const ty = try store.fresh();
     const effect_row = try store.freshEffects();
     const variable = store.effects.node(effect_row).tail.variable;
-    const first = try store.effects.row(&.{11}, .closed);
-    const later = try store.effects.row(&.{22}, .closed);
+    const later_label = try store.internOperation(.{ .unit = 8, .decl = 22 }, &.{});
+    const first = try store.effects.row(&.{foreign_operation}, .closed);
+    const later = try store.effects.row(&.{later_label}, .closed);
     try store.effects.appendVersion(variable, first); // global position 0
     try store.appendVersion(ty, try store.functionWithEffects(unit, u32_type, effect_row)); // 1
     try store.effects.appendVersion(variable, later); // 2
     const resolved = store.node(try store.resolve(ty, 0));
-    try std.testing.expectEqualSlices(u32, &.{22}, store.effects.list(store.effects.node(resolved.c).labels));
+    try std.testing.expectEqualSlices(u32, &.{later_label}, store.effects.list(store.effects.node(resolved.c).labels));
     try std.testing.expectEqual(@as(u32, 3), store.cursor());
     const suspended = try store.fresh();
     const demand_row = try store.freshEffects();
@@ -1743,7 +1978,7 @@ test "type and row replacements share one history cursor through function and de
     try store.appendVersion(suspended, try store.demandWithEffects(u32_type, demand_row)); // 4
     try store.effects.appendVersion(store.effects.node(demand_row).tail.variable, later); // 5
     const demand_node = store.node(try store.resolve(suspended, 0));
-    try std.testing.expectEqualSlices(u32, &.{22}, store.effects.list(store.effects.node(demand_node.c).labels));
+    try std.testing.expectEqualSlices(u32, &.{later_label}, store.effects.list(store.effects.node(demand_node.c).labels));
     try std.testing.expectEqual(@as(u32, 6), store.cursor());
 }
 test "rejected function effect rows roll back type and row writes and shared chronology" {
@@ -1751,8 +1986,9 @@ test "rejected function effect rows roll back type and row writes and shared chr
     defer store.deinit();
     const parameter = try store.fresh();
     const effect_row = try store.freshEffects();
-    const left = try store.functionWithEffects(parameter, try store.functionWithEffects(unit, u32_type, effect_row), try store.effects.row(&.{11}, .closed));
-    const right = try store.functionWithEffects(u32_type, try store.function(unit, u32_type), try store.effects.row(&.{22}, .closed));
+    const other = try store.internOperation(.{ .unit = 8, .decl = 22 }, &.{});
+    const left = try store.functionWithEffects(parameter, try store.functionWithEffects(unit, u32_type, effect_row), try store.effects.row(&.{foreign_operation}, .closed));
+    const right = try store.functionWithEffects(u32_type, try store.function(unit, u32_type), try store.effects.row(&.{other}, .closed));
     const point = store.mark();
     try std.testing.expectError(error.EffectMismatch, store.unify(left, right));
     try std.testing.expectEqualDeep(point, store.mark());
@@ -1763,7 +1999,7 @@ test "recursive latent rows report InfiniteEffect without changing type or row h
     var store = try Store.init(std.testing.allocator);
     defer store.deinit();
     const latent = try store.freshEffects();
-    const recursive = try store.effects.row(&.{11}, store.row(latent).tail);
+    const recursive = try store.effects.row(&.{foreign_operation}, store.row(latent).tail);
     const left = try store.functionWithEffects(unit, u32_type, latent);
     const right = try store.functionWithEffects(unit, u32_type, recursive);
     const point = store.mark();
@@ -1783,12 +2019,12 @@ test "value and effect quantifiers freshen independently without accidental nume
     const two_row = try store.freshEffects();
     const one = try store.substituteWithRows(root, &.{ty}, &.{u32_type}, rows, &.{one_row});
     const two = try store.substituteWithRows(root, &.{ty}, &.{f32_type}, rows, &.{two_row});
-    const label = try store.effects.row(&.{ 7, 7 }, .closed);
+    const label = try store.effects.row(&.{ foreign_operation, foreign_operation }, .closed);
     try store.unifyEffects(store.node(one).c, label);
     try std.testing.expectEqual(Effects.Tail.variable, std.meta.activeTag(store.effects.node(try store.resolveEffects(store.node(two).c, 0)).tail));
     const one_result = store.node(store.node(try store.resolve(one, 0)).b);
     try std.testing.expectEqual(u32_type, one_result.a);
-    try std.testing.expectEqualSlices(u32, &.{ 7, 7 }, store.effects.list(store.effects.node(one_result.c).labels));
+    try std.testing.expectEqualSlices(u32, &.{ foreign_operation, foreign_operation }, store.effects.list(store.effects.node(one_result.c).labels));
 }
 fn effectAllocationFailures(allocator: std.mem.Allocator) !void {
     var store = try Store.init(allocator);
@@ -2187,4 +2423,162 @@ fn closedVariableCertificateLaw(allocator: std.mem.Allocator) !void {
 test "closed variable certificates preserve chronological cursors physical edits rollback and allocation failure" {
     try closedVariableCertificateLaw(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, closedVariableCertificateLaw, .{});
+}
+
+fn symbolicOperationLaw(allocator: std.mem.Allocator) !void {
+    var store = try Store.init(allocator);
+    defer store.deinit();
+    const identity: NominalIdentity = .{ .unit = 9, .decl = 21 };
+    const argument = try store.fresh();
+    const other = try store.fresh();
+    const label = try store.internSymbolicOperation(identity, &.{argument});
+    try std.testing.expectEqual(label, try store.internSymbolicOperation(identity, &.{argument}));
+    try std.testing.expect(label != try store.internSymbolicOperation(identity, &.{other}));
+    const open = try store.freshEffects();
+    const root = try store.functionWithEffects(unit, unit, try store.effects.row(&.{ label, label }, store.row(open).tail));
+    const variables = try store.freeVariables(root);
+    defer allocator.free(variables);
+    try std.testing.expectEqualSlices(Id, &.{argument}, variables);
+    const closed = try store.internOperation(identity, &.{u32_type});
+    const instantiated = try store.substituteWithRows(root, &.{argument}, &.{u32_type}, &.{store.row(open).tail.variable}, &.{0});
+    const row_ = store.node(instantiated).c;
+    try std.testing.expectEqualSlices(Effects.Label, &.{ closed, closed }, store.rowLabels(row_));
+    try std.testing.expect(store.row(row_).tail == .closed);
+    try store.unify(argument, f32_type);
+    const floating = try store.internOperation(identity, &.{f32_type});
+    const resolved = try store.resolve(root, 0);
+    try std.testing.expectEqualSlices(Effects.Label, &.{ floating, floating }, store.rowLabels(store.node(resolved).c));
+    try std.testing.expectEqualSlices(Effects.Label, &.{ label, label }, store.rowLabels(store.node(root).c));
+    try store.unifyEffects(store.node(root).c, try store.effects.row(&.{ floating, floating }, .closed));
+    store.unifyEffects(row_, try store.effects.row(&.{floating}, .closed)) catch |err| {
+        if (err == error.OutOfMemory) return err;
+        try std.testing.expectEqual(error.EffectMismatch, err);
+        return;
+    };
+    return error.TestExpectedError;
+}
+
+test "symbolic operation arguments substitute and resolve without erasing row multiplicity" {
+    try symbolicOperationLaw(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, symbolicOperationLaw, .{});
+}
+
+fn symbolicOperationInferenceLaw(allocator: std.mem.Allocator) !void {
+    var store = try Store.init(allocator);
+    defer store.deinit();
+    const identity: NominalIdentity = .{ .unit = 9, .decl = 21 };
+    const argument = try store.fresh();
+    const label = try store.internSymbolicOperation(identity, &.{argument});
+    const symbolic = try store.effects.row(&.{ label, label }, .closed);
+    const integer = try store.internOperation(identity, &.{u32_type});
+    const floating = try store.internOperation(identity, &.{f32_type});
+    try store.unifyEffects(symbolic, try store.effects.row(&.{ integer, integer }, .closed));
+    try std.testing.expectEqual(u32_type, try store.resolve(argument, 0));
+    const future = try store.resolve(argument, store.cursor());
+    const future_label = try store.internSymbolicOperation(identity, &.{future});
+    const future_row = try store.effects.row(&.{future_label}, .closed);
+    try store.appendVersion(argument, f32_type);
+    try std.testing.expectEqualSlices(Effects.Label, &.{ integer, integer }, store.rowLabels(try store.resolveEffects(symbolic, 0)));
+    try std.testing.expectEqualSlices(Effects.Label, &.{floating}, store.rowLabels(try store.resolveEffects(future_row, 0)));
+
+    const unresolved = try store.fresh();
+    const unknown = try store.internSymbolicOperation(identity, &.{unresolved});
+    const requirement = try store.effects.row(&.{unknown}, .closed);
+    const ambiguous = try store.effects.row(&.{ integer, floating }, .closed);
+    const point = store.mark();
+    store.unifyEffects(requirement, ambiguous) catch |err| {
+        try std.testing.expectEqualDeep(point, store.mark());
+        if (err == error.OutOfMemory) return err;
+        try std.testing.expectEqual(error.EffectMismatch, err);
+        try std.testing.expectEqual(unresolved, try store.resolve(unresolved, 0));
+        return;
+    };
+    return error.TestExpectedError;
+}
+
+test "symbolic operation inference preserves chronological argument views and rejects ambiguous instances transactionally" {
+    try symbolicOperationInferenceLaw(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, symbolicOperationInferenceLaw, .{});
+}
+
+fn symbolicNestedRowLaw(allocator: std.mem.Allocator) !void {
+    var store = try Store.init(allocator);
+    defer store.deinit();
+    const nested = try store.freshEffects();
+    const callback = try store.functionWithEffects(unit, u32_type, nested);
+    const label = try store.internSymbolicOperation(.{ .unit = 7, .decl = 19 }, &.{callback});
+    const root = try store.functionWithEffects(unit, unit, try store.effects.row(&.{label}, .closed));
+    try std.testing.expect(!try store.equalClosed(root, root));
+    const rows = try store.freeRowVariables(root);
+    defer allocator.free(rows);
+    try std.testing.expectEqualSlices(u32, &.{store.row(nested).tail.variable}, rows);
+    const concrete = try store.substituteWithRows(root, &.{}, &.{}, rows, &.{0});
+    try std.testing.expect(try store.equalClosed(concrete, concrete));
+    const substituted = store.operationArguments(store.rowLabels(store.node(concrete).c)[0])[0];
+    try std.testing.expectEqual(@as(Effects.Id, 0), store.node(substituted).c);
+}
+
+test "symbolic operation arguments quantify nested row binders and require closed evidence" {
+    try symbolicNestedRowLaw(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, symbolicNestedRowLaw, .{});
+}
+
+test "closed operation argument heights preserve cached and uncached resolution depth limits" {
+    const a = std.testing.allocator;
+    var store = try Store.initWithOptions(a, .{ .closed_graphs = true });
+    defer store.deinit();
+    var root: Id = unit;
+    // Construct the immutable graph without asking resolution to certify it.
+    // The admission depth boundary is independent of the allocator/owner graph.
+    for (0..600) |_| {
+        const label: Effects.Label = @intCast(store.operations.items.len);
+        const arguments = try store.saveList(&.{root});
+        try store.operations.append(a, .{ .identity = .{ .unit = 7, .decl = 19 }, .arguments = arguments });
+        root = try store.functionWithEffects(unit, unit, try store.effects.row(&.{label}, .closed));
+    }
+    const cached = store.resolve(root, 0);
+    store.use_closed_graphs = false;
+    store.use_resolution_cache = false;
+    store.use_composite_cache = false;
+    const uncached = store.resolve(root, 0);
+    try std.testing.expectError(error.TypeLimit, uncached);
+    try std.testing.expectError(error.TypeLimit, cached);
+}
+
+fn scopedOperationIdentityLaw(allocator: std.mem.Allocator) !void {
+    var store = try Store.init(allocator);
+    defer store.deinit();
+    const identity: NominalIdentity = .{ .unit = 7, .decl = 8 };
+    const left: NominalIdentity = .{ .unit = 7, .decl = 90 };
+    const right: NominalIdentity = .{ .unit = 7, .decl = 91 };
+    const variable = try store.fresh();
+    const static = try store.internOperation(identity, &.{u32_type});
+    const first = try store.internScopedOperation(identity, left, &.{variable});
+    const second = try store.internScopedOperation(identity, right, &.{u32_type});
+    try store.unify(variable, u32_type);
+    const row_ = try store.effects.row(&.{ first, first, second, static }, .closed);
+    const resolved = try store.resolveEffects(row_, 0);
+    const labels = store.rowLabels(resolved);
+    try std.testing.expectEqual(@as(usize, 4), labels.len);
+    try std.testing.expectEqual(labels[0], labels[1]);
+    try std.testing.expect(labels[0] != labels[2] and labels[0] != labels[3]);
+    try std.testing.expectEqual(left, store.operation(labels[0]).instance);
+    const nominal_ = try store.nominal(identity, &.{variable});
+    const scoped_ = try store.scoped(nominal_, left);
+    const other = try store.scoped(nominal_, right);
+    try std.testing.expect(!try store.equalSymbolic(scoped_, other));
+    store.unify(scoped_, other) catch |err| switch (err) {
+        error.TypeMismatch => {},
+        else => return err,
+    };
+    const normalized = store.node(try store.resolve(scoped_, 0));
+    try std.testing.expectEqual(Tag.scoped, normalized.tag);
+    try std.testing.expectEqual(left.unit, normalized.b);
+    try std.testing.expectEqual(left.decl, normalized.c);
+}
+test "scoped effect identity survives normalization and preserves multiplicity" {
+    try scopedOperationIdentityLaw(std.testing.allocator);
+}
+test "scoped effect identity releases every failed allocation" {
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, scopedOperationIdentityLaw, .{});
 }

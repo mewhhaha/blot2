@@ -49,6 +49,23 @@ fn checkInterfaceUnits(owner: *const PI.Interface, units: []const u32) Error!voi
         _ = try mapped(units, p.identity.unit);
         _ = try mapped(units, p.qualification_unit);
     }
+    for (owner.implementations) |value| {
+        _ = try mapped(units, value.identity.unit);
+        _ = try mapped(units, value.contract.unit);
+    }
+    for (owner.implementation_predicates) |value| {
+        _ = try mapped(units, value.identity.unit);
+        _ = try mapped(units, value.qualification_unit);
+    }
+    for (owner.implementation_members) |value| _ = try mapped(units, value.target.unit);
+    for (owner.member_templates) |value| _ = try mapped(units, value.contract.unit);
+    for (owner.selected_members) |value| _ = try mapped(units, value.target.unit);
+    for (owner.selected_proofs) |value| {
+        _ = try mapped(units, value.context);
+        _ = try mapped(units, value.implementation.unit);
+        _ = try mapped(units, value.contract.unit);
+        _ = try mapped(units, value.predicate.identity.unit);
+    }
     for (owner.constructors) |c| _ = try mapped(units, c.identity.unit);
     for (owner.effect_families) |f| _ = try mapped(units, f.identity.unit);
     for (owner.effect_templates) |o| _ = try mapped(units, o.identity.unit);
@@ -378,6 +395,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
         try @import("module_abstraction_validation.zig").publicView(a, &m.interface);
         try @import("module_abstraction_validation.zig").storageContracts(&m.interface, &m.core);
         try @import("associated_admission.zig").publicCoreWithBudget(a, &m.interface, &m.core, &associated_remaining);
+        try @import("implementation_admission.zig").publicCore(a, &m.interface, &m.core, &associated_remaining);
         for (m.core.bodies) |body| try require(!body.exported);
         for (m.imports) |unit| try require(unit != 0 and unit <= value.modules.len and unit != id + 1);
         try require(m.imports.len == m.source_imports.len + @intFromBool(m.implicit_prelude));
@@ -411,6 +429,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
                 .nominal => try require(exported.catalog != 0 and exported.catalog < owner.nominals.len and !owner.nominals[exported.catalog].private and (producer != id + 1 or owner.nominals[exported.catalog].name == exported.name)),
                 .constructor => try require(exported.catalog != 0 and exported.catalog < owner.constructors.len and !owner.constructors[exported.catalog].private and (producer != id + 1 or owner.constructors[exported.catalog].name == exported.name)),
                 .effect_family => try require(exported.catalog != 0 and exported.catalog < owner.effect_families.len and !owner.effect_families[exported.catalog].private and (producer != id + 1 or owner.effect_families[exported.catalog].name == exported.name)),
+                .implementation => try require(exported.catalog < owner.implementations.len and !owner.implementations[exported.catalog].private and (producer != id + 1 or owner.implementations[exported.catalog].name == exported.name)),
                 .contract => try require(exported.catalog < owner.contracts.len and !owner.contracts[exported.catalog].private and (producer != id + 1 or owner.contracts[exported.catalog].name == exported.name)),
             }
         }
@@ -422,6 +441,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
     }
     try validateImportGraph(a, value);
     try @import("associated_admission.zig").originalProducersWithBudget(a, value.modules, &associated_remaining);
+    try @import("implementation_admission.zig").originalProducers(a, value.modules, &associated_remaining);
 }
 
 fn forwardedOwners(a: std.mem.Allocator, value: *const D.FrozenDependency, current: usize, remaining: *usize) Error![]bool {

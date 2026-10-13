@@ -71,7 +71,9 @@ function annotationWhere(
         if (text !== "(") return false;
       }
       if (nested > 0) continue;
-      if (text === "let" || text === "const" || text === "fn") return true;
+      if (
+        text === "let" || text === "const" || text === "fn" || text === "impl"
+      ) return true;
       if (["\uE000", "=", "=>", "<-", ","].includes(text)) {
         return false;
       }

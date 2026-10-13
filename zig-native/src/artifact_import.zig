@@ -630,6 +630,7 @@ pub const Importer = struct {
         for (labels) |label| {
             if (label == 0 or label >= source.operations.len) return error.Declined;
             const operation = source.operations[label];
+            if (operation.instance.unit != 0 or operation.instance.decl != 0) return error.Declined;
             if (operation.identity.unit == std.math.maxInt(u32)) return error.Declined;
             const arguments = try bounded(u32, source.arguments, operation.arguments.start, operation.arguments.len);
             if (operation.identity.unit == 0) {
@@ -787,6 +788,7 @@ pub const Importer = struct {
         for (labels) |label| {
             if (label == 0 or label >= source.operations.len) return error.Declined;
             const operation = source.operations[label];
+            if (operation.instance.unit != 0 or operation.instance.decl != 0) return error.Declined;
             const old_args = try bounded(u32, source.arguments, operation.arguments.start, operation.arguments.len);
             var owner: u32 = undefined;
             if (operation.identity.unit == 0) {
@@ -962,6 +964,15 @@ pub const Importer = struct {
         if (value.* != 0) value.* = try self.symbol(value.*);
     }
     fn remapCore(self: *const Importer, module: *core.Module) Error!void {
+        const roles = try self.allocator.alloc(u8, module.types.extra.len);
+        defer self.allocator.free(roles);
+        @import("dependency_symbol_slots.zig").coreRoles(roles, module) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.InvalidArtifact => return error.Declined,
+        };
+        for (module.types.extra, roles) |*word, role| if (role == 1) {
+            word.* = try self.symbol(word.*);
+        };
         for (module.field_names) |*field| try self.optionalSymbol(&field.symbol);
         std.mem.sortUnstable(core.FieldName, module.field_names, {}, struct {
             fn less(_: void, left: core.FieldName, right: core.FieldName) bool {
@@ -973,15 +984,6 @@ pub const Importer = struct {
             .nominal, .projection, .type_constructor => if (n.a != 0 and n.a != std.math.maxInt(u32)) {
                 n.a = try self.unit(n.a, false);
                 n.b = try self.nominalDeclaration(n.b);
-                if (n.tag == .projection) {
-                    const member = n.c + 1 + module.types.extra[n.c];
-                    module.types.extra[member] = try self.symbol(module.types.extra[member]);
-                }
-            },
-            .record => {
-                const fields = try bounded(u32, module.types.extra, n.a, @as(usize, n.b) * 2);
-                var i: usize = 0;
-                while (i < fields.len) : (i += 2) module.types.extra[n.a + i] = try self.symbol(fields[i]);
             },
             else => {},
         };
@@ -1005,6 +1007,44 @@ pub const Importer = struct {
         for (module.contract_members) |*value| {
             try self.remapIdentity(&value.contract);
             try self.optionalSymbol(&value.name);
+        }
+        for (module.implementations) |*value| {
+            try self.remapIdentity(&value.identity);
+            try self.remapIdentity(&value.contract);
+            try self.optionalSymbol(&value.name);
+        }
+        for (module.implementation_members) |*value| {
+            try self.optionalSymbol(&value.name);
+            if (value.target.binding != 0) {
+                var method: core.BindingRef = .{ .unit = value.target.unit, .binding = value.target.binding };
+                try self.remapReference(&method);
+                value.target = .{ .unit = method.unit, .binding = method.binding };
+            }
+        }
+        for (module.member_templates) |*value| {
+            try self.remapIdentity(&value.contract);
+            try self.optionalSymbol(&value.name);
+        }
+        for (module.selected_proofs) |*value| {
+            if (value.predicate_target.binding != 0) {
+                var proof_target: core.BindingRef = .{ .unit = value.predicate_target.unit, .binding = value.predicate_target.binding };
+                try self.remapReference(&proof_target);
+                value.predicate_target = .{ .unit = proof_target.unit, .binding = proof_target.binding };
+            }
+            if (value.context != 0) value.context = try self.unit(value.context, false);
+            try self.remapIdentity(&value.implementation);
+            try self.remapIdentity(&value.contract);
+            try self.remapIdentity(&value.predicate.identity);
+            try self.optionalSymbol(&value.predicate.name);
+            if (value.predicate.qualification_unit != 0) value.predicate.qualification_unit = try self.unit(value.predicate.qualification_unit, false);
+        }
+        for (module.selected_members) |*value| {
+            try self.optionalSymbol(&value.name);
+            if (value.target.binding != 0) {
+                var method: core.BindingRef = .{ .unit = value.target.unit, .binding = value.target.binding };
+                try self.remapReference(&method);
+                value.target = .{ .unit = method.unit, .binding = method.binding };
+            }
         }
         for (module.operation_names) |*value| try self.remapIdentity(&value.identity);
         for (module.constructors) |*value| try self.remapIdentity(&value.identity);

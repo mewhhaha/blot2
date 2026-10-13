@@ -69,7 +69,6 @@ pub fn collect(allocator: Allocator, owner: *const D.Module) Error!Slots {
     @memset(b, 0);
     @memset(c, 0);
     try graph(a, iface.graph.nodes, iface.graph.extra, iface.graph.operations);
-    try graph(c, ir.types.nodes, ir.types.extra, ir.types.operations);
     for (iface.bindings) |value| try scheme(a, value.scheme);
     for (iface.constructors) |value| try scheme(a, value.scheme);
     for (iface.nominals) |value| {
@@ -96,6 +95,7 @@ pub fn collect(allocator: Allocator, owner: *const D.Module) Error!Slots {
         try list(a, value.row_parameters, 2);
         try list(b, value.patterns, 2);
     }
+    try implementationLists(a, iface);
     for (iface.patterns.nodes) |node| switch (node.kind) {
         .binding => {},
         .tuple, .array => try mark(b, node.a, node.b, 2),
@@ -108,29 +108,48 @@ pub fn collect(allocator: Allocator, owner: *const D.Module) Error!Slots {
             }
         },
     };
-    for (ir.bindings) |value| try scheme(c, value.scheme);
+    try coreRoles(c, ir);
+    return .{ .interface_types = a, .patterns = b, .core_types = c };
+}
+pub fn coreRoles(slots: []u8, ir: *const @import("core.zig").Module) Error!void {
+    @memset(slots, 0);
+    try graph(slots, ir.types.nodes, ir.types.extra, ir.types.operations);
+    try implementationLists(slots, ir);
+    for (ir.bindings) |value| try scheme(slots, value.scheme);
     for (ir.bodies) |value| {
-        try scheme(c, value.scheme);
-        try list(c, value.closed_rows, 2);
+        try scheme(slots, value.scheme);
+        try list(slots, value.closed_rows, 2);
     }
-    for (ir.constructors) |value| try scheme(c, value.scheme);
+    for (ir.constructors) |value| try scheme(slots, value.scheme);
     for (ir.contracts) |value| {
-        try list(c, value.parameters, 2);
-        try list(c, value.variables, 2);
-        try list(c, value.row_variables, 2);
-        try list(c, value.row_parameter_names, 1);
-        try list(c, value.row_parameters, 2);
+        try list(slots, value.parameters, 2);
+        try list(slots, value.variables, 2);
+        try list(slots, value.row_variables, 2);
+        try list(slots, value.row_parameter_names, 1);
+        try list(slots, value.row_parameters, 2);
     }
     for (ir.nominals) |value| {
-        try list(c, value.parameters, 2);
-        try list(c, value.variables, 2);
+        try list(slots, value.parameters, 2);
+        try list(slots, value.variables, 2);
     }
-    for (ir.closures) |value| try list(c, value.closed_rows, 2);
-    for (ir.operation_values) |value| try list(c, value.arguments, 2);
-    return .{ .interface_types = a, .patterns = b, .core_types = c };
+    for (ir.closures) |value| try list(slots, value.closed_rows, 2);
+    for (ir.operation_values) |value| try list(slots, value.arguments, 2);
 }
 pub fn rewrite(extra: []u32, slots: []const u8, symbols: []const u32) void {
     for (extra, slots) |*word, role| if (role == 1) {
         word.* = symbols[word.*];
     };
+}
+
+fn implementationLists(slots: []u8, owner: anytype) Error!void {
+    for (owner.implementations) |value| {
+        try list(slots, value.head, 2);
+        try list(slots, value.variables, 2);
+        try list(slots, value.parameter_names, 1);
+        try list(slots, value.row_variables, 2);
+        try list(slots, value.row_parameter_names, 1);
+        try list(slots, value.row_parameters, 2);
+    }
+    for (owner.member_templates) |value| try list(slots, value.arguments, 2);
+    for (owner.selected_proofs) |value| try list(slots, value.arguments, 2);
 }

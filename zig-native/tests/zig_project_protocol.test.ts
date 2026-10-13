@@ -394,7 +394,11 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
         equal(explanation, {
           operation: "+",
           member: "add",
-          candidates: [{ side: "left", operand: "Bool", outcome: "no_member" }],
+          candidates: [{
+            side: "left",
+            operand: "Bool",
+            outcome: "no_member",
+          }],
           truncated: false,
         });
       }

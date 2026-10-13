@@ -295,3 +295,40 @@ test "private cursor versions keep immutable Core replay and emission OOM owners
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, privateCursorEmission, .{ &units, &first.capture.?, first.bytes });
     try std.testing.expectEqualDeep(nodes, module.nodes);
 }
+test "eager tuple reductions keep immutable Core fresh retained replay and emission OOM ownership" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\infixl 60 (+) = add
+        \\const primitive = fn (left: U32) => fn (right: U32) => @u32.add left right
+        \\const add = fn (left: U32) => fn (right: U32) => primitive left right
+        \\entry const run = fn (count: U32) => do:
+        \\  let values = @list.fill count (1, 2, 3, 4, 5, 6, 7, 8, 9)
+        \\  let cursor = @list.cursor values
+        \\  let total = 0
+        \\  for index in 0..count:
+        \\    let (a, b, c, d, e, f, g, h, i) = @cursor.value cursor
+        \\    total := self + a + b + c + d + e + f + g + h + i
+        \\    cursor := @cursor.advance self
+        \\  return total
+    );
+    defer module.deinit(a);
+    const before = @import("core_snapshot_tests.zig").stamp(module);
+    const units = [_]core.Module{module};
+    var first = try @import("core_backend.zig").compileWithOptions(a, &units, 1, .{ .retain_artifacts = true });
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    var vectors: usize = 0;
+    for (first.capture.?.optimized.?.entries.items) |entry| {
+        if (entry.output) |body| for (body.instructions.items) |inst| {
+            if (inst.op == .v128_load) vectors += 1;
+        };
+    }
+    try std.testing.expectEqual(@as(usize, 2), vectors);
+    try privateCursorEmission(a, &units, &first.capture.?, first.bytes);
+    var replay = try @import("core_backend.zig").compileWithOptions(a, &units, 1, .{ .artifact_replay = true });
+    defer replay.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, replay.bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, privateCursorEmission, .{ &units, null, first.bytes });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, privateCursorEmission, .{ &units, &first.capture.?, first.bytes });
+    try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
+}

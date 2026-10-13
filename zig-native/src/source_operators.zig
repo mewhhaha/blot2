@@ -70,6 +70,23 @@ pub fn validate(allocator: std.mem.Allocator, tree: *const ast.Tree, pool: *cons
         const id = tree.roots.items[index];
         if (comptime @hasDecl(@TypeOf(context.*), "sourceDeclarationHeader")) try context.sourceDeclarationHeader(id);
         if (validator.annotationsStopped()) return null;
+        if (tree.node(id).tag == .implementation_decl) {
+            const saved_locals = validator.locals.items.len;
+            defer validator.locals.shrinkRetainingCapacity(saved_locals);
+            const implementation = tree.implementation(id);
+            for (tree.list(implementation.members)) |member| if (tree.node(member).tag == .value_decl) try validator.locals.append(allocator, tree.node(member).a);
+            const scope = if (comptime @hasDecl(@TypeOf(context.*), "sourceImplementationStart")) try context.sourceImplementationStart(id) else {};
+            defer if (comptime @hasDecl(@TypeOf(context.*), "sourceImplementationEnd")) context.sourceImplementationEnd(scope);
+            for (tree.list(implementation.members)) |member| {
+                if (tree.node(member).tag != .value_decl) continue;
+                if (comptime @hasDecl(@TypeOf(context.*), "sourceBindingAnnotation")) try context.sourceBindingAnnotation(member);
+                if (validator.annotationsStopped()) return null;
+                try validator.walk(tree.valueDecl(member).body, 0);
+                if (validator.issue != null) return validator.issue;
+                if (validator.annotationsStopped()) return null;
+            }
+            continue;
+        }
         if (tree.node(id).tag != .value_decl) continue;
         const value = tree.valueDecl(id);
         if (value.modifier != 0 and !std.mem.eql(u8, pool.get(value.modifier), "entry"))

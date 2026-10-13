@@ -231,6 +231,11 @@ const Bounds = struct {
             if (id < builtins.len) try require(value.tag == builtins[id] and value.a == 0 and value.b == 0 and value.c == 0);
             if (id >= builtins.len) try require(value.tag != .absent);
             switch (value.tag) {
+                .scoped => {
+                    try self.ty(value.a);
+                    try require(self.m.types.node(value.a).tag == .nominal and value.b == self.m.unit and value.c != 0);
+                    try self.scopedInstance(.{ .unit = value.b, .decl = value.c });
+                },
                 .absent, .unit, .boolean, .u32, .f32, .never, .variable => {},
                 .function => {
                     try self.ty(value.a);
@@ -294,11 +299,27 @@ const Bounds = struct {
         for (self.m.types.effects.labels) |label_| try self.label(label_);
         try require(self.m.types.operations.len >= 2);
         for (self.m.types.operations, 0..) |value, id| {
+            try self.scopedInstance(value.instance);
+            if (value.identity.unit == 0) try require(value.instance.unit == 0 and value.instance.decl == 0);
             try self.identity(value.identity, id == 0);
             try self.listTypes(value.arguments);
             if (id == 0) try require(value.identity.unit == 0 and value.identity.decl == 0 and value.arguments.len == 0);
             if (id == T.foreign_operation) try require(value.identity.unit == 0 and value.identity.decl == 1 and value.arguments.len == 0);
         }
+    }
+    fn scopedInstance(self: Bounds, instance: T.NominalIdentity) BoundsError!void {
+        if (instance.decl == 0) return require(instance.unit == 0);
+        try require(instance.unit == self.m.unit);
+        for (self.m.nodes) |node_| {
+            if (node_.tag != .effect_scope or node_.a >= self.m.nodes.len) continue;
+            const callback = self.m.nodes[node_.a];
+            if (callback.tag != .closure or callback.a >= self.m.closures.len) continue;
+            const parameter_type = self.m.closures[callback.a].parameter.ty;
+            if (parameter_type >= self.m.types.nodes.len) continue;
+            const capability = self.m.types.nodes[parameter_type];
+            if (capability.tag == .scoped and capability.b == instance.unit and capability.c == instance.decl) return;
+        }
+        return error.InvalidArtifact;
     }
     fn catalogs(self: Bounds) BoundsError!void {
         for (self.m.bindings, 0..) |value, id| {
@@ -387,6 +408,64 @@ const Bounds = struct {
                 if (value.qualification_unit == 0 or value.qualification_unit == self.m.unit) try self.span(s) else _ = try self.owner(value.qualification_unit);
             } else try require(value.qualification_unit == 0);
             try range(self.m.names.len, value.diagnostic_name.start, value.diagnostic_name.len);
+        }
+        try require(self.m.implementations.len <= 4096);
+        for (self.m.implementations) |implementation| {
+            try self.identity(implementation.identity, false);
+            try self.identity(implementation.contract, false);
+            try self.symbol(implementation.name, false);
+            try require(implementation.declaration == 0 and implementation.identity.decl == T.opaque_name_bit | implementation.name);
+            try self.listTypes(implementation.head);
+            try self.listTypes(implementation.variables);
+            for (self.m.types.list(implementation.variables)) |root| try require(self.m.types.node(root).tag == .variable);
+            try range(self.m.types.extra.len, implementation.parameter_names.start, implementation.parameter_names.len);
+            for (self.m.types.list(implementation.parameter_names)) |name| try self.symbol(name, false);
+            try range(self.m.types.extra.len, implementation.row_parameter_names.start, implementation.row_parameter_names.len);
+            for (self.m.types.list(implementation.row_parameter_names)) |name| try self.symbol(name, false);
+            try require(implementation.parameter_names.len == implementation.variables.len and implementation.row_parameter_names.len == implementation.row_variables.len and implementation.row_parameters.len == implementation.row_variables.len);
+            try range(self.m.types.extra.len, implementation.row_variables.start, implementation.row_variables.len);
+            for (self.m.types.list(implementation.row_variables)) |variable| try index(self.m.types.effects.variable_count, variable);
+            try range(self.m.types.extra.len, implementation.row_parameters.start, implementation.row_parameters.len);
+            for (self.m.types.list(implementation.row_parameters)) |row_id| try index(self.m.types.effects.rows.len, row_id);
+            try range(self.m.obligations.len, implementation.predicates.start, implementation.predicates.len);
+            try range(self.m.implementation_members.len, implementation.members.start, implementation.members.len);
+        }
+        for (self.m.implementation_members) |member| {
+            try self.symbol(member.name, false);
+            try self.ty(member.root);
+            try require(member.root != 0);
+            if (member.kind == .type_) try require(member.target.unit == 0 and member.target.binding == 0) else {
+                try self.bindingRef(.{ .unit = member.target.unit, .binding = member.target.binding }, false);
+                try require(self.m.types.node(member.root).tag == .function);
+            }
+        }
+        for (self.m.member_templates) |template| {
+            try self.binding(template.binding, false);
+            try self.identity(template.contract, false);
+            try self.symbol(template.name, false);
+            try self.listTypes(template.arguments);
+        }
+        for (self.m.selected_members) |member| {
+            try self.symbol(member.name, false);
+            try self.ty(member.root);
+            try require(member.root != 0);
+            if (member.kind == .type_) try require(member.target.unit == 0 and member.target.binding == 0) else try self.bindingRef(.{ .unit = member.target.unit, .binding = member.target.binding }, false);
+        }
+        for (self.m.selected_proofs, 0..) |proof, ordinal| {
+            if (proof.predicate_target.binding != 0) try self.bindingRef(.{ .unit = proof.predicate_target.unit, .binding = proof.predicate_target.binding }, false) else try require(proof.predicate_target.unit == 0);
+            if (proof.context != 0) _ = try self.owner(proof.context);
+            try self.identity(proof.implementation, proof.kind == .predicate);
+            try self.identity(proof.contract, proof.kind == .predicate);
+            try self.listTypes(proof.arguments);
+            inline for (.{ "ty", "other", "result", "signature" }) |field| try self.ty(@field(proof.predicate, field));
+            try range(self.m.selected_members.len, proof.members.start, proof.members.len);
+            try range(self.m.selected_edges.len, proof.prerequisites.start, proof.prerequisites.len);
+            for (self.m.selected_edges[proof.prerequisites.start..][0..proof.prerequisites.len]) |child| try require(child < ordinal);
+        }
+        for (self.m.selected_uses) |use| {
+            try self.node(use.node, false);
+            try index(self.m.selected_proofs.len, use.proof);
+            try require(self.m.selected_proofs[use.proof].kind == .implementation);
         }
         for (self.m.contracts) |contract| {
             try self.identity(contract.identity, false);
@@ -567,6 +646,13 @@ const Bounds = struct {
             try self.ty(value.method_type);
         }
         for (self.m.operation_values) |value| {
+            try self.scopedInstance(value.instance);
+            try self.node(value.capability, true);
+            if (value.instance.decl != 0) {
+                try require(value.capability != 0);
+                const capability = self.m.types.node(self.m.typeOf(value.capability));
+                try require(capability.tag == .scoped and capability.b == value.instance.unit and capability.c == value.instance.decl);
+            } else try require(value.capability == 0);
             try self.identity(value.identity, false);
             try self.listTypes(value.arguments);
             try self.ty(value.signature);
@@ -584,6 +670,15 @@ const Bounds = struct {
         for (self.m.request_arms) |value| {
             try self.label(value.operation);
             try self.node(value.callback, false);
+            try self.node(value.selector, true);
+            const operation = self.m.types.operation(value.operation);
+            if (operation.instance.decl != 0) {
+                try require(value.selector != 0);
+                const signature = self.m.types.node(self.m.typeOf(value.selector));
+                try require(signature.tag == .function);
+                const labels = self.m.types.rowLabels(signature.c);
+                try require(labels.len == 1 and labels[0] == value.operation);
+            } else try require(value.selector == 0);
         }
         for (self.m.request_loops) |value| {
             try self.node(value.computation, false);
@@ -650,6 +745,14 @@ const Bounds = struct {
             if (id == 0) try require(std.meta.eql(value, core.Node{ .tag = .invalid })) else try require(value.tag != .invalid);
             if (self.m.dispatch_signatures.len != 0) try self.ty(self.m.dispatch_signatures[id]);
             switch (value.tag) {
+                .effect_scope => {
+                    try self.node(value.a, false);
+                    try require(self.m.node(value.a).tag == .closure);
+                    const callback = self.m.closure(value.a);
+                    try require(self.m.types.node(callback.parameter.ty).tag == .scoped);
+                    try require(value.b == 0 and value.c == 0);
+                },
+
                 .invalid, .constant, .type_constructor => {},
                 .reference => try index(self.m.references.len, value.a),
                 .scalar => {
@@ -662,6 +765,10 @@ const Bounds = struct {
                     try require(value.op == .and_ or value.op == .or_);
                     try self.node(value.a, false);
                     try self.node(value.b, false);
+                },
+                .contract_method => {
+                    try index(self.m.member_templates.len, value.a);
+                    try self.listNodes(.{ .start = value.b, .len = value.c });
                 },
                 .call => {
                     try index(self.m.calls.len, value.a);
@@ -856,6 +963,16 @@ fn listRoles(m: *const core.Module, type_roles: []u8, core_roles: []u8) BoundsEr
         try mark(type_roles, contract.row_parameters.start, contract.row_parameters.len, .row);
         try mark(type_roles, contract.row_parameter_names.start, contract.row_parameter_names.len, .symbol);
     }
+    for (m.implementations) |implementation| {
+        try mark(type_roles, implementation.head.start, implementation.head.len, .type_);
+        try mark(type_roles, implementation.variables.start, implementation.variables.len, .type_);
+        try mark(type_roles, implementation.parameter_names.start, implementation.parameter_names.len, .symbol);
+        try mark(type_roles, implementation.row_variables.start, implementation.row_variables.len, .row_variable);
+        try mark(type_roles, implementation.row_parameters.start, implementation.row_parameters.len, .row);
+        try mark(type_roles, implementation.row_parameter_names.start, implementation.row_parameter_names.len, .symbol);
+    }
+    for (m.member_templates) |template| try mark(type_roles, template.arguments.start, template.arguments.len, .type_);
+    for (m.selected_proofs) |proof| try mark(type_roles, proof.arguments.start, proof.arguments.len, .type_);
     for (m.nominals) |n| {
         try mark(type_roles, n.parameters.start, n.parameters.len, .type_);
         try mark(type_roles, n.variables.start, n.variables.len, .type_);
@@ -926,7 +1043,7 @@ const Graph = struct {
                         for (m.contract_members) |member| if (member.contract.unit == v.a and member.contract.decl == v.b and member.name == name and member.kind == .defined_type) break :blk self.vertex(.type_, member.root);
                         break :blk null;
                     },
-                    .array, .list, .cursor, .resolver => if (slot == 0) self.vertex(.type_, v.a) else null,
+                    .array, .list, .cursor, .resolver, .scoped => if (slot == 0) self.vertex(.type_, v.a) else null,
                     .demand, .provider => switch (slot) {
                         0 => self.vertex(.type_, v.a),
                         1 => if (m.types.effects.rows.len == 0) null else self.vertex(.row, v.c),
@@ -964,9 +1081,9 @@ const Graph = struct {
                         else => null,
                     },
                     .block, .suite, .product, .record, .array, .array_op => if (slot < v.b) self.vertex(.node, m.extra[v.a + slot]) else null,
-                    .call, .break_ => if (slot < v.c) self.vertex(.node, m.extra[v.b + slot]) else null,
+                    .call, .contract_method, .break_ => if (slot < v.c) self.vertex(.node, m.extra[v.b + slot]) else null,
                     .bind, .construct => if (slot == 0) self.vertex(.node, v.b) else null,
-                    .return_, .project, .force, .result_associated, .computation => if (slot == 0) self.vertex(.node, v.a) else null,
+                    .return_, .project, .force, .result_associated, .computation, .effect_scope => if (slot == 0) self.vertex(.node, v.a) else null,
                     .closure, .suspend_ => if (slot == 0) self.vertex(.closure, v.a) else null,
                     .match => if (slot == 0) self.vertex(.match_, v.a) else null,
                     .pattern_bind => switch (slot) {
@@ -1050,13 +1167,21 @@ const Graph = struct {
                 if (slot - 2 < v.arms.len) return self.vertex(.request_arm, v.arms.start + slot - 2);
                 return if (slot - 2 == v.arms.len and v.completion_pattern != 0) self.vertex(.pattern, v.completion_pattern) else null;
             },
-            .request_arm => return if (slot == 0) self.vertex(.node, m.request_arms[id].callback) else null,
+            .request_arm => return switch (slot) {
+                0 => self.vertex(.node, m.request_arms[id].callback),
+                1 => self.vertex(.node, m.request_arms[id].selector),
+                else => null,
+            },
             .resolver => {
                 const v = m.resolver_ops[id];
                 if (slot == 0) return self.vertex(.node, v.resolver);
                 return if (slot - 1 < v.arguments.len) self.vertex(.node, m.extra[v.arguments.start + slot - 1]) else null;
             },
-            .operation_value => return if (slot == 0) self.vertex(.node, m.operation_values[id].witness) else null,
+            .operation_value => return switch (slot) {
+                0 => self.vertex(.node, m.operation_values[id].witness),
+                1 => self.vertex(.node, m.operation_values[id].capability),
+                else => null,
+            },
             .scheme => {
                 const list = m.bindings[id].scheme.obligations;
                 return if (slot < list.len) self.vertex(.obligation, list.start + slot) else null;
@@ -1198,6 +1323,10 @@ fn associatedScopes(graph: Graph, scratch: Scratch, remaining: *usize) BoundsErr
 /// undersized workspace is an API error (InvalidArtifact), never a size policy.
 pub fn validateWithScratch(module: *const core.Module, context: Context, scratch: Scratch) BoundsError!void {
     try validateBounds(module, context);
+    // Implementation admission owns its required coherence/proof workspace.
+    // Callers of this allocation-free API must use validateWithBudget when
+    // such declarations are present; never publish unchecked feature graphs.
+    try require(module.implementations.len == 0 and module.member_templates.len == 0 and module.selected_proofs.len == 0);
     const graph = try Graph.init(module);
     const needed = try scratchRequirements(module);
     try require(scratch.colors.len >= needed.colors and scratch.path.len >= needed.path);
@@ -1224,4 +1353,6 @@ pub fn validateWithBudget(allocator: std.mem.Allocator, module: *const core.Modu
     try listRoles(module, colors[start..][0..module.types.extra.len], colors[start + module.types.extra.len ..][0..module.extra.len]);
     try cycles(graph, .{ .colors = colors, .path = path });
     try associatedScopes(graph, .{ .colors = colors, .path = path }, remaining);
+    try @import("implementation_admission.zig").scopes(allocator, &module.types, module, module.obligations, remaining);
+    try @import("selected_implementation_admission.zig").core(allocator, module, remaining);
 }

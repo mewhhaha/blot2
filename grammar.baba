@@ -20,10 +20,15 @@ export_declaration = ("exporT" binding:named_import "froM" path:STRING LAYOUT_NE
 namespace_import = ("*" "as" name:IDENT) ;
 named_import = ("{" (bindings:import_binding ("," bindings:import_binding)* ","?)? "}") ;
 import_binding = (name:(IDENT | TYPE_IDENT) alias:("as" (IDENT | TYPE_IDENT))?) ;
-declaration = (visibility:"privatE"? (value:opaque_type | attributes:declaration_attribute* value:(value_declaration | data_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity)) LAYOUT_NEWLINE) ;
+declaration = (visibility:"privatE"? (value:opaque_type | attributes:declaration_attribute* value:(value_declaration | implementation_declaration | data_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity)) LAYOUT_NEWLINE) ;
 opaque_type = ("opaquE" value:type_alias) ;
 type_alias = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "=" value:type_expression) ;
 contract_type = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "is" kind:IDENT "=" body:contract_body) ;
+implementation_declaration = (marker:"impL" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* ":" head:constraint_predicate where:where_clause? "=" body:implementation_body) ;
+implementation_body = ("{" LAYOUT_NEWLINE? (members:implementation_member ("," LAYOUT_NEWLINE? members:implementation_member)* ","?)? LAYOUT_NEWLINE? "}") ;
+implementation_member = (implementation_type_member | implementation_value_member) ;
+implementation_type_member = ("type" name:TYPE_IDENT "=" value:type_expression) ;
+implementation_value_member = ("const" name:(IDENT | TYPE_IDENT) annotation:(":" type_expression)? "=" value:lambda) ;
 declaration_attribute = ("@" body:attribute_name LAYOUT_NEWLINE?) ;
 attribute_name = ("[" value:expression "]") ;
 value_declaration = (modifier:IDENT? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? where:where_clause? "=" value:expression) ;

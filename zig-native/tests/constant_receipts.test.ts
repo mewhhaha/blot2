@@ -147,3 +147,128 @@ Deno.test("subfloor scalars and known compound heads keep ordinary execution wit
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+Deno.test("enclosing constant member judgments retain exact executed authority in both tiers", async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-enclosing-member-",
+  });
+  const entry = `${directory}/main.blot`;
+  const prelude = `${directory}/prelude.blot`;
+  const library = "";
+  await Deno.writeTextFile(
+    prelude,
+    library + "\nconst Array.count = fn values => @array.length values\n",
+  );
+  const source = (
+    sibling = "1",
+    seed = "2",
+    delta = "0",
+    receiver = "#[]",
+    twice = false,
+    alias = false,
+  ) => {
+    let method = "@u32.add seed (@array.length values)";
+    let expression = `${receiver}.count`;
+    for (let index = 0; index < 80; index++) {
+      method = `@u32.add ${delta} (${method})`;
+      expression = `@u32.add 1 (${expression})`;
+    }
+    method =
+      `do:\n  let total = (${method})\n  for index in 0..128:\n    total := @u32.add self 1\n  return total`;
+    if (twice) expression = `@u32.add (#[].count) (${expression})`;
+    let prefix = "";
+    if (alias) prefix = "const alias: Array U32 = #[]\n";
+    return {
+      [prelude]:
+        `${library}\nconst seed = ${seed}\nconst Array.count = fn values => ${method}\n`,
+      [entry]: `${prefix}entry const warm: U32 = #[].count
+entry const enclosing: U32 = ${expression}
+entry const run = fn () => enclosing
+entry const sibling = ${sibling}
+`,
+    };
+  };
+  try {
+    for (const codegenTier of ["development", "optimized"] as const) {
+      const options = {
+        executable,
+        entry,
+        prelude,
+        cacheDirectory: false as const,
+        codegenTier,
+      };
+      const retained = await createZigProjectCompiler(options);
+      try {
+        const revisions = [
+          [source(), 210, false],
+          [source("2"), 210, true],
+          [source("3"), 210, true],
+          [source("3", "3"), 211, false],
+          [source("3", "3", "1"), 291, false],
+          [source("3", "3", "1", "#[1]"), 292, false],
+          [source("3", "3", "1", "#[]", true), 502, false],
+          [source("3", "3", "1", "alias", false, true), 291, false],
+          [source('@panic "failed"'), null, false],
+          // The independent warm scalar can retain its own admitted judgment
+          // while the enclosing typed alias continues ordinary evaluation.
+          [source("5", "3", "1", "alias", false, true), 291, true],
+          [source("4", "3", "1", "alias", false, true), 291, true],
+          [source(), 210, false],
+          [source("2"), 210, true],
+        ] as const;
+        for (const [revision, [text, answer, hit]] of revisions.entries()) {
+          const fresh = await createZigProjectCompiler(options);
+          try {
+            const sources = text;
+            const expected = await fresh.build({ sources });
+            const actual = await retained.build({ sources });
+            assert.equal(actual.success, expected.success);
+            if (!actual.success || !expected.success) {
+              assert.ok(!actual.success && !expected.success);
+              assert.deepEqual(actual.diagnostics, expected.diagnostics);
+              assert.equal(answer, null, JSON.stringify(expected.diagnostics));
+              continue;
+            }
+            assert.deepEqual(actual.bytes, expected.bytes);
+            assert.equal(
+              actual.stats.nativeWorkSteps,
+              expected.stats.nativeWorkSteps,
+            );
+            const receipts = actual.stats.constantReceipts as Record<
+              string,
+              number
+            >;
+            if (hit) {
+              assert.equal(
+                receipts.member_replayed,
+                1,
+                JSON.stringify(receipts),
+              );
+            }
+            if (!hit) {
+              assert.equal(
+                receipts.member_replayed,
+                0,
+                `${codegenTier} revision ${revision}: ${
+                  JSON.stringify(receipts)
+                }`,
+              );
+            }
+            const guest = await instantiateGuest(actual.bytes);
+            try {
+              assert.equal(guest.call("run", null), answer);
+            } finally {
+              await guest.dispose();
+            }
+          } finally {
+            await fresh.close();
+          }
+        }
+      } finally {
+        await retained.close();
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});

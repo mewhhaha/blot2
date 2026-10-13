@@ -8,7 +8,7 @@ pub fn main(init: std.process.Init) !void {
     defer module.deinit();
     const arena = try module.ensureArena();
     module.globals.items[arena.root_enabled].bits = 1;
-    inline for (.{ "root_allocate", "root_reserve", "root_open", "root_close", "root_enter", "root_leave", "root_force" }) |name|
+    inline for (.{ "root_allocate", "root_reserve", "root_open", "root_close", "root_enter", "root_leave", "root_force", "root_authority" }) |name|
         try module.exportFunction(@field(arena, name), name, .u32, .u32);
     try module.exportGlobal(arena.root_count, "roots");
     inline for (.{ "cycle_head", "cycle_passes", "cycle_vertices", "cycle_edges", "cycle_bytes" }) |name| try module.exportGlobal(@field(arena, name), name);

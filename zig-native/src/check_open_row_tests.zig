@@ -102,8 +102,6 @@ fn rejectedRows(allocator: std.mem.Allocator) !void {
         .{ .source = "const outer = fn () => do:\n  let invoke = fn (callback: Unit -> U32 ! {| e}) => callback ()\n  return fn (value: e) => value\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let invoke" },
         .{ .source = "const outer = fn () => do:\n  let identity = fn (value: e) => value\n  return fn (callback: Unit -> U32 ! {| e}) => callback ()\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let identity" },
         .{ .source = "type State a is effect = { get: Unit -> a }\nconst bad = fn (callback: Unit -> U32 ! {State.get e | e}) => callback ()\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "e | e" },
-        .{ .source = "type State a is effect = { get: Unit -> a }\nconst bad: Unit -> a ! {State.get a | e} = fn () => 42\nentry const answer = 42\n", .code = .unsupported_polymorphic_effect_label, .marker = "! {State" },
-        .{ .source = "type State a is effect = { get: Unit -> a }\nconst bad = fn (callback: Unit -> U32 ! {State.get (Unit -> U32 ! {| e}) | f}) => callback ()\nentry const answer = 42\n", .code = .unsupported_polymorphic_effect_label, .marker = "! {State" },
         .{ .source = "type Box is data = #Box { callback: Unit -> U32 ! {| e} }\nentry const answer = 42\n", .code = .invalid_effect_annotation, .marker = "e}" },
         .{ .source = "const pure = fn (callback: Unit -> U32) => callback ()\nconst bad = fn (callback: Unit -> U32 ! {Foreign | e}) => pure callback\nentry const answer = 42\n", .code = .effect_mismatch, .marker = "pure callback" },
     };
@@ -123,7 +121,7 @@ fn rejectedRows(allocator: std.mem.Allocator) !void {
     }
 }
 
-test "written open rows reject type-row collisions polymorphic labels and pure callbacks" {
+test "written open rows reject type-row collisions and pure callbacks" {
     try rejectedRows(a);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, rejectedRows, .{});
 }

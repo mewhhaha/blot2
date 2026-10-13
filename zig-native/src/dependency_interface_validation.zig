@@ -43,6 +43,7 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
     try require(owner.graph.nodes.len >= 6 and owner.graph.rows.len != 0 and owner.graph.operations.len >= 2);
     for ([_]T.Tag{ .absent, .unit, .boolean, .u32, .f32, .never }, owner.graph.nodes[0..6]) |tag, node| try require(node.tag == tag and node.a == 0 and node.b == 0 and node.c == 0);
     for (owner.graph.nodes) |node| switch (node.tag) {
+        .scoped => return error.InvalidArtifact,
         .absent, .unit, .boolean, .u32, .f32, .never => {},
         .variable => try require(node.b == 0 and node.c == 0),
         .function => {
@@ -102,6 +103,7 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
     }
     try require(owner.graph.rows[0].labels.len == 0 and owner.graph.rows[0].tail == .closed);
     for (owner.graph.operations) |operation| {
+        try require(operation.instance.unit == 0 and operation.instance.decl == 0);
         try identity(operation.identity, symbol_count, unit_count);
         for (try list(owner, operation.arguments)) |argument| try ty(owner, argument);
     }
@@ -209,6 +211,64 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
         try identity(predicate.identity, symbol_count, unit_count);
         try units(predicate.qualification_unit, unit_count);
     }
+    try require(owner.implementations.len <= 4096);
+    for (owner.implementations) |implementation| {
+        try identity(implementation.identity, symbol_count, unit_count);
+        try identity(implementation.contract, symbol_count, unit_count);
+        try require(implementation.name < symbol_count and implementation.declaration == 0);
+        if (implementation.private and implementation.name == 0) {
+            try require(implementation.head.len == 0 and implementation.variables.len == 0 and implementation.row_variables.len == 0 and implementation.predicates.len == 0 and implementation.members.len == 0);
+            continue;
+        }
+        try require(implementation.name != 0 and implementation.identity.decl == T.opaque_name_bit | implementation.name);
+        for (try list(owner, implementation.head)) |id| try ty(owner, id);
+        for (try list(owner, implementation.variables)) |id| {
+            try ty(owner, id);
+            try require(owner.graph.nodes[id].tag == .variable);
+        }
+        try names(try list(owner, implementation.parameter_names), symbol_count);
+        try names(try list(owner, implementation.row_parameter_names), symbol_count);
+        try require(implementation.parameter_names.len == implementation.variables.len and implementation.row_parameter_names.len == implementation.row_variables.len and implementation.row_parameters.len == implementation.row_variables.len);
+        for (try list(owner, implementation.row_variables)) |id| try require(id < owner.graph.row_variable_count);
+        for (try list(owner, implementation.row_parameters)) |id| try require(id < owner.graph.rows.len);
+        try range(implementation.predicates.start, implementation.predicates.len, owner.implementation_predicates.len);
+        try range(implementation.members.start, implementation.members.len, owner.implementation_members.len);
+    }
+    for (owner.implementation_members) |member| {
+        try require(member.name < symbol_count);
+        try ty(owner, member.root);
+        try units(member.target.unit, unit_count);
+        if (member.kind == .type_) try require(member.target.unit == 0 and member.target.binding == 0);
+        if (member.name != 0 and member.kind == .value) try require(member.target.binding != 0 and owner.graph.nodes[member.root].tag == .function);
+    }
+    for (owner.implementation_predicates) |predicate| {
+        inline for (.{ "ty", "other", "result", "signature" }) |field| try ty(owner, @field(predicate, field));
+        try require(predicate.source == 0 and predicate.name < symbol_count);
+        try identity(predicate.identity, symbol_count, unit_count);
+    }
+    for (owner.member_templates) |template| {
+        try require(template.binding != 0 and template.binding < owner.bindings.len and template.name != 0 and template.name < symbol_count);
+        try identity(template.contract, symbol_count, unit_count);
+        for (try list(owner, template.arguments)) |root| try ty(owner, root);
+    }
+    for (owner.selected_members) |member| {
+        try require(member.name != 0 and member.name < symbol_count);
+        try ty(owner, member.root);
+        try require(member.root != 0);
+        try units(member.target.unit, unit_count);
+    }
+    for (owner.selected_proofs, 0..) |proof, ordinal| {
+        try units(proof.predicate_target.unit, unit_count);
+        if (proof.predicate_target.binding == 0) try require(proof.predicate_target.unit == 0);
+        try units(proof.context, unit_count);
+        try identity(proof.implementation, symbol_count, unit_count);
+        try identity(proof.contract, symbol_count, unit_count);
+        for (try list(owner, proof.arguments)) |root| try ty(owner, root);
+        inline for (.{ "ty", "other", "result", "signature" }) |field| try ty(owner, @field(proof.predicate, field));
+        try range(proof.members.start, proof.members.len, owner.selected_members.len);
+        try range(proof.prerequisites.start, proof.prerequisites.len, owner.selected_edges.len);
+        for (owner.selected_edges[proof.prerequisites.start..][0..proof.prerequisites.len]) |child| try require(child < ordinal);
+    }
     for (owner.constructors) |constructor| {
         try identity(constructor.identity, symbol_count, unit_count);
         try require(constructor.name < symbol_count and constructor.nominal < owner.nominals.len);
@@ -247,6 +307,8 @@ pub fn validateGraph(allocator: std.mem.Allocator, owner: *const PI.Interface) (
 }
 pub fn validateGraphWithBudget(allocator: std.mem.Allocator, owner: *const PI.Interface, remaining: *usize) (Error || std.mem.Allocator.Error)!void {
     try @import("associated_admission.zig").interfaceWithBudget(allocator, owner, remaining);
+    const source = @import("associated_admission.zig").typesView(&owner.graph);
+    try @import("implementation_admission.zig").scopes(allocator, &source, owner, owner.implementation_predicates, remaining);
     // Reuse one symbol-stamp lane across every source record. Arbitrary
     // declaration order is legal; duplicate fields reject in linear work.
     var symbol_limit: usize = 0;

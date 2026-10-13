@@ -85,6 +85,7 @@ fn importExport(a: Allocator, bundle: *const D.FrozenDependency, imports: *std.A
             .constructor => .constructor,
             .effect_family => .effect_family,
             .contract => .contract,
+            .implementation => .implementation,
             .value => unreachable,
         } });
     }

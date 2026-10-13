@@ -60,7 +60,7 @@ pub const Snapshot = struct {
     queries: Section,
 };
 pub fn wireKey(compiler: format.Digest) format.Key {
-    return .{ .compiler = compiler, .settings = format.digest("blot-semantic-archive-v2:associated-types"), .source = @splat(0), .dependencies = @splat(0) };
+    return .{ .compiler = compiler, .settings = format.digest("blot-semantic-archive-v3:selected-implementations"), .source = @splat(0), .dependencies = @splat(0) };
 }
 pub const limits: format.Limits = .{ .elements = 64 * 1024 * 1024 };
 
@@ -182,6 +182,14 @@ pub fn validate(a: A, snapshot: *const Snapshot) format.Error!void {
     // compares the full graph with current Core before admitting any unit.
     for (units) |*unit| validation.validate(a, &unit.core, .{ .units = views, .symbol_count = names.symbols.len }) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else error.InvalidArtifact;
     try validEvaluator(&snapshot.evaluator, units.len);
+    if (snapshot.evaluator.implementation_proofs.proofs.len != 0) {
+        const modules = try a.alloc(core.Module, units.len);
+        defer a.free(modules);
+        for (units, modules) |*unit, *module| module.* = unit.core;
+        var remaining: usize = 1_000_000;
+        const proofs = snapshot.evaluator.implementation_proofs;
+        try @import("selected_implementation_admission.zig").snapshot(a, modules, snapshot.evaluator.evidence.view(), .{ .proofs = proofs.proofs, .arguments = proofs.arguments, .members = proofs.members, .edges = proofs.edges }, &remaining);
+    }
     try require(snapshot.slots.len == bindings);
     for (snapshot.slots) |slot| try require(slot.value < snapshot.evaluator.values.len);
     // Builtin field families use the reserved unit; others name a unit here.
@@ -213,6 +221,19 @@ fn validEvaluator(snapshot: *const eval.Snapshot, units: usize) format.Error!voi
     for (snapshot.value_records) |record| try require(record < snapshot.record_layouts.len);
     for (snapshot.record_layouts) |layout| try require(validSpan(snapshot.field_names.len, layout.start, layout.len));
     for (snapshot.demands) |demand| try require(demand.value < values);
+    const proofs = snapshot.implementation_proofs;
+    for (proofs.arguments) |root| try require(root != 0 and root < nodes);
+    for (proofs.members) |member| try require(member.root != 0 and member.root < nodes and member.target.unit <= units);
+    for (proofs.proofs, 0..) |proof, ordinal| {
+        try require(proof.context != 0 and proof.context <= units);
+        try require(proof.implementation.unit <= units and proof.contract.unit <= units);
+        try require(validSpan(proofs.arguments.len, proof.arguments.start, proof.arguments.len));
+        try require(validSpan(proofs.members.len, proof.members.start, proof.members.len));
+        try require(validSpan(proofs.edges.len, proof.prerequisites.start, proof.prerequisites.len));
+        for (proofs.edges[proof.prerequisites.start..][0..proof.prerequisites.len]) |child| try require(child < ordinal);
+        for (proof.predicate.operands) |root| try require(root < nodes);
+        try require(proof.predicate.target.unit <= units);
+    }
 }
 
 fn validRecord(record: Record, snapshot: *const Snapshot) format.Error!void {
@@ -288,7 +309,7 @@ fn adopt(a: A, snapshot: *Snapshot) format.Error!Archive {
         proof.views = &.{};
         proof.plain_facts = &.{};
         const closure = snapshot.evaluator.closures[snapshot.evaluator.values[owned.input].bits];
-        selected.remember(&context.specialization_queries, a, closure, owned) catch |err| {
+        _ = selected.remember(&context.specialization_queries, a, closure, owned) catch |err| {
             owned = undefined;
             return err;
         };

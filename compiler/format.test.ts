@@ -249,3 +249,23 @@ const keep:a->(Identity.Item a) where{Identity a,type_eq (Identity.Item a) a}=fn
   equal(formatted.includes("const first: s -> (Source.Item s)"), true);
   equal(formatted.includes("type_eq (Identity.Item a) a"), true);
 });
+
+Deno.test("formatter preserves implementation heads requirements and ordinary lambda members", async () => {
+  const source =
+    `type Source s is contract={type Item,const first:s->(Source.Item s)}
+private impl ArraySource a:Source (Array a) where{type_eq a U32}={type Item=a,const first=fn values=>@array.get values 0}
+const impl=fn impl=>impl
+`;
+  const formatted = await formatSource(source);
+  equal(await formatSource(formatted), formatted);
+  equal(
+    formatted.includes("private impl ArraySource a: Source (Array a)"),
+    true,
+  );
+  equal(formatted.includes("type Item = a"), true);
+  equal(
+    formatted.includes("const first = fn values => @array.get values 0"),
+    true,
+  );
+  equal(formatted.includes("const impl = fn impl => impl"), true);
+});

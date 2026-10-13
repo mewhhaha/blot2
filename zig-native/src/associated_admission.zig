@@ -33,7 +33,7 @@ fn boundRow(source: F.Source, contract: anytype, variable: u32, member: bool) bo
     for (source.list(contract.row_variables)) |id| if (id == variable) return true;
     return false;
 }
-fn scope(a: A, source: F.Source, contract: anytype, root: T.Id, member: bool, remaining: *usize) Error!void {
+pub fn scope(a: A, source: F.Source, contract: anytype, root: T.Id, member: bool, remaining: *usize) Error!void {
     var work: std.ArrayList(Work) = .empty;
     defer work.deinit(a);
     var seen: std.AutoHashMapUnmanaged(ScopeKey, void) = .empty;
@@ -98,7 +98,7 @@ pub fn interfaceWithBudget(a: A, owner: *const PI.Interface, remaining: *usize) 
     }
     for (owner.contract_members, claimed) |member, used| if (!used) try require(member.name == 0 and member.root == 0);
 }
-fn typesView(graph: *const F.Graph) core.Types {
+pub fn typesView(graph: *const F.Graph) core.Types {
     return .{ .nodes = graph.nodes, .extra = graph.extra, .effects = .{ .rows = graph.rows, .labels = graph.labels, .variable_count = graph.row_variable_count }, .operations = graph.operations };
 }
 const Copier = @import("principal_type_graph.zig").FrozenCopy;
@@ -121,7 +121,7 @@ fn sameRoot(a: A, left: *Copier, right: *Copier, l: T.Id, r: T.Id, remaining: *u
         else => return error.InvalidArtifact,
     });
 }
-fn equivalent(a: A, first: *const core.Types, second: *const core.Types, left_contract: anytype, right_contract: anytype, left_members: []const PI.ContractMember, right_members: []const PI.ContractMember, left_predicates: anytype, right_predicates: anytype, remaining: *usize) Error!void {
+pub fn equivalent(a: A, first: *const core.Types, second: *const core.Types, left_contract: anytype, right_contract: anytype, left_members: []const PI.ContractMember, right_members: []const PI.ContractMember, left_predicates: anytype, right_predicates: anytype, remaining: *usize) Error!void {
     try require(std.meta.eql(left_contract.identity, right_contract.identity) and left_contract.name == right_contract.name and left_contract.private == right_contract.private and left_contract.requires_implementation == right_contract.requires_implementation);
     try require(left_contract.row_parameters.len == right_contract.row_parameters.len and std.mem.eql(u32, first.list(left_contract.row_parameter_names), second.list(right_contract.row_parameter_names)));
     try require(left_contract.parameters.len == right_contract.parameters.len and left_contract.variables.len == right_contract.variables.len and left_contract.row_variables.len == right_contract.row_variables.len and left_members.len == right_members.len and left_predicates.len == right_predicates.len);

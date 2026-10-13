@@ -37,21 +37,13 @@ entry const answer = fn () => do:
   );
 });
 
-Deno.test("written open rows reject kind collisions and polymorphic labels", async () => {
+Deno.test("written open rows reject kind collisions and effect erasure", async () => {
   await compileExpectedFailure(
     `
 const bad: e -> U32 ! {| e} = fn value => 1
 entry const answer = 42
 `,
     "annotation_kind_mismatch",
-  );
-  await compileExpectedFailure(
-    `
-type State a is effect = { get: Unit -> a }
-const bad: Unit -> a ! {State.get a | e} = fn () => 42
-entry const answer = 42
-`,
-    "unsupported_polymorphic_effect_label",
   );
   await compileExpectedFailure(
     `

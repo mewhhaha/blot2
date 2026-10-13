@@ -15,7 +15,7 @@ pub const EditorQuery = struct {
     budget: *@import("completion_fit.zig").Budget,
 };
 
-pub const Export = struct { name: symbols.Symbol, target: check.ExternalTarget = .{ .unit = 0, .binding = 0 }, kind: enum { value, nominal, constructor, effect_family, contract } = .value, catalog: u32 = 0 };
+pub const Export = struct { name: symbols.Symbol, target: check.ExternalTarget = .{ .unit = 0, .binding = 0 }, kind: enum { value, nominal, constructor, effect_family, contract, implementation } = .value, catalog: u32 = 0 };
 pub const Module = struct {
     checked: check.Checked,
     exports: []Export,
@@ -117,6 +117,10 @@ fn moduleOrigin(context: ?*const anyopaque, allocator: Allocator, unit: u32) @im
     return std.Io.Dir.path.relativeAlloc(allocator, directory, null, directory, loaded.filename(unit));
 }
 
+fn moduleSourceAvailable(context: ?*const anyopaque, unit: u32) bool {
+    const loaded: *const project.Project = @ptrCast(@alignCast(context orelse return false));
+    return unit != 0 and unit <= loaded.units.items.len and loaded.compiledModule(unit) == null;
+}
 pub fn diagnosticModuleOrigin(context: ?*const anyopaque, allocator: Allocator, unit: u32) @import("types.zig").Error![]u8 {
     return moduleOrigin(context, allocator, unit);
 }
@@ -251,6 +255,7 @@ const Engine = struct {
             .constructor => .constructor,
             .effect_family => .effect_family,
             .contract => .contract,
+            .implementation => .implementation,
             .value => unreachable,
         }, exported.catalog, origin);
     }
@@ -341,7 +346,7 @@ const Engine = struct {
         // of the source position of a namespace import.
         for (tree.roots.items) |root| {
             const node = tree.node(root);
-            if (node.tag == .value_decl or node.tag == .data_decl or node.tag == .type_alias_decl or node.tag == .contract_decl or node.tag == .effect_type_decl or node.tag == .effect_decl)
+            if (node.tag == .value_decl or node.tag == .data_decl or node.tag == .type_alias_decl or node.tag == .contract_decl or node.tag == .implementation_decl or node.tag == .effect_type_decl or node.tag == .effect_decl)
                 try occupied.put(self.allocator, node.a, {});
             if (node.tag == .data_decl) for (tree.children(node.b)) |constructor| {
                 try occupied.put(self.allocator, tree.node(constructor).a, {});
@@ -463,7 +468,7 @@ const Engine = struct {
                 }
             }
         }
-        var options: check.ModuleOptions = .{ .associated_remaining = &self.associated_remaining, .purity_origins = .{ .context = self.source, .lookup = moduleOrigin }, .builtin_catalog = unit == self.source.prelude_unit, .prelude_unit = self.source.prelude_unit, .inherited_fixities = inherited_fixities.items };
+        var options: check.ModuleOptions = .{ .associated_remaining = &self.associated_remaining, .purity_origins = .{ .context = self.source, .lookup = moduleOrigin, .source_available = moduleSourceAvailable }, .builtin_catalog = unit == self.source.prelude_unit, .prelude_unit = self.source.prelude_unit, .inherited_fixities = inherited_fixities.items };
         if (self.retain_bodies and self.editor == null) options.retained_bodies = &self.result.body_caches[unit - 1];
         options.body_source = self.source.unit(unit).source;
         options.body_external_names = .{ .context = self, .lookup = originalBindingName, .closed_rows = originalBindingClosedRows, .qualification = originalQualification };
@@ -514,8 +519,10 @@ const Engine = struct {
             errdefer if (hole) |value| value.deinit(self.allocator);
             const explanation = if (diagnostic_.explanation) |value| try value.clone(self.allocator) else null;
             errdefer if (explanation) |value| value.deinit(self.allocator);
+            var origin_unit = unit;
+            if (diagnostic_.origin_unit != 0) origin_unit = diagnostic_.origin_unit;
             try self.diagnostics.append(self.allocator, .{
-                .unit = unit,
+                .unit = origin_unit,
                 .span = diagnostic_.span,
                 .code = .semantic,
                 .semantic = diagnostic_.code,
@@ -549,6 +556,9 @@ const Engine = struct {
         };
         for (catalog.contracts, 0..) |contract, index| if (contract.identity.unit == unit and !contract.private) {
             try exports.append(self.allocator, .{ .name = contract.name, .target = .{ .unit = unit, .binding = 0 }, .kind = .contract, .catalog = @intCast(index) });
+        };
+        for (catalog.implementations, 0..) |implementation, index| if (implementation.identity.unit == unit and !implementation.private) {
+            try exports.append(self.allocator, .{ .name = implementation.name, .target = .{ .unit = unit, .binding = 0 }, .kind = .implementation, .catalog = @intCast(index) });
         };
         try exports.appendSlice(self.allocator, forwarded);
         try self.appendDiagnostics(unit, diagnostics);

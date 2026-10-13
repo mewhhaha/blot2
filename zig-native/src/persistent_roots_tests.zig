@@ -768,7 +768,7 @@ fn acyclicClaims(result: *const backend.Result) usize {
     return count;
 }
 
-fn ownedFieldAdmission(allocator: std.mem.Allocator) !void {
+fn ownedFieldAdmission(allocator: std.mem.Allocator, conflict: bool) !void {
     const w = @import("wasm.zig");
     const ir = @import("runtime_ir.zig");
     const bodies = @import("optimized_bodies.zig");
@@ -814,6 +814,25 @@ fn ownedFieldAdmission(allocator: std.mem.Allocator) !void {
     var exported_matcher = try bodies.Matcher.init(allocator, &before, &exposed);
     defer exported_matcher.deinit();
     try std.testing.expect(!exported_matcher.matches(function));
+    if (conflict) {
+        // A private scalar slot storing another allocation's address creates
+        // a source role conflict, independently of the owning cursor above.
+        const other = try module.addTypedFunction(&.{}, .i32, .scalar);
+        const child = try module.addLocal(other, .i32);
+        const parent = try module.addLocal(other, .i32);
+        try module.emitSlice(other, ir.annotations(&.{.scalar}, .scalar, &buffer));
+        try module.emitSlice(other, &.{ .{ .op = .i32_const, .operand = 4 }, .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = child } });
+        try module.emitSlice(other, ir.annotations(&.{.scalar}, .scalar, &buffer));
+        try module.emitSlice(other, &.{
+            .{ .op = .i32_const, .operand = 4 },      .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = parent },
+            .{ .op = .local_get, .operand = parent }, .{ .op = .local_get, .operand = child },     .{ .op = .i32_store },
+            .{ .op = .i32_const, .operand = 42 },
+        });
+        var summaries = try @import("wasm_lifetimes.zig").Summaries.init(allocator, &module);
+        defer summaries.deinit();
+        try summaries.prepare();
+        try std.testing.expect(summaries.role_conflicts != 0);
+    }
     // An unrelated dynamic raw allocation declines only the final RC proof.
     const unproven = try module.addTypedFunction(&.{.i32}, .i32, .reference);
     try module.emitSlice(unproven, &.{ .{ .op = .local_get }, .{ .op = .call, .operand = arena.allocate } });
@@ -840,8 +859,10 @@ fn ownedFieldAdmission(allocator: std.mem.Allocator) !void {
 }
 
 test "late module ownership failure restores owning field objects through retained portable and OOM" {
-    try ownedFieldAdmission(a);
-    try @import("allocation_failures.zig").checkAllAllocationFailures(a, ownedFieldAdmission, .{});
+    for ([_]bool{ false, true }) |conflict| {
+        try ownedFieldAdmission(a, conflict);
+        try @import("allocation_failures.zig").checkAllAllocationFailures(a, ownedFieldAdmission, .{conflict});
+    }
 }
 
 test "private cursor constructor body reads invalidate retained and portable admission" {

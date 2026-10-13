@@ -1,5 +1,10 @@
 import { instantiateGuest } from "../../compiler/guest.ts";
-const fixture = new URL("../zig-out/arena-fixture.wasm", import.meta.url);
+const executable = Deno.args[0] ??
+  new URL("../zig-out/bin/blotc", import.meta.url).pathname;
+const fixture = new URL(
+  "../arena-fixture.wasm",
+  new URL(executable, `file://${Deno.cwd()}/`),
+);
 function equal(actual: unknown, expected: unknown): void {
   if (!Object.is(actual, expected)) throw new Error(`Expected ${expected}, received ${actual}`);
 }

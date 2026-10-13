@@ -21,6 +21,18 @@ fn is(inst: ir.Instruction, op: ir.Op, operand: u32) bool {
 fn privateLocal(uses: []const Uses, id: u32) bool {
     return id < uses.len and uses[id].reads == 1 and uses[id].writes == 1;
 }
+fn contiguous(offsets: []const u32) ?u32 {
+    const first = std.mem.min(u32, offsets);
+    var seen: u16 = 0;
+    for (offsets) |offset| {
+        const difference = offset - first;
+        if (difference % 4 != 0 or difference / 4 >= offsets.len) return null;
+        const bit = @as(u16, 1) << @intCast(difference / 4);
+        if (seen & bit != 0) return null;
+        seen |= bit;
+    }
+    return first;
+}
 fn match(source: []const ir.Instruction, at: usize, uses: []const Uses) ?Plan {
     if (at > source.len or source.len - at < 13 or source[at].op != .local_get or source[at + 1].op != .local_set) return null;
     const accumulator = source[at].operand;
@@ -44,16 +56,62 @@ fn match(source: []const ir.Instruction, at: usize, uses: []const Uses) ?Plan {
         carry = part[10].operand;
     }
     if (count < 8) return null;
-    const first = std.mem.min(u32, offsets[0..count]);
-    var seen: u16 = 0;
-    for (offsets[0..count]) |offset| {
-        const difference = offset - first;
-        if (difference % 4 != 0 or difference / 4 >= count) return null;
-        const bit = @as(u16, 1) << @intCast(difference / 4);
-        if (seen & bit != 0) return null;
-        seen |= bit;
-    }
+    const first = contiguous(offsets[0..count]) orelse return null;
     return .{ .end = cursor, .accumulator = accumulator, .base = base, .result = carry, .offset = first, .words = @intCast(count) };
+}
+// Tuple patterns read every field eagerly, then reduce the private scalar
+// bindings. All reads and aliases must disappear together; an observed field
+// or intervening instruction retains the original complete sequence.
+fn eagerPrefix(source: []const ir.Instruction, at: usize) bool {
+    if (at > source.len or source.len - at < 24) return false;
+    const base = source[at].operand;
+    for (0..8) |index| {
+        const part = source[at + index * 3 ..][0..3];
+        if (!is(part[0], .local_get, base) or part[1].op != .i32_load or part[2].op != .local_set) return false;
+    }
+    return true;
+}
+fn matchEager(source: []const ir.Instruction, at: usize, uses: []const Uses) ?Plan {
+    if (!eagerPrefix(source, at)) return null;
+    const base = source[at].operand;
+    var values: [16]u32 = undefined;
+    var offsets: [16]u32 = undefined;
+    var count: usize = 0;
+    var cursor = at;
+    while (count < values.len and cursor <= source.len and source.len - cursor >= 3) {
+        const part = source[cursor..][0..3];
+        if (!is(part[0], .local_get, base) or part[1].op != .i32_load or part[2].op != .local_set) break;
+        if (!privateLocal(uses, part[2].operand)) return null;
+        values[count] = part[2].operand;
+        offsets[count] = part[1].operand;
+        count += 1;
+        cursor += 3;
+    }
+    if (count < 8 or source.len - cursor < 12) return null;
+    const first = contiguous(offsets[0..count]) orelse return null;
+    const head = source[cursor..][0..12];
+    if (head[0].op != .local_get or head[1].op != .local_set or
+        !is(head[2], .local_get, values[0]) or head[3].op != .local_set or
+        !is(head[4], .local_get, head[1].operand) or head[5].op != .local_set or
+        !is(head[6], .local_get, head[3].operand) or head[7].op != .local_set or
+        !is(head[8], .local_get, head[5].operand) or !is(head[9], .local_get, head[7].operand) or
+        head[10].op != .i32_add or head[11].op != .local_set) return null;
+    for ([_]usize{ 1, 3, 5, 7 }) |index| if (!privateLocal(uses, head[index].operand)) return null;
+    var carry = head[11].operand;
+    cursor += 12;
+    for (values[1..count]) |value| {
+        if (source.len - cursor < 10 or !privateLocal(uses, carry)) return null;
+        const part = source[cursor..][0..10];
+        if (!is(part[0], .local_get, value) or part[1].op != .local_set or
+            !is(part[2], .local_get, carry) or part[3].op != .local_set or
+            !is(part[4], .local_get, part[1].operand) or part[5].op != .local_set or
+            !is(part[6], .local_get, part[3].operand) or !is(part[7], .local_get, part[5].operand) or
+            part[8].op != .i32_add or part[9].op != .local_set) return null;
+        for ([_]usize{ 1, 3, 5 }) |index| if (!privateLocal(uses, part[index].operand)) return null;
+        carry = part[9].operand;
+        cursor += 10;
+    }
+    return .{ .end = cursor, .accumulator = head[0].operand, .base = base, .result = carry, .offset = first, .words = @intCast(count) };
 }
 fn emit(out: *ir.Body, a: A, plan: Plan, vector: u32) A.Error!void {
     try out.emit(a, .local_get, plan.accumulator);
@@ -82,8 +140,8 @@ pub fn run(a: A, function: *const ir.Function) A.Error!?ir.Body {
     // Most bodies contain no eligible row. Avoid allocating use tables there.
     var possible = false;
     for (0..source.len - 3) |at| {
-        if (source[at].op == .local_get and source[at + 1].op == .local_set and
-            source[at + 2].op == .local_get and source[at + 3].op == .i32_load)
+        if ((source[at].op == .local_get and source[at + 1].op == .local_set and
+            source[at + 2].op == .local_get and source[at + 3].op == .i32_load) or eagerPrefix(source, at))
         {
             possible = true;
             break;
@@ -107,7 +165,7 @@ pub fn run(a: A, function: *const ir.Function) A.Error!?ir.Body {
     var copied: usize = 0;
     var at: usize = 0;
     while (at <= source.len and source.len - at >= 90) : (at += 1) {
-        const plan = match(source, at, uses) orelse continue;
+        const plan = match(source, at, uses) orelse matchEager(source, at, uses) orelse continue;
         if (!changed) {
             try out.locals.appendSlice(a, function.locals.items);
             try out.locals.append(a, .v128);
@@ -152,10 +210,57 @@ fn fixture(module: *@import("wasm.zig").Module, words: u32) !Fixture {
     try module.emitSlice(function, &.{ .{ .op = .local_get, .operand = carry }, .{ .op = .return_ } });
     return .{ .function = function, .first_carry = first_carry };
 }
+fn eagerFixture(module: *@import("wasm.zig").Module, words: u32) !Fixture {
+    const function = try module.addFunction(&.{ .i32, .i32 }, .i32);
+    var values: [16]u32 = undefined;
+    for (values[0..words], 0..) |*value, word| {
+        value.* = try module.addLocal(function, .i32);
+        try module.emitSlice(function, &.{
+            .{ .op = .local_get },
+            .{ .op = .i32_load, .operand = @as(u32, @intCast(word)) * 4 },
+            .{ .op = .local_set, .operand = value.* },
+        });
+    }
+    var carry: u32 = 1;
+    var first_carry: u32 = undefined;
+    for (values[0..words], 0..) |value, word| {
+        const left = try module.addLocal(function, .i32);
+        const right = try module.addLocal(function, .i32);
+        const next = try module.addLocal(function, .i32);
+        if (word == 0) {
+            first_carry = left;
+            const left_alias = try module.addLocal(function, .i32);
+            const right_alias = try module.addLocal(function, .i32);
+            try module.emitSlice(function, &.{
+                .{ .op = .local_get, .operand = carry },       .{ .op = .local_set, .operand = left_alias },
+                .{ .op = .local_get, .operand = value },       .{ .op = .local_set, .operand = right_alias },
+                .{ .op = .local_get, .operand = left_alias },  .{ .op = .local_set, .operand = left },
+                .{ .op = .local_get, .operand = right_alias }, .{ .op = .local_set, .operand = right },
+            });
+        } else {
+            const right_alias = try module.addLocal(function, .i32);
+            try module.emitSlice(function, &.{
+                .{ .op = .local_get, .operand = value },       .{ .op = .local_set, .operand = right_alias },
+                .{ .op = .local_get, .operand = carry },       .{ .op = .local_set, .operand = left },
+                .{ .op = .local_get, .operand = right_alias }, .{ .op = .local_set, .operand = right },
+            });
+        }
+        try module.emitSlice(function, &.{
+            .{ .op = .local_get, .operand = left }, .{ .op = .local_get, .operand = right },
+            .{ .op = .i32_add },                    .{ .op = .local_set, .operand = next },
+        });
+        carry = next;
+    }
+    try module.emitSlice(function, &.{ .{ .op = .local_get, .operand = carry }, .{ .op = .return_ } });
+    return .{ .function = function, .first_carry = first_carry };
+}
 fn ownership(a: A) !void {
+    inline for (.{ fixture, eagerFixture }) |make| try ownershipFixture(a, make);
+}
+fn ownershipFixture(a: A, comptime make: anytype) !void {
     var module = @import("wasm.zig").Module.init(a);
     defer module.deinit();
-    const made = try fixture(&module, 14);
+    const made = try make(&module, 14);
     const source = &module.functions.items[made.function];
     const before = try a.dupe(ir.Instruction, source.instructions.items);
     defer a.free(before);
@@ -177,10 +282,10 @@ test "wrapping row reductions preserve immutable bodies through allocation failu
 }
 test "wrapping row reductions use exact byte ranges for every admitted width" {
     const a = std.testing.allocator;
-    for (1..17) |words| {
+    inline for (.{ fixture, eagerFixture }) |make| for (1..17) |words| {
         var module = @import("wasm.zig").Module.init(a);
         defer module.deinit();
-        const made = try fixture(&module, @intCast(words));
+        const made = try make(&module, @intCast(words));
         if (try run(a, &module.functions.items[made.function])) |body| {
             var out = body;
             defer out.deinit(a);
@@ -193,7 +298,7 @@ test "wrapping row reductions use exact byte ranges for every admitted width" {
             }
             try std.testing.expectEqual(words * 4, loaded);
         } else try std.testing.expect(words < 8);
-    }
+    };
 }
 test "wrapping row reductions retain observed temporaries and decline traps gaps floating sums and cleanup calls" {
     const a = std.testing.allocator;
@@ -218,6 +323,33 @@ test "wrapping row reductions retain observed temporaries and decline traps gaps
                 };
             },
             4 => try source.instructions.insert(a, 46, .{ .op = .call, .operand = cleanup }),
+            else => unreachable,
+        }
+        try std.testing.expect(try run(a, source) == null);
+    }
+}
+test "eager row reductions retain observed fields traps floating sums and effect boundaries" {
+    const a = std.testing.allocator;
+    for (0..7) |variant| {
+        var module = @import("wasm.zig").Module.init(a);
+        defer module.deinit();
+        const cleanup = try module.addFunction(&.{}, .none);
+        const made = try eagerFixture(&module, 8);
+        const source = &module.functions.items[made.function];
+        switch (variant) {
+            0 => try module.emitSlice(made.function, &.{ .{ .op = .local_get, .operand = source.instructions.items[2].operand }, .{ .op = .drop } }),
+            1 => try module.emitSlice(made.function, &.{ .{ .op = .local_get, .operand = made.first_carry }, .{ .op = .drop } }),
+            2 => source.instructions.items[34].op = .i32_div_u,
+            3 => source.instructions.items[1].operand = 64,
+            4 => {
+                for (source.instructions.items) |*inst| switch (inst.op) {
+                    .i32_load => inst.op = .f32_load,
+                    .i32_add => inst.op = .f32_add,
+                    else => {},
+                };
+            },
+            5 => try source.instructions.insert(a, 15, .{ .op = .call, .operand = cleanup }),
+            6 => try source.instructions.insert(a, 15, .{ .op = .i32_store }),
             else => unreachable,
         }
         try std.testing.expect(try run(a, source) == null);

@@ -693,3 +693,90 @@ deltas zero, and synthetic fresh/retained/restart output remains exact. No LLVM
 field-specific speedup or overall retained-edit gain is claimed. General
 requirements/access paths, relocation and the under 100 ms target remain open.
 Merged pins are in `build/bench/joint-024-035-045-046/qualification-pins.json`.
+
+## Compact concrete dotted paths (isolated checkpoint, 13 October 2026)
+
+Concrete dotted record/nominal references now own one sparse access array. Each
+step retains the declaration-relative source position, complete receiver type,
+owned field spelling, original nominal recipe and all variant tags. The final
+result comes from the expression fact. Intermediate roots share the frozen graph
+and field-name owner; replay reconstructs current physical slots and the
+complete access-type/path side tables. The same slot planner serves explicit
+fields. Qualified root references instantiate against the root receiver type. No
+solver, AST, field-symbol or projection-catalog ordinal crosses the owned
+boundary.
+
+The body header grows 16 bytes; each step is 32 bytes plus its variant tags and
+shared graph/name storage. Paths exceeding 128 steps, more than 4,096 total
+steps or variant tags, unsupported types, methods without concrete field
+variants and access-node forms decline. Local requirements and
+imported/namespaced annotation heads keep their existing ordinary checks.
+Imported nominal tests use a local transparent alias and preserve
+source/compiled origin, privacy and recipe reads.
+
+Focused qualification passes 50 native laws (35 body laws plus 15 suite
+anchors), including retained allocation failures; a separate fresh/retained path
+allocation sweep passes 16 tests. Seventeen executed-Wasm laws, eight unchanged
+allocation budgets and 371 analyzer files/zero findings pass. The path laws
+cover chained structural and two-variant nominal fields, owning Array results,
+earlier AST/type nodes and reversed field spelling order, executable producer
+edits, revoked missing-field interfaces, fresh-identical diagnostics, rejected
+revisions and recovery. Every successful retained output equals fresh Wasm
+bytes.
+
+Exact basis tree `344769cece12fdeb4484b63187cfab123a3abe85` and immutable
+Safe/noLLVM binaries are recorded in ignored `build/bench/task024-dotted/` in
+`/tmp/blot2-task024-completion`. Five alternating pairs on CPU5, with two
+warmups and 20 edited/reverted preparations per sample, measure dotted128/512
+edit child CPU 123.5→90 /477.5→350.5 ms (paired median ratios .7317/.7267), body
+elaborations 130.5/514.5→2.5 and exact Wasm hashes. Dotted population CPU rises
+about9–12%; 512 steady RSS rises about2 MiB. Plain controls measure79→77.5
+/294→293 ms and unchanged2.5 elaborations. Process clocks use Linux100Hz ticks;
+these development costs are not LLVM/Fast release acceptance or a
+captured-project speedup.
+
+Task024 remains active. General requirements, dotted methods/selector forms,
+producer-unit ordinal relocation, richer scoped/control forms and the total
+under100ms edit target remain open. Root owns the combined full gate and release
+qualification; no milestone commit, overall completion or task053 qualification
+is claimed by this isolated checkpoint.
+
+## Inferred local requirements (isolated checkpoint, 13 October 2026)
+
+Sparse local principals now own flat inferred associated and result-selection
+requirements. Their argument/result/signature roots share the existing frozen
+graph; names and source sites belong to the body. Principal obligation spans
+refer to the owned predicate array and are restored into the current checker
+before qualified local references instantiate. Principal entries do not become
+duplicate body obligations. The marker uses existing predicate padding; body and
+local-scheme headers stay unchanged. Complete positive/negative member catalogs
+remain reads, including requirements on otherwise unreferenced local bindings.
+
+Local requirement traversal shares a4,096-node proof budget, with at most4,096
+owned predicates across the body. Unsupported or exhausted proofs retain
+ordinary checking. Written local qualification origins, shared local callee
+edges, field/receiver/update/effect requirements and other residual forms remain
+ordinary. No portable artifact schema changes.
+
+The preceding implementation passes53 focused native laws. Final bounded code
+passes18 owned-body/principal/OOM controls and16 large-receipt fallback
+controls; 21 executed-Wasm laws plus eight unchanged budgets and371 analyzer
+files/zero pass. Source/compiled imports revoke local reuse on selected Foreign
+interfaces with fresh-identical diagnostics, then recover. Laws cover
+result-directed selection, negative candidate insertion, new AST/type/spelling
+positions, scalar U32/F32 and owning Array results, fresh/replayed allocation
+failures and positive Foreign callback traces. Every successful retained output
+equals fresh bytes.
+
+Against the exact dotted checkpoint `dca23f405a42c208d0cbcccf66656f7a69a09739`,
+three alternating CPU5 pairs with two warmups and16 edits/reverts per sample
+measure Safe/noLLVM local64/128 CPU98.125→79.375 /188.125→152.5 ms; paired
+median ratios.8141/.8040, elaborations69.5/133.5→5.5. Plain controls are near
+parity. Local population CPU rises22–25%;128 steady RSS rises372KiB. Root's full
+gate was running during these development measurements. Immutable binaries,
+prior unbounded prototype, samples, exact pins and logs remain in ignored
+`build/bench/task024-local-requirements/` in `/tmp/blot2-task024-completion`.
+
+Task024 and dependent053 remain open. Root owns combined full-gate and LLVM/Fast
+acceptance. This does not complete general local requirements, producer-unit
+ordinal relocation, richer scoped/control forms or the total edit target.

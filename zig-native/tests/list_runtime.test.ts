@@ -609,3 +609,109 @@ Deno.test("slicing and concatenating adversarial boundaries match flat sequence 
     for (let i = 0; i < values.length; i++) equal(r.get(list, i), values[i]);
   }
 });
+
+Deno.test("regular directory lookup counts duplicate leaf occurrences and declines irregular prefixes", async () => {
+  const r = await runtime();
+  const capacity = r.call("capacity");
+  const leaves = (list: number) => {
+    const ordered: { node: number; base: number; count: number }[] = [];
+    let base = 0;
+    const visit = (node: number) => {
+      if (r.word(node + 4) !== 0) {
+        visit(r.word(node + 16));
+        visit(r.word(node + 20));
+        return;
+      }
+      const count = r.word(node + 8);
+      ordered.push({ node, base, count });
+      base += count;
+    };
+    if (r.word(list + 4)) visit(r.word(list + 4));
+    equal(base, r.word(list));
+    return ordered;
+  };
+  const verify = (list: number, expected: number[]) => {
+    const ordered = leaves(list);
+    const directory = r.call("directory", list);
+    if (ordered.length > 1) {
+      equal(r.word(directory), ordered.length);
+      ordered.forEach(({ node }, index) => {
+        equal(r.word(directory + 4 + index * 4), node);
+      });
+    }
+    for (const { node, base, count } of ordered) {
+      for (let i = 0; i < count; i++) {
+        equal(r.get(list, base + i), expected[base + i]);
+        equal(r.word(list + 8), node);
+        equal(r.word(list + 12), base);
+      }
+    }
+  };
+  const original = r.create(capacity * 3);
+  const values = Array.from({ length: capacity * 3 }, (_, i) => i);
+  const repeated = r.call("concat", original, original);
+  const ordered = leaves(repeated);
+  ok(new Set(ordered.map(({ node }) => node)).size < ordered.length);
+  verify(repeated, [...values, ...values]);
+  for (const start of [1, capacity - 1, capacity + 1]) {
+    const part = r.call("slice", original, start, capacity + 7);
+    const partValues = values.slice(start, start + capacity + 7);
+    const twice = r.call("concat", part, part);
+    verify(twice, [...partValues, ...partValues]);
+  }
+});
+
+Deno.test("mixed concat limits bound both ordered leaf families before directory lookup", async () => {
+  const r = await runtime();
+  const capacity = r.call("capacity");
+  for (const [leftWidth, rightWidth] of [[7, 3], [3, 7], [13, 1], [1, 13]]) {
+    const leftLimit = Math.floor(capacity / leftWidth) * leftWidth;
+    const rightLimit = Math.floor(capacity / rightWidth) * rightWidth;
+    const leftCount = leftLimit * 2 + 17;
+    const rightCount = rightLimit * 2 + 23;
+    const left = r.call("new_limit", leftCount, leftWidth, leftLimit);
+    const right = r.call("new_limit", rightCount, rightWidth, rightLimit);
+    for (let i = 0; i < leftCount; i++) r.put(r.call("address", left, i), i);
+    for (let i = 0; i < rightCount; i++) {
+      r.put(r.call("address", right, i), 10000 + i);
+    }
+    const joined = r.call("concat", left, right);
+    equal(r.word(joined + 24), Math.max(leftLimit, rightLimit));
+    r.call("directory", joined);
+    for (let i = 0; i < leftCount + rightCount; i++) {
+      let expected = i;
+      if (i >= leftCount) expected = 10000 + i - leftCount;
+      equal(r.get(joined, i), expected);
+    }
+  }
+});
+
+Deno.test("small mixed leaf limits keep joined nodes within the descriptor bound", async () => {
+  const r = await runtime();
+  for (
+    const [leftLimit, rightLimit] of [[1, 1], [3, 7], [7, 3], [17, 31], [
+      31,
+      17,
+    ]]
+  ) {
+    for (
+      const [leftCount, rightCount] of [[leftLimit, rightLimit], [
+        leftLimit * 3 + 1,
+        rightLimit * 3 + 1,
+      ]]
+    ) {
+      const left = r.call("new_limit", leftCount, 1, leftLimit);
+      const right = r.call("new_limit", rightCount, 1, rightLimit);
+      const joined = r.call("concat", left, right);
+      const bound = Math.max(leftLimit, rightLimit);
+      equal(r.word(joined + 24), bound);
+      for (const leaf of r.inspect(joined).chunks) {
+        ok(r.word(leaf + 8) <= bound);
+      }
+      r.call("directory", joined);
+      for (let index = 0; index < r.word(joined); index++) {
+        equal(r.get(joined, index), 0);
+      }
+    }
+  }
+});

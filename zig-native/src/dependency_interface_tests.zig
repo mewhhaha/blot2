@@ -564,3 +564,277 @@ test "associated declared row recipe admission rejects shifted positions and nam
     try associatedRowsAdmissionLaw(a, bytes);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, associatedRowsAdmissionLaw, .{bytes});
 }
+
+const implementation_producer =
+    \\type Source s is contract = { type Item, const first: s -> (Source.Item s) }
+    \\impl ArraySource a : Source (Array a) = { type Item = a, const first = fn values => @array.get values 0 }
+;
+fn implementationAdmissionLaw(allocator: std.mem.Allocator, bytes: []const u8) !void {
+    var frozen = try format.decode(D.FrozenDependency, allocator, bytes, key);
+    defer format.deinit(allocator, &frozen);
+    try admission.validatePrelude(allocator, &frozen, implementation_producer, "std/prelude.blot");
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    _ = try pool.intern(allocator, "before");
+    try relink.relink(allocator, &frozen, &pool, &.{2});
+    const owner = &frozen.modules[0];
+    try validation.validate(&owner.interface, pool.entries.items.len + 1, 2);
+    try validation.validateGraph(allocator, &owner.interface);
+    try @import("frozen_core_validation.zig").validate(allocator, &owner.core, .{ .symbol_count = pool.entries.items.len + 1 });
+    var remaining: usize = 1_000_000;
+    try @import("implementation_admission.zig").publicCore(allocator, &owner.interface, &owner.core, &remaining);
+}
+test "implementation portable admission relocation and ownership release every failed allocation" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, implementation_producer);
+    defer a.free(bytes);
+    try implementationAdmissionLaw(a, bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, implementationAdmissionLaw, .{bytes});
+}
+test "implementation portable admission rejects forged equations targets and binder recipes" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, implementation_producer);
+    defer a.free(bytes);
+    var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &frozen);
+    const owner = &frozen.modules[0].interface;
+    try admission.validatePrelude(a, &frozen, implementation_producer, "std/prelude.blot");
+    const member = owner.implementation_members[0];
+    owner.implementation_members[0].root = @import("types.zig").f32_type;
+    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, implementation_producer, "std/prelude.blot"));
+    owner.implementation_members[0] = member;
+    const target = owner.implementation_members[1].target;
+    owner.implementation_members[1].target.binding += 1;
+    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, implementation_producer, "std/prelude.blot"));
+    owner.implementation_members[1].target = target;
+    const variables = owner.implementations[0].variables;
+    owner.implementations[0].variables.len = 0;
+    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, implementation_producer, "std/prelude.blot"));
+    owner.implementations[0].variables = variables;
+    const template = owner.member_templates[0];
+    owner.member_templates[0].arguments = owner.implementations[0].head;
+    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, implementation_producer, "std/prelude.blot"));
+    owner.member_templates[0] = template;
+    const principal = owner.bindings[template.binding].scheme;
+    owner.bindings[template.binding].scheme.variables.len = 0;
+    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, implementation_producer, "std/prelude.blot"));
+    owner.bindings[template.binding].scheme = principal;
+    const executable = &frozen.modules[0].core;
+    const body = executable.bodies[executable.bindings[template.binding].body_id];
+    const method_root = executable.nodes[body.root];
+    executable.nodes[body.root].ty = @import("types.zig").f32_type;
+    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, implementation_producer, "std/prelude.blot"));
+    executable.nodes[body.root] = method_root;
+    var exhausted: usize = 0;
+    try std.testing.expectError(error.InvalidArtifact, validation.validateGraphWithBudget(a, owner, &exhausted));
+    try std.testing.expectEqual(@as(usize, 0), exhausted);
+}
+
+const selected_implementation_producer =
+    \\type Source s is contract = { type Item, const first: s -> (Source.Item s) }
+    \\impl Scalar : Source U32 = { type Item = U32, const first = fn value => value }
+    \\impl ArraySource a : Source (Array a) where { Source a } = { type Item = Source.Item a, const first = fn values => Source.first (@array.get values 0) }
+    \\const answer: U32 = Source.first #[42]
+;
+fn selectedImplementationAdmissionLaw(allocator: std.mem.Allocator, bytes: []const u8) !void {
+    var frozen = try format.decode(D.FrozenDependency, allocator, bytes, key);
+    defer format.deinit(allocator, &frozen);
+    try std.testing.expect(frozen.modules[0].core.selected_proofs.len >= 2);
+    try admission.validatePrelude(allocator, &frozen, selected_implementation_producer, "std/prelude.blot");
+}
+test "implementation portable complete proofs reject forged roots targets and missing prerequisite edges" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, selected_implementation_producer);
+    defer a.free(bytes);
+    try selectedImplementationAdmissionLaw(a, bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, selectedImplementationAdmissionLaw, .{bytes});
+    var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &frozen);
+    const module = &frozen.modules[0].core;
+    const last = module.selected_proofs.len - 1;
+    const original = module.selected_proofs[last];
+    module.selected_proofs[last].prerequisites.len = 0;
+    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, selected_implementation_producer, "std/prelude.blot"));
+    module.selected_proofs[last] = original;
+    const root = module.selected_members[original.members.start].root;
+    module.selected_members[original.members.start].root = @import("types.zig").f32_type;
+    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, selected_implementation_producer, "std/prelude.blot"));
+    module.selected_members[original.members.start].root = root;
+    const target = module.selected_members[original.members.start + 1].target;
+    module.selected_members[original.members.start + 1].target.binding = frozen.modules[0].interface.member_templates[0].binding;
+    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, selected_implementation_producer, "std/prelude.blot"));
+    module.selected_members[original.members.start + 1].target = target;
+    try admission.validatePrelude(a, &frozen, selected_implementation_producer, "std/prelude.blot");
+}
+
+const legacy_implementation_producer =
+    \\type Token is data = #Token U32
+    \\const Token.add = fn (left: Token) => fn (right: Token) => left
+    \\type Source s is contract = { associated "add" s s s ! {}, type Item }
+    \\impl TokenSource : Source Token = { type Item = U32 }
+    \\const answer: (Source.Item Token) = 42
+;
+fn legacyImplementationAdmissionLaw(allocator: std.mem.Allocator, bytes: []const u8) !void {
+    var frozen = try format.decode(D.FrozenDependency, allocator, bytes, key);
+    defer format.deinit(allocator, &frozen);
+    try admission.validatePrelude(allocator, &frozen, legacy_implementation_producer, "std/prelude.blot");
+    var present = false;
+    for (frozen.modules[0].core.selected_proofs) |proof| if (proof.kind == .predicate and proof.predicate_target.binding != 0) {
+        present = true;
+    };
+    try std.testing.expect(present);
+}
+test "implementation portable legacy prerequisite certificates retain selected targets through OOM" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, legacy_implementation_producer);
+    defer a.free(bytes);
+    try legacyImplementationAdmissionLaw(a, bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, legacyImplementationAdmissionLaw, .{bytes});
+    var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &frozen);
+    for (frozen.modules[0].core.selected_proofs) |*proof| if (proof.kind == .predicate and proof.predicate_target.binding != 0) {
+        proof.predicate_target.binding += 1;
+        try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, legacy_implementation_producer, "std/prelude.blot"));
+        return;
+    };
+    return error.TestUnexpectedResult;
+}
+
+const inferred_legacy_implementation_producer =
+    \\type Token is data = #Token U32
+    \\const Token.add = fn (left: Token) => fn (right: Token) => left
+    \\type Source s is contract = { associated "add" s s s, type Item }
+    \\impl TokenSource : Source Token = { type Item = U32 }
+    \\const answer: (Source.Item Token) = 42
+;
+fn inferredLegacyImplementationAdmissionLaw(allocator: std.mem.Allocator, bytes: []const u8) !void {
+    var frozen = try format.decode(D.FrozenDependency, allocator, bytes, key);
+    defer format.deinit(allocator, &frozen);
+    try admission.validatePrelude(allocator, &frozen, inferred_legacy_implementation_producer, "std/prelude.blot");
+}
+test "implementation portable inferred invocation rows remain local to their selected proof" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, inferred_legacy_implementation_producer);
+    defer a.free(bytes);
+    try inferredLegacyImplementationAdmissionLaw(a, bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, inferredLegacyImplementationAdmissionLaw, .{bytes});
+}
+
+test "implementation portable admission rejects paired method recipes and inherited prerequisite deletion" {
+    const a = std.testing.allocator;
+    {
+        const bytes = try artifact(a, implementation_producer);
+        defer a.free(bytes);
+        var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
+        defer format.deinit(a, &frozen);
+        try admission.validatePrelude(a, &frozen, implementation_producer, "std/prelude.blot");
+        const owner = &frozen.modules[0];
+        const pi_root = owner.interface.implementation_members[1].root;
+        const core_root = owner.core.implementation_members[1].root;
+        const old_pi = owner.interface.graph.nodes[pi_root];
+        const old_core = owner.core.types.nodes[core_root];
+        owner.interface.graph.nodes[pi_root].b = @import("types.zig").f32_type;
+        owner.core.types.nodes[core_root].b = @import("types.zig").f32_type;
+        try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, implementation_producer, "std/prelude.blot"));
+        owner.interface.graph.nodes[pi_root] = old_pi;
+        owner.core.types.nodes[core_root] = old_core;
+        try admission.validatePrelude(a, &frozen, implementation_producer, "std/prelude.blot");
+    }
+    {
+        const source = "type Ready s is contract = { type Proof }\ntype Source s is contract = { Ready s, type Item }\nimpl ArraySource a : Source (Array a) = { type Item = a }\n";
+        const bytes = try artifact(a, source);
+        defer a.free(bytes);
+        var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
+        defer format.deinit(a, &frozen);
+        try admission.validatePrelude(a, &frozen, source, "std/prelude.blot");
+        const owner = &frozen.modules[0];
+        try std.testing.expect(owner.interface.implementations[0].predicates.len != 0);
+        owner.interface.implementations[0].predicates.len = 0;
+        owner.core.implementations[0].predicates.len = 0;
+        try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, source, "std/prelude.blot"));
+    }
+}
+fn compiledImplementation(allocator: std.mem.Allocator, bytes: []const u8) !void {
+    var compiled = try consume(allocator, bytes, "entry const answer: U32 = Source.first #[42]\n");
+    defer compiled.deinit(allocator);
+    try std.testing.expect(compiled.diagnostic == null and compiled.compiled.diagnostic == null);
+    try std.testing.expect(compiled.compiled.bytes.len > 8);
+}
+test "implementation compiled producers retain method substitutions and transitive evidence through OOM" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, selected_implementation_producer);
+    defer a.free(bytes);
+    try compiledImplementation(a, bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compiledImplementation, .{bytes});
+}
+
+fn compiledHandlerImplementation(allocator: std.mem.Allocator, bytes: []const u8) !void {
+    var compiled = try consume(allocator, bytes, "entry const answer: U32 = Source.first (#Token 42)\n");
+    defer compiled.deinit(allocator);
+    try std.testing.expect(compiled.diagnostic == null and compiled.compiled.diagnostic == null);
+    try std.testing.expect(compiled.compiled.bytes.len > 8);
+}
+test "implementation compiled handler prerequisites reconstruct invocation local rows through OOM" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, @import("implementation_tests.zig").handler_source);
+    defer a.free(bytes);
+    try compiledHandlerImplementation(a, bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compiledHandlerImplementation, .{bytes});
+}
+
+fn compiledRejectedImplementation(allocator: std.mem.Allocator, bytes: []const u8) !void {
+    var compiled = try consume(allocator, bytes, "entry const answer: (Source.Item U32) = 42\n");
+    defer compiled.deinit(allocator);
+    const issue = compiled.diagnostic orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqualStrings("incompatible_implementation", issue.code);
+    const publication = issue.publication orelse return error.TestUnexpectedResult;
+    const Details = struct { explanation: @import("dispatch_explanation.zig").Explanation };
+    const parsed = try std.json.parseFromSlice(Details, allocator, publication.details_json, .{});
+    defer parsed.deinit();
+    const explained = parsed.value.explanation;
+    try std.testing.expect(explained.candidates.len == 1 and explained.steps.len == 1);
+    try std.testing.expectEqualStrings("Scalar", explained.candidates[0].origin.?.name.?);
+    try std.testing.expect(explained.candidates[0].origin.?.span == null);
+    try std.testing.expectEqual(@import("dispatch_explanation.zig").Outcome.requires_evidence, explained.candidates[0].outcome);
+    try std.testing.expectEqual(@import("dispatch_explanation.zig").Outcome.incompatible_type, explained.steps[0].outcome);
+    try std.testing.expectEqualStrings("U32", explained.steps[0].ty.?);
+}
+test "implementation compiled rejection preserves prerequisite facts and omits unavailable source positions" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, @import("implementation_tests.zig").rejected_source);
+    defer a.free(bytes);
+    try compiledRejectedImplementation(a, bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compiledRejectedImplementation, .{bytes});
+}
+
+fn compiledWitnessImplementation(allocator: std.mem.Allocator, bytes: []const u8) !void {
+    var compiled = try consume(allocator, bytes, "entry const answer: U32 = Source.first (#Token (fn () -> U32 => 7))\n");
+    defer compiled.deinit(allocator);
+    if (compiled.diagnostic) |issue| std.debug.print("compiled witness frontend {s} at {d}: {s}\n", .{ issue.code, issue.start, issue.message });
+    if (compiled.compiled.diagnostic) |issue| std.debug.print("compiled witness backend {s}\n", .{@tagName(issue.code)});
+    try std.testing.expect(compiled.diagnostic == null and compiled.compiled.diagnostic == null);
+    try std.testing.expect(compiled.compiled.bytes.len > 8);
+}
+test "implementation compiled witness prerequisites derive closed local results through OOM" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, @import("implementation_tests.zig").witness_source);
+    defer a.free(bytes);
+    try compiledWitnessImplementation(a, bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compiledWitnessImplementation, .{bytes});
+}
+
+fn compiledSymbolicImplementation(allocator: std.mem.Allocator, bytes: []const u8) !void {
+    var compiled = try consume(allocator, bytes, "entry const answer = @product.get (@effect.run State.get State.set 42 (fn () => Callable.keep read ())) 1\n");
+    defer compiled.deinit(allocator);
+    if (compiled.diagnostic) |issue| std.debug.print("compiled symbolic frontend {s}\n", .{issue.code});
+    if (compiled.compiled.diagnostic) |issue| std.debug.print("compiled symbolic backend {s}\n", .{@tagName(issue.code)});
+    try std.testing.expect(compiled.diagnostic == null and compiled.compiled.diagnostic == null);
+    try std.testing.expect(compiled.compiled.bytes.len > 8);
+}
+test "implementation compiled symbolic operation heads preserve selected method invocation rows through OOM" {
+    const a = std.testing.allocator;
+    const bytes = try artifact(a, @import("implementation_tests.zig").symbolic_source);
+    defer a.free(bytes);
+    try compiledSymbolicImplementation(a, bytes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compiledSymbolicImplementation, .{bytes});
+}

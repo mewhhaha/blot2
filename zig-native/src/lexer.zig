@@ -452,7 +452,7 @@ fn layout(allocator: Allocator, source: []const u8, result: *Result) Allocator.E
     }
 }
 
-fn annotationColon(tokens: []const Token, index: usize) bool {
+fn annotationColon(source: []const u8, tokens: []const Token, index: usize) bool {
     var nested: usize = 0;
     var cursor = index;
     while (cursor != 0) {
@@ -472,6 +472,7 @@ fn annotationColon(tokens: []const Token, index: usize) bool {
         if (nested != 0) continue;
         switch (tag) {
             .kw_let, .kw_const, .kw_fn => return true,
+            .identifier => if (std.mem.eql(u8, tokens[cursor].text(source), "impl")) return true,
             .newline, .equal, .fat_arrow, .left_arrow, .comma => return false,
             else => {},
         }
@@ -494,7 +495,7 @@ fn contextual(allocator: Allocator, source: []const u8, result: *Result) Allocat
         if (annotation) |level| if (braces < level) {
             annotation = null;
         };
-        if (tag == .colon and annotationColon(result.tokens.items, index)) annotation = braces else if (annotation == braces and (tag == .newline or tag == .equal or tag == .fat_arrow or tag == .left_arrow or tag == .colon_equal))
+        if (tag == .colon and annotationColon(source, result.tokens.items, index)) annotation = braces else if (annotation == braces and (tag == .newline or tag == .equal or tag == .fat_arrow or tag == .left_arrow or tag == .colon_equal))
             annotation = null
         else if (annotation == braces and index + 1 < result.tokens.items.len and result.tokens.items[index + 1].tag == .l_brace) {
             if (tag == .private_where) try diagnose(result, allocator, .reserved_clause_marker, current.start, current.end) else if (tag == .identifier and std.mem.eql(u8, current.text(source), "where")) current.tag = .kw_where;

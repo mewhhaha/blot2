@@ -167,12 +167,13 @@ pub const Binding = struct {
     predecessor: u32 = 0,
 };
 pub const FieldProjection = struct { position: u32, nominal: T.NominalIdentity, tags: T.List };
+pub const Access = struct { position: u32, ty: T.Id, nominal: T.NominalIdentity, tags: T.List, field: u32 };
 pub const LocalScheme = struct { binding: u32, principal: T.Scheme };
 pub const Constructor = struct { position: u32, nominal: T.NominalIdentity, tag: u32 };
 pub const Merge = struct { position: u32, result: u32, yes: u32, no: u32 };
 pub const Projection = struct { position: u32, index: u32, owner: u32 = 0 };
 pub const Signature = struct { position: u32, ty: T.Id };
-pub const Predicate = struct { value: T.Obligation, position: u32, name: []u8 };
+pub const Predicate = struct { value: T.Obligation, position: u32, local: bool = false, name: []u8 };
 pub const Body = struct {
     owner: *Chunk,
     name: []u8,
@@ -191,6 +192,7 @@ pub const Body = struct {
     constructors: []Constructor = &.{},
     local_schemes: []LocalScheme = &.{},
     fields: []FieldProjection = &.{},
+    accesses: []Access = &.{},
     field_tags: []u32 = &.{},
     members: [][]u8 = &.{},
     selection_digest: ?Digest = null,
@@ -200,6 +202,7 @@ pub const Body = struct {
         total += self.predicates.len * @sizeOf(Predicate);
         for (self.predicates) |predicate| total += predicate.name.len;
         total += self.fields.len * @sizeOf(FieldProjection) + self.field_tags.len * 4 + self.local_schemes.len * @sizeOf(LocalScheme) + self.constructors.len * @sizeOf(Constructor) + self.merges.len * @sizeOf(Merge) + self.projections.len * @sizeOf(Projection) + self.signatures.len * @sizeOf(Signature) + self.members.len * @sizeOf([]u8);
+        total += self.accesses.len * @sizeOf(Access);
         for (self.members) |member| total += member.len;
         return total;
     }
@@ -220,6 +223,7 @@ pub const Body = struct {
         a.free(self.constructors);
         a.free(self.local_schemes);
         a.free(self.fields);
+        a.free(self.accesses);
         a.free(self.field_tags);
         for (self.members) |member| a.free(member);
         a.free(self.members);
@@ -941,6 +945,9 @@ pub fn capture(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
 /// The checker has already retained successful replays. Freeze only newly
 /// elaborated bodies, and publish each immutable chunk after complete ownership.
 pub fn captureInto(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []const u8, checked: *const check.Checked, names: ?ExternalNames, cache: *Cache) !void {
+    // Selected implementation dependencies need their complete proof/read
+    // owner. The ordinary body receipt has no implementation admission lane.
+    if (checked.implementations.len != 0 or checked.member_templates.len != 0) return;
     if (checked.diagnostics.len != 0 or text.len == 0) return;
     try cache.compact(a);
     var bodies: std.ArrayList(Body) = .empty;
@@ -972,6 +979,7 @@ pub fn captureInto(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text:
         for (body.facts) |fact| try roots.append(a, fact.ty);
         for (body.bindings) |binding| try roots.append(a, binding.ty);
         for (body.signatures) |signature| try roots.append(a, signature.ty);
+        for (body.accesses) |access| try roots.append(a, access.ty);
         for (body.predicates) |predicate| try roots.appendSlice(a, &.{ predicate.value.ty, predicate.value.other, predicate.value.result, predicate.value.signature });
         try rows.appendSlice(a, body.closed_rows);
     }
@@ -985,7 +993,13 @@ fn freezeChunk(a: A, tree: *const ast.Tree, checked_pool: *const symbols.Pool, c
     const catalog: Catalog = .{ .unit = checked.unit, .pool = checked_pool, .nominals = checked.nominals, .constructors = checked.constructors, .patterns = .{ .store = &checked.parameter_patterns } };
     var schemes: std.ArrayList(T.Scheme) = .empty;
     defer schemes.deinit(a);
-    for (bodies.items) |body| for (body.local_schemes) |local| try schemes.append(a, local.principal);
+    for (bodies.items) |body| for (body.local_schemes) |local| {
+        var principal = local.principal;
+        // Owned requirements are projected with the ordinary body roots. The
+        // scheme projector owns only binders and covariance certificates.
+        principal.obligations = .{};
+        try schemes.append(a, principal);
+    };
     var graph = snapshot.freezeRootsWithSchemes(a, tree, checked, roots, rows, schemes.items) catch |err| {
         if (err == error.OutOfMemory) return err;
         return null;
@@ -1004,19 +1018,7 @@ fn freezeChunk(a: A, tree: *const ast.Tree, checked_pool: *const symbols.Pool, c
     for (graph.nodes) |node| if (node.tag == .record) {
         for (0..node.b) |index| {
             const position_ = node.a + index * 2;
-            const name = catalog.pool.get(graph.extra[position_]);
-            var slot: ?usize = null;
-            for (field_names.items, 0..) |known, i| if (std.mem.eql(u8, known, name)) {
-                slot = i;
-                break;
-            };
-            if (slot == null) {
-                try field_names.ensureUnusedCapacity(a, 1);
-                const owned_name = try a.dupe(u8, name);
-                slot = field_names.items.len;
-                field_names.appendAssumeCapacity(owned_name);
-            }
-            graph.extra[position_] = @intCast(slot.?);
+            graph.extra[position_] = try ownFieldName(a, &field_names, catalog.pool.get(graph.extra[position_]));
         }
     };
     for (graph.nodes) |*node| if (node.tag == .nominal) {
@@ -1045,7 +1047,9 @@ fn freezeChunk(a: A, tree: *const ast.Tree, checked_pool: *const symbols.Pool, c
     var next_scheme: usize = 0;
     for (bodies.items) |*body| {
         for (body.local_schemes) |*local| {
+            const requirements = local.principal.obligations;
             local.principal = schemes.items[next_scheme];
+            local.principal.obligations = requirements;
             next_scheme += 1;
         }
         for (body.facts) |*fact| {
@@ -1060,6 +1064,10 @@ fn freezeChunk(a: A, tree: *const ast.Tree, checked_pool: *const symbols.Pool, c
             signature.ty = roots[next_type];
             next_type += 1;
         }
+        for (body.accesses) |*access| {
+            access.ty = roots[next_type];
+            next_type += 1;
+        }
         for (body.predicates) |*predicate| {
             predicate.value.ty = roots[next_type];
             predicate.value.other = roots[next_type + 1];
@@ -1071,6 +1079,10 @@ fn freezeChunk(a: A, tree: *const ast.Tree, checked_pool: *const symbols.Pool, c
         next_row += body.closed_rows.len;
         for (body.constructors) |*constructor| constructor.nominal = try frozenNominal(catalog, nominals.items, constructor.nominal);
         for (body.fields) |*field| field.nominal = try frozenNominal(catalog, nominals.items, field.nominal);
+        for (body.accesses) |*step| {
+            step.nominal = try frozenNominal(catalog, nominals.items, step.nominal);
+            step.field = try ownFieldName(a, &field_names, catalog.pool.get(step.field));
+        }
         const reads = try bodyReads(a, &graph, body, field_names.items, nominals.items);
         body.nominals = reads.nominals;
         body.type_work = reads.bytes;
@@ -1098,6 +1110,14 @@ fn freezeChunk(a: A, tree: *const ast.Tree, checked_pool: *const symbols.Pool, c
     for (owned_bodies) |*body| body.owner = owner;
     return owner;
 }
+fn ownFieldName(a: A, names: *std.ArrayList([]u8), name: []const u8) !u32 {
+    for (names.items, 0..) |known, index| if (std.mem.eql(u8, known, name)) return @intCast(index);
+    try names.ensureUnusedCapacity(a, 1);
+    const owned = try a.dupe(u8, name);
+    const index: u32 = @intCast(names.items.len);
+    names.appendAssumeCapacity(owned);
+    return index;
+}
 fn frozenNominal(catalog: Catalog, reads: []const NominalRead, identity: T.NominalIdentity) !T.NominalIdentity {
     if (identity.unit == 0) return identity;
     const index = catalog.identity(identity) orelse return error.DependencyLimit;
@@ -1119,6 +1139,7 @@ fn bodyReads(a: A, graph: *const F.Graph, body: *const Body, names: []const []co
     for (body.facts) |fact| try pending.append(a, fact.ty);
     for (body.bindings) |binding| try pending.append(a, binding.ty);
     for (body.signatures) |signature| try pending.append(a, signature.ty);
+    for (body.accesses) |access| try pending.append(a, access.ty);
     for (body.local_schemes) |local| {
         try pending.append(a, local.principal.root);
         try pending.appendSlice(a, source.list(local.principal.variables));
@@ -1239,6 +1260,8 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
     defer merges.deinit(a);
     var constructors: std.ArrayList(Constructor) = .empty;
     defer constructors.deinit(a);
+    var accesses: std.ArrayList(Access) = .empty;
+    defer accesses.deinit(a);
     var fields: std.ArrayList(FieldProjection) = .empty;
     defer fields.deinit(a);
     var field_tags: std.ArrayList(u32) = .empty;
@@ -1246,9 +1269,29 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
     var needs_selection = false;
     var type_work: usize = 0;
     for (shape.ids, 0..) |id, position_| {
-        // Dotted reads need complete access-path/type/projection side tables.
-        // A copied scalar result alone must not turn a projection into a raw ref.
-        if (checked.access_paths[id].len != 0) return null;
+        const path = checked.types.list(checked.access_paths[id]);
+        if (path.len != 0) {
+            // Concrete dotted references have no access-node side table. Method
+            // paths need complete selection reads and remain ordinary.
+            if (tree.node(id).tag != .name or checked.access_nodes[id].len != 0 or path.len > 128 or path.len > 4096 - accesses.items.len) return null;
+            const types = checked.types.list(checked.access_types[id]);
+            if (types.len != path.len + 1) return null;
+            for (types) |ty| {
+                var proof: std.crypto.hash.Blake3 = .init(.{});
+                var budget: usize = 4096;
+                if (!typeHash(.{ .store = &checked.types }, ty, &proof, &budget, 0, true, &.{}, &.{}, catalog)) return null;
+            }
+            for (path, 0..) |projection, index| {
+                if (projection >= checked.projection_catalog.len) return null;
+                const step = checked.projection_catalog[projection];
+                const variants = checked.types.list(step.variants);
+                if (variants.len == 0 or variants.len % 2 != 0 or variants.len / 2 > 4096 - field_tags.items.len or pool.get(step.field).len == 0) return null;
+                const start: u32 = @intCast(field_tags.items.len);
+                var offset: usize = 0;
+                while (offset < variants.len) : (offset += 2) try field_tags.append(a, variants[offset]);
+                try accesses.append(a, .{ .position = @intCast(position_), .ty = types[index], .nominal = step.nominal, .field = step.field, .tags = .{ .start = start, .len = @intCast(variants.len / 2) } });
+            }
+        }
         const field_id = checked.projection_resolved[id];
         if (field_id != 0) {
             if (tree.node(id).tag != .field_access) return null;
@@ -1312,7 +1355,6 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             if (index == null) {
                 const old = checked.bindings[old_id];
                 const local = old.kind == .parameter or old.kind == .local;
-                if (old.kind == .local and old.scheme.obligations.len != 0) return null;
                 if (!local and old.scheme.obligations.len != 0) {
                     needs_selection = true;
                     var member_budget: usize = 64;
@@ -1352,9 +1394,34 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
     }
     var local_schemes: std.ArrayList(LocalScheme) = .empty;
     defer local_schemes.deinit(a);
+    var local_requirement_budget: usize = 4096;
     for (old_bindings.items, 0..) |id, index| {
         const old = checked.bindings[id];
-        if (old.kind == .local and (old.scheme.variables.len != 0 or old.scheme.row_variables.len != 0 or old.scheme.closed_rows.len != 0)) try local_schemes.append(a, .{ .binding = @intCast(index + 1), .principal = old.scheme });
+        if (old.kind != .local or (old.scheme.variables.len == 0 and old.scheme.row_variables.len == 0 and old.scheme.closed_rows.len == 0 and old.scheme.obligations.len == 0)) continue;
+        if (old.scheme.obligations.len > 4096 - predicates.items.len) return null;
+        if (old.scheme.obligations.len != 0) {
+            needs_selection = true;
+            var member_budget: usize = 64;
+            if (!try appendSchemeMembers(a, &members, old.scheme, checked.obligations, catalog, &member_budget)) return null;
+        }
+        var local = old.scheme;
+        local.obligations = .{ .start = @intCast(predicates.items.len), .len = old.scheme.obligations.len };
+        for (checked.obligations[old.scheme.obligations.start..][0..old.scheme.obligations.len]) |predicate| {
+            // Inferred flat associated requirements have complete type/name
+            // and candidate reads. Declared or shared local origins need more.
+            if (!supportedPredicate(predicate) or local_requirement_budget == 0) return null;
+            local_requirement_budget -= 1;
+            const source_position = position(shape.ids, predicate.source) orelse return null;
+            var proof: std.crypto.hash.Blake3 = .init(.{});
+            for ([_]T.Id{ predicate.ty, predicate.other, predicate.result, predicate.signature }) |part| if (!typeHash(.{ .store = &checked.types }, part, &proof, &local_requirement_budget, 0, true, &.{}, &.{}, catalog)) return null;
+            try predicates.ensureUnusedCapacity(a, 1);
+            const name = try a.dupe(u8, pool.get(predicate.name));
+            var value = predicate;
+            value.name = 0;
+            value.source = 0;
+            predicates.appendAssumeCapacity(.{ .value = value, .position = source_position, .name = name, .local = true });
+        }
+        try local_schemes.append(a, .{ .binding = @intCast(index + 1), .principal = local });
     }
     var selection_digest: ?Digest = null;
     if (needs_selection) selection_digest = associatedDigest(.{ .store = &checked.types }, catalog, tree, checked.associated, checked.bindings, checked.obligations, names, members.items) orelse return null;
@@ -1378,6 +1445,8 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
         for (owned_members) |member| a.free(member);
         a.free(owned_members);
     }
+    const owned_accesses = try accesses.toOwnedSlice(a);
+    errdefer a.free(owned_accesses);
     const owned_fields = try fields.toOwnedSlice(a);
     errdefer a.free(owned_fields);
     const owned_field_tags = try field_tags.toOwnedSlice(a);
@@ -1394,7 +1463,7 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
         a.free(owned_predicates);
     }
     const owned_bindings = try bindings.toOwnedSlice(a);
-    return .{ .owner = undefined, .name = name, .source = source, .syntax = shape.digest, .facts = owned_facts, .bindings = owned_bindings, .closed_rows = owned_rows, .type_work = type_work, .type_reads = owned_reads, .predicates = owned_predicates, .signatures = owned_signatures, .projections = owned_projections, .merges = owned_merges, .constructors = owned_constructors, .local_schemes = owned_local_schemes, .fields = owned_fields, .field_tags = owned_field_tags, .members = owned_members, .selection_digest = selection_digest };
+    return .{ .owner = undefined, .name = name, .source = source, .syntax = shape.digest, .facts = owned_facts, .bindings = owned_bindings, .closed_rows = owned_rows, .type_work = type_work, .type_reads = owned_reads, .predicates = owned_predicates, .signatures = owned_signatures, .projections = owned_projections, .merges = owned_merges, .constructors = owned_constructors, .local_schemes = owned_local_schemes, .fields = owned_fields, .accesses = owned_accesses, .field_tags = owned_field_tags, .members = owned_members, .selection_digest = selection_digest };
 }
 
 // Branch joins can define a binding that no source reference uses. Preserve
@@ -1404,7 +1473,6 @@ fn captureLocal(a: A, checked: *const check.Checked, pool: *const symbols.Pool, 
     if (id == 0 or id >= checked.bindings.len) return null;
     const old = checked.bindings[id];
     if (old.kind != .local and old.kind != .parameter) return null;
-    if (old.scheme.obligations.len != 0) return null;
     const declaration = position(shape.ids, old.declaration) orelse return null;
     const owner = position(shape.ids, old.owner) orelse return null;
     var hash: std.crypto.hash.Blake3 = .init(.{});

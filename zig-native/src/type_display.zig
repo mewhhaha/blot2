@@ -8,7 +8,11 @@ pub fn append(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id) T.Error!void
     try appendBounded(engine, bytes, ty, &budget);
 }
 pub fn appendBounded(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, budget: *usize) T.Error!void {
-    try render(engine, bytes, ty, 0, budget);
+    try render(engine, bytes, ty, 0, budget, false);
+}
+pub fn appendStable(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id) T.Error!void {
+    var budget: usize = 256;
+    try render(engine, bytes, ty, 0, &budget, true);
 }
 pub fn text(engine: anytype, bytes: *std.ArrayList(u8), value: []const u8) T.Error!void {
     const limit = 8192;
@@ -25,11 +29,20 @@ fn number(engine: anytype, bytes: *std.ArrayList(u8), value: u32) T.Error!void {
     var buffer: [16]u8 = undefined;
     try text(engine, bytes, std.mem.print(&buffer, "{d}", .{value}) catch unreachable);
 }
-fn render(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, depth: usize, budget: *usize) T.Error!void {
+fn render(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, depth: usize, budget: *usize, comptime stable: bool) T.Error!void {
     if (depth >= 32 or budget.* == 0) return text(engine, bytes, "...");
     budget.* -= 1;
-    const node = engine.types.node(try engine.types.resolve(ty, 0));
+    var root = engine.types.head(ty, 0);
+    if (!stable) root = try engine.types.resolve(ty, 0);
+    const node = engine.types.node(root);
     switch (node.tag) {
+        .scoped => {
+            try render(engine, bytes, node.a, depth + 1, budget, stable);
+            try text(engine, bytes, " @scope");
+            try number(engine, bytes, node.b);
+            try text(engine, bytes, ":");
+            try number(engine, bytes, node.c);
+        },
         .absent => try text(engine, bytes, "?"),
         .unit => try text(engine, bytes, "Unit"),
         .boolean => try text(engine, bytes, "Bool"),
@@ -47,14 +60,16 @@ fn render(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, depth: usize, bu
                 .cursor => "Cursor ",
                 else => "~",
             });
-            try render(engine, bytes, node.a, depth + 1, budget);
+            try render(engine, bytes, node.a, depth + 1, budget, stable);
         },
         .function => {
             try text(engine, bytes, "(");
-            try render(engine, bytes, node.a, depth + 1, budget);
+            try render(engine, bytes, node.a, depth + 1, budget, stable);
             try text(engine, bytes, " -> ");
-            try render(engine, bytes, node.b, depth + 1, budget);
-            const row = engine.types.effects.node(try engine.types.resolveEffects(node.c, 0));
+            try render(engine, bytes, node.b, depth + 1, budget, stable);
+            var row_id = node.c;
+            if (!stable) row_id = try engine.types.resolveEffects(node.c, 0);
+            const row = engine.types.effects.node(row_id);
             if (row.labels.len != 0 or row.tail != .closed) {
                 try text(engine, bytes, " ! {");
                 for (0..row.labels.len) |index| {
@@ -76,6 +91,12 @@ fn render(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, depth: usize, bu
                         break;
                     };
                     try text(engine, bytes, if (name == 0) "operation" else engine.pool.get(name));
+                    if (operation.instance.decl != 0) {
+                        try text(engine, bytes, " @scope");
+                        try number(engine, bytes, operation.instance.unit);
+                        try text(engine, bytes, ":");
+                        try number(engine, bytes, operation.instance.decl);
+                    }
                     for (0..operation.arguments.len) |argument_index| {
                         if (budget.* == 0) {
                             try text(engine, bytes, " ...");
@@ -83,7 +104,7 @@ fn render(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, depth: usize, bu
                         }
                         const argument = engine.types.list(operation.arguments)[argument_index];
                         try text(engine, bytes, " ");
-                        try render(engine, bytes, argument, depth + 1, budget);
+                        try render(engine, bytes, argument, depth + 1, budget, stable);
                     }
                 }
                 if (row.tail != .closed) try text(engine, bytes, " | ?e");
@@ -100,7 +121,7 @@ fn render(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, depth: usize, bu
                 }
                 const item = engine.types.list(.{ .start = node.a, .len = node.b })[index];
                 if (index != 0) try text(engine, bytes, ", ");
-                try render(engine, bytes, item, depth + 1, budget);
+                try render(engine, bytes, item, depth + 1, budget, stable);
             }
             if (node.b == 1) try text(engine, bytes, ",");
             try text(engine, bytes, ")");
@@ -116,7 +137,7 @@ fn render(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, depth: usize, bu
                 const field = engine.types.recordField(node, index);
                 try text(engine, bytes, engine.pool.get(field.name));
                 try text(engine, bytes, ": ");
-                try render(engine, bytes, field.ty, depth + 1, budget);
+                try render(engine, bytes, field.ty, depth + 1, budget, stable);
             }
             try text(engine, bytes, " }");
         },
@@ -134,7 +155,7 @@ fn render(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, depth: usize, bu
                 }
                 const argument = engine.types.nominalArguments(node)[index];
                 try text(engine, bytes, " ");
-                try render(engine, bytes, argument, depth + 1, budget);
+                try render(engine, bytes, argument, depth + 1, budget, stable);
             };
         },
         .projection => {
@@ -149,7 +170,7 @@ fn render(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, depth: usize, bu
             for (0..engine.types.nominalArguments(node).len) |index| {
                 const argument = engine.types.nominalArguments(node)[index];
                 try text(engine, bytes, " ");
-                try render(engine, bytes, argument, depth + 1, budget);
+                try render(engine, bytes, argument, depth + 1, budget, stable);
             }
         },
         .resolver, .provider, .state_provider => try text(engine, bytes, @tagName(node.tag)),

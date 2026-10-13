@@ -5632,3 +5632,34 @@ test "frozen publication preserves wide source captures and owned snapshots at e
     try frozenPublicationScenario(a, &module);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, frozenPublicationScenario, .{&module});
 }
+
+fn symbolicRowSourceEvidence(allocator: std.mem.Allocator, module: *const core.Module, sharing: bool) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    session.reuse_principal_graphs = sharing;
+    for ([_]struct { []const u8, type_evidence.Id }{ .{ "integer", types.u32_type }, .{ "floating", types.f32_type } }) |expected| {
+        const selected = try session.sourceInterface(target(module, expected[0]));
+        const arrow = session.evidence.node(selected.evidence);
+        try std.testing.expectEqual(type_evidence.Tag.function, arrow.tag);
+        try std.testing.expectEqual(types.unit, arrow.a);
+        try std.testing.expectEqual(expected[1], arrow.b);
+        try std.testing.expectEqual(@as(u32, 0), arrow.c);
+    }
+    try std.testing.expect(session.diagnostic == null);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+}
+
+test "symbolic operation rows publish closed source evidence through generic captures and allocation failures" {
+    var module = try lower(
+        \\type State a is effect = { get: Unit -> a, set: a -> Unit }
+        \\const read: Unit -> a ! {State.get a} = fn () => State.get ()
+        \\const apply = fn (callback: Unit -> a ! {State.get a | e}) => callback ()
+        \\const capture = fn (callback: Unit -> a ! {State.get a}) => fn () => callback ()
+        \\entry const integer = fn () => @product.get (@effect.run State.get State.set 42 (fn () => apply (capture read))) 1
+        \\entry const floating = fn () => @product.get (@effect.run State.get State.set 1.5 (fn () => read ())) 1
+    );
+    defer module.deinit(a);
+    try symbolicRowSourceEvidence(a, &module, true);
+    try symbolicRowSourceEvidence(a, &module, false);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, symbolicRowSourceEvidence, .{ &module, true });
+}

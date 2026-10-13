@@ -98,7 +98,7 @@ fn text(hash: *std.crypto.hash.Blake3, value: []const u8) void {
 }
 pub fn settings(options: project.Options) [32]u8 {
     var hash = std.crypto.hash.Blake3.init(.{});
-    text(&hash, "blotc-dependencies-v3:associated-type-members:module-visibility:opaque-nominals:project:default-check-and-backend:generic-core:no-evaluated-values:ordered-dictionary");
+    text(&hash, "blotc-dependencies-v4:selected-implementations:module-visibility:opaque-nominals:project:default-check-and-backend:generic-core:no-evaluated-values:ordered-dictionary");
     text(&hash, options.prelude_path orelse "");
     text(&hash, options.std_root orelse "");
     word(&hash, options.aliases.len);

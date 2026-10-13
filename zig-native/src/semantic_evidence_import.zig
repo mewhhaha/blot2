@@ -8,9 +8,16 @@ pub const Importer = struct {
     source: evidence.View,
     destination: *evidence.Store,
     max_depth: usize,
+    remaining: ?*usize = null,
     nodes: std.AutoHashMapUnmanaged(u32, u32) = .empty,
     rows: std.AutoHashMapUnmanaged(u32, u32) = .empty,
     labels: std.AutoHashMapUnmanaged(u32, u32) = .empty,
+    fn charge(self: *Importer) evidence.Error!void {
+        if (self.remaining) |remaining| {
+            if (remaining.* == 0) return error.EvidenceLimit;
+            remaining.* -= 1;
+        }
+    }
     pub fn deinit(self: *Importer) void {
         self.nodes.deinit(self.allocator);
         self.rows.deinit(self.allocator);
@@ -21,6 +28,7 @@ pub const Importer = struct {
         if (depth >= self.max_depth or id >= self.source.nodes.len) return error.EvidenceLimit;
         if (id <= 5) return id;
         if (self.nodes.get(id)) |known| return known;
+        try self.charge();
         const node = self.source.node(id);
         const children = self.source.children(id);
         const copied = try self.allocator.dupe(u32, children);
@@ -51,6 +59,7 @@ pub const Importer = struct {
         if (id == 0) return 0;
         if (depth >= self.max_depth or id >= self.source.effects.rows.len) return error.EvidenceLimit;
         if (self.rows.get(id)) |known| return known;
+        try self.charge();
         const original = self.source.effects.rowLabels(id);
         const copied = try self.allocator.alloc(u32, original.len);
         defer self.allocator.free(copied);
@@ -62,12 +71,13 @@ pub const Importer = struct {
     fn label(self: *Importer, id: u32, depth: usize) evidence.Error!u32 {
         if (depth >= self.max_depth or id == 0 or id >= self.source.effects.operations.len) return error.EvidenceLimit;
         if (self.labels.get(id)) |known| return known;
+        try self.charge();
         const operation = self.source.effects.operation(id);
         const original = self.source.effects.operationArguments(id);
         const copied = try self.allocator.alloc(u32, original.len);
         defer self.allocator.free(copied);
         for (original, copied) |old, *new| new.* = try self.ty(old, depth + 1);
-        const result = try self.destination.effects.internOperation(operation.identity, copied);
+        const result = try self.destination.effects.internOperationInstance(operation.identity, copied, operation.instance);
         try self.labels.put(self.allocator, id, result);
         return result;
     }
@@ -119,4 +129,38 @@ fn transferScenario(a: A) !void {
 test "private semantic evidence remaps nominal records aliases and repeated effect labels with atomic owner staging" {
     try transferScenario(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, transferScenario, .{});
+}
+
+fn scopedSemanticImportLaw(allocator: A) !void {
+    var source = try evidence.Store.init(allocator);
+    defer source.deinit();
+    var destination = try evidence.Store.init(allocator);
+    defer destination.deinit();
+    const operation: @import("types.zig").NominalIdentity = .{ .unit = 2, .decl = 30 };
+    const left: @import("types.zig").NominalIdentity = .{ .unit = 2, .decl = 31 };
+    const right: @import("types.zig").NominalIdentity = .{ .unit = 2, .decl = 32 };
+    const a_ = try source.effects.internOperationInstance(operation, &.{3}, left);
+    const b_ = try source.effects.internOperationInstance(operation, &.{3}, right);
+    const row_ = try source.effects.internRow(&.{ a_, a_, b_ });
+    var copy: Importer = .{ .allocator = allocator, .source = source.view(), .destination = &destination, .max_depth = 128 };
+    defer copy.deinit();
+    const copied = try copy.row(row_, 0);
+    const labels = destination.effects.view().rowLabels(copied);
+    try std.testing.expectEqual(@as(usize, 3), labels.len);
+    try std.testing.expectEqual(labels[0], labels[1]);
+    try std.testing.expect(labels[0] != labels[2]);
+    try std.testing.expectEqual(left, destination.effects.view().operation(labels[0]).instance);
+    try std.testing.expectEqual(right, destination.effects.view().operation(labels[2]).instance);
+    var solver = try @import("types.zig").Store.init(allocator);
+    defer solver.deinit();
+    var closed: @import("closed_evidence_import.zig").Importer = .{ .allocator = allocator, .source = destination.view(), .destination = &solver };
+    defer closed.deinit();
+    const solver_row = try closed.row(copied, 0);
+    const solver_labels = solver.rowLabels(solver_row);
+    try std.testing.expectEqual(left, solver.operation(solver_labels[0]).instance);
+    try std.testing.expectEqual(right, solver.operation(solver_labels[2]).instance);
+}
+test "scoped effect semantic imports preserve owner and repeated occurrences" {
+    try scopedSemanticImportLaw(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, scopedSemanticImportLaw, .{});
 }

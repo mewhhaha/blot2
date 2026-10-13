@@ -23,7 +23,7 @@ pub const CapturedTemplate = struct { unit: u32 = 0, node: core.Id, captures: la
 pub const CallableKey = struct { target: core.BindingRef, ty: layout.Id, applied: u32 = 0 };
 pub const ConstructorKey = struct { unit: u32, catalog: u32, ty: layout.Id };
 pub const PrimitiveKey = struct { unit: u32, catalog: u32, ty: layout.Id, applied: u32 = 0 };
-pub const OperationKey = struct { operation: runtime_operations.Id, ty: layout.Id };
+pub const OperationKey = struct { operation: runtime_operations.Id, ty: layout.Id, scoped: bool = false };
 pub const ConstantKey = struct { target: core.BindingRef, ty: layout.Id };
 pub const Request = union(enum) {
     named: Key,
@@ -251,6 +251,7 @@ pub const Pools = struct {
         free(leases, allocator, .layout_labels, self.layouts.effects.labels);
         const evaluator = &self.evaluator;
         inline for (.{ "values", "children", "closures", "value_evidence", "type_mappings", "row_mappings", "value_records", "record_layouts", "field_names", "demands" }) |name| free(leases, allocator, @field(pool_leases.Field, name), @field(evaluator, name));
+        inline for (.{ "proofs", "arguments", "members", "edges" }) |name| free(leases, allocator, @field(pool_leases.Field, "implementation_" ++ name), @field(evaluator.implementation_proofs, name));
         free(leases, allocator, .evidence_nodes, evaluator.evidence.nodes);
         free(leases, allocator, .evidence_extra, evaluator.evidence.extra);
         free(leases, allocator, .evidence_operations, evaluator.evidence.effects.operations);
@@ -859,6 +860,12 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
     inline for (.{ "values", "children", "closures", "value_evidence", "type_mappings", "row_mappings", "value_records", "record_layouts", "field_names", "demands" }) |name| {
         const Item = std.meta.Elem(@FieldType(core_eval.Snapshot, name));
         @field(evaluator, name) = try shared.dupe(@field(pool_leases.Field, name), Item, @field(session, name).items, if (old_evaluator) |old| @field(old, name) else null);
+    }
+    inline for (.{ "proofs", "arguments", "members", "edges" }) |name| {
+        const Item = std.meta.Elem(@FieldType(@import("implementation_evidence.zig").Snapshot, name));
+        var previous_values: ?[]const Item = null;
+        if (old_evaluator) |old| previous_values = @field(old.implementation_proofs, name);
+        @field(evaluator.implementation_proofs, name) = try shared.dupe(@field(pool_leases.Field, "implementation_" ++ name), Item, @field(session.implementation_proofs, name).items, previous_values);
     }
     const evidence = &session.evidence;
     evaluator.evidence = .{

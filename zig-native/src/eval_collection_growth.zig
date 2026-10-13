@@ -8,6 +8,8 @@ pub const Store = struct {
     // Only the latest span in each buffer can extend into its unused slots.
     // Keys are spans, so typed views of the same value need no side metadata.
     buffers: std.AutoHashMapUnmanaged(Span, Span) = .empty,
+    /// Observation only: a saturated serial cannot certify unchanged frontiers.
+    mutation_serial: u64 = 0,
 
     pub fn deinit(self: *Store, allocator: std.mem.Allocator) void {
         self.buffers.deinit(allocator);
@@ -30,6 +32,7 @@ pub const Store = struct {
                 _ = self.buffers.remove(before);
                 children.items[if (front) after.start else before.start + before.len] = value;
                 self.buffers.putAssumeCapacity(after, buffer);
+                self.mutation_serial +|= 1;
                 return after;
             }
         }
@@ -48,6 +51,7 @@ pub const Store = struct {
         @memcpy(children.items[after.start + @intFromBool(front) ..][0..before.len], children.items[before.start..][0..before.len]);
         children.items[if (front) after.start else after.start + before.len] = value;
         self.buffers.putAssumeCapacity(after, buffer);
+        self.mutation_serial +|= 1;
         return after;
     }
 };

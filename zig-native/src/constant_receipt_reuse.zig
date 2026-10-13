@@ -46,7 +46,7 @@ pub const State = struct {
         if (graph.scalarRoot(self.old.evaluator, record.value) == null) return false;
         for (record.events) |event| switch (event) {
             .read => |read| if (graph.scalarRoot(self.old.evaluator, read.value) == null) return false,
-            .work => {},
+            .work, .member => {},
         };
         return true;
     }
@@ -61,7 +61,7 @@ pub const State = struct {
                 if (before.scalar != after.scalar or before.bits != after.bits) return self.reject(g, .read);
                 if (read.value == record.value) anchor = current;
             },
-            .work => {},
+            .work, .member => {},
         };
         if (anchor == 0 and total.values == 0) return self.reject(g, .resource);
         var owned = try record.clone(self.allocator);
@@ -81,7 +81,7 @@ pub const State = struct {
         owned.value = anchor;
         for (owned.events) |*event| switch (event.*) {
             .read => |*read| read.value = session.readyConstantAnchor(read.target).?,
-            .work => {},
+            .work, .member => {},
         };
         session.steps += total.steps;
         session.constant_value_debt += total.values - added;
@@ -95,13 +95,125 @@ pub const State = struct {
         session.constant_stats.owned_payload_bytes += owned.ownedBytes();
         return anchor;
     }
+    fn replayMemberScalar(self: *State, g: anytype, record: *const receipt.Record, total: receipt.Resources, inputs: receipt.Inputs, member_event: receipt.MemberEvent, prefix: receipt.Resources) A.Error!?u32 {
+        if (comptime !@hasField(@TypeOf(g.*), "query_state")) return self.reject(g, .mode);
+        const session = &g.evaluator;
+        const queries = g.query_state orelse return self.reject(g, .mode);
+        if (&queries.old.metadata.pools.? != self.old or member_event.record >= queries.old.metadata.specialization_queries.records.items.len) return self.reject(g, .source);
+        const query = &queries.old.metadata.specialization_queries.records.items[member_event.record];
+        if (!@import("selected_query.zig").Adapter.complete(query.*) or !receipt.admittedMember(self.old.evaluator, query.dependencies)) return self.reject(g, .mode);
+        if (query.dependencies.values_added != member_event.values or prefix.values == 0 or total.values <= member_event.values) return self.reject(g, .resource);
+        const member = query.dependencies.member.?;
+        if (member.transitions != session.summary_transitions or member.exhausted != session.summary_exhausted) return self.reject(g, .mode);
+        var anchor: u32 = 0;
+        for (record.events) |event| switch (event) {
+            .read => |read| {
+                const current = session.readyConstantAnchor(read.target).?;
+                const before = graph.scalarRoot(self.old.evaluator, read.value).?;
+                const after = graph.scalarRoot(session.snapshot(), current) orelse return self.reject(g, .read);
+                if (before.scalar != after.scalar or before.bits != after.bits) return self.reject(g, .read);
+                if (read.value == record.value) anchor = current;
+            },
+            .work, .member => {},
+        };
+        const result_info = graph.scalarRoot(self.old.evaluator, record.value).?;
+        // The selected graph and receiver retain their ordinary allocations.
+        // A copied non-unit result needs one remaining local allocation unless
+        // it already names an exact ready scalar read anchor.
+        if (anchor == 0 and result_info.scalar != .unit and total.values < member_event.values + 2) return self.reject(g, .resource);
+        var owned = try record.clone(self.allocator);
+        @memcpy(@constCast(owned.inputs.types), inputs.types);
+        @memcpy(@constCast(owned.inputs.rows), inputs.rows);
+        var live = true;
+        defer if (live) owned.deinit(self.allocator);
+        try session.constant_records.ensureUnusedCapacity(self.allocator, 1);
+        const count = member_event.values + 2;
+        try session.values.ensureUnusedCapacity(self.allocator, count);
+        try session.value_evidence.ensureUnusedCapacity(self.allocator, count);
+        try session.value_records.ensureUnusedCapacity(self.allocator, count);
+        const maps = try queries.pairedImporter();
+        const expected = (try maps.importEvidence(g, query.dependencies.expected)) orelse return self.reject(g, .source);
+        const values_before = session.values.items.len;
+        const steps_before = session.steps;
+        const value_debt = session.constant_value_debt;
+        const child_debt = session.constant_child_debt;
+        const depth_before = session.depth;
+        const query_before = session.specialization_receipts.items.len;
+        // This new empty untyped array is representation only. The existing
+        // selected-query authority validates its exact receiver and judgment.
+        const receiver: u32 = @intCast(values_before);
+        session.values.appendAssumeCapacity(.{ .kind = .array, .start = @intCast(session.children.items.len) });
+        session.value_evidence.appendAssumeCapacity(0);
+        session.value_records.appendAssumeCapacity(0);
+        session.steps += prefix.steps;
+        session.constant_value_debt += prefix.values - 1;
+        session.constant_child_debt += prefix.children;
+        session.depth += member_event.depth;
+        defer session.depth = depth_before;
+        const selected = try queries.lookupMemberRecord(g, member.target, receiver, expected, member_event.record);
+        if (selected == null) {
+            // This admitted query publishes no view/call/plain effects, and
+            // its graph publication happens only on a successful match. Thus
+            // a miss can discard the private receiver and restore fuel/debt.
+            std.debug.assert(session.values.items.len == values_before + 1);
+            session.values.items.len = values_before;
+            session.value_evidence.items.len = values_before;
+            session.value_records.items.len = values_before;
+            session.steps = steps_before;
+            session.constant_value_debt = value_debt;
+            session.constant_child_debt = child_debt;
+            session.constant_stats.member_declined += 1;
+            return self.reject(g, .imported);
+        }
+        // All resource checks and reserves precede query publication. The
+        // scalar output and outer record commit now allocate nothing.
+        const info = result_info;
+        if (anchor == 0 and info.scalar != .unit) {
+            anchor = @intCast(session.values.items.len);
+            session.values.appendAssumeCapacity(info);
+            session.value_evidence.appendAssumeCapacity(switch (info.scalar) {
+                .unit => @import("types.zig").unit,
+                .bool => @import("types.zig").boolean,
+                .u32 => @import("types.zig").u32_type,
+                .f32 => @import("types.zig").f32_type,
+                else => unreachable,
+            });
+            session.value_records.appendAssumeCapacity(0);
+        }
+        const added = session.values.items.len - values_before;
+        std.debug.assert(added <= total.values);
+        owned.value = anchor;
+        for (owned.events) |*event| switch (event.*) {
+            .read => |*read| read.value = session.readyConstantAnchor(read.target).?,
+            .member => |*current| {
+                current.record = @intCast(query_before);
+                current.inference_observations = 1;
+            },
+            .work => {},
+        };
+        // An ordinary validated member-provider hit observes one inference
+        // query. Preserve that observation for a suspended enclosing recorder.
+        session.constant_inference_serial +|= 1;
+        session.steps = steps_before + total.steps;
+        session.constant_value_debt = value_debt + total.values - added;
+        session.constant_child_debt = child_debt + total.children;
+        session.constant_records.appendAssumeCapacity(owned);
+        live = false;
+        session.constant_stats.reused += 1;
+        session.constant_stats.scalar_reused += 1;
+        session.constant_stats.member_replayed += 1;
+        session.constant_stats.source_steps_replayed += total.steps;
+        session.constant_stats.values_imported += added;
+        session.constant_stats.owned_payload_bytes += owned.ownedBytes();
+        return anchor;
+    }
     fn replay(self: *State, g: anytype, record: *const receipt.Record, inputs: receipt.Inputs) A.Error!?u32 {
         const session = &g.evaluator;
-        if (record.sourceSteps() < session.minimum_constant_steps) return null;
+        if (!record.productive(session.minimum_constant_steps)) return null;
         if (!receipt.admittedGraph(self.old.evaluator, record.value)) return self.reject(g, .graph);
         for (record.events) |event| switch (event) {
             .read => |dependency| if (dependency.value >= self.old.evaluator.values.len or self.old.evaluator.values[dependency.value].kind != .scalar) return self.reject(g, .graph),
-            .work => {},
+            .work, .member => {},
         };
         if (!std.meta.eql(record.options, session.options) or !self.gate.admitsLocalSource(record.target) or !self.gate.admitsCallIdentity(record.target)) return self.reject(g, .source);
         for (record.sources) |source| switch (source) {
@@ -132,7 +244,15 @@ pub const State = struct {
         var roots: std.ArrayList(u32) = .empty;
         defer roots.deinit(self.allocator);
         var total: receipt.Resources = .{};
+        var member_event: ?receipt.MemberEvent = null;
+        var prefix: receipt.Resources = .{};
         for (record.events) |event| switch (event) {
+            .member => |member| {
+                if (member_event != null or member.values > session.options.max_values -| session.constantValueCount() -| total.values or member.depth > session.options.max_depth -| session.depth) return self.reject(g, .resource);
+                member_event = member;
+                prefix = total;
+                total.values += member.values;
+            },
             .work => |work| {
                 if (work.steps > session.options.max_steps -| session.steps -| total.steps or work.values > session.options.max_values -| session.constantValueCount() -| total.values or work.children > session.options.max_children -| session.constantChildCount() -| total.children or work.depth > session.options.max_depth -| session.depth or work.call_depth > session.options.max_call_depth -| session.call_depth) return self.reject(g, .resource);
                 total.steps += work.steps;
@@ -145,11 +265,15 @@ pub const State = struct {
                 if (session.readyConstantAnchor(read.target) == null) return self.reject(g, .ready);
             },
         };
+        if (member_event) |member| {
+            if (!self.scalarInputs(record)) return self.reject(g, .mode);
+            return self.replayMemberScalar(g, record, total, inputs, member, prefix);
+        }
         if (self.scalarInputs(record)) return self.replayScalar(g, record, total, inputs);
         try roots.append(self.allocator, record.value);
         for (record.events) |event| switch (event) {
             .read => |read| try roots.append(self.allocator, read.value),
-            .work => {},
+            .work, .member => {},
         };
         const found = try graph.Plan.inspectRootsWithRows(self.allocator, self.old, &self.gate, roots.items, .source_declared);
         var plan = found.plan orelse return self.reject(g, .graph);
@@ -164,7 +288,7 @@ pub const State = struct {
         defer self.allocator.free(seeds);
         @memset(seeds, 0);
         for (record.events) |event| switch (event) {
-            .work => {},
+            .work, .member => {},
             .read => |read| {
                 const current = (session.readyConstantAnchor(read.target)).?;
                 session.constant_stats.graph_index_bytes += seeds.len * (@sizeOf(usize) + @sizeOf(u32)) + session.values.items.len * @sizeOf(u32) + plan.order.len * @sizeOf(u32);
@@ -214,7 +338,7 @@ pub const State = struct {
         owned.value = mapped[record.value];
         for (owned.events) |*event| switch (event.*) {
             .read => |*read| read.value = mapped[read.value],
-            .work => {},
+            .work, .member => {},
         };
         session.steps += total.steps;
         session.constant_value_debt += total.values - added_values;

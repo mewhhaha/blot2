@@ -132,3 +132,30 @@ remain declined; the sparse field header adds 32 bytes and no field-specific
 LLVM speedup is claimed. Requirements, relocation and the total edit target
 remain open. Exact merged/isolated evidence is in
 [BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
+
+### Isolated compact dotted paths —13 October 2026
+
+The next reviewable slice owns concrete dotted record/nominal paths with all
+intermediate types, field spellings, nominal recipes and variant tags. It adds
+16 bytes per body header and reconstructs current physical slots. Fifty focused
+native laws, a separate fresh/retained path OOM sweep,17 executed-Wasm laws,
+eight unchanged budgets and371-file zero analyzer pass. Five matched Safe/noLLVM
+pairs reduce dotted128/512 edit CPU123.5→90 /477.5→350.5ms and elaborations
+130.5/514.5→2.5; population costs rise9–12%. These are development measurements.
+Root's combined full gate, LLVM/Fast and captured-project acceptance remain
+pending. Methods, local requirements, imported annotation heads, producer
+relocation and the general total edit target keep024 and dependent053 open.
+Exact implementation/cost boundaries are in
+[BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
+
+### Isolated inferred local requirements —13 October 2026
+
+Flat inferred associated/result-selection local principals now own their
+requirements through the existing sparse graph and predicate owner. Complete
+candidate reads precede current instantiation; unsupported/exhausted proofs
+remain ordinary. Native fresh/replay OOM,21 executed-Wasm laws, eight unchanged
+budgets and371-file zero analyzer pass. Matched bounded Safe/noLLVM local64/128
+edit CPU98.125→79.375 /188.125→152.5ms and elaborations69.5/133.5→5.5;
+population costs rise22–25%. Written/shared local origins, other residual kinds,
+relocation, full-gate/release acceptance and the total edit target keep024
+and053 open. See [BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).

@@ -79,6 +79,7 @@ const Projector = struct {
             return id;
         }
         const value: T.Node = switch (original.tag) {
+            .scoped => return error.DependencyLimit,
             .variable => blk: {
                 const index = self.variable_count;
                 self.variable_count += 1;
@@ -135,13 +136,14 @@ const Projector = struct {
         if (depth >= 1024 or label == 0 or label >= self.effect_operation_map.len) return error.DependencyLimit;
         if (self.effect_operation_map[label] != 0) return self.effect_operation_map[label];
         const source = self.checked.types.operations.items[label];
+        if (source.instance.unit != 0 or source.instance.decl != 0) return error.DependencyLimit;
         var values: std.ArrayList(T.Id) = .empty;
         defer values.deinit(self.allocator);
         for (self.checked.types.list(source.arguments)) |argument| try values.append(self.allocator, try self.projectType(argument, depth + 1));
         const arguments = try self.saveTypes(values.items);
         if (self.effect_operations.items.len == std.math.maxInt(u32)) return error.DependencyLimit;
         const id: u32 = @intCast(self.effect_operations.items.len);
-        try self.effect_operations.append(self.allocator, .{ .identity = source.identity, .arguments = arguments });
+        try self.effect_operations.append(self.allocator, .{ .identity = source.identity, .arguments = arguments, .instance = source.instance });
         self.effect_operation_map[label] = id;
         return id;
     }
@@ -246,7 +248,7 @@ pub fn deinit(allocator: Allocator, owner: *PI.Interface) void {
     inline for (.{ "nodes", "extra", "rows", "labels", "operations" }) |field| allocator.free(@field(owner.graph, field));
     allocator.free(owner.patterns.nodes);
     allocator.free(owner.patterns.extra);
-    inline for (.{ "bindings", "obligations", "obligation_spans", "nominals", "constructors", "effect_families", "effect_templates", "associated", "contracts", "contract_predicates", "contract_members" }) |field| allocator.free(@field(owner, field));
+    inline for (.{ "bindings", "obligations", "obligation_spans", "nominals", "constructors", "effect_families", "effect_templates", "associated", "contracts", "contract_predicates", "contract_members", "implementations", "implementation_predicates", "implementation_members", "member_templates", "selected_proofs", "selected_members", "selected_edges" }) |field| allocator.free(@field(owner, field));
     owner.* = undefined;
 }
 
@@ -464,6 +466,90 @@ fn freezeMode(allocator: Allocator, tree: *const ast.Tree, checked: *const check
         value.* = old;
         inline for (.{ "ty", "other", "result", "signature" }) |field| @field(value, field) = try projector.projectType(@field(old, field), 0);
         value.source = 0;
+    }
+    result.implementations = try allocator.alloc(PI.Implementation, checked.implementations.len);
+    for (checked.implementations, result.implementations) |old, *value| {
+        value.* = old;
+        value.declaration = 0;
+        if (principal_only and old.private) {
+            value.name = 0;
+            value.head = .{};
+            value.variables = .{};
+            value.parameter_names = .{};
+            value.row_variables = .{};
+            value.row_parameter_names = .{};
+            value.row_parameters = .{};
+            value.predicates = .{};
+            value.members = .{};
+            continue;
+        }
+        value.head = try projector.projectedList(old.head);
+        value.variables = try projector.projectedList(old.variables);
+        value.parameter_names = try projector.copiedList(old.parameter_names);
+        var rows: std.ArrayList(T.Id) = .empty;
+        defer rows.deinit(allocator);
+        for (checked.types.list(old.row_variables)) |row| try rows.append(allocator, try projector.projectRowVariable(row));
+        value.row_variables = try projector.saveTypes(rows.items);
+        rows.clearRetainingCapacity();
+        for (checked.types.list(old.row_parameters)) |row| try rows.append(allocator, try projector.projectRow(row, 0));
+        value.row_parameters = try projector.saveTypes(rows.items);
+        value.row_parameter_names = try projector.copiedList(old.row_parameter_names);
+    }
+    result.implementation_members = try allocator.alloc(PI.ImplementationMember, checked.implementation_members.len);
+    for (checked.implementation_members, result.implementation_members, 0..) |old, *value, index| {
+        var private = false;
+        if (principal_only) for (checked.implementations) |implementation| {
+            if (index >= implementation.members.start and index - implementation.members.start < implementation.members.len) {
+                private = implementation.private;
+                break;
+            }
+        };
+        value.* = old;
+        if (private) {
+            value.* = .{ .name = 0, .kind = old.kind };
+            continue;
+        }
+        value.root = try projector.projectType(old.root, 0);
+    }
+    result.implementation_predicates = try allocator.alloc(T.Obligation, checked.implementation_predicates.len);
+    for (checked.implementation_predicates, result.implementation_predicates, 0..) |old, *value, index| {
+        var private = false;
+        if (principal_only) for (checked.implementations) |implementation| {
+            if (index >= implementation.predicates.start and index - implementation.predicates.start < implementation.predicates.len) {
+                private = implementation.private;
+                break;
+            }
+        };
+        value.* = .{ .ty = 0, .kind = .type_rep, .source = 0, .explicit = true };
+        if (private) continue;
+        value.* = old;
+        for (checked.implementations) |implementation| {
+            if (index < implementation.predicates.start or index - implementation.predicates.start >= implementation.predicates.len) continue;
+            if (@import("implementation_predicates.zig").inferredCarrier(&checked.types, old, implementation.row_parameters)) value.signature = 0;
+            break;
+        }
+        inline for (.{ "ty", "other", "result", "signature" }) |field| @field(value, field) = try projector.projectType(@field(value.*, field), 0);
+        value.source = 0;
+    }
+    var templates: std.ArrayList(PI.MemberTemplate) = .empty;
+    defer templates.deinit(allocator);
+    for (checked.member_templates) |old| {
+        if (principal_only and checked.bindings[old.binding].private) continue;
+        var value = old;
+        value.arguments = try projector.projectedList(old.arguments);
+        try templates.append(allocator, value);
+    }
+    result.member_templates = try templates.toOwnedSlice(allocator);
+    if (!principal_only) {
+        result.selected_proofs = try allocator.dupe(PI.SelectedProof, checked.selected_proofs);
+        for (checked.selected_proofs, result.selected_proofs) |old, *value| {
+            value.arguments = try projector.projectedList(old.arguments);
+            inline for (.{ "ty", "other", "result", "signature" }) |field| @field(value.predicate, field) = try projector.projectType(@field(old.predicate, field), 0);
+            value.predicate.source = 0;
+        }
+        result.selected_members = try allocator.dupe(PI.ImplementationMember, checked.selected_members);
+        for (checked.selected_members, result.selected_members) |old, *value| value.root = try projector.projectType(old.root, 0);
+        result.selected_edges = try allocator.dupe(u32, checked.selected_edges);
     }
     result.patterns.nodes = try projector.pattern_nodes.toOwnedSlice(allocator);
     result.patterns.extra = try projector.pattern_extra.toOwnedSlice(allocator);

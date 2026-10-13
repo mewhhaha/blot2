@@ -21,6 +21,8 @@ pub const Tag = enum(u32) {
     // Contract members: a=name,b=type equation or value signature (0 abstract).
     contract_type_member,
     contract_value_member,
+    // implementation_decl(a=name,b=members list,c=[params start,len,head,where start,len,where node]).
+    implementation_decl,
     effect_decl,
     effect_type_decl,
     fixity_decl,
@@ -173,6 +175,7 @@ pub const ValueDecl = struct {
     where_node: Id,
     attributes: List,
 };
+pub const ImplementationDecl = struct { name: symbols.Symbol, parameters: List, head: Id, members: List, where: List, where_node: Id };
 pub const Parameter = struct {
     name: symbols.Symbol,
     annotation: Id,
@@ -285,6 +288,13 @@ pub const Tree = struct {
         std.debug.assert(n.tag == .value_decl);
         const x = self.extra.items[n.c..][0..9];
         return .{ .name = n.a, .body = n.b, .annotation = x[0], .modifier = x[1], .runtime = x[2] == 1, .exported = x[7] & 1 != 0, .where = .{ .start = x[3], .len = x[4] }, .where_node = x[8], .attributes = .{ .start = x[5], .len = x[6] } };
+    }
+    pub fn implementation(self: *const Tree, id: Id) ImplementationDecl {
+        const n = self.node(id);
+        std.debug.assert(n.tag == .implementation_decl);
+        const x = self.extra.items[n.c..][0..6];
+        const members = self.node(n.b);
+        return .{ .name = n.a, .parameters = .{ .start = x[0], .len = x[1] }, .head = x[2], .members = .{ .start = members.a, .len = members.b }, .where = .{ .start = x[3], .len = x[4] }, .where_node = x[5] };
     }
     // parameter c points to [flags,where start,len,node]; flags bit0=demand,bit1=unit.
     pub fn parameter(self: *const Tree, id: Id) Parameter {

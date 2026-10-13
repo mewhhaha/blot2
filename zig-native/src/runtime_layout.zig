@@ -48,6 +48,44 @@ pub const ProviderFrame = extern struct {
     kind: ProviderKind,
     pub const roles = [_]Role{ .scalar, .reference, .reference, .scalar };
 };
+/// Separate authority owner. Operation closures and scoped installations own
+/// this edge, independently of mutable State cells and provider heads.
+pub const EffectAuthority = extern struct {
+    active: u32,
+    pub const roles = [_]Role{.scalar};
+};
+pub const ScopedProvider = extern struct {
+    operation: u32,
+    implementation: u32,
+    owner: u32,
+    pub const roles = [_]Role{ .scalar, .reference, .reference };
+};
+pub const ScopedStateProvider = extern struct {
+    read: u32,
+    write: u32,
+    initial: u32,
+    owner: u32,
+    pub const roles = [_]Role{ .scalar, .scalar, .value, .reference };
+};
+pub const ScopedFrame = extern struct {
+    operation: u32,
+    target: u32,
+    outer: u32,
+    kind: u32,
+    owner: u32,
+    pub const tag: u32 = 6;
+    pub const roles = [_]Role{ .scalar, .reference, .reference, .scalar, .reference };
+};
+pub const ScopedStateFrame = extern struct {
+    read: u32,
+    value: u32,
+    outer: u32,
+    kind: u32,
+    write: u32,
+    owner: u32,
+    pub const tag: u32 = 5;
+    pub const roles = [_]Role{ .scalar, .value, .reference, .scalar, .scalar, .reference };
+};
 pub const StateCell = extern struct {
     value: u32,
     pub const roles = [_]Role{.value};
@@ -89,6 +127,19 @@ pub const RequestFrame = extern struct {
     cell: u32,
     runner_outer: u32,
     pub const roles = [_]Role{ .scalar, .reference, .reference, .scalar, .reference, .reference };
+};
+/// The static request prefix stays byte-identical. Fresh authority is an
+/// additional counted edge, separate from the request cancellation cell.
+pub const ScopedRequestFrame = extern struct {
+    operation: u32,
+    target: u32,
+    outer: u32,
+    kind: u32,
+    cell: u32,
+    runner_outer: u32,
+    owner: u32,
+    pub const tag: u32 = 7;
+    pub const roles = [_]Role{ .scalar, .reference, .reference, .scalar, .reference, .reference, .reference };
 };
 pub const Decision = extern struct {
     kind: u32,
@@ -152,7 +203,7 @@ pub fn fields(comptime T: type) [T.roles.len]Field {
 }
 
 comptime {
-    for (.{ Closure, HostClosure, Demand, Pair, Cursor, ProviderFrame, StateCell, StateFrame, Provider, StateProvider, RequestCell, RequestFrame, Decision, Array, ListDescriptor, ListNode, ListBranch, ArenaHeader }) |T| {
+    for (.{ Closure, HostClosure, Demand, Pair, Cursor, ProviderFrame, StateCell, StateFrame, Provider, StateProvider, RequestCell, RequestFrame, ScopedRequestFrame, Decision, Array, ListDescriptor, ListNode, ListBranch, ArenaHeader }) |T| {
         _ = fields(T);
     }
     for (@typeInfo(ListNode).@"struct".field_names) |name|
@@ -165,6 +216,8 @@ comptime {
         std.debug.assert(offset(Closure, name) == offset(Demand, name));
         std.debug.assert(offset(Closure, name) == offset(HostClosure, name));
     }
+    for (@typeInfo(RequestFrame).@"struct".field_names) |name|
+        std.debug.assert(offset(RequestFrame, name) == offset(ScopedRequestFrame, name));
     for (@typeInfo(ProviderFrame).@"struct".field_names) |name|
         std.debug.assert(offset(ProviderFrame, name) == offset(RequestFrame, name));
 }

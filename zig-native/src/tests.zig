@@ -42,6 +42,7 @@ comptime {
     _ = @import("partial_runtime_tests.zig");
     _ = @import("runtime_operation_tests.zig");
     _ = @import("runtime_operation_backend_tests.zig");
+    _ = @import("scoped_effect_backend_tests.zig");
     _ = @import("module_relink_tests.zig");
     _ = @import("unit_coverage_tests.zig");
     _ = @import("layout_bridge.zig");
@@ -145,6 +146,9 @@ test {
 
 comptime {
     _ = @import("associated_catalog_tests.zig");
+    _ = @import("implementation_tests.zig");
+    _ = @import("implementation_rows.zig");
+    _ = @import("implementation_project_tests.zig");
     _ = @import("product_projection_tests.zig");
 }
 

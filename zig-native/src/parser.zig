@@ -287,6 +287,10 @@ const Parser = struct {
         if (self.at(.kw_infixl) or self.at(.kw_infixr) or self.at(.kw_infix)) {
             return self.fixityDecl(attrs, start);
         }
+        if (self.word("impl")) {
+            if (is_opaque or attrs.len != 0) return self.fail(.unexpected_token);
+            return self.implementationDeclaration(start);
+        }
         if (self.at(.kw_type) or self.at(.kw_data)) return self.typeDeclaration(attrs, start, is_opaque);
         if (self.eat(.kw_effect)) {
             const name = try self.qualified();
@@ -470,6 +474,51 @@ const Parser = struct {
         }
         const range = try self.list(params.items);
         return self.add(if (effect) .effect_type_decl else .data_decl, name, body, try self.extra(&.{ range.start, range.len, attrs.start, attrs.len }), start);
+    }
+    fn implementationDeclaration(self: *Parser, start: u32) Error!Id {
+        _ = self.advance();
+        const name = try self.typeIdentifier();
+        var parameters: std.ArrayList(Id) = .empty;
+        defer parameters.deinit(self.allocator);
+        if (typeAtomTag(self.current().tag)) try parameters.append(self.allocator, try self.typeAtom());
+        while (self.eat(.fat_arrow)) {
+            _ = try self.expect(.kw_type);
+            try parameters.append(self.allocator, try self.typeAtom());
+        }
+        _ = try self.expect(.colon);
+        const head = try self.contractItem(false);
+        const prerequisites = try self.whereClause();
+        _ = try self.expect(.equal);
+        const body_start = (try self.expect(.l_brace)).start;
+        self.newlines();
+        var members: std.ArrayList(Id) = .empty;
+        defer members.deinit(self.allocator);
+        while (!self.at(.r_brace)) {
+            const member_start = self.current().start;
+            if (self.eat(.kw_type)) {
+                const member = try self.typeIdentifier();
+                _ = try self.expect(.equal);
+                try members.append(self.allocator, try self.add(.contract_type_member, member, try self.typeExpression(), 0, member_start));
+            } else {
+                _ = try self.expect(.kw_const);
+                const member = try self.identifier();
+                var annotation: Id = 0;
+                if (self.eat(.colon)) annotation = try self.typeExpression();
+                _ = try self.expect(.equal);
+                if (!self.at(.kw_fn)) return self.fail(.expected_token);
+                const value = try self.expression();
+                const method = try self.add(.value_decl, member, value, try self.extra(&.{ annotation, 0, 0, 0, 0, 0, 0, 0, 0 }), member_start);
+                try members.append(self.allocator, method);
+                try self.tree.constant_names.append(self.allocator, .{ .declaration = method, .point = member_start });
+            }
+            if (!self.eat(.comma)) break;
+            self.newlines();
+        }
+        self.newlines();
+        _ = try self.expect(.r_brace);
+        const body = try self.listNode(.where_clause, members.items, body_start);
+        const params = try self.list(parameters.items);
+        return self.add(.implementation_decl, name, body, try self.extra(&.{ params.start, params.len, head, prerequisites.predicates.start, prerequisites.predicates.len, prerequisites.node }), start);
     }
     const Where = struct { predicates: ast.List = .{}, node: ast.Id = 0 };
     fn whereClause(self: *Parser) Error!Where {

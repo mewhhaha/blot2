@@ -65,6 +65,10 @@
 (if_expression "else" @keyword)
 (if_expression "if" @keyword)
 (if_expression "then" @keyword)
+(implementation_declaration "type" @keyword)
+(implementation_declaration marker: "impL" @keyword)
+(implementation_type_member "type" @keyword)
+(implementation_value_member "const" @keyword)
 (import_binding alias: "as" @keyword)
 (import_declaration "froM" @keyword)
 (import_declaration "import" @keyword)
@@ -93,6 +97,9 @@
 (opaque_type) @type
 (type_alias) @type
 (contract_type) @type
+(implementation_member) @variable.other.member
+(implementation_type_member) @variable.other.member
+(implementation_value_member) @variable.other.member
 (effect_type) @type
 (data_type) @type
 (type_array) @type
@@ -128,6 +135,9 @@
 (data_type name: (TYPE_IDENT) @type)
 (effect_binding name: (IDENT) @variable)
 (effect_type name: (TYPE_IDENT) @type)
+(implementation_type_member name: (TYPE_IDENT) @type)
+(implementation_value_member name: (IDENT) @variable.other.member)
+(implementation_value_member name: (TYPE_IDENT) @variable.other.member)
 (import_binding name: (IDENT) @variable)
 (import_binding name: (TYPE_IDENT) @variable)
 (member_access name: (IDENT) @variable.other.member)

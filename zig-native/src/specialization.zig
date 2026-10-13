@@ -115,14 +115,19 @@ pub const Service = struct {
         errdefer rows.deinit(self.allocator);
         errdefer mappings.deinit(self.allocator);
         var ty = source.binding(key.target.binding).ty;
+        // Written labels can name result or later parameter binders.
+        // Map every data endpoint before projecting their operation arguments.
+        var source_rows: [code_artifacts.max_parameters]types.Effects.Id = undefined;
         for (key.parameters[0..key.count], 0..) |scalar_type, index| {
             const n = source.types.node(ty);
             if (n.tag != .function) return self.decline(unit_id, body.span, .unresolved_type);
             try self.mapTypeDepth(unit_id, &mappings, &rows, n.a, scalar_type, body.span, 0);
-            try self.mapRow(unit_id, &mappings, &rows, n.c, key.effects[index], body.span, true);
+            source_rows[index] = n.c;
             ty = n.b;
         }
         try self.mapTypeDepth(unit_id, &mappings, &rows, ty, key.result, body.span, 0);
+        for (source_rows[0..key.count], key.effects[0..key.count]) |row, actual|
+            try self.mapRow(unit_id, &mappings, &rows, row, actual, body.span, true);
         var full = key.result;
         var reverse: usize = key.count;
         while (reverse > 0) {
@@ -231,11 +236,64 @@ pub const Service = struct {
         if (depth >= 1024) return self.decline(unit_id, span, .complexity);
         const source = self.unit(unit_id);
         const n = source.types.node(ty);
+        if (n.tag == .scoped) {
+            const physical = self.layouts.node(concrete);
+            if (physical.tag != .nominal or physical.a != std.math.maxInt(u32) or physical.b != layout.capability_layout_decl) return self.decline(unit_id, span, .unresolved_type);
+            return;
+        }
         const representation = self.layouts.node(concrete);
         if (n.tag == .never) return;
         if (n.tag == .variable) {
             for (mappings.items) |*mapping| if (mapping.variable == ty) {
                 mapping.layout = self.layouts.mergePartial(mapping.layout, concrete) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
+                return;
+            };
+            try mappings.append(self.allocator, .{ .variable = ty, .layout = concrete });
+            return;
+        }
+        if (n.tag == .projection) {
+            // Inputs must already own semantic evidence. The wanted physical
+            // result cannot invent a contract argument or select a witness.
+            var seeds: std.ArrayList(type_evidence.Mapping) = .empty;
+            defer seeds.deinit(self.allocator);
+            for (mappings.items) |mapping| {
+                if (self.layouts.node(mapping.layout).tag == .erased) continue;
+                const actual = self.toEvidence(mapping.layout) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    else => continue,
+                };
+                try seeds.append(self.allocator, .{ .variable = mapping.variable, .evidence = actual });
+            }
+            var row_seeds: std.ArrayList(type_evidence.RowMapping) = .empty;
+            defer row_seeds.deinit(self.allocator);
+            if (rows) |values| for (values.items) |mapping| {
+                if (mapping.row == layout.unknown_row) continue;
+                try row_seeds.append(self.allocator, .{ .variable = mapping.variable, .evidence = self.rowToEvidence(mapping.row) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    else => return self.decline(unit_id, span, .unresolved_type),
+                } });
+            };
+            var use: core.Id = 0;
+            for (source.selected_uses) |selected| {
+                const location = source.span(selected.node);
+                if (location.start >= span.start and location.end <= span.end) {
+                    use = selected.node;
+                    break;
+                }
+            }
+            const owner: usize = @intCast(unit_id - 1);
+            const selected = self.evaluator.projectType(owner, use, ty, seeds.items, row_seeds.items) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                else => return self.evaluationFailure(),
+            };
+            if (selected == 0) return self.decline(unit_id, span, .unresolved_type);
+            const wanted = self.toEvidence(concrete) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                else => return self.decline(unit_id, span, .unresolved_type),
+            };
+            if (selected != wanted) return self.decline(unit_id, span, .unresolved_type);
+            for (mappings.items) |*mapping| if (mapping.variable == ty) {
+                mapping.layout = concrete;
                 return;
             };
             try mappings.append(self.allocator, .{ .variable = ty, .layout = concrete });
@@ -304,7 +362,7 @@ pub const Service = struct {
             for (actuals, 0..) |actual, index| {
                 if (used[index]) continue;
                 const operation = self.layouts.effects.view().operation(actual);
-                if (!std.meta.eql(identity, operation.identity)) continue;
+                if (!std.meta.eql(identity, operation.identity) or !std.meta.eql(source.operation(label).instance, operation.instance)) continue;
                 const arguments = self.layouts.effects.view().operationArguments(actual);
                 if (arguments.len != argument_ids.items.len) continue;
                 var same = true;

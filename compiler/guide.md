@@ -848,15 +848,28 @@ may include an open tail, as in `U32 -> U32 ! {State.get U32 | e}` or
 `U32 -> U32 ! {| e}`. The tail is a row variable; using `e` as both a type
 variable and a row variable in one binding is an error. Checked rows preserve
 repeated labels; reflected effect sets discard repetitions. This release accepts
-concrete operation labels, including closed instances of generic effects, before
-an open tail. A label applied to a free type variable, such as `State a`,
-reports `unsupported_polymorphic_effect_label`; symbolic generic labels require
-a later effect-identity representation.
+operation labels, including symbolic generic arguments such as `State.get a`,
+before an open tail. Instantiation preserves their exact declaration and family
+arguments. Reflection still requires complete closed descriptors; unresolved
+arguments cannot become a closed reflected effect set.
 
 [Scoped effect identities](../zig-native/SCOPED_EFFECTS.md) specifies that next
 representation: symbolic family arguments, distinct same-typed capabilities and
-checked scope/capture lifetimes. Its proposed syntax remains design work for
-tasks058–059, separate from the executable behavior above.
+checked scope/capture lifetimes. The direct annotated-family subset accepts
+`@effect.scope (fn (state: State U32) => body)`, with member operations such as
+`state.get ()`. Each entry creates fresh authority. Local aliases and providers
+preserve its identity; its operations must be handled before exit. Generic scope
+factories may use symbolic family payloads such as `State a`; returning the same
+inherited payload shape retains its original lifetime. A longer-lived outer
+capability may pass through an inner scope in structural data; only the exiting
+owner is forbidden in that result. Primitive and structural data may return;
+callable, demand, provider, nominal and unresolved results or transferred
+arguments conservatively reject. Direct source closures may return when a
+bounded capture proof excludes the exiting owner; unknown captures still reject.
+A direct anonymous adapter whose whole body invokes its callback may borrow a
+capturing callable with a structural result. Generic capability contracts,
+selected identities and mixed-owner State pairs remain unsupported. See
+[qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
 
 ## Qualified bindings
 
@@ -931,12 +944,36 @@ even if its defined equation reduces to a public type.
 be discharged at a concrete use. Equality includes nominal identity and exact
 function effect rows. It never infers a contract input from an abstract output.
 Abstract projections may remain in principal schemes under their contract
-requirement; concrete execution requires implementation evidence. Implementation
-declarations and member calls are task 056. Residual projections provide no
-backend layout. Direct, mutual and growing equation cycles reject after alias
-expansion; normalization shares exact graph work within the project budget. The
-complete rules are in
+requirement; concrete execution requires implementation evidence. Residual
+projections provide no backend layout. Direct, mutual and growing equation
+cycles reject after alias expansion; normalization shares exact graph work
+within the project budget. The complete rules are in
 [associated contracts](../zig-native/ASSOCIATED_CONTRACTS.md).
+
+An explicit implementation supplies every abstract type and function member. Its
+named parameters must be determined by its head; prerequisites cannot introduce
+extra binders. Defined equations cannot be overridden.
+
+```blot
+type Source s is contract = { type Item, const first: s -> (Source.Item s) }
+impl ArraySource a : Source (Array a) = {
+  type Item = a,
+  const first = fn values => @array.get values 0,
+}
+const read: s -> (Source.Item s) where { Source s } =
+  fn values => Source.first values
+entry const first = fn () => read #[42]
+```
+
+Heads must be disjoint across the acquired public module graph, irrespective of
+prerequisites. The original contract producer or the producer of the head's
+anchor nominal owns each implementation. A module's `private impl` stays
+lexical. Generic public callers supply their own evidence context. Known inputs
+select a unique head and then discharge its complete prerequisites; an
+incompatible head has no fallback. Selection never executes a method or forces
+its captures. Member functions use ordinary callbacks, currying, effects and
+ownership when called. They do not register legacy receiver methods or
+operators.
 
 In gdev, const resource/component registrations determine the nested world type;
 `ecs.build` discards registration metadata and retains initial state, scope and

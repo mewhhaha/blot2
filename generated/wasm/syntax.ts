@@ -134,12 +134,13 @@ export type LiteralKind =
   | "=>"
   | "="
   | "is"
+  | "impL"
+  | ":"
+  | "const"
   | "@"
   | "["
   | "]"
-  | "const"
   | "let"
-  | ":"
   | "effect"
   | "->"
   | "data"
@@ -247,6 +248,11 @@ export type RuleName =
   | "opaque_type"
   | "type_alias"
   | "contract_type"
+  | "implementation_declaration"
+  | "implementation_body"
+  | "implementation_member"
+  | "implementation_type_member"
+  | "implementation_value_member"
   | "declaration_attribute"
   | "attribute_name"
   | "value_declaration"
@@ -422,7 +428,7 @@ export interface ImportBindingCursor extends RuleCursorBase<"import_binding"> {
 
 export interface DeclarationCursor extends RuleCursorBase<"declaration"> {
   field(name: "attributes"): ReadonlyArray<DeclarationAttributeCursor> | null;
-  field(name: "value"): ContractTypeCursor | DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | NamedFixityCursor | SymbolicFixityCursor | TypeAliasCursor | ValueDeclarationCursor | OpaqueTypeCursor;
+  field(name: "value"): ContractTypeCursor | DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | ImplementationDeclarationCursor | NamedFixityCursor | SymbolicFixityCursor | TypeAliasCursor | ValueDeclarationCursor | OpaqueTypeCursor;
   field(name: "visibility"): TokenCursor<"literal", "privatE"> | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -450,6 +456,43 @@ export interface ContractTypeCursor extends RuleCursorBase<"contract_type"> {
   field(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ImplementationDeclarationCursor extends RuleCursorBase<"implementation_declaration"> {
+  field(name: "body"): ImplementationBodyCursor;
+  field(name: "head"): ConstraintPredicateCursor;
+  field(name: "marker"): TokenCursor<"literal", "impL">;
+  field(name: "name"): TokenCursor<"named", "TYPE_IDENT">;
+  field(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
+  field(name: "where"): WhereClauseCursor | null;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ImplementationBodyCursor extends RuleCursorBase<"implementation_body"> {
+  field(name: "members"): ReadonlyArray<ImplementationMemberCursor>;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "members"): ReadonlyArray<ImplementationMemberCursor>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ImplementationMemberCursor extends RuleCursorBase<"implementation_member"> {
+}
+
+export interface ImplementationTypeMemberCursor extends RuleCursorBase<"implementation_type_member"> {
+  field(name: "name"): TokenCursor<"named", "TYPE_IDENT">;
+  field(name: "value"): TypeExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ImplementationValueMemberCursor extends RuleCursorBase<"implementation_value_member"> {
+  field(name: "annotation"): readonly [TokenCursor<"literal", ":">, TypeExpressionCursor] | null;
+  field(name: "name"): TokenCursor<"named", "IDENT"> | TokenCursor<"named", "TYPE_IDENT">;
+  field(name: "value"): LambdaCursor;
+  field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
@@ -1146,6 +1189,11 @@ export type AnyRuleCursor =
   | OpaqueTypeCursor
   | TypeAliasCursor
   | ContractTypeCursor
+  | ImplementationDeclarationCursor
+  | ImplementationBodyCursor
+  | ImplementationMemberCursor
+  | ImplementationTypeMemberCursor
+  | ImplementationValueMemberCursor
   | DeclarationAttributeCursor
   | AttributeNameCursor
   | ValueDeclarationCursor

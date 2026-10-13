@@ -22,14 +22,13 @@ if (development) {
     "build",
     "install",
     "compiler-identity",
+    ...fixtures,
     ...options,
     "--prefix",
     "zig-out-dev",
     "--summary",
     "all",
   ]);
-  // Fixture tests read zig-out; generating them leaves its release binary alone.
-  commands.push(["build", ...fixtures, ...options, "--summary", "all"]);
   // An unchanged budget fixture can use Zig's artifact cache. Forcing another
   // incremental compiler invocation adds several seconds to every quick check.
   commands.push([
@@ -37,6 +36,8 @@ if (development) {
     "budget-fixture",
     "-Doptimize=safe",
     "-Dllvm=false",
+    "--prefix",
+    "zig-out-dev",
     "--summary",
     "all",
   ]);

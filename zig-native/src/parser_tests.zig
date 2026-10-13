@@ -314,3 +314,49 @@ test "every executable guide block parses independently" {
     }
     try std.testing.expect(count >= 10);
 }
+
+fn implementationSyntax(allocator: std.mem.Allocator) !void {
+    const source =
+        \\private impl ArraySource a : Source (Array a) where { Type_rep a } = {
+        \\  type Item = a,
+        \\  const first: (Array a) -> a = fn values => @array.get values 0,
+        \\}
+        \\impl Pair (a, b) => type c : Combined (a, b) c = {}
+        \\const impl = fn impl => impl
+    ;
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parsed(allocator, source, &pool);
+    defer tree.deinit(allocator);
+    for (tree.diagnostics.items) |issue| std.debug.print("implementation syntax at {d}: {s} expected {any} near {s}\n", .{ issue.start, issue.message(), issue.expected_token, source[issue.start..@min(source.len, issue.end + 20)] });
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    try std.testing.expectEqual(@as(usize, 3), tree.roots.items.len);
+    const root = tree.roots.items[0];
+    try std.testing.expectEqual(ast.Tag.implementation_decl, tree.node(root).tag);
+    try std.testing.expect(tree.declarationTraits(root).private);
+    const declaration = tree.implementation(root);
+    try std.testing.expectEqual(@as(u32, 1), declaration.parameters.len);
+    try std.testing.expectEqual(@as(u32, 1), declaration.where.len);
+    try std.testing.expectEqual(@as(u32, 2), declaration.members.len);
+    const members = tree.list(declaration.members);
+    try std.testing.expectEqual(ast.Tag.contract_type_member, tree.node(members[0]).tag);
+    try std.testing.expectEqual(ast.Tag.value_decl, tree.node(members[1]).tag);
+    try std.testing.expectEqual(ast.Tag.lambda, tree.node(tree.valueDecl(members[1]).body).tag);
+    try std.testing.expectEqual(@as(u32, 2), tree.implementation(tree.roots.items[1]).parameters.len);
+}
+
+test "implementation contextual headers retain explicit parameters heads prerequisites and lambda members" {
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, implementationSyntax, .{});
+    for ([_][]const u8{
+        "entry impl X : Source U32 = {}\n",
+        "opaque impl X : Source U32 = {}\n",
+        "impl X : Source U32 = { const first = other }\n",
+        "impl X : Source U32 = { type Item }\n",
+    }) |source| {
+        var pool: symbols.Pool = .{};
+        defer pool.deinit(std.testing.allocator);
+        var tree = try parsed(std.testing.allocator, source, &pool);
+        defer tree.deinit(std.testing.allocator);
+        try std.testing.expect(tree.diagnostics.items.len != 0);
+    }
+}

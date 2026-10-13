@@ -7,8 +7,10 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const fixture =
-  new URL("../zig-out/bin/budget-fixture", import.meta.url).pathname;
+const fixture = new URL(
+  "budget-fixture",
+  new URL(executable, `file://${Deno.cwd()}/`),
+).pathname;
 
 // Exercise unknown callback rows, rejection and recovery without spending the
 // production million-step budget. The fixture has a build-local 256-step limit.

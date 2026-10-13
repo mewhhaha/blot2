@@ -114,6 +114,16 @@ const Capture = struct {
                         }
                     }.compare)) |i| try self.reference(self.module.erased_declaration_references[i].target, id);
                     switch (n.tag) {
+                        .contract_method => {
+                            try self.nodes(self.module.children(id));
+                            const template = self.module.member_templates[n.a];
+                            for (self.module.implementations) |implementation| {
+                                if (!std.meta.eql(implementation.contract, template.contract)) continue;
+                                for (self.module.implementation_members[implementation.members.start..][0..implementation.members.len]) |method| {
+                                    if (method.kind == .value and method.name == template.name) try self.reference(.{ .unit = method.target.unit, .binding = method.target.binding }, id);
+                                }
+                            }
+                        },
                         .constant, .primitive_function, .panic, .constructor_function, .type_constructor => {},
                         .reference => try self.reference(self.module.reference(id), id),
                         .scalar, .logical, .associated, .record_merge, .type_same, .effect_provider, .handle => {
@@ -136,7 +146,7 @@ const Capture = struct {
                             try self.scheme(self.module.binding(n.a).scheme);
                             try self.node(n.b);
                         },
-                        .return_, .force, .project, .computation => try self.node(n.a),
+                        .return_, .force, .project, .computation, .effect_scope => try self.node(n.a),
                         .result_associated => {
                             try self.member(n.b, .none);
                             try self.node(n.a);
@@ -173,6 +183,7 @@ const Capture = struct {
                             while (i != 0) {
                                 i -= 1;
                                 try self.node(arms[i].callback);
+                                try self.node(arms[i].selector);
                             }
                             try self.node(metadata.computation);
                         },

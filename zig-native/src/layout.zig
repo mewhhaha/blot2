@@ -9,6 +9,7 @@ const Allocator = std.mem.Allocator;
 pub const Id = u32;
 pub const erased: Id = 6;
 /// Unknown effects are representation-only facts, distinct from closed empty.
+pub const capability_layout_decl: u32 = 7;
 pub const unknown_row: u32 = std.math.maxInt(u32);
 pub const Tag = enum(u8) { invalid, unit, boolean, u32, f32, never, product, record, nominal, array, list, cursor, function, demand, type_constructor, resolver, erased, provider, state_provider };
 pub const Node = struct { tag: Tag, a: u32 = 0, b: u32 = 0, c: u32 = 0 };
@@ -299,6 +300,7 @@ pub const Store = struct {
             .unit, .boolean, .u32, .f32, .never => return root,
             .variable => return erased,
             .absent, .projection => return error.UnresolvedType,
+            .scoped => return self.intern(.nominal, std.math.maxInt(u32), capability_layout_decl, &.{}),
             .type_constructor => return self.intern(.type_constructor, n.a, n.b, &.{}),
             .array, .list, .cursor, .resolver => return self.intern(switch (n.tag) {
                 .array => .array,
@@ -350,7 +352,7 @@ pub const Store = struct {
             defer self.allocator.free(source_arguments);
             const identity = source.operation(label).identity;
             for (source_arguments) |argument| try arguments.append(self.allocator, try self.fromSolverDepth(source, argument, depth + 1, budget));
-            try labels.append(self.allocator, self.effects.internOperation(identity, arguments.items) catch |err| return effectError(err));
+            try labels.append(self.allocator, self.effects.internOperationInstance(identity, arguments.items, source.operation(label).instance) catch |err| return effectError(err));
         }
         return self.effects.internRow(labels.items) catch |err| return effectError(err);
     }
@@ -379,6 +381,7 @@ pub const Store = struct {
         budget.* -= 1;
         if (id == 0 or id >= self.nodes.items.len) return error.UnresolvedType;
         const n = self.node(id);
+        if (n.tag == .nominal and n.a == std.math.maxInt(u32) and n.b == capability_layout_decl) return error.UnresolvedType;
         switch (n.tag) {
             .invalid, .erased => return error.UnresolvedType,
             .unit, .boolean, .u32, .f32, .never => return id,
@@ -418,6 +421,7 @@ pub const Store = struct {
         budget.* -= 1;
         if (id == 0 or id >= self.nodes.items.len) return error.UnresolvedType;
         const n = self.node(id);
+        if (n.tag == .nominal and n.a == std.math.maxInt(u32) and n.b == capability_layout_decl) return 0;
         switch (n.tag) {
             .invalid => return error.UnresolvedType,
             .erased => return 0,
@@ -483,6 +487,7 @@ pub const Store = struct {
             .unit, .boolean, .u32, .f32, .never => return ty,
             .variable => return if (allow_erased) erased else error.UnresolvedType,
             .absent, .projection => return error.UnresolvedType,
+            .scoped => return self.intern(.nominal, std.math.maxInt(u32), capability_layout_decl, &.{}),
             .array => return self.intern(.array, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),
             .list => return self.intern(.list, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),
             .cursor => return self.intern(.cursor, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),
@@ -539,7 +544,7 @@ pub const Store = struct {
         for (self.effects.view().rowLabels(row)) |label| {
             arguments.clearRetainingCapacity();
             for (self.effects.view().operationArguments(label)) |argument| try arguments.append(target.allocator, try self.toEvidenceDepth(target, argument, depth + 1, budget));
-            try labels.append(target.allocator, try target.effects.internOperation(self.effects.view().operation(label).identity, arguments.items));
+            try labels.append(target.allocator, try target.effects.internOperationInstance(self.effects.view().operation(label).identity, arguments.items, self.effects.view().operation(label).instance));
         }
         return target.effects.internRow(labels.items);
     }
@@ -553,7 +558,7 @@ pub const Store = struct {
         for (view.effects.rowLabels(row)) |label| {
             arguments.clearRetainingCapacity();
             for (view.effects.operationArguments(label)) |argument| try arguments.append(self.allocator, try self.fromEvidenceDepth(view, argument, depth + 1, budget));
-            const mapped = self.effects.internOperation(view.effects.operation(label).identity, arguments.items) catch |err| return effectError(err);
+            const mapped = self.effects.internOperationInstance(view.effects.operation(label).identity, arguments.items, view.effects.operation(label).instance) catch |err| return effectError(err);
             try labels.append(self.allocator, mapped);
         }
         return self.effects.internRow(labels.items) catch |err| return effectError(err);
@@ -583,7 +588,7 @@ pub const Store = struct {
         for (module.types.rowLabels(row)) |label| {
             arguments.clearRetainingCapacity();
             for (module.types.operationArguments(label)) |argument| try arguments.append(self.allocator, try self.fromTypeDepth(module, argument, mappings, rows, depth + 1, allow_erased));
-            const mapped = self.effects.internOperation(module.types.operation(label).identity, arguments.items) catch |err| return effectError(err);
+            const mapped = self.effects.internOperationInstance(module.types.operation(label).identity, arguments.items, module.types.operation(label).instance) catch |err| return effectError(err);
             try labels.append(self.allocator, mapped);
         }
         try labels.appendSlice(self.allocator, self.effects.view().rowLabels(suffix));

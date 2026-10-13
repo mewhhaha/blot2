@@ -183,7 +183,7 @@ pub fn behavior(m: *const core.Module, id: core.Id, budget: *usize) Behavior {
             result = behavior(m, n.b, budget);
             result.allocates = true;
         },
-        .operation_value, .effect_provider, .state_provider, .handle, .request_loop, .request_decision, .force, .resolver_op => result = .{ .unknown = true, .effects = true },
+        .effect_scope, .operation_value, .effect_provider, .state_provider, .handle, .request_loop, .request_decision, .force, .resolver_op => result = .{ .unknown = true, .effects = true },
         else => result.unknown = true,
     }
     return result;

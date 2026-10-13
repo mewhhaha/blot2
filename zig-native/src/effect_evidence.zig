@@ -6,7 +6,7 @@ const Allocator = std.mem.Allocator;
 pub const Id = u32;
 pub const Label = u32;
 pub const List = struct { start: u32 = 0, len: u32 = 0 };
-pub const Operation = struct { identity: types.NominalIdentity, arguments: List };
+pub const Operation = struct { identity: types.NominalIdentity, arguments: List, instance: types.NominalIdentity = .{ .unit = 0, .decl = 0 } };
 pub const Error = Allocator.Error || error{ EvidenceLimit, TypeMismatch };
 pub const View = struct {
     operations: []const Operation = &.{},
@@ -91,19 +91,27 @@ pub const Store = struct {
         return result;
     }
     pub fn internOperation(self: *Store, identity: types.NominalIdentity, values: []const u32) Error!Label {
+        return self.internOperationInstance(identity, values, .{ .unit = 0, .decl = 0 });
+    }
+    pub fn internOperationInstance(self: *Store, identity: types.NominalIdentity, values: []const u32, instance: types.NominalIdentity) Error!Label {
         var hash = std.hash.Wyhash.init(0);
+        if (instance.decl != 0) hash.update(std.mem.asBytes(&instance));
         hash.update(std.mem.asBytes(&identity.unit));
         hash.update(std.mem.asBytes(&identity.decl));
         hash.update(std.mem.sliceAsBytes(values));
-        return self.internOperationHashed(identity, values, hash.final());
+        return self.internOperationInstanceHashed(identity, values, instance, hash.final());
     }
     fn internOperationHashed(self: *Store, identity: types.NominalIdentity, values: []const u32, fingerprint: u64) Error!Label {
+        return self.internOperationInstanceHashed(identity, values, .{ .unit = 0, .decl = 0 }, fingerprint);
+    }
+    fn internOperationInstanceHashed(self: *Store, identity: types.NominalIdentity, values: []const u32, instance: types.NominalIdentity, fingerprint: u64) Error!Label {
         if (identity.decl == 0) return error.TypeMismatch;
+        if (identity.unit == 0 and identity.decl == 1 and (instance.unit != 0 or instance.decl != 0)) return error.TypeMismatch;
         for (values) |value| if (value == 0) return error.TypeMismatch;
         var candidate = self.operation_buckets.get(fingerprint) orelse 0;
         while (candidate != 0) : (candidate = self.operation_next.items[candidate]) {
             const op = self.view().operation(candidate);
-            if (op.identity.unit == identity.unit and op.identity.decl == identity.decl and std.mem.eql(u32, self.view().operationArguments(candidate), values)) return candidate;
+            if (std.meta.eql(op.instance, instance) and op.identity.unit == identity.unit and op.identity.decl == identity.decl and std.mem.eql(u32, self.view().operationArguments(candidate), values)) return candidate;
         }
         if (self.operations.items.len >= std.math.maxInt(u32) or values.len > std.math.maxInt(u32) or self.arguments.items.len > std.math.maxInt(u32) - values.len) return error.EvidenceLimit;
         // Copy borrowed argument spans before growing their containing array.
@@ -118,7 +126,7 @@ pub const Store = struct {
         try self.operation_next.ensureUnusedCapacity(self.allocator, 1);
         try self.arguments.ensureUnusedCapacity(self.allocator, owned.len);
         const label: Label = @intCast(self.operations.items.len);
-        self.operations.appendAssumeCapacity(.{ .identity = identity, .arguments = .{ .start = @intCast(self.arguments.items.len), .len = @intCast(owned.len) } });
+        self.operations.appendAssumeCapacity(.{ .identity = identity, .instance = instance, .arguments = .{ .start = @intCast(self.arguments.items.len), .len = @intCast(owned.len) } });
         self.arguments.appendSliceAssumeCapacity(owned);
         self.operation_next.appendAssumeCapacity(bucket.value_ptr.*);
         bucket.value_ptr.* = label;

@@ -2,8 +2,10 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready —057's reviewed design is complete; no implementation is
-  claimed.
+- **Status:** In progress — direct annotated scopes, aliases and exact provider
+  routing are implemented. Generic capability contracts and scoped requests
+  remain open; see
+  [qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
 - **Dependencies:** [057](057-specify-scoped-effect-identities.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / effect
   identities and handlers. Sources:

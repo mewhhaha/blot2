@@ -25,6 +25,7 @@ fn target(map: []const u32, value: anytype) void {
 }
 fn typeUnits(nodes: []T.Node, names: []const u32, units: []const u32) void {
     for (nodes) |*node| switch (node.tag) {
+        .scoped => node.b = unit(units, node.b),
         .nominal, .projection, .type_constructor => {
             node.a = unit(units, node.a);
             if (node.a != 0 and node.a != std.math.maxInt(u32) and node.b & T.opaque_name_bit != 0) node.b = T.opaque_name_bit | symbol(names, node.b & ~T.opaque_name_bit);
@@ -33,10 +34,42 @@ fn typeUnits(nodes: []T.Node, names: []const u32, units: []const u32) void {
     };
 }
 
+fn implementations(owner: anytype, names: []const u32, units: []const u32) void {
+    for (owner.implementations) |*value| {
+        identity(units, names, &value.identity);
+        identity(units, names, &value.contract);
+        value.name = symbol(names, value.name);
+    }
+    for (owner.implementation_members) |*value| {
+        value.name = symbol(names, value.name);
+        target(units, &value.target);
+    }
+    for (owner.member_templates) |*value| {
+        identity(units, names, &value.contract);
+        value.name = symbol(names, value.name);
+    }
+    for (owner.selected_members) |*value| {
+        value.name = symbol(names, value.name);
+        target(units, &value.target);
+    }
+    for (owner.selected_proofs) |*value| {
+        target(units, &value.predicate_target);
+        value.context = unit(units, value.context);
+        identity(units, names, &value.implementation);
+        identity(units, names, &value.contract);
+        identity(units, names, &value.predicate.identity);
+        value.predicate.name = symbol(names, value.predicate.name);
+        value.predicate.qualification_unit = unit(units, value.predicate.qualification_unit);
+    }
+}
 pub fn interface(owner: *PI.Interface, names: []const u32, units: []const u32) void {
+    implementations(owner, names, units);
     owner.unit = unit(units, owner.unit);
     typeUnits(owner.graph.nodes, names, units);
-    for (owner.graph.operations) |*operation| identity(units, names, &operation.identity);
+    for (owner.graph.operations) |*operation| {
+        identity(units, names, &operation.identity);
+        operation.instance.unit = unit(units, operation.instance.unit);
+    }
     for (owner.bindings) |*binding| {
         binding.name = symbol(names, binding.name);
         if (binding.external) |*external| target(units, external);
@@ -59,6 +92,11 @@ pub fn interface(owner: *PI.Interface, names: []const u32, units: []const u32) v
         member.name = symbol(names, member.name);
     }
     for (owner.contract_predicates) |*predicate| {
+        predicate.name = symbol(names, predicate.name);
+        identity(units, names, &predicate.identity);
+        predicate.qualification_unit = unit(units, predicate.qualification_unit);
+    }
+    for (owner.implementation_predicates) |*predicate| {
         predicate.name = symbol(names, predicate.name);
         identity(units, names, &predicate.identity);
         predicate.qualification_unit = unit(units, predicate.qualification_unit);
@@ -88,9 +126,13 @@ pub fn module(owner: *core.Module, names: []const u32, units: []const u32) void 
             return left.symbol < right.symbol;
         }
     }.less);
+    implementations(owner, names, units);
     owner.unit = unit(units, owner.unit);
     typeUnits(owner.types.nodes, names, units);
-    for (owner.types.operations) |*operation| identity(units, names, &operation.identity);
+    for (owner.types.operations) |*operation| {
+        identity(units, names, &operation.identity);
+        operation.instance.unit = unit(units, operation.instance.unit);
+    }
     for (owner.nodes) |*node| switch (node.tag) {
         .associated => node.c = symbol(names, node.c),
         .result_associated => node.b = symbol(names, node.b),
@@ -131,7 +173,10 @@ pub fn module(owner: *core.Module, names: []const u32, units: []const u32) void 
         operation.member = symbol(names, operation.member);
         target(units, &operation.method);
     }
-    for (owner.operation_values) |*operation| identity(units, names, &operation.identity);
+    for (owner.operation_values) |*operation| {
+        identity(units, names, &operation.identity);
+        operation.instance.unit = unit(units, operation.instance.unit);
+    }
 }
 
 /// The caller validates all payload IDs before this transaction. Failure to

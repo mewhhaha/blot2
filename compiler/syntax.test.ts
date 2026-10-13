@@ -227,3 +227,20 @@ Deno.test("layout line indexing preserves CST origins across LF, CRLF, CR and mi
     frontend.dispose();
   }
 });
+
+Deno.test("implementation headers are contextual and retain explicit row and type binders", async () => {
+  const frontend = await createFrontend();
+  try {
+    for (
+      const source of [
+        "impl ArraySource a : Source (Array a) = { type Item = a, const first = fn values => @array.get values 0 }\n",
+        "private impl Arrow (a,b,e) : Callable (a -> b ! {| e}) where { type_eq a U32 } = { type Run = a -> b ! {| e} }\n",
+        "impl Curried a => type b : Pair (a,b) = { type Item = a }\n",
+        "const impl = fn impl => impl\nentry const answer = impl 42\n",
+      ]
+    ) frontend.parse(source);
+    throws(() => frontend.parse("impL Name : Source U32 = {}\n"), SourceError);
+  } finally {
+    frontend.dispose();
+  }
+});

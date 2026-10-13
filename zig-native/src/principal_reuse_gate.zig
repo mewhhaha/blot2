@@ -442,7 +442,7 @@ fn catalogEqual(previous: *const core.Module, current: *const core.Module, const
             // identical. Their witness expressions are projected by every
             // referencing declaration's definition equality and dependency
             // walk, so a changed witness dirties exactly its consumers.
-            .unit, .nominals, .constructors, .associated, .contracts, .contract_members, .operation_names, .names, .field_names, .operation_values => {
+            .unit, .nominals, .constructors, .associated, .contracts, .contract_members, .implementations, .implementation_members, .member_templates, .selected_proofs, .selected_members, .selected_edges, .selected_uses, .operation_names, .names, .field_names, .operation_values => {
                 if (!equal(@field(previous, name), @field(current, name))) return false;
             },
             .types => {

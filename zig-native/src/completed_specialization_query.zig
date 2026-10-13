@@ -152,15 +152,25 @@ pub const State = struct {
         return if (old == 0) @as(u32, 0) else try maps.importEvidence(g, old);
     }
     pub fn lookup(self: *State, g: anytype, input: u32, expected: u32) Allocator.Error!?u32 {
-        return self.lookupQuery(g, null, input, expected);
+        return self.lookupQuery(g, null, input, expected, null);
     }
     pub fn lookupMember(self: *State, g: anytype, target: core.BindingRef, input: u32, expected: u32) Allocator.Error!?u32 {
-        if (target.unit == 0 or target.unit > g.evaluator.units.len or target.binding >= g.evaluator.units[target.unit - 1].bindings.len or g.evaluator.inquiry_regions != 0 or g.evaluator.semantic_job_budget != null) return null;
-        const slot = g.evaluator.slots[g.evaluator.binding_offsets[target.unit - 1] + target.binding];
-        if (slot.state != .complete or !g.evaluator.memberReceiptEligible(target)) return null;
-        return self.lookupQuery(g, target, input, expected);
+        if (!memberReady(g, target)) return null;
+        return self.lookupQuery(g, target, input, expected, null);
     }
-    fn lookupQuery(self: *State, g: anytype, member_target: ?core.BindingRef, input: u32, expected: u32) Allocator.Error!?u32 {
+    /// The enclosing tape and table belong to the same immutable Capture.
+    /// A position selects one complete judgment; normal validation remains
+    /// authoritative for its source, input, expected type and observations.
+    pub fn lookupMemberRecord(self: *State, g: anytype, target: core.BindingRef, input: u32, expected: u32, position: u32) Allocator.Error!?u32 {
+        if (!memberReady(g, target)) return null;
+        return self.lookupQuery(g, target, input, expected, position);
+    }
+    fn memberReady(g: anytype, target: core.BindingRef) bool {
+        if (target.unit == 0 or target.unit > g.evaluator.units.len or target.binding >= g.evaluator.units[target.unit - 1].bindings.len or g.evaluator.inquiry_regions != 0 or g.evaluator.semantic_job_budget != null) return false;
+        const slot = g.evaluator.slots[g.evaluator.binding_offsets[target.unit - 1] + target.binding];
+        return slot.state == .complete and g.evaluator.memberReceiptEligible(target);
+    }
+    fn lookupQuery(self: *State, g: anytype, member_target: ?core.BindingRef, input: u32, expected: u32, exact_position: ?u32) Allocator.Error!?u32 {
         defer self.stats.graph_scratch = self.graph_scratch.stats;
         self.stats.lookups += 1;
         if (!self.gate.enabled or g.evaluator.units.ptr != self.gate.units.ptr or g.evaluator.units.len != self.gate.units.len or self.allocator.ptr != g.evaluator.allocator.ptr or self.allocator.vtable != g.evaluator.allocator.vtable) return null;
@@ -193,6 +203,7 @@ pub const State = struct {
         const table = &self.old.metadata.specialization_queries;
         var cursor = table.candidates(selected_query.fingerprint(current_source), .oldest_first);
         while (cursor.next()) |position| {
+            if (exact_position) |exact| if (position != exact) continue;
             const record = &table.records.items[position].dependencies;
             self.stats.enumerated_records += 1;
             if (record.input >= pools.evaluator.values.len) continue;

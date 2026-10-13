@@ -43,6 +43,7 @@ pub fn emit(m: *w.Module, a: w.Arena) Error!void {
     try publicAllocate(code(m, a.root_public_allocate), a);
     try publicReset(code(m, a.root_public_reset), a);
     try force(code(m, a.root_force), a);
+    try authority(code(m, a.root_authority), a);
 }
 fn reserve(c: Code, a: w.Arena) Error!void {
     const page = try c.temp();
@@ -227,6 +228,9 @@ fn leave(c: Code, a: w.Arena) Error!void {
     try c.when(.{ .i32_eq, outcome, 1 });
     try setGlobal(c, a.root_active, .{ .i32_or, .{ .global, a.root_active }, 1 });
     try c.end();
+    try c.when(.{ .i32_and, .{ .global, a.root_active }, 2 });
+    try revokeAuthorities(c, a);
+    try c.end();
     try c.loop(.{ .global, a.root_frame });
     try c.value(.{ .call, a.root_close, 0 });
     try c.again();
@@ -330,6 +334,40 @@ pub fn hostCleanup(m: *w.Module, a: w.Arena) Error!void {
 
 // The low frame bit marks an active-force record. Static demand cells are
 // immortal references and need a record, but consume no dynamic strong count.
+// Scope records own their owner edge. Bit two is separate from active demands.
+fn authority(c: Code, a: w.Arena) Error!void {
+    const value: Local = .{ .id = 0 };
+    const slot = try c.temp();
+    try c.when(.{ .i32_eqz, .{ .global, a.root_enabled } });
+    try c.op(.return_, 0);
+    try c.end();
+    try c.set(slot, .{ .call, a.root_reserve });
+    try c.value(.{ .call, a.root_store, slot, value });
+    try c.store(slot, 4, .{ .i32_or, .{ .load, slot, 4 }, 2 });
+    try setGlobal(c, a.root_active, .{ .i32_or, .{ .global, a.root_active }, 2 });
+}
+// Revoke the complete invocation before closing any frame. In particular a
+// JSPI rejection/trap cannot leave a cycle-retained operation active.
+fn revokeAuthorities(c: Code, a: w.Arena) Error!void {
+    const page = try c.temp();
+    const top = try c.temp();
+    const slot = try c.temp();
+    const owner = try c.temp();
+    try c.set(page, .{ .global, a.root_page });
+    try c.set(top, .{ .global, a.root_top });
+    try c.loop(page);
+    try c.loop(.{ .i32_gt_u, top, first_slot });
+    try c.set(top, .{ .i32_sub, top, slot_bytes });
+    try c.set(slot, .{ .i32_add, page, top });
+    try c.set(owner, .{ .load, slot, 0 });
+    try c.when(.{ .i32_and, .{ .i32_ne, owner, 0 }, .{ .i32_ne, .{ .i32_and, .{ .load, slot, 4 }, 2 }, 0 } });
+    try c.store(owner, h.offset(h.EffectAuthority, "active"), 0);
+    try c.end();
+    try c.again();
+    try c.set(page, .{ .load, page, 0 });
+    try c.set(top, page_bytes);
+    try c.again();
+}
 fn force(c: Code, a: w.Arena) Error!void {
     const value: Local = .{ .id = 0 };
     const slot = try c.temp();

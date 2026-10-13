@@ -429,23 +429,24 @@ test "startup source edges and project component order survive borrowed and cons
     }
 }
 
-test "associated type members preserve forwarding opaque identity and wire three source parity" {
+test "implementation and associated members preserve compiled forwarding opaque identity and wire four parity" {
     const entry =
-        \\import {Same, Store, make, read, keep} from "./facade"
+        \\import {Same, Store, Source, make, read, keep} from "./facade"
         \\type Alias a = Same.Item a
         \\const passthrough: (Alias U32) -> (Same.Item U32) = fn value => keep value
-        \\entry const answer: Unit -> U32 = fn () => passthrough (read (make 42))
+        \\entry const answer: Unit -> U32 = fn () => Source.first #[passthrough (read (make 42))]
     ;
     const producer =
         \\opaque type Token = U32
         \\type Identity a is contract = { type Item = a }
         \\type Tokens is contract = { type Item = Token }
         \\type Source s is contract = { type Item, const first: s -> (Source.Item s) }
+        \\impl ArraySource a : Source (Array a) = { type Item = a, const first = fn values => @array.get values 0 }
         \\const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = fn value => value
         \\const make: U32 -> Tokens.Item = fn value => #Token value
         \\const read: Tokens.Item -> U32 = fn (#Token value) => value
     ;
-    const facade = "export {Identity as Same, Tokens as Store, Source, make, read, keep} from \"./producer\"\n";
+    const facade = "export {Identity as Same, Tokens as Store, Source, ArraySource, make, read, keep} from \"./producer\"\n";
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
     try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = entry });
@@ -455,7 +456,7 @@ test "associated type members preserve forwarding opaque identity and wire three
     defer a.free(path);
     var owned = try freezeEntry(path);
     defer owned.deinit();
-    try std.testing.expectEqual(@as(u32, 3), std.mem.readInt(u32, owned.bytes[8..12], .little));
+    try std.testing.expectEqual(@as(u32, 4), std.mem.readInt(u32, owned.bytes[8..12], .little));
     var loaded = try format.decode(D.FrozenDependency, a, owned.bytes, key);
     defer format.deinit(a, &loaded);
     try closure.validate(a, &loaded);

@@ -10,7 +10,7 @@ const heap = @import("runtime_layout.zig");
 const A = std.mem.Allocator;
 
 pub const Mark = enum(usize) { _ };
-pub const Action = union(enum) { release: ir.LocalId, release_if_nonzero: ir.LocalId, reset_demand: ir.LocalId, root_scope: void };
+pub const Action = union(enum) { release: ir.LocalId, release_if_nonzero: ir.LocalId, reset_demand: ir.LocalId, root_scope: void, revoke_effect: ir.LocalId };
 pub const Stack = struct {
     parent: ?*const Stack = null,
     actions: std.ArrayList(Action) = .empty,
@@ -48,11 +48,12 @@ pub const Stack = struct {
         try self.emitToResult(module, function, checkpoint, null);
     }
     pub fn emitToResult(self: *const Stack, module: *wasm.Module, function: ir.FunctionId, checkpoint: Mark, result: ?u32) A.Error!void {
+        for (self.actions.items[@backingInt(checkpoint)..]) |action| if (action == .revoke_effect) try emit(action, module, function, result);
         var index = self.actions.items.len;
         std.debug.assert(@backingInt(checkpoint) <= index);
         while (index > @backingInt(checkpoint)) {
             index -= 1;
-            try emit(self.actions.items[index], module, function, result);
+            if (self.actions.items[index] != .revoke_effect) try emit(self.actions.items[index], module, function, result);
         }
     }
     pub fn emitAll(self: *const Stack, module: *wasm.Module, function: ir.FunctionId) A.Error!void {
@@ -63,6 +64,9 @@ pub const Stack = struct {
 fn emit(action: Action, module: *wasm.Module, function: ir.FunctionId, result: ?u32) A.Error!void {
     const id = @backingInt(function);
     switch (action) {
+        .revoke_effect => |local| {
+            try module.emitSlice(id, &.{ .{ .op = .local_get, .operand = @backingInt(local) }, .{ .op = .i32_const }, .{ .op = .i32_store, .operand = heap.offset(heap.EffectAuthority, "active") } });
+        },
         .root_scope => {
             const scope: ir.Ownership = .{ .kind = .scope, .chunk = if (result != null) 2 else 1, .roles = @intCast(result orelse 0) };
             try module.emit(id, .{ .op = .ownership, .operand = @bitCast(scope) });

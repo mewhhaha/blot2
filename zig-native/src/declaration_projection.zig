@@ -133,6 +133,10 @@ const Scan = struct {
         }
         try self.erased(id);
         switch (n.tag) {
+            .contract_method => {
+                _ = try equalItem(core.MemberTemplate, self.old.member_templates, self.current.member_templates, n.a);
+                for (try equalSlice(core.Id, self.old.extra, self.current.extra, .{ .start = n.b, .len = n.c })) |child| try self.node(child);
+            },
             .invalid => return error.Changed,
             .constant, .panic, .constructor_function, .type_constructor => {},
             .primitive_function => {
@@ -174,7 +178,7 @@ const Scan = struct {
                 try self.node(n.a);
                 try self.node(n.b);
             },
-            .force, .computation, .result_associated => try self.node(n.a),
+            .force, .computation, .effect_scope, .result_associated => try self.node(n.a),
             .project => {
                 try self.node(n.a);
                 try self.projection(n.b);
@@ -215,7 +219,10 @@ const Scan = struct {
                 try self.node(value.return_target);
                 try self.bindingList(value.completion_state_bindings);
                 try self.carries(value.carries);
-                for (try equalSlice(core.RequestArm, self.old.request_arms, self.current.request_arms, value.arms)) |arm| try self.node(arm.callback);
+                for (try equalSlice(core.RequestArm, self.old.request_arms, self.current.request_arms, value.arms)) |arm| {
+                    try self.node(arm.callback);
+                    try self.node(arm.selector);
+                }
             },
             .resolver_op => {
                 const value = try self.projectedItem(core.ResolverInfo, self.old.resolver_ops, self.current.resolver_ops, n.a);

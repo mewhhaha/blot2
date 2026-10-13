@@ -43,7 +43,7 @@ fn children(work: *Pending, allocator: Allocator, module: *const core.Module, id
     switch (n.tag) {
         .scalar, .associated, .logical, .record_merge, .type_same, .apply, .effect_provider, .handle => try work.appendSlice(allocator, &.{ n.a, n.b }),
         .if_value, .if_stmt, .state_provider => try work.appendSlice(allocator, &.{ n.a, n.b, n.c }),
-        .block, .suite, .product, .record, .array, .array_op, .call => try work.appendSlice(allocator, module.children(id)),
+        .block, .suite, .product, .record, .array, .array_op, .call, .contract_method => try work.appendSlice(allocator, module.children(id)),
         .bind => try work.append(allocator, n.b),
         .return_, .project, .result_associated, .force => try work.append(allocator, n.a),
         .construct => try work.append(allocator, n.b),
@@ -75,12 +75,15 @@ fn children(work: *Pending, allocator: Allocator, module: *const core.Module, id
             if (kind == .count or kind == .has or kind == .same) try work.append(allocator, n.b);
             if (n.c != 0) try work.append(allocator, n.c);
         },
-        .computation => try work.append(allocator, n.a),
+        .computation, .effect_scope => try work.append(allocator, n.a),
         .request_decision => try work.appendSlice(allocator, &.{ n.b, n.c }),
         .request_loop => {
             const metadata = module.requestLoopInfo(id);
             try work.appendSlice(allocator, &.{ metadata.computation, metadata.completion_body });
-            for (module.requestArms(id)) |arm| try work.append(allocator, arm.callback);
+            for (module.requestArms(id)) |arm| {
+                try work.append(allocator, arm.callback);
+                if (arm.selector != 0) try work.append(allocator, arm.selector);
+            }
         },
         .closure, .operation_value, .suspend_, .constant, .reference, .constructor_function, .primitive_function, .panic, .type_constructor, .invalid => {},
     }

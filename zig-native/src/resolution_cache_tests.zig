@@ -3,6 +3,63 @@ const T = @import("types.zig");
 const E = @import("effects.zig");
 const cache = @import("resolution_cache.zig");
 const a = std.testing.allocator;
+
+test "closed operation arguments recover bounded resolution after rollback" {
+    var store = try T.Store.initWithOptions(a, .{ .closed_graphs = true });
+    defer store.deinit();
+    const nested = try store.array(try store.array(T.u32_type));
+    const argument = try store.nominal(.{ .unit = 9, .decl = 2 }, &.{nested});
+    const operation = try store.internOperation(.{ .unit = 4, .decl = 7 }, &.{argument});
+    const row = try store.effects.row(&.{ operation, operation }, .closed);
+    const point = store.mark();
+    _ = try store.fresh();
+    store.rollback(point);
+    try std.testing.expectEqual(row, try store.resolveEffects(row, 0));
+    const visits = store.resolution_steps;
+    for (0..100) |_| try std.testing.expectEqual(row, try store.resolveEffects(row, 0));
+    try std.testing.expectEqual(visits, store.resolution_steps);
+    store.resolution_depth_limit = 2;
+    try std.testing.expectError(error.TypeLimit, store.resolveEffects(row, 0));
+    store.resolution_depth_limit = 1024;
+    const raw = store.node(argument);
+    const unknown = try store.fresh();
+    store.replaceListItem(.{ .start = raw.c + 1, .len = 1 }, 0, unknown);
+    _ = try store.resolveEffects(row, 0);
+    try std.testing.expect(!try store.equalClosed(argument, argument));
+    try store.appendVersion(unknown, T.f32_type);
+    const resolved = try store.resolveEffects(row, 0);
+    const current = store.operationArguments(store.rowLabels(resolved)[0])[0];
+    try std.testing.expectEqualSlices(T.Id, &.{T.f32_type}, store.nominalArguments(store.node(current)));
+}
+
+test "symbolic operation rows preserve unchanged allocation and changed argument order" {
+    var allocations = std.testing.FailingAllocator.init(a, .{});
+    var store = try T.Store.init(allocations.allocator());
+    defer store.deinit();
+    const element = try store.fresh();
+    const argument = try store.array(element);
+    const operation = try store.internSymbolicOperation(.{ .unit = 4, .decl = 7 }, &.{ T.unit, argument, T.f32_type, argument });
+    const row = try store.effects.row(&.{ operation, operation }, .closed);
+    try std.testing.expectEqual(row, try store.resolveEffects(row, 0));
+    allocations.fail_index = allocations.alloc_index;
+    allocations.resize_fail_index = allocations.resize_index;
+    for (0..100) |_| try std.testing.expectEqual(row, try store.resolveEffects(row, 0));
+    allocations.fail_index = std.math.maxInt(usize);
+    allocations.resize_fail_index = std.math.maxInt(usize);
+    try store.appendVersion(element, T.u32_type);
+    const resolved = try store.resolveEffects(row, 0);
+    const labels = store.rowLabels(resolved);
+    try std.testing.expectEqual(@as(usize, 2), labels.len);
+    try std.testing.expectEqual(labels[0], labels[1]);
+    const arguments = store.operationArguments(labels[0]);
+    try std.testing.expectEqual(@as(usize, 4), arguments.len);
+    try std.testing.expectEqual(T.unit, arguments[0]);
+    try std.testing.expectEqual(T.f32_type, arguments[2]);
+    try std.testing.expectEqual(T.Tag.array, store.node(arguments[1]).tag);
+    try std.testing.expectEqual(T.u32_type, store.node(arguments[1]).a);
+    try std.testing.expect(try store.equalClosed(arguments[1], arguments[3]));
+}
+
 fn observe(store: *T.Store, root: T.Id, at: T.Cursor) !u64 {
     const normalized = try store.resolve(root, at);
     var hash = std.hash.Wyhash.init(0);
@@ -53,6 +110,12 @@ fn fingerprint(store: *const T.Store, root: T.Id, hash: *std.hash.Wyhash, depth:
         else => {},
     }
 }
+// Chronology fixtures use numeric labels; install their closed descriptors so
+// type-row resolution also exercises the semantic operation catalog.
+fn seedOperations(store: *T.Store) !void {
+    for (2..32) |index| _ = try store.internOperation(.{ .unit = 123, .decl = @intCast(index) }, &.{});
+}
+
 fn paired(seed: u64) !void {
     var cached = try T.Store.initWithOptions(a, .{ .closed_graphs = true });
     defer cached.deinit();
@@ -65,6 +128,7 @@ fn paired(seed: u64) !void {
     var variables: [2][4]T.Id = undefined;
     var rows: [2][2]E.Id = undefined;
     const stores = [_]*T.Store{ &cached, &plain };
+    for (stores) |store| try seedOperations(store);
     for (stores, 0..) |store, s| {
         for (&variables[s]) |*variable| variable.* = try store.fresh();
         for (&rows[s]) |*row| row.* = try store.freshEffects();
@@ -107,6 +171,7 @@ test "resolution caches equal uncached chronological observations through genera
 fn futureScenario(allocator: std.mem.Allocator) !void {
     var store = try T.Store.initWithOptions(allocator, .{ .closed_graphs = true });
     defer store.deinit();
+    try seedOperations(&store);
     const untouched = try store.fresh();
     const future = try store.resolve(untouched, 4);
     try std.testing.expectEqual(@as(T.Cursor, 4), store.node(try store.resolve(future, 0)).b);
@@ -187,6 +252,7 @@ fn sparseHistory(allocator: std.mem.Allocator) !void {
     var plain = try T.Store.initWithOptions(allocator, .{ .resolution_cache = false });
     defer plain.deinit();
     const stores = [_]*T.Store{ &cached, &plain };
+    for (stores) |store| try seedOperations(store);
     var roots: [2][24]T.Id = undefined;
     var parameters: [2][24]T.Id = undefined;
     var rows: [2][24]E.Id = undefined;
@@ -240,6 +306,7 @@ fn compositeScenario(allocator: std.mem.Allocator) !void {
     var plain = try T.Store.initWithOptions(allocator, .{ .resolution_cache = false });
     defer plain.deinit();
     const stores = [_]*T.Store{ &cached, &plain };
+    for (stores) |store| try seedOperations(store);
     var roots: [2]T.Id = undefined;
     var variables: [2][3]T.Id = undefined;
     var rows: [2]E.Id = undefined;

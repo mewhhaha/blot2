@@ -10,8 +10,8 @@ const format = @import("dependency_format.zig");
 const A = std.mem.Allocator;
 const Wire = struct { principal: []const u8, optimizer: []const u8, semantic: []const u8 };
 fn key(compiler: format.Digest) format.Key {
-    // Version five adds owned associated declaration and projection recipes.
-    return .{ .compiler = compiler, .settings = format.digest("blot-backend-checkpoint-v5:associated-types"), .source = @splat(0), .dependencies = @splat(0) };
+    // Version six adds owned implementations and complete selected proof recipes.
+    return .{ .compiler = compiler, .settings = format.digest("blot-backend-checkpoint-v6:selected-implementations"), .source = @splat(0), .dependencies = @splat(0) };
 }
 pub fn encode(a: A, compiler: format.Digest, source: *const capture.Capture) format.Error![]u8 {
     if (!source.emission.sealed) return error.InvalidArtifact;

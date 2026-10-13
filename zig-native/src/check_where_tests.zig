@@ -100,7 +100,6 @@ fn rejectionLaws(allocator: std.mem.Allocator) !void {
         .{ .source = "type Reader is effect = { get: Unit -> U32 }\nentry const answer: U32 where { operation Reader.get } = 42\n", .code = .invalid_constraint, .marker = "operation" },
         .{ .source = "type Signal a is effect = { get: Unit -> a }\nentry const answer: U32 where { operation (Signal.get) U32 } = 42\n", .code = .invalid_constraint, .marker = "operation" },
         .{ .source = "entry const answer: U32 where { effect_rep ! {Missing} } = 42\n", .code = .unknown_effect, .marker = "effect_rep" },
-        .{ .source = "type Signal a is effect = Unit -> a\nentry const answer: U32 -> U32 where { associated \"add\" U32 U32 U32 ! {Signal a | e} } = fn value => value\n", .code = .unsupported_polymorphic_effect_label, .marker = "associated" },
         .{ .source = "const replace: a -> b -> c where {} = fn box => fn value => do:\n  let current = box\n  current.value := value\n  return current\nentry const answer = 42\n", .code = .missing_predicate, .marker = ".value" },
         .{ .source = "infixl 60 (+) = _fixity_add\nconst twice: a -> a where { associated \"add\" a a a } = fn value => value + value\nentry const answer = fn () => do:\n  let selected = case #True of\n    #True => twice\n    #False => twice\n  return @f32.add (@u32.to_f32 (selected 21)) (selected 1.5)\nconst _fixity_add = fn left => fn right => @type.call \"add\" left right\n", .code = .type_mismatch, .marker = "selected 1.5" },
     };

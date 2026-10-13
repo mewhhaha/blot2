@@ -12,6 +12,7 @@ pub const Node = struct { tag: Tag, a: u32 = 0, b: u32 = 0, c: u32 = 0 };
 pub const Mapping = struct { variable: types.Id, evidence: Id };
 pub const RowMapping = struct { variable: u32, evidence: Effects.Id };
 pub const Error = Allocator.Error || error{ UnresolvedType, EvidenceLimit, TypeMismatch };
+pub const ProjectionResolver = struct { context: *anyopaque, remaining: *usize, resolve: *const fn (*anyopaque, types.NominalIdentity, u32, []const Id) Error!Id };
 pub const View = struct {
     nodes: []const Node,
     extra: []const Id,
@@ -205,11 +206,20 @@ pub const Store = struct {
     }
     pub fn projectWithRows(self: *Store, source: anytype, ty: types.Id, mappings: []const Mapping, rows: []const RowMapping) Error!Id {
         var budget: usize = 1_000_000;
-        return self.projectDepth(source, ty, mappings, rows, 0, &budget, false, null, null);
+        return self.projectDepth(source, ty, mappings, rows, 0, &budget, false, null, null, null);
+    }
+    pub fn projectWithBudget(self: *Store, source: anytype, ty: types.Id, mappings: []const Mapping, rows: []const RowMapping, budget: *usize) Error!Id {
+        return self.projectDepth(source, ty, mappings, rows, 0, budget, false, null, null, null);
+    }
+    pub fn projectSelected(self: *Store, source: anytype, ty: types.Id, mappings: []const Mapping, rows: []const RowMapping, resolver: ProjectionResolver) Error!Id {
+        var budget: usize = 1_000_000;
+        var memo: projections.Cache = .{};
+        defer memo.deinit(self.allocator);
+        return self.projectDepth(source, ty, mappings, rows, 0, &budget, false, &memo, null, resolver);
     }
     pub fn projectEffects(self: *Store, source: anytype, row: types.Effects.Id, mappings: []const Mapping, rows: []const RowMapping) Error!Effects.Id {
         var budget: usize = 1_000_000;
-        return self.projectRowDepth(source, row, mappings, rows, 0, &budget, false, null, null);
+        return self.projectRowDepth(source, row, mappings, rows, 0, &budget, false, null, null, null);
     }
     /// Owned inference has no caller mappings. Successful normalized subgraphs
     /// are immutable until rollback or physical mutation changes their clocks.
@@ -217,10 +227,31 @@ pub const Store = struct {
     pub fn projectOwned(self: *Store, source: *const types.Store, ty: types.Id, memo: *projections.Cache) Error!Id {
         if (!memo.activate(source, self, source.closed_generation, source.effects.physical_epoch)) return self.project(source, ty, &.{});
         var budget: usize = 1_000_000;
-        return self.projectDepth(source, ty, &.{}, &.{}, 0, &budget, true, memo, null);
+        return self.projectDepth(source, ty, &.{}, &.{}, 0, &budget, true, memo, null, null);
     }
-    fn projectDepth(self: *Store, source: anytype, ty: types.Id, mappings: []const Mapping, rows: []const RowMapping, depth: usize, budget: *usize, comptime retained: bool, memo: ?*projections.Cache, parent_height: ?*u16) Error!Id {
+    pub fn projectAssociatedOwned(self: *Store, source: *const types.Store, ty: types.Id, memo: *projections.Cache, remaining: *usize) Error!Id {
+        const Closed = struct {
+            fn resolve(_: *anyopaque, _: types.NominalIdentity, _: u32, _: []const Id) Error!Id {
+                return error.UnresolvedType;
+            }
+        };
+        const resolver: ProjectionResolver = .{ .context = self, .remaining = remaining, .resolve = Closed.resolve };
+        if (!memo.activate(source, self, source.closed_generation, source.effects.physical_epoch)) return self.projectSelected(source, ty, &.{}, &.{}, resolver);
+        var budget: usize = 1_000_000;
+        return self.projectDepth(source, ty, &.{}, &.{}, 0, &budget, false, memo, null, resolver);
+    }
+    fn projectDepth(self: *Store, source: anytype, ty: types.Id, mappings: []const Mapping, rows: []const RowMapping, depth: usize, budget: *usize, comptime retained: bool, memo: ?*projections.Cache, parent_height: ?*u16, resolver: ?ProjectionResolver) Error!Id {
         if (depth >= 1024 or budget.* == 0) return error.EvidenceLimit;
+        if (resolver) |selection| {
+            if (depth >= 256 or selection.remaining.* == 0) return error.EvidenceLimit;
+            selection.remaining.* -= 1;
+            if (ty > types.never) if (memo) |cache| if (cache.answers.get(ty)) |answer| {
+                if (depth + answer.height > 256) return error.EvidenceLimit;
+                budget.* -= 1;
+                if (parent_height) |parent| parent.* = @max(parent.*, answer.height + 1);
+                return answer.value;
+            };
+        }
         if (retained and ty > types.never) if (memo.?.answers.get(ty)) |answer| {
             if (depth + answer.height > 1024 or budget.* < answer.visits) return error.EvidenceLimit;
             budget.* -= answer.visits;
@@ -230,45 +261,62 @@ pub const Store = struct {
         const before = budget.*;
         budget.* -= 1;
         var height: u16 = 1;
-        const result = try self.projectNodeDepth(source, ty, mappings, rows, depth, budget, retained, memo, &height);
+        const result = try self.projectNodeDepth(source, ty, mappings, rows, depth, budget, retained, memo, &height, resolver);
         if (retained) {
             if (parent_height) |parent| parent.* = @max(parent.*, height + 1);
             if (ty > types.never) try memo.?.answers.put(memo.?.allocator orelse self.allocator, ty, .{ .value = result, .visits = @intCast(before - budget.*), .height = height });
         }
+        if (!retained and memo != null) {
+            if (parent_height) |parent| parent.* = @max(parent.*, height + 1);
+            if (ty > types.never) try memo.?.answers.put(memo.?.allocator orelse self.allocator, ty, .{ .value = result, .visits = 1, .height = height });
+        }
         return result;
     }
-    fn projectRowDepth(self: *Store, source: anytype, row: types.Effects.Id, mappings: []const Mapping, rows: []const RowMapping, depth: usize, budget: *usize, comptime retained: bool, memo: ?*projections.Cache, parent_height: ?*u16) Error!Effects.Id {
+    fn projectRowDepth(self: *Store, source: anytype, row: types.Effects.Id, mappings: []const Mapping, rows: []const RowMapping, depth: usize, budget: *usize, comptime retained: bool, memo: ?*projections.Cache, parent_height: ?*u16, resolver: ?ProjectionResolver) Error!Effects.Id {
         if (depth >= 1024 or budget.* == 0) return error.EvidenceLimit;
         budget.* -= 1;
+        if (resolver) |selection| {
+            if (depth >= 256 or selection.remaining.* == 0) return error.EvidenceLimit;
+            selection.remaining.* -= 1;
+        }
         var height: u16 = 1;
-        const result = try self.projectRowBody(source, row, mappings, rows, depth, budget, retained, memo, &height);
-        if (retained) if (parent_height) |parent| {
+        const result = try self.projectRowBody(source, row, mappings, rows, depth, budget, retained, memo, &height, resolver);
+        if (memo != null) if (parent_height) |parent| {
             parent.* = @max(parent.*, height + 1);
         };
         return result;
     }
-    fn projectNodeDepth(self: *Store, source: anytype, ty: types.Id, mappings: []const Mapping, rows: []const RowMapping, depth: usize, budget: *usize, comptime retained: bool, memo: ?*projections.Cache, height: *u16) Error!Id {
+    fn projectNodeDepth(self: *Store, source: anytype, ty: types.Id, mappings: []const Mapping, rows: []const RowMapping, depth: usize, budget: *usize, comptime retained: bool, memo: ?*projections.Cache, height: *u16, resolver: ?ProjectionResolver) Error!Id {
         for (mappings) |mapping| if (mapping.variable == ty) {
             if (mapping.evidence == 0 or mapping.evidence >= self.nodes.items.len) return error.TypeMismatch;
             return mapping.evidence;
         };
         const n = source.node(ty);
         switch (n.tag) {
+            .scoped => return error.UnresolvedType,
             .unit => return types.unit,
             .boolean => return types.boolean,
             .u32 => return types.u32_type,
             .f32 => return types.f32_type,
             .never => return types.never,
-            .variable, .absent, .projection => return error.UnresolvedType,
-            .array => return self.intern(.array, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, &.{}),
-            .list => return self.intern(.list, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, &.{}),
-            .cursor => return self.intern(.cursor, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, &.{}),
-            .demand => return self.internWithEffects(.demand, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, try self.projectRowDepth(source, n.c, mappings, rows, depth + 1, budget, retained, memo, height), &.{}),
-            .resolver => return self.intern(.resolver, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, &.{}),
-            .provider => return self.internWithEffects(.provider, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, try self.projectRowDepth(source, n.c, mappings, rows, depth + 1, budget, retained, memo, height), &.{}),
-            .state_provider => return self.internStateProvider(try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), try self.projectDepth(source, n.b, mappings, rows, depth + 1, budget, retained, memo, height), try self.projectDepth(source, n.c, mappings, rows, depth + 1, budget, retained, memo, height)),
+            .variable, .absent => return error.UnresolvedType,
+            .projection => {
+                const selection = resolver orelse return error.UnresolvedType;
+                const input = source.nominalArguments(n);
+                const arguments = try self.allocator.alloc(Id, input.len);
+                defer self.allocator.free(arguments);
+                for (input, arguments) |root, *argument| argument.* = try self.projectDepth(source, root, mappings, rows, depth + 1, budget, retained, memo, height, resolver);
+                return selection.resolve(selection.context, .{ .unit = n.a, .decl = n.b }, source.projectionMember(n), arguments);
+            },
+            .array => return self.intern(.array, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height, resolver), 0, &.{}),
+            .list => return self.intern(.list, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height, resolver), 0, &.{}),
+            .cursor => return self.intern(.cursor, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height, resolver), 0, &.{}),
+            .demand => return self.internWithEffects(.demand, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height, resolver), 0, try self.projectRowDepth(source, n.c, mappings, rows, depth + 1, budget, retained, memo, height, resolver), &.{}),
+            .resolver => return self.intern(.resolver, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height, resolver), 0, &.{}),
+            .provider => return self.internWithEffects(.provider, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height, resolver), 0, try self.projectRowDepth(source, n.c, mappings, rows, depth + 1, budget, retained, memo, height, resolver), &.{}),
+            .state_provider => return self.internStateProvider(try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height, resolver), try self.projectDepth(source, n.b, mappings, rows, depth + 1, budget, retained, memo, height, resolver), try self.projectDepth(source, n.c, mappings, rows, depth + 1, budget, retained, memo, height, resolver)),
             .type_constructor => return self.intern(.type_constructor, n.a, n.b, &.{}),
-            .function => return self.internWithEffects(.function, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), try self.projectDepth(source, n.b, mappings, rows, depth + 1, budget, retained, memo, height), try self.projectRowDepth(source, n.c, mappings, rows, depth + 1, budget, retained, memo, height), &.{}),
+            .function => return self.internWithEffects(.function, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height, resolver), try self.projectDepth(source, n.b, mappings, rows, depth + 1, budget, retained, memo, height, resolver), try self.projectRowDepth(source, n.c, mappings, rows, depth + 1, budget, retained, memo, height, resolver), &.{}),
             .product, .record, .nominal => {
                 var scratch_buffer: [256]u8 align(@alignOf(usize)) = undefined;
                 var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
@@ -279,11 +327,11 @@ pub const Store = struct {
                     for (0..n.b) |index| {
                         const field = source.recordField(n, index);
                         try values.append(allocator, field.name);
-                        try values.append(allocator, try self.projectDepth(source, field.ty, mappings, rows, depth + 1, budget, retained, memo, height));
+                        try values.append(allocator, try self.projectDepth(source, field.ty, mappings, rows, depth + 1, budget, retained, memo, height, resolver));
                     }
                 } else {
                     const children_ = if (n.tag == .nominal) source.nominalArguments(n) else source.list(.{ .start = n.a, .len = n.b });
-                    for (children_) |child| try values.append(allocator, try self.projectDepth(source, child, mappings, rows, depth + 1, budget, retained, memo, height));
+                    for (children_) |child| try values.append(allocator, try self.projectDepth(source, child, mappings, rows, depth + 1, budget, retained, memo, height, resolver));
                 }
                 return self.intern(switch (n.tag) {
                     .product => .product,
@@ -294,7 +342,7 @@ pub const Store = struct {
             },
         }
     }
-    fn projectRowBody(self: *Store, source: anytype, row: types.Effects.Id, mappings: []const Mapping, rows: []const RowMapping, depth: usize, budget: *usize, comptime retained: bool, memo: ?*projections.Cache, height: *u16) Error!Effects.Id {
+    fn projectRowBody(self: *Store, source: anytype, row: types.Effects.Id, mappings: []const Mapping, rows: []const RowMapping, depth: usize, budget: *usize, comptime retained: bool, memo: ?*projections.Cache, height: *u16, resolver: ?ProjectionResolver) Error!Effects.Id {
         const tail = source.row(row).tail;
         var suffix: Effects.Id = 0;
         switch (tail) {
@@ -319,9 +367,13 @@ pub const Store = struct {
         var arguments: std.ArrayList(Id) = .empty;
         defer arguments.deinit(allocator);
         for (source.rowLabels(row)) |label| {
+            if (resolver) |selection| {
+                if (selection.remaining.* == 0) return error.EvidenceLimit;
+                selection.remaining.* -= 1;
+            }
             arguments.clearRetainingCapacity();
-            for (source.operationArguments(label)) |argument| try arguments.append(allocator, try self.projectDepth(source, argument, mappings, rows, depth + 1, budget, retained, memo, height));
-            try labels.append(allocator, try self.effects.internOperation(source.operation(label).identity, arguments.items));
+            for (source.operationArguments(label)) |argument| try arguments.append(allocator, try self.projectDepth(source, argument, mappings, rows, depth + 1, budget, retained, memo, height, resolver));
+            try labels.append(allocator, try self.effects.internOperationInstance(source.operation(label).identity, arguments.items, source.operation(label).instance));
         }
         try labels.appendSlice(allocator, self.effects.view().rowLabels(suffix));
         return self.effects.internRow(labels.items);
@@ -340,18 +392,185 @@ pub const Store = struct {
         const start = mappings.items.len;
         errdefer mappings.shrinkRetainingCapacity(start);
         var budget: usize = 1_000_000;
-        const accepted = try self.matchDepth(source, pattern, actual, mappings, rows, 0, &budget);
+        const accepted = try self.matchDepth(source, pattern, actual, mappings, rows, 0, &budget, null, null);
         if (!accepted) {
             mappings.shrinkRetainingCapacity(start);
             if (rows) |values| values.shrinkRetainingCapacity(row_start);
         }
         return accepted;
     }
-    fn matchDepth(self: *Store, source: anytype, pattern: types.Id, actual: Id, mappings: *std.ArrayList(Mapping), rows: ?*std.ArrayList(RowMapping), depth: usize, budget: *usize) Error!bool {
-        if (depth >= 1024 or budget.* == 0) return error.EvidenceLimit;
+    const MatchMemo = std.AutoHashMapUnmanaged(u64, void);
+    pub fn matchWithRowsBudget(self: *Store, source: anytype, pattern: types.Id, actual: Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), budget: *usize) Error!bool {
+        var memo: MatchMemo = .empty;
+        defer memo.deinit(self.allocator);
+        const frontier = mappings.items.len;
+        const row_frontier = rows.items.len;
+        errdefer {
+            mappings.shrinkRetainingCapacity(frontier);
+            rows.shrinkRetainingCapacity(row_frontier);
+        }
+        const accepted = try self.matchDepth(source, pattern, actual, mappings, rows, 0, budget, null, &memo);
+        if (!accepted) {
+            mappings.shrinkRetainingCapacity(frontier);
+            rows.shrinkRetainingCapacity(row_frontier);
+        }
+        return accepted;
+    }
+    /// A method reference may carry its caller's larger ambient row. Its
+    /// ordinary argument types remain exact implementation-head evidence.
+    pub fn matchTemplate(self: *Store, source: anytype, pattern: types.Id, actual: Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), resolver: ProjectionResolver) Error!bool {
+        return self.matchSignature(source, pattern, actual, mappings, rows, resolver, false);
+    }
+    pub fn matchLegacySignature(self: *Store, source: anytype, pattern: types.Id, actual: Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), resolver: ProjectionResolver) Error!bool {
+        return self.matchSignature(source, pattern, actual, mappings, rows, resolver, true);
+    }
+    fn matchSignature(self: *Store, source: anytype, pattern: types.Id, actual: Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), resolver: ProjectionResolver, infer_rows: bool) Error!bool {
+        var memo: MatchMemo = .empty;
+        defer memo.deinit(self.allocator);
+        const frontier = mappings.items.len;
+        const row_frontier = rows.items.len;
+        var accepted = false;
+        defer if (!accepted) {
+            mappings.shrinkRetainingCapacity(frontier);
+            rows.shrinkRetainingCapacity(row_frontier);
+        };
+        var expected = pattern;
+        var supplied = actual;
+        var depth: usize = 0;
+        while (source.node(expected).tag == .function) {
+            if (depth >= 256 or resolver.remaining.* == 0) return error.EvidenceLimit;
+            resolver.remaining.* -= 1;
+            const arrow = source.node(expected);
+            const concrete = self.node(supplied);
+            if (concrete.tag != .function) return false;
+            if (!try self.matchDepth(source, arrow.a, concrete.a, mappings, rows, depth + 1, resolver.remaining, resolver, &memo)) return false;
+            const required_row = self.projectRowDepth(source, arrow.c, mappings.items, rows.items, depth + 1, resolver.remaining, false, null, null, resolver) catch |err| switch (err) {
+                error.UnresolvedType => fallback: {
+                    if (!infer_rows) return false;
+                    if (!try self.matchRowDepth(source, arrow.c, concrete.c, mappings, rows, depth + 1, resolver.remaining, resolver, &memo)) return false;
+                    break :fallback try self.projectRowDepth(source, arrow.c, mappings.items, rows.items, depth + 1, resolver.remaining, false, null, null, resolver);
+                },
+                else => return err,
+            };
+            const required = try self.allocator.dupe(Effects.Label, self.effects.view().rowLabels(required_row));
+            defer self.allocator.free(required);
+            for (required) |label| {
+                if (resolver.remaining.* == 0) return error.EvidenceLimit;
+                resolver.remaining.* -= 1;
+                if (std.mem.findScalar(Effects.Label, self.effects.view().rowLabels(concrete.c), label) == null) return false;
+            }
+            expected = arrow.b;
+            supplied = concrete.b;
+            depth += 1;
+        }
+        accepted = try self.matchDepth(source, expected, supplied, mappings, rows, depth + 1, resolver.remaining, resolver, &memo);
+        return accepted;
+    }
+    /// Legacy invocation facts infer only their own invocation rows. The
+    /// selected signature is never opened against an executable ambient.
+    pub fn matchPrerequisite(self: *Store, source: anytype, pattern: types.Id, operands: [4]Id, arity: usize, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), resolver: ProjectionResolver) Error!?Id {
+        var memo: MatchMemo = .empty;
+        defer memo.deinit(self.allocator);
+        var labels: std.ArrayList(Effects.Label) = .empty;
+        defer labels.deinit(self.allocator);
+        const frontier = mappings.items.len;
+        const row_frontier = rows.items.len;
+        var accepted = false;
+        defer if (!accepted) {
+            mappings.shrinkRetainingCapacity(frontier);
+            rows.shrinkRetainingCapacity(row_frontier);
+        };
+        var required = pattern;
+        var requested: Effects.Id = 0;
+        if (operands[3] != 0) {
+            const carrier = self.node(operands[3]);
+            if (carrier.tag != .function) return null;
+            requested = carrier.c;
+        }
+        for (0..arity) |stage| {
+            if (resolver.remaining.* == 0) return error.EvidenceLimit;
+            resolver.remaining.* -= 1;
+            const arrow = source.node(required);
+            if (arrow.tag != .function) return null;
+            if (!try self.matchDepth(source, arrow.a, operands[stage], mappings, rows, 0, resolver.remaining, resolver, &memo)) return null;
+            const own_row = self.projectRowDepth(source, arrow.c, mappings.items, rows.items, 0, resolver.remaining, false, null, null, resolver) catch |err| switch (err) {
+                error.UnresolvedType => fallback: {
+                    if (operands[3] == 0) return null;
+                    if (!try self.matchRowDepth(source, arrow.c, requested, mappings, rows, 0, resolver.remaining, resolver, &memo)) return null;
+                    break :fallback try self.projectRowDepth(source, arrow.c, mappings.items, rows.items, 0, resolver.remaining, false, null, null, resolver);
+                },
+                else => return err,
+            };
+            const own_labels = self.effects.view().rowLabels(own_row);
+            for (own_labels, 0..) |label, index| {
+                if (resolver.remaining.* == 0) return error.EvidenceLimit;
+                resolver.remaining.* -= 1;
+                var count: usize = 0;
+                for (own_labels[0 .. index + 1]) |earlier| {
+                    if (resolver.remaining.* == 0) return error.EvidenceLimit;
+                    resolver.remaining.* -= 1;
+                    if (earlier == label) count += 1;
+                }
+                if (operands[3] != 0) {
+                    var available: usize = 0;
+                    for (self.effects.view().rowLabels(requested)) |actual| {
+                        if (resolver.remaining.* == 0) return error.EvidenceLimit;
+                        resolver.remaining.* -= 1;
+                        if (actual == label) available += 1;
+                    }
+                    if (count > available) return error.TypeMismatch;
+                }
+                var present: usize = 0;
+                for (labels.items) |actual| {
+                    if (resolver.remaining.* == 0) return error.EvidenceLimit;
+                    resolver.remaining.* -= 1;
+                    if (actual == label) present += 1;
+                }
+                if (count > present) try labels.append(self.allocator, label);
+            }
+            required = arrow.b;
+        }
+        if (!try self.matchDepth(source, required, operands[2], mappings, rows, 0, resolver.remaining, resolver, &memo)) return error.TypeMismatch;
+        accepted = true;
+        if (operands[3] != 0) return operands[3];
+        const own = try self.effects.internRow(labels.items);
+        return try self.internWithEffects(.function, types.unit, types.unit, own, &.{});
+    }
+    pub fn matchSelected(self: *Store, source: anytype, pattern: types.Id, actual: Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), resolver: ProjectionResolver) Error!bool {
+        var memo: MatchMemo = .empty;
+        defer memo.deinit(self.allocator);
+        const frontier = mappings.items.len;
+        const row_frontier = rows.items.len;
+        errdefer {
+            mappings.shrinkRetainingCapacity(frontier);
+            rows.shrinkRetainingCapacity(row_frontier);
+        }
+        const accepted = try self.matchDepth(source, pattern, actual, mappings, rows, 0, resolver.remaining, resolver, &memo);
+        if (!accepted) {
+            mappings.shrinkRetainingCapacity(frontier);
+            rows.shrinkRetainingCapacity(row_frontier);
+        }
+        return accepted;
+    }
+    fn matchDepth(self: *Store, source: anytype, pattern: types.Id, actual: Id, mappings: *std.ArrayList(Mapping), rows: ?*std.ArrayList(RowMapping), depth: usize, budget: *usize, resolver: ?ProjectionResolver, memo: ?*MatchMemo) Error!bool {
+        if (depth >= 1024 or (memo != null and depth >= 256) or budget.* == 0) return error.EvidenceLimit;
         budget.* -= 1;
         if (actual == 0 or actual >= self.nodes.items.len) return error.UnresolvedType;
+        const pair = (@as(u64, pattern) << 32) | actual;
+        if (memo) |seen| if (seen.contains(pair)) return true;
         const n = source.node(pattern);
+        if (n.tag == .projection) {
+            const selected = resolver orelse return false;
+            var mapped_rows: []const RowMapping = &.{};
+            if (rows) |values| mapped_rows = values.items;
+            const normalized = self.projectSelected(source, pattern, mappings.items, mapped_rows, selected) catch |err| switch (err) {
+                error.UnresolvedType => return false,
+                else => return err,
+            };
+            if (normalized != actual) return false;
+            if (memo) |seen| try seen.put(self.allocator, pair, {});
+            return true;
+        }
         const concrete = self.node(actual);
         if (n.tag == .never or concrete.tag == .never) return true;
         if (n.tag == .variable) {
@@ -360,6 +579,7 @@ pub const Store = struct {
             return true;
         }
         const same = switch (n.tag) {
+            .scoped => false,
             .absent, .projection => false,
             .unit => concrete.tag == .unit,
             .boolean => concrete.tag == .boolean,
@@ -380,26 +600,40 @@ pub const Store = struct {
             .variable, .never => unreachable,
         };
         if (!same) return false;
-        if ((n.tag == .function or n.tag == .demand or n.tag == .provider) and !try self.matchRowDepth(source, n.c, concrete.c, mappings, rows, depth + 1, budget)) return false;
+        if ((n.tag == .demand or n.tag == .provider) and !try self.matchRowDepth(source, n.c, concrete.c, mappings, rows, depth + 1, budget, resolver, memo)) return false;
         switch (n.tag) {
-            .array, .list, .cursor, .demand, .resolver, .provider => return self.matchDepth(source, n.a, concrete.a, mappings, rows, depth + 1, budget),
-            .state_provider => return try self.matchDepth(source, n.a, concrete.a, mappings, rows, depth + 1, budget) and try self.matchDepth(source, n.b, concrete.b, mappings, rows, depth + 1, budget) and try self.matchDepth(source, n.c, concrete.c, mappings, rows, depth + 1, budget),
-            .function => return try self.matchDepth(source, n.a, concrete.a, mappings, rows, depth + 1, budget) and try self.matchDepth(source, n.b, concrete.b, mappings, rows, depth + 1, budget),
+            .array, .list, .cursor, .demand, .resolver, .provider => {
+                if (!try self.matchDepth(source, n.a, concrete.a, mappings, rows, depth + 1, budget, resolver, memo)) return false;
+            },
+            .state_provider => {
+                if (!try self.matchDepth(source, n.a, concrete.a, mappings, rows, depth + 1, budget, resolver, memo)) return false;
+                if (!try self.matchDepth(source, n.b, concrete.b, mappings, rows, depth + 1, budget, resolver, memo)) return false;
+                if (!try self.matchDepth(source, n.c, concrete.c, mappings, rows, depth + 1, budget, resolver, memo)) return false;
+            },
+            .function => {
+                if (!try self.matchDepth(source, n.a, concrete.a, mappings, rows, depth + 1, budget, resolver, memo)) return false;
+                if (!try self.matchRowDepth(source, n.c, concrete.c, mappings, rows, depth + 1, budget, resolver, memo)) return false;
+                if (!try self.matchDepth(source, n.b, concrete.b, mappings, rows, depth + 1, budget, resolver, memo)) return false;
+            },
             .product, .nominal => {
                 const expected = if (n.tag == .nominal) source.nominalArguments(n) else source.list(.{ .start = n.a, .len = n.b });
-                const actuals = self.children(actual);
+                var actuals = self.children(actual);
+                if (resolver != null) actuals = try self.allocator.dupe(Id, actuals);
+                defer if (resolver != null) self.allocator.free(actuals);
                 if (expected.len != actuals.len) return false;
-                for (expected, actuals) |child, child_actual| if (!try self.matchDepth(source, child, child_actual, mappings, rows, depth + 1, budget)) return false;
+                for (expected, actuals) |child, child_actual| if (!try self.matchDepth(source, child, child_actual, mappings, rows, depth + 1, budget, resolver, memo)) return false;
             },
             .record => {
-                const fields = self.children(actual);
+                var fields = self.children(actual);
+                if (resolver != null) fields = try self.allocator.dupe(Id, fields);
+                defer if (resolver != null) self.allocator.free(fields);
                 if (fields.len != @as(usize, n.b) * 2) return false;
                 for (0..n.b) |index| {
                     const field = source.recordField(n, index);
                     var found = false;
                     var i: usize = 0;
                     while (i < fields.len) : (i += 2) if (fields[i] == field.name) {
-                        if (!try self.matchDepth(source, field.ty, fields[i + 1], mappings, rows, depth + 1, budget)) return false;
+                        if (!try self.matchDepth(source, field.ty, fields[i + 1], mappings, rows, depth + 1, budget, resolver, memo)) return false;
                         found = true;
                         break;
                     };
@@ -408,9 +642,10 @@ pub const Store = struct {
             },
             else => {},
         }
+        if (memo) |seen| try seen.put(self.allocator, pair, {});
         return true;
     }
-    fn matchRowDepth(self: *Store, source: anytype, pattern: types.Effects.Id, actual: Effects.Id, mappings: *std.ArrayList(Mapping), rows: ?*std.ArrayList(RowMapping), depth: usize, budget: *usize) Error!bool {
+    fn matchRowDepth(self: *Store, source: anytype, pattern: types.Effects.Id, actual: Effects.Id, mappings: *std.ArrayList(Mapping), rows: ?*std.ArrayList(RowMapping), depth: usize, budget: *usize, resolver: ?ProjectionResolver, memo: ?*MatchMemo) Error!bool {
         const tail = source.row(pattern).tail;
         if (tail == .parameter or (tail == .variable and rows == null)) return error.UnresolvedType;
         const expected = source.rowLabels(pattern);
@@ -420,10 +655,10 @@ pub const Store = struct {
         const used = try self.allocator.alloc(bool, actuals.len);
         defer self.allocator.free(used);
         @memset(used, false);
-        return self.matchOperations(source, expected, actuals, used, tail, 0, mappings, rows, depth, budget);
+        return self.matchOperations(source, expected, actuals, used, tail, 0, mappings, rows, depth, budget, resolver, memo);
     }
-    fn matchOperations(self: *Store, source: anytype, expected: []const types.Effects.Label, actuals: []const Effects.Label, used: []bool, tail: types.Effects.Tail, index: usize, mappings: *std.ArrayList(Mapping), rows: ?*std.ArrayList(RowMapping), depth: usize, budget: *usize) Error!bool {
-        if (depth >= 1024 or budget.* == 0) return error.EvidenceLimit;
+    fn matchOperations(self: *Store, source: anytype, expected: []const types.Effects.Label, actuals: []const Effects.Label, used: []bool, tail: types.Effects.Tail, index: usize, mappings: *std.ArrayList(Mapping), rows: ?*std.ArrayList(RowMapping), depth: usize, budget: *usize, resolver: ?ProjectionResolver, memo: ?*MatchMemo) Error!bool {
+        if (depth >= 1024 or (memo != null and depth >= 256) or budget.* == 0) return error.EvidenceLimit;
         budget.* -= 1;
         if (index == expected.len) {
             if (tail == .closed) return true;
@@ -438,25 +673,32 @@ pub const Store = struct {
         const operation = source.operation(expected[index]);
         const arguments = source.operationArguments(expected[index]);
         for (actuals, 0..) |label, i| {
+            if (memo != null) {
+                if (budget.* == 0) return error.EvidenceLimit;
+                budget.* -= 1;
+            }
             if (used[i]) continue;
             const concrete = self.effects.view().operation(label);
-            if (operation.identity.unit != concrete.identity.unit or operation.identity.decl != concrete.identity.decl) continue;
-            const actual_arguments = self.effects.view().operationArguments(label);
+            if (!std.meta.eql(operation.instance, concrete.instance) or operation.identity.unit != concrete.identity.unit or operation.identity.decl != concrete.identity.decl) continue;
+            var actual_arguments = self.effects.view().operationArguments(label);
+            if (resolver != null) actual_arguments = try self.allocator.dupe(Id, actual_arguments);
+            defer if (resolver != null) self.allocator.free(actual_arguments);
             if (arguments.len != actual_arguments.len) continue;
             const frontier = mappings.items.len;
             const row_frontier = if (rows) |values| values.items.len else 0;
             var same = true;
             for (arguments, actual_arguments) |argument, concrete_argument| {
-                if (!try self.matchDepth(source, argument, concrete_argument, mappings, rows, depth + 1, budget)) {
+                if (!try self.matchDepth(source, argument, concrete_argument, mappings, rows, depth + 1, budget, resolver, memo)) {
                     same = false;
                     break;
                 }
             }
             if (same) {
                 used[i] = true;
-                if (try self.matchOperations(source, expected, actuals, used, tail, index + 1, mappings, rows, depth + 1, budget)) return true;
+                if (try self.matchOperations(source, expected, actuals, used, tail, index + 1, mappings, rows, depth + 1, budget, resolver, memo)) return true;
                 used[i] = false;
             }
+            if (memo) |seen| seen.clearRetainingCapacity();
             mappings.shrinkRetainingCapacity(frontier);
             if (rows) |values| values.shrinkRetainingCapacity(row_frontier);
         }

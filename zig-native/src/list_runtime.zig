@@ -487,6 +487,30 @@ fn emitAddress(c: Code) Error!void {
     try c.ret(.{ .cell, node, .{ .i32_sub, index, base }, header });
     try c.end();
     try c.end();
+    const directory = try c.temp();
+    const leaf_limit = try c.temp();
+    try c.set(directory, .{ .load, sequence, d.directory });
+    try c.when(directory);
+    try c.set(leaf_limit, .{ .load, sequence, d.leaf_limit });
+    try c.when(.{ .i32_and, .{ .i32_gt_u, leaf_limit, 0 }, .{ .i32_le_u, leaf_limit, capacity } });
+    try c.set(left, .{ .load, directory, heap.offset(heap.Array, "length") });
+    try c.when(left);
+    try c.set(split, .{ .i32_sub, left, 1 });
+    // Guard the product before evaluating it, including highly shared trees.
+    try c.when(.{ .i32_le_u, split, .{ .i32_div_u, .{ .load, sequence, d.length }, leaf_limit } });
+    try c.set(node, .{ .load, .{ .cell, directory, split, @sizeOf(heap.Array) }, 0 });
+    try c.set(base, .{ .load, node, n.length });
+    try c.when(.{ .i32_and, .{ .i32_gt_u, base, 0 }, .{ .i32_le_u, base, leaf_limit } });
+    // Each ordered leaf is bounded by leaf_limit. Equality proves every
+    // preceding occurrence is full, even when leaf addresses are repeated.
+    try c.when(.{ .i32_eq, .{ .i32_sub, .{ .load, sequence, d.length }, .{ .i32_mul, split, leaf_limit } }, base });
+    try c.set(split, .{ .i32_div_u, index, leaf_limit });
+    try c.set(node, .{ .load, .{ .cell, directory, split, @sizeOf(heap.Array) }, 0 });
+    try c.set(base, .{ .i32_mul, split, leaf_limit });
+    try store(c, sequence, d.cached_leaf, node);
+    try store(c, sequence, d.cached_base, base);
+    try c.ret(.{ .cell, node, .{ .i32_sub, index, base }, header });
+    for (0..6) |_| try c.end();
     try c.set(node, .{ .load, sequence, d.root });
     try c.set(base, 0);
     try c.loop(.{ .load, node, n.height });
@@ -536,7 +560,8 @@ fn emitEdit(c: Code, arena: wasm.Arena) Error!void {
     try c.end();
     try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 134 });
     try copy(c, result, sequence, descriptor_bytes);
-    try store(c, result, d.directory, 0);
+    // This copy retains the identical tree and its typed directory edge.
+    // Writers invalidate the directory before changing that tree.
     try acyclic(c, arena, result, .{ .load, sequence, d.scalar_elements });
     try store(c, result, d.cached_leaf, 0);
     try store(c, result, d.immutable, 0);
@@ -643,7 +668,7 @@ fn emitJoin(c: Code, r: Runtime) Error!void {
     try c.ret(left);
     try c.end();
     try c.set(count, .{ .i32_add, .{ .load, left, n.length }, .{ .load, right, n.length } });
-    try c.when(.{ .i32_le_u, count, 64 });
+    try c.when(.{ .i32_and, .{ .i32_le_u, count, 64 }, .{ .i32_le_u, count, .{ .load, owner, d.leaf_limit } } });
     // Both operands need to be leaves; a fragmented small tree is handled by
     // the same structural path instead of unbounded recursive flattening.
     try c.when(.{ .i32_eqz, .{ .i32_or, .{ .load, left, n.height }, .{ .load, right, n.height } } });
@@ -701,6 +726,7 @@ fn emitConcat(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     const right: Local = .{ .id = 1 };
     const count = try c.temp();
     const result = try c.temp();
+    const leaf_limit = try c.temp();
     try c.set(count, .{ .i32_add, .{ .load, left, d.length }, .{ .load, right, d.length } });
     try c.trap(.{ .i32_gt_u, count, limit });
     try c.when(.{ .i32_eqz, count });
@@ -715,7 +741,13 @@ fn emitConcat(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 134 });
     try c.zero(result, descriptor_bytes);
     try store(c, result, d.scalar_elements, .{ .i32_and, .{ .load, left, d.scalar_elements }, .{ .load, right, d.scalar_elements } });
-    try store(c, result, d.leaf_limit, .{ .load, left, d.leaf_limit });
+    // Keep the bound valid for every reused leaf, including mixed runtime
+    // descriptors. Checked equal-row source concatenations keep their limit.
+    try c.set(leaf_limit, .{ .load, left, d.leaf_limit });
+    try c.when(.{ .i32_gt_u, .{ .load, right, d.leaf_limit }, leaf_limit });
+    try c.set(leaf_limit, .{ .load, right, d.leaf_limit });
+    try c.end();
+    try store(c, result, d.leaf_limit, leaf_limit);
     try acyclic(c, arena, result, .{ .load, result, d.scalar_elements });
     try store(c, result, d.length, count);
     try store(c, result, d.root, .{ .call, r.join, .{ .load, left, d.root }, .{ .load, right, d.root }, result });

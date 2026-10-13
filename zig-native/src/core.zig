@@ -17,7 +17,7 @@ pub const Name = struct { start: u32 = 0, len: u32 = 0 };
 /// Only record field spellings survive in this compact symbol projection.
 /// Physical layouts use spelling, never the incidental interning order.
 pub const FieldName = struct { symbol: u32, spelling: Name };
-pub const Tag = enum(u8) { invalid, constant, reference, scalar, logical, call, if_value, block, suite, bind, return_, if_stmt, product, record, construct, project, match, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop, break_, type_same, result_associated, suspend_, force, type_constructor, resolver_op, operation_value, effect_provider, state_provider, handle, effect_reflection, computation, request_loop, request_decision, record_merge };
+pub const Tag = enum(u8) { invalid, constant, reference, scalar, logical, call, if_value, block, suite, bind, return_, if_stmt, product, record, construct, project, match, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop, break_, type_same, result_associated, suspend_, force, type_constructor, resolver_op, operation_value, effect_provider, state_provider, handle, effect_reflection, computation, request_loop, request_decision, record_merge, contract_method, effect_scope };
 pub const ArrayOp = @import("collection_ops.zig").Op;
 pub const PrimitiveKind = enum(u8) { scalar, array };
 pub const Primitive = struct { kind: PrimitiveKind, op: Op = .none, array_op: ArrayOp = .length, arity: u8 };
@@ -98,10 +98,10 @@ pub const ResolverInfo = struct {
 /// An operation is an ordinary callable value with an exact producer identity.
 /// Its closed or principal argument types live in this module's frozen graph;
 /// runtime handler selection never compares frontend-local operation labels.
-pub const OperationValue = struct { identity: T.NominalIdentity, arguments: T.List, signature: T.Id, witness: Id = 0, witness_result: T.Id = 0 };
+pub const OperationValue = struct { identity: T.NominalIdentity, arguments: T.List, signature: T.Id, witness: Id = 0, witness_result: T.Id = 0, instance: T.NominalIdentity = .{ .unit = 0, .decl = 0 }, capability: Id = 0 };
 pub const HandleEffects = struct { node: Id, first: T.Id, second: T.Id = 0, extended: T.Effects.Id, residual: T.Effects.Id };
 pub const RequestDecisionKind = enum(u32) { reply, cancel, break_ };
-pub const RequestArm = struct { operation: T.Effects.Label, callback: Id };
+pub const RequestArm = struct { operation: T.Effects.Label, callback: Id, selector: Id = 0 };
 pub const RequestLoopInfo = struct {
     computation: Id,
     action_type: T.Id,
@@ -155,6 +155,11 @@ pub const EffectRows = struct {
 /// these identities; runtime layout never interprets a residual projection.
 pub const Contract = struct { private: bool, identity: T.NominalIdentity, name: u32, parameters: T.List, variables: T.List, row_variables: T.List, predicates: T.List, members: T.List, requires_implementation: bool, row_parameter_names: T.List = .{}, row_parameters: T.List = .{} };
 pub const ContractMember = @import("principal_interface.zig").ContractMember;
+pub const Implementation = @import("principal_interface.zig").Implementation;
+pub const ImplementationMember = @import("principal_interface.zig").ImplementationMember;
+pub const MemberTemplate = @import("principal_interface.zig").MemberTemplate;
+pub const SelectedProof = @import("principal_interface.zig").SelectedProof;
+pub const SelectedUse = struct { node: Id, proof: u32 };
 pub const Types = struct {
     nodes: []T.Node,
     extra: []T.Id,
@@ -233,6 +238,13 @@ pub const Module = struct {
     associated: []Associated = &.{},
     contracts: []Contract = &.{},
     contract_members: []ContractMember = &.{},
+    implementations: []Implementation = &.{},
+    implementation_members: []ImplementationMember = &.{},
+    member_templates: []MemberTemplate = &.{},
+    selected_proofs: []SelectedProof = &.{},
+    selected_members: []ImplementationMember = &.{},
+    selected_edges: []u32 = &.{},
+    selected_uses: []SelectedUse = &.{},
     primitives: []Primitive = &.{},
     loops: []LoopInfo = &.{},
     loop_carries: []LoopCarry = &.{},
@@ -285,6 +297,13 @@ pub const Module = struct {
         allocator.free(self.associated);
         allocator.free(self.contracts);
         allocator.free(self.contract_members);
+        allocator.free(self.implementations);
+        allocator.free(self.implementation_members);
+        allocator.free(self.member_templates);
+        allocator.free(self.selected_proofs);
+        allocator.free(self.selected_members);
+        allocator.free(self.selected_edges);
+        allocator.free(self.selected_uses);
         allocator.free(self.primitives);
         allocator.free(self.loops);
         allocator.free(self.loop_carries);
@@ -346,7 +365,7 @@ pub const Module = struct {
         const value = self.node(id);
         return switch (value.tag) {
             .block, .suite, .product, .record, .array, .array_op => self.extra[value.a..][0..value.b],
-            .call, .break_ => self.extra[value.b..][0..value.c],
+            .call, .contract_method, .break_ => self.extra[value.b..][0..value.c],
             else => &.{},
         };
     }
@@ -572,6 +591,13 @@ const Builder = struct {
     associated: std.ArrayList(Associated) = .empty,
     contracts: std.ArrayList(Contract) = .empty,
     contract_members: std.ArrayList(ContractMember) = .empty,
+    implementations: std.ArrayList(Implementation) = .empty,
+    implementation_members: std.ArrayList(ImplementationMember) = .empty,
+    member_templates: std.ArrayList(MemberTemplate) = .empty,
+    selected_proofs: std.ArrayList(SelectedProof) = .empty,
+    selected_members: std.ArrayList(ImplementationMember) = .empty,
+    selected_edges: std.ArrayList(u32) = .empty,
+    selected_uses: std.ArrayList(SelectedUse) = .empty,
     primitives: std.ArrayList(Primitive) = .empty,
     loops: std.ArrayList(LoopInfo) = .empty,
     loop_carries: std.ArrayList(LoopCarry) = .empty,
@@ -602,7 +628,7 @@ const Builder = struct {
     fn deinit(self: *Builder) void {
         self.field_names.deinit(self.allocator);
         self.saved_fields.deinit(self.allocator);
-        inline for (.{ "request_loops", "request_arms", "request_callbacks", "runtime_names", "source_names", "erased_declaration_references", "tag_calls", "nodes", "spans", "extra", "type_nodes", "type_extra", "effect_rows", "effect_labels", "effect_operations", "bindings", "bodies", "parameters", "references", "calls", "merges", "merge_ranges", "name_bytes", "obligations", "diagnostics", "nominals", "operation_names", "constructors", "projections", "projection_variants", "patterns", "pattern_rows", "match_arms", "matches", "updates", "update_steps", "closures", "visit_epochs", "associated", "contracts", "contract_members", "primitives", "loops", "loop_carries", "resolver_ops", "operation_values", "handle_effects", "dispatch_signatures", "resolver_loop_frames" }) |field| @field(self, field).deinit(self.allocator);
+        inline for (.{ "request_loops", "request_arms", "request_callbacks", "runtime_names", "source_names", "erased_declaration_references", "tag_calls", "nodes", "spans", "extra", "type_nodes", "type_extra", "effect_rows", "effect_labels", "effect_operations", "bindings", "bodies", "parameters", "references", "calls", "merges", "merge_ranges", "name_bytes", "obligations", "diagnostics", "nominals", "operation_names", "constructors", "projections", "projection_variants", "patterns", "pattern_rows", "match_arms", "matches", "updates", "update_steps", "closures", "visit_epochs", "associated", "contracts", "contract_members", "implementations", "implementation_members", "member_templates", "selected_proofs", "selected_members", "selected_edges", "selected_uses", "primitives", "loops", "loop_carries", "resolver_ops", "operation_values", "handle_effects", "dispatch_signatures", "resolver_loop_frames" }) |field| @field(self, field).deinit(self.allocator);
         self.allocator.free(self.type_map);
         self.allocator.free(self.variable_map);
         self.allocator.free(self.effect_row_map);
@@ -749,6 +775,7 @@ const Builder = struct {
                 const span = try self.saveTypes(arguments.items);
                 break :blk .{ .tag = original.tag, .a = original.a, .b = original.b, .c = span.start };
             },
+            .scoped => .{ .tag = .scoped, .a = try self.projectType(original.a, depth + 1), .b = original.b, .c = original.c },
             .array, .list, .cursor, .resolver => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1) },
             .demand, .provider => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1), .c = try self.projectRow(original.c, depth + 1) },
             .state_provider => .{ .tag = .state_provider, .a = try self.projectType(original.a, depth + 1), .b = try self.projectType(original.b, depth + 1), .c = try self.projectType(original.c, depth + 1) },
@@ -781,7 +808,7 @@ const Builder = struct {
         const arguments = try self.saveTypes(values.items);
         if (self.effect_operations.items.len == std.math.maxInt(u32)) return error.CoreLimit;
         const id: u32 = @intCast(self.effect_operations.items.len);
-        try self.effect_operations.append(self.allocator, .{ .identity = source.identity, .arguments = arguments });
+        try self.effect_operations.append(self.allocator, .{ .identity = source.identity, .arguments = arguments, .instance = source.instance });
         self.effect_operation_map[label] = id;
         return id;
     }
@@ -864,6 +891,15 @@ const Builder = struct {
     fn make(self: *Builder, source: ast.Id, value: Node) Error!Id {
         const id = try self.reserve(source);
         self.nodes.items[id] = value;
+        if (value.tag == .call or value.tag == .reference) {
+            const span = self.tree.span(source);
+            for (self.checked.selected_uses) |use| {
+                const origin = self.tree.span(use.source);
+                if (origin.start < span.start or origin.end > span.end) continue;
+                try self.selected_uses.append(self.allocator, .{ .node = id, .proof = use.proof });
+            }
+        }
+
         if (value.tag == .project and self.projections.items[value.b].diagnostic_point == 0) {
             const field = self.projections.items[value.b].field;
             var member_point: u32 = 0;
@@ -953,9 +989,12 @@ const Builder = struct {
             try self.diagnostic(.unresolved_binding, source);
             return 0;
         }
-        const path = if (source < self.checked.access_paths.len) self.checked.types.list(self.checked.access_paths[source]) else &.{};
+        return self.projectedReference(source, binding, ty, source);
+    }
+    fn projectedReference(self: *Builder, source: ast.Id, binding: BindingId, ty: T.Id, path_source: ast.Id) Error!Id {
+        const path = if (path_source < self.checked.access_paths.len) self.checked.types.list(self.checked.access_paths[path_source]) else &.{};
         if (path.len == 0) return self.referenceNode(source, binding, ty);
-        const type_path = self.checked.types.list(self.checked.access_types[source]);
+        const type_path = self.checked.types.list(self.checked.access_types[path_source]);
         if (type_path.len != path.len + 1) {
             try self.diagnostic(.unresolved_binding, source);
             return 0;
@@ -1175,12 +1214,13 @@ const Builder = struct {
         self.visit_epochs.items[id] = epoch;
         const value = self.nodes.items[id];
         switch (value.tag) {
+            .operation_value => try self.nodeCaptures(self.operation_values.items[value.a].capability, epoch, captures, depth + 1),
             .effect_reflection => {
                 const kind: checked_types.ReflectionKind = @fromBackingInt(@intCast(value.a));
                 if (kind == .count or kind == .has or kind == .same) try self.nodeCaptures(value.b, epoch, captures, depth + 1);
                 if (value.c != 0) try self.nodeCaptures(value.c, epoch, captures, depth + 1);
             },
-            .computation => try self.nodeCaptures(value.a, epoch, captures, depth + 1),
+            .computation, .effect_scope => try self.nodeCaptures(value.a, epoch, captures, depth + 1),
             .request_decision => {
                 try self.nodeCaptures(value.b, epoch, captures, depth + 1);
                 try self.nodeCaptures(value.c, epoch, captures, depth + 1);
@@ -1188,7 +1228,10 @@ const Builder = struct {
             .request_loop => {
                 const info = self.request_loops.items[value.a];
                 try self.nodeCaptures(info.computation, epoch, captures, depth + 1);
-                for (self.request_arms.items[info.arms.start..][0..info.arms.len]) |arm| try self.nodeCaptures(arm.callback, epoch, captures, depth + 1);
+                for (self.request_arms.items[info.arms.start..][0..info.arms.len]) |arm| {
+                    try self.nodeCaptures(arm.callback, epoch, captures, depth + 1);
+                    if (arm.selector != 0) try self.nodeCaptures(arm.selector, epoch, captures, depth + 1);
+                }
                 for (self.loop_carries.items[info.carries.start..][0..info.carries.len]) |carry| {
                     try self.noteCapture(carry.incoming, epoch, captures);
                     self.definition_epochs[carry.outgoing] = epoch;
@@ -1387,6 +1430,12 @@ const Builder = struct {
         }
         const syntax = self.tree.node(source);
         const ty = try self.typeOf(source);
+        for (self.checked.effect_scopes) |scope_| if (scope_.node == source) {
+            const callback = try self.expression(scope_.callback, depth + 1);
+            const result = try self.make(source, .{ .tag = .effect_scope, .ty = ty, .a = callback });
+            self.ast_map[source] = result;
+            return result;
+        };
         const runner = if (source < self.checked.effect_runner_ids.len) self.checked.effect_runner_ids[source] else 0;
         if (runner != 0) {
             const result = try self.effectRunner(source, self.checked.effect_runners[runner - 1], depth + 1);
@@ -1416,7 +1465,7 @@ const Builder = struct {
             const use = self.checked.operation_uses[operation - 1];
             if (use.template == 0 or use.template >= self.checked.effect_templates.len) return error.CoreLimit;
             const catalog: u32 = @intCast(self.operation_values.items.len);
-            const metadata: OperationValue = .{ .identity = self.checked.effect_templates[use.template].identity, .arguments = try self.projectedTypeList(use.arguments), .signature = try self.projectType(use.signature, 0) };
+            const metadata: OperationValue = .{ .identity = self.checked.effect_templates[use.template].identity, .arguments = try self.projectedTypeList(use.arguments), .signature = try self.projectType(use.signature, 0), .instance = use.instance, .capability = if (use.capability_binding != 0) try self.projectedReference(source, use.capability_binding, try self.projectType(self.checked.bindings[use.capability_binding].ty, 0), use.node) else if (use.capability == 0) 0 else try self.expression(use.capability, depth + 1) };
             try self.operation_values.append(self.allocator, metadata);
             const operation_ty = if (use.call == .value) ty else metadata.signature;
             const operation_node = try self.make(source, .{ .tag = .operation_value, .ty = operation_ty, .a = catalog });
@@ -1634,6 +1683,7 @@ const Builder = struct {
             const metadata = self.checked.bindings[binding];
             if (metadata.kind == .external) return null;
             if (metadata.kind != .global) return 0;
+            for (self.checked.member_templates) |template| if (template.binding == binding) return null;
             var source = self.unwrap(self.tree.valueDecl(metadata.declaration).body);
             var count: usize = 0;
             while (self.tree.node(source).tag == .lambda) {
@@ -2365,7 +2415,7 @@ const Builder = struct {
         defer arms.deinit(self.allocator);
         for (self.checked.types.list(checked.arms)) |index| {
             const arm = self.checked.request_arms[index];
-            try arms.append(self.allocator, .{ .operation = try self.projectOperation(arm.operation, 0), .callback = try self.requestCallback(arm.node, source, arm, info.state_type, depth + 1) });
+            try arms.append(self.allocator, .{ .operation = try self.projectOperation(arm.operation, 0), .callback = try self.requestCallback(arm.node, source, arm, info.state_type, depth + 1), .selector = if (self.checked.types.operation(arm.operation).instance.decl == 0) 0 else try self.expression(arm.operation_source, depth + 1) });
         }
         if (arms.items.len > std.math.maxInt(u32) - self.request_arms.items.len) return error.CoreLimit;
         info.arms = .{ .start = @intCast(self.request_arms.items.len), .len = @intCast(arms.items.len) };
@@ -2642,6 +2692,78 @@ const Builder = struct {
         }
         for (self.checked.constructors) |metadata| try self.constructors.append(self.allocator, .{ .identity = metadata.identity, .nominal = metadata.nominal, .tag = metadata.tag, .scheme = try self.projectScheme(metadata.scheme), .payload = try self.projectType(metadata.payload, 0) });
         for (self.checked.associated) |metadata| try self.associated.append(self.allocator, .{ .identity = metadata.identity, .member = metadata.member, .operator = metadata.operator, .target = self.target(metadata.binding) });
+        try self.implementationCatalog();
+    }
+    fn implementationCatalog(self: *Builder) Error!void {
+        for (self.checked.implementations) |old| {
+            var declaration = old;
+            declaration.declaration = 0;
+            declaration.head = try self.projectedTypeList(old.head);
+            declaration.variables = try self.projectedTypeList(old.variables);
+            declaration.parameter_names = try self.saveTypes(self.checked.types.list(old.parameter_names));
+            declaration.row_variables = try self.projectedRowVariables(old.row_variables);
+            declaration.row_parameter_names = try self.saveTypes(self.checked.types.list(old.row_parameter_names));
+            declaration.row_parameters = try self.projectedRows(old.row_parameters);
+            const members: u32 = @intCast(self.implementation_members.items.len);
+            for (self.checked.implementation_members[old.members.start..][0..old.members.len]) |before| {
+                var member = before;
+                member.root = try self.projectType(before.root, 0);
+                try self.implementation_members.append(self.allocator, member);
+            }
+            declaration.members = .{ .start = members, .len = old.members.len };
+            const predicates: u32 = @intCast(self.obligations.items.len);
+            for (self.checked.implementation_predicates[old.predicates.start..][0..old.predicates.len]) |old_predicate| {
+                var value = old_predicate;
+                if (@import("implementation_predicates.zig").inferredCarrier(&self.checked.types, value, old.row_parameters)) value.signature = 0;
+                try self.obligations.append(self.allocator, .{ .ty = try self.projectType(value.ty, 0), .kind = value.kind, .span = self.checked.diagnosticSpan(self.tree, value.source), .name = value.name, .result = try self.projectType(value.result, 0), .other = try self.projectType(value.other, 0), .signature = try self.projectType(value.signature, 0), .operator = value.operator, .identity = value.identity, .explicit = true, .qualification_span = value.qualification_span, .qualification_unit = value.qualification_unit });
+            }
+            declaration.predicates = .{ .start = predicates, .len = old.predicates.len };
+            try self.implementations.append(self.allocator, declaration);
+        }
+        for (self.checked.member_templates) |old| {
+            var template = old;
+            template.arguments = try self.projectedTypeList(old.arguments);
+            try self.member_templates.append(self.allocator, template);
+        }
+        for (self.checked.selected_members) |old| {
+            var member = old;
+            member.root = try self.projectType(old.root, 0);
+            try self.selected_members.append(self.allocator, member);
+        }
+        try self.selected_edges.appendSlice(self.allocator, self.checked.selected_edges);
+        for (self.checked.selected_proofs) |old| {
+            var proof = old;
+            proof.arguments = try self.projectedTypeList(old.arguments);
+            inline for (.{ "ty", "other", "result", "signature" }) |field| @field(proof.predicate, field) = try self.projectType(@field(old.predicate, field), 0);
+            proof.predicate.source = 0;
+            try self.selected_proofs.append(self.allocator, proof);
+        }
+    }
+    fn memberTemplateBody(self: *Builder, template_index: u32) Error!void {
+        self.body_lowerings += 1;
+        const template = self.member_templates.items[template_index];
+        const source = self.checked.bindings[template.binding].declaration;
+        const span = self.tree.span(source);
+        const body_id: BodyId = @intCast(self.bodies.items.len);
+        const start: u32 = @intCast(self.parameters.items.len);
+        var arguments: std.ArrayList(Id) = .empty;
+        defer arguments.deinit(self.allocator);
+        var root = self.bindings.items[template.binding].ty;
+        while (self.type_nodes.items[root].tag == .function) {
+            const arrow = self.type_nodes.items[root];
+            const parameter: BindingId = @intCast(self.bindings.items.len);
+            try self.bindings.append(self.allocator, .{ .kind = .parameter, .ty = arrow.a, .scheme = .{ .root = arrow.a }, .target = .{ .unit = self.checked.unit, .binding = parameter }, .span = span });
+            try self.parameters.append(self.allocator, .{ .binding = parameter, .ty = arrow.a, .span = span });
+            const reference: u32 = @intCast(self.references.items.len);
+            try self.references.append(self.allocator, .{ .unit = self.checked.unit, .binding = parameter });
+            try arguments.append(self.allocator, try self.make(source, .{ .tag = .reference, .ty = arrow.a, .a = reference }));
+            root = arrow.b;
+            if (arguments.items.len >= 256) return error.CoreLimit;
+        }
+        const list = try self.save(arguments.items);
+        const body = try self.make(source, .{ .tag = .contract_method, .ty = root, .a = template_index, .b = list.start, .c = list.len });
+        try self.bodies.append(self.allocator, .{ .binding = template.binding, .root = body, .parameters = .{ .start = start, .len = list.len }, .scheme = self.bindings.items[template.binding].scheme, .span = span, .is_function = true });
+        self.bindings.items[template.binding].body_id = body_id;
     }
     fn saveName(self: *Builder, text: []const u8) Error!Name {
         if (text.len > std.math.maxInt(u32) -| self.name_bytes.items.len) return error.CoreLimit;
@@ -2684,6 +2806,13 @@ const Builder = struct {
         for (certificates) |*range| range.start -= range.len;
         for (self.checked.bindings, 0..) |value, index| {
             if (index == 0 or value.kind != .global) continue;
+            const template = for (self.member_templates.items, 0..) |candidate, ordinal| {
+                if (candidate.binding == index) break @as(?u32, @intCast(ordinal));
+            } else null;
+            if (template) |ordinal| {
+                try self.memberTemplateBody(ordinal);
+                continue;
+            }
             const declaration = self.tree.valueDecl(value.declaration);
             self.body_lowerings += 1;
             const body_id: BodyId = @intCast(self.bodies.items.len);
@@ -2723,7 +2852,7 @@ const Builder = struct {
         result.types.effects.labels = try self.effect_labels.toOwnedSlice(self.allocator);
         result.types.effects.variable_count = self.effect_variable_count;
         result.types.operations = try self.effect_operations.toOwnedSlice(self.allocator);
-        inline for (.{ "request_loops", "request_arms", "runtime_names", "source_names", "erased_declaration_references", "tag_calls", "nodes", "spans", "extra", "bindings", "bodies", "parameters", "references", "calls", "merges", "merge_ranges", "obligations", "diagnostics", "nominals", "operation_names", "constructors", "projections", "projection_variants", "patterns", "pattern_rows", "match_arms", "matches", "updates", "update_steps", "closures", "associated", "contracts", "contract_members", "primitives", "loops", "loop_carries", "resolver_ops", "operation_values", "handle_effects", "dispatch_signatures" }) |field| @field(result, field) = try @field(self, field).toOwnedSlice(self.allocator);
+        inline for (.{ "request_loops", "request_arms", "runtime_names", "source_names", "erased_declaration_references", "tag_calls", "nodes", "spans", "extra", "bindings", "bodies", "parameters", "references", "calls", "merges", "merge_ranges", "obligations", "diagnostics", "nominals", "operation_names", "constructors", "projections", "projection_variants", "patterns", "pattern_rows", "match_arms", "matches", "updates", "update_steps", "closures", "associated", "contracts", "contract_members", "implementations", "implementation_members", "member_templates", "selected_proofs", "selected_members", "selected_edges", "selected_uses", "primitives", "loops", "loop_carries", "resolver_ops", "operation_values", "handle_effects", "dispatch_signatures" }) |field| @field(result, field) = try @field(self, field).toOwnedSlice(self.allocator);
         result.names = try self.name_bytes.toOwnedSlice(self.allocator);
         return result;
     }

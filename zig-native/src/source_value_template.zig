@@ -89,6 +89,7 @@ const Checker = struct {
         for (effects.labels[span.start..][0..span.len]) |label| {
             if (label == 0 or label >= effects.operations.len) return false;
             const operation = effects.operations[label];
+            if (operation.instance.unit != 0 or operation.instance.decl != 0) return false;
             const args = operation.arguments;
             if (!range(args.start, args.len, effects.arguments.len)) return false;
             if (operation.identity.unit == 0) {

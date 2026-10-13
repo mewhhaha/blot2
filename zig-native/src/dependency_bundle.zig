@@ -41,6 +41,9 @@ pub fn freeze(allocator: Allocator, path: []const u8, source: []const u8, pool: 
     for (checked.contracts, 0..) |contract, id| if (contract.identity.unit == 1 and !contract.private) {
         try exports.append(allocator, .{ .name = contract.name, .target = .{ .unit = 0, .binding = 0 }, .kind = .contract, .catalog = @intCast(id) });
     };
+    for (checked.implementations, 0..) |implementation, id| if (implementation.identity.unit == 1 and !implementation.private) {
+        try exports.append(allocator, .{ .name = implementation.name, .target = .{ .unit = 0, .binding = 0 }, .kind = .implementation, .catalog = @intCast(id) });
+    };
     var fixities: std.ArrayList(D.Fixity) = .empty;
     defer fixities.deinit(allocator);
     for (tree.roots.items) |id| if (tree.node(id).tag == .fixity_decl) {

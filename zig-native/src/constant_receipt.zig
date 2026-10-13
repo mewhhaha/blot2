@@ -8,6 +8,9 @@ const A = std.mem.Allocator;
 /// The measured 105-step class could not pay for lookup/owner work; the
 /// profitable primitive spines start at 161 steps. Admission stays source based.
 pub const minimum_steps: usize = 128;
+/// A selected judgment costs more than scalar transport. The166-step class
+/// regressed retained Fast CPU;1069-step method bodies repaid its owner work.
+pub const minimum_member_steps: usize = 1024;
 
 /// Decline known unsupported result heads before installing observation. Open
 /// types still use the ordinary evaluator and the exact result admission below.
@@ -25,7 +28,7 @@ pub fn recordable(module: *const core.Module, root: core.Id, declared: u32) bool
 }
 
 pub fn hasProductiveRecord(records: []const Record, floor: usize) bool {
-    for (records) |record| if (record.sourceSteps() >= floor) return true;
+    for (records) |record| if (record.productive(floor)) return true;
     return false;
 }
 
@@ -47,7 +50,11 @@ pub const Resources = struct {
 };
 pub const Read = struct { target: core.BindingRef, value: eval.ValueId };
 pub const Source = union(enum) { named: core.BindingRef, anonymous: struct { unit: u32, catalog: u32 } };
-pub const Event = union(enum) { work: Resources, read: Read };
+/// A Session position is remapped to an immutable selected-query table
+/// position during capture. The table, its snapshot and this tape share one
+/// artifact owner; the position only locates proof, never supplies proof.
+pub const MemberEvent = struct { record: u32, values: usize, depth: usize, inference_observations: u64 };
+pub const Event = union(enum) { work: Resources, read: Read, member: MemberEvent };
 pub const Inputs = struct {
     types: []const @import("type_evidence.zig").Mapping = &.{},
     rows: []const @import("type_evidence.zig").RowMapping = &.{},
@@ -73,9 +80,15 @@ pub const Record = struct {
         var steps: usize = 0;
         for (self.events) |event| switch (event) {
             .work => |work| steps +|= work.steps,
-            .read => {},
+            .read, .member => {},
         };
         return steps;
+    }
+    pub fn productive(self: Record, floor: usize) bool {
+        const steps = self.sourceSteps();
+        if (steps < floor) return false;
+        for (self.events) |event| if (event == .member and steps < minimum_member_steps) return false;
+        return true;
     }
     /// Exact payload requested by the immutable artifact owner, excluding the
     /// shared evaluator snapshot and allocator bookkeeping/capacity slack.
@@ -109,6 +122,9 @@ pub const Stats = struct {
     declined: usize = 0,
     source_steps_replayed: usize = 0,
     values_imported: usize = 0,
+    member_recorded: usize = 0,
+    member_replayed: usize = 0,
+    member_declined: usize = 0,
     owned_payload_bytes: usize = 0,
     lookup_comparisons: usize = 0,
     graph_values_examined: usize = 0,
@@ -131,6 +147,7 @@ pub const Recorder = struct {
     base_depth: usize,
     base_calls: usize,
     inference_serial: u64,
+    collection_serial: u64,
     summary_transitions: usize,
     summary_work: usize,
     summary_exhausted: bool,
@@ -138,8 +155,9 @@ pub const Recorder = struct {
     depth: usize = 0,
     call_depth: usize = 0,
     eligible: bool = true,
+    members: usize = 0,
     pub fn init(session: *const eval.Session) Recorder {
-        return .{ .mark = position(session), .base_depth = session.depth, .base_calls = session.call_depth, .inference_serial = session.constant_inference_serial, .summary_transitions = session.summary_transitions, .summary_work = session.summary_graph_work, .summary_exhausted = session.summary_exhausted, .query_budgets = queryBudgets(session) };
+        return .{ .mark = position(session), .base_depth = session.depth, .base_calls = session.call_depth, .inference_serial = session.constant_inference_serial, .collection_serial = session.collection_buffers.mutation_serial, .summary_transitions = session.summary_transitions, .summary_work = session.summary_graph_work, .summary_exhausted = session.summary_exhausted, .query_budgets = queryBudgets(session) };
     }
     pub fn captureInputs(self: *Recorder, a: A, inputs: Inputs) A.Error!void {
         const owned = try inputs.clone(a);
@@ -171,7 +189,7 @@ pub const Recorder = struct {
         try pending.append(a, result);
         for (self.events.items) |event| switch (event) {
             .read => |dependency| try pending.append(a, dependency.value),
-            .work => {},
+            .work, .member => {},
         };
         while (pending.pop()) |id| {
             if (seen.contains(id)) continue;
@@ -225,9 +243,23 @@ pub const Recorder = struct {
         if (self.eligible) try self.events.append(a, .{ .read = .{ .target = target, .value = value } });
         self.reset(session);
     }
+    pub fn member(self: *Recorder, a: A, session: *const eval.Session, before: usize, inference_before: u64) A.Error!bool {
+        if (self.inference_serial != inference_before or session.constant_inference_serial == std.math.maxInt(u64)) return false;
+        if (!self.eligible or self.members != 0 or session.specialization_receipts.items.len != before + 1) return false;
+        const record = session.specialization_receipts.items[before];
+        if (!admittedMember(session.snapshot(), record)) return false;
+        if (self.collection_serial == std.math.maxInt(u64) or session.collection_buffers.mutation_serial != self.collection_serial) return false;
+        if (session.summary_transitions != self.summary_transitions or session.summary_graph_work != self.summary_work or session.summary_exhausted != self.summary_exhausted or !std.meta.eql(self.query_budgets, queryBudgets(session))) return false;
+        try self.events.append(a, .{ .member = .{ .record = @intCast(before), .values = record.values_added, .depth = session.depth - self.base_depth, .inference_observations = session.constant_inference_serial - inference_before } });
+        self.members = 1;
+        self.inference_serial = session.constant_inference_serial;
+        self.reset(session);
+        return true;
+    }
     pub fn finish(self: *Recorder, a: A, session: *const eval.Session, target: core.BindingRef, value: eval.ValueId) A.Error!?Record {
         try self.flush(a, session);
         if (!self.eligible) return null;
+        if (self.collection_serial == std.math.maxInt(u64) or session.collection_buffers.mutation_serial != self.collection_serial) return null;
         // Cumulative inference work has its own fallback state. Until an exact
         // tape owns those charges, observing a transition keeps evaluation
         // ordinary rather than silently giving later queries a larger budget.
@@ -237,17 +269,18 @@ pub const Recorder = struct {
         var steps: usize = 0;
         for (self.events.items) |event| switch (event) {
             .work => |work| steps += work.steps,
-            .read => {},
+            .read, .member => {},
         };
-        if (steps < session.minimum_constant_steps) return null;
+        if (steps < session.minimum_constant_steps or (self.members != 0 and steps < minimum_member_steps)) return null;
         // Compound graph indexes did not pay for themselves on the captured
         // workload. Only measured primitive payloads retain this authority.
         if (!admittedGraph(session.snapshot(), value)) return null;
         for (self.events.items) |event| switch (event) {
             .read => |dependency| if (session.valueInfo(dependency.value).kind != .scalar) return null,
-            .work => {},
+            .work, .member => {},
         };
         const info = session.valueInfo(value);
+        if (self.members != 0 and info.kind != .scalar) return null;
         if ((info.kind == .array or info.kind == .list) and info.len > steps / 4) return null;
         if (try self.viewsEscape(a, session, value)) return null;
         const events = try self.events.toOwnedSlice(a);
@@ -284,5 +317,18 @@ pub fn admittedGraph(snapshot: anytype, value: u32) bool {
     for (snapshot.children[info.start..][0..info.len]) |child| {
         if (child >= snapshot.values.len or snapshot.values[child].kind != .scalar) return false;
     }
+    return true;
+}
+
+/// First enclosing law: a fresh empty receiver and no staged cache/proof
+/// effects. All dynamic principal/source/ready reads remain selected-query
+/// authority. Other receiver and publication shapes keep ordinary evaluation.
+pub fn admittedMember(snapshot: anytype, record: @import("specialization_receipt.zig").Record) bool {
+    if (record.member == null or !record.complete or record.steps != 0 or record.input >= snapshot.values.len or record.expected == 0 or record.children_added != 0) return false;
+    const ordinary = eval.Options{};
+    inline for (.{ "max_values", "max_children", "max_depth", "max_type_depth", "max_steps" }) |field| if (@field(record.options, field) != @field(ordinary, field)) return false;
+    const input = snapshot.values[record.input];
+    if (input.kind != .array or input.len != 0 or snapshot.value_evidence[record.input] != 0) return false;
+    if (record.views.len != 0 or record.call_reads.len != 0 or record.call_publications.len != 0 or record.plain_facts.len != 0) return false;
     return true;
 }

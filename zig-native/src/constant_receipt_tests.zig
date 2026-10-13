@@ -407,3 +407,224 @@ test "constant receipts keep 105-step scalars ordinary without provider bookkeep
     const old = [_]receipt.Record{.{ .target = .{ .unit = 1, .binding = 1 }, .value = 0, .options = .{}, .events = @constCast(&work), .sources = &.{} }};
     try std.testing.expect(!receipt.hasProductiveRecord(&old, receipt.minimum_steps));
 }
+
+fn enclosingSource(sibling: []const u8, seed: []const u8, delta: []const u8, receiver: []const u8, second: bool) ![]u8 {
+    var method = try a.dupe(u8, "@u32.add seed (@array.length values)");
+    defer a.free(method);
+    var expression = try a.print("{s}.count", .{receiver});
+    defer a.free(expression);
+    for (0..80) |_| {
+        const next_method = try a.print("@u32.add {s} ({s})", .{ delta, method });
+        a.free(method);
+        method = next_method;
+        const next = try a.print("@u32.add 1 ({s})", .{expression});
+        a.free(expression);
+        expression = next;
+    }
+    const loop_method = try a.print("do:\n  let total = ({s})\n  for index in 0..128:\n    total := @u32.add self 1\n  return total", .{method});
+    a.free(method);
+    method = loop_method;
+    if (second) {
+        const next = try a.print("@u32.add (#[].count) ({s})", .{expression});
+        a.free(expression);
+        expression = next;
+    }
+    return a.print("const seed = {s}\nconst Array.count = fn values => {s}\nentry const warm: U32 = #[].count\nentry const enclosing: U32 = {s}\nentry const sibling = {s}\n", .{ seed, method, expression, sibling });
+}
+fn enclosingReplay(allocator: std.mem.Allocator, fixture: *const Fixture, previous: *const backend.Result, expected: *const backend.Result) !void {
+    var result = try fixture.compile(allocator, previous, true);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expectEqualSlices(u8, expected.bytes, result.bytes);
+    try std.testing.expectEqual(expected.constant_steps, result.constant_steps);
+    try std.testing.expectEqual(@as(usize, 1), result.constant_receipts.member_replayed);
+}
+
+fn enclosingFresh(allocator: std.mem.Allocator, fixture: *const Fixture, expected: *const backend.Result) !void {
+    var result = try fixture.compile(allocator, null, true);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expectEqualSlices(u8, expected.bytes, result.bytes);
+    try std.testing.expectEqual(expected.constant_steps, result.constant_steps);
+    try std.testing.expectEqual(@as(usize, 1), result.constant_receipts.member_recorded);
+}
+
+test "enclosing constant member judgment owns fresh and retained authority with OOM rollback" {
+    const original = try enclosingSource("1", "2", "0", "#[]", false);
+    defer a.free(original);
+    var before = try Fixture.init(original);
+    defer before.deinit();
+    var initial = try before.compile(a, null, true);
+    defer initial.deinit(a);
+    try std.testing.expect(initial.diagnostic == null);
+    try std.testing.expectEqual(@as(usize, 1), initial.constant_receipts.member_recorded);
+    const edited = try enclosingSource("2", "2", "0", "#[]", false);
+    defer a.free(edited);
+    var after = try Fixture.init(edited);
+    defer after.deinit();
+    var ordinary = try after.compile(a, null, false);
+    defer ordinary.deinit(a);
+    try enclosingFresh(a, &after, &ordinary);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, enclosingFresh, .{ &after, &ordinary });
+    try enclosingReplay(a, &after, &initial, &ordinary);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, enclosingReplay, .{ &after, &initial, &ordinary });
+    var retained = try after.compile(a, &initial, true);
+    defer retained.deinit(a);
+    try enclosingReplay(a, &after, &retained, &ordinary);
+    inline for (.{
+        .{ "2", "3", "0", "#[]", false },
+        .{ "2", "2", "1", "#[]", false },
+        .{ "2", "2", "0", "#[1]", false },
+        .{ "2", "2", "0", "#[]", true },
+    }) |change| {
+        const text = try enclosingSource(change[0], change[1], change[2], change[3], change[4]);
+        defer a.free(text);
+        var fixture = try Fixture.init(text);
+        defer fixture.deinit();
+        var fresh = try fixture.compile(a, null, false);
+        defer fresh.deinit(a);
+        var result = try fixture.compile(a, &initial, true);
+        defer result.deinit(a);
+        try std.testing.expectEqualSlices(u8, fresh.bytes, result.bytes);
+        try std.testing.expectEqual(fresh.constant_steps, result.constant_steps);
+        try std.testing.expectEqual(@as(usize, 0), result.constant_receipts.member_replayed);
+    }
+}
+
+fn enclosingParity(allocator: std.mem.Allocator, fixture: *const Fixture, previous: *const backend.Result, expected: *const backend.Result, limits: @FieldType(backend.CompileOptions, "constant_limits")) !void {
+    var actual = try fixture.compileLimited(allocator, previous, true, limits);
+    defer actual.deinit(allocator);
+    try std.testing.expectEqualDeep(expected.diagnostic, actual.diagnostic);
+    try std.testing.expectEqual(expected.constant_steps, actual.constant_steps);
+    try std.testing.expectEqualSlices(u8, expected.bytes, actual.bytes);
+    try std.testing.expectEqual(@as(usize, 0), actual.constant_receipts.member_replayed);
+}
+
+test "enclosing constant member judgment preserves failed edits limits and owned lookup outcomes" {
+    const text = try enclosingSource("1", "2", "0", "#[]", false);
+    defer a.free(text);
+    var fixture = try Fixture.init(text);
+    defer fixture.deinit();
+    var initial = try fixture.compile(a, null, true);
+    defer initial.deinit(a);
+    var ordinary = try fixture.compile(a, null, false);
+    defer ordinary.deinit(a);
+    const Limits = @FieldType(backend.CompileOptions, "constant_limits");
+    for ([_]Limits{ .{ .steps = 80 }, .{ .values = 80 }, .{ .children = 0 }, .{ .depth = 40 }, .{ .calls = 0 }, .{ .steps = 1000 }, .{ .values = 1000 } }) |limits| {
+        var fresh = try fixture.compileLimited(a, null, false, limits);
+        defer fresh.deinit(a);
+        try enclosingParity(a, &fixture, &initial, &fresh, limits);
+    }
+    // A changed observed principal-cache outcome declines before graph
+    // publication. The private receiver/fuel rollback permits ordinary work.
+    const query = &initial.capture.?.metadata.specialization_queries.records.items[0];
+    const member = query.dependencies.member.?;
+    const reads = member.principals;
+    const forged = try a.alloc(@import("specialization_receipt.zig").PrincipalRead, 1);
+    defer a.free(forged);
+    forged[0] = .{ .target = member.target, .open = false, .source_interface = false, .deferred_member = false, .outcome = .declined };
+    member.principals = forged;
+    try enclosingParity(a, &fixture, &initial, &ordinary, .{});
+    member.principals = reads;
+    // Failed publication never replaces the previous immutable Capture.
+    const trapping = try enclosingSource("@panic \"failed\"", "2", "0", "#[]", false);
+    defer a.free(trapping);
+    var broken = try Fixture.init(trapping);
+    defer broken.deinit();
+    var fresh_failure = try broken.compile(a, null, false);
+    defer fresh_failure.deinit(a);
+    try std.testing.expect(fresh_failure.diagnostic != null);
+    try enclosingParity(a, &broken, &initial, &fresh_failure, .{});
+    try enclosingReplay(a, &fixture, &initial, &ordinary);
+    // Replacing the enclosing explicit context retains ordinary validation.
+    const marker = "entry const enclosing: U32";
+    const index = std.mem.find(u8, text, marker).?;
+    const changed = try a.print("{s}entry const enclosing{s}", .{ text[0..index], text[index + marker.len ..] });
+    defer a.free(changed);
+    var inferred = try Fixture.init(changed);
+    defer inferred.deinit();
+    var fresh_inferred = try inferred.compile(a, null, false);
+    defer fresh_inferred.deinit(a);
+    try enclosingParity(a, &inferred, &initial, &fresh_inferred, .{});
+}
+
+test "enclosing constant member judgment leaves typed warm aliases and value quotas ordinary" {
+    const base = try enclosingSource("1", "2", "0", "alias", false);
+    defer a.free(base);
+    const text = try a.print("const alias: Array U32 = #[]\n{s}", .{base});
+    defer a.free(text);
+    var fixture = try Fixture.init(text);
+    defer fixture.deinit();
+    var initial = try fixture.compile(a, null, true);
+    defer initial.deinit(a);
+    var fresh = try fixture.compile(a, null, false);
+    defer fresh.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), initial.constant_receipts.member_recorded);
+    try enclosingParity(a, &fixture, &initial, &fresh, .{});
+    // Ordinary typed alias cache publication remains authoritative even when
+    // quota leaves room for one use but not an extra reconstructed alias.
+    for ([_]usize{ 160, 250, 1000 }) |limit| {
+        const limits: @FieldType(backend.CompileOptions, "constant_limits") = .{ .values = limit };
+        var limited = try fixture.compileLimited(a, null, false, limits);
+        defer limited.deinit(a);
+        try enclosingParity(a, &fixture, &initial, &limited, limits);
+    }
+}
+
+test "enclosing constant member judgment subfloor keeps ordinary selected reuse without an outer owner" {
+    const text = try memberSource("1");
+    defer a.free(text);
+    var before = try Fixture.init(text);
+    defer before.deinit();
+    var initial = try before.compile(a, null, true);
+    defer initial.deinit(a);
+    try std.testing.expect(initial.diagnostic == null);
+    try std.testing.expectEqual(@as(usize, 0), initial.constant_receipts.recorded);
+    try std.testing.expectEqual(@as(usize, 0), initial.constant_receipts.owned_payload_bytes);
+    const edited = try memberSource("2");
+    defer a.free(edited);
+    var after = try Fixture.init(edited);
+    defer after.deinit();
+    var fresh = try after.compile(a, null, false);
+    defer fresh.deinit(a);
+    var actual = try after.compile(a, &initial, true);
+    defer actual.deinit(a);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, actual.bytes);
+    try std.testing.expectEqual(fresh.constant_steps, actual.constant_steps);
+    try std.testing.expect(actual.completed_queries.member_reused != 0);
+    try std.testing.expectEqual(@as(usize, 0), actual.constant_receipts.lookups);
+    try std.testing.expectEqual(@as(usize, 0), actual.constant_receipts.member_replayed);
+    try std.testing.expectEqual(@as(usize, 0), actual.constant_receipts.owned_payload_bytes);
+}
+
+test "enclosing constant member judgment cannot absorb prior unowned inference" {
+    const text = try enclosingSource("1", "2", "0", "#[]", false);
+    defer a.free(text);
+    var fixture = try Fixture.init(text);
+    defer fixture.deinit();
+    var session = try @import("core_eval.zig").Session.init(a, fixture.units);
+    defer session.deinit();
+    session.retain_specialization_receipts = true;
+    session.options.trace_runtime_dependencies = true;
+    session.options.retain_source_suspensions = true;
+    _ = try session.richValue(.{ .unit = 1, .binding = 3 });
+    _ = try session.richValue(.{ .unit = 1, .binding = 2 });
+    _ = try session.body_recipes.get(a, session.units, .{ .owner = 0, .body = session.units[0].body(2).?.root, .callables = true }, session.options.max_values);
+    try std.testing.expect(session.memberReceiptEligible(.{ .unit = 1, .binding = 2 }));
+    var parent = @import("constant_receipt.zig").Recorder.init(&session);
+    defer parent.deinit(a);
+    // A child frame runs while its enclosing recorder is suspended. Its real
+    // inference observation cannot be reassigned to a later member callback.
+    const value = try session.richValue(.{ .unit = 1, .binding = 4 });
+    try std.testing.expect(session.constant_inference_serial > parent.inference_serial);
+    try std.testing.expect(session.specialization_receipts.items.len != 0);
+    const complete = session.specialization_receipts.items.len - 1;
+    try std.testing.expect(session.specialization_receipts.items[complete].complete);
+    try std.testing.expect(!try parent.member(a, &session, complete, session.constant_inference_serial));
+    try std.testing.expect(try parent.finish(a, &session, .{ .unit = 1, .binding = 4 }, value) == null);
+    session.constant_inference_serial = std.math.maxInt(u64);
+    var saturated = @import("constant_receipt.zig").Recorder.init(&session);
+    defer saturated.deinit(a);
+    try std.testing.expect(!try saturated.member(a, &session, complete, session.constant_inference_serial));
+    try std.testing.expect(try saturated.finish(a, &session, .{ .unit = 1, .binding = 4 }, value) == null);
+}

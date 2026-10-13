@@ -227,7 +227,7 @@ pub fn annotations(words: []const Role, rest: Role, out: *[max_annotations]Instr
 /// annotation immediately before its `i32_const` size, preceded by that run's
 /// `words` chunks counting down to chunk 0. Anything else describes nothing.
 pub fn allocationAnnotations(instructions: []const Instruction, at: usize) []const Instruction {
-    if (at < 2 or instructions[at - 1].op != .i32_const) return &.{};
+    if (at < 2 or at > instructions.len or instructions[at - 1].op != .i32_const) return &.{};
     const end = at - 1;
     if (instructions[end - 1].op != .ownership or @as(Ownership, @bitCast(instructions[end - 1].operand)).kind != .rest) return &.{};
     var start = end - 1;
@@ -243,6 +243,23 @@ pub fn allocationAnnotations(instructions: []const Instruction, at: usize) []con
         if (chunk == 0) return instructions[start..end];
         chunk -= 1;
     }
+}
+/// Exact empty-constructor fields before their static address. The tag bits
+/// belong to the symbolic body, so optimizer reuse never depends on data bytes.
+/// Chunks 14/15 carry the tag; the distinct rest terminator separates this fact
+/// from allocation annotations left behind by earlier replacement passes.
+pub fn staticConstructor(instructions: []const Instruction, at: usize) ?u32 {
+    if (at < 4 or at >= instructions.len or instructions[at].op != .i32_const or instructions[at].table_reference) return null;
+    const run = instructions[at - 4 .. at];
+    for (run) |inst| if (inst.op != .ownership) return null;
+    const low: Ownership = @bitCast(run[0].operand);
+    const high: Ownership = @bitCast(run[1].operand);
+    const words: Ownership = @bitCast(run[2].operand);
+    const rest: Ownership = @bitCast(run[3].operand);
+    if (low.kind != .words or low.chunk != 14 or high.kind != .words or high.chunk != 15 or high.roles >= 64 or
+        words.kind != .words or words.chunk != 0 or words.roles != @backingInt(Role.scalar) + @as(u26, @backingInt(Role.reference)) * 4 or
+        rest.kind != .rest or rest.chunk != 15 or rest.roles != 8) return null;
+    return @as(u32, low.roles) | (@as(u32, high.roles) << 26);
 }
 /// Instructions that are code, excluding ownership annotations.
 pub fn codeLength(instructions: []const Instruction) usize {
@@ -523,4 +540,23 @@ test "indirect ownership results require an adjacent checked annotation" {
     try std.testing.expectEqual(Role.unknown, indirectResult(&instructions, 2));
     try std.testing.expectEqual(Role.unknown, indirectResult(&instructions, 0));
     try std.testing.expectEqual(@as(usize, 1), codeLength(&instructions));
+}
+
+test "static constructor bits are exact symbolic facts with bounded zero reference payloads" {
+    var facts = [_]Instruction{
+        .{ .op = .ownership, .operand = @bitCast(Ownership{ .kind = .words, .chunk = 14, .roles = 67108863 }) },
+        .{ .op = .ownership, .operand = @bitCast(Ownership{ .kind = .words, .chunk = 15, .roles = 63 }) },
+        .{ .op = .ownership, .operand = @bitCast(Ownership{ .kind = .words, .roles = 9 }) },
+        .{ .op = .ownership, .operand = @bitCast(Ownership{ .kind = .rest, .chunk = 15, .roles = 8 }) },
+        .{ .op = .i32_const, .operand = 736 },
+    };
+    try std.testing.expectEqual(std.math.maxInt(u32), staticConstructor(&facts, 4).?);
+    facts[0].operand = @bitCast(Ownership{ .kind = .words, .chunk = 14, .roles = 1 });
+    facts[1].operand = @bitCast(Ownership{ .kind = .words, .chunk = 15 });
+    try std.testing.expectEqual(@as(u32, 1), staticConstructor(&facts, 4).?);
+    facts[1].operand = @bitCast(Ownership{ .kind = .words, .chunk = 15, .roles = 64 });
+    try std.testing.expect(staticConstructor(&facts, 4) == null);
+    facts[1].operand = @bitCast(Ownership{ .kind = .words, .chunk = 15 });
+    facts[4].table_reference = true;
+    try std.testing.expect(staticConstructor(&facts, 4) == null);
 }

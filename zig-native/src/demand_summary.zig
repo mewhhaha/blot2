@@ -478,7 +478,10 @@ const Walk = struct {
                 child.loop = id;
                 const info = self.module.requestLoopInfo(id);
                 try self.escape(info.computation, child, depth + 1);
-                for (self.module.requestArms(id)) |arm| try self.escape(arm.callback, child, depth + 1);
+                for (self.module.requestArms(id)) |arm| {
+                    try self.escape(arm.callback, child, depth + 1);
+                    if (arm.selector != 0) try self.escape(arm.selector, child, depth + 1);
+                }
                 try self.visit(info.completion_body, child, depth + 1);
                 self.unknown();
             },

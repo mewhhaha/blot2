@@ -108,3 +108,51 @@ Deno.test("dispatch explanation readers copy known fields and reject malformed p
     throws(() => readDispatchExplanation(value), TypeError);
   }
 });
+
+Deno.test("implementation explanations validate owned origins steps and total bytes", () => {
+  const value = {
+    operation: null,
+    member: "Source",
+    candidates: [{
+      side: "implementation",
+      operand: null,
+      outcome: "head_mismatch",
+      origin: { name: "Scalar", path: "source.blot", span: null },
+    }],
+    steps: [{ member: "Item", ty: "U32", outcome: "requires_evidence" }],
+    truncated: false,
+  };
+  equal(readDispatchExplanation(value), value);
+  throws(
+    () =>
+      readDispatchExplanation({
+        ...value,
+        steps: Array(9).fill(value.steps[0]),
+      }),
+    TypeError,
+  );
+  throws(
+    () =>
+      readDispatchExplanation({
+        ...value,
+        candidates: [{
+          ...value.candidates[0],
+          origin: {
+            name: "Scalar",
+            path: "source.blot",
+            span: { start: 20, end: 1 },
+          },
+        }],
+      }),
+    TypeError,
+  );
+  const large = {
+    ...value,
+    candidates: Array(4).fill({
+      ...value.candidates[0],
+      operand: "x".repeat(256),
+      origin: { name: "x".repeat(256), path: "x".repeat(256), span: null },
+    }),
+  };
+  throws(() => readDispatchExplanation(large), TypeError);
+});

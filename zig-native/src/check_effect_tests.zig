@@ -936,3 +936,304 @@ test "sealed Foreign annotations keep exact negative admission and ordinary shad
         try std.testing.expectEqualSlices(u32, &.{T.foreign_operation}, checked.types.rowLabels(checked.types.node(binding.scheme.root).c));
     };
 }
+
+fn symbolicWrittenRows(allocator: std.mem.Allocator) !void {
+    const text =
+        \\type State a is effect = { get: Unit -> a, set: a -> Unit }
+        \\const read: Unit -> a ! {State.get a} = fn () => State.get ()
+        \\const apply = fn (callback: Unit -> a ! {State.get a | e}) => callback ()
+        \\const capture = fn (callback: Unit -> a ! {State.get a}) => fn () => callback ()
+        \\entry const integer = fn () => @effect.run State.get State.set 42 (fn () => apply (capture read))
+        \\entry const floating = fn () => @effect.run State.get State.set 1.5 (fn () => read ())
+    ;
+    var tokens = try lexer.lex(allocator, text);
+    defer tokens.deinit(allocator);
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parser.parse(allocator, text, tokens.tokens.items, &pool);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var checked = try check.check(allocator, &tree, &pool);
+    defer checked.deinit(allocator);
+    for (checked.diagnostics) |diagnostic| std.debug.print("SYMBOLIC_ROW {s} at {d}\n", .{ @tagName(diagnostic.code), diagnostic.span.start });
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+}
+
+test "symbolic written operation rows retain generic arguments through callbacks and captures" {
+    try symbolicWrittenRows(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, symbolicWrittenRows, .{});
+}
+
+fn symbolicImportedRows(allocator: std.mem.Allocator) !void {
+    const text =
+        \\const alias = source
+        \\const integer = fn () -> U32 => source ()
+        \\const floating = fn () -> F32 => alias ()
+        \\entry const answer = 42
+    ;
+    var tokens = try lexer.lex(allocator, text);
+    defer tokens.deinit(allocator);
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parser.parse(allocator, text, tokens.tokens.items, &pool);
+    defer tree.deinit(allocator);
+    var producer = try T.Store.init(allocator);
+    defer producer.deinit();
+    const variable = try producer.fresh();
+    const label = try producer.internSymbolicOperation(.{ .unit = 9, .decl = 31 }, &.{variable});
+    const signature = try producer.functionWithEffects(T.unit, variable, try producer.effects.row(&.{label}, .closed));
+    const scheme: T.Scheme = .{ .root = signature, .variables = try producer.saveList(&.{variable}) };
+    var checked = try check.checkWithImports(allocator, &tree, &pool, &.{.{
+        .name = pool.lookup("source").?,
+        .target = .{ .unit = 9, .binding = 1 },
+        .origin = 0,
+        .interface = .{ .types = .{ .store = &producer }, .scheme = scheme, .obligations = &.{} },
+    }});
+    defer checked.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    for ([_]struct { []const u8, T.Id }{ .{ "integer", T.u32_type }, .{ "floating", T.f32_type } }) |expected| {
+        const binding = for (checked.bindings) |candidate| {
+            if (candidate.name == pool.lookup(expected[0]).?) break candidate;
+        } else unreachable;
+        const root = checked.types.node(binding.scheme.root);
+        const labels = checked.types.rowLabels(root.c);
+        try std.testing.expectEqual(@as(usize, 1), labels.len);
+        try std.testing.expectEqualSlices(T.Id, &.{expected[1]}, checked.types.operationArguments(labels[0]));
+    }
+}
+
+test "symbolic operation interface imports freshen argument binders with generic aliases" {
+    try symbolicImportedRows(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, symbolicImportedRows, .{});
+}
+
+fn checkScopedSource(allocator: std.mem.Allocator, text: []const u8, expected: ?check.Code) !void {
+    var tokens = try lexer.lex(allocator, text);
+    defer tokens.deinit(allocator);
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parser.parse(allocator, text, tokens.tokens.items, &pool);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var checked = try check.check(allocator, &tree, &pool);
+    defer checked.deinit(allocator);
+    if (expected) |code| {
+        for (checked.diagnostics) |diagnostic| if (diagnostic.code == code) return;
+        for (checked.diagnostics) |diagnostic| std.debug.print("unexpected {s}\n", .{@tagName(diagnostic.code)});
+        return error.ExpectedScopedDiagnostic;
+    }
+    for (checked.diagnostics) |diagnostic| std.debug.print("unexpected {s} at {}\n", .{ @tagName(diagnostic.code), diagnostic.span.start });
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    try std.testing.expect(checked.effect_scopes.len != 0);
+}
+const scoped_state_header = "type State a is effect = {get: Unit -> a, set: a -> Unit}\n";
+const scoped_nested_source = scoped_state_header ++
+    "entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:\n" ++
+    "  let (outer, result) = do (@effect.state left.get left.set 10):\n" ++
+    "    use nested <- do (@effect.state right.get right.set 100):\n" ++
+    "      use a <- left.get ()\n" ++
+    "      use b <- right.get ()\n" ++
+    "      use left.set (@u32.add a 1)\n" ++
+    "      use right.set (@u32.add b 2)\n" ++
+    "      return #[a, b]\n" ++
+    "    let (inner, reads) = nested\n" ++
+    "    return @array.concat #[inner] reads\n" ++
+    "  return @array.concat #[outer] result\n" ++
+    "))\n";
+test "scoped effect nested same typed capabilities retain independent exact rows" {
+    try checkScopedSource(a, scoped_nested_source, null);
+}
+test "scoped effect boundary rejects direct capability and handled closures" {
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => s)\n", .capability_escape);
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => fn () => do (@effect.state s.get s.set 0):\n  return 42\n)\n", .capability_escape);
+}
+test "scoped effect requires explicit closed family callback and rejects residual identity" {
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn s => 42)\n", .effect_identity_scope);
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => do:\n  use n <- s.get ()\n  return n\n)\n", .effect_mismatch);
+}
+test "scoped effect operation aliases and local callbacks remain usable" {
+    try checkScopedSource(a, scoped_state_header ++ "entry const answer = fn () => @effect.scope (fn (s: State U32) => do:\n  let capability = s\n  let read = capability.get\n  let write = capability.set\n  let local = fn () => read ()\n  let (state, result) = do (@effect.state read write 7):\n    return local ()\n  return result\n)\n", null);
+}
+
+test "scoped effect rejects operation aggregate demand and generic authority escapes" {
+    const suffixes = [_][]const u8{
+        "s.get",
+        "#[s]",
+        "{saved: s.get}",
+        "@computation (fn () => do (@effect.state s.get s.set 0):\n  return 42\n)",
+    };
+    for (suffixes) |suffix| {
+        const text = try a.print("{s}entry const bad = fn () => @effect.scope (fn (s: State U32) => {s})\n", .{ scoped_state_header, suffix });
+        defer a.free(text);
+        try checkScopedSource(a, text, .capability_escape);
+    }
+    try checkScopedSource(a, scoped_state_header ++ "const identity = fn value => value\nentry const bad = fn () => @effect.scope (fn (s: State U32) => identity s)\n", .capability_escape);
+}
+
+test "scoped effect different instance provider leaves exact requirement visible" {
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do (@effect.state right.get right.set 0):\n  use value <- left.get ()\n  return value\n))\n", .effect_mismatch);
+}
+
+test "scoped effect reflection cannot publish a fresh descriptor" {
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => @effect.descriptor s.get)\n", .open_effect_descriptor);
+}
+
+fn scopedAllocationLaw(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, scoped_state_header ++ "entry const answer = fn () => @effect.scope (fn (s: State U32) => do (@effect.state s.get s.set 7):\n  return s.get ()\n)\n", null);
+}
+
+test "scoped effect checker releases every failed allocation" {
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, scopedAllocationLaw, .{});
+}
+
+test "scoped effect longer lived builtin State cannot retain capturing closure" {
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @state.run (fn () => 0) (fn () => @effect.scope (fn (s: State U32) => do:\n  use @state.set (fn () => do (@effect.state s.get s.set 0):\n    return 42\n  )\n  return 42\n))\n", .capability_escape);
+}
+
+test "scoped effect request clauses preserve a fresh owner" {
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => do:\n  let computation = @computation (fn () => s.get ())\n  for request in @requests computation:\n    case request of\n      effect s.get () =>\n        yield 7\n      complete value =>\n        return value\n)\n", null);
+}
+
+test "scoped effect State pairing rejects different runtime owners" {
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:\n  let provider = @effect.state left.get right.set 0\n  return 42\n))\n", .effect_identity_scope);
+}
+
+test "scoped effect request aliases reject duplicate owner clauses" {
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => do:\n  let alias = s.get\n  let computation = @computation (fn () => s.get ())\n  for request in @requests computation:\n    case request of\n      effect s.get () =>\n        yield 7\n      effect alias () =>\n        yield 8\n      complete value =>\n        return value\n)\n", .duplicate_request_handler);
+}
+test "scoped effect request clause for another owner leaves its requirement" {
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:\n  let computation = @computation (fn () => left.get ())\n  for request in @requests computation:\n    case request of\n      effect right.get () =>\n        yield 7\n      complete value =>\n        return value\n))\n", .effect_mismatch);
+}
+
+const scoped_generic_source = scoped_state_header ++
+    "const local = fn (value: a) => @effect.scope (fn (s: State a) => do:\n" ++
+    "  let (state, result) = do (@effect.state s.get s.set value):\n" ++
+    "    return s.get ()\n" ++
+    "  return result\n" ++
+    ")\n" ++
+    "entry const integer = fn () => local 7\n" ++
+    "entry const fraction = fn () => local 1.5\n";
+test "scoped effect symbolic family arguments preserve inherited payload shapes" {
+    try checkScopedSource(a, scoped_generic_source, null);
+    try checkScopedSource(a, scoped_state_header ++ "const local = fn (value: a) => @effect.scope (fn (s: State a) => {saved: value})\nentry const answer = fn () => local 7\n", null);
+}
+test "scoped effect symbolic payload proof cannot erase a fresh capture" {
+    try checkScopedSource(a, scoped_state_header ++ "const local = fn (value: a) => @effect.scope (fn (s: State a) => fn () => do (@effect.state s.get s.set value):\n  return s.get ()\n)\nentry const bad = fn () => local 7\n", .capability_escape);
+    try checkScopedSource(a, scoped_state_header ++ "const local = fn (value: a) => @effect.scope (fn (s: State a) => {saved: s})\nentry const bad = fn () => local 7\n", .capability_escape);
+}
+fn scopedGenericAllocationLaw(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, scoped_generic_source, null);
+}
+test "scoped effect symbolic payload checking releases failed allocations" {
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, scopedGenericAllocationLaw, .{});
+}
+
+const scoped_static_store_source =
+    \\type State a is effect = {get: Unit -> a, set: a -> Unit}
+    \\type Save a is effect = {keep: (Unit -> a) -> Unit}
+    \\entry const bad = fn () => do:
+    \\  let (saved, result) = @state.run (fn () => 0) (fn () => do (@effect.provider (Save.keep U32) (fn value => @state.set value)):
+    \\    return @effect.scope (fn (s: State U32) => do:
+    \\      use Save.keep U32 (fn () => do:
+    \\        let (state, result) = do (@effect.state s.get s.set 0):
+    \\          return 42
+    \\        return result
+    \\      )
+    \\      return 42
+    \\    )
+    \\  )
+    \\  return saved ()
+;
+fn scopedStaticStoreAllocationLaw(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, scoped_static_store_source, .capability_escape);
+}
+test "scoped effect static generic operations cannot transfer authority to longer lived storage" {
+    try scopedStaticStoreAllocationLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, scopedStaticStoreAllocationLaw, .{});
+}
+
+const scoped_callback_source = scoped_state_header ++
+    "entry const answer = fn () => @effect.scope (fn (s: State U32) => do:\n" ++
+    "  let (state, result) = do (@effect.state s.get s.set 7):\n" ++
+    "    return (fn callback => callback ()) (fn () => s.get ())\n" ++
+    "  return result\n" ++
+    ")\n";
+fn scopedCallbackAllocationLaw(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, scoped_callback_source, null);
+}
+test "scoped effect direct callback adapters can borrow live authority" {
+    try scopedCallbackAllocationLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, scopedCallbackAllocationLaw, .{});
+}
+test "scoped effect direct callback adapter cannot return captured authority" {
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => (fn callback => callback ()) (fn () => s.get))\n", .capability_escape);
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => (fn callback => fn () => callback ()) (fn () => do (@effect.state s.get s.set 0):\n  return 42\n))\n", .capability_escape);
+}
+
+const scoped_outer_result_source = scoped_state_header ++
+    "entry const answer = fn () => @effect.scope (fn (left: State U32) => do:\n" ++
+    "  let longer = @effect.scope (fn (right: State U32) => {saved: left})\n" ++
+    "  let (state, result) = do (@effect.state left.get left.set 7):\n" ++
+    "    return longer.saved.get ()\n" ++
+    "  return result\n" ++
+    ")\n";
+fn scopedOuterResultAllocationLaw(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, scoped_outer_result_source, null);
+}
+test "scoped effect result footprint subtracts only the exiting binder" {
+    try scopedOuterResultAllocationLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, scopedOuterResultAllocationLaw, .{});
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (left: State U32) => do:\n  let invalid = @effect.scope (fn (right: State U32) => {outer: left, inner: #[right]})\n  return 42\n)\n", .capability_escape);
+}
+
+const scoped_pure_closure_source = scoped_state_header ++
+    "entry const answer = fn () => do:\n" ++
+    "  let callback = @effect.scope (fn (s: State U32) => fn () => 42)\n" ++
+    "  return callback ()\n";
+fn scopedPureClosureAllocationLaw(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, scoped_pure_closure_source, null);
+}
+test "scoped effect closed source closure footprints distinguish captures from effects" {
+    try scopedPureClosureAllocationLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, scopedPureClosureAllocationLaw, .{});
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => fn () => do (@effect.state s.get s.set 0):\n  return 42\n)\n", .capability_escape);
+}
+
+const static_alias_regression_source =
+    \\type Number = U32
+    \\type Identity a = a
+    \\type Signal a is effect = { get: Unit -> a }
+    \\type Read a is contract = { operation Signal.get a, type_rep a, effect_rep ! {} }
+    \\const read: Unit -> a ! {| e} where { Read a } = fn () => Signal.get a ()
+    \\const number: Unit -> Number ! {Signal.get Number} = fn () => Signal.get Number ()
+    \\entry const answer = fn () -> U32 => do (@effect.provider (Signal.get (Identity Number)) (fn () => 21)):
+    \\  return @u32.add (read ()) (number ())
+    \\entry const fraction = fn () -> F32 => do (@effect.provider (Signal.get (Identity F32)) (fn () => 1.5)):
+    \\  return read ()
+;
+fn abstractReadAliasLaw(allocator: std.mem.Allocator) !void {
+    var tokens = try lexer.lex(allocator, static_alias_regression_source);
+    defer tokens.deinit(allocator);
+    var names: symbols.Pool = .{};
+    defer names.deinit(allocator);
+    var tree = try parser.parse(allocator, static_alias_regression_source, tokens.tokens.items, &names);
+    defer tree.deinit(allocator);
+    var checked = try check.check(allocator, &tree, &names);
+    defer checked.deinit(allocator);
+    try std.testing.expectEqual(0, checked.diagnostics.len);
+    var symbolic: usize = 0;
+    for (checked.contract_predicates) |predicate| {
+        if (predicate.kind != .effect_operation) continue;
+        const signature = checked.types.node(try checked.types.resolve(predicate.signature, 0));
+        for (checked.types.rowLabels(signature.c)) |label| {
+            const arguments = checked.types.operationArguments(label);
+            if (arguments.len != 1) continue;
+            if (!try checked.types.equalClosed(arguments[0], arguments[0])) symbolic += 1;
+        }
+    }
+    try std.testing.expect(symbolic > 0);
+}
+test "symbolic operation aliases with abstract Read contracts retain argument closure" {
+    try abstractReadAliasLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, abstractReadAliasLaw, .{});
+}

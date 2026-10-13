@@ -8,6 +8,7 @@ const scalar_ops = @import("scalar_ops.zig");
 const types = @import("types.zig");
 const region_arena = @import("region_arena.zig");
 const type_evidence = @import("type_evidence.zig");
+const implementation_evidence = @import("implementation_evidence.zig");
 const checked_types = @import("check.zig");
 const code_expectation = @import("code_expectation.zig");
 const provider_chain = @import("provider_chain.zig");
@@ -91,6 +92,7 @@ pub const Snapshot = struct {
     record_layouts: []core.List,
     field_names: []u32,
     demands: []Demand,
+    implementation_proofs: implementation_evidence.Snapshot = .{},
     pub fn deinit(self: *Snapshot, allocator: Allocator) void {
         allocator.free(self.values);
         allocator.free(self.children);
@@ -103,10 +105,11 @@ pub const Snapshot = struct {
         allocator.free(self.record_layouts);
         allocator.free(self.field_names);
         allocator.free(self.demands);
+        self.implementation_proofs.deinit(allocator);
         self.* = undefined;
     }
 };
-pub const View = struct { values: []const ValueInfo, children: []const ValueId, closures: []const ClosureValue, value_evidence: []const type_evidence.Id, type_mappings: []const type_evidence.Mapping, row_mappings: []const type_evidence.RowMapping, evidence: type_evidence.View, value_records: []const u32, record_layouts: []const core.List, field_names: []const u32, demands: []const Demand };
+pub const View = struct { values: []const ValueInfo, children: []const ValueId, closures: []const ClosureValue, value_evidence: []const type_evidence.Id, type_mappings: []const type_evidence.Mapping, row_mappings: []const type_evidence.RowMapping, evidence: type_evidence.View, value_records: []const u32, record_layouts: []const core.List, field_names: []const u32, demands: []const Demand, implementation_proofs: implementation_evidence.View = .{} };
 pub const Error = Allocator.Error || error{ Declined, RequestUnwind };
 pub const Options = struct {
     reuse_body_recipes: bool = true,
@@ -157,6 +160,11 @@ pub const SourceLocation = struct { unit: u32, span: core.Span };
 pub fn callerDependent(source: *const core.Types, ty: types.Id, depth: usize) bool {
     if (ty == 0 or depth >= 256) return false;
     const n = source.node(ty);
+    if (n.tag == .function or n.tag == .demand or n.tag == .provider) {
+        for (source.rowLabels(n.c)) |label| for (source.operationArguments(label)) |argument| {
+            if (callerDependent(source, argument, depth + 1)) return true;
+        };
+    }
     switch (n.tag) {
         .variable => return true,
         .function, .provider => return callerDependent(source, n.a, depth + 1) or callerDependent(source, n.b, depth + 1),
@@ -206,6 +214,7 @@ pub const Diagnostic = struct {
     tag_origin: bool = false,
     related: ?SourceLocation = null,
     dispatch: ?DispatchRecord = null,
+    implementation_trace: ?@import("implementation_trace.zig").Record = null,
     pub fn message(self: Diagnostic) []const u8 {
         return self.code.message(self.detail);
     }
@@ -1398,6 +1407,9 @@ pub const Session = struct {
     type_mappings: std.ArrayList(type_evidence.Mapping) = .empty,
     row_mappings: std.ArrayList(type_evidence.RowMapping) = .empty,
     evidence: type_evidence.Store,
+    implementation_proofs: @import("implementation_evidence.zig").Store,
+    associated_remaining: usize = 1_000_000,
+    has_implementations: bool = false,
     typed_views: std.AutoHashMapUnmanaged(ViewKey, ValueId) = .empty,
     specialized_closures: std.AutoHashMapUnmanaged(ViewKey, ValueId) = .empty,
     value_records: std.ArrayList(u32) = .empty,
@@ -1454,9 +1466,11 @@ pub const Session = struct {
         errdefer allocator.free(binding_offsets);
         const node_offsets = try allocator.alloc(usize, units.len);
         errdefer allocator.free(node_offsets);
+        var has_implementations = false;
         var binding_count: usize = 0;
         var node_count: usize = 0;
         for (units, 0..) |module, index| {
+            has_implementations = has_implementations or module.implementations.len != 0 or module.member_templates.len != 0;
             binding_offsets[index] = binding_count;
             node_offsets[index] = node_count;
             binding_count = std.math.add(usize, binding_count, module.bindings.len) catch return error.OutOfMemory;
@@ -1502,11 +1516,12 @@ pub const Session = struct {
                 }
             }
         }
-        return .{ .region_arena_pool = .init(allocator), .allocator = allocator, .units = units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .visited_nodes = visited_nodes, .values = values, .field_locations = field_locations, .value_evidence = value_evidence, .evidence = evidence, .value_records = value_records, .record_layouts = record_layouts };
+        return .{ .region_arena_pool = .init(allocator), .allocator = allocator, .units = units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .visited_nodes = visited_nodes, .values = values, .field_locations = field_locations, .value_evidence = value_evidence, .evidence = evidence, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = has_implementations, .value_records = value_records, .record_layouts = record_layouts };
     }
     pub fn deinit(self: *Session) void {
         for (self.constant_records.items) |*record| record.deinit(self.allocator);
         self.constant_records.deinit(self.allocator);
+        self.implementation_proofs.deinit();
         self.call_summaries.deinit(self);
         self.lexical_inputs.deinit(self.allocator);
         self.canonical_specializations.deinit(self.allocator);
@@ -1716,6 +1731,15 @@ pub const Session = struct {
         const metadata = self.closureInfo(value_);
         const owner = self.findUnit(metadata.unit, null) orelse return self.fail(self.units.len, .{ .start = 0, .end = 0 }, .unsupported);
         const module = &self.units[owner];
+        if (metadata.origin == .named and self.has_implementations) {
+            const reference: core.BindingRef = .{ .unit = metadata.unit, .binding = metadata.identity };
+            const selected = try self.selectTemplate(owner, 0, reference, expected);
+            if (!std.meta.eql(reference, selected)) {
+                try self.prepare(selected);
+                const selected_value = try self.constant(try self.external(try self.target(owner, selected)));
+                return self.specializeRetained(selected_value, expected);
+            }
+        }
         const span = switch (metadata.origin) {
             .anonymous => module.span(module.closures[metadata.identity].body),
             .named => (module.body(metadata.identity) orelse return self.fail(owner, .{ .start = 0, .end = 0 }, .unsupported)).span,
@@ -1972,7 +1996,7 @@ pub const Session = struct {
                 }
             }
             switch (n.tag) {
-                .associated, .project, .result_associated, .resolver_op, .update, .operation_value, .invalid => return false,
+                .associated, .project, .result_associated, .resolver_op, .update, .operation_value, .effect_scope, .invalid => return false,
                 .scalar => {
                     if (n.c != 0 and n.b != 0) return false;
                     for ([_]core.Id{ n.a, n.b }) |id| try work.append(self.allocator, .{ .owner = key.owner, .node = id });
@@ -1983,7 +2007,7 @@ pub const Session = struct {
                 .if_value, .if_stmt, .state_provider => for ([_]core.Id{ n.a, n.b, n.c }) |id| {
                     try work.append(self.allocator, .{ .owner = key.owner, .node = id });
                 },
-                .block, .suite, .product, .record, .array, .array_op, .call => for (module.children(key.node)) |id| {
+                .block, .suite, .product, .record, .array, .array_op, .call, .contract_method => for (module.children(key.node)) |id| {
                     try work.append(self.allocator, .{ .owner = key.owner, .node = id });
                 },
                 .bind => try work.append(self.allocator, .{ .owner = key.owner, .node = n.b }),
@@ -2142,7 +2166,10 @@ pub const Session = struct {
             error.OutOfMemory => error.OutOfMemory,
             error.Declined => error.Declined,
             error.RequestUnwind => error.RequestUnwind,
-            error.TypeLimit, error.EvidenceLimit => self.fail(owner, span, .constant_fuel),
+            error.TypeLimit, error.EvidenceLimit => blk: {
+                if (self.has_implementations and (self.associated_remaining == 0 or self.implementation_proofs.failure == .associated_limit)) break :blk self.fail(owner, span, .associated_limit);
+                break :blk self.fail(owner, span, .constant_fuel);
+            },
             error.TypeMismatch, error.InfiniteType => self.fail(owner, span, .type_mismatch),
             error.EffectMismatch => self.fail(owner, span, .effect_mismatch),
             error.InfiniteEffect => self.fail(owner, span, .infinite_effect),
@@ -2152,7 +2179,7 @@ pub const Session = struct {
     /// Borrowed until this session is destroyed. Array growth preserves handles,
     /// so consumers obtain the view after evaluation rather than retaining slices.
     pub fn snapshot(self: *const Session) View {
-        return .{ .values = self.values.items, .children = self.children.items, .closures = self.closures.items, .value_evidence = self.value_evidence.items, .type_mappings = self.type_mappings.items, .row_mappings = self.row_mappings.items, .evidence = self.evidence.view(), .value_records = self.value_records.items, .record_layouts = self.record_layouts.items, .field_names = self.field_names.items, .demands = self.demands.items };
+        return .{ .values = self.values.items, .children = self.children.items, .closures = self.closures.items, .value_evidence = self.value_evidence.items, .type_mappings = self.type_mappings.items, .row_mappings = self.row_mappings.items, .evidence = self.evidence.view(), .value_records = self.value_records.items, .record_layouts = self.record_layouts.items, .field_names = self.field_names.items, .demands = self.demands.items, .implementation_proofs = self.implementation_proofs.view() };
     }
     pub fn copySnapshotMeasured(self: *Session, backing: Allocator) Allocator.Error!Snapshot {
         // Only slices escape this adapter. Their durable caller frees with the
@@ -2185,7 +2212,9 @@ pub const Session = struct {
         errdefer allocator.free(field_names);
         const demands = try allocator.dupe(Demand, self.demands.items);
         errdefer allocator.free(demands);
-        return .{ .values = values, .children = children, .closures = closures, .value_evidence = value_evidence, .type_mappings = type_mappings, .row_mappings = row_mappings, .evidence = try self.evidence.copyOwned(allocator), .value_records = value_records, .record_layouts = record_layouts, .field_names = field_names, .demands = demands };
+        var selected = try self.implementation_proofs.copyOwned(allocator);
+        errdefer selected.deinit(allocator);
+        return .{ .implementation_proofs = selected, .values = values, .children = children, .closures = closures, .value_evidence = value_evidence, .type_mappings = type_mappings, .row_mappings = row_mappings, .evidence = try self.evidence.copyOwned(allocator), .value_records = value_records, .record_layouts = record_layouts, .field_names = field_names, .demands = demands };
     }
     fn makeClosure(self: *Session, owner: usize, source: core.Id, metadata: ClosureValue, captures: []const ValueId) Error!ValueId {
         if (self.closures.items.len >= std.math.maxInt(u32)) return self.failNode(owner, source, .constant_fuel);
@@ -2292,16 +2321,250 @@ pub const Session = struct {
     fn requireScalar(self: *Session, owner: usize, source: core.Id, id: ValueId) Error!Value {
         return self.valueScalar(id) orelse return self.failNode(owner, source, .unsupported);
     }
-    fn projectType(self: *Session, owner: usize, source: core.Id, ty: types.Id, mappings: []const type_evidence.Mapping, rows: []const type_evidence.RowMapping) Error!type_evidence.Id {
-        return self.evidence.projectWithRows(&self.units[owner].types, ty, mappings, rows) catch |err| switch (err) {
+    fn implementationContext(self: *const Session, owner: usize) u32 {
+        if (self.specialization_origin) |origin| return origin.unit;
+        return self.unitId(owner);
+    }
+    fn privateImplementationMethod(self: *const Session, owner: usize, binding: core.BindingId) bool {
+        if (!self.has_implementations) return false;
+        const module = &self.units[owner];
+        for (module.implementations) |declaration| {
+            if (!declaration.private or declaration.identity.unit != self.unitId(owner)) continue;
+            for (module.implementation_members[declaration.members.start..][0..declaration.members.len]) |member| {
+                if (member.kind == .value and (member.target.unit == 0 or member.target.unit == self.unitId(owner)) and member.target.binding == binding) return true;
+            }
+        }
+        return false;
+    }
+    fn implementationUseContext(self: *const Session, owner: usize, source: core.Id) u32 {
+        const module = &self.units[owner];
+        for (module.selected_uses) |use| if (use.node == source) {
+            const proof = module.selected_proofs[use.proof];
+            if (proof.kind == .implementation) {
+                if (proof.context == 0) return self.unitId(owner);
+                return proof.context;
+            }
+        };
+        if (self.has_implementations and source != 0) {
+            const span = module.span(source);
+            for (module.bodies) |body| {
+                if (span.start < body.span.start or span.end > body.span.end) continue;
+                if (self.privateImplementationMethod(owner, body.binding)) return self.unitId(owner);
+            }
+        }
+        return self.implementationContext(owner);
+    }
+    pub fn selectTemplate(self: *Session, owner: usize, source: core.Id, reference: core.BindingRef, actual: type_evidence.Id) Error!core.BindingRef {
+        return (try self.selectTemplateSelection(owner, source, reference, actual)).target;
+    }
+    fn selectTemplateSelection(self: *Session, owner: usize, source: core.Id, reference: core.BindingRef, actual: type_evidence.Id) Error!MethodSelection {
+        if (!self.has_implementations) return .{ .target = reference, .signature = actual };
+        const target_ = try self.external(try self.target(owner, reference));
+        const module = &self.units[target_.unit];
+        for (module.member_templates) |template| {
+            if (template.binding != target_.binding) continue;
+            if (actual == 0) return self.failNode(owner, source, .ambiguous_qualified);
+            var mappings: std.ArrayList(type_evidence.Mapping) = .empty;
+            defer mappings.deinit(self.allocator);
+            var rows: std.ArrayList(type_evidence.RowMapping) = .empty;
+            defer rows.deinit(self.allocator);
+            var projection: ImplementationProjection = .{ .session = self, .context = self.implementationUseContext(owner, source) };
+            if (!(self.evidence.matchTemplate(&module.types, module.binding(template.binding).ty, actual, &mappings, &rows, projection.resolver()) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                error.EvidenceLimit => return self.failNode(owner, source, .associated_limit),
+                error.UnresolvedType => return self.failNode(owner, source, .ambiguous_qualified),
+                error.TypeMismatch => return self.implementationMatchFailure(owner, source, projection, err),
+            })) return self.failNode(owner, source, .type_mismatch);
+            const previous = self.specialization_origin;
+            self.specialization_origin = .{ .unit = projection.context, .span = self.units[owner].span(source) };
+            defer self.specialization_origin = previous;
+            return self.implementationMethodAt(target_.unit, owner, source, projection.context, template, mappings.items, rows.items);
+        }
+        return .{ .target = reference, .signature = actual };
+    }
+    fn implementationFailure(self: *Session, owner: usize, source: core.Id) Error {
+        const code = self.implementation_proofs.failure orelse .missing_implementation;
+        const fresh = self.diagnostic == null;
+        const result = self.failNode(owner, source, switch (code) {
+            .missing_implementation => .missing_implementation,
+            .incompatible_implementation => .incompatible_implementation,
+            .recursive_evidence => .recursive_evidence,
+            .recursive_associated_type => .recursive_associated_type,
+            .associated_limit => .associated_limit,
+        });
+        if (fresh) self.diagnostic.?.implementation_trace = self.implementation_proofs.trace;
+        return result;
+    }
+    pub fn implementationRead(self: *Session, context: u32, implementation: types.NominalIdentity) Allocator.Error!void {
+        // Selected proofs are required semantic owners. Until a complete read
+        // set is exportable, optional executable/principal receipts decline.
+        if (self.principal_reads) |reads| reads.invalidate(.specialize);
+        if (self.receipt_tape) |tape| tape.unknown = true;
+        _ = context;
+        _ = implementation;
+    }
+    pub fn implementationLegacyPredicate(self: *Session, context: u32, requirement: core.Obligation, operands: [4]type_evidence.Id, resolver: type_evidence.ProjectionResolver) type_evidence.Error!?implementation_evidence.LegacyChoice {
+        const owner = self.findUnit(context, null) orelse return error.TypeMismatch;
+        if (requirement.kind == .field or requirement.kind == .writable_field) {
+            const shape = self.evidence.node(operands[0]);
+            if (shape.tag == .record) {
+                const fields = self.evidence.children(operands[0]);
+                var at: usize = 0;
+                while (at < fields.len) : (at += 2) {
+                    if (fields[at] == requirement.name) {
+                        if (operands[2] == 0 or operands[2] == fields[at + 1]) return .{ .target = .{ .unit = 0, .binding = 0 }, .carrier = operands[3] };
+                        return null;
+                    }
+                }
+            }
+        }
+        if (requirement.kind != .dispatch and requirement.kind != .receiver and requirement.kind != .field and requirement.kind != .result_dispatch and requirement.kind != .resolver_dispatch) return null;
+        var first: ?core.BindingRef = null;
+        var second: ?core.BindingRef = null;
+        var selection_owner = operands[0];
+        var selected_identity: ?types.NominalIdentity = null;
+        if (requirement.kind == .result_dispatch) selection_owner = operands[2];
+        if (requirement.kind == .resolver_dispatch) {
+            const resolver_type = self.evidence.node(operands[0]);
+            if (resolver_type.tag != .resolver) return null;
+            const constructor = self.evidence.node(resolver_type.a);
+            if (constructor.tag != .type_constructor) return null;
+            selected_identity = .{ .unit = constructor.a, .decl = constructor.b };
+        } else {
+            selected_identity = self.evidenceIdentity(selection_owner);
+        }
+        if (selected_identity) |identity| first = self.associatedTarget(context, identity, requirement.name, requirement.operator) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => return error.TypeMismatch,
+        };
+        if (requirement.kind == .dispatch) {
+            if (self.evidenceIdentity(operands[1])) |identity| second = self.associatedTarget(context, identity, requirement.name, requirement.operator) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                else => return error.TypeMismatch,
+            };
+        }
+        for ([_]?core.BindingRef{ first, second }, 0..) |target_, side| {
+            if (side == 1 and requirement.kind == .dispatch and requirement.name == 0) {
+                if (@import("implementation_predicates.zig").primitiveResult(&self.evidence, requirement.operator, operands[0], operands[1])) |result| {
+                    if (result != operands[2]) return null;
+                    var carrier = operands[3];
+                    if (carrier == 0) carrier = try self.evidence.intern(.function, types.unit, types.unit, &.{});
+                    return .{ .target = .{ .unit = 0, .binding = 0 }, .carrier = carrier };
+                }
+            }
+            const target_ref = target_ orelse continue;
+            const target_owner = self.findUnit(target_ref.unit, owner) orelse continue;
+            const module = &self.units[target_owner];
+            const binding = module.binding(target_ref.binding);
+            var mappings: std.ArrayList(type_evidence.Mapping) = .empty;
+            defer mappings.deinit(self.allocator);
+            var rows: std.ArrayList(type_evidence.RowMapping) = .empty;
+            defer rows.deinit(self.allocator);
+            var arity: usize = 2;
+            if (requirement.kind == .field or requirement.kind == .result_dispatch) arity = 1;
+            var carrier: type_evidence.Id = 0;
+            if (requirement.kind == .resolver_dispatch) {
+                if (!try self.evidence.matchLegacySignature(&module.types, binding.scheme.root, operands[1], &mappings, &rows, resolver)) continue;
+            } else carrier = try self.evidence.matchPrerequisite(&module.types, binding.scheme.root, operands, arity, &mappings, &rows, resolver) orelse continue;
+            // Never infer an unquantified captured slot from a wanted result.
+            for (mappings.items) |mapping| {
+                if (std.mem.findScalar(types.Id, module.types.list(binding.scheme.variables), mapping.variable) == null) return null;
+            }
+            for (rows.items) |mapping| if (std.mem.findScalar(u32, module.types.list(binding.scheme.row_variables), mapping.variable) == null) return null;
+            var original = target_ref;
+            if (original.unit == 0) original.unit = self.unitId(target_owner);
+            return .{ .target = original, .carrier = carrier };
+        }
+        return null;
+    }
+    const ImplementationProjection = struct {
+        session: *Session,
+        context: u32,
+        resolved: bool = false,
+        fn resolve(raw: *anyopaque, contract: types.NominalIdentity, member: u32, arguments: []const type_evidence.Id) type_evidence.Error!type_evidence.Id {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.resolved = true;
+            return self.session.implementation_proofs.projection(self.session, self.context, contract, member, arguments) catch |err| switch (err) {
+                error.OutOfMemory => error.OutOfMemory,
+                error.AssociatedLimit, error.EvidenceLimit => error.EvidenceLimit,
+                error.UnresolvedType => error.UnresolvedType,
+                else => error.TypeMismatch,
+            };
+        }
+        fn resolver(self: *@This()) type_evidence.ProjectionResolver {
+            return .{ .context = self, .remaining = &self.session.associated_remaining, .resolve = resolve };
+        }
+    };
+    fn implementationMatchFailure(self: *Session, owner: usize, source: core.Id, projection: ImplementationProjection, err: type_evidence.Error) Error {
+        if (err == error.OutOfMemory) return error.OutOfMemory;
+        if (projection.resolved and self.implementation_proofs.failure != null) return self.implementationFailure(owner, source);
+        if (err == error.EvidenceLimit) return self.failNode(owner, source, .associated_limit);
+        if (err == error.UnresolvedType) return self.failNode(owner, source, .ambiguous_qualified);
+        return self.failNode(owner, source, .type_mismatch);
+    }
+    const MethodSelection = struct { target: core.BindingRef, signature: type_evidence.Id };
+    pub fn implementationMethod(self: *Session, owner: usize, source: core.Id, template: core.MemberTemplate, mappings: []const type_evidence.Mapping, rows: []const type_evidence.RowMapping) Error!MethodSelection {
+        return self.implementationMethodAt(owner, owner, source, self.implementationUseContext(owner, source), template, mappings, rows);
+    }
+    fn implementationMethodAt(self: *Session, owner: usize, caller: usize, source: core.Id, context: u32, template: core.MemberTemplate, mappings: []const type_evidence.Mapping, rows: []const type_evidence.RowMapping) Error!MethodSelection {
+        var arguments: std.ArrayList(type_evidence.Id) = .empty;
+        defer arguments.deinit(self.allocator);
+        for (self.units[owner].types.list(template.arguments)) |root| {
+            const actual = try self.projectType(owner, 0, root, mappings, rows);
+            if (actual == 0) return self.failNode(caller, source, .ambiguous_qualified);
+            try arguments.append(self.allocator, actual);
+        }
+        const proof = self.implementation_proofs.resolve(self, context, template.contract, arguments.items) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.UnresolvedType => return self.failNode(caller, source, .ambiguous_qualified),
+            else => return self.implementationFailure(caller, source),
+        };
+        const declaration = self.implementation_proofs.proofs.items[proof];
+        for (self.implementation_proofs.members.items[declaration.members.start..][0..declaration.members.len]) |member| {
+            if (member.name == template.name) return .{ .target = member.target, .signature = member.root };
+        }
+        return self.failNode(caller, source, .missing_implementation);
+    }
+    fn contractMethod(self: *Session, owner: usize, id: core.Id, frame: *Frame) Error!Flow {
+        const module = &self.units[owner];
+        const template = module.member_templates[module.node(id).a];
+        const selected = try self.implementationMethod(owner, id, template, frame.mappings.items, frame.row_mappings.items);
+        const target_ = try self.external(try self.target(owner, selected.target));
+        try self.prepare(selected.target);
+        const children = module.children(id);
+        const arguments = try self.allocator.alloc(ValueId, children.len);
+        defer self.allocator.free(arguments);
+        for (children, arguments) |child, *argument| {
+            const outcome = try self.expression(owner, child, frame);
+            if (outcome != .value) return outcome;
+            argument.* = outcome.value;
+        }
+        return self.invokeNamed(target_, arguments, owner, id, selected.signature, frame.providers);
+    }
+    pub fn projectType(self: *Session, owner: usize, source: core.Id, ty: types.Id, mappings: []const type_evidence.Mapping, rows: []const type_evidence.RowMapping) Error!type_evidence.Id {
+        if (!self.has_implementations) return self.evidence.projectWithRows(&self.units[owner].types, ty, mappings, rows) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.UnresolvedType => return 0,
             error.EvidenceLimit => return self.failNode(owner, source, .constant_fuel),
             error.TypeMismatch => return self.failNode(owner, source, .unsupported),
         };
+        var projection: ImplementationProjection = .{ .session = self, .context = self.implementationUseContext(owner, source) };
+        return self.evidence.projectSelected(&self.units[owner].types, ty, mappings, rows, projection.resolver()) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.UnresolvedType => return 0,
+            else => return self.implementationMatchFailure(owner, source, projection, err),
+        };
     }
     fn matchType(self: *Session, owner: usize, source: core.Id, producer: usize, ty: types.Id, actual: type_evidence.Id, mappings: *std.ArrayList(type_evidence.Mapping), rows: *std.ArrayList(type_evidence.RowMapping)) Error!bool {
         if (actual == 0) return false;
+        if (self.has_implementations) {
+            var projection: ImplementationProjection = .{ .session = self, .context = self.implementationUseContext(owner, source) };
+            return self.evidence.matchSelected(&self.units[producer].types, ty, actual, mappings, rows, projection.resolver()) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                error.UnresolvedType => return false,
+                else => return self.implementationMatchFailure(owner, source, projection, err),
+            };
+        }
         return self.evidence.matchWithRows(&self.units[producer].types, ty, actual, mappings, rows) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.EvidenceLimit => return self.failNode(owner, source, .constant_fuel),
@@ -2536,7 +2799,7 @@ pub const Session = struct {
                         if (n.b != 0) try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.b } });
                         try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.a } });
                     },
-                    .call, .block, .suite, .product, .record, .array, .array_op => {
+                    .call, .contract_method, .block, .suite, .product, .record, .array, .array_op => {
                         const children = module.children(operation.id);
                         var index = children.len;
                         while (index != 0) {
@@ -2564,7 +2827,7 @@ pub const Session = struct {
                         if (kind == .count or kind == .has or kind == .same) try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.b } });
                         if (n.c != 0) try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.c } });
                     },
-                    .computation => try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.a } }),
+                    .computation, .effect_scope => try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.a } }),
                     .request_decision => {
                         if (n.c != 0) try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.c } });
                         if (n.b != 0) try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.b } });
@@ -2773,6 +3036,7 @@ pub const Session = struct {
                 // output replay law; only stable mappings qualify this slice.
                 if (!@import("structural.zig").equal(recording.inputs.types, frame.mappings.items) or !@import("structural.zig").equal(recording.inputs.rows, frame.row_mappings.items)) recording.eligible = false;
                 pending = try recording.finish(self.allocator, self, reference, outcome.?);
+                if (pending == null and recording.members != 0) self.constant_stats.member_declined += 1;
             }
         }
         const result = outcome.?;
@@ -2793,6 +3057,9 @@ pub const Session = struct {
             try self.constant_records.append(self.allocator, record);
             pending = null;
             self.constant_stats.recorded += 1;
+            for (record.events) |event| if (event == .member) {
+                self.constant_stats.member_recorded += 1;
+            };
             self.constant_stats.owned_payload_bytes += record.ownedBytes();
         }
         self.slot(resolved).value = published;
@@ -2864,7 +3131,7 @@ pub const Session = struct {
             if (actual == 0) return self.failNode(owner, id, .unsupported);
             try arguments.append(self.allocator, actual);
         }
-        return self.evidence.effects.internOperation(operation.identity, arguments.items) catch |err| return self.evidenceFailure(owner, self.units[owner].span(id), err);
+        return self.evidence.effects.internOperationInstance(operation.identity, arguments.items, operation.instance) catch |err| return self.evidenceFailure(owner, self.units[owner].span(id), err);
     }
     fn containsReflectionType(self: *Session, owner: usize, id: core.Id, evidence: type_evidence.Id, depth: usize) Error!bool {
         if (evidence == 0) return false;
@@ -3231,8 +3498,15 @@ pub const Session = struct {
                 } else return self.failNode(owner, id, .unsupported);
                 return .{ .value = try self.makeScalar(owner, id, .{ .scalar = scalar, .bits = n.a }) };
             },
+            .contract_method => return self.contractMethod(owner, id, frame),
             .reference => {
-                const resolved = try self.external(try self.target(owner, module.reference(id)));
+                var reference = module.reference(id);
+                if (self.has_implementations) {
+                    const actual = try self.projectType(owner, id, n.ty, frame.mappings.items, frame.row_mappings.items);
+                    reference = try self.selectTemplate(owner, id, reference, actual);
+                    if (!std.meta.eql(reference, module.reference(id))) try self.prepare(reference);
+                }
+                const resolved = try self.external(try self.target(owner, reference));
                 const binding = self.units[resolved.unit].binding(resolved.binding);
                 if (binding.kind == .local or binding.kind == .parameter) {
                     if (resolved.unit != owner) return self.failNode(owner, id, .unsupported);
@@ -3350,6 +3624,10 @@ pub const Session = struct {
                     break :blk first.bits == second.bits;
                 };
                 return .{ .value = try self.makeScalar(owner, id, .{ .scalar = .bool, .bits = @intFromBool(matches) }) };
+            },
+            .effect_scope => {
+                self.declineConstant();
+                return self.failNode(owner, id, .unsupported);
             },
             .operation_value => {
                 const operation = module.operationValue(id);
@@ -3946,10 +4224,28 @@ pub const Session = struct {
         return true;
     }
     fn partialArrayMember(self: *Session, owner: usize, source: core.Id, target_: Target, receiver: ValueId, expected: type_evidence.Id) Error!ValueId {
+        // The completed selected-query record owns this entire inference
+        // judgment. Keep its observations out of the surrounding value tape;
+        // only a complete admitted record can restore that tape afterwards.
+        const outer = self.constant_recorder;
+        const selected_before = self.specialization_receipts.items.len;
+        const inference_before = self.constant_inference_serial;
+        if (outer) |recorder| try recorder.flush(self.allocator, self);
+        self.constant_recorder = null;
+        var completed = false;
+        defer {
+            self.constant_recorder = outer;
+            if (!completed) {
+                if (outer != null) self.constant_stats.member_declined += 1;
+                self.declineConstant();
+            }
+        }
         if (self.receipt_tape) |tape| tape.nested = true;
         const member_target: core.BindingRef = .{ .unit = self.unitId(target_.unit), .binding = target_.binding };
         if (self.receipt_tape == null and self.inquiry_regions == 0 and self.memberReceiptEligible(member_target)) if (self.specialization_provider) |provider| if (provider.member) |lookup| if (try lookup(provider.context, self, member_target, receiver, expected)) |selected| {
             self.observeConstantInference();
+            if (outer) |recorder| completed = try recorder.member(self.allocator, self, selected_before, inference_before);
+            if (outer == null) completed = true;
             return selected;
         };
         const method_slot = self.slots[self.binding_offsets[target_.unit] + target_.binding];
@@ -4011,6 +4307,8 @@ pub const Session = struct {
                 owns_record = false;
             }
         }
+        if (outer) |recorder| completed = try recorder.member(self.allocator, self, selected_before, inference_before);
+        if (outer == null) completed = true;
         return selected;
     }
     fn replaceProjection(self: *Session, owner: usize, source: core.Id, projection_index: u32, value_: ValueId, replacement: ValueId) Error!ValueId {
@@ -4564,6 +4862,7 @@ pub const Session = struct {
         var region = ClosureRegion.init(self) catch return error.OutOfMemory;
         defer region.deinit();
         const scope = region.typeScope(owner) catch |err| return self.evidenceFailure(owner, self.units[owner].span(source), err);
+        if (self.has_implementations) region.current_implementation_context = self.implementationUseContext(owner, source);
         region.scratch.sources.items[scope].closed_rows = scheme.closed_rows;
         region.seed(scope, frame.mappings.items) catch |err| return self.evidenceFailure(owner, self.units[owner].span(source), err);
         region.seedRows(scope, frame.row_mappings.items) catch |err| return self.evidenceFailure(owner, self.units[owner].span(source), err);
@@ -4780,7 +5079,7 @@ pub const Session = struct {
             try arguments.append(self.allocator, projected);
         }
         const identity: types.NominalIdentity = .{ .unit = if (operation.identity.unit == 0) self.unitId(producer) else operation.identity.unit, .decl = operation.identity.decl };
-        return self.evidence.effects.internOperation(identity, arguments.items) catch |err| switch (err) {
+        return self.evidence.effects.internOperationInstance(identity, arguments.items, operation.instance) catch |err| switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             error.EvidenceLimit => self.failNode(owner, source, .constant_fuel),
             else => self.failNode(owner, source, .unsupported),
@@ -5153,8 +5452,12 @@ pub const Session = struct {
     }
     fn call(self: *Session, owner: usize, id: core.Id, caller: *Frame) Error!Flow {
         const invocation = self.units[owner].call(id);
-        const actual = try self.projectType(owner, id, invocation.callee_type, caller.mappings.items, caller.row_mappings.items);
-        const resolved = try self.external(try self.target(owner, invocation.target));
+        const caller_type = try self.projectType(owner, id, invocation.callee_type, caller.mappings.items, caller.row_mappings.items);
+        const selected = try self.selectTemplateSelection(owner, id, invocation.target, caller_type);
+        const actual = selected.signature;
+        const selected_target = selected.target;
+        if (!std.meta.eql(selected_target, invocation.target)) try self.prepare(selected_target);
+        const resolved = try self.external(try self.target(owner, selected_target));
         const module = &self.units[resolved.unit];
         const body = module.body(resolved.binding) orelse return self.failNode(owner, id, .unsupported);
         if (module.binding(resolved.binding).kind != .global) return self.failNode(owner, id, .unsupported);
@@ -5244,7 +5547,7 @@ const ClosureRegion = struct {
             self.frames.deinit(allocator);
         }
     };
-    const Source = struct { origin: ?SourceLocation = null, binding: core.BindingId = 0, value: ValueId, owner: usize, root: types.Id = 0, body: core.Id = 0, closed_rows: types.List = .{}, body_collected: bool = false };
+    const Source = struct { origin: ?SourceLocation = null, implementation_context: ?u32 = null, binding: core.BindingId = 0, value: ValueId, owner: usize, root: types.Id = 0, body: core.Id = 0, closed_rows: types.List = .{}, body_collected: bool = false };
     const Import = struct { scope: u32, ty: types.Id };
     const RowImport = struct { scope: u32, row: types.Effects.Id };
     const LabelImport = struct { scope: u32, label: types.Effects.Label };
@@ -5268,8 +5571,8 @@ const ClosureRegion = struct {
     };
     const DefinitionKey = struct { owner: usize, node: core.Id };
     const CandidateKey = struct { caller: u32, node: core.Id, target: Target };
-    const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge, call_summary, scheme_use, callback_use, type_eq, contract };
-    const Constraint = struct { use_node: core.Id = 0, origin: ?SourceLocation = null, lexical_key: u32 = 0, callback_slot: u32 = 0, callback_stage: u32 = 0, callback_interface: bool = false, target: Target = .{ .unit = 0, .binding = 0 }, arguments: core.List = .{}, explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, principal_only: bool = false, solved: bool = false };
+    const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge, call_summary, scheme_use, callback_use, type_eq, contract, implementation_method };
+    const Constraint = struct { use_node: core.Id = 0, origin: ?SourceLocation = null, lexical_key: u32 = 0, callback_slot: u32 = 0, callback_stage: u32 = 0, callback_interface: bool = false, target: Target = .{ .unit = 0, .binding = 0 }, arguments: core.List = .{}, explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, instance: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, principal_only: bool = false, solved: bool = false };
     const Worklists = struct {
         constraints: @import("solver_worklist.zig").Queue = .{},
         aliases: @import("solver_worklist.zig").Queue = .{},
@@ -5341,11 +5644,15 @@ const ClosureRegion = struct {
     profile_output_rows: usize = 0,
     session: *Session,
     current_origin: ?SourceLocation = null,
+    current_implementation_context: ?u32 = null,
     current_use: core.Id = 0,
     scratch: Scratch = .{},
     scratch_allocator: Allocator,
     timing: ?@import("backend_timing.zig").Work.Scope = null,
     solver: types.Store,
+    projection_scopes: std.AutoHashMapUnmanaged(types.Id, u32) = .empty,
+    normalization_memo: std.AutoHashMapUnmanaged(NormalizationKey, void) = .empty,
+    associated_observed: usize = 0,
     arena: *region_arena.Arena,
     retain_selected: bool = false,
     startup_coverage_complete: bool = true,
@@ -5372,6 +5679,8 @@ const ClosureRegion = struct {
     occurs_base: u64 = 0,
     importing_evidence: bool = false,
 
+    const NormalizationKey = struct { root: types.Id, types: u64, rows: u64 };
+
     fn init(session: *Session) types.Error!ClosureRegion {
         return initWithSolverAllocator(session, null);
     }
@@ -5393,6 +5702,8 @@ const ClosureRegion = struct {
         return region;
     }
     fn deinit(self: *ClosureRegion) void {
+        self.projection_scopes.deinit(self.session.allocator);
+        self.normalization_memo.deinit(self.session.allocator);
         std.debug.assert(self.session.inquiry_regions != 0);
         self.session.inquiry_regions -= 1;
         defer if (self.timing) |scope| scope.deinit();
@@ -5549,7 +5860,7 @@ const ClosureRegion = struct {
         const module = &self.session.units[self.scratch.sources.items[scope].owner];
         for (mappings) |mapping| {
             if (mapping.variable == 0 or mapping.variable >= module.types.nodes.len) return error.UnresolvedType;
-            try self.solver.unify(try self.importType(scope, mapping.variable, 0), try self.importEvidence(mapping.evidence, 0));
+            try self.unify(try self.importType(scope, mapping.variable, 0), try self.importEvidence(mapping.evidence, 0));
         }
     }
     fn exportMappings(self: *ClosureRegion, scope: u32) RegionError![]type_evidence.Mapping {
@@ -5754,8 +6065,8 @@ const ClosureRegion = struct {
     fn solveFieldConstraint(self: *ClosureRegion, constraint: Constraint) RegionError!bool {
         const selected = self.fieldType(constraint) catch |err| return self.sourceSelectionFailure(constraint, err);
         const actual = selected orelse return false;
-        if (constraint.kind == .receiver) self.solver.unify(constraint.right, types.unit) catch |err| return self.sourceSelectionFailure(constraint, err);
-        self.solver.unify(constraint.result, actual) catch |err| return self.sourceSelectionFailure(constraint, err);
+        if (constraint.kind == .receiver) self.unify(constraint.right, types.unit) catch |err| return self.sourceSelectionFailure(constraint, err);
+        self.unify(constraint.result, actual) catch |err| return self.sourceSelectionFailure(constraint, err);
         return true;
     }
     fn bodyEvidence(self: *ClosureRegion, owner: usize, body: core.Id, root: types.Id, closed_rows: types.List, scheme: types.Scheme, expected: Expected, seeds: []const type_evidence.Mapping) RegionError![]type_evidence.Mapping {
@@ -5770,7 +6081,7 @@ const ClosureRegion = struct {
         try self.seed(scope, seeds);
         try self.seedRows(scope, row_seeds);
         const actual = try self.solver.resolve(imported, 0);
-        try self.solver.unify(try self.solver.openCovariant(actual), try self.importEvidence(expected, 0));
+        try self.unify(try self.solver.openCovariant(actual), try self.importEvidence(expected, 0));
         return self.exportSolved(scope);
     }
     fn bodyEvidenceFull(self: *ClosureRegion, owner: usize, body: core.Id, root: types.Id, closed_rows: types.List, scheme: types.Scheme, expected: Expected, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping) RegionError!SolvedEvidence {
@@ -5830,7 +6141,7 @@ const ClosureRegion = struct {
             if (self.session.evidence.node(capture.mappings).tag != .record or words.len % 2 != 0) return error.TypeMismatch;
             for (0..words.len / 2) |index| {
                 if (words[index * 2] >= module.types.nodes.len or words[index * 2 + 1] >= self.session.evidence.nodes.items.len) return error.UnresolvedType;
-                try self.solver.unify(try self.importType(scope, words[index * 2], 0), try self.importEvidence(words[index * 2 + 1], 0));
+                try self.unify(try self.importType(scope, words[index * 2], 0), try self.importEvidence(words[index * 2 + 1], 0));
             }
         }
         try self.seedRows(scope, capture.rows);
@@ -5839,12 +6150,12 @@ const ClosureRegion = struct {
         const captured = module.extra[capture_list.start..][0..capture_list.len];
         for (capture.values) |value| {
             if (value.binding == 0 or value.binding >= module.bindings.len or value.evidence >= self.session.evidence.nodes.items.len or std.mem.findScalar(core.BindingId, captured, value.binding) == null) return error.UnresolvedType;
-            try self.solver.unify(try self.importType(scope, module.binding(value.binding).ty, 0), try self.importEvidence(value.evidence, 0));
+            try self.unify(try self.importType(scope, module.binding(value.binding).ty, 0), try self.importEvidence(value.evidence, 0));
         }
         for (capture.captures) |child| {
             if (child.binding == 0 or child.binding >= module.bindings.len or std.mem.findScalar(core.BindingId, captured, child.binding) == null) return error.UnresolvedType;
             const actual = try self.importRetainedCapture(child, depth + 1);
-            try self.solver.unify(try self.importType(scope, module.binding(child.binding).ty, 0), try self.solver.openCovariant(try self.solver.resolve(actual, 0)));
+            try self.unify(try self.importType(scope, module.binding(child.binding).ty, 0), try self.solver.openCovariant(try self.solver.resolve(actual, 0)));
         }
         if (node.tag == .closure or node.tag == .suspend_) {
             const closure_ = module.closures[node.a];
@@ -5853,8 +6164,8 @@ const ClosureRegion = struct {
             } else {
                 const demanded = self.solver.node(try self.solver.resolve(self.scratch.sources.items[scope].root, 0));
                 if (demanded.tag != .demand) return error.TypeMismatch;
-                try self.solver.unify(demanded.a, try self.importType(scope, module.typeOf(closure_.body), 0));
-                if (closure_.function_type != 0) try self.solver.unify(try self.importType(scope, closure_.function_type, 0), try self.solver.functionWithEffects(types.unit, demanded.a, demanded.c));
+                try self.unify(demanded.a, try self.importType(scope, module.typeOf(closure_.body), 0));
+                if (closure_.function_type != 0) try self.unify(try self.importType(scope, closure_.function_type, 0), try self.solver.functionWithEffects(types.unit, demanded.a, demanded.c));
             }
         } else if (node.tag != .reference and node.tag != .constructor_function and node.tag != .primitive_function) return error.UnresolvedType;
         const actual = self.scratch.sources.items[scope].root;
@@ -5876,7 +6187,7 @@ const ClosureRegion = struct {
             if (capture.binding == 0 or capture.binding >= module.bindings.len) return error.UnresolvedType;
             if (std.mem.findScalar(core.BindingId, module.extra[closure.captures.start..][0..closure.captures.len], capture.binding) == null and capture.binding != closure.parameter.binding) return error.UnresolvedType;
             const actual = try self.importRetainedCapture(capture, 0);
-            try self.solver.unify(try self.importType(scope, module.binding(capture.binding).ty, 0), try self.solver.openCovariant(try self.solver.resolve(actual, 0)));
+            try self.unify(try self.importType(scope, module.binding(capture.binding).ty, 0), try self.solver.openCovariant(try self.solver.resolve(actual, 0)));
         }
         if (closure.qualifier != 0) try self.importScheme(scope, module.binding(closure.qualifier).scheme, closure.body);
         try self.collect(scope, closure.body);
@@ -5893,22 +6204,42 @@ const ClosureRegion = struct {
     // richer evidence key. A complete prior region proves all imported source
     // bodies under their exact semantic arrow, including effect rows.
     fn firstOrderData(self: *ClosureRegion, evidence: type_evidence.Id, depth: usize) RegionError!bool {
+        var memo: FirstOrderMemo = .empty;
+        defer memo.deinit(self.scratch_allocator);
+        if (!self.session.has_implementations) return self.firstOrderDataNode(evidence, depth, null);
+        return self.firstOrderDataDepth(evidence, depth, &memo);
+    }
+    const FirstOrderKey = struct { root: type_evidence.Id, depth: usize };
+    const FirstOrderMemo = std.AutoHashMapUnmanaged(FirstOrderKey, bool);
+    fn firstOrderDataDepth(self: *ClosureRegion, evidence: type_evidence.Id, depth: usize, memo: ?*FirstOrderMemo) RegionError!bool {
+        if (memo) |answers| {
+            if (self.session.associated_remaining == 0) return error.TypeLimit;
+            self.session.associated_remaining -= 1;
+            const key: FirstOrderKey = .{ .root = evidence, .depth = depth };
+            if (answers.get(key)) |known| return known;
+            const result = try self.firstOrderDataNode(evidence, depth, memo);
+            try answers.put(self.scratch_allocator, key, result);
+            return result;
+        }
+        return self.firstOrderDataNode(evidence, depth, null);
+    }
+    fn firstOrderDataNode(self: *ClosureRegion, evidence: type_evidence.Id, depth: usize, memo: ?*FirstOrderMemo) RegionError!bool {
         if (depth >= self.session.options.max_type_depth or evidence == 0) return false;
         const value = self.session.evidence.node(evidence);
         switch (value.tag) {
             .unit, .boolean, .u32, .f32, .never => return true,
-            .array, .list, .cursor => return self.firstOrderData(value.a, depth + 1),
+            .array, .list, .cursor => return self.firstOrderDataDepth(value.a, depth + 1, memo),
             .nominal => {
-                for (self.session.evidence.children(evidence)) |argument| if (!try self.firstOrderData(argument, depth + 1)) return false;
+                for (self.session.evidence.children(evidence)) |argument| if (!try self.firstOrderDataDepth(argument, depth + 1, memo)) return false;
                 return self.plainNominal(value.a, value.b, depth + 1);
             },
             .product => for (self.session.evidence.children(evidence)) |child| {
-                if (!try self.firstOrderData(child, depth + 1)) return false;
+                if (!try self.firstOrderDataDepth(child, depth + 1, memo)) return false;
             },
             .record => {
                 const children = self.session.evidence.children(evidence);
                 for (0..children.len / 2) |index| {
-                    if (!try self.firstOrderData(children[index * 2 + 1], depth + 1)) return false;
+                    if (!try self.firstOrderDataDepth(children[index * 2 + 1], depth + 1, memo)) return false;
                 }
             },
             else => return false,
@@ -6094,10 +6425,10 @@ const ClosureRegion = struct {
     }
     fn expectShape(self: *ClosureRegion, root: types.Id, expected: Expected) RegionError!void {
         switch (expected) {
-            .semantic => |actual| if (actual != 0) try self.solver.unify(root, try self.importEvidence(actual, 0)),
+            .semantic => |actual| if (actual != 0) try self.unify(root, try self.importEvidence(actual, 0)),
             .code => |actual| {
                 self.code_expectation_remaining = self.session.options.max_values;
-                try self.solver.unify(root, try self.importCodeExpectation(actual.view, actual.id, 0));
+                try self.unify(root, try self.importCodeExpectation(actual.view, actual.id, 0));
             },
         }
     }
@@ -6170,6 +6501,7 @@ const ClosureRegion = struct {
             .absent => return error.UnresolvedType,
             .unit, .boolean, .u32, .f32, .never => ty,
             .variable => try self.solver.fresh(),
+            .scoped => try self.solver.scoped(try self.importType(scope, node.a, depth + 1), .{ .unit = node.b, .decl = node.c }),
             .function => try self.solver.functionWithEffects(try self.importType(scope, node.a, depth + 1), try self.importType(scope, node.b, depth + 1), try self.importRow(scope, node.c, depth + 1)),
             .array, .list, .cursor => try self.solver.sequence(node.tag, try self.importType(scope, node.a, depth + 1)),
             .demand => try self.solver.demandWithEffects(try self.importType(scope, node.a, depth + 1), try self.importRow(scope, node.c, depth + 1)),
@@ -6204,7 +6536,8 @@ const ClosureRegion = struct {
         if (shared and self.scratch.closed_source_cache.activate(&self.solver, self.session.options.max_type_depth)) {
             try self.scratch.closed_source_cache.answers.put(self.scratch_allocator, closed_key, result);
         } else try self.scratch.imported.put(self.scratch_allocator, key, result);
-        if (node.tag == .variable) try self.scratch.variables.append(self.scratch_allocator, .{ .source = key, .region = result });
+        if (node.tag == .variable or node.tag == .projection) try self.scratch.variables.append(self.scratch_allocator, .{ .source = key, .region = result });
+        if (node.tag == .projection) try self.projection_scopes.put(self.session.allocator, result, scope);
         return result;
     }
     fn importLabel(self: *ClosureRegion, scope: u32, label: types.Effects.Label, depth: usize) RegionError!types.Effects.Label {
@@ -6220,7 +6553,7 @@ const ClosureRegion = struct {
         const arguments = try allocator.alloc(types.Id, original.len);
         defer allocator.free(arguments);
         for (original, arguments) |argument, *imported| imported.* = try self.importType(scope, argument, depth + 1);
-        const result = try self.solver.internOperation(source.operation(label).identity, arguments);
+        const result = try self.solver.internScopedOperation(source.operation(label).identity, source.operation(label).instance, arguments);
         try self.scratch.imported_labels.put(self.scratch_allocator, key, result);
         return result;
     }
@@ -6355,7 +6688,7 @@ const ClosureRegion = struct {
         const arguments = try allocator.alloc(types.Id, original.len);
         defer allocator.free(arguments);
         for (original, arguments) |argument, *imported| imported.* = try self.importEvidence(argument, depth + 1);
-        const result = try self.solver.internOperation(operation.identity, arguments);
+        const result = try self.solver.internScopedOperation(operation.identity, operation.instance, arguments);
         try self.scratch.evidence_labels.put(self.scratch_allocator, label, result);
         return result;
     }
@@ -6376,8 +6709,156 @@ const ClosureRegion = struct {
         try self.scratch.evidence_rows.put(self.scratch_allocator, row, result);
         return result;
     }
+    fn associatedContext(self: *ClosureRegion, scope: u32) u32 {
+        const source = self.scratch.sources.items[scope];
+        if (self.session.privateImplementationMethod(source.owner, source.binding)) return self.session.unitId(source.owner);
+        if (self.current_implementation_context) |context| return context;
+        if (source.implementation_context) |context| return context;
+        if (self.current_origin) |origin| return origin.unit;
+        if (source.origin) |origin| return origin.unit;
+        return self.session.unitId(source.owner);
+    }
+    fn normalizeProjection(self: *ClosureRegion, root: types.Id, depth: usize) RegionError!void {
+        if (!self.solver.has_projections) return;
+        try self.associatedSync();
+        errdefer self.associatedDebit();
+        try self.normalizeProjectionNode(root, depth);
+        try self.associatedSync();
+    }
+    fn associatedDebit(self: *ClosureRegion) void {
+        const spent = self.solver.projection_steps - self.associated_observed;
+        self.session.associated_remaining -= @min(self.session.associated_remaining, spent);
+        self.associated_observed = self.solver.projection_steps;
+    }
+    fn associatedSync(self: *ClosureRegion) RegionError!void {
+        const spent = self.solver.projection_steps - self.associated_observed;
+        if (spent > self.session.associated_remaining) {
+            self.associatedDebit();
+            self.session.implementation_proofs.failure = .associated_limit;
+            return error.TypeLimit;
+        }
+        self.associatedDebit();
+        self.solver.projection_limit = self.solver.projection_steps + self.session.associated_remaining;
+    }
+    fn projectAssociatedOwned(self: *ClosureRegion, root: types.Id) type_evidence.Error!type_evidence.Id {
+        return self.session.evidence.projectAssociatedOwned(&self.solver, root, &self.scratch.projection_cache, &self.session.associated_remaining) catch |err| {
+            if (err == error.EvidenceLimit) self.session.implementation_proofs.failure = .associated_limit;
+            return err;
+        };
+    }
+    fn normalizeProjectionNode(self: *ClosureRegion, root: types.Id, depth: usize) RegionError!void {
+        if (depth >= 256 or self.session.associated_remaining == 0) {
+            self.session.implementation_proofs.failure = .associated_limit;
+            return error.TypeLimit;
+        }
+        self.session.associated_remaining -= 1;
+        const id = self.solver.head(root, 0);
+        const node = self.solver.node(id);
+        if (id <= types.never or node.tag == .variable) return;
+        const key: NormalizationKey = .{ .root = id, .types = self.solver.mutation_epoch, .rows = self.solver.effects.mutation_epoch };
+        if (self.normalization_memo.contains(key)) return;
+        switch (node.tag) {
+            .function, .state_provider => {
+                try self.normalizeProjection(node.a, depth + 1);
+                try self.normalizeProjection(node.b, depth + 1);
+                if (node.tag == .state_provider) try self.normalizeProjection(node.c, depth + 1);
+            },
+            .array, .list, .cursor, .demand, .provider, .resolver => try self.normalizeProjection(node.a, depth + 1),
+            .product, .nominal, .projection => {
+                var children: []const types.Id = undefined;
+                if (node.tag == .product) {
+                    children = self.solver.list(.{ .start = node.a, .len = node.b });
+                } else children = self.solver.nominalArguments(node);
+                const saved = try self.scratch_allocator.dupe(types.Id, children);
+                defer self.scratch_allocator.free(saved);
+                for (saved) |child| try self.normalizeProjection(child, depth + 1);
+                if (node.tag == .projection) {
+                    const scope = self.projection_scopes.get(id) orelse return;
+                    const arguments = try self.scratch_allocator.alloc(type_evidence.Id, saved.len);
+                    defer self.scratch_allocator.free(arguments);
+                    for (saved, arguments) |child, *argument| {
+                        argument.* = self.projectAssociatedOwned(try self.solver.resolve(child, 0)) catch |err| switch (err) {
+                            error.OutOfMemory => return error.OutOfMemory,
+                            error.UnresolvedType => return,
+                            error.EvidenceLimit => return error.TypeLimit,
+                            error.TypeMismatch => return error.TypeMismatch,
+                        };
+                    }
+                    const context = self.associatedContext(scope);
+                    const actual = self.session.implementation_proofs.projection(self.session, context, .{ .unit = node.a, .decl = node.b }, self.solver.projectionMember(node), arguments) catch |err| switch (err) {
+                        error.OutOfMemory => return error.OutOfMemory,
+                        error.UnresolvedType => return,
+                        else => return self.session.implementationFailure(self.scratch.sources.items[scope].owner, self.scratch.sources.items[scope].body),
+                    };
+                    try self.associatedSync();
+                    try self.solver.bindAssociated(id, try self.importEvidence(actual, 0));
+                }
+            },
+            .record => {
+                for (0..node.b) |ordinal| try self.normalizeProjection(self.solver.recordField(node, ordinal).ty, depth + 1);
+            },
+            else => {},
+        }
+        try self.normalization_memo.put(self.session.allocator, .{ .root = id, .types = self.solver.mutation_epoch, .rows = self.solver.effects.mutation_epoch }, {});
+    }
+    fn unify(self: *ClosureRegion, left: types.Id, right: types.Id) RegionError!void {
+        if (!self.solver.has_projections) return self.solver.unify(left, right);
+        return self.unifyAssociatedRoot(left, right, null);
+    }
+    fn unifyAssociatedRoot(self: *ClosureRegion, left: types.Id, right: types.Id, reporter: ?types.Store.MismatchReporter) RegionError!void {
+        try self.associatedSync();
+        errdefer self.associatedDebit();
+        var pairs: std.AutoHashMapUnmanaged(u64, void) = .empty;
+        defer pairs.deinit(self.scratch_allocator);
+        try self.unifyAssociated(left, right, 0, reporter, &pairs);
+        try self.associatedSync();
+    }
+    fn unifyAssociated(self: *ClosureRegion, left: types.Id, right: types.Id, depth: usize, reporter: ?types.Store.MismatchReporter, pairs: *std.AutoHashMapUnmanaged(u64, void)) RegionError!void {
+        const a = self.solver.head(left, 0);
+        const b = self.solver.head(right, 0);
+        if (a == b) return;
+        const key = (@as(u64, a) << 32) | b;
+        if (pairs.contains(key)) return;
+        if (self.session.associated_remaining == 0) return error.TypeLimit;
+        self.session.associated_remaining -= 1;
+        try self.unifyAssociatedPair(left, right, depth, reporter, pairs);
+        try pairs.put(self.scratch_allocator, key, {});
+    }
+    fn unifyAssociatedPair(self: *ClosureRegion, left: types.Id, right: types.Id, depth: usize, reporter: ?types.Store.MismatchReporter, pairs: *std.AutoHashMapUnmanaged(u64, void)) RegionError!void {
+        if (depth >= 256) return error.TypeLimit;
+        const a = self.solver.head(left, 0);
+        const b = self.solver.head(right, 0);
+        const first = self.solver.node(a);
+        const second = self.solver.node(b);
+        if (first.tag == .function and second.tag == .function) {
+            // Inputs determine public binders before an associated result can
+            // be normalized. A result never determines a projection's input.
+            try self.unifyAssociated(first.a, second.a, depth + 1, reporter, pairs);
+            try self.unifyAssociated(first.b, second.b, depth + 1, reporter, pairs);
+            return self.solver.unifyEffects(first.c, second.c);
+        }
+        if (first.tag == second.tag) {
+            switch (first.tag) {
+                .array, .list, .cursor => return self.unifyAssociated(first.a, second.a, depth + 1, reporter, pairs),
+                .product => {
+                    if (first.b != second.b) return error.TypeMismatch;
+                    for (0..first.b) |ordinal| try self.unifyAssociated(self.solver.list(.{ .start = first.a, .len = first.b })[ordinal], self.solver.list(.{ .start = second.a, .len = second.b })[ordinal], depth + 1, reporter, pairs);
+                    return;
+                },
+                else => {},
+            }
+        }
+        try self.normalizeProjection(a, 0);
+        try self.normalizeProjection(b, 0);
+        return self.solver.unifyWithReporter(a, b, reporter);
+    }
     fn project(self: *ClosureRegion, ty: types.Id) RegionError!type_evidence.Id {
+        try self.normalizeProjection(ty, 0);
         const resolved = try self.solver.resolve(ty, 0);
+        if (self.solver.has_projections) return self.projectAssociatedOwned(resolved) catch |err| switch (err) {
+            error.UnresolvedType => 0,
+            else => return err,
+        };
         return self.session.evidence.projectOwned(&self.solver, resolved, &self.scratch.projection_cache) catch |err| switch (err) {
             error.UnresolvedType => 0,
             else => return err,
@@ -6443,10 +6924,10 @@ const ClosureRegion = struct {
         };
         self.scratch.sources.items[scope].root = root;
         self.scratch.sources.items[scope].body = body;
-        for (self.session.type_mappings.items[metadata.mappings.start..][0..metadata.mappings.len]) |mapping| try self.solver.unify(try self.importType(scope, mapping.variable, 0), try self.importEvidence(mapping.evidence, 0));
+        for (self.session.type_mappings.items[metadata.mappings.start..][0..metadata.mappings.len]) |mapping| try self.unify(try self.importType(scope, mapping.variable, 0), try self.importEvidence(mapping.evidence, 0));
         try self.seedRows(scope, self.session.row_mappings.items[metadata.row_mappings.start..][0..metadata.row_mappings.len]);
         const existing = self.session.valueEvidence(value_);
-        if (existing != 0) try self.solver.unify(root, try self.importEvidence(existing, 0));
+        if (existing != 0) try self.unify(root, try self.importEvidence(existing, 0));
         const capture_count = self.session.valueInfo(value_).len;
         self.unkeyed_capture_inputs = self.unkeyed_capture_inputs or capture_count != 0;
         for (0..capture_count) |index| {
@@ -6466,12 +6947,12 @@ const ClosureRegion = struct {
                 const child = try self.addValue(capture, depth + 1);
                 const actual = try self.solver.resolve(self.scratch.sources.items[child].root, 0);
                 // Admit the capture's ambient view while retaining its implementation row.
-                try self.solver.unify(formal, try self.solver.openCovariant(actual));
+                try self.unify(formal, try self.solver.openCovariant(actual));
                 try self.scratch.edges.append(self.scratch_allocator, .{ .parent = scope, .child = child, .slot = @intCast(index), .formal = formal });
             } else {
                 const actual = self.session.valueEvidence(capture);
                 if (actual == 0) return error.UnresolvedType;
-                try self.solver.unify(formal, try self.importEvidence(actual, 0));
+                try self.unify(formal, try self.importEvidence(actual, 0));
             }
         }
         if (metadata.origin == .named) {
@@ -6570,7 +7051,7 @@ const ClosureRegion = struct {
             },
             .array, .list => blk: {
                 const element = if (children.items.len == 0) try self.solver.fresh() else children.items[0];
-                for (children.items) |child| try self.solver.unify(element, child);
+                for (children.items) |child| try self.unify(element, child);
                 break :blk try self.solver.sequence(if (info.kind == .list) .list else .array, element);
             },
             .nominal => blk: {
@@ -6583,7 +7064,7 @@ const ClosureRegion = struct {
                 if (children.items.len != 1) return error.TypeMismatch;
                 const arrow = self.solver.node(scheme);
                 if (arrow.tag != .function) return error.TypeMismatch;
-                try self.solver.unify(try self.importType(scope, constructor.payload, 0), children.items[0]);
+                try self.unify(try self.importType(scope, constructor.payload, 0), children.items[0]);
                 break :blk arrow.b;
             },
             .effect_set, .effect_descriptor, .computation, .request_decision => try self.importEvidence(self.session.valueEvidence(value_), 0),
@@ -6591,12 +7072,30 @@ const ClosureRegion = struct {
         };
         self.scratch.sources.items[scope].root = root;
         const existing = self.session.valueEvidence(value_);
-        if (existing != 0) try self.solver.unify(root, try self.importEvidence(existing, 0));
+        if (existing != 0) try self.unify(root, try self.importEvidence(existing, 0));
         if (try self.project(root) != 0) try self.scratch.value_scopes.put(self.scratch_allocator, value_, scope);
         return scope;
     }
     fn collectCall(self: *ClosureRegion, caller: u32, reference: core.BindingRef, callee_type: types.Id, arguments: []const core.Id) RegionError!void {
+        return self.collectCallAt(caller, reference, callee_type, arguments, 0);
+    }
+    fn collectCallAt(self: *ClosureRegion, caller: u32, reference: core.BindingRef, callee_type: types.Id, arguments: []const core.Id, site: core.Id) RegionError!void {
         const caller_owner = self.scratch.sources.items[caller].owner;
+        const previous_implementation_context = self.current_implementation_context;
+        if (self.session.has_implementations and site != 0) self.current_implementation_context = self.session.implementationUseContext(caller_owner, site);
+        defer self.current_implementation_context = previous_implementation_context;
+        if (self.session.has_implementations and site != 0) {
+            const resolved = try self.session.external(try self.session.target(caller_owner, reference));
+            const module = &self.session.units[resolved.unit];
+            for (module.member_templates) |template| {
+                if (template.binding != resolved.binding) continue;
+                const actual = try self.project(try self.importType(caller, callee_type, 0));
+                if (actual == 0) break;
+                const selected = try self.session.selectTemplate(caller_owner, site, reference, actual);
+                try self.session.prepare(selected);
+                return self.collectCall(caller, selected, callee_type, arguments);
+            }
+        }
         if (!self.building_principal) if (self.current_origin) |origin| {
             const caller_module = &self.session.units[caller_owner];
             for (arguments) |argument| {
@@ -6909,7 +7408,7 @@ const ClosureRegion = struct {
                                 parts.mask[slot] = true;
                             } else parts.has_private = true;
                         },
-                        .absent, .projection => return false,
+                        .absent, .projection, .scoped => return false,
                         .unit, .boolean, .u32, .f32, .never, .type_constructor => {},
                         .array, .list, .cursor, .resolver => try pending.append(self.scratch_allocator, .{ .ty = node.a }),
                         .function, .demand, .provider => {
@@ -7205,6 +7704,7 @@ const ClosureRegion = struct {
     }
     fn bodyEdge(self: *ClosureRegion, caller: u32, callee: u32) RegionError!void {
         self.scratch.sources.items[callee].origin = self.current_origin;
+        self.scratch.sources.items[callee].implementation_context = self.current_implementation_context;
         const before = self.component_work;
         if (try self.scratch.components.add(self.scratch_allocator, caller, callee, self.scratch.sources.items.len, &self.component_work, self.session.options.max_children)) self.work_revision +|= 1;
         _ = self.session.summaryCharge(self.component_work - before);
@@ -7571,7 +8071,7 @@ const ClosureRegion = struct {
             // Every domain, result and operation row belongs to the complete
             // key. Normal operand selection is safe in this independent job;
             // it never guesses a caller's still-open input or ambient row.
-            try self.solver.unify(cursor, try self.importEvidence(key.expected_signature, 0));
+            try self.unify(cursor, try self.importEvidence(key.expected_signature, 0));
             try self.scratch.unresolved_calls.put(self.scratch_allocator, key.target, scope);
             try self.collect(scope, self.scratch.sources.items[scope].body);
             return scope;
@@ -7586,7 +8086,7 @@ const ClosureRegion = struct {
             // Quantified inputs remain fresh in this solver. A destination can
             // prove their types through the selected source constructor, but
             // operand dispatch must never guess an unselected input.
-            try self.solver.unify(cursor, try self.importEvidence(key.expected_result, 0));
+            try self.unify(cursor, try self.importEvidence(key.expected_result, 0));
             try self.scratch.unresolved_calls.put(self.scratch_allocator, key.target, scope);
             try self.collect(scope, self.scratch.sources.items[scope].body);
             return scope;
@@ -7598,7 +8098,7 @@ const ClosureRegion = struct {
         for (inputs) |input| {
             const arrow = self.solver.node(try self.solver.resolve(cursor, 0));
             if (arrow.tag != .function) return error.UnresolvedType;
-            try self.solver.unify(arrow.a, try self.importEvidence(input, 0));
+            try self.unify(arrow.a, try self.importEvidence(input, 0));
             cursor = arrow.b;
         }
         if (key.lexical == 0) try self.scratch.unresolved_calls.put(self.scratch_allocator, key.target, scope);
@@ -7638,10 +8138,10 @@ const ClosureRegion = struct {
         // handle nor a caller solver variable is imported into the private job.
         try self.seed(scope, input.mappings);
         try self.seedRows(scope, input.rows);
-        if (input.existing != 0) try self.solver.unify(self.scratch.sources.items[scope].root, try self.importEvidence(input.existing, 0));
+        if (input.existing != 0) try self.unify(self.scratch.sources.items[scope].root, try self.importEvidence(input.existing, 0));
         for (input.slots, 0..) |capture, index| {
             const formal = if (input.anonymous) module.binding(capture.binding).ty else module.bodyParameters(module.body(input.identity).?)[index].ty;
-            try self.solver.unify(try self.importType(scope, formal, 0), try self.importEvidence(capture.interface, 0));
+            try self.unify(try self.importType(scope, formal, 0), try self.importEvidence(capture.interface, 0));
         }
         if (qualifier != 0) try self.importScheme(scope, module.binding(qualifier).scheme, self.scratch.sources.items[scope].body);
         self.scratch.sources.items[scope].binding = qualifier;
@@ -7655,7 +8155,7 @@ const ClosureRegion = struct {
         for (0..variable_count) |index| {
             const variable = self.scratch.variables.items[index];
             if (variable.source.scope != scope or std.mem.findScalar(types.Id, module.types.list(scheme.variables), variable.source.ty) != null) continue;
-            try self.solver.unify(variable.region, try self.importType(caller, variable.source.ty, 0));
+            try self.unify(variable.region, try self.importType(caller, variable.source.ty, 0));
         }
         var rows: std.ArrayList(RowVariable) = .empty;
         defer rows.deinit(self.session.allocator);
@@ -7732,8 +8232,8 @@ const ClosureRegion = struct {
         const signature = self.solver.node(try self.solver.resolve(envelope, 0));
         if (signature.tag != .function) return error.TypeMismatch;
         const shape = try self.solver.functionWithEffects(try self.importType(scope, closure.parameter.ty, 0), try self.importType(scope, module.typeOf(closure.body), 0), signature.c);
-        try self.solver.unify(actual, envelope);
-        try self.solver.unify(actual, shape);
+        try self.unify(actual, envelope);
+        try self.unify(actual, shape);
         if (self.source_interface) try self.appendFunction(actual);
     }
     fn operationConstraint(self: *ClosureRegion, scope: u32, id: core.Id, operation: core.OperationValue) RegionError!void {
@@ -7746,7 +8246,7 @@ const ClosureRegion = struct {
         if (operation.witness != 0 and !try self.sourceHeadProven(owner, module.typeOf(operation.witness), operation.witness_result)) {
             try self.appendConstraint(.{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(operation.witness), 0), .right = try self.importType(scope, operation.witness_result, 0), .result = 0, .kind = .type_head });
         }
-        try self.appendConstraint(.{ .scope = scope, .node = id, .left = signature, .right = try self.solver.product(arguments.items), .result = 0, .signature = signature, .identity = .{ .unit = if (operation.identity.unit == 0) self.session.unitId(owner) else operation.identity.unit, .decl = operation.identity.decl }, .kind = .effect_operation, .solved = self.building_principal and try self.sourceOperationProven(owner, operation) });
+        try self.appendConstraint(.{ .scope = scope, .node = id, .left = signature, .right = try self.solver.product(arguments.items), .result = 0, .signature = signature, .identity = .{ .unit = if (operation.identity.unit == 0) self.session.unitId(owner) else operation.identity.unit, .decl = operation.identity.decl }, .instance = operation.instance, .kind = .effect_operation, .solved = self.building_principal and try self.sourceOperationProven(owner, operation) });
     }
     fn sourceOperationProven(self: *ClosureRegion, owner: usize, operation: core.OperationValue) RegionError!bool {
         // A source-seeded exact instance already owns its row prefix. This
@@ -7764,7 +8264,7 @@ const ClosureRegion = struct {
             if (!try self.firstOrderData(complete, 0)) return false;
         }
         for (source.rowLabels(signature.c)) |label| {
-            if (std.meta.eql(source.operation(label).identity, operation.identity) and std.mem.eql(types.Id, source.operationArguments(label), arguments)) return true;
+            if (std.meta.eql(source.operation(label).instance, operation.instance) and std.meta.eql(source.operation(label).identity, operation.identity) and std.mem.eql(types.Id, source.operationArguments(label), arguments)) return true;
         }
         return false;
     }
@@ -7806,13 +8306,14 @@ const ClosureRegion = struct {
         var selected: ?types.Effects.Label = null;
         for (0..self.solver.rowLabels(row).len) |index| {
             const label = self.solver.rowLabels(row)[index];
-            if (!std.meta.eql(self.solver.operation(label).identity, constraint.identity)) continue;
+            if (!std.meta.eql(self.solver.operation(label).instance, constraint.instance) or !std.meta.eql(self.solver.operation(label).identity, constraint.identity)) continue;
             if (selected == label) continue;
             const arguments = try self.session.allocator.dupe(types.Id, self.solver.operationArguments(label));
             defer self.session.allocator.free(arguments);
             const candidate = try self.solver.product(arguments);
+            if (!try self.solver.equalClosed(candidate, candidate)) continue;
             const point = self.solver.mark();
-            self.solver.unify(constraint.right, candidate) catch |err| switch (err) {
+            self.unify(constraint.right, candidate) catch |err| switch (err) {
                 error.TypeMismatch, error.InfiniteType, error.EffectMismatch, error.InfiniteEffect => {
                     self.solver.rollback(point);
                     continue;
@@ -7826,7 +8327,7 @@ const ClosureRegion = struct {
         const label = selected orelse return false;
         const arguments = try self.session.allocator.dupe(types.Id, self.solver.operationArguments(label));
         defer self.session.allocator.free(arguments);
-        try self.solver.unify(constraint.right, try self.solver.product(arguments));
+        try self.unify(constraint.right, try self.solver.product(arguments));
         return true;
     }
     fn definitionIndex(self: *ClosureRegion) *std.AutoHashMapUnmanaged(DefinitionKey, core.BindingId) {
@@ -8615,7 +9116,7 @@ const ClosureRegion = struct {
             const original = try self.importType(scope, entry.source, 0);
             const node = graph.types.node(entry.graph);
             if (node.tag == .variable) {
-                if (copy.variables.get(node.a)) |prior| try self.solver.unify(prior, original) else try copy.variables.put(self.scratch_allocator, node.a, original);
+                if (copy.variables.get(node.a)) |prior| try self.unify(prior, original) else try copy.variables.put(self.scratch_allocator, node.a, original);
             }
         }
         for (graph.rows) |entry| {
@@ -8625,7 +9126,7 @@ const ClosureRegion = struct {
                 if (copy.row_variables.get(row.tail.variable)) |prior| try self.solver.unifyEffects(prior, existing) else try copy.row_variables.put(self.scratch_allocator, row.tail.variable, existing);
             }
         }
-        for (graph.imports) |entry| try self.solver.unify(try self.importType(scope, entry.source, 0), try copy.ty(entry.graph, 0));
+        for (graph.imports) |entry| try self.unify(try self.importType(scope, entry.source, 0), try copy.ty(entry.graph, 0));
         for (graph.rows) |entry| try self.solver.unifyEffects(try self.importRowVariable(scope, entry.source), try copy.row(entry.graph, 0));
         self.principal_only_used = true;
         try self.principalDependencies(graph, false);
@@ -8833,7 +9334,7 @@ const ClosureRegion = struct {
             if (binding.kind == .global and definition != null and !definition.?.runtime and cached.state == .complete and self.session.valueInfo(cached.value).kind == .scalar) {
                 // A completed immutable scalar supplies its exact selected type.
                 const actual = self.session.valueEvidence(cached.value);
-                if (actual != 0) try self.solver.unify(try self.importType(scope, n.ty, 0), try self.importEvidence(actual, 0));
+                if (actual != 0) try self.unify(try self.importType(scope, n.ty, 0), try self.importEvidence(actual, 0));
             }
         }
         if (self.include_callables and n.tag == .reference and module.types.node(n.ty).tag == .function) {
@@ -8842,7 +9343,7 @@ const ClosureRegion = struct {
                 const previous = self.defer_members;
                 self.defer_members = true;
                 defer self.defer_members = previous;
-                try self.collectCall(scope, module.reference(id), n.ty, &.{});
+                try self.collectCallAt(scope, module.reference(id), n.ty, &.{}, id);
             }
         }
         const source_signature = module.dispatchSignature(id);
@@ -8850,7 +9351,7 @@ const ClosureRegion = struct {
         if (n.tag == .handle) if (module.handleEffects(id)) |handler| {
             try self.appendConstraint(.{ .scope = scope, .node = id, .left = try self.importType(scope, handler.first, 0), .right = if (handler.second == 0) 0 else try self.importType(scope, handler.second, 0), .result = try self.solver.functionWithEffects(types.unit, types.unit, try self.importRow(scope, handler.residual, 0)), .signature = try self.solver.functionWithEffects(types.unit, types.unit, try self.importRow(scope, handler.extended, 0)), .kind = .effect_handler });
         };
-        if (self.include_callables and n.tag == .call) try self.collectCall(scope, module.call(id).target, module.call(id).callee_type, module.children(id));
+        if (self.include_callables and n.tag == .call) try self.collectCallAt(scope, module.call(id).target, module.call(id).callee_type, module.children(id), id);
         if (self.include_callables and n.tag == .apply) {
             const callee = module.node(n.a);
             const callback = if (self.building_principal) self.callbackOrigin(scope, n.a) else null;
@@ -8863,7 +9364,7 @@ const ClosureRegion = struct {
                 const reference = module.reference(n.a);
                 const target_ = try self.session.external(try self.session.target(self.scratch.sources.items[scope].owner, reference));
                 const binding = self.session.units[target_.unit].binding(target_.binding);
-                if (binding.kind == .global or binding.initializer != 0) try self.collectCall(scope, reference, callee.ty, &.{n.b}) else if (self.retain_selected) {
+                if (binding.kind == .global or binding.initializer != 0) try self.collectCallAt(scope, reference, callee.ty, &.{n.b}, id) else if (self.retain_selected) {
                     self.startup_coverage_complete = false;
                 }
             } else if (callback == null and callee.tag != .closure and self.retain_selected) {
@@ -8877,6 +9378,13 @@ const ClosureRegion = struct {
         if (n.tag == .project) try self.appendConstraint(.{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .projection = n.b, .kind = .field, .deferred_member = self.defer_members });
         if (n.tag == .result_associated) try self.appendConstraint(.{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .member = n.b, .kind = .result_dispatch, .deferred_member = self.defer_members });
         switch (n.tag) {
+            .contract_method => {
+                const template = module.member_templates[n.a];
+                var arguments: std.ArrayList(types.Id) = .empty;
+                defer arguments.deinit(self.scratch_allocator);
+                for (module.types.list(template.arguments)) |root| try arguments.append(self.scratch_allocator, try self.importType(scope, root, 0));
+                try self.appendConstraint(.{ .scope = scope, .node = id, .kind = .implementation_method, .identity = template.contract, .member = template.name, .left = try self.solver.product(arguments.items), .result = try self.importType(scope, n.ty, 0) });
+            },
             .scalar, .associated, .logical, .record_merge, .type_same, .apply, .effect_provider, .handle => try work.appendSlice(self.session.allocator, &.{ n.a, n.b }),
             .if_value, .if_stmt, .state_provider => try work.appendSlice(self.session.allocator, &.{ n.a, n.b, n.c }),
             .array_op => {
@@ -8887,7 +9395,7 @@ const ClosureRegion = struct {
                     // as its element. Replay that relationship when a body
                     // is specialized, just as the source checker does.
                     const collection = try self.solver.fresh();
-                    try self.solver.unify(try self.importType(scope, module.typeOf(args[0]), 0), try self.solver.sequence(.cursor, collection));
+                    try self.unify(try self.importType(scope, module.typeOf(args[0]), 0), try self.solver.sequence(.cursor, collection));
                     try self.appendConstraint(.{
                         .kind = .collection,
                         .scope = scope,
@@ -8944,7 +9452,7 @@ const ClosureRegion = struct {
                 if (metadata.operation == .forward) {
                     const arguments = module.resolverArguments(id);
                     if (arguments.len != 1) return error.TypeMismatch;
-                    try self.solver.unify(try self.importType(scope, module.typeOf(arguments[0]), 0), try self.importType(scope, module.typeOf(id), 0));
+                    try self.unify(try self.importType(scope, module.typeOf(arguments[0]), 0), try self.importType(scope, module.typeOf(id), 0));
                 }
                 if (metadata.operation == .run) {
                     const arguments = module.resolverArguments(id);
@@ -8952,7 +9460,7 @@ const ClosureRegion = struct {
                     const action = try self.importType(scope, module.typeOf(arguments[0]), 0);
                     const signature = self.solver.node(try self.solver.resolve(action, 0));
                     if (signature.tag != .function) return error.TypeMismatch;
-                    try self.solver.unify(action, try self.solver.functionWithEffects(types.unit, try self.importType(scope, module.typeOf(id), 0), signature.c));
+                    try self.unify(action, try self.solver.functionWithEffects(types.unit, try self.importType(scope, module.typeOf(id), 0), signature.c));
                 }
                 if (self.include_callables and (metadata.operation == .run or metadata.operation == .bind or metadata.operation == .iterate)) for (module.resolverArguments(id)) |argument| {
                     const callback = module.node(argument);
@@ -8968,10 +9476,10 @@ const ClosureRegion = struct {
                     for (module.resolverArguments(id)) |argument| {
                         const arrow = self.solver.node(try self.solver.resolve(suffix, 0));
                         if (arrow.tag != .function) return error.TypeMismatch;
-                        try self.solver.unify(arrow.a, try self.importType(scope, module.typeOf(argument), 0));
+                        try self.unify(arrow.a, try self.importType(scope, module.typeOf(argument), 0));
                         suffix = arrow.b;
                     }
-                    try self.solver.unify(suffix, try self.importType(scope, module.typeOf(id), 0));
+                    try self.unify(suffix, try self.importType(scope, module.typeOf(id), 0));
                     try self.appendConstraint(.{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(metadata.resolver), 0), .right = signature, .result = try self.importType(scope, module.typeOf(id), 0), .kind = .resolver });
                 }
                 if (metadata.operation != .monad) try self.appendConstraint(.{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(metadata.resolver), 0), .result = try self.importType(scope, module.typeOf(id), 0), .kind = .resolver_shape });
@@ -8990,7 +9498,7 @@ const ClosureRegion = struct {
                         break :selector core.UpdateStep{ .kind = .field, .projection = projection_index, .source_type = projection.source_type, .result_type = projection.result_type };
                     };
                     if (selector.kind == .index) {
-                        try self.solver.unify(assigned, try self.importType(scope, selector.result_type, 0));
+                        try self.unify(assigned, try self.importType(scope, selector.result_type, 0));
                         assigned = try self.importType(scope, selector.source_type, 0);
                     } else {
                         const result = if (reverse == 0) try self.importType(scope, n.ty, 0) else try self.solver.fresh();
@@ -9034,7 +9542,7 @@ const ClosureRegion = struct {
                 if (kind == .count or kind == .has or kind == .same) try work.append(self.session.allocator, n.b);
                 if (n.c != 0) try work.append(self.session.allocator, n.c);
             },
-            .computation => try work.append(self.session.allocator, n.a),
+            .computation, .effect_scope => try work.append(self.session.allocator, n.a),
             .request_decision => try work.appendSlice(self.session.allocator, &.{ n.b, n.c }),
             .request_loop => {
                 const metadata = module.requestLoopInfo(id);
@@ -9049,8 +9557,8 @@ const ClosureRegion = struct {
                     const actual = try self.importType(scope, n.ty, 0);
                     const demanded = self.solver.node(try self.solver.resolve(actual, 0));
                     if (demanded.tag != .demand) return error.TypeMismatch;
-                    try self.solver.unify(demanded.a, try self.importType(scope, module.typeOf(closure.body), 0));
-                    if (closure.function_type != 0) try self.solver.unify(try self.importType(scope, closure.function_type, 0), try self.solver.functionWithEffects(types.unit, demanded.a, demanded.c));
+                    try self.unify(demanded.a, try self.importType(scope, module.typeOf(closure.body), 0));
+                    if (closure.function_type != 0) try self.unify(try self.importType(scope, closure.function_type, 0), try self.solver.functionWithEffects(types.unit, demanded.a, demanded.c));
                     if (closure.qualifier != 0 and closure.qualifier != self.scratch.sources.items[scope].binding) try self.importScheme(scope, module.binding(closure.qualifier).scheme, closure.body);
                     try self.collectWithExit(scope, closure.body, .{ .demand = .{ .scope = scope, .node = id, .body = closure.body, .root = actual } });
                 }
@@ -9081,7 +9589,7 @@ const ClosureRegion = struct {
         if (depth >= self.session.options.max_type_depth) return error.TypeLimit;
         const actual = try self.solver.resolve(principal, 0);
         if (try self.closedDataShape(actual, depth)) {
-            try self.solver.unify(instance, actual);
+            try self.unify(instance, actual);
             return true;
         }
         const source = self.solver.node(actual);
@@ -9294,11 +9802,11 @@ const ClosureRegion = struct {
                 if (stage.tag != .function) return error.TypeMismatch;
                 signature = stage.b;
             }
-            try self.solver.unify(signature, constraint.left);
+            try self.unify(signature, constraint.left);
             const arrow = self.solver.node(try self.solver.resolve(constraint.left, 0));
             if (arrow.tag != .function) return error.TypeMismatch;
-            try self.solver.unify(arrow.a, constraint.right);
-            try self.solver.unify(arrow.b, constraint.result);
+            try self.unify(arrow.a, constraint.right);
+            try self.unify(arrow.b, constraint.result);
             if (self.building_principal) {
                 self.scratch.constraints.items[index].callback_interface = true;
                 return .open;
@@ -9315,7 +9823,7 @@ const ClosureRegion = struct {
         if (constraint.kind == .call_summary) return self.solveSummary(index);
         if (constraint.kind == .record_merge) {
             if (try self.solver.mergeRecords(constraint.left, constraint.right)) |merged| {
-                try self.solver.unify(merged, constraint.result);
+                try self.unify(merged, constraint.result);
                 self.scratch.constraints.items[index].solved = true;
                 return .solved;
             }
@@ -9325,11 +9833,15 @@ const ClosureRegion = struct {
             const owner_type = self.solver.node(try self.solver.resolve(constraint.left, 0));
             if (owner_type.tag == .variable) return .open;
             if (owner_type.tag != .array and owner_type.tag != .list) return error.TypeMismatch;
-            try self.solver.unify(owner_type.a, constraint.result);
+            try self.unify(owner_type.a, constraint.result);
             self.scratch.constraints.items[index].solved = true;
             return .solved;
         }
         if (constraint.kind == .type_eq) {
+            if (self.session.has_implementations) {
+                try self.normalizeProjection(constraint.left, 0);
+                try self.normalizeProjection(constraint.result, 0);
+            }
             if (try self.solver.equalSymbolic(constraint.left, constraint.result)) {
                 self.scratch.constraints.items[index].solved = true;
                 return .solved;
@@ -9337,14 +9849,43 @@ const ClosureRegion = struct {
             // Ordinary binders may be determined by equality. Residual
             // projections cannot determine their inputs or a concrete layout.
             if (try self.solver.containsProjection(constraint.left) or try self.solver.containsProjection(constraint.result)) return .open;
-            try self.solver.unify(constraint.left, constraint.result);
+            try self.unify(constraint.left, constraint.result);
             if (try self.project(constraint.left) == 0 or try self.project(constraint.result) == 0) return .open;
             self.scratch.constraints.items[index].solved = true;
             return .solved;
         }
         if (constraint.kind == .contract) {
-            if (try self.project(constraint.left) == 0) return .open;
-            return self.failConstraint(constraint, .missing_implementation);
+            const root = try self.project(constraint.left);
+            if (root == 0) return .open;
+            const context = self.associatedContext(constraint.scope);
+            _ = self.session.implementation_proofs.resolve(self.session, context, constraint.identity, self.session.evidence.children(root)) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                error.UnresolvedType => return .open,
+                else => return self.session.implementationFailure(self.scratch.sources.items[constraint.scope].owner, constraint.node),
+            };
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        if (constraint.kind == .implementation_method) {
+            const root = try self.project(constraint.left);
+            if (root == 0) return .open;
+            const owner = self.scratch.sources.items[constraint.scope].owner;
+            const context = self.associatedContext(constraint.scope);
+            const proof = self.session.implementation_proofs.resolve(self.session, context, constraint.identity, self.session.evidence.children(root)) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                error.UnresolvedType => return .open,
+                else => return self.session.implementationFailure(owner, constraint.node),
+            };
+            const selected = self.session.implementation_proofs.proofs.items[proof];
+            for (self.session.implementation_proofs.members.items[selected.members.start..][0..selected.members.len]) |member| {
+                if (member.name != constraint.member) continue;
+                const module = &self.session.units[owner];
+                const template = module.member_templates[module.node(constraint.node).a];
+                try self.collectCall(constraint.scope, member.target, module.binding(template.binding).ty, module.children(constraint.node));
+                self.scratch.constraints.items[index].solved = true;
+                return .solved;
+            }
+            return self.session.failNode(owner, constraint.node, .missing_implementation);
         }
         if (constraint.kind == .type_rep or constraint.kind == .effect_rep) {
             const represented = if (constraint.kind == .type_rep) constraint.left else constraint.signature;
@@ -9374,7 +9915,13 @@ const ClosureRegion = struct {
             var closed = true;
             for ([_]types.Id{ constraint.left, constraint.right }) |token_type| {
                 if (token_type == 0) continue;
-                const token = try self.solver.resolve(token_type, 0);
+                var token = try self.solver.resolve(token_type, 0);
+                const scoped = self.solver.node(token);
+                var instance: types.NominalIdentity = .{ .unit = 0, .decl = 0 };
+                if (scoped.tag == .scoped) {
+                    instance = .{ .unit = scoped.b, .decl = scoped.c };
+                    token = try self.solver.resolve(scoped.a, 0);
+                }
                 if (!try self.solver.equalClosed(token, token)) {
                     closed = false;
                     break;
@@ -9383,7 +9930,7 @@ const ClosureRegion = struct {
                 if (nominal.tag != .nominal) return error.TypeMismatch;
                 const arguments = try self.session.allocator.dupe(types.Id, self.solver.nominalArguments(nominal));
                 defer self.session.allocator.free(arguments);
-                try labels.append(self.session.allocator, try self.solver.internOperation(.{ .unit = nominal.a, .decl = nominal.b }, arguments));
+                try labels.append(self.session.allocator, try self.solver.internScopedOperation(.{ .unit = nominal.a, .decl = nominal.b }, instance, arguments));
             }
             if (!closed) return .open;
             const remainder = self.solver.node(try self.solver.resolve(constraint.result, 0));
@@ -9421,7 +9968,7 @@ const ClosureRegion = struct {
                 depth += 1;
             }
             if (self.solver.node(try self.solver.resolve(head, 0)).tag == .variable) return .open;
-            try self.solver.unify(head, constraint.right);
+            try self.unify(head, constraint.right);
             self.scratch.constraints.items[index].solved = true;
             return .solved;
         }
@@ -9435,12 +9982,12 @@ const ClosureRegion = struct {
             if (signature.tag == .variable) return .open;
             if (signature.tag != .function) return error.TypeMismatch;
             const arguments = self.solver.list(.{ .start = self.solver.node(argument_pack).a, .len = self.solver.node(argument_pack).b });
-            const label = try self.solver.internOperation(constraint.identity, arguments);
+            const label = try self.solver.internScopedOperation(constraint.identity, constraint.instance, arguments);
             const residual = if (constraint.explicit) 0 else try self.solver.freshEffects();
             const row = self.solver.effects.row(&.{label}, self.solver.row(residual).tail) catch |err| return types.effectError(err);
             const selected = try self.solver.functionWithEffects(signature.a, signature.b, row);
-            try self.solver.unify(constraint.left, selected);
-            if (constraint.signature != 0) try self.solver.unify(constraint.signature, selected);
+            try self.unify(constraint.left, selected);
+            if (constraint.signature != 0) try self.unify(constraint.signature, selected);
             self.scratch.constraints.items[index].solved = true;
             return .solved;
         }
@@ -9461,7 +10008,7 @@ const ClosureRegion = struct {
             const target_ = try self.session.resolverTarget(source.owner, constraint.node, metadata, (@as(u64, token.a) << 32) | token.b);
             const body = self.session.units[target_.unit].body(target_.binding) orelse return error.UnresolvedType;
             const scope = try self.typeScope(target_.unit);
-            try self.solver.unify(constraint.right, try self.importType(scope, body.scheme.root, 0));
+            try self.unify(constraint.right, try self.importType(scope, body.scheme.root, 0));
             try self.collect(scope, body.root);
             try self.selectedTarget(target_);
             self.scratch.constraints.items[index].solved = true;
@@ -9485,7 +10032,7 @@ const ClosureRegion = struct {
                 var arguments: std.ArrayList(types.Id) = .empty;
                 defer arguments.deinit(self.session.allocator);
                 for (0..nominal.parameters.len) |_| try arguments.append(self.session.allocator, try self.solver.fresh());
-                try self.solver.unify(constraint.result, try self.solver.nominal(.{ .unit = token.a, .decl = token.b }, arguments.items));
+                try self.unify(constraint.result, try self.solver.nominal(.{ .unit = token.a, .decl = token.b }, arguments.items));
             } else if (result.tag != .nominal or result.a != token.a or result.b != token.b) return error.TypeMismatch;
             self.scratch.constraints.items[index].solved = true;
             return .solved;
@@ -9573,14 +10120,14 @@ const ClosureRegion = struct {
         const second = self.solver.node(first.b);
         if (second.tag != .function) return false;
         const point = self.solver.mark();
-        self.solver.unify(first.a, constraint.left) catch |err| switch (err) {
+        self.unify(first.a, constraint.left) catch |err| switch (err) {
             error.TypeMismatch, error.InfiniteType, error.EffectMismatch, error.InfiniteEffect => {
                 self.solver.rollback(point);
                 return false;
             },
             else => return err,
         };
-        self.solver.unify(second.a, constraint.right) catch |err| switch (err) {
+        self.unify(second.a, constraint.right) catch |err| switch (err) {
             error.TypeMismatch, error.InfiniteType, error.EffectMismatch, error.InfiniteEffect => {
                 self.solver.rollback(point);
                 return false;
@@ -9589,7 +10136,7 @@ const ClosureRegion = struct {
         };
         // Operand admission selects the method before its result is checked.
         // A result mismatch never licenses trying the other receiver.
-        try self.solver.unify(constraint.result, second.b);
+        try self.unify(constraint.result, second.b);
         if (constraint.row_carrier) try self.addInvocation(constraint, signature, true) else _ = try self.admitSignature(constraint.signature, signature);
         try self.collectSelected(constraint.scope, scope, target_);
         return true;
@@ -9603,7 +10150,7 @@ const ClosureRegion = struct {
         const b = self.solver.node(try self.solver.resolve(constraint.right, 0));
         if (constraint.member == 0 and constraint.op != .none and a.tag == b.tag and (a.tag == .u32 or a.tag == .f32 or (a.tag == .boolean and (constraint.op == .equal or constraint.op == .not_equal)))) {
             const comparison = constraint.op == .equal or constraint.op == .not_equal or constraint.op == .less or constraint.op == .less_equal or constraint.op == .greater or constraint.op == .greater_equal;
-            try self.solver.unify(constraint.result, if (comparison) types.boolean else constraint.left);
+            try self.unify(constraint.result, if (comparison) types.boolean else constraint.left);
             if (constraint.row_carrier) try self.pureInvocation(constraint);
             return true;
         }
@@ -9629,8 +10176,8 @@ const ClosureRegion = struct {
         const signature = self.scratch.sources.items[scope].root;
         const arrow = self.solver.node(signature);
         if (arrow.tag != .function) return error.TypeMismatch;
-        try self.solver.unify(constraint.left, arrow.a);
-        try self.solver.unify(constraint.result, arrow.b);
+        try self.unify(constraint.left, arrow.a);
+        try self.unify(constraint.result, arrow.b);
         _ = try self.admitSignature(constraint.signature, signature);
         try self.collectSelected(constraint.scope, scope, target_);
         return true;
@@ -9653,7 +10200,7 @@ const ClosureRegion = struct {
         if (actual != 0) {
             const key: CallKey = .{ .owner = target_.unit, .binding = target_.binding, .evidence = actual };
             if (self.scratch.call_instances.get(key)) |prior| {
-                try self.solver.unify(root, self.scratch.sources.items[prior].root);
+                try self.unify(root, self.scratch.sources.items[prior].root);
                 return;
             }
             try self.scratch.call_instances.put(self.scratch_allocator, key, scope);
@@ -9707,7 +10254,9 @@ const ClosureRegion = struct {
         // ambient capability. Its source type and callback input rows retain
         // their exact requirements in the same imported scope.
         const admitted = try self.solver.openCovariant(try self.solver.resolve(actual, 0));
-        try self.solver.unifyWithReporter(expected, admitted, reporter);
+        if (self.solver.has_projections) {
+            try self.unifyAssociatedRoot(expected, admitted, reporter);
+        } else try self.solver.unifyWithReporter(expected, admitted, reporter);
         return admitted;
     }
     fn typeScope(self: *ClosureRegion, owner: usize) RegionError!u32 {
@@ -9733,8 +10282,8 @@ const ClosureRegion = struct {
         const root = self.scratch.sources.items[scope].root;
         const arrow = self.solver.node(root);
         if (arrow.tag != .function) return error.TypeMismatch;
-        try self.solver.unify(arrow.a, self.scratch.sources.items[actual].root);
-        if (expected != 0) try self.solver.unify(try self.solver.openCovariant(arrow.b), try self.importEvidence(expected, 0));
+        try self.unify(arrow.a, self.scratch.sources.items[actual].root);
+        if (expected != 0) try self.unify(try self.solver.openCovariant(arrow.b), try self.importEvidence(expected, 0));
         try self.collect(scope, self.scratch.sources.items[scope].body);
         self.solve() catch |err| {
             if (err == error.UnresolvedType) {
@@ -9817,7 +10366,7 @@ const ClosureRegion = struct {
                 const scope = try self.typeScope(nominal_owner);
                 const arrow = self.solver.node(try self.importType(scope, constructor.scheme.root, 0));
                 if (arrow.tag != .function) return error.TypeMismatch;
-                try self.solver.unify(arrow.b, receiver);
+                try self.unify(arrow.b, receiver);
                 const payload = self.solver.node(try self.solver.resolve(try self.importType(scope, constructor.payload, 0), 0));
                 if (payload.tag != .record) {
                     field = null;
@@ -9835,7 +10384,7 @@ const ClosureRegion = struct {
                     field = null;
                     break;
                 }
-                if (field) |prior| try self.solver.unify(prior, found.?) else field = found;
+                if (field) |prior| try self.unify(prior, found.?) else field = found;
             }
             if (constructors == 0 and !hidden) return error.UnresolvedType;
         }
@@ -9865,7 +10414,7 @@ const ClosureRegion = struct {
         const signature = self.scratch.sources.items[scope].root;
         const arrow = self.solver.node(signature);
         if (arrow.tag != .function) return error.TypeMismatch;
-        try self.solver.unify(arrow.a, receiver);
+        try self.unify(arrow.a, receiver);
         var mismatch: MemberMismatch = .{ .region = self, .constraint = constraint };
         const reporter: types.Store.MismatchReporter = .{ .context = &mismatch, .report = MemberMismatch.report };
         const admitted = if (constraint.row_carrier) row: {
@@ -9978,8 +10527,8 @@ const ClosureRegion = struct {
             if (field.name != prior.name) return error.TypeMismatch;
             if (field.name == member) {
                 found = true;
-                if (existing != null) try self.solver.unify(field.ty, assigned);
-            } else if (existing != null) try self.solver.unify(field.ty, prior.ty);
+                if (existing != null) try self.unify(field.ty, assigned);
+            } else if (existing != null) try self.unify(field.ty, prior.ty);
             try fields.append(self.session.allocator, .{ .name = field.name, .ty = if (field.name == member) assigned else field.ty });
         }
         return if (found) try self.solver.record(fields.items) else null;
@@ -9989,7 +10538,7 @@ const ClosureRegion = struct {
         if (owner.tag == .variable) return false;
         if (owner.tag == .record) {
             const updated = try self.updatedRecord(constraint.left, constraint.right, constraint.member, null) orelse return self.failConstraint(constraint, .missing_field);
-            try self.solver.unify(constraint.result, updated);
+            try self.unify(constraint.result, updated);
         } else if (owner.tag == .nominal) {
             const source = self.scratch.sources.items[constraint.scope];
             const module = &self.session.units[source.owner];
@@ -10004,9 +10553,9 @@ const ClosureRegion = struct {
                 const input = self.solver.node(try self.importType(input_scope, constructor.scheme.root, 0));
                 const output = self.solver.node(try self.importType(output_scope, constructor.scheme.root, 0));
                 if (input.tag != .function or output.tag != .function) return error.TypeMismatch;
-                try self.solver.unify(input.b, constraint.left);
+                try self.unify(input.b, constraint.left);
                 _ = try self.updatedRecord(try self.importType(output_scope, constructor.payload, 0), constraint.right, constraint.member, try self.importType(input_scope, constructor.payload, 0)) orelse return self.failConstraint(constraint, .missing_field);
-                try self.solver.unify(output.b, constraint.result);
+                try self.unify(output.b, constraint.result);
             }
             if (constructors == 0) return error.UnresolvedType;
         } else return self.failConstraint(constraint, .missing_field);
@@ -10183,7 +10732,7 @@ const ClosureRegion = struct {
         self.include_callables = true;
         const scope = try self.addValue(value_, 0);
         const actual = try self.solver.resolve(self.scratch.sources.items[scope].root, 0);
-        try self.solver.unify(try self.solver.openCovariant(actual), try self.importEvidence(expected, 0));
+        try self.unify(try self.solver.openCovariant(actual), try self.importEvidence(expected, 0));
         try self.solve();
         try self.closeRetainedRows();
         const selected = try self.session.typedView(self.scratch.sources.items[scope].owner, self.scratch.sources.items[scope].body, try self.freeze(scope), expected);
@@ -10286,13 +10835,14 @@ fn lexicalSnapshotScenario(backing: Allocator, eligible: usize) !void {
     for (source_rows, 0..) |row, index| {
         const variable = source.effects.node(row).tail.variable;
         const actual = try region.importRowVariable(caller, variable);
-        const label: types.Effects.Label = @intCast(index + 1);
+        const label = try region.solver.internOperation(.{ .unit = 2, .decl = @intCast(index + 1) }, &.{});
         try region.solver.unifyEffects(actual, try region.solver.effects.row(&.{label}, .closed));
         const retained = try region.importRowVariable(callee, variable);
         if (index == 0) {
             try std.testing.expectEqualSlices(types.Effects.Label, &.{label}, region.solver.rowLabels(try region.solver.resolveEffects(retained, 0)));
         } else {
-            try region.solver.unifyEffects(retained, try region.solver.effects.row(&.{label + 10}, .closed));
+            const other = try region.solver.internOperation(.{ .unit = 2, .decl = @intCast(index + 11) }, &.{});
+            try region.solver.unifyEffects(retained, try region.solver.effects.row(&.{other}, .closed));
             try std.testing.expectEqualSlices(types.Effects.Label, &.{label}, region.solver.rowLabels(try region.solver.resolveEffects(actual, 0)));
         }
     }
@@ -10915,6 +11465,7 @@ fn constantReceiptTapeScenario(allocator: Allocator, module: *const core.Module)
     var steps: usize = 0;
     var reads: usize = 0;
     for (recorded.constant_records.items) |record| for (record.events) |event| switch (event) {
+        .member => return error.TestUnexpectedResult,
         .work => |work| steps += work.steps,
         .read => |read| {
             reads += 1;

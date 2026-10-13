@@ -38,7 +38,7 @@ async function verified(directory: string): Promise<string> {
   const bytes = await Deno.readFile(bundle);
   ok(bytes.length >= 212);
   equal(new TextDecoder().decode(bytes.subarray(0, 8)), "BLOTDEP1");
-  equal(new DataView(bytes.buffer).getUint32(8, true), 3);
+  equal(new DataView(bytes.buffer).getUint32(8, true), 4);
   const identity = Array.from(
     bytes.subarray(44, 76),
     (byte) => byte.toString(16).padStart(2, "0"),
@@ -362,11 +362,14 @@ Deno.test("chunk runtime and static chains survive dependency bundles and retain
   const item = await fixture("blot-zig-project-collections-");
   const { directory } = item, entry = directory + "/main.blot";
   let compiler: ZigProjectCompiler | undefined;
-  const source = (offset: number) => `import * as lists from "./lists"
+  const source = (offset: number) =>
+    `import * as lists from "./lists"
 entry const answer = fn () => @u32.add (lists.read 40) ${offset}
 `;
   try {
-    await Deno.writeTextFile(directory + "/lists.blot", `
+    await Deno.writeTextFile(
+      directory + "/lists.blot",
+      `
 const frozen = @list.generate 513 (fn index => index)
 const first = fn values => (@array.from_list values)[0]
 const read = fn (seed: U32) => do:
@@ -374,15 +377,28 @@ const read = fn (seed: U32) => do:
   values[1] := (@array.from_list frozen)[512]
   let array = @array.from_list [value | value <- values, @u32.lt 0 value]
   return first (@list.from_array array)
-`);
+`,
+    );
     await Deno.writeTextFile(entry, source(2));
     const identity = await verified(directory);
     const bundle = directory + "/collections.blotdep";
-    await command(directory, "collection-bundle", ["dependencies", entry, bundle, "--prelude", "none"]);
+    await command(directory, "collection-bundle", [
+      "dependencies",
+      entry,
+      bundle,
+      "--prelude",
+      "none",
+    ]);
     for (const dependencies of [undefined, bundle]) {
       const label = dependencies ? "cached" : "source";
       await Deno.writeTextFile(entry, source(2));
-      compiler = await createZigProjectCompiler({ executable, entry, prelude: null, dependencies, expectedCompilerIdentity: identity });
+      compiler = await createZigProjectCompiler({
+        executable,
+        entry,
+        prelude: null,
+        dependencies,
+        expectedCompilerIdentity: identity,
+      });
       for (const offset of [2, 3, 2]) {
         await Deno.writeTextFile(entry, source(offset));
         const result = await compiler.build();
@@ -396,6 +412,10 @@ const read = fn (seed: U32) => do:
       await compiler.close();
     }
   } finally {
-    try { await compiler?.dispose(); } finally { await item.cleanup(); }
+    try {
+      await compiler?.dispose();
+    } finally {
+      await item.cleanup();
+    }
   }
 });

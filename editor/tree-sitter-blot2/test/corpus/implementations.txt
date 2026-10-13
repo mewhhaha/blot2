@@ -1,0 +1,66 @@
+==================
+Implementation headers explicit product and curried binders remain contextual
+==================
+
+impl ArraySource a : Source (Array a) where { Source a } = { type Item = a, const first = fn values => @array.get values 0 }
+private impl Pair (a,b) => type c : Map a b c = { type Item = c }
+const impl = fn impl => impl
+
+---
+
+(source_file
+  (implementation_header
+    (type_identifier)
+    (type_parameter)
+    (separator))
+  (type_identifier)
+  (parenthesized
+    (type_identifier)
+    (identifier))
+  (where_clause
+    (braced
+      (type_identifier)
+      (identifier)))
+  (operator)
+  (braced
+    (type_header
+      (type_identifier))
+    (operator)
+    (identifier)
+    (separator)
+    (function_binding
+      (binding_keyword)
+      (identifier)
+      (operator)
+      (lambda_header
+        (identifier)))
+    (operator)
+    (intrinsic)
+    (identifier)
+    (integer))
+  (implementation_header
+    (private_modifier)
+    (type_identifier)
+    (type_parameter_tuple
+      (type_parameter)
+      (type_parameter))
+    (type_parameter)
+    (separator))
+  (type_identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (operator)
+  (braced
+    (type_header
+      (type_identifier))
+    (operator)
+    (identifier))
+  (function_binding
+    (binding_keyword)
+    (identifier)
+    (operator)
+    (lambda_header
+      (identifier)))
+  (operator)
+  (identifier))

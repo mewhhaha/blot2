@@ -29,7 +29,7 @@ pub const Snapshot = struct {
     evidence: types.Snapshot,
 };
 pub fn wireKey(compiler: format.Digest) format.Key {
-    return .{ .compiler = compiler, .settings = format.digest("blot-principal-archive-v4:associated-types"), .source = @splat(0), .dependencies = @splat(0) };
+    return .{ .compiler = compiler, .settings = format.digest("blot-principal-archive-v5:selected-implementations"), .source = @splat(0), .dependencies = @splat(0) };
 }
 /// Only records with complete dynamic observations are portable. Exact-source
 /// proofs without them, selected judgments and local templates stay behind.
@@ -431,6 +431,7 @@ const Import = struct {
         for (labels) |label| {
             if (label == 0 or label >= source.operations.len) return error.InvalidEvidence;
             const operation = source.operations[label];
+            if (operation.instance.unit != 0 or operation.instance.decl != 0) return error.InvalidEvidence;
             const original = try span(source.arguments, operation.arguments.start, operation.arguments.len);
             if (operation.identity.unit == 0) {
                 if (operation.identity.decl != 1 or original.len != 0) return error.InvalidEvidence;

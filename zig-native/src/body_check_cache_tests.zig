@@ -844,12 +844,85 @@ test "body check cache relocates concrete record and nominal projections by spel
     try compare(a, &before.bodies, changed, altered_result.bytes, 2);
 }
 
-test "body check cache declines dotted access paths instead of erasing projections" {
+test "body check cache relocates dotted access paths without erasing projections" {
     const source = "const seed = 2\nconst helper = fn (value: { head: U32, tail: F32 }) -> U32 => @u32.add value.head seed\nentry const run = fn (value: U32) -> U32 => helper { head: value, tail: 1.0 }\n";
     var before = try prepare(a, source, null);
     defer before.deinit(a);
-    try std.testing.expect(before.bodies.find("helper") == null);
+    try std.testing.expect(before.bodies.find("helper") != null);
     const changed = try std.mem.replaceOwned(u8, a, source, "const seed = 2", "const seed = 3");
+    defer a.free(changed);
+    var fresh = try prepare(a, changed, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, changed, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 1) });
+}
+
+test "body check cache owns chained dotted nominal paths and owning payloads" {
+    const source =
+        \\type Packet is data = #Packet { head: U32, nested: { tail: Array U32, marker: F32 } } | #Alternate { nested: { marker: F32, tail: Array U32 }, head: U32 }
+        \\const read = fn (value: Packet) => value.nested.tail
+        \\const get = fn (value: { head: U32, nested: { tail: Array U32, marker: F32 } }) => value.nested.tail
+        \\const make = fn value => #Packet { head: value, nested: { tail: #[value, @u32.add value 1], marker: 1.0 } }
+        \\entry const run = fn (value: U32) => read (make value)
+        \\entry const plain = fn (value: U32) => get { head: value, nested: { tail: #[value], marker: 1.0 } }
+    ;
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expectEqual(@as(usize, 2), before.bodies.find("read").?.accesses.len);
+    try std.testing.expectEqual(@as(usize, 2), before.bodies.find("get").?.accesses.len);
+    const inserted = try a.print("const earlier_spelling = {{ marker: 3.0, tail: 2, nested: 1, head: 4 }}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
+    const empty: cache.Cache = .{};
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
+    const changed = try std.mem.replaceOwned(u8, a, inserted, "=> #Packet", "=> #Alternate");
+    defer a.free(changed);
+    var altered = try prepare(a, changed, null);
+    defer altered.deinit(a);
+    var altered_result = try compile(a, &altered);
+    defer altered_result.deinit(a);
+    try compare(a, &before.bodies, changed, altered_result.bytes, 2);
+}
+
+test "body check cache leaves dotted method paths ordinary" {
+    const source =
+        \\type Number is data = #Number U32
+        \\const Number.next = fn (#Number value) => @u32.add value 1
+        \\const read = fn (value: Number) => value.next
+        \\entry const run = fn (value: U32) => read (#Number value)
+    ;
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("read") == null);
+    const changed = try std.mem.replaceOwned(u8, a, source, "@u32.add value 1", "@u32.add value 2");
+    defer a.free(changed);
+    try parity(source, changed, 2);
+}
+
+test "body check cache owns inferred local associated requirements" {
+    const source =
+        \\const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right
+        \\const F32.add = fn (left: F32) => fn (right: F32) => @f32.add left right
+        \\const Array.add = fn (left: Array U32) => fn (right: Array U32) => @array.concat left right
+        \\const twice = fn value => do:
+        \\  let local = fn amount => @type.call "add" amount amount
+        \\  return local value
+        \\entry const unsigned = fn (value: U32) => twice value
+        \\entry const floating = fn (value: F32) => twice value
+        \\entry const packed = fn (value: U32) => twice #[value, @u32.add value 1]
+    ;
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("twice") != null);
+    try std.testing.expect(before.bodies.find("twice").?.local_schemes[0].principal.obligations.len != 0);
+    const changed = try a.print("const earlier_spelling = {{ tail: 3.0, head: 2 }}\n{s}", .{source});
     defer a.free(changed);
     var fresh = try prepare(a, changed, null);
     defer fresh.deinit(a);
@@ -857,4 +930,82 @@ test "body check cache declines dotted access paths instead of erasing projectio
     defer expected.deinit(a);
     try compare(a, &before.bodies, changed, expected.bytes, 2);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 2) });
+    const empty: cache.Cache = .{};
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, changed, expected.bytes, fresh.elaborations });
+    const edited = try std.mem.replaceOwned(u8, a, source, "@u32.add left right", "@u32.sub left right");
+    defer a.free(edited);
+    try parity(source, edited, 2);
+    const candidate = try a.print("const Bool.add = fn (left: Bool) => fn (right: Bool) => left\n{s}", .{source});
+    defer a.free(candidate);
+    var candidate_fresh = try prepare(a, candidate, null);
+    defer candidate_fresh.deinit(a);
+    var candidate_expected = try compile(a, &candidate_fresh);
+    defer candidate_expected.deinit(a);
+    var candidate_reused = try prepare(a, candidate, &before.bodies);
+    defer candidate_reused.deinit(a);
+    try std.testing.expect(candidate_reused.bodies.find("twice").? != before.bodies.find("twice").?);
+    try std.testing.expect(candidate_reused.elaborations > 2);
+    var candidate_result = try compile(a, &candidate_reused);
+    defer candidate_result.deinit(a);
+    try std.testing.expectEqualSlices(u8, candidate_expected.bytes, candidate_result.bytes);
+}
+
+test "body check cache owns local result directed requirements" {
+    const source =
+        \\type Number is data = #Number U32
+        \\const Number.from = fn (value: U32) => #Number value
+        \\const read = fn (#Number value) => value
+        \\const convert = fn (value: U32) -> Number => do:
+        \\  let local = fn amount => @type.result "from" amount
+        \\  return local value
+        \\entry const run = fn (value: U32) => read (convert value)
+    ;
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("convert") != null);
+    const inserted = try a.print("const earlier_spelling = {{ tail: 3.0, head: 2 }}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
+    const edited = try std.mem.replaceOwned(u8, a, source, "=> #Number value", "=> #Number (@u32.add value 1)");
+    defer a.free(edited);
+    try parity(source, edited, 1);
+}
+
+test "body check cache leaves declared local qualification origins ordinary" {
+    const source =
+        \\const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right
+        \\const twice = fn (value: U32) => do:
+        \\  let local: a -> a where { associated "add" a a a } = fn amount => @type.call "add" amount amount
+        \\  return local value
+        \\entry const run = fn (value: U32) => twice value
+    ;
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("twice") == null);
+    const edited = try std.mem.replaceOwned(u8, a, source, "@u32.add left right", "@u32.sub left right");
+    defer a.free(edited);
+    try parity(source, edited, 3);
+}
+
+test "body check cache declines large local requirement receipts without changing results" {
+    var source: std.ArrayList(u8) = .empty;
+    defer source.deinit(a);
+    try source.appendSlice(a, "const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right\nconst seed = 2\nconst many = fn (value: U32) => do:\n");
+    for (0..256) |index| {
+        const local = try a.print("  let local{d} = fn amount => @type.call \"add\" (@type.call \"add\" amount amount) amount\n", .{index});
+        defer a.free(local);
+        try source.appendSlice(a, local);
+    }
+    try source.appendSlice(a, "  return @u32.add value seed\nentry const run = fn (value: U32) => many value\n");
+    var before = try prepare(a, source.items, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("many") == null);
+    const changed = try std.mem.replaceOwned(u8, a, source.items, "const seed = 2", "const seed = 3");
+    defer a.free(changed);
+    try parity(source.items, changed, 2);
 }
