@@ -3,8 +3,8 @@
 ## Status, dependencies, and originating requirements
 
 - **Status:** In progress — direct annotated scopes, aliases and exact provider
-  routing are implemented. Generic capability contracts and scoped requests
-  remain open; see
+  routing are implemented. Generic capability contracts and complete identity
+  transport remain open; see
   [qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
 - **Dependencies:** [057](057-specify-scoped-effect-identities.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / effect
@@ -61,11 +61,12 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Partial checkpoint: `10fab46`; task 058 remains in progress.
+- Validation: merged full gate passes 1,624 native laws, 1,030 guests, 977 OOM
+  sweeps and zero analyzer findings across 373 files.
+- Comparison and remaining limits: public dependent capability parameters,
+  selected identity and full escape graphs remain open; current runtime/compiler
+  costs are recorded in the
+  [merged qualification](../zig-native/CONTINUATION_QUALIFICATION.md).
+- Durable record:
+  [scoped effects](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).

@@ -138,3 +138,11 @@ measured candidate compiler SHA-256 is
 numbers qualify the earlier direct source slice, not a merged release compiler.
 The later scoped-request, symbolic-factory and transfer-guard extensions have
 separate source/binary pins; no additional CPU claim is made.
+
+## Merged checkpoint, 13 October 2026
+
+Local `10fab46` qualifies this admitted slice with 1,624 native laws, 1,030
+executed guests, 977 exhaustive failure sweeps and zero analyzer findings across
+373 files. [Merged qualification](CONTINUATION_QUALIFICATION.md) records the
+exact source/binary pins, measured costs and still-open scope. Isolated clocks
+above remain separate from the final combined release measurements.

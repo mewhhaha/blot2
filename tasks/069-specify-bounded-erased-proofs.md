@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — no completion is claimed.
 - **Dependencies:**
   [056](056-implement-declarations-and-evidence-diagnostics.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 9 / erased proofs.

@@ -1,9 +1,10 @@
 # Implementation declarations and evidence
 
 Task 056 implements the declaration, coherence and selection rules in
-[associated contracts](ASSOCIATED_CONTRACTS.md). The combined release gate is
-still pending. The earlier isolated development record remains in
-`/var/tmp/blot2-implementations-056-port-ec6a2ae`; it is not release evidence.
+[associated contracts](ASSOCIATED_CONTRACTS.md). The combined release gate
+passes at local commit `10fab46`. The earlier isolated development record
+remains in `/var/tmp/blot2-implementations-056-port-ec6a2ae`; it is not release
+evidence.
 
 ## Checked behavior
 
@@ -51,41 +52,40 @@ also identified an obsolete symbolic-row rejection and inconsistent empty
 optional diagnostic fields. Those three failures are repaired. Ordinary guest
 preflight then passed 988 tests; 38 fixture tests initially used the wrong
 development output directory. The corrected fixture layout passes all 44
-fixture-related checks. These runs do not replace the final full gate.
+fixture-related checks. The final combined gate passes 1,624 native laws, 1,030
+guest/client tests and 977 exhaustive allocation-failure sweeps. The analyzer
+reports zero findings across 373 files. See the
+[merged qualification](CONTINUATION_QUALIFICATION.md) for exact source/binary
+pins and the intervening worklist repair.
 
 ## Cost evidence
 
-Root evidence is under `build/bench/continuation-20261013/`. The first frozen
-candidate is tree `e6706c39d913d1d76054d9b8f43843d239f63865`, with LLVM/Fast
-compiler SHA-256
-`202857aaf440fa2f65d3fd34c139439318c1a3e83f4ee022fdd644366f9d73ad`. These
-measurements describe that combined candidate, including iterator and
-scoped-effect changes, rather than isolating task 056.
+The [merged qualification](CONTINUATION_QUALIFICATION.md) records the exact
+final LLVM/Fast compiler, seven-pair distributions, failures and raw evidence
+paths. These costs include iterator, body-cutoff and scoped-effect changes.
 
 Seven repetitions cover projection DAG depths 4–64, disjoint heads 8–64 and
 prerequisite chains 4–64: 98 successful whole-check samples, all with zero live
-requested storage after teardown. Median CPU grows from 0.658 to 6.391 ms for
-projection DAGs, 0.616 to 1.759 ms for disjoint heads, and 0.598 to 1.201 ms for
+requested storage after teardown. Median CPU grows from 0.733 to 6.352 ms for
+projection DAGs, 0.728 to 1.831 ms for disjoint heads, and 0.730 to 1.249 ms for
 prerequisite chains. Whole-source preparation includes catalog work and is
-polynomial; it is not claimed to scale linearly. The prior compiler cannot
-accept these declarations, so no equivalent old-feature timing exists.
+polynomial; linear scaling is not claimed. The previous compiler cannot accept
+these declarations, so no equivalent old-feature timing exists.
 
-A separate 98-sample lifecycle run covers both compilation tiers through fresh
+A separate 98-sample lifecycle covers both compilation tiers through fresh
 builds, body edits, equation edits, failed overlaps, restoration, no-op and
-portable restart. Results/diagnostics/bytes match independent fresh builds;
-executed answers change between 42 and 43 as expected, and restart loads its
-portable candidate.
+portable restart. Results, diagnostics and bytes match independent fresh builds;
+executed answers change between 42 and 43, and restart loads its portable
+candidate.
 
-Thirteen ordinary public programs take 1.004–1.026 times baseline compiler CPU
-in seven alternating pairs. The private captured project regresses by about
-15–18% in fresh/edit/revert compilation. Profiling attributes substantial extra
-work to symbolic effect-row resolution; root is qualifying its correction
-separately. No general compiler speedup or final release acceptance is claimed.
+Thirteen public programs take 1.0435–1.0636 times baseline compiler CPU in seven
+alternating pairs. Captured fresh/edit/revert paired medians are
+1.1164/1.0923/1.0938, with a broad fresh distribution. No general compiler
+speedup is claimed. Those regressions remain in task 084's performance scope.
 
-## Remaining release work
+## Remaining boundaries
 
-Freeze the corrected combined source, run the full compiler gate and analyzer,
-then repeat affected cost measurements on its exact LLVM/Fast binary. Record
-that pin and the final costs here before marking task 056 complete. General body
-receipt admission, iterator allocation elimination, scoped capabilities and
-tracing removal retain their own task boundaries.
+Task 056 is complete. General body receipt admission, iterator allocation
+elimination, scoped capability contracts, constant graph retention and tracing
+removal retain their separate tasks. Implementation declarations do not grant
+scoped authority or admit incomplete optional receipts.

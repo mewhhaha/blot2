@@ -121,3 +121,17 @@ build/native compilation remained 176.14/250.33 seconds. Guest wall time was
 23.34 seconds in this run. The increased sweep count reflects splitting large
 products into independent exhaustive phases, rather than sampling faults. The CI
 installer was validated locally; no remote Actions run was triggered.
+
+## Development fixture paths, 13 October 2026
+
+`10fab46` installs the compiler, identity and ordinary fixtures in one configure
+call under `zig-out-dev` during development. Fixture tests derive paths from the
+selected compiler. This repairs 38 failures caused by looking in the release
+output directory; all 1,030 development guests then pass.
+
+The combined full gate now covers 1,624 native laws and 977 exhaustive sweeps.
+It takes 839.91 seconds: 199.90 release build, 277.96 native compilation, 331.97
+native execution and 18.17 guests. The changed workload prevents treating this
+as a like-for-like regression from the earlier 743.57-second gate. Full native
+execution remains LLVM; focused changed-code work uses Safe/noLLVM. Exact pins
+and all phases are in [the merged qualification](CONTINUATION_QUALIFICATION.md).

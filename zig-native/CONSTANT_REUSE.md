@@ -170,3 +170,11 @@ scalar/collection and deep-member edits improve modestly. The captured project
 has zero dedicated receipt/index bookkeeping and no constant payoff; its
 roughly5% retained CPU regression comes from late ownership fallback assembly.
 Task086 remains open.
+
+## Merged checkpoint, 13 October 2026
+
+Local `10fab46` qualifies this admitted slice with 1,624 native laws, 1,030
+executed guests, 977 exhaustive failure sweeps and zero analyzer findings across
+373 files. [Merged qualification](CONTINUATION_QUALIFICATION.md) records the
+exact source/binary pins, measured costs and still-open scope. Isolated clocks
+above remain separate from the final combined release measurements.

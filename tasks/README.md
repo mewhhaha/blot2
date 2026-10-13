@@ -595,16 +595,15 @@ also adds `zig-native/tests/list_span_execution.test.ts`.
 
 ## Latest local compiler checkpoint
 
-Compiler6a57437 qualifies owned iterator state, private packed cursors and
-validated primitive constant/member receipts. Full native/OOM,973 guest/client
-laws,8 unchanged budgets and355-file zero analyzer pass. Array cursors lose4097
-objects; generic range/map/take loses4096. Repeated all-width F32 cursors pass.
-U32 tails, other adapters, dominant constant payoff and broader035/086 gates
-remain open. Captured edits regress about5% from double fallback assembly.
-[The merged qualification](../zig-native/ITERATOR_CONSTANTS_QUALIFICATION.md)
-records exact pins, failures and costs. Safe/noLLVM development and retained
-native-cache savings are separate
-[iteration evidence](../zig-native/ITERATION_COST.md).
+Compiler `10fab46` completes [056] and extends [024], [047], [058] and [086].
+The full gate passes 1,624 native laws, 1,030 guests and 977 exhaustive
+allocation failure sweeps; the analyzer has zero findings across 373 files. The
+pipeline uses 16,384 fewer objects and about 17% less CPU. Every packed-width
+median beats the reconstructed boxed reference across three batches. Child
+aggregates, generic capabilities and dominant constant retention remain open.
+Public compiler CPU rises 4–6%; captured fresh/edit/revert rises about 9–12%.
+[The merged qualification](../zig-native/CONTINUATION_QUALIFICATION.md)
+preserves source/binary pins, distributions, failed gates and remaining scope.
 
 ## Task index
 
@@ -667,9 +666,9 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [053] — Qualify module cutoffs and wrapper erasure      | Pending     | [052], [024]                           |
 | [054] — Specify associated types and implementations    | Complete    | [052]                                  |
 | [055] — Implement associated type members               | Complete    | [054]                                  |
-| [056] — Implement declarations and evidence diagnostics | In progress | [055]                                  |
+| [056] — Implement declarations and evidence diagnostics | Complete    | [055]                                  |
 | [057] — Specify scoped effect identities                | Complete    | [052]                                  |
-| [058] — Implement effect instances and subtraction      | Ready       | [057]                                  |
+| [058] — Implement effect instances and subtraction      | In progress | [057]                                  |
 | [059] — Reject escaping capabilities                    | Pending     | [058]                                  |
 | [060] — Specify usage and lifetime contracts            | Pending     | [059], [030]                           |
 | [061] — Check usage and call multiplicity               | Pending     | [060]                                  |
@@ -680,7 +679,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [066] — Specify typed staging                           | Pending     | [053], [065]                           |
 | [067] — Implement typed code and descriptors            | Pending     | [066]                                  |
 | [068] — Implement hygienic generation and reuse         | Pending     | [067], [024]                           |
-| [069] — Specify bounded erased proofs                   | Pending     | [056]                                  |
+| [069] — Specify bounded erased proofs                   | Ready       | [056]                                  |
 | [070] — Implement numeric and index witnesses           | Pending     | [069]                                  |
 | [071] — Eliminate checks from proved branch facts       | Pending     | [070], [026]                           |
 | [072] — Specify structured concurrency                  | Pending     | [059], [062]                           |

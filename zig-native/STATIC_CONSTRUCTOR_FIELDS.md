@@ -71,3 +71,11 @@ span0.9552–0.9791. Requested compiler allocation increases0–140096B, peak
 increases0–512B and teardown is zero. Small-program timing is not a general
 compiler gain or a captured-project qualification. Final combined release
 qualification remains with the parent.
+
+## Merged checkpoint, 13 October 2026
+
+Local `10fab46` qualifies this admitted slice with 1,624 native laws, 1,030
+executed guests, 977 exhaustive failure sweeps and zero analyzer findings across
+373 files. [Merged qualification](CONTINUATION_QUALIFICATION.md) records the
+exact source/binary pins, measured costs and still-open scope. Isolated clocks
+above remain separate from the final combined release measurements.

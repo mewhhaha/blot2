@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — no completion is claimed.
+- **Status:** Complete — qualified at `10fab46`.
 - **Dependencies:** [055](055-implement-associated-type-members.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 3 / implementation
   declarations and evidence. Sources:
@@ -24,11 +24,11 @@ selection/publication boundaries.
 
 ## Implementation checklist
 
-- [ ] Check implementation declarations and apply the exact coherence/visibility
+- [x] Check implementation declarations and apply the exact coherence/visibility
       rules from task 054.
-- [ ] Select evidence with associated substitutions, retain all dependencies and
+- [x] Select evidence with associated substitutions, retain all dependencies and
       preserve current dispatch compatibility.
-- [ ] Explain rejection/ambiguity consistently for source and compiled
+- [x] Explain rejection/ambiguity consistently for source and compiled
       dependency declarations.
 
 ## Validation
@@ -48,19 +48,24 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Declaration checking and selection obey the documented coherence rules.
-- [ ] Missing/incompatible/ambiguous evidence has bounded native/client
+- [x] Declaration checking and selection obey the documented coherence rules.
+- [x] Missing/incompatible/ambiguous evidence has bounded native/client
       explanations across dependency boundaries.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `10fab46` (local main; no push).
+- Validation: Zig 0.17.0; full `deno task test:compiler --oom-profile`, 1,624
+  native laws, 1,030 guests and 977 exhaustive allocation-failure sweeps.
+  Analyzer zero across 373 files; editor/generation, Deno checks and packaging
+  dry run pass.
+- Comparison: 98 scaling and 98 lifecycle samples on the final LLVM/Fast binary;
+  seven paired public/captured controls. The combined compiler adds 4–6% public
+  CPU and about 9–12% captured CPU; task 084 retains performance qualification.
+- Remaining limitations: body reuse, scoped capabilities and tracing removal
+  retain their own task scopes; no task 056 semantic requirement is deferred.
+- Durable record:
+  [implementation qualification](../zig-native/IMPLEMENTATIONS_QUALIFICATION.md)
+  and [merged inputs/costs](../zig-native/CONTINUATION_QUALIFICATION.md).
