@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — owned/scalar local checkpoint at `6a57437`; other
-  adapters and U32 packed cursor tails remain open.
+- **Status:** In progress — packed cursors and scalar adapters including strict
+  zip are qualified; window state and broader ownership cases remain open.
 - **Dependencies:** [040](040-fuse-packed-row-producers-and-consumers.md),
   [027](027-represent-ownership-in-resolved-ir.md)
 - **Originating requirements:** PLAN: Earlier programs / iterator step and
@@ -69,12 +69,16 @@ development and the scenarios below.
 
 ## Completion evidence
 
-Compiler6a57437 passes full native/OOM,973 guests,8 unchanged budgets and355
-analyzer files/zero. Exact owning-field locals remove4097 Array cursor objects
-and4096 generic pipeline objects. Three merged all-width F32 cursor batches
-qualify; U32 boxed tails and other tagged adapters remain open.
+`121eb59` passes the full gate: 1,688 native tests, 1,066 guests, 1,036 complete
+OOM sweeps plus two expected-error harness laws, and 375 analyzer files with
+zero findings. Strict zip falls 45,062→0 objects and 2.899→0.030 ms at 4,096
+rows; earlier range/map/filter/take/enumerate/zip/pipeline elimination remains.
+All 62 packed U32/F32 record/tuple width outputs exactly match the previously
+qualified all-width comparison. Windows remains at 81,894 objects; independent
+runtime ratios 1.0264 and 0.9868 establish no improvement.
 
-[The durable merged record](../zig-native/ITERATOR_CONSTANTS_QUALIFICATION.md)
-pins actual source/binary, counts, runtime/compiler costs, failures and limits.
-Projection and word-position candidates remain separate unqualified work. No
+[The current merged record](../zig-native/CONTINUATION_QUALIFICATION.md) pins
+source/binary, allocations, runtime/compiler costs and limits. The
+[original record](../zig-native/ITERATOR_CONSTANTS_QUALIFICATION.md) is
+preserved. Further explicit root-lifetime experiments remain isolated. No
 broader completion or push is claimed.

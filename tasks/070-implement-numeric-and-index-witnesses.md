@@ -27,17 +27,23 @@ corresponding checked evidence representation.
 
 `/var/tmp/blot2-erased-proofs-070` owns an unmerged native parser, exact
 value-term owner and bounded public-contract validator. Focused native laws pass
-24/24, full syntax passes 41/41, and the analyzer has zero findings across 377
-files. Term import and portable ownership cover every allocation failure.
-Importing 256 propositions shares one 2,049-term validation and costs 2,817
-charged visits. This is deterministic import work, not compiler performance
-qualification.
+26/26, full syntax passes 41/41, frontend checks pass 23/23, editor checks pass,
+and the analyzer has zero findings across 377 files. Term import and portable
+ownership cover every allocation failure. Importing 256 propositions shares one
+2,049-term validation and costs 2,817 charged visits. This is deterministic
+import work, not compiler performance qualification.
+
+SCC consistency replaces transitive edge expansion. The 256-requirement case now
+validates in 4,902 charged visits; the previous algorithm exhausted 65,536
+visits at 32 requirements. Requested bytes at 256 fall 74,548→53,332, with zero
+live bytes after teardown. All source syntax layers are implemented in the
+isolated prototype; proof-kind checking and execution remain unfinished.
 
 Source patch/pins and remaining integration are recorded under
-`build/bench/continuation-20261013/proof-foundation/`. Distinct proof-kind
-checking, constructor execution, use/guard validation, erasure, frontend syntax
-and full release qualification remain unfinished. The prototype grants no
-runtime witness authority and is not included in the qualified main compiler.
+`build/bench/continuation-20261013/proof-consistency-foundation/`. Distinct
+proof-kind checking, constructor execution, use/guard validation, erasure and
+full release qualification remain unfinished. The prototype grants no runtime
+witness authority and is not included in the qualified main compiler.
 
 ## Implementation checklist
 
@@ -84,5 +90,5 @@ development and the scenarios below.
   distributions, or explain why performance measurement does not apply.
 - Remaining limitations: source/runtime/boundary integration listed above; all
   acceptance criteria remain open.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Durable record:
+  [prototype qualification](../zig-native/NUMERIC_PROOF_QUALIFICATION.md).

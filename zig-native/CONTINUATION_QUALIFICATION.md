@@ -466,3 +466,74 @@ Evidence under `build/bench/continuation-20261013/`:
 and diagnostic isolation worktrees remain separate. Tasks
 024/035/047/058/086/093 remain open; proof task 070 and later iterator/effect
 prototypes are unmerged.
+
+## Selected effects and strict zip, 13 October 2026
+
+Local `121eb59ccd751e6a61cb7ecf676d7a5253e73e1b` is frozen tree
+`7b19d7a427ab1cf2a798b60a07cf585ce85d6e12`, native source
+`adb955cc7c88209bc738b6246ec44bf83610a04c`, based on `ab4ab86`. Its Zig 0.17.0
+LLVM/Fast binary SHA-256 is
+`9414b47707e14fd2818453a643113d275a497271e7d967fd4fc241d77b9b6642`; compiler
+identity is `d11c232cacab12e5a0d25db31c10555b7dfaa469c48ac9fbebeea0796a38c9a3`.
+Patch SHA-256:
+`0e748723f849fa11419ca3c111058cf08f1858c1680696d08d81cce4c0fdf55e`. The control
+is the qualified `ae001bb` compiler from the preceding section.
+
+[Selected effect identities](SCOPED_EFFECTS_QUALIFICATION.md) own both possible
+origins and preserve identity through payload normalization. Their bounded local
+scope excludes loops, nested ordinary callbacks and public generative selection
+schemes. Structured Wasm control analysis now distinguishes reachable outward
+exits, dead fallthrough and loop backedges; this removes fictitious joins that
+blocked strict-zip scalar replacement. Optimized archive semantics advance to
+version 23. Executed laws preserve nested alternatives, outward returns and
+loop-carried snapshots in both codegen tiers.
+
+The complete frozen gate passes **1,688 native tests, 1,066 guest/client tests
+and zero findings across 375 analyzer files**. All 1,036 ordinary allocation
+failure sweeps complete; the profiler also includes two intentional
+expected-error harness laws. The gate took 933.29 seconds: release compilation
+203.61, native compilation 298.96, native execution 396.76 and guests 21.39.
+Post-gate source, patch and binary hashes are unchanged. Main's ignored compiler
+and compressed bundle match. The release handshake and an independent fresh Zig
+configure agree on identity. An isolated experiment with copied configure cache
+returned an obsolete identity; that binary remains rejected and preserved.
+
+Seven alternating captured-project pairs on CPU 6 preserve every phase's fresh
+oracle, cross-compiler Wasm and source fuel (70,330 steps):
+
+| Phase  | Control CPU ms | Candidate CPU ms | Median paired ratio |   Ratio range |
+| ------ | -------------: | ---------------: | ------------------: | ------------: |
+| Fresh  |       2014.867 |         2003.632 |              0.9980 | 0.9703–1.0223 |
+| Edit   |        934.130 |          941.311 |              0.9973 | 0.9935–1.0736 |
+| Revert |        835.391 |          834.855 |              0.9988 | 0.9741–1.0386 |
+
+These paired medians describe near parity. Thirteen public programs, seven pairs
+each, retain exact Wasm, fuel, results and zero teardown. CPU ratios span
+0.9917–1.0118; requested allocation increases by 0–2,144 bytes and peak is
+unchanged. All 62 packed width/type modules remain byte-identical, preserving
+the previous packed qualification. Captured constant receipt activity stays
+zero.
+
+At 4,096 rows, strict zip falls **45,062→0 objects, 360,496→0 requested payload
+bytes, 20,486→0 stores and 53,261→4,099 root reserve events**. Ordinary Wasm CPU
+falls 2.899125→0.030000 ms (ratio 0.01035), with 31 alternating pairs, twenty
+warmups and sixteen calls per sample. A second batch after the gate reproduces
+ratio 0.0103. Allocation instrumentation uses separate Wasm copies and does not
+affect those runtime clocks.
+
+Windows remains at 81,894 objects and 1,277,540 requested bytes. Its first
+runtime ratio is 1.0264; the follow-up is 0.9868. Both batches are retained and
+no window improvement is claimed. The other eight adapters remain near parity
+and preserve earlier allocation counts. Every workload checks boundary answers;
+roots and leases finish at zero, journal reset retains 4,096 bytes and committed
+guest memory stays 131,072 bytes. Other isolated work and filesystem caches are
+uncontrolled; these are pinned workload measurements, not whole-project targets.
+
+Evidence under `build/bench/continuation-20261013/`:
+`selected-qualified-pins.json`, `selected-handshake-identity.json`,
+`selected-full-gate.log`, `selected-gate/`, `selected-analyzer.log`,
+`selected-measurement-summary.json`, `captured-selected/`, `public-selected/`,
+`selected-packed/equality.json`, `selected-runtime.json`,
+`selected-runtime-repeat.json` and `selected-adapters-ownership.jsonl`. Tasks
+024/035/047/058/086/093 remain open. Later window, footprint and
+[numeric-proof](NUMERIC_PROOF_QUALIFICATION.md) prototypes are separate.

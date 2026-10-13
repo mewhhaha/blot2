@@ -63,11 +63,12 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Partial checkpoint: `10fab46`; task 058 remains in progress.
-- Validation: merged full gate passes 1,624 native laws, 1,030 guests, 977 OOM
-  sweeps and zero analyzer findings across 373 files.
-- Comparison and remaining limits: public dependent capability parameters,
-  selected identity and full escape graphs remain open; current runtime/compiler
+- Partial checkpoint: `121eb59`; task 058 remains in progress.
+- Validation: merged full gate passes 1,688 native laws, 1,066 guests, 1,036
+  complete OOM sweeps plus two expected-error harness laws and zero analyzer
+  findings across 375 files.
+- Comparison and remaining limits: general multi-input footprints, generative
+  selection schemes and full escape graphs remain open; current runtime/compiler
   costs are recorded in the
   [merged qualification](../zig-native/CONTINUATION_QUALIFICATION.md).
 - Durable record:

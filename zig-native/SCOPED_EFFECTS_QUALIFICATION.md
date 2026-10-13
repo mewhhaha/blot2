@@ -371,3 +371,11 @@ fanout/prelude inputs and fresh equal-length restart-cache paths request exactly
 16,104,444 bytes in 53,920 allocations before and after this slice, with 18,504
 type nodes and identical work counters. This establishes ordinary allocation
 parity; CPU and combined retained qualification belong to the root gate.
+
+The selected-identity boundary is merged in `121eb59`: the full combined gate
+passes 1,688 native laws, 1,066 guest/client tests, 1,036 complete OOM sweeps
+plus two expected-error harness laws, and zero findings across 375 analyzer
+files. Seven captured-project pairs and thirteen public programs retain output
+parity and near-parity compiler CPU. Exact source/binary pins and measurements
+are in [merged qualification](CONTINUATION_QUALIFICATION.md). Later parameter
+footprints remain isolated and unqualified.
