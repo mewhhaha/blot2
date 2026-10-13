@@ -595,23 +595,24 @@ also adds `zig-native/tests/list_span_execution.test.ts`.
 
 ## Latest local compiler checkpoint
 
-Compiler `38e822d` extends [024], [047], [058] and [086]; [056] was completed at
-`10fab46`. The latest full gate passes 1,664 native laws, 1,053 guests and 1,011
-complete allocation-failure sweeps plus two expected-error sweep laws; the
-analyzer has zero findings across 374 files. Enumerate/zip and the pipeline now
-use zero per-call objects in the measured scalar workloads. Packed-width Wasm is
-unchanged from the prior boxed-reference qualification. Strict/window state,
-complete capability flows and dominant constant retention remain open. Captured
-compilation is near parity against `b145c5e`; earlier regressions remain.
-Growing primitive constants improve retained CPU about 28–53% at 512–2,048
-elements, with 3–6% population cost and ordinary fallback at 4,096.
+Compiler `ae001bb` extends [024], [047], [058] and [093]. The full gate passes
+1,679 native laws, 1,061 guest/client tests and 1,029 complete
+allocation-failure sweeps plus two expected-error sweep laws; analyzer zero
+across 375 files. Seven captured pairs improve fresh/edit/revert CPU by about
+12%/27%/29% against `38e822d`, with exact Wasm and source fuel. Public outputs
+and all 62 packed width/type outputs also retain exact bytes. New body recipes
+improve synthetic edits but cost 15–39% more at population. General body
+coverage, strict/window state, complete capability flows and dominant constant
+retention remain open.
 [The merged qualification](../zig-native/CONTINUATION_QUALIFICATION.md)
-preserves source/binary pins, distributions, failed gates and remaining scope.
+preserves pins, distributions, failed runs and remaining scope.
 
 The documentation-only [erased proof design](../zig-native/ERASED_PROOFS.md)
 completes [069]. It settles exact value identities, checked constructors, proof
 kinds, finite arithmetic/branch rules, portable admission, erasure and bounded
-fallback. Tasks [070]–[071] implement and qualify that proposal.
+fallback. Task [070] has an isolated parser/owned-term/contract prototype; its
+checker, runtime and compiled-body authority are unfinished. Task [071] follows
+complete witness implementation.
 
 ## Task index
 
@@ -688,7 +689,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [067] — Implement typed code and descriptors            | Pending     | [066]                                  |
 | [068] — Implement hygienic generation and reuse         | Pending     | [067], [024]                           |
 | [069] — Specify bounded erased proofs                   | Complete    | [056]                                  |
-| [070] — Implement numeric and index witnesses           | Ready       | [069]                                  |
+| [070] — Implement numeric and index witnesses           | In progress | [069]                                  |
 | [071] — Eliminate checks from proved branch facts       | Pending     | [070], [026]                           |
 | [072] — Specify structured concurrency                  | Pending     | [059], [062]                           |
 | [073] — Implement scoped tasks and cancellation         | Pending     | [072], [035]                           |

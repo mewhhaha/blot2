@@ -1119,3 +1119,19 @@ in `build/bench/task024-architecture/REMAINING.md`. Whole Checked/module copying
 is rejected. Qualified/projected/declared fields, receiver/update/demand/loop/
 user-effect/implementation proof owners and total edit acceptance keep024/053
 open; the proposed broader source-Core path remains a prototype.
+
+### Combined replay qualification, 13 October 2026
+
+`ae001bb` includes these field and pure-form recipes. Replay preserves the
+validated current catalog's monomorphic constructor-pattern payload roots,
+including ordinary transparent-record canonicalization. Annotation roots stay
+independent. This prevents four copied nominal roots from invalidating the next
+captured revision's strict type-catalog gate. Third-revision full Core
+type-table parity, Wasm parity, nominal-recipe invalidation and complete replay
+OOM pass.
+
+The combined gate and release measurements are in
+[merged qualification](CONTINUATION_QUALIFICATION.md). Retained synthetic CPU
+falls about 22–29%; population costs about 15–39% more. General owned
+source-Core replay remains isolated and unqualified; this checkpoint does not
+close task 024.

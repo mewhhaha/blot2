@@ -327,3 +327,8 @@ substitution through generative/captured generic calls; opaque/associated
 boundaries carrying those footprints; and generic storage/lifetime contracts
 with exact row subtraction. Arbitrary multi-input bodies remain conservative.
 Neither task is complete.
+
+The combined `ae001bb` checkpoint passes the complete native/guest/OOM gate and
+release comparisons. See [merged qualification](CONTINUATION_QUALIFICATION.md)
+for exact pins, the repaired revert regression and final measurements. Later
+prototypes remain separate.

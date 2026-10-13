@@ -41,9 +41,10 @@ The 13 October isolated collection-length path removes 220 inference regions and
 170,960 scopes per captured revision. LLVM/Fast seven-pair edit CPU falls
 1232.855→961.714 ms, with exact Wasm and source fuel; fresh/revert CPU also
 falls. The optimizer invalidation worklist separately restores 2,862/2,864
-retained body matches. Combined qualification is still required. These
-current-snapshot improvements do not establish the historical target or complete
-task 093. See
+retained body matches. Combined `ae001bb` passes the full gate; seven pairs
+measure edit 1247.822→906.212 ms and revert 1147.918→813.715 ms against
+`38e822d`, with exact Wasm and source fuel. These current-snapshot improvements
+do not establish the historical target or complete task 093. See
 [collection shape members](../zig-native/COLLECTION_SHAPE_MEMBERS.md) and
 [retained assembly](../zig-native/RETAINED_ASSEMBLY_WORKLIST.md).
 

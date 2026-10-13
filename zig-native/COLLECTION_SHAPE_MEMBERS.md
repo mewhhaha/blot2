@@ -67,3 +67,8 @@ and logs are in `build/bench/continuation-20261013/shape-members-release/`.
 Earlier Safe/noLLVM screens are retained separately. The first screen admitted
 nothing because its alpha-renamed parameter guard was too strict; its timings
 are not evidence for this implementation.
+
+The combined `ae001bb` checkpoint passes the complete native/guest/OOM gate and
+release comparisons. See [merged qualification](CONTINUATION_QUALIFICATION.md)
+for exact pins, the repaired revert regression and final measurements. Later
+prototypes remain separate.

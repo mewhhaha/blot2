@@ -97,3 +97,8 @@ completed. The original failure log remains; `pairs.json` was finalized from
 those complete persisted samples in Python, without repeating measurements.
 Immutable tree/source/patch pins and control artifacts are recorded beside it in
 `build/bench/retained-matcher/PINS.json`.
+
+The combined `ae001bb` checkpoint passes the complete native/guest/OOM gate and
+release comparisons. See [merged qualification](CONTINUATION_QUALIFICATION.md)
+for exact pins, the repaired revert regression and final measurements. Later
+prototypes remain separate.

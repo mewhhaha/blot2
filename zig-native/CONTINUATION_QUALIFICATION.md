@@ -370,3 +370,99 @@ Raw evidence: `following-qualified-pins.json`, `following-gate/`,
 `following-runtime/` and `following-packed/equality.json`. Tasks
 024/035/047/058/086/093 remain open. Later optimizer matching and capability
 input prototypes are separate from this frozen checkpoint.
+
+## Shape-only members and retained graphs, 13 October 2026
+
+Local `ae001bbb033809e79842e17918244ec9f084aafc` is frozen tree
+`b9e400071b8e432bd8190cf8c49d12faacada9d9`, native source
+`14c627c76cbfef133137c600c286f1a381e93e59`, based on `1a34c50`. Its Zig 0.17.0
+LLVM/Fast binary SHA-256 is
+`cad370ab8c149d1d009adae2c709b6cac6544bcc59691bc0884c3baac7a60d3a`; compiler
+identity is `4d2a0e35de50a85c0fce0dc28843900e4978b0a903926a2114c9a7548d1afce1`.
+Patch SHA-256:
+`8dc6ab8ac772c4360bcea3da74654448ceeb6ee291e10d5cd0380052c88313ae`. The control
+is the qualified `38e822d` binary from the preceding section.
+
+The batch adds exact shape-only Array/List length evaluation, a bounded reverse
+worklist for optimizer invalidation, generic explicit/dotted field body recipes,
+compatible pure collection/pattern forms and ordered multiple-capability member
+inputs. The linked component documents define their conservative boundaries:
+[shape members](COLLECTION_SHAPE_MEMBERS.md), [body cutoff](BODY_CUTOFF.md),
+[retained assembly](RETAINED_ASSEMBLY_WORKLIST.md) and
+[scoped effects](SCOPED_EFFECTS_QUALIFICATION.md).
+
+The final frozen gate passes **1,679 native tests, 1,061 guest/client tests and
+375 analyzer files with zero findings**. All 1,029 ordinary allocation-failure
+sweeps complete; two additional harness sweeps intentionally report an
+unexpected scenario error with zero allocations. The 1,031-record profiler total
+includes those expected-error laws. The full gate took 906.88 seconds: release
+build 202.67, native compilation 279.34, native execution 388.36 and guests
+19.56. Source, native subtree, patch and executable hashes are unchanged after
+the gate. Main's executable and compressed compiler bundle match the qualified
+binary.
+
+The earlier combined run passed all 1,678 native laws but failed a guest law
+whose exact-length fixture no longer required lexical interface projections. The
+corrected fixture invokes an ordinary generic member that still exercises those
+projections. That failed run remains under `later-gate/`; it is not the final
+gate.
+
+Its first release measurement also exposed a real revert regression: 1.0622
+paired CPU ratio, with all selected reuse lost. Replay copied monomorphic
+constructor-pattern payload roots that ordinary checking shares with the current
+validated catalog. Four extra nominal type nodes changed the next revision's
+ordered type graph and invalidated the whole selected-reuse gate. The repair
+seeds only those zero-quantifier pattern payload mappings, preserving ordinary
+annotation instances and record-pattern canonicalization. Strict catalog
+validation remains unchanged. The new law compares the full Core type table,
+Wasm, a changed nominal recipe and every replay allocation-failure point.
+
+Seven alternating release pairs on CPU 6 give:
+
+| Phase  | Control CPU ms | Candidate CPU ms | Median paired ratio |   Ratio range |
+| ------ | -------------: | ---------------: | ------------------: | ------------: |
+| Fresh  |       2225.518 |         1950.672 |              0.8767 | 0.8665–0.8832 |
+| Edit   |       1247.822 |          906.212 |              0.7266 | 0.7249–0.7322 |
+| Revert |       1147.918 |          813.715 |              0.7084 | 0.7071–0.7153 |
+
+Every phase matches fresh compilation and the control in Wasm and source fuel
+(70,330 steps). Edit/revert select 66/69 reusable judgments, evaluate
+1,274/1,269 inference regions, and reuse 2,862 of 2,864 optimizer bodies.
+Matcher work is 820,898 with no exhaustion. Constant receipts remain inactive on
+this capture. Other isolated work and filesystem caches remain uncontrolled;
+these paired results apply to the pinned current snapshot, not the historical
+task 093 input.
+
+Thirteen public programs, seven pairs each, preserve exact Wasm, diagnostics,
+source fuel and zero teardown. CPU ratios are 0.9922–1.0065; requested
+allocation falls by 128–3,056 bytes, while peak requested memory is unchanged.
+All 62 packed width/type outputs match the previously qualified machine code
+exactly.
+
+Four body-cache suites have three alternating pairs at 64 and 128 siblings, with
+population and sixteen edits measured separately: 192 samples including plain
+controls. Linux process CPU clocks replace the earlier inadequate 10 ms sampling
+ticks; original low-resolution runs remain preserved.
+
+| Recipe           | Edit paired ratio, 64 / 128 | Population paired ratio, 64 / 128 |
+| ---------------- | --------------------------: | --------------------------------: |
+| Explicit field   |             0.7175 / 0.7075 |                   1.1843 / 1.1896 |
+| Dotted field     |             0.7254 / 0.7169 |                   1.1528 / 1.1854 |
+| If-let           |             0.7816 / 0.7748 |                   1.3260 / 1.3854 |
+| Pure collections |             0.7587 / 0.7481 |                   1.2932 / 1.3256 |
+
+The faster retained path costs more at population on these workloads. Plain
+controls have retained ratios 0.9794–0.9873 and population 0.9871–1.0138. Guest
+answers and cross-compiler output assertions pass throughout. RSS varies across
+processes and is recorded in raw samples; it is not a deterministic allocation
+claim.
+
+Evidence under `build/bench/continuation-20261013/`:
+`later-repaired-qualified-pins.json`, `later-repaired-gate/`,
+`later-repaired-analyzer.log`, `later-repaired-measurement-summary.json`,
+`captured-later-repaired/`, `public-later-repaired/`,
+`later-repaired-body-summary.json`, `later-repaired-body-*/` and
+`later-repaired-packed/equality.json`. Earlier failed/regressed combined runs
+and diagnostic isolation worktrees remain separate. Tasks
+024/035/047/058/086/093 remain open; proof task 070 and later iterator/effect
+prototypes are unmerged.
