@@ -111,6 +111,8 @@ pub const Tag = enum(u32) {
     // Grammar-valid numeric text that cannot be decoded. a=NumericCode,
     // b/c=raw token start/end. This is never an executable numeric payload.
     numeric_error,
+    // A dependent arrow input: a=value binder name, b=family annotation.
+    type_binder,
 };
 pub const NumericCode = enum(u32) { integer_range, float_range, float_literal };
 pub const NumericFault = struct { node: Id, code: NumericCode, span: Span, actual_token: token.Tag };

@@ -545,6 +545,34 @@ fn publishField(out: *Output, analysis: *Analysis, id: u32, field: u32) !void {
     const scope: ir.Ownership = .{ .kind = .scope, .chunk = 4, .roles = @intCast(slot | (value << 13)) };
     try emit(out, analysis.a, .ownership, @bitCast(scope));
 }
+// A checked private callback can expose bounded scalar field consumption.
+// Internal blocks keep their labels; every local is freshly initialized for
+// each activation. Memory writes, allocation, other calls and loops decline.
+fn scalarConsumer(body: *const w.Function) bool {
+    if (body.result_role != .scalar or body.codeLength() == 0 or body.codeLength() > 96 or body.parameters.len > 4 or body.locals.items.len > 64 - body.parameters.len) return false;
+    const count = body.parameters.len + body.locals.items.len;
+    for (0..body.parameters.len) |parameter| if (body.parameterRole(parameter) == .unknown) return false;
+    for (body.locals.items) |ty| if (ty != .i32 and ty != .f32) return false;
+    var depth: usize = 0;
+    for (body.instructions.items) |inst| switch (inst.op) {
+        .block, .if_ => depth += 1,
+        .end => {
+            if (depth == 0) return false;
+            depth -= 1;
+        },
+        .else_ => if (depth == 0) return false,
+        .br, .br_if => if (inst.operand >= depth) return false,
+        .unreachable_ => {},
+        .local_get, .local_set, .local_tee => if (inst.operand >= count) return false,
+        .ownership => {
+            const fact: ir.Ownership = @bitCast(inst.operand);
+            if (fact.kind == .scope) return false;
+        },
+        .i32_load, .f32_load => {},
+        else => if (ir.fixed(inst.op).effect != .pure) return false,
+    };
+    return depth == 0;
+}
 // A private closure's explicit table reference can expose its tiny projection
 // wrapper. The existing initialization/copy proof supplies dominance; numeric
 // scalar constants and mutable/imported table values cannot enter this path.
@@ -576,8 +604,9 @@ fn projectedCall(analysis: *Analysis, module: *const w.Module, instructions: []c
     if (id >= module.functions.items.len or module.runtimeHelper(id)) return null;
     const body = &module.functions.items[id];
     if (body.entry or body.signature != instructions[at].operand or body.result_role != .scalar or ir.indirectResult(instructions, at) != .scalar) return null;
-    if (body.parameters.len == 0 or body.parameters.len > 4 or body.locals.items.len != 0 or body.instructions.items.len != body.parameters.len + 2) return null;
-    if (body.parameterRole(0) != .reference or body.parameters[0] != .i32) return null;
+    if (body.parameters.len == 0 or body.parameters.len > 4 or body.parameterRole(0) != .reference or body.parameters[0] != .i32) return null;
+    if (scalarConsumer(body)) return id;
+    if (body.locals.items.len != 0 or body.instructions.items.len != body.parameters.len + 2) return null;
     const code = body.instructions.items;
     if (code[0].op != .local_get or code[0].operand != 0 or code[1].op != .i32_load or code[1].operand != 0) return null;
     for (1..body.parameters.len) |parameter| {
@@ -596,15 +625,22 @@ fn emitProjectedCall(out: *Output, analysis: *Analysis, function: *const w.Funct
     const a = analysis.a;
     const base: u32 = @intCast(function.parameters.len + out.locals.items.len);
     try out.locals.appendSlice(a, body.parameters);
+    try out.locals.appendSlice(a, body.locals.items);
     try emit(out, a, .drop, 0); // The checked table index is still on the stack.
     var parameter = body.parameters.len;
     while (parameter != 0) {
         parameter -= 1;
         try emit(out, a, .local_set, base + @as(u32, @intCast(parameter)));
     }
+    for (body.locals.items, 0..) |ty, id| {
+        var op: w.Op = .i32_const;
+        if (ty == .f32) op = .f32_const;
+        try emit(out, a, op, 0);
+        try emit(out, a, .local_set, base + @as(u32, @intCast(body.parameters.len + id)));
+    }
     for (body.instructions.items) |inst| {
         var copy = inst;
-        if (copy.op == .local_get) copy.operand += base;
+        if (copy.op == .local_get or copy.op == .local_set or copy.op == .local_tee) copy.operand += base;
         try out.instructions.append(a, copy);
     }
 }
@@ -847,7 +883,8 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
     for (instructions, 0..) |inst, at| {
         if (inst.op != .call_indirect) continue;
         const target = projectedCall(&analysis, module, instructions, at) orelse continue;
-        const parameters = module.functions.items[target].parameters.len;
+        const target_body = &module.functions.items[target];
+        const parameters = target_body.parameters.len + target_body.locals.items.len;
         if (planned_locals >= 8192 or parameters >= 8192 - planned_locals) continue;
         planned_locals += parameters;
         // Call events have no field offset. During emission these two slots
@@ -1585,4 +1622,75 @@ fn permanentReferenceFlows(a: A) !void {
 test "permanent reference copies require symbolic static or enclosing frame ownership through OOM" {
     try permanentReferenceFlows(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, permanentReferenceFlows, .{});
+}
+
+fn privateScalarConsumers(a: A) !void {
+    for (0..10) |scenario| {
+        var module = w.Module.init(a);
+        defer module.deinit();
+        const arena = try module.ensureArena();
+        const consumer = try module.addTypedFunction(&.{ .i32, .i32 }, .i32, .scalar);
+        try module.setParameterRoles(consumer, ir.packParameterRoles(&.{ .reference, .scalar }));
+        const carry = try module.addLocal(consumer, .i32);
+        const bits = try module.addLocal(consumer, .f32);
+        try module.emitSlice(consumer, &.{
+            .{ .op = .local_get, .operand = 1 },     .{ .op = .if_ },
+            .{ .op = .local_get, .operand = 1 },     .{ .op = .local_set, .operand = carry },
+            .{ .op = .end },                         .{ .op = .local_get, .operand = bits },
+            .{ .op = .i32_reinterpret_f32 },         .{ .op = .drop },
+            .{ .op = .local_get, .operand = carry },
+        });
+        if (scenario == 2) module.functions.items[consumer].entry = true;
+        if (scenario == 3) module.functions.items[consumer].result_role = .unknown;
+        if (scenario == 5) try module.setParameterRoles(consumer, ir.packParameterRoles(&.{ .reference, .unknown }));
+        if (scenario == 6) {
+            module.functions.items[consumer].instructions.items[0].op = .nop;
+            module.functions.items[consumer].instructions.items[1].op = .loop;
+        }
+        if (scenario == 7) module.functions.items[consumer].instructions.items[3] = .{ .op = .br, .operand = 1 };
+        if (scenario == 8) {
+            const imported = try module.importFunction("host", "observe", &.{.i32}, .none);
+            module.functions.items[consumer].instructions.items[7] = .{ .op = .call_import, .operand = imported };
+        }
+        if (scenario == 9) {
+            const global = try module.addGlobal(.u32, 0, true);
+            module.functions.items[consumer].instructions.items[3] = .{ .op = .global_set, .operand = global };
+        }
+        const caller = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+        const closure = try module.addLocal(caller, .i32);
+        try module.emitSlice(caller, &.{
+            .{ .op = .i32_const, .operand = 8 },                                              .{ .op = .call, .operand = arena.allocate_scalar },                           .{ .op = .local_set, .operand = closure },
+            .{ .op = .local_get, .operand = closure },                                        .{ .op = .i32_const, .operand = consumer, .table_reference = scenario != 4 }, .{ .op = .i32_store },
+            .{ .op = .local_get, .operand = closure },                                        .{ .op = .i32_const },                                                        .{ .op = .i32_store, .operand = 4 },
+            .{ .op = .local_get, .operand = closure },                                        .{ .op = .i32_load, .operand = 4 },                                           .{ .op = .local_get },
+            .{ .op = .local_get, .operand = closure },                                        .{ .op = .i32_load },                                                         .{ .op = .ownership, .operand = @bitCast(ir.Ownership{ .kind = .call_result, .roles = @backingInt(ir.Role.scalar) }) },
+            .{ .op = .call_indirect, .operand = module.functions.items[consumer].signature },
+        });
+        const before = try a.dupe(w.Instruction, module.functions.items[caller].instructions.items);
+        defer a.free(before);
+        const callee_before = try a.dupe(w.Instruction, module.functions.items[consumer].instructions.items);
+        defer a.free(callee_before);
+        var output = (try runWithRoots(a, &module, &module.functions.items[caller], scenario != 1)).?;
+        defer output.deinit(a);
+        var indirect: usize = 0;
+        var fresh_float = false;
+        var fresh_integer = false;
+        for (output.instructions.items, 0..) |inst, at| {
+            if (inst.op == .call_indirect) indirect += 1;
+            if (at + 1 == output.instructions.items.len or output.instructions.items[at + 1].op != .local_set) continue;
+            const local = output.instructions.items[at + 1].operand;
+            if (local < module.functions.items[caller].parameters.len or local >= module.functions.items[caller].parameters.len + output.locals.items.len) continue;
+            const ty = output.locals.items[local - module.functions.items[caller].parameters.len];
+            if (inst.op == .f32_const and inst.operand == 0 and ty == .f32) fresh_float = true;
+            if (inst.op == .i32_const and inst.operand == 0 and ty == .i32) fresh_integer = true;
+        }
+        try std.testing.expectEqual(@as(usize, @intFromBool(scenario != 0)), indirect);
+        if (scenario == 0) try std.testing.expect(fresh_float and fresh_integer);
+        try std.testing.expectEqualSlices(w.Instruction, before, module.functions.items[caller].instructions.items);
+        try std.testing.expectEqualSlices(w.Instruction, callee_before, module.functions.items[consumer].instructions.items);
+    }
+}
+test "private scalar callback consumers preserve fresh locals and decline unknown control effects targets through OOM" {
+    try privateScalarConsumers(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, privateScalarConsumers, .{});
 }

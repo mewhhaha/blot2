@@ -1,0 +1,76 @@
+==================
+Scoped value binders in complete arrow annotations
+==================
+
+const read: (state: State a) -> a ! {state.get} = fn input => input.get ()
+const apply: (state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.get | e}) = fn input => fn callback => callback ()
+
+---
+
+(source_file
+  (function_binding
+    (binding_keyword)
+    (identifier)
+    (binding_annotation
+      (separator)
+      (parenthesized
+        (identifier)
+        (separator)
+        (type_identifier)
+        (identifier))
+      (operator)
+      (identifier)
+      (operator)
+      (braced
+        (identifier)
+        (member
+          (identifier))))
+    (operator)
+    (lambda_header
+      (identifier)))
+  (operator)
+  (identifier)
+  (method_call
+    (identifier)
+    (parenthesized))
+  (function_binding
+    (binding_keyword)
+    (identifier)
+    (binding_annotation
+      (separator)
+      (parenthesized
+        (identifier)
+        (separator)
+        (type_identifier)
+        (identifier))
+      (operator)
+      (parenthesized
+        (parenthesized
+          (type_identifier)
+          (operator)
+          (identifier)
+          (operator)
+          (braced
+            (identifier)
+            (member
+              (identifier))
+            (operator)
+            (identifier)))
+        (operator)
+        (identifier)
+        (operator)
+        (braced
+          (identifier)
+          (member
+            (identifier))
+          (operator)
+          (identifier))))
+    (operator)
+    (lambda_header
+      (identifier)))
+  (operator)
+  (lambda_header
+    (identifier))
+  (operator)
+  (identifier)
+  (parenthesized))

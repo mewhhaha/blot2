@@ -112,6 +112,7 @@
 (type_application) @type
 (demand_type) @type
 (type_atom) @type
+(type_binder) @type
 (type_group) @type
 (member_access) @variable.other.member
 (type_witness) @type
@@ -149,5 +150,6 @@
 (record name: (qualified_name) @type)
 (symbolic_fixity target: (qualified_name) @variable)
 (type_alias name: (TYPE_IDENT) @type)
+(type_binder name: (IDENT) @type)
 (type_field name: (IDENT) @type)
 (typed_parameter name: (IDENT) @variable)

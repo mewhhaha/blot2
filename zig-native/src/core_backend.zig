@@ -2547,7 +2547,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
                     member.record = member_positions.?[member.record];
                     if (member.record == std.math.maxInt(u32)) complete = false;
                 },
-                .work, .read => {},
+                .work, .read, .growth => {},
             };
             if (!complete) {
                 generator.evaluator.constant_stats.recorded -|= 1;

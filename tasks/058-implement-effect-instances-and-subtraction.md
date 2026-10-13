@@ -3,8 +3,9 @@
 ## Status, dependencies, and originating requirements
 
 - **Status:** In progress — direct scopes, scoped requests, symbolic rows and
-  exact generic capability/callback contracts are implemented. Complete dependent
-  arrows, selected identities and general capture contracts remain open; see
+  exact generic capability/callback contracts and single-input dependent arrow
+  headers are implemented. Multiple capability inputs, selected identities and
+  general capture contracts remain open; see
   [qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
 - **Dependencies:** [057](057-specify-scoped-effect-identities.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / effect

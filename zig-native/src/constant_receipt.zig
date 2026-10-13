@@ -54,7 +54,8 @@ pub const Source = union(enum) { named: core.BindingRef, anonymous: struct { uni
 /// position during capture. The table, its snapshot and this tape share one
 /// artifact owner; the position only locates proof, never supplies proof.
 pub const MemberEvent = struct { record: u32, values: usize, depth: usize, inference_observations: u64 };
-pub const Event = union(enum) { work: Resources, read: Read, member: MemberEvent };
+pub const Growth = struct { mutations: u64, frontier: ?@import("eval_collection_growth.zig").Frontier = null };
+pub const Event = union(enum) { work: Resources, read: Read, member: MemberEvent, growth: Growth };
 pub const Inputs = struct {
     types: []const @import("type_evidence.zig").Mapping = &.{},
     rows: []const @import("type_evidence.zig").RowMapping = &.{},
@@ -80,7 +81,7 @@ pub const Record = struct {
         var steps: usize = 0;
         for (self.events) |event| switch (event) {
             .work => |work| steps +|= work.steps,
-            .read, .member => {},
+            .read, .member, .growth => {},
         };
         return steps;
     }
@@ -148,6 +149,8 @@ pub const Recorder = struct {
     base_calls: usize,
     inference_serial: u64,
     collection_serial: u64,
+    children_before: usize,
+    growth_mutations: u64 = 0,
     summary_transitions: usize,
     summary_work: usize,
     summary_exhausted: bool,
@@ -157,7 +160,7 @@ pub const Recorder = struct {
     eligible: bool = true,
     members: usize = 0,
     pub fn init(session: *const eval.Session) Recorder {
-        return .{ .mark = position(session), .base_depth = session.depth, .base_calls = session.call_depth, .inference_serial = session.constant_inference_serial, .collection_serial = session.collection_buffers.mutation_serial, .summary_transitions = session.summary_transitions, .summary_work = session.summary_graph_work, .summary_exhausted = session.summary_exhausted, .query_budgets = queryBudgets(session) };
+        return .{ .mark = position(session), .base_depth = session.depth, .base_calls = session.call_depth, .inference_serial = session.constant_inference_serial, .collection_serial = session.collection_buffers.mutation_serial, .children_before = session.children.items.len, .summary_transitions = session.summary_transitions, .summary_work = session.summary_graph_work, .summary_exhausted = session.summary_exhausted, .query_budgets = queryBudgets(session) };
     }
     pub fn captureInputs(self: *Recorder, a: A, inputs: Inputs) A.Error!void {
         const owned = try inputs.clone(a);
@@ -189,7 +192,7 @@ pub const Recorder = struct {
         try pending.append(a, result);
         for (self.events.items) |event| switch (event) {
             .read => |dependency| try pending.append(a, dependency.value),
-            .work, .member => {},
+            .work, .member, .growth => {},
         };
         while (pending.pop()) |id| {
             if (seen.contains(id)) continue;
@@ -207,6 +210,19 @@ pub const Recorder = struct {
     pub fn observe(self: *Recorder, session: *const eval.Session) void {
         self.depth = @max(self.depth, session.depth - self.base_depth);
         self.call_depth = @max(self.call_depth, session.call_depth - self.base_calls);
+    }
+    /// Only this constant's new child spans may change a growth frontier.
+    /// Nested constants and pre-existing collections retain ordinary work.
+    pub fn canGrow(self: *const Recorder, session: *const eval.Session, before: @import("eval_collection_growth.zig").Span) bool {
+        if (!self.eligible or self.members != 0 or self.collection_serial == std.math.maxInt(u64) or self.collection_serial != session.collection_buffers.mutation_serial) return false;
+        if (before.len != 0 and before.start < self.children_before) return false;
+        if (session.collection_buffers.buffers.get(before)) |buffer| if (buffer.start < self.children_before) return false;
+        return true;
+    }
+    pub fn grew(self: *Recorder, session: *const eval.Session) void {
+        std.debug.assert(self.collection_serial + 1 == session.collection_buffers.mutation_serial);
+        self.collection_serial += 1;
+        self.growth_mutations += 1;
     }
     pub fn source(self: *Recorder, a: A, target: core.BindingRef) A.Error!void {
         return self.observed(a, .{ .named = target });
@@ -245,7 +261,7 @@ pub const Recorder = struct {
     }
     pub fn member(self: *Recorder, a: A, session: *const eval.Session, before: usize, inference_before: u64) A.Error!bool {
         if (self.inference_serial != inference_before or session.constant_inference_serial == std.math.maxInt(u64)) return false;
-        if (!self.eligible or self.members != 0 or session.specialization_receipts.items.len != before + 1) return false;
+        if (!self.eligible or self.members != 0 or self.growth_mutations != 0 or session.specialization_receipts.items.len != before + 1) return false;
         const record = session.specialization_receipts.items[before];
         if (!admittedMember(session.snapshot(), record)) return false;
         if (self.collection_serial == std.math.maxInt(u64) or session.collection_buffers.mutation_serial != self.collection_serial) return false;
@@ -269,7 +285,7 @@ pub const Recorder = struct {
         var steps: usize = 0;
         for (self.events.items) |event| switch (event) {
             .work => |work| steps += work.steps,
-            .read, .member => {},
+            .read, .member, .growth => {},
         };
         if (steps < session.minimum_constant_steps or (self.members != 0 and steps < minimum_member_steps)) return null;
         // Compound graph indexes did not pay for themselves on the captured
@@ -277,12 +293,20 @@ pub const Recorder = struct {
         if (!admittedGraph(session.snapshot(), value)) return null;
         for (self.events.items) |event| switch (event) {
             .read => |dependency| if (session.valueInfo(dependency.value).kind != .scalar) return null,
-            .work, .member => {},
+            .work, .member, .growth => {},
         };
         const info = session.valueInfo(value);
         if (self.members != 0 and info.kind != .scalar) return null;
         if ((info.kind == .array or info.kind == .list) and info.len > steps / 4) return null;
         if (try self.viewsEscape(a, session, value)) return null;
+        if (self.growth_mutations != 0) {
+            var growth: Growth = .{ .mutations = self.growth_mutations };
+            if (info.kind == .array or info.kind == .list) if (session.collection_buffers.buffers.get(.{ .start = info.start, .len = info.len })) |buffer| {
+                if (buffer.start < self.children_before) return null;
+                growth.frontier = .{ .offset = info.start - buffer.start, .capacity = buffer.len };
+            };
+            try self.events.append(a, .{ .growth = growth });
+        }
         const events = try self.events.toOwnedSlice(a);
         errdefer a.free(events);
         const sources = try self.sources.toOwnedSlice(a);

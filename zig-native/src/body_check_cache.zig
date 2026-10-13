@@ -925,10 +925,27 @@ const Walker = struct {
                 self.word(@intFromBool(param.is_unit));
                 return self.visit(param.annotation, depth + 1);
             },
-            .apply, .type_apply, .type_function => {
-                if (node.tag == .type_function and node.c != 0) return false;
+            .apply, .index_access, .type_apply, .type_function => {
                 if (!try self.visit(node.a, depth + 1)) return false;
-                return self.visit(node.b, depth + 1);
+                if (!try self.visit(node.b, depth + 1)) return false;
+                if (node.tag == .type_function) return self.visit(node.c, depth + 1);
+            },
+            .effect_row => {
+                self.word(node.b);
+                for (self.tree.list(.{ .start = node.a, .len = node.b })) |label| {
+                    const item = self.tree.node(label);
+                    const location = self.tree.span(label);
+                    if (item.tag != .type_name or !std.mem.eql(u8, self.pool.get(item.a), "Foreign")) return false;
+                    if (depth + 1 >= 128 or self.count >= self.max_nodes or location.start < self.start) return false;
+                    self.count += 1;
+                    // Foreign is sealed and globally stable. Its syntax belongs
+                    // to the row, rather than a nominal annotation read.
+                    self.word(@backingInt(item.tag));
+                    self.word(location.start - self.start);
+                    self.word(location.end - self.start);
+                    self.text(self.pool.get(item.a));
+                }
+                return self.visit(node.c, depth + 1);
             },
             .binary => {
                 self.text(self.pool.get(node.a));
@@ -1341,7 +1358,7 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
         // copying their forwarded requirements too would duplicate predicates.
         if (tree.node(predicate.source).tag == .name or tree.node(predicate.source).tag == .binary) {
             const target = checked.resolved[predicate.source];
-            if (target == 0 or checked.bindings[target].scheme.obligations.len == 0 or (predicate.kind == .callee_use and predicate.identity.decl != target)) return null;
+            if (target == 0 or checked.bindings[target].scheme.obligations.len == 0 or (predicate.kind == .callee_use and checked.bindings[target].kind != .local and predicate.identity.decl != target)) return null;
             continue;
         }
         if (predicate.kind == .callee_use or tree.node(predicate.source).tag != .apply) return null;
@@ -1513,9 +1530,9 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
         var local = old.scheme;
         local.obligations = .{ .start = @intCast(predicates.items.len), .len = old.scheme.obligations.len };
         for (checked.obligations[old.scheme.obligations.start..][0..old.scheme.obligations.len]) |predicate| {
-            // Flat local requirements have complete type/name and candidate
-            // reads. Written clauses retain declaration-relative origins.
-            if ((!supportedPredicate(predicate) and !declaredPredicate(predicate)) or local_requirement_budget == 0) return null;
+            // Local requirements own flat roots or a completed callee read.
+            // Written clauses retain declaration-relative origins.
+            if ((!supportedPredicate(predicate) and !declaredPredicate(predicate) and !sharedPredicate(predicate, checked.unit)) or local_requirement_budget == 0) return null;
             if (predicate.explicit) {
                 const origin = predicate.qualification_span orelse return null;
                 const root_span = tree.span(root);
@@ -1525,9 +1542,17 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             const source_position = position(shape.ids, predicate.source) orelse return null;
             var proof: std.crypto.hash.Blake3 = .init(.{});
             for ([_]T.Id{ predicate.ty, predicate.other, predicate.result, predicate.signature }) |part| if (!typeHash(.{ .store = &checked.types }, part, &proof, &local_requirement_budget, 0, true, &.{}, &.{}, catalog)) return null;
+            var identity = predicate.identity;
+            if (predicate.kind == .callee_use) {
+                const target = std.mem.findScalar(check.BindingId, old_bindings.items, predicate.identity.decl) orelse return null;
+                if (bindings.items[target].kind != .global and bindings.items[target].kind != .external) return null;
+                // This is an owned binding slot, not a nominal identity.
+                identity = .{ .unit = 0, .decl = @intCast(target + 1) };
+            }
             try predicates.ensureUnusedCapacity(a, 1);
             const name = try a.dupe(u8, pool.get(predicate.name));
             var value = predicate;
+            value.identity = identity;
             value.name = 0;
             value.source = 0;
             if (value.qualification_span) |*origin| {

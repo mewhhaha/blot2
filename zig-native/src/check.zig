@@ -657,6 +657,8 @@ const Engine = struct {
     scoped_parameter: ast.Id = 0,
     scoped_parameter_type: T.Id = 0,
     active_effect_scopes: usize = 0,
+    expected_lambda_source: ast.Id = 0,
+    expected_lambda_type: T.Id = 0,
     scope_lifetimes: std.ArrayList(T.Id) = .empty,
     storage_frames: std.ArrayList(struct { read: T.Effects.Label, write: T.Effects.Label = 0, depth: usize }) = .empty,
     effect_runners: std.ArrayList(EffectRunner) = .empty,
@@ -1723,7 +1725,7 @@ const Engine = struct {
             },
             .group, .type_demand, .type_witness, .field_access, .return_stmt, .yield_stmt, .forever_stmt => try self.collectAnnotationNames(node.a, depth + 1),
             .field, .unary, .operator_tail => try self.collectAnnotationNames(node.b, depth + 1),
-            .type_field => {
+            .type_field, .type_binder => {
                 if (node.b == 0) _ = try self.typeVariable(node.a, id) else try self.collectAnnotationNames(node.b, depth + 1);
             },
             .apply, .index_access, .rebind_stmt, .type_apply, .type_effect => {
@@ -4741,7 +4743,7 @@ const Engine = struct {
             if (value.tag == .apply) supplied += 1;
             source = value.a;
         }
-        var contract = self.capabilityFlowContract(source);
+        var contract = self.capabilityFlowContract(source, 0);
         if (self.tree.node(source).tag == .name) {
             const binding = self.resolved[source];
             if (binding != 0) contract = self.bindings.items[binding].capability_flow;
@@ -4851,7 +4853,7 @@ const Engine = struct {
         for (syntax.items, self.parameter_patterns.list(family.patterns)) |source, pattern_| try arguments.append(self.allocator, try self.parameterArgument(pattern_, source, true, 0));
         return try self.types.nominal(family.identity, arguments.items);
     }
-    fn capabilityFlowContract(self: *const Engine, source: ast.Id) CapabilityFlow {
+    fn capabilityFlowContract(self: *const Engine, source: ast.Id, annotation_: ast.Id) CapabilityFlow {
         const basic = @import("capability_flow.zig").source(self.tree, source);
         if (basic != .unknown) return basic;
         const member = @import("capability_flow.zig").memberSource(self.tree, self.pool, source);
@@ -4860,7 +4862,15 @@ const Engine = struct {
         var head = source;
         while (self.tree.node(head).tag == .group) head = self.tree.node(head).a;
         const lambda = self.tree.node(head);
-        if (self.capabilityFamilyAnnotation(self.tree.parameter(lambda.a).annotation) == null) return .unknown;
+        var family_annotation = self.tree.parameter(lambda.a).annotation;
+        if (family_annotation == 0 and annotation_ != 0) {
+            const signature = self.tree.node(annotation_);
+            if (signature.tag == .type_function) {
+                const input = self.tree.node(signature.a);
+                if (input.tag == .type_binder) family_annotation = input.b;
+            }
+        }
+        if (self.capabilityFamilyAnnotation(family_annotation) == null) return .unknown;
         if (curried) return .invoke_with_capability;
         return .member_unit;
     }
@@ -6108,6 +6118,29 @@ const Engine = struct {
         }
         return self.types.record(fields.items);
     }
+    fn dependentParameter(self: *Engine, id: ast.Id) T.Error!T.Id {
+        const binder = self.tree.node(id);
+        const descriptor = try self.capabilityDescriptorAnnotation(binder.b) orelse {
+            try self.diagnostic(.effect_identity_scope, id);
+            return self.types.fresh();
+        };
+        const parameter = try self.types.capabilityParameter(descriptor);
+        const binding = try self.addBinding(.{ .name = binder.a, .declaration = id, .owner = id, .kind = .parameter, .ty = parameter });
+        try self.env.append(self.allocator, .{ .name = binder.a, .binding = binding });
+        self.expr_types[id] = parameter;
+        return parameter;
+    }
+    fn contextualLambda(self: *Engine, source: ast.Id, required: T.Id) T.Error!T.Id {
+        const saved_source = self.expected_lambda_source;
+        const saved_type = self.expected_lambda_type;
+        self.expected_lambda_source = source;
+        self.expected_lambda_type = required;
+        defer {
+            self.expected_lambda_source = saved_source;
+            self.expected_lambda_type = saved_type;
+        }
+        return self.expression(source);
+    }
     fn annotation(self: *Engine, id: ast.Id) T.Error!T.Id {
         if (id == 0) return self.types.fresh();
         if (self.depth >= 1024) return error.TypeLimit;
@@ -6140,6 +6173,15 @@ const Engine = struct {
             },
             .type_demand => return self.types.demand(try self.annotation(node.a)),
             .type_function => {
+                const input = self.tree.node(node.a);
+                if (input.tag == .type_binder) {
+                    const scope = self.env.items.len;
+                    defer self.env.shrinkRetainingCapacity(scope);
+                    const parameter = try self.dependentParameter(node.a);
+                    const result = try self.annotation(node.b);
+                    const row = if (node.c == 0) 0 else try self.annotationEffects(node.c);
+                    return self.types.functionWithEffects(parameter, result, row);
+                }
                 const parameter = try self.annotation(node.a);
                 const result = try self.annotation(node.b);
                 const row = if (node.c == 0) 0 else try self.annotationEffects(node.c);
@@ -7253,6 +7295,10 @@ const Engine = struct {
         try self.beginQualification(id, declaration.where_node, declaration.annotation, declaration.body);
         self.defer_associated = saved_defer;
         const required = if (declaration.annotation != 0) try self.annotation(declaration.annotation) else 0;
+        if (declaration.annotation != 0) {
+            const written = self.tree.node(declaration.annotation);
+            if (written.tag == .type_function and self.tree.node(written.a).tag == .type_binder) self.expr_types[declaration.annotation] = required;
+        }
         self.body_elaborations += 1;
         self.traceGlobal(.begun, binding);
         return .{ .binding = binding, .id = id, .required = required, .initializer_diagnostics = initializer_diagnostics, .context = context };
@@ -7563,7 +7609,7 @@ const Engine = struct {
             for (variables, mapped_variables) |variable, *mapped_variable| mapped_variable.* = try copier.copy(variable, 0);
             const requirement_start: u32 = @intCast(self.obligations.items.len);
             for (body.predicates[frozen.obligations.start..][0..frozen.obligations.len]) |predicate| {
-                const value = try self.replayedBodyPredicate(&copier, shape.ids, predicate, span);
+                const value = try self.replayedBodyPredicate(&copier, shape.ids, mapped, predicate, span);
                 try self.obligations.append(self.allocator, value);
             }
             self.bindings.items[mapped[owned_scheme.binding - 1]].scheme = .{
@@ -7626,9 +7672,17 @@ const Engine = struct {
         // References to qualified schemes still instantiate their current
         // predicates. The candidate receipt first proves that copying their
         // already solved caller types cannot constrain a newly selected effect.
-        for (shape.ids, body.facts) |id, fact| if (fact.binding != 0 and (self.tree.node(id).tag == .name or self.tree.node(id).tag == .binary)) {
+        for (shape.ids, body.facts, 0..) |id, fact, at| if (fact.binding != 0 and (self.tree.node(id).tag == .name or self.tree.node(id).tag == .binary)) {
             const target = mapped[fact.binding - 1];
             if (self.bindings.items[target].scheme.obligations.len != 0) {
+                // Local generalization already transferred these requirements
+                // out of the enclosing pending graph into its owned principal.
+                var owned_reference = false;
+                for (body.predicates) |predicate| if (predicate.local and predicate.position == at) {
+                    owned_reference = true;
+                    break;
+                };
+                if (owned_reference) continue;
                 var reference_type = self.expr_types[id];
                 if (self.access_paths[id].len != 0) reference_type = self.types.list(self.access_types[id])[0];
                 try self.constrain(try self.instantiate(target, id), reference_type, id);
@@ -7639,7 +7693,7 @@ const Engine = struct {
         };
         for (body.predicates) |predicate| {
             if (predicate.local) continue;
-            const value = try self.replayedBodyPredicate(&copier, shape.ids, predicate, span);
+            const value = try self.replayedBodyPredicate(&copier, shape.ids, mapped, predicate, span);
             try self.appendPending(.{ .owner = self.current, .direct = true, .value = value });
         }
         const ty = self.expr_types[declaration.body];
@@ -7648,7 +7702,7 @@ const Engine = struct {
         self.body_elaborations -= 1;
         return ty;
     }
-    fn replayedBodyPredicate(self: *Engine, copier: *SchemeCopier, ids: []const ast.Id, predicate: @import("body_check_cache.zig").Predicate, root: ast.Span) T.Error!T.Obligation {
+    fn replayedBodyPredicate(self: *Engine, copier: *SchemeCopier, ids: []const ast.Id, bindings: []const BindingId, predicate: @import("body_check_cache.zig").Predicate, root: ast.Span) T.Error!T.Obligation {
         var value = predicate.value;
         value.ty = try copier.copy(value.ty, 0);
         value.other = try copier.copy(value.other, 0);
@@ -7657,6 +7711,10 @@ const Engine = struct {
         value.source = ids[predicate.position];
         value.name = 0;
         if (predicate.name.len != 0) value.name = self.pool.lookup(predicate.name) orelse return error.TypeLimit;
+        if (predicate.local and value.kind == .callee_use) {
+            if (value.identity.unit != 0 or value.identity.decl == 0 or value.identity.decl > bindings.len) return error.TypeLimit;
+            value.identity = .{ .unit = self.unit, .decl = bindings[value.identity.decl - 1] };
+        }
         if (predicate.local and value.explicit) {
             const origin = value.qualification_span orelse return error.TypeLimit;
             if (origin.start > origin.end or origin.end > root.end - root.start) return error.TypeLimit;
@@ -8244,10 +8302,20 @@ const Engine = struct {
             .lambda => blk: {
                 const parameter = self.tree.parameter(node.a);
                 if (parameter.where_node != 0) try self.diagnostic(.higher_rank_constraint, parameter.where_node);
+                var expected: T.Id = 0;
+                if (self.expected_lambda_source == id) expected = self.expected_lambda_type;
+                var required_arrow: T.Node = .{ .tag = .absent };
+                if (expected != 0) required_arrow = self.types.node(try self.types.resolve(expected, 0));
+                const contextual = expected != 0 and required_arrow.tag == .function;
+                const contextual_capability = contextual and self.types.node(try self.types.resolve(required_arrow.a, 0)).tag == .scoped;
                 const scoped = node.a == self.scoped_parameter;
                 const descriptor = if (!scoped) try self.capabilityDescriptorAnnotation(parameter.annotation) else null;
-                const symbolic_capability = descriptor != null;
-                const element_ty = if (scoped) self.scoped_parameter_type else if (descriptor) |family| try self.types.capabilityParameter(family) else if (parameter.is_unit) T.unit else try self.types.fresh();
+                const symbolic_capability = descriptor != null or contextual_capability;
+                const element_ty = if (scoped) self.scoped_parameter_type else if (contextual) required_arrow.a else if (descriptor) |family| try self.types.capabilityParameter(family) else if (parameter.is_unit) T.unit else try self.types.fresh();
+                if (contextual) {
+                    if (descriptor) |family| try self.constrain(element_ty, try self.types.capabilityParameter(family), node.a);
+                    if (parameter.is_unit) try self.constrain(element_ty, T.unit, node.a);
+                }
                 if (!scoped and !symbolic_capability and parameter.annotation != 0) try self.constrain(element_ty, try self.annotation(parameter.annotation), node.a);
                 if (symbolic_capability) {
                     try self.scope_lifetimes.append(self.allocator, element_ty);
@@ -8304,7 +8372,7 @@ const Engine = struct {
                 const result_annotation = if (node.c != 0 and self.tree.node(node.c).tag == .type_effect) self.tree.node(node.c).a else node.c;
                 const required = if (result_annotation != 0) try self.annotation(result_annotation) else 0;
                 if (node.c != 0 and self.tree.node(node.c).tag == .type_effect) try self.constrainEffects(latent, try self.annotationEffects(self.tree.node(node.c).b), id);
-                var result = try self.expression(node.b);
+                var result = if (contextual) try self.contextualLambda(node.b, required_arrow.b) else try self.expression(node.b);
                 if (required != 0) {
                     try self.constrain(result, required, id);
                     result = required;
@@ -8472,7 +8540,16 @@ const Engine = struct {
     }
     fn taggedExpression(self: *Engine, attributes: []const ast.Id, body: ast.Id, depth: usize) T.Error!T.Id {
         if (depth >= 1024) return error.TypeLimit;
-        if (attributes.len == 0) return self.expression(body);
+        if (attributes.len == 0) {
+            if (self.current != 0 and self.bindings.items[self.current].kind == .global) {
+                const declaration = self.tree.valueDecl(self.bindings.items[self.current].declaration);
+                if (declaration.body == body and declaration.annotation != 0) {
+                    const written = self.tree.node(declaration.annotation);
+                    if (written.tag == .type_function and self.tree.node(written.a).tag == .type_binder) return self.contextualLambda(body, self.expr_types[declaration.annotation]);
+                }
+            }
+            return self.expression(body);
+        }
         const attribute = attributes[0];
         const function_ty = try self.expression(self.tree.node(attribute).a);
         const argument = try self.taggedExpression(attributes[1..], body, depth + 1);
@@ -11379,7 +11456,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     for (headers) |imported| try engine.importHeader(imported);
     try engine.effectHeaders();
     for (engine.bindings.items) |*binding| if (binding.kind == .global and binding.named_function) {
-        binding.capability_flow = engine.capabilityFlowContract(tree.valueDecl(binding.declaration).body);
+        binding.capability_flow = engine.capabilityFlowContract(tree.valueDecl(binding.declaration).body, tree.valueDecl(binding.declaration).annotation);
     };
     try engine.dataBodies();
     engine.prepareOpaqueStorage();

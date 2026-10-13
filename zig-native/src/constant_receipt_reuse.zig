@@ -48,7 +48,7 @@ pub const State = struct {
         if (graph.scalarRoot(self.old.evaluator, record.value) == null) return false;
         for (record.events) |event| switch (event) {
             .read => |read| if (graph.scalarRoot(self.old.evaluator, read.value) == null) return false,
-            .work, .member => {},
+            .work, .member, .growth => {},
         };
         return true;
     }
@@ -63,7 +63,7 @@ pub const State = struct {
                 if (before.scalar != after.scalar or before.bits != after.bits) return self.reject(g, .read);
                 if (read.value == record.value) anchor = current;
             },
-            .work, .member => {},
+            .work, .member, .growth => {},
         };
         if (anchor == 0 and total.values == 0) return self.reject(g, .resource);
         var owned = try record.clone(self.allocator);
@@ -83,7 +83,7 @@ pub const State = struct {
         owned.value = anchor;
         for (owned.events) |*event| switch (event.*) {
             .read => |*read| read.value = session.readyConstantAnchor(read.target).?,
-            .work, .member => {},
+            .work, .member, .growth => {},
         };
         session.steps += total.steps;
         session.constant_value_debt += total.values - added;
@@ -116,7 +116,7 @@ pub const State = struct {
                 if (before.scalar != after.scalar or before.bits != after.bits) return self.reject(g, .read);
                 if (read.value == record.value) anchor = current;
             },
-            .work, .member => {},
+            .work, .member, .growth => {},
         };
         const result_info = graph.scalarRoot(self.old.evaluator, record.value).?;
         // The selected graph and receiver retain their ordinary allocations.
@@ -191,7 +191,7 @@ pub const State = struct {
                 current.record = @intCast(query_before);
                 current.inference_observations = 1;
             },
-            .work => {},
+            .work, .growth => {},
         };
         // An ordinary validated member-provider hit observes one inference
         // query. Preserve that observation for a suspended enclosing recorder.
@@ -215,7 +215,7 @@ pub const State = struct {
         if (!receipt.admittedGraph(self.old.evaluator, record.value)) return self.reject(g, .graph);
         for (record.events) |event| switch (event) {
             .read => |dependency| if (dependency.value >= self.old.evaluator.values.len or self.old.evaluator.values[dependency.value].kind != .scalar) return self.reject(g, .graph),
-            .work, .member => {},
+            .work, .member, .growth => {},
         };
         if (!std.meta.eql(record.options, session.options) or !self.gate.admitsLocalSource(record.target) or !self.gate.admitsCallIdentity(record.target)) return self.reject(g, .source);
         for (record.sources) |source| switch (source) {
@@ -247,8 +247,13 @@ pub const State = struct {
         defer roots.deinit(self.allocator);
         var total: receipt.Resources = .{};
         var member_event: ?receipt.MemberEvent = null;
+        var growth: ?receipt.Growth = null;
         var prefix: receipt.Resources = .{};
         for (record.events) |event| switch (event) {
+            .growth => |observed| {
+                if (growth != null or observed.mutations == 0 or observed.mutations >= std.math.maxInt(u64) - session.collection_buffers.mutation_serial) return self.reject(g, .resource);
+                growth = observed;
+            },
             .member => |member| {
                 if (member_event != null or member.values > session.options.max_values -| session.constantValueCount() -| total.values or member.depth > session.options.max_depth -| session.depth) return self.reject(g, .resource);
                 member_event = member;
@@ -268,14 +273,28 @@ pub const State = struct {
             },
         };
         if (member_event) |member| {
-            if (!self.scalarInputs(record)) return self.reject(g, .mode);
+            if (growth != null or !self.scalarInputs(record)) return self.reject(g, .mode);
             return self.replayMemberScalar(g, record, total, inputs, member, prefix);
         }
-        if (self.scalarInputs(record)) return self.replayScalar(g, record, total, inputs);
+        if (self.scalarInputs(record)) {
+            if (growth) |observed| if (observed.frontier != null) return self.reject(g, .graph);
+            const result = try self.replayScalar(g, record, total, inputs);
+            if (result != null) if (growth) |observed| {
+                session.collection_buffers.mutation_serial += observed.mutations;
+            };
+            return result;
+        }
+        var frontier: ?@import("eval_collection_growth.zig").Frontier = null;
+        if (growth) |observed| if (observed.frontier) |buffer| {
+            const root = self.old.evaluator.values[record.value];
+            if (root.len == 0 or buffer.capacity < root.len or buffer.offset > buffer.capacity - root.len or buffer.offset > root.start) return self.reject(g, .graph);
+            if (buffer.capacity > self.old.evaluator.children.len - (root.start - buffer.offset)) return self.reject(g, .graph);
+            frontier = buffer;
+        };
         try roots.append(self.allocator, record.value);
         for (record.events) |event| switch (event) {
             .read => |read| try roots.append(self.allocator, read.value),
-            .work, .member => {},
+            .work, .member, .growth => {},
         };
         const found = try graph.Plan.inspectRootsWithRows(self.allocator, self.old, &self.gate, roots.items, .source_declared);
         var plan = found.plan orelse return self.reject(g, .graph);
@@ -294,7 +313,7 @@ pub const State = struct {
             return self.reject(g, .imported);
         };
         for (record.events) |event| switch (event) {
-            .work, .member => {},
+            .work, .member, .growth => {},
             .read => |read| {
                 const current = (session.readyConstantAnchor(read.target)).?;
                 const matched = plan.matchIntoWithScratch(g, semantic, read.value, current, seeds, buffers) catch |err| {
@@ -314,6 +333,7 @@ pub const State = struct {
         };
         var children: usize = 0;
         if (seeds[record.value] == 0) children = self.old.evaluator.values[record.value].len;
+        if (frontier) |buffer| children = buffer.capacity;
         if (values > total.values or children > total.children) return self.reject(g, .resource);
         var owned = try record.clone(self.allocator);
         @memcpy(@constCast(owned.inputs.types), inputs.types);
@@ -321,9 +341,10 @@ pub const State = struct {
         var live = true;
         defer if (live) owned.deinit(self.allocator);
         try session.constant_records.ensureUnusedCapacity(self.allocator, 1);
+        if (frontier != null) try session.collection_buffers.buffers.ensureUnusedCapacity(self.allocator, 1);
         const before_values = session.values.items.len;
         const before_children = session.children.items.len;
-        const storage: graph.Plan.QueryStorage = .{ .values_before = 0, .values_added = 0, .children_added = 0, .exact = false };
+        const storage: graph.Plan.QueryStorage = .{ .values_before = 0, .values_added = 0, .children_added = 0, .exact = false, .root_buffer = frontier };
         const mapped = plan.materializeReceiptWithScratch(g, semantic, seeds, storage, buffers) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
             return self.reject(g, .imported);
@@ -332,9 +353,14 @@ pub const State = struct {
         const added_children = session.children.items.len - before_children;
         std.debug.assert(added_values <= total.values and added_children <= total.children);
         owned.value = mapped[record.value];
+        if (frontier) |buffer| {
+            const root = session.valueInfo(owned.value);
+            session.collection_buffers.buffers.putAssumeCapacity(.{ .start = root.start, .len = root.len }, .{ .start = root.start - buffer.offset, .len = buffer.capacity });
+        }
+        if (growth) |observed| session.collection_buffers.mutation_serial += observed.mutations;
         for (owned.events) |*event| switch (event.*) {
             .read => |*read| read.value = mapped[read.value],
-            .work, .member => {},
+            .work, .member, .growth => {},
         };
         session.steps += total.steps;
         session.constant_value_debt += total.values - added_values;

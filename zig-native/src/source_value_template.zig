@@ -641,7 +641,7 @@ pub const Plan = struct {
         return mapped[self.root];
     }
     /// Seeds are the correspondence proved by matchInto in this paired owner.
-    pub const QueryStorage = struct { values_before: usize, values_added: usize, children_added: usize, exact: bool = true };
+    pub const QueryStorage = struct { values_before: usize, values_added: usize, children_added: usize, exact: bool = true, root_buffer: ?@import("eval_collection_growth.zig").Frontier = null };
     pub fn materializeMapped(self: *const Plan, g: anytype, entry: ?u32, seeds: ?[]const u32) Error![]u32 {
         return self.materializeImpl(g, entry, seeds, null, null, null);
     }
@@ -695,6 +695,13 @@ pub const Plan = struct {
             if (known.len != mapped.len) return error.Declined;
             if (scratch == null) @memcpy(mapped, known);
         }
+        var root_buffer: ?@import("eval_collection_growth.zig").Frontier = null;
+        if (storage) |query| if (query.root_buffer) |buffer| {
+            const root = old.values[self.root];
+            if (mapped[self.root] != 0 or (root.kind != .array and root.kind != .list) or root.len == 0 or buffer.capacity < root.len or buffer.offset > buffer.capacity - root.len) return error.Declined;
+            for (self.order) |id| if (id != self.root and old.values[id].kind != .scalar) return error.Declined;
+            root_buffer = buffer;
+        };
         const semantic = if (scratch) |buffers| block: {
             try buffers.semantic.resize(a, self.order.len);
             try buffers.types.resize(a, self.stats.type_maps);
@@ -770,14 +777,20 @@ pub const Plan = struct {
                 const span = positions[info.start..][0..info.len];
                 if (span[0] == std.math.maxInt(u32)) {
                     for (span) |position| if (position != std.math.maxInt(u32)) return error.Declined;
-                    if (!room(session.children.items.len, added_children + info.len)) return error.Declined;
-                    const start: u32 = @intCast(session.children.items.len + added_children);
+                    var capacity = info.len;
+                    var offset: u32 = 0;
+                    if (id == self.root) if (root_buffer) |buffer| {
+                        capacity = buffer.capacity;
+                        offset = buffer.offset;
+                    };
+                    if (!room(session.children.items.len, added_children + capacity)) return error.Declined;
+                    const start: u32 = @intCast(session.children.items.len + added_children + offset);
                     for (span, 0..) |*position, index| {
                         if (scratch) |buffers| buffers.child_ids.appendAssumeCapacity(info.start + @as(u32, @intCast(index)));
                         position.* = start + @as(u32, @intCast(index));
                     }
                     append_children[id] = true;
-                    added_children += info.len;
+                    added_children += capacity;
                 } else for (span, 0..) |position, index| if (position != span[0] + index) return error.Declined;
             };
             if (query.exact and added_children != query.children_added) return error.Declined;
@@ -811,7 +824,15 @@ pub const Plan = struct {
             var info = old.values[id];
             const children = old.children[info.start..][0..info.len];
             info.start = if (storage != null and info.len != 0) positions[info.start] else @intCast(session.children.items.len);
-            if (storage == null or append_children[id]) for (children) |child| session.children.appendAssumeCapacity(mapped[child]);
+            if (storage == null or append_children[id]) {
+                if (id == self.root and root_buffer != null) {
+                    const buffer = root_buffer.?;
+                    const start = session.children.items.len;
+                    session.children.items.len += buffer.capacity;
+                    @memset(session.children.items[start..], 0);
+                    for (children, session.children.items[start + buffer.offset ..][0..info.len]) |child, *actual_child| actual_child.* = mapped[child];
+                } else for (children) |child| session.children.appendAssumeCapacity(mapped[child]);
+            }
             if (info.kind == .closure) {
                 var meta = old.closures[info.bits];
                 const len = meta.mappings.len;

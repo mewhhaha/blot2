@@ -63,7 +63,8 @@ constraint_body = ("{" LAYOUT_NEWLINE? (predicates:constraint_predicate ("," LAY
 constraint_predicate = (kind:qualified_name member:STRING? arguments:type_atom* effects:effect_row?) ;
 type_application = (head:type_atom arguments:type_atom*) ;
 demand_type = ("~" value:type_atom) ;
-type_atom = (qualified_name | type_group | type_array | type_record | demand_type) ;
+type_atom = (qualified_name | type_binder | type_group | type_array | type_record | demand_type) ;
+type_binder = ("(" name:IDENT ":" annotation:type_expression ")") ;
 type_group = ("(" (value:type_expression ("," value:type_expression)* ","?)? ")") ;
 
 expression = (value:(lambda | do_block | case_expression | if_expression | infix_expression)) ;

@@ -158,17 +158,18 @@ requires the public and implementation claims to match. The portable structural
 schema digest includes this field. Source/compiled catalogs and retained body
 interface digests preserve it; execution owner handles remain guest local.
 
-The two executed public-flow groups cover U32/F32 capabilities, captured callbacks,
-sync/JSPI, rejection recovery, source/compiled dependencies, checkpoints, an
-escaping identity result, and a retained helper edit that loses its flow proof
-while preserving its ordinary a -> a header. Native body-forgery and checking,
-lowering/emission allocation-failure laws cover the same boundary. Twenty-one
-focused scoped guest groups pass. No full combined gate or additional CPU claim
-is made here.
+The two executed public-flow groups cover U32/F32 capabilities, captured
+callbacks, sync/JSPI, rejection recovery, source/compiled dependencies,
+checkpoints, an escaping identity result, and a retained helper edit that loses
+its flow proof while preserving its ordinary a -> a header. Native body-forgery
+and checking, lowering/emission allocation-failure laws cover the same boundary.
+Twenty-one focused scoped guest groups pass. No full combined gate or additional
+CPU claim is made here.
 
-This boundary does not complete general symbolic capability parameters, dependent
-arrows, selected capability terms, or arbitrary hidden capture/store contracts.
-Unknown helpers and opaque callable results continue to reject conservatively.
+This boundary does not complete general symbolic capability parameters,
+dependent arrows, selected capability terms, or arbitrary hidden capture/store
+contracts. Unknown helpers and opaque callable results continue to reject
+conservatively.
 
 ## Quantified capability parameter boundary
 
@@ -194,17 +195,19 @@ written parameter rows, source/compiled imports, sync/JSPI, rejection recovery,
 retained edits, revert, checkpoint byte parity, and a same-header helper edit
 that loses its flow claim. The focused regression batch has32 executed groups.
 Native allocation-failure laws cover identity freshening, precise repeated rows,
-rollback rerouting, owned principal copying, worklist wakeups, checking/lowering/
-emission, and storage rejection. Frozen validation rejects substituted binder
-edges and body claims; closed evidence rejects unresolved instances. Solver
-regressions and the analyzer pass. No combined gate or new CPU claim is made.
+rollback rerouting, owned principal copying, worklist wakeups,
+checking/lowering/ emission, and storage rejection. Frozen validation rejects
+substituted binder edges and body claims; closed evidence rejects unresolved
+instances. Solver regressions and the analyzer pass. No combined gate or new CPU
+claim is made.
 
 Complete dependent arrows, selections, general callback/capture contracts, and
 precise same-lifetime State stores remain open in058/059.
 
 ## Curried callback boundary
 
-The exact helper `fn (state: State a) => fn (callback: Unit -> a ! {state.get | e}) => callback ()`
+The exact helper
+`fn (state: State a) => fn (callback: Unit -> a ! {state.get | e}) => callback ()`
 owns a two-binder invocation claim. Immutable Core validation checks its exact
 Unit invocation and callback binder; source and compiled interfaces preserve
 that claim. Named, inline and demand specialization seed the first capability's
@@ -213,12 +216,12 @@ owners; an unhandled exiting owner produces `capability_escape`. Partially
 applying an identity helper does not license later arguments to an unknown sink.
 
 Two executed groups exercise separate same-family owners, U32/F32 payloads,
-source/compiled imports, sync/JSPI/rejection recovery, retained edits, checkpoint
-parity, unmatched callback requirements and rollback after proof loss. Native
-checking/lowering/emission allocation-failure laws and forged-claim validation
-cover this boundary. General dependent arrows, selections, hidden capture/store
-contracts and precise same-lifetime stores remain open. This slice makes no
-additional CPU claim or full combined qualification claim.
+source/compiled imports, sync/JSPI/rejection recovery, retained edits,
+checkpoint parity, unmatched callback requirements and rollback after proof
+loss. Native checking/lowering/emission allocation-failure laws and forged-claim
+validation cover this boundary. General dependent arrows, selections, hidden
+capture/store contracts and precise same-lifetime stores remain open. This slice
+makes no additional CPU claim or full combined qualification claim.
 
 ## Local State lifetime boundary
 
@@ -234,8 +237,52 @@ Two executed groups cover source/compiled imported declarations, stored captures
 across JSPI suspension, rejection recovery, checkpoint parity, older cells,
 ordinary providers and returned state negatives. Native laws cover handler
 shadowing, construction-time frame rejection and checking/lowering/emission
-allocation failure. The focused batch passes36 executed groups and all8 unchanged
-compile budgets; the analyzer reports369 files and zero findings. Fixed-path
-fanout128 requests16,136,290 bytes in53,920 allocations with exactly equal work
-counters before and after this slice. Full combined qualification and CPU
-measurement remain separate.
+allocation failure. The focused batch passes36 executed groups and all8
+unchanged compile budgets; the analyzer reports369 files and zero findings.
+Fixed-path fanout128 requests16,136,290 bytes in53,920 allocations with exactly
+equal work counters before and after this slice. Full combined qualification and
+CPU measurement remain separate.
+
+## Complete arrow binder boundary
+
+Complete annotations can bind one effect-family capability input and refer to
+its operations in subsequent arrow/result annotations. Binder AST nodes retain
+that value-name relationship separately from type variables. Annotation checking
+owns the quantified identity edge and limits the value environment to that
+annotation; plain implementation lambdas receive those contextual input types.
+Exact member and curried Unit-invocation flow claims retain their existing
+immutable Core validation. Implementation parameter names may differ from
+annotation binders.
+
+Curried results use explicit grouping, for example
+`(state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.get | e})`.
+This preserves ordinary arrow-row placement and keeps capability application
+pure. The durable design example now uses this spelling. Source
+frontend/formatter and native parser agree on binder syntax; generated artifacts
+come from the grammar.
+
+The existing curried execution matrix now runs both parameter and
+complete-header forms through source/compiled imports, U32/F32, two same-family
+owners, sync/JSPI, rejection recovery, edits, checkpoints, unmatched rows and
+proof-loss rollback. Native checking/lowering/emission allocation-failure laws
+cover complete binders, their annotation scope and hidden storage rejection.
+Multiple capability inputs, selected identities, general hidden capture/store
+contracts and arbitrary opaque footprints remain open. This is a focused
+boundary, not full058/059 completion.
+
+Final controls pass38 executed guest groups,8 unchanged compile budgets and19
+source frontend/formatter groups. Native scoped and complete-arrow laws include
+allocation-failure recovery;369 analyzer files have zero findings. Fresh Safe/
+noLLVM controls with isolated equal-length restart-cache directories request
+exactly16,136,392 bytes in53,920 allocations with18,504 type nodes and equal
+work counters before and after this slice. A restored CLI checkpoint must not be
+compared with a fresh run; an early mixed-state comparison was discarded.
+
+Tree-sitter's existing permissive annotation grammar needs no production change.
+The named-binder corpus and highlight controls pass with pinned upstream CLI
+v0.27.1:7 corpus parses and15 highlight fixtures, including5 new assertions. The
+official release archive SHA-256 is
+`d01042f94ba3d6827ddc9788e235f75d8366431be42bdf90ade534d960c98b7d`; the
+installed executable SHA-256 is
+`6de5f5c0f6d2e281ad2643d3874b66cf240fa77140c5346b670889483982b0c7`. Full
+combined qualification and CPU measurement remain separate.

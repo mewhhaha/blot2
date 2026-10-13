@@ -227,3 +227,154 @@ entry const windows = fn count => do:
     { stdRoot },
   );
 });
+
+Deno.test("private scalar callbacks retain conditional values reference pairs and independent replay under pressure", async () => {
+  await compileAndRun(
+    `
+import * as iter from "std/iter"
+const sum_pair = fn total => fn pair => do:
+  let (index, value) = pair
+  if index % 2 == 0:
+    return total + value * 3 + index
+  return total + value
+entry const conditional = fn count => iter.fold_left sum_pair 0 (iter.enumerate (iter.range 0 count))
+entry const replay = fn count => do:
+  let cursor = iter.enumerate (iter.range 0 count)
+  let saved = cursor.next
+  let total = 0
+  for repeat in 0..3:
+    total := self + iter.fold_left sum_pair 0 cursor
+    let garbage = @array.generate 8192 identity
+  let #Some ((index, value), rest) = saved else:
+    return total + 999
+  let #Some ((again, second), _) = rest.next else:
+    return total + index + value + 100
+  return total + index + value + again + second
+entry const references = fn (seed: U32) => do:
+  let values = @array.generate 4 (fn index => #[seed + index, index])
+  let cursor = iter.zip values (iter.range 0 4)
+  let saved = cursor.next
+  let total = 0
+  for repeat in 0..3:
+    total := self + iter.fold_left (fn accumulator => fn pair => do:
+      let (values, index) = pair
+      return accumulator + values.length + values[0] + index) 0 cursor
+    let garbage = @array.generate 8192 identity
+  let #Some ((first, index), _) = saved else:
+    return 999
+  return total + first.length + first[0] + index
+entry const floats = fn seed => iter.fold_left (fn total => fn pair => do:
+  let (index, value) = pair
+  if index % 2 == 0:
+    return total + value
+  return total - value) seed (iter.enumerate #[1.5, 2.5, 3.5, 4.5])
+`,
+    (guest) => {
+      for (const count of [0, 1, 2, 3, 17, 65]) {
+        let expected = 0;
+        for (let index = 0; index < count; index++) {
+          if (index % 2 === 0) expected += index * 4;
+          else expected += index;
+        }
+        assert.equal(guest.call("conditional", count), expected);
+        let replay = expected * 3 + 2;
+        if (count === 0) replay = 999;
+        if (count === 1) replay = 100;
+        assert.equal(guest.call("replay", count), replay);
+      }
+      for (const seed of [1, 7, 41]) {
+        assert.equal(guest.call("references", seed), 13 * seed + 62);
+      }
+      assert.equal(guest.call("floats", 0), -2);
+      assert.equal(guest.call("floats", 7), 5);
+    },
+    { stdRoot },
+  );
+});
+
+Deno.test("private scalar callback edits and restored checkpoints match fresh bodies in both tiers", async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-private-consumer-",
+  });
+  const entry = `${directory}/main.blot`;
+  const helper = `${directory}/consumer.blot`;
+  const program = `import * as iter from "std/iter"
+import * as consumer from "./consumer"
+entry const run = fn count => iter.fold_left consumer.sum 0 (iter.enumerate (iter.range 0 count))
+`;
+  const sources = (factor: number) => ({
+    [entry]: program,
+    [helper]: `const sum = fn total => fn pair => do:
+  let (index, value) = pair
+  if index % 2 == 0:
+    return total + value * ${factor} + index
+  return total + value * ${factor}
+`,
+  });
+  try {
+    for (const codegenTier of ["optimized", "development"] as const) {
+      const options = {
+        executable: Deno.args[0],
+        entry,
+        codegenTier,
+        prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+        stdRoot,
+        cacheDirectory: false as const,
+      };
+      const retained = await createZigProjectCompiler(options);
+      let checkpoint;
+      try {
+        for (const factor of [3, 5, 3]) {
+          const built = await retained.build({ sources: sources(factor) });
+          const fresh = await createZigProjectCompiler(options);
+          try {
+            const ordinary = await fresh.build({ sources: sources(factor) });
+            assert(
+              built.success && ordinary.success,
+              JSON.stringify({ built, ordinary }),
+            );
+            assert.deepEqual(built.bytes, ordinary.bytes);
+            const guest = await instantiateGuest(built.bytes);
+            try {
+              for (const count of [0, 1, 2, 17, 65]) {
+                let expected = factor * count * (count - 1) / 2;
+                for (let index = 0; index < count; index += 2) {
+                  expected += index;
+                }
+                assert.equal(guest.call("run", count), expected >>> 0);
+              }
+            } finally {
+              guest.dispose();
+            }
+          } finally {
+            await fresh.dispose();
+          }
+          if (checkpoint === undefined) {
+            checkpoint = await retained.exportCheckpoint();
+          }
+        }
+      } finally {
+        await retained.dispose();
+      }
+      const resumed = await createZigProjectCompiler({
+        ...options,
+        checkpoint,
+      });
+      const fresh = await createZigProjectCompiler(options);
+      try {
+        const built = await resumed.build({ sources: sources(5) });
+        const ordinary = await fresh.build({ sources: sources(5) });
+        assert(
+          built.success && ordinary.success,
+          JSON.stringify({ built, ordinary }),
+        );
+        assert.deepEqual(built.bytes, ordinary.bytes);
+      } finally {
+        await resumed.dispose();
+        await fresh.dispose();
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});

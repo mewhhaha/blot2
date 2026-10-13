@@ -3,6 +3,7 @@
 //! older version copies it into a new buffer; old values never change.
 const std = @import("std");
 pub const Span = struct { start: u32, len: u32 };
+pub const Frontier = struct { offset: u32, capacity: u32 };
 pub const Error = std.mem.Allocator.Error || error{Limit};
 pub const Store = struct {
     // Only the latest span in each buffer can extend into its unused slots.

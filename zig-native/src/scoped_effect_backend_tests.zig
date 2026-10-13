@@ -329,3 +329,17 @@ test "scoped effect local State storage releases capture roots on failed lowerin
     try emit(a, &module);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
 }
+
+fn lowerDependentArrowAndRelease(allocator: std.mem.Allocator) !void {
+    var module = try lowerText(allocator, @import("check_effect_tests.zig").dependent_arrow_source);
+    defer module.deinit(allocator);
+    try validation.validate(allocator, &module, .{ .units = &.{&module} });
+}
+test "scoped effect complete arrow binders survive owned lowering emission and OOM" {
+    var module = try lowerText(a, @import("check_effect_tests.zig").dependent_arrow_source);
+    defer module.deinit(a);
+    try validation.validate(a, &module, .{ .units = &.{&module} });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lowerDependentArrowAndRelease, .{});
+    try emit(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+}

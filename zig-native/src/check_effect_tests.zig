@@ -1355,3 +1355,51 @@ test "scoped effect closures do not inherit construction time State handlers" {
         \\)
     , .capability_escape);
 }
+
+pub const dependent_arrow_source = scoped_state_header ++
+    \\const read: (state: State a) -> a ! {state.get} = fn input => input.get ()
+    \\const apply: (state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.get | e}) = fn input => fn callback => callback ()
+    \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
+    \\  let (state, result) = do (@effect.state s.get s.set 7):
+    \\    use a <- read s
+    \\    use b <- apply s (fn () => s.get ())
+    \\    return @u32.add a b
+    \\  return result
+    \\)
+;
+fn dependentArrowLaw(allocator: std.mem.Allocator) !void {
+    try checkScopedSource(allocator, dependent_arrow_source, null);
+}
+test "scoped effect complete arrow binders share input identities across later rows" {
+    try dependentArrowLaw(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, dependentArrowLaw, .{});
+}
+
+test "scoped effect complete arrow inputs cannot hide captures in storage" {
+    try checkScopedSource(a, scoped_state_header ++
+        \\type Save a is effect = {keep: (Unit -> a) -> Unit}
+        \\const invalid: (state: State U32) -> Unit ! {Save.keep U32} = fn input => Save.keep U32 (fn () => do:
+        \\  let (state, value) = do (@effect.state input.get input.set 7):
+        \\    return input.get ()
+        \\  return value
+        \\)
+        \\entry const answer = 42
+    , .capability_escape);
+}
+
+test "scoped effect complete arrow binder names stop at the annotation boundary" {
+    try checkScopedSource(a, dependent_arrow_source ++ "\n" ++
+        \\const invalid: Unit -> U32 ! {state.get} = fn () => 42
+    , .unknown_effect);
+}
+
+test "scoped effect complete arrow context preserves explicit parameter constraints" {
+    try checkScopedSource(a, scoped_state_header ++
+        \\const invalid: (state: State U32) -> U32 ! {state.get} = fn (input: State F32) => input.get ()
+        \\entry const answer = 42
+    , .type_mismatch);
+    try checkScopedSource(a, scoped_state_header ++
+        \\const invalid: (state: State U32) -> U32 = fn () => 42
+        \\entry const answer = 42
+    , .type_mismatch);
+}

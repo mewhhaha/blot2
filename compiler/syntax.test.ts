@@ -2,6 +2,26 @@ import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import { createFrontend, type Cst, SourceError } from "./syntax.ts";
 const syntaxChildren = (children: readonly Cst[]) => children;
 
+Deno.test("dependent arrow binders remain distinct from type groups", async () => {
+  const frontend = await createFrontend();
+  const source = `type State a is effect = {get: Unit -> a, set: a -> Unit}
+const apply: (state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.get | e}) = fn input => fn callback => callback ()
+`;
+  try {
+    for (const input of [source, source.replaceAll("\n", "\r\n")]) {
+      const rows = normalizedNodes(frontend.parse(input).root, input);
+      equal(
+        rows.filter((row) => row.field === "name" && row.text === "state")
+          .length,
+        1,
+      );
+      ok(rows.some((row) => row.kind === "type_group"));
+    }
+  } finally {
+    frontend.dispose();
+  }
+});
+
 Deno.test("selector markers remain ordinary text inside comments and strings", async () => {
   const frontend = await createFrontend();
   try {

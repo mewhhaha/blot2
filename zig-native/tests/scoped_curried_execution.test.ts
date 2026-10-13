@@ -4,14 +4,21 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const library = `type State a is effect = {get: Unit -> a, set: a -> Unit}
+const libraries = {
+  parameter: `type State a is effect = {get: Unit -> a, set: a -> Unit}
+const read = fn (s: State a) => s.get ()
 const apply = fn (s: State a) => fn (callback: Unit -> a ! {s.get | e}) => callback ()
-`;
-const main = `import {State, apply} from "./state"
+`,
+  arrow: `type State a is effect = {get: Unit -> a, set: a -> Unit}
+const read: (state: State a) -> a ! {state.get} = fn input => input.get ()
+const apply: (state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.get | e}) = fn input => fn callback => callback ()
+`,
+};
+const main = `import {State, apply, read} from "./state"
 entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   use outer <- do (@effect.state left.get left.set 7):
     use inner <- do (@effect.state right.get right.set 100):
-      use a <- apply left (fn () => left.get ())
+      use a <- read left
       use b <- apply right (fn () => right.get ())
       use next <- host a
       use left.set next
@@ -36,8 +43,15 @@ entry const invalid = fn () => @effect.scope (fn (left: State U32) => @effect.sc
   return result
 ))
 `;
-for (const codegenTier of ["optimized", "development"] as const) {
-  Deno.test(`curried scoped capability callbacks retain identity through compiled imports and JSPI (${codegenTier})`, async () => {
+const cases = Object.entries(libraries).flatMap(([syntax, library]) =>
+  (["optimized", "development"] as const).map((codegenTier) => ({
+    syntax,
+    library,
+    codegenTier,
+  }))
+);
+for (const { syntax, library, codegenTier } of cases) {
+  Deno.test(`curried scoped capability callbacks retain identity through compiled imports and JSPI (${syntax}, ${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir({
       prefix: "blot-scoped-curried-",
     });
@@ -159,7 +173,10 @@ for (const codegenTier of ["optimized", "development"] as const) {
             ),
             JSON.stringify(wrongOwner),
           );
-          assert.deepEqual(await compiler.exportCheckpoint(), beforeUnmatched);
+          assert.deepEqual(
+            await compiler.exportCheckpoint(),
+            beforeUnmatched,
+          );
           const afterUnmatched = await compiler.build({ sources });
           assert(afterUnmatched.success, JSON.stringify(afterUnmatched));
           assert.deepEqual(afterUnmatched.bytes, built.bytes);

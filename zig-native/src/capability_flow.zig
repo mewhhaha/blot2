@@ -37,7 +37,7 @@ pub fn memberSource(tree: *const ast.Tree, pool: *const @import("symbols.zig").P
     const lambda = tree.node(expression);
     if (lambda.tag != .lambda) return false;
     const parameter = tree.parameter(lambda.a);
-    if (parameter.name == 0 or parameter.demanded or parameter.annotation == 0) return false;
+    if (parameter.name == 0 or parameter.demanded) return false;
     const body = unwrap(tree, lambda.b) orelse return false;
     const value = tree.node(body);
     if (value.tag != .apply) return false;
@@ -59,6 +59,6 @@ pub fn curriedUnitSource(tree: *const ast.Tree, initial: ast.Id) bool {
     const lambda = tree.node(expression);
     if (lambda.tag != .lambda) return false;
     const parameter = tree.parameter(lambda.a);
-    if (parameter.name == 0 or parameter.demanded or parameter.is_unit or parameter.annotation == 0) return false;
+    if (parameter.name == 0 or parameter.demanded or parameter.is_unit) return false;
     return tree.node(lambda.b).tag == .lambda and source(tree, lambda.b) == .invoke_unit;
 }

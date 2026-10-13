@@ -1,6 +1,18 @@
 import { deepStrictEqual as equal } from "node:assert/strict";
 import { formatSource } from "./format.ts";
 
+Deno.test("formatter preserves dependent arrow binders and staged row grouping", async () => {
+  const source = `type State a is effect={get:Unit->a,set:a->Unit}
+const read:(state:State a)->a!{state.get}=fn input=>input.get ()
+const apply:(state:State a)->((Unit->a!{state.get|e})->a!{state.get|e})=fn input=>fn callback=>callback ()
+`;
+  const formatted = await formatSource(source);
+  equal(await formatSource(formatted), formatted);
+  equal(await formatSource(source.replaceAll("\n", "\r\n")), formatted);
+  equal(formatted.includes("(state: State a)"), true);
+  equal(formatted.includes("((Unit -> a ! { state.get | e })"), true);
+});
+
 Deno.test("formatter preserves private opaque forwarding and constructor lambda syntax", async () => {
   const source = `export {Token as Ticket, make} from "./tokens"
 private opaque type Token=F32

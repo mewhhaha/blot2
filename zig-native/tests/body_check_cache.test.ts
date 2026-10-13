@@ -2324,3 +2324,415 @@ entry const owned = fn (value: U32) => do:
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+Deno.test("body checker reuse owns shared local relays through source and compiled changes", async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-body-shared-local-",
+  });
+  const entry = `${directory}/main.blot`;
+  const producer = `${directory}/numbers.blot`;
+  const pad = `${directory}/pad.blot`;
+  const bundle = `${directory}/numbers.blotdep`;
+  const library = (
+    inserted = false,
+    operation = "@u32.add",
+    foreign = false,
+    qualified = true,
+    owning = false,
+  ) => {
+    let prefix = "";
+    if (inserted) {
+      prefix = "type Earlier is data = #Earlier F32\nconst earlier = 7\n";
+    }
+    let annotation = "";
+    if (foreign) annotation = ": Number -> Number -> Number ! {Foreign}";
+    let payload = "U32";
+    let make = "#Number value";
+    let read = "value";
+    if (owning) {
+      payload = "Array U32";
+      make = "#Number #[value, @u32.add value 1]";
+      read = "@array.length value";
+      operation = "@array.concat";
+    }
+    let twice = '@type.call "add" amount amount';
+    if (!qualified) twice = "amount";
+    return `${prefix}type Number is data = #Number ${payload}
+const make = fn (value: U32) => ${make}
+const read = fn (#Number value) => ${read}
+const Number.add${annotation} = fn (#Number left) => fn (#Number right) => #Number (${operation} left right)
+const twice = fn amount => ${twice}
+`;
+  };
+  const imports = (inserted: boolean) => {
+    let text = "";
+    if (inserted) text = 'import {ignored} from "./pad"\n';
+    return text +
+      'import {Number, make, read, twice as exposed} from "./numbers"\n';
+  };
+  const source = (inserted = false, missing = false) => {
+    let target = "exposed";
+    if (missing) target = "missing_twice";
+    return `${imports(inserted)}const pipeline = fn value => do:
+  let local = fn amount => ${target} (${genericSpine("amount")})
+  let relay = fn amount => local amount
+  return relay value
+const require_pure = fn (callback: U32 -> U32) => callback 40
+entry const run = fn (value: U32) => read (pipeline (make value))
+entry const strict = fn () => require_pure run
+`;
+  };
+  async function pack(inserted = false) {
+    await Deno.writeTextFile(
+      entry,
+      `${imports(inserted)}entry const pack = fn (value: U32) => value\n`,
+    );
+    const result = await new Deno.Command(executable, {
+      args: ["dependencies", entry, bundle, "--prelude", "none"],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    assert.ok(
+      result.success,
+      new TextDecoder().decode(result.stdout) +
+        new TextDecoder().decode(result.stderr),
+    );
+  }
+  try {
+    await Deno.writeTextFile(pad, "const ignored = 7\n");
+    await Deno.writeTextFile(producer, library());
+    await pack();
+    for (const dependencies of [undefined, bundle]) {
+      const options = { executable, entry, prelude: null, dependencies };
+      const retained = await createZigProjectCompiler(options);
+      try {
+        for (
+          const [
+            index,
+            [inserted, operation, foreign, qualified, missing, owning, answer],
+          ] of ([
+            [false, "@u32.add", false, true, false, false, 80],
+            [true, "@u32.add", false, true, false, false, 80],
+            [true, "@u32.sub", false, true, false, false, 0],
+            [true, "@u32.add", false, true, true, false, null],
+            [true, "@u32.add", true, true, false, false, null],
+            [true, "@u32.add", false, true, false, false, 80],
+            [true, "@u32.add", false, false, false, false, 40],
+            [true, "@u32.add", false, false, false, true, 2],
+            [true, "@u32.add", false, true, false, true, 4],
+            [false, "@u32.add", false, true, false, true, 4],
+            [false, "@u32.add", false, true, false, false, 80],
+          ] as const).entries()
+        ) {
+          const producerText = library(
+            inserted,
+            operation,
+            foreign,
+            qualified,
+            owning,
+          );
+          await Deno.writeTextFile(producer, producerText);
+          if (dependencies !== undefined) await pack(inserted);
+          const fresh = await createZigProjectCompiler(options);
+          try {
+            const sources = {
+              [entry]: source(inserted, missing),
+              [producer]: producerText,
+              [pad]: "const ignored = 7\n",
+            };
+            const expected = await fresh.build({ sources });
+            const actual = await retained.build({ sources });
+            assert.equal(actual.success, expected.success);
+            if (!actual.success || !expected.success) {
+              assert.ok(!actual.success && !expected.success);
+              assert.equal(answer, null);
+              assert.deepEqual(actual.diagnostics, expected.diagnostics);
+              continue;
+            }
+            assert.deepEqual(actual.bytes, expected.bytes);
+            if (index === 1 || index === 2 || index === 5 || index === 9) {
+              assert.ok(
+                Number(actual.stats.frontend.body_elaborations) <
+                  Number(expected.stats.frontend.body_elaborations),
+                `lane=${dependencies} index=${index} actual=${
+                  JSON.stringify(actual.stats.frontend)
+                } fresh=${JSON.stringify(expected.stats.frontend)}`,
+              );
+            }
+            const guest = await instantiateGuest(actual.bytes);
+            try {
+              assert.equal(guest.call("run", 40), answer);
+              assert.equal(guest.call("strict", null), answer);
+            } finally {
+              await guest.dispose();
+            }
+          } finally {
+            await fresh.close();
+          }
+        }
+      } finally {
+        await retained.close();
+      }
+      await Deno.writeTextFile(producer, library());
+      await pack();
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
+Deno.test("body checker reuse owns Foreign arrows through source compiled changes and rejection", async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-body-foreign-arrow-",
+  });
+  const entry = `${directory}/main.blot`;
+  const producer = `${directory}/callbacks.blot`;
+  const bundle = `${directory}/callbacks.blotdep`;
+  const library = (changed = false, pure = false) => {
+    let effects = "Foreign";
+    if (pure) effects = "";
+    let value = "value";
+    if (changed) value = "@u32.add value 1";
+    return `const invoke = fn (host: U32 -> U32 ! {${effects}}) => fn (value: U32) => host (${value})\n`;
+  };
+  const source = (inserted = false, pure = false, missing = false) => {
+    let prefix = "";
+    if (inserted) prefix = "const earlier_spelling = {tail: 3.0, head: 2}\n";
+    let effects = "Foreign";
+    let target = "host";
+    if (pure) {
+      effects = "";
+      target = "fn (value: U32) => value";
+    }
+    let helper = "invoke";
+    if (missing) helper = "missing_invoke";
+    return `import {invoke} from "./callbacks"
+${prefix}const relay = fn (host: U32 -> U32 ! {${effects}}) => ${helper} host (${
+      genericSpine("40")
+    })
+entry const run = fn (host: U32 -> U32 ! {Foreign}) => relay (${target})
+`;
+  };
+  async function pack() {
+    await Deno.writeTextFile(
+      entry,
+      'import {invoke} from "./callbacks"\nentry const pack = fn (value: U32) => value\n',
+    );
+    const result = await new Deno.Command(executable, {
+      args: ["dependencies", entry, bundle, "--prelude", "none"],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    assert.ok(
+      result.success,
+      new TextDecoder().decode(result.stdout) +
+        new TextDecoder().decode(result.stderr),
+    );
+  }
+  try {
+    await Deno.writeTextFile(producer, library());
+    await pack();
+    for (const dependencies of [undefined, bundle]) {
+      const options = { executable, entry, prelude: null, dependencies };
+      const retained = await createZigProjectCompiler(options);
+      try {
+        for (
+          const [index, [inserted, changed, pure, missing, accepted, answer]]
+            of ([
+              [false, false, false, false, true, 41],
+              [true, false, false, false, true, 41],
+              [true, true, false, false, true, 42],
+              [true, true, false, true, false, 0],
+              [true, true, false, "closed", false, 0],
+              [true, true, true, false, true, 41],
+              [true, true, false, false, true, 42],
+              [false, false, false, false, true, 41],
+            ] as const).entries()
+        ) {
+          const producerText = library(changed, pure);
+          await Deno.writeTextFile(producer, producerText);
+          if (dependencies !== undefined) await pack();
+          const fresh = await createZigProjectCompiler(options);
+          try {
+            let entryText = source(inserted, pure, missing === true);
+            if (missing === "closed") {
+              entryText = entryText.replace(
+                "const relay = fn",
+                "const relay: (U32 -> U32 ! {Foreign}) -> U32 ! {} = fn",
+              );
+            }
+            const sources = {
+              [entry]: entryText,
+              [producer]: producerText,
+            };
+            const expected = await fresh.build({ sources });
+            const actual = await retained.build({ sources });
+            assert.equal(actual.success, accepted);
+            assert.equal(actual.success, expected.success);
+            if (!actual.success || !expected.success) {
+              assert.ok(!actual.success && !expected.success);
+              assert.deepEqual(actual.diagnostics, expected.diagnostics);
+              continue;
+            }
+            assert.deepEqual(actual.bytes, expected.bytes);
+            if (index === 1) {
+              assert.ok(
+                Number(actual.stats.frontend.body_elaborations) <
+                  Number(expected.stats.frontend.body_elaborations),
+              );
+            }
+            const guest = await instantiateGuest(actual.bytes);
+            const trace: number[] = [];
+            try {
+              assert.equal(
+                guest.call(
+                  "run",
+                  guest.capability({
+                    parameter: "U32",
+                    result: "U32",
+                    call(value: number) {
+                      trace.push(value);
+                      return value + 1;
+                    },
+                  }),
+                ),
+                answer,
+              );
+              let expectedTrace: number[] = [40];
+              if (changed) expectedTrace = [41];
+              if (pure) expectedTrace = [];
+              assert.deepEqual(trace, expectedTrace);
+            } finally {
+              await guest.dispose();
+            }
+          } finally {
+            await fresh.close();
+          }
+        }
+      } finally {
+        await retained.close();
+      }
+      await Deno.writeTextFile(producer, library());
+      await pack();
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
+Deno.test("body checker reuse owns array selectors through source compiled changes and rejection", async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-body-array-index-",
+  });
+  const entry = `${directory}/main.blot`;
+  const producer = `${directory}/arrays.blot`;
+  const bundle = `${directory}/arrays.blotdep`;
+  const library = (changed = false) => {
+    let index = "0";
+    if (changed) index = "1";
+    return `const first = fn (values: Array a) => (${
+      genericSpine("values")
+    })[${index}]\n`;
+  };
+  const source = (index = "0", inserted = false) => {
+    let prefix = "";
+    if (inserted) prefix = "const earlier_spelling = {tail: 3.0, head: 2}\n";
+    return `import {first} from "./arrays"
+${prefix}const slot = ${index}
+const select = fn (values: Array a) => (${genericSpine("values")})[slot]
+entry const run = fn (value: U32) => select #[value, @u32.add value 1]
+entry const floating = fn (value: F32) => select #[value, @f32.add value 1.0]
+entry const packed = fn (value: U32) => select #[#[value], #[@u32.add value 1]]
+entry const imported = fn (value: U32) => first #[value, @u32.add value 1]
+`;
+  };
+  async function pack() {
+    await Deno.writeTextFile(
+      entry,
+      'import {first} from "./arrays"\nentry const pack = fn (value: U32) => value\n',
+    );
+    const result = await new Deno.Command(executable, {
+      args: ["dependencies", entry, bundle, "--prelude", "none"],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    assert.ok(
+      result.success,
+      new TextDecoder().decode(result.stdout) +
+        new TextDecoder().decode(result.stderr),
+    );
+  }
+  try {
+    await Deno.writeTextFile(producer, library());
+    await pack();
+    for (const dependencies of [undefined, bundle]) {
+      const options = { executable, entry, prelude: null, dependencies };
+      const retained = await createZigProjectCompiler(options);
+      try {
+        for (
+          const [revision, [slot, inserted, changed, accepted]] of ([
+            ["0", false, false, true],
+            ["0", true, false, true],
+            ["1", true, false, true],
+            ["1.0", true, false, false],
+            ["1", true, true, true],
+            ["0", false, false, true],
+          ] as const).entries()
+        ) {
+          const producerText = library(changed);
+          await Deno.writeTextFile(producer, producerText);
+          if (dependencies !== undefined) await pack();
+          const fresh = await createZigProjectCompiler(options);
+          try {
+            const sources = {
+              [entry]: source(slot, inserted),
+              [producer]: producerText,
+            };
+            const expected = await fresh.build({ sources });
+            const actual = await retained.build({ sources });
+            assert.equal(actual.success, accepted);
+            assert.equal(actual.success, expected.success);
+            if (!actual.success || !expected.success) {
+              assert.ok(!actual.success && !expected.success);
+              assert.deepEqual(actual.diagnostics, expected.diagnostics);
+              continue;
+            }
+            assert.deepEqual(actual.bytes, expected.bytes);
+            if (revision === 1 || revision === 2 || revision === 4) {
+              assert.ok(
+                Number(actual.stats.frontend.body_elaborations) <
+                  Number(expected.stats.frontend.body_elaborations),
+              );
+            }
+            const guest = await instantiateGuest(actual.bytes);
+            let answer = 40;
+            if (slot === "1") answer += 1;
+            let imported = 40;
+            if (changed) imported += 1;
+            try {
+              for (let repeat = 0; repeat < 3; repeat++) {
+                assert.equal(guest.call("run", 40), answer);
+                assert.equal(guest.call("floating", 40.5), answer + 0.5);
+                assert.deepEqual(
+                  guest.call("packed", 40),
+                  new Uint32Array([answer]),
+                );
+                assert.equal(guest.call("imported", 40), imported);
+              }
+            } finally {
+              await guest.dispose();
+            }
+          } finally {
+            await fresh.close();
+          }
+        }
+      } finally {
+        await retained.close();
+      }
+      await Deno.writeTextFile(producer, library());
+      await pack();
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});

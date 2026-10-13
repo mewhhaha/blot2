@@ -614,6 +614,13 @@ const Parser = struct {
         }
         const array = self.eat(.l_bracket);
         if (!array and !self.eat(.l_paren)) return self.fail(.expected_type);
+        if (!array and self.at(.identifier) and self.peek(1) == .colon) {
+            const name = try self.lowerIdentifier();
+            _ = try self.expect(.colon);
+            const annotation = try self.typeExpression();
+            _ = try self.expect(.r_paren);
+            return self.add(.type_binder, name, annotation, 0, start);
+        }
         const end: Tag = if (array) .r_bracket else .r_paren;
         var values: std.ArrayList(Id) = .empty;
         defer values.deinit(self.allocator);

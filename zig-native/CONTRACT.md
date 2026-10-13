@@ -523,8 +523,8 @@ static or reference identity from scalar bits. Machine-observed slots stay.
 Nested child replacement proceeds while allocation sites strictly decrease.
 Admission bounds loops and control nesting and compares added root publications
 against removed allocation sites in each unchanged loop. One-time allocations
-and cadence-only carrier allocations do not pay for per-pull journal traffic.
-An unprofitable candidate keeps the established scalar/activation optimization.
+and cadence-only carrier allocations do not pay for per-pull journal traffic. An
+unprofitable candidate keeps the established scalar/activation optimization.
 Direct loop patterns containing only bindings, wildcards and products need no
 failure blocks; their local definitions dominate the loop body. Patterns with
 runtime tests retain the failure path. Generic iterator lowering still creates
@@ -971,6 +971,13 @@ carry-slot clearing retain their original order. Unknown/owning fields and
 demand-force markers decline. Source arithmetic, eager operands and F32 bits
 remain exact; this grants no semantic or value-cache validity. See
 [iterator state qualification](ITERATOR_STATE.md).
+
+An exact table target in a selected private closure may expose a bounded checked
+scalar consumer with internal blocks. Copied locals start at typed zero on every
+call, and branches remain inside that body. Calls, loops, writes, unknown roles,
+source root scopes and external observations retain the call. This admission
+consumes complete callable inputs; see
+[the private callback checkpoint](PRIVATE_SCALAR_CONSUMERS.md).
 
 A closed private packed List cursor family may keep its four immutable version
 fields in machine locals. Exact source uses, scalar row layouts and constructor

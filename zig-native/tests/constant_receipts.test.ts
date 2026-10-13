@@ -5,6 +5,87 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 
+Deno.test("constant receipts restore growing collection frontiers across edits and failed revisions", async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-constant-growth-" });
+  const entry = `${directory}/main.blot`;
+  const source = (sibling: string, count: number) => `
+const grown: List U32 = do:
+  let values = []
+  for index in 0..${count}:
+    values := if @u32.lt index 16 then @list.append values index else @list.prepend values index
+  return values
+const later = @list.prepend (@list.append grown 99) 100
+entry const first = fn () => @array.from_list grown
+entry const following = fn () => @array.from_list later
+entry const sibling = ${sibling}
+`;
+  const options = {
+    executable,
+    entry,
+    prelude: null,
+    cacheDirectory: false,
+  } as const;
+  const retained = await createZigProjectCompiler(options);
+  try {
+    const revisions = [
+      ["1", 32],
+      ["2", 32],
+      ["3", 33],
+      ["missing", 33],
+      ["4", 33],
+      ["5", 32],
+      ["6", 32],
+    ] as const;
+    for (const [revision, [sibling, count]] of revisions.entries()) {
+      const fresh = await createZigProjectCompiler(options);
+      try {
+        const sources = { [entry]: source(sibling, count) };
+        const expected = await fresh.build({ sources });
+        const actual = await retained.build({ sources });
+        assert.equal(actual.success, expected.success);
+        if (!expected.success || !actual.success) {
+          assert.equal(sibling, "missing");
+          assert.ok(!actual.success && !expected.success);
+          assert.deepEqual(actual.diagnostics, expected.diagnostics);
+          continue;
+        }
+        assert.deepEqual(actual.bytes, expected.bytes);
+        assert.equal(
+          actual.stats.nativeWorkSteps,
+          expected.stats.nativeWorkSteps,
+        );
+        if (revision === 1 || revision === 6) {
+          const traffic = actual.stats.constantReceipts as Record<
+            string,
+            number
+          >;
+          assert.equal(traffic.reused, 1);
+        }
+        const values: number[] = [];
+        for (let index = 0; index < count; index++) {
+          if (index < 16) values.push(index);
+          else values.unshift(index);
+        }
+        const guest = await instantiateGuest(actual.bytes);
+        try {
+          assert.deepEqual(guest.call("first", null), new Uint32Array(values));
+          assert.deepEqual(
+            guest.call("following", null),
+            new Uint32Array([100, ...values, 99]),
+          );
+        } finally {
+          await guest.dispose();
+        }
+      } finally {
+        await fresh.dispose();
+      }
+    }
+  } finally {
+    await retained.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 Deno.test("constant receipts retain qualified scalar and owning graphs with fresh bytes and fuel", async () => {
   const directory = await Deno.makeTempDir({
     prefix: "blot-constant-receipts-",

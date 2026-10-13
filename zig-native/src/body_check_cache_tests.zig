@@ -160,13 +160,13 @@ test "body check cache sparse storage and elaboration scale with admitted declar
     }
 }
 
-test "body check cache declines effect annotations and preserves unresolved selection diagnostics" {
+test "body check cache owns Foreign annotations and preserves unresolved selection diagnostics" {
     const effectful = "const invoke = fn (host: U32 -> U32 ! {Foreign}) => host 42\nentry const run = fn (host: U32 -> U32 ! {Foreign}) => invoke host\nconst unrelated = 7\n";
     var before = try prepare(a, effectful, null);
     defer before.deinit(a);
-    try std.testing.expect(before.bodies.find("invoke") == null);
-    try std.testing.expect(before.bodies.find("run") == null);
-    try parity(effectful, effectful, 2);
+    try std.testing.expect(before.bodies.find("invoke") != null);
+    try std.testing.expect(before.bodies.find("run") != null);
+    try parity(effectful, effectful, 0);
     const selected = "const helper = fn (x: U32) -> U32 => @type.call \"add\" x 2\nentry const run = fn (x: U32) -> U32 => helper x\nconst unrelated = 7\n";
     var selected_before = try prepare(a, selected, null);
     defer selected_before.deinit(a);
@@ -401,8 +401,7 @@ test "body check cache relocates symbolic callback effects without closing them"
     defer expected.deinit(a);
     try compare(a, &first.bodies, next_source, expected.bytes, 1);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &first.bodies, next_source, expected.bytes, @as(usize, 1) });
-    // The helper's symbolic row must remain open for Foreign callbacks. A
-    // consumer with explicit effect syntax stays ordinary in this slice.
+    // Both inferred and written callback rows preserve the Foreign effect.
     const foreign_source = "const apply = fn callback => fn argument => callback argument\nentry const run = fn (host: U32 -> U32 ! {Foreign}) => apply host 42\n";
     var foreign_fresh = try prepare(a, foreign_source, null);
     defer foreign_fresh.deinit(a);
@@ -1171,4 +1170,100 @@ test "body check cache imported annotation recipes own original heads through al
     var renamed = try importedAnnotationConsumer(a, false, true, &before.bodies);
     defer renamed.deinit(a);
     try std.testing.expectEqual(@as(usize, 1), renamed.elaborations);
+}
+
+test "body check cache restores shared requirements inside local principals" {
+    const source =
+        \\const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right
+        \\const F32.add = fn (left: F32) => fn (right: F32) => @f32.add left right
+        \\const Array.add = fn (left: Array U32) => fn (right: Array U32) => @array.concat left right
+        \\const twice = fn value => @type.call "add" value value
+        \\const pipeline = fn value => do:
+        \\  let local = fn amount => twice amount
+        \\  let relay = fn amount => local amount
+        \\  return relay value
+        \\entry const unsigned = fn (value: U32) => pipeline value
+        \\entry const floating = fn (value: F32) => pipeline value
+        \\entry const packed = fn (value: U32) => pipeline #[value, @u32.add value 1]
+    ;
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("pipeline") != null);
+    const inserted = try a.print("const earlier_spelling = {{tail: 3.0, head: 2}}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 2);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 2) });
+    const empty: cache.Cache = .{};
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
+    const edited = try std.mem.replaceOwned(u8, a, source, "@u32.add left right", "@u32.sub left right");
+    defer a.free(edited);
+    try parity(source, edited, 2);
+    const added = try a.print("const Bool.add = fn (left: Bool) => fn (right: Bool) => left\n{s}", .{source});
+    defer a.free(added);
+    try parity(source, added, 6);
+    const unqualified = try std.mem.replaceOwned(u8, a, source, "fn value => @type.call \"add\" value value", "fn value => value");
+    defer a.free(unqualified);
+    try parity(source, unqualified, 6);
+}
+
+test "body check cache Foreign arrow receipts survive allocation failures and interface changes" {
+    const source = "const invoke = fn (host: U32 -> U32 ! {Foreign}) => host 42\nentry const run = fn (host: U32 -> U32 ! {Foreign}) => invoke host\n";
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("invoke") != null);
+    try std.testing.expect(before.bodies.find("run") != null);
+    const inserted = try a.print("const earlier_spelling = {{tail: 3.0, head: 2}}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
+    const empty: cache.Cache = .{};
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
+    const edited = try std.mem.replaceOwned(u8, a, source, "host 42", "host 43");
+    defer a.free(edited);
+    try parity(source, edited, 1);
+    const pure = "const invoke = fn (host: U32 -> U32 ! {}) => host 42\nentry const run = fn () => invoke (fn (value: U32) => value)\n";
+    try parity(source, pure, 2);
+    const operation = "effect Read: Unit -> U32\nconst invoke = fn (host: Unit -> U32 ! {Read}) => host ()\n";
+    var ordinary = try prepare(a, operation, null);
+    defer ordinary.deinit(a);
+    try std.testing.expect(ordinary.bodies.find("invoke") == null);
+}
+
+test "body check cache owns symbolic written Foreign arrow rows" {
+    const symbolic = "const invoke: (U32 -> U32 ! {|e}) -> U32 ! {|e} = fn host => host 42\nentry const run = fn (host: U32 -> U32 ! {Foreign}) => invoke host\n";
+    try parity(symbolic, symbolic, 0);
+}
+
+test "body check cache owns generic array indexing through allocation failures" {
+    const source =
+        \\const seed = 0
+        \\const first = fn (value: Array a) => value[seed]
+        \\entry const unsigned = fn (value: U32) => first #[value, @u32.add value 1]
+        \\entry const floating = fn (value: F32) => first #[value, @f32.add value 1.0]
+        \\entry const packed = fn (value: U32) => first #[#[value], #[@u32.add value 1]]
+    ;
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("first") != null);
+    const inserted = try a.print("const earlier_spelling = {{tail: 3.0, head: 2}}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
+    const empty: cache.Cache = .{};
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
+    const edited = try std.mem.replaceOwned(u8, a, source, "const seed = 0", "const seed = 1");
+    defer a.free(edited);
+    try parity(source, edited, 1);
 }

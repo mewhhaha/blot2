@@ -159,6 +159,121 @@ test "constant receipts reset shared graph scratch after hits misses and allocat
     }
 }
 
+fn growingSource(sibling: []const u8) ![]u8 {
+    return a.print(
+        \\const grown: List U32 = do:
+        \\  let values = []
+        \\  for index in 0..32:
+        \\    values := if @u32.lt index 16 then @list.append values index else @list.prepend values index
+        \\  return values
+        \\const later = @list.prepend (@list.append grown 99) 100
+        \\entry const first = fn () => @array.from_list grown
+        \\entry const following = fn () => @array.from_list later
+        \\entry const sibling = {s}
+        \\
+    , .{sibling});
+}
+test "constant receipts restore the recorded growth frontier before later ordinary extensions" {
+    const source = try growingSource("1");
+    defer a.free(source);
+    var before = try Fixture.init(source);
+    defer before.deinit();
+    var initial = try before.compile(a, null, true);
+    defer initial.deinit(a);
+    try std.testing.expect(initial.diagnostic == null);
+    try std.testing.expectEqual(@as(usize, 1), initial.constant_receipts.recorded);
+    const record = initial.capture.?.metadata.pools.?.constant_records[0];
+    const growth = record.events[record.events.len - 1].growth;
+    try std.testing.expectEqual(@as(u64, 32), growth.mutations);
+    try std.testing.expect(growth.frontier != null);
+    const edited = try growingSource("2");
+    defer a.free(edited);
+    var after = try Fixture.init(edited);
+    defer after.deinit();
+    var fresh = try after.compile(a, null, false);
+    defer fresh.deinit(a);
+    try replayGraphs(a, &after, &initial, &fresh, 1);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, replayGraphs, .{ &after, &initial, &fresh, @as(usize, 1) });
+    try replayGraphs(a, &after, &initial, &fresh, 1);
+}
+
+test "constant receipts preserve growth capacity and temporary debt at tight child limits" {
+    const original = try growingSource("1");
+    defer a.free(original);
+    const edited = try growingSource("2");
+    defer a.free(edited);
+    var before = try Fixture.init(original);
+    defer before.deinit();
+    var after = try Fixture.init(edited);
+    defer after.deinit();
+    var admitted: usize = 0;
+    for ([_]usize{ 64, 80, 96, 112, 128, 144, 160, 192, 256 }) |children| {
+        const limits: @FieldType(backend.CompileOptions, "constant_limits") = .{ .children = children };
+        var initial = try before.compileLimited(a, null, true, limits);
+        defer initial.deinit(a);
+        if (initial.diagnostic != null) continue;
+        var fresh = try after.compileLimited(a, null, false, limits);
+        defer fresh.deinit(a);
+        var retained = try after.compileLimited(a, &initial, true, limits);
+        defer retained.deinit(a);
+        try std.testing.expectEqualDeep(fresh.diagnostic, retained.diagnostic);
+        try std.testing.expectEqualSlices(u8, fresh.bytes, retained.bytes);
+        try std.testing.expectEqual(fresh.constant_steps, retained.constant_steps);
+        try std.testing.expectEqual(@as(usize, 1), retained.constant_receipts.reused);
+        admitted += 1;
+    }
+    try std.testing.expect(admitted >= 3);
+}
+
+test "constant receipts omit inaccessible growth frontiers from old versions and scalar results" {
+    var expression = try a.dupe(u8, "1");
+    defer a.free(expression);
+    for (0..80) |_| {
+        const next = try a.print("@u32.add 1 ({s})", .{expression});
+        a.free(expression);
+        expression = next;
+    }
+    for ([_]bool{ false, true }) |scalar| {
+        var outcome: []const u8 = "first";
+        var use: []const u8 = "@array.from_list following";
+        var following: []const u8 = "@list.append value 9";
+        if (scalar) {
+            outcome = "@list.length later";
+            use = "following";
+            following = "@u32.add value 9";
+        }
+        const text = try a.print(
+            \\const value = do:
+            \\  let first = @list.append [] ({s})
+            \\  let later = @list.append first 7
+            \\  return {s}
+            \\const following = {s}
+            \\entry const run = fn () => {s}
+            \\entry const sibling = 1
+            \\
+        , .{ expression, outcome, following, use });
+        defer a.free(text);
+        var before = try Fixture.init(text);
+        defer before.deinit();
+        var initial = try before.compile(a, null, true);
+        defer initial.deinit(a);
+        try std.testing.expect(initial.diagnostic == null);
+        try std.testing.expectEqual(@as(usize, 1), initial.constant_receipts.recorded);
+        const record = initial.capture.?.metadata.pools.?.constant_records[0];
+        const growth = record.events[record.events.len - 1].growth;
+        try std.testing.expectEqual(@as(u64, 2), growth.mutations);
+        try std.testing.expect(growth.frontier == null);
+        text[text.len - 2] = '2';
+        var after = try Fixture.init(text);
+        defer after.deinit();
+        var fresh = try after.compile(a, null, false);
+        defer fresh.deinit(a);
+        if (scalar) {
+            try replay(a, &after, &initial, &fresh, 1);
+        } else try replayGraphs(a, &after, &initial, &fresh, 1);
+    }
+}
+
 test "constant receipts prove duplicate closed type tails and reject forged tails" {
     const original = try makeSource("2", "1");
     defer a.free(original);

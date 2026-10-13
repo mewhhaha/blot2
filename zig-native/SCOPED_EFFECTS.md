@@ -72,8 +72,11 @@ type. Its value name is in scope only in subsequent arrow/result annotations; it
 is not a general value-dependent type expression.
 
 ```blot
-const apply: (state: State a) -> (Unit -> a ! {state.get}) -> a ! {state.get} = fn state => fn callback => callback ()
+const apply: (state: State a) -> ((Unit -> a ! {state.get}) -> a ! {state.get}) = fn state => fn callback => callback ()
 ```
+
+The grouped result preserves ordinary arrow-row placement: its written row
+describes callback invocation, while supplying the capability remains pure.
 
 Operation aliases retain the exact identity. An arbitrary ordinary function with
 the same input/output types cannot serve as a row label. Capabilities have no

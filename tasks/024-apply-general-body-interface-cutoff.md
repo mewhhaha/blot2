@@ -160,7 +160,6 @@ population costs rise22–25%. Written/shared local origins, other residual kind
 relocation, full-gate/release acceptance and the total edit target keep024
 and053 open. See [BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
 
-
 ### Isolated declared local qualifications —13 October 2026
 
 Written associated/result-selection and representation local principals now
@@ -170,15 +169,15 @@ clause position; portable snapshots and sparse receipt headers stay unchanged.
 Native fresh/retained/population OOM and exact bounded clause controls,23body
 guest laws, eight unchanged budgets and371-file zero analyzer pass. Matched
 Safe/noLLVM declared64/128 edit CPU94.375→81.875 /183.75→158.125ms; elaborations
-69.5/133.5→5.5. Population rises37–44%. Shared local edges, other residual kinds,
-producer ordinals, broader forms, release/full-gate acceptance and the total
-edit target keep024/053 open. See [BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
-
+69.5/133.5→5.5. Population rises37–44%. Shared local edges, other residual
+kinds, producer ordinals, broader forms, release/full-gate acceptance and the
+total edit target keep024/053 open. See
+[BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
 
 ### Isolated producer ordinal relocation —13 October 2026
 
-Borrowed body offers now resolve by canonical filename. Owned nominal reads
-and imported/associated/qualified principal receipts bind exact original module
+Borrowed body offers now resolve by canonical filename. Owned nominal reads and
+imported/associated/qualified principal receipts bind exact original module
 origins and declaration names, while replay reconstructs current unit/binding
 execution targets. Source and compiled insert/delete/renumber, equal-interface
 retarget revocation, owning payloads, retained revision/allocation failures,
@@ -189,7 +188,6 @@ shared locals, imported annotation heads, broader forms, other residual kinds,
 full-gate/release acceptance and the total edit target keep024/053 open. See
 [BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
 
-
 ### Isolated imported annotation heads and recipe proofs —13 October 2026
 
 Capture/replay now use the checker's exact current nominal-name lookup while it
@@ -199,7 +197,45 @@ table or receipt/archive header is added. A fixed body-local recipe memo retains
 exact depth and proof-budget guards and resets across checker mutations.
 59focused native/OOM laws,25body guests, eight budgets and371-file zero analyzer
 pass. Matched Safe/noLLVM head64/128 CPU115.625→108.125 /223.75→208.125ms and
-elaborations66/130→2; population rises15–17%. The rejected un-memoized regression
-is preserved. Shared local requirements, other residuals, broader forms,
-full-gate/release acceptance and the total edit target keep024/053 open. See
+elaborations66/130→2; population rises15–17%. The rejected un-memoized
+regression is preserved. Shared local requirements, other residuals, broader
+forms, full-gate/release acceptance and the total edit target keep024/053 open.
+See [BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
+
+### Isolated shared local requirements —13 October 2026
+
+Local principals now own completed shared callee edges through binding receipts
+and restore their current targets before instantiation. Replay preserves the
+local generalization boundary, avoiding duplicate enclosing requirements.
+60native/OOM laws,26body guests, eight budgets and371-file zero analyzer pass.
+Matched Safe/noLLVM local64/128 CPU120→89.375 /231.875→172.5ms and elaborations
+70.5/134.5→6.5; population rises9–10%, steady RSS944/720KiB. Five additional
+plain pairs are equal after a noisy initial control. Other residual/effect/
+control forms, combined release acceptance and the total edit target keep024
+and053 open. See [BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
+
+### Isolated written Foreign arrows —13 October 2026
+
+Explicit Foreign function-arrow syntax now uses the existing complete owned row
+proof, including closed empty rows and symbolic written tails. Exact syntax
+bounds and the sealed label identity require no schema growth.62 body native
+laws,27 executed body guests,8 unchanged budgets and371-file zero analyzer pass
+in isolation. Source/compiled callbacks preserve changed traces, reject a closed
+pure annotation and recover. CPU5 Safe/noLLVM64/128 retained CPU falls 70→63.125
+/136.875→120ms; population rises33%/25% and retained RSS604/1792KiB. Root's
+combined release qualification remains separate. User-operation and
+field/receiver/update residuals, other control forms and total edit performance
+keep024/053 open. See[BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).
+
+### Isolated ordinary array selectors —13 October 2026
+
+Array indexing is admitted through the existing owned expression facts, without
+metadata/schema growth.63 native body laws,28 executed body guests,8 unchanged
+budgets and371-file zero analyzer pass in isolation. Generic scalar/F32/owning
+selectors cover source/compiled edits, selector diagnostics/recovery and every
+capture/replay allocation failure. Safe/noLLVM64/128 retained CPU falls
+64.375→56.25 /122.5→106.875ms; population rises17%/30%, retained RSS96/1224KiB.
+An initial plain128 slowdown did not repeat across five further pairs. Root's
+combined release gate remains separate; general residuals, mutation/control
+forms and total edit performance keep024/053 open. See
 [BODY_CUTOFF](../zig-native/BODY_CUTOFF.md).

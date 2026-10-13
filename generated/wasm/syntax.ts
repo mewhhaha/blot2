@@ -285,6 +285,7 @@ export type RuleName =
   | "type_application"
   | "demand_type"
   | "type_atom"
+  | "type_binder"
   | "type_group"
   | "expression"
   | "lambda"
@@ -724,6 +725,13 @@ export interface DemandTypeCursor extends RuleCursorBase<"demand_type"> {
 }
 
 export interface TypeAtomCursor extends RuleCursorBase<"type_atom"> {
+}
+
+export interface TypeBinderCursor extends RuleCursorBase<"type_binder"> {
+  field(name: "annotation"): TypeExpressionCursor;
+  field(name: "name"): TokenCursor<"named", "IDENT">;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
 }
 
 export interface TypeGroupCursor extends RuleCursorBase<"type_group"> {
@@ -1226,6 +1234,7 @@ export type AnyRuleCursor =
   | TypeApplicationCursor
   | DemandTypeCursor
   | TypeAtomCursor
+  | TypeBinderCursor
   | TypeGroupCursor
   | ExpressionCursor
   | LambdaCursor

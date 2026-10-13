@@ -11,8 +11,8 @@ A typed read of a nonempty product/record or boxed nominal carries an exact
 symbolic fact. Private copies may include an absent zero alternative only when
 every read has this fact. Field locals remain independent across snapshots and
 forks. Full initialization, fixed offsets, checked field roles and ordinary
-escape restrictions still apply. Unknown/unmarked reads retain heap storage. F
-32 copies retain their raw bits. Consumed empty-constructor facts disappear with
+escape restrictions still apply. Unknown/unmarked reads retain heap storage. F32
+copies retain their raw bits. Consumed empty-constructor facts disappear with
 the old address; inserted scalar tags cannot become stale constructor facts on a
 later pass.
 
@@ -112,3 +112,7 @@ qualification is claimed. The next compiler-cost hill is attributing this extra
 The parent owns the merged full compiler gate. This isolated checkpoint makes no
 full-task completion, commit, push or captured-project claim. Remaining
 strict/windows state and escaped callback values keep their ordinary storage.
+
+The subsequent [private scalar callback checkpoint](PRIVATE_SCALAR_CONSUMERS.md)
+eliminates eligible enumerate/zip value pairs and partial environments. Strict
+zip and windows state remain open; captured assembly cost is a separate hill.

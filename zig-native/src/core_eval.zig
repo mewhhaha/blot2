@@ -3970,8 +3970,8 @@ pub const Session = struct {
         return .{ .value = try self.arrayValues(owner, id, operation, values[0..arity], frame.providers) };
     }
     fn extendCollection(self: *Session, owner: usize, source: core.Id, original: ValueId, value_: ValueId, front: bool) Error!ValueId {
-        self.declineConstant();
         const before = self.valueInfo(original);
+        if (self.constant_recorder) |recorder| if (!recorder.canGrow(self, .{ .start = before.start, .len = before.len })) self.declineConstant();
         if (before.len >= 4_194_303) return self.arrayLengthFailure(owner);
         if (self.constantValueCount() >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId)) return self.failNode(owner, source, .constant_fuel);
         try self.values.ensureUnusedCapacity(self.allocator, 1);
@@ -3981,6 +3981,7 @@ pub const Session = struct {
             error.Limit => return self.failNode(owner, source, .constant_fuel),
             error.OutOfMemory => return error.OutOfMemory,
         };
+        if (self.constant_recorder) |recorder| recorder.grew(self);
         const id: ValueId = @intCast(self.values.items.len);
         self.values.appendAssumeCapacity(.{ .kind = before.kind, .start = span.start, .len = span.len });
         self.value_evidence.appendAssumeCapacity(0);
@@ -11482,7 +11483,7 @@ fn constantReceiptTapeScenario(allocator: Allocator, module: *const core.Module)
     var steps: usize = 0;
     var reads: usize = 0;
     for (recorded.constant_records.items) |record| for (record.events) |event| switch (event) {
-        .member => return error.TestUnexpectedResult,
+        .member, .growth => return error.TestUnexpectedResult,
         .work => |work| steps += work.steps,
         .read => |read| {
             reads += 1;
