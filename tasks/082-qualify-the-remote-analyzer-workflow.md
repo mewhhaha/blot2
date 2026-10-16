@@ -89,3 +89,25 @@ changes; run code gates only when code or build inputs change.
 - Remaining: rerun over the final committed tree, and decide whether the gate
   uses the CI pin or the newer analyzer (which would need either analyzer fixes
   or source changes for those ten sites).
+
+### Local analyzer run — 16 October 2026 (committed tree `2b2ffbb`)
+
+- Owner decision, 16 October 2026: the local `../zig-analyzer` build gates this
+  task, and its known false positives are accepted for now.
+- `../zig-analyzer` at `13b7e03`, Zig 0.17.0: `zig build backend` succeeded
+  (8:02) and `zig-analyzer doctor` reports Zig 0.17.0 and a compatible backend.
+  `deno task lint:zig` checks 486 files and reports the same 10 findings as on
+  15 October, in `eval/region_arena.zig` (2), `reuse/artifact_import_tests.zig`,
+  `reuse/code_artifacts_tests.zig`, `reuse/source_value_template_tests.zig` (4)
+  and `reuse/dependency_interface_tests.zig` (2).
+- Cause of the eight `double-release` findings: the rule's deferred-release
+  check (`src/rules/lifecycle/container_release.zig`, `deferredReleaseAfter`)
+  treats `defer if (flag) x.deinit()` as unconditional, although its explicit-
+  release check already skips conditional defers. The two
+  `invalidated-container-view` findings flag a by-value node copy and a `usize`
+  index broken out of a `for` loop, neither of which views the reallocated
+  slice.
+- No source suppressions or restructuring were applied. No upstream issue has
+  been filed; that needs owner approval.
+- The CI-pinned analyzer `756bfd5` reported zero findings over `23a934f`; the
+  only source change since then is the `2b2ffbb` contract fix.

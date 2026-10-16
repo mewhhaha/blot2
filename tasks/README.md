@@ -427,9 +427,9 @@ traversal regression.
 Each task owns one bounded reviewable result. If new required work is
 discovered, add a numbered task before 999, update this index, coverage and
 dependency graph, and link it from the originating task. Do not silently reduce
-scope. Task [075] follows all 001–074; task [999] follows every required task,
-including additions. Local analyzer evidence in [082] and the owner decision in
-[083] must actually exist before those tasks or final cleanup are complete.
+scope. Task [999] follows every required task, including additions. Local
+analyzer evidence in [082] and the owner decision in [083] must actually exist
+before those tasks or final cleanup are complete.
 
 Keep local milestone commits on `main`; **nothing is pushed without
 authorization**. Stage only the intended changes and preserve unrelated or
@@ -715,7 +715,7 @@ failed 20 of 2,354 native laws in `deno task test:compiler`.
 | [072] — Specify structured concurrency                  | Complete design | [059], [062]                           |
 | [073] — Implement scoped tasks and cancellation         | In progress     | [072], [035]                           |
 | [074] — Implement disjoint access and host execution    | In progress     | [073], [071]                           |
-| [075] — Split evaluator state and dispatch              | In progress     | All [001]–[074]                        |
+| [075] — Split evaluator state and dispatch              | In progress     | —                                      |
 | [076] — Split core module and builder                   | In progress     | [075]                                  |
 | [077] — Split checker responsibilities                  | In progress     | [076]                                  |
 | [078] — Split backend state and emission                | In progress     | [077]                                  |

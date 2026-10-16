@@ -42,7 +42,8 @@ verifies.
   486 files.
 - Four retained/reuse laws evaluate an infinite `read ()` recursion. They
   overflow the stack only in `-Dllvm=false` builds; the LLVM gate passes them.
-- The task 075 dependency on all of 001–074 is under owner review.
+- Task 075 no longer depends on 001–074 (owner-delegated decision, 16 October
+  2026); open feature tasks build on the split evaluator structure.
 
 ## Active continuation after the qualified freeze
 
@@ -653,9 +654,9 @@ above is preserved in the pinned prior-release copy.
   `build/bench/continuation-20261014/constant-current-diagnostic/`. Do not merge
   its logging patch or reuse the older 177-step inference trace as current
   attribution. General mapping/view publication still needs owned effects.
-- **075–081 / 084 / 999:** Respect dependencies. Task 075 follows 001–074; broad
-  owner/module moves and final documentation/qualification remain. Test
-  extraction may continue as an iteration improvement. Do not delete tasks,
+- **075–081 / 084 / 999:** Respect dependencies. Task 075 has no feature-task
+  edge; broad owner/module moves and final documentation/qualification remain.
+  Test extraction may continue as an iteration improvement. Do not delete tasks,
   PLAN.md or this handoff before task 999's prerequisites hold.
 
 ## Iteration and validation
