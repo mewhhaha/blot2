@@ -1,10 +1,46 @@
 import { fileURLToPath } from "node:url";
 
+import {
+  type CompilerFixture,
+  compilerFixtures,
+  parseCompilerFixtures,
+} from "./compiler_fixtures.ts";
+
 const directory = new URL("../zig-native/", import.meta.url);
-const development = Deno.args.includes("--dev");
-for (const argument of Deno.args) {
-  if (argument !== "--dev") throw new Error(`Unknown argument: ${argument}`);
+let development = false;
+let incremental = false;
+let fixtures: CompilerFixture[] | undefined;
+let jobs: number | undefined;
+for (let index = 0; index < Deno.args.length; index++) {
+  const argument = Deno.args[index];
+  if (argument === "--dev") {
+    development = true;
+  } else if (argument === "--incremental") {
+    incremental = true;
+  } else if (argument.startsWith("--fixtures=")) {
+    fixtures ??= [];
+    fixtures.push(
+      ...parseCompilerFixtures(argument.slice("--fixtures=".length)),
+    );
+  } else if (argument === "--fixtures") {
+    const value = Deno.args[++index];
+    if (value === undefined) {
+      throw new Error("--fixtures requires a comma-separated list");
+    }
+    fixtures ??= [];
+    fixtures.push(...parseCompilerFixtures(value));
+  } else if (argument.startsWith("--jobs=")) {
+    jobs = Number(argument.slice("--jobs=".length));
+    if (!Number.isInteger(jobs) || jobs < 1) {
+      throw new Error("--jobs requires a positive integer");
+    }
+  } else throw new Error(`Unknown argument: ${argument}`);
 }
+if (incremental && !development) {
+  throw new Error("--incremental requires --dev");
+}
+fixtures ??= [...compilerFixtures];
+fixtures = [...new Set(fixtures)];
 const version = await new Deno.Command("zig", {
   args: ["version"],
   stdout: "piped",
@@ -14,52 +50,28 @@ if (!version.success || !/^0\.17\.0(?:-|$)/.test(installed)) {
   throw new Error(`Blot requires Zig 0.17.0 (installed: ${installed})`);
 }
 console.log(`Building Blot with Zig ${installed}`);
-const fixtures = ["arena-fixture", "shared-rc-fixture", "list-runtime-fixture"];
-const commands = [];
+const args = ["build", "install", "compiler-identity", ...fixtures];
 if (development) {
-  const options = ["-Doptimize=safe", "-Dllvm=false", "-fincremental"];
-  commands.push([
-    "build",
-    "install",
-    "compiler-identity",
-    ...fixtures,
-    ...options,
-    "--prefix",
-    "zig-out-dev",
-    "--summary",
-    "all",
-  ]);
-  // An unchanged budget fixture can use Zig's artifact cache. Forcing another
-  // incremental compiler invocation adds several seconds to every quick check.
-  commands.push([
-    "build",
-    "budget-fixture",
+  args.push(
     "-Doptimize=safe",
     "-Dllvm=false",
     "--prefix",
     "zig-out-dev",
-    "--summary",
-    "all",
-  ]);
+  );
 } else {
-  commands.push([
-    "build",
-    "install",
-    "compiler-identity",
-    ...fixtures,
-    "budget-fixture",
-    "-Doptimize=fast",
-    "--summary",
-    "all",
-  ]);
+  args.push("-Doptimize=fast");
 }
-for (const args of commands) {
-  const result = await new Deno.Command("zig", {
-    cwd: fileURLToPath(directory),
-    args,
-    stdout: "inherit",
-    stderr: "inherit",
-  }).output();
-  if (!result.success) Deno.exit(result.code);
-}
+if (incremental) args.push("-fincremental");
+if (jobs !== undefined) args.push(`-j${jobs}`);
+args.push("--summary", "all");
+const result = await new Deno.Command("zig", {
+  cwd: fileURLToPath(directory),
+  args,
+  stdout: "inherit",
+  stderr: "inherit",
+}).output();
+if (!result.success) Deno.exit(result.code);
 await Deno.mkdir(new URL("../build/", import.meta.url), { recursive: true });
+let executable = new URL("zig-out/bin/blotc", directory);
+if (development) executable = new URL("zig-out-dev/bin/blotc", directory);
+console.log(`Compiler executable: ${fileURLToPath(executable)}`);

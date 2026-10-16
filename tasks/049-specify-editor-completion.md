@@ -18,11 +18,12 @@ and integration with the existing editor setup.
 ## Starting point
 
 [compiler/zig_project_client.ts](../compiler/zig_project_client.ts),
-[zig_project_server.zig](../zig-native/src/zig_project_server.zig),
-[zig_project_frames.zig](../zig-native/src/zig_project_frames.zig) and
-[source_overlays.zig](../zig-native/src/source_overlays.zig) provide retained
-protocol/overlays. [editor/helix/languages.toml](../editor/helix/languages.toml)
-and tree-sitter integration currently provide editor syntax support.
+[zig_project_server.zig](../zig-native/src/reuse/zig_project_server.zig),
+[zig_project_frames.zig](../zig-native/src/reuse/zig_project_frames.zig) and
+[source_overlays.zig](../zig-native/src/reuse/source_overlays.zig) provide
+retained protocol/overlays.
+[editor/helix/languages.toml](../editor/helix/languages.toml) and tree-sitter
+integration currently provide editor syntax support.
 
 ## Implementation checklist
 

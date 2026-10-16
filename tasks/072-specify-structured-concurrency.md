@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete design — implementation and dependency qualification
+  remain separate; no executable feature completion is claimed.
 - **Dependencies:** [059](059-reject-escaping-capabilities.md),
   [062](062-implement-resource-cleanup-contracts.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 10 / structured
@@ -26,13 +27,13 @@ forcing unspecified.
 
 ## Implementation checklist
 
-- [ ] Settle task/spawn/join syntax and APIs, lifetime nesting, failure
+- [x] Settle task/spawn/join syntax and APIs, lifetime nesting, failure
       propagation, cancellation and cleanup order.
-- [ ] Define ownership and capability transfer, allowed sharing, disjoint-access
+- [x] Define ownership and capability transfer, allowed sharing, disjoint-access
       evidence and host scheduling integration.
-- [ ] Specify demand forcing across tasks, synchronization/state rules or
+- [x] Specify demand forcing across tasks, synchronization/state rules or
       explicit rejection, and permitted nondeterminism.
-- [ ] Document artifact/ABI compatibility, diagnostics and acceptance traces for
+- [x] Document artifact/ABI compatibility, diagnostics and acceptance traces for
       tasks 073–074.
 
 ## Validation
@@ -49,20 +50,23 @@ change.
 
 ## Acceptance criteria
 
-- [ ] Durable task semantics settle syntax, representation, diagnostics,
+- [x] Durable task semantics settle syntax, representation, diagnostics,
       transfer and cancellation rules.
-- [ ] Demand and host interactions are explicit; concurrency is not inferred
+- [x] Demand and host interactions are explicit; concurrency is not inferred
       from existing effect labels.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Source milestone: isolated design checkpoint based on `ef57ec5`; no compiler
+  source or executable fixtures changed in this specification checkpoint.
+- Durable record:
+  [Structured Concurrency](../zig-native/STRUCTURED_CONCURRENCY.md).
+- Validation: `deno fmt --no-config --check` on the four specifications and task
+  records, plus local path/heading validation; results recorded in
+  [design qualification](../zig-native/LANGUAGE_DESIGN_QUALIFICATION.md).
+- Comparison: documentation only; no runtime or compiler performance claim.
+- Remaining limitations: dependent implementation tasks remain open. The design
+  fixes syntax, ownership/identity, portable evidence and rejection boundaries;
+  it does not claim those mechanisms are executable or qualified yet.

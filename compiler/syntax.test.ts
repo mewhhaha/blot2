@@ -2,6 +2,86 @@ import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import { createFrontend, type Cst, SourceError } from "./syntax.ts";
 const syntaxChildren = (children: readonly Cst[]) => children;
 
+Deno.test("typed staging CST owns result rows and descriptor boundaries", async () => {
+  const frontend = await createFrontend();
+  const source = `const code = 1
+const descriptor = fn code => code
+const left: code [U32, row {}] = @code.quote 40
+const shape: descriptor (code [U32, row {Foreign}]) = @code.describe left
+type Generator = forall [row e] => code [U32, row e]
+`;
+  try {
+    for (const input of [source, source.replaceAll("\n", "\r\n")]) {
+      const nodes = normalizedNodes(frontend.parse(input).root, input);
+      equal(nodes.filter((node) => node.kind === "code_type").length, 3);
+      equal(nodes.filter((node) => node.kind === "code_row").length, 3);
+      equal(nodes.filter((node) => node.kind === "descriptor_type").length, 1);
+    }
+    for (
+      const annotation of [
+        "code [U32]",
+        "code [U32, {}]",
+        "code [U32, row]",
+        "descriptor () ->",
+      ]
+    ) {
+      throws(
+        () => frontend.parse(`const invalid: ${annotation} = ()\n`),
+        SourceError,
+      );
+    }
+  } finally {
+    frontend.dispose();
+  }
+});
+
+Deno.test("numeric proof syntax preserves bounded operands and rejects arbitrary computations", async () => {
+  const frontend = await createFrontend();
+  const names = [
+    "U32Eq",
+    "U32Lt",
+    "U32Le",
+    "U32AddFits",
+    "U32SubFits",
+    "Index",
+  ];
+  const source =
+    names.map((name, index) =>
+      `const proof_${index}: (values: Array U32) -> (index: U32) -> @proof.${name} values index = fn values => fn index => @proof.index values index\n`
+    ).join("") +
+    "const bounded: (values: List U32) -> @proof.U32Lt (0) (@list.length values) = fn values => @proof.lt 0 (@list.length values)\n";
+  try {
+    for (const input of [source, source.replaceAll("\n", "\r\n")]) {
+      const rows = normalizedNodes(frontend.parse(input).root, input);
+      equal(rows.filter((row) => row.kind === "proof_type").length, 7);
+      for (const name of names) {
+        ok(rows.some((row) => row.text === `@proof.${name}`));
+      }
+      ok(rows.some((row) => row.kind === "proof_length"));
+    }
+    for (
+      const annotation of [
+        "@proof.U32Lt x",
+        "@proof.U32Lt (make x) y",
+        "@proof.U32Lt (@u32.add x 1) y",
+        "@proof.Other x y",
+        "@proof.U32LtExtra x y",
+        "@foreign.U32Lt x y",
+      ]
+    ) {
+      throws(
+        () => frontend.parse(`const invalid: ${annotation} = ()\n`),
+        SourceError,
+      );
+    }
+    frontend.parse(
+      "const length = @array.length #[1, 2]\nconst checked = @proof.lt 0 1\n",
+    );
+  } finally {
+    frontend.dispose();
+  }
+});
+
 Deno.test("dependent arrow binders remain distinct from type groups", async () => {
   const frontend = await createFrontend();
   const source = `type State a is effect = {get: Unit -> a, set: a -> Unit}
@@ -260,6 +340,31 @@ Deno.test("implementation headers are contextual and retain explicit row and typ
       ]
     ) frontend.parse(source);
     throws(() => frontend.parse("impL Name : Source U32 = {}\n"), SourceError);
+  } finally {
+    frontend.dispose();
+  }
+});
+
+Deno.test("usage and quantified package CST retains semantic syntax boundaries", async () => {
+  const frontend = await createFrontend();
+  const source = `type Item=exists [a] where {Render a}=>a
+const f:once (borrow r U32->shared U32)=fn x=>x
+const make=pack [U32] 42 as Item
+const read=fn item=>unpack item as [a] value in Render.show value
+`;
+  try {
+    const rows = normalizedNodes(frontend.parse(source).root, source);
+    for (
+      const kind of [
+        "usage_type",
+        "quantified_type",
+        "quantified_binder",
+        "package_pack",
+        "package_unpack",
+      ]
+    ) {
+      ok(rows.some((row) => row.kind === kind), kind);
+    }
   } finally {
     frontend.dispose();
   }

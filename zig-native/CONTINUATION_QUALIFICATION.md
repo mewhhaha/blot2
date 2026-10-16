@@ -1,5 +1,13 @@
 # Implementation and iterator continuation
 
+The latest uncommitted batch passes the complete compiler gate on15 October:
+2,223 native laws, 1,404 guest/client tests, 1,366 complete allocation sweeps
+plus two expected-error harness laws, and zero analyzer findings across 455
+files. Tasks 070/071 are complete;27 program tasks remain open. Exact final pins
+and remaining boundaries are in
+[the current checkpoint](#qualified-continuation-15-october-2026). Earlier
+sections below retain their historical qualification scope.
+
 Local `b145c5e` extends the qualified `10fab46` checkpoint with private child
 fields, scoped capability contracts, body reuse and shared constant scratch.
 Both full gates pass. The later qualification appears below; the broader tasks
@@ -666,3 +674,361 @@ Evidence under `build/bench/continuation-20261013/`:
 `captured-invocation/`, `public-invocation/`, `invocation-packed/equality.json`,
 `invocation-runtime.json`, and `invocation-{control,candidate}-ownership.jsonl`.
 The frozen worktree is `/var/tmp/blot2-continuation-invocation-20261013`.
+
+## Qualified continuation, 14 October 2026
+
+This is a qualified **uncommitted batch**, based on local HEAD `ef57ec5`. It
+does not complete the program: 71 tasks are complete, 15 in progress and 14
+pending. No commit, push or remote workflow is claimed. The complete pre-gate
+handoff remains in the immutable source snapshot.
+
+Frozen source: `/var/tmp/blot2-continuation-reuse-repaired-20261014`. The
+manifest contains 1,177 files and 24,341,867 bytes; SHA-256
+`1e6c2804d823e09ec96f2e75a0bd463e06d5c8280427665f7274c087e9e1d4cc`. All file
+contents and the complete tracked/untracked file set matched after the gate. The
+later qualification-note edits do not change compiler inputs.
+
+Zig 0.17.0 LLVM/Fast release SHA-256:
+`2693207b2dada8bd6305b510cab2efecb8ba524f429711854e64293760be6666`. Compressed
+bundle SHA-256:
+`398c616eecc7aab21bc80853ffb18eeaddd093a7f29101633190b9da283835f8`.
+Decompression matches the release executable. The release handshake and an
+independent configure with a new external cache both report identity
+`a953759fdac4d10db77c5f4f55bc9820a16f43e07daea831a78dabcf0f60964c`. The
+unrelated `deno.lock` remains at SHA-256
+`9ca792a967d134b10168500f68a576a67008431574b7007e14978d22d7e4e781`.
+
+The batch includes complete production ownership admission, scalar publication
+and generalized-local storage repairs; exact constructor and generic forwarding;
+single-leaf List traversal; capability, lexical-loan and scalar resource scopes;
+runtime package carriers; numeric proof propagation; and owned typed staging
+with bounded producer-local named calls. Each remains within its documented
+admitted frontier. Reference resource payloads/transfer, general rank
+publication, broader staging authority and generative capability contracts
+remain open.
+
+Ordinary body reuse now survives implementation modules and annotation-only
+nominal/alias reads using the existing recipes. Explicit selected-call proofs
+remain fresh. Retained executable reuse of static captures uses the existing
+owned graph importer; promoted local initializers still require exact wrapper
+reads and fresh code. The original cache-reuse guest assertions remain intact,
+and the new initializer-owner law fails when its safeguard is removed.
+
+The complete compiler gate passes **1,869 native laws, 1,170 guest/client tests,
+1,133 complete allocation-failure sweeps and two expected-error harness laws**.
+Both shards report zero skips, failed tests, leaks and logged errors. Full lint
+under a working Zig/backend checks **417 files with zero findings**. A prior
+isolated analyzer zero without Zig on PATH was invalid evidence; lint now checks
+that prerequisite before every mode and keys local passes by actual toolchain
+contents.
+
+| Phase                 | Seconds |
+| --------------------- | ------: |
+| Preflight regressions |  14.686 |
+| Smoke                 |   1.920 |
+| Harness               |  16.886 |
+| Release compilation   | 224.611 |
+| Native compilation    | 309.869 |
+| Native execution      | 177.299 |
+| Bundle packing        |   1.778 |
+| Complete guests       |  39.154 |
+| Whole gate            | 564.842 |
+
+Release and native compilation start together; native execution follows its
+compile. A process sample records both LLVM workers running, about 5.4 GB
+combined RSS. The native shards start 0.303 ms apart: 934 laws take 135.191 s,
+935 laws take 177.261 s. The preceding failed gate took 619.700 s, but it used a
+different source/test batch; their totals are not a controlled scheduler A/B.
+The runner's ordering law passes and fails against the preceding runner. The
+full fourteen-hill record and test-only build measurements remain in
+[iteration costs](ITERATION_COST.md).
+
+Three alternating captured-project pairs compare this release against qualified
+`b4fb67c…`, using each compiler's own pinned standard library. The complete
+screen takes 26.217 s; Linux child CPU clocks measure compilation, with no
+concurrent agent builds. Project, compiler, client, script and standard-library
+contents are pinned alongside every raw sample.
+
+| Phase  | Control median CPU ms | Candidate median CPU ms | Geometric paired ratio |   Ratio range |
+| ------ | --------------------: | ----------------------: | ---------------------: | ------------: |
+| Fresh  |              1951.795 |                1941.131 |                 0.9990 | 0.9910–1.0135 |
+| Edit   |               918.778 |                 843.265 |                 0.9178 | 0.9074–0.9258 |
+| Revert |               806.954 |                 732.553 |                 0.9117 | 0.9030–0.9283 |
+
+Fresh compilation is near parity; retained edit/revert CPU falls about 8–9% in
+this bounded screen. Within each compiler, fresh, retained and repeated output
+bytes and source work agree. Cross-compiler Wasm differs. Source work stays
+70,330 and every constant-receipt counter remains zero: this is no constant
+replay win. These three pairs do not replace task 093's complete performance
+qualification or task 084's final targets.
+
+Failed evidence is retained separately: the 653.382 s batch failed five native
+laws; the following 619.700 s batch passed 1,864 native laws but failed static
+capture reuse. Its separate guest sweep gave 1,165 passes and one failure. The
+failed executables and source manifests remain immutable. A broad development
+guest attempt stopped at its 60 s budget after 323 passes, without an assertion
+failure; it was incomplete. The complete release gate above supersedes that
+coverage gap, without reclassifying the timed-out attempt as a pass.
+
+Evidence under `build/bench/continuation-20261014/`:
+`reuse-repaired-qualified-pins.json`, `reuse-repaired-frozen-inputs.json`,
+`reuse-repaired-release/`, `reuse-repaired-clean-identity.json`,
+`full-gate-reuse-repaired/run-df20dfe025a99233/`,
+`captured-reuse-repaired-pairs/`, `reuse-repaired-lint.log`,
+`static-capture-reuse/`, `annotation-recipes/`, `types-test-extraction/`,
+`build-overlap-control/` and `overlap-process-sample.json`.
+
+A later isolated diagnostic against this exact frozen source completes three
+captured phases within 60 s. The 57,019-step constant is nominal and excluded
+before installing a receipt recorder; no inference query occurs in its value
+work. The observed query in another constant already uses the retained principal
+owner without ledger changes. This supersedes the older inference first-decline
+attribution for the current workload. Compound constant value/slot/fuel
+authority is the next measured frontier, with graph cost and
+publication/rollback controls still required. The logging patch is unmerged; it
+establishes no release timing claim. Pins, logs and assessment are preserved in
+`constant-current-diagnostic/` under the evidence directory.
+
+## Native gate repairs —15 October 2026
+
+The later combined gate failed after 2,182/2,209 native laws passed; 27 failed,
+with no skips, leaks or logged errors. LLVM/Fast release and LLVM/Safe native
+compilation passed, but guest/pack phases did not run. Wall 667.702 s. The
+frozen 1,302-file source manifest is
+8d28eff26b6bc673591cc9fde56a033c5a15e2d0db6345961ce3d842e2a3b3c3; all files
+matched after the run, before repair. Exact evidence is under
+`build/bench/complete-program-20261015/final-qualified-gate/`.
+
+Repairs retain the real negative controls. Shared usage/associated DAGs now
+visit exact IDs once within unchanged work/depth limits; query-local negative
+memoization invalidates on solver and owned nominal-catalog mutations. Optional
+no-store publication declines exhausted proofs instead of rejecting ordinary
+compilation. Completed generative/scalar roles are synchronized; named callback
+composition requires executable no-store roles. Scoped partial application
+reconstructs captures from its actual residual body. Tests repair malformed
+owners, mutate the executed universal instance, accept supported packages/rank
+closures while retaining witness/body forgery controls, and propagate injected
+OOM correctly.
+
+Ordinary body receipts now pay one optional pointer for loop metadata instead of
+three always-present slices: 40 B saved per body without loops. The unchanged
+sparse-budget law passes at 64/128/256 declarations (owned
+65,522/128,618/254,954 B). Function provider indices occupy one byte, preserving
+the preexisting 104 B machine-body header; existing known-role limits admit only
+indices 0–31, with two byte sentinels. Journal/archive indices remain 16-bit and
+validate before narrowing. Wide-index and stale archive controls remain
+permanent laws. The compaction fixture now grows syntax without adding unrelated
+type graphs; the qualified rebuilt seed correctly replays both wrapper and entry
+(zero body elaborations). Demand explanation retains all four storage categories
+and adds the existing unknown-callee case to exercise real indirect forcing.
+
+The integrated repair union passes 35 focused native laws, 23 complete OOM
+sweeps, 11 executed guests and 455-file zero analyzer. Each native group
+finishes within 60 s. Ordinary Cost remains 11,958 B, byte-exact SHA
+1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad. Development
+compiler SHA baafbd63d7bfc8f35400d4b89f86796dd7218e58304988f9cc9ae85b23f0c3d9.
+This is focused qualification; the final full compiler gate is still required.
+
+Exact private/integrated patches, before/source pins, failure matrix, full logs
+and selection/count records are retained in `native-gate-root-repairs/`,
+`rank-package-gate-repair/`, `shared-dag-gate-repair-v2/`, `scope-gate-repair/`
+and `combined-gate-repairs/` under the same evidence base. No task is closed,
+commit made or source pushed by this repair batch.
+
+The next full attempt stopped during native compilation: a test snapshot helper
+correctly refused to hash the new optional loop owner as a borrowed address. The
+helper now hashes presence and owned loop contents, leaving generic structural
+hashing strict. Its existing mutation/rollback law also changes a real cached
+loop carry and verifies the stamp changes/restores. The first added loop fixture
+was below the existing syntax threshold; growing its actual body fixes the
+fixture without reducing that threshold. Focused law, unfiltered Safe/noLLVM
+compilation (2,215-law inventory) and 455-file zero analyzer pass. Evidence:
+`sparse-owner-snapshot-repair/`. The failed attempt remains pinned in
+`repaired-final-gate/`; it is not counted as a completed native run.
+
+## Release guest repairs —15 October 2026
+
+The next exact full attempt (`repaired-final-v2-gate/`) compiled release and
+native programs, then passed 2,214/2,215 native laws. Wall 652.497 s; release
+261.71 s, native compilation 385.69 s, native execution 245.20 s. The one failed
+shared test helper incorrectly expected zero elaborations after a producer
+ordinal change. It now takes explicit expected counts: unchanged entry zero,
+relocated producer one. Both full allocation-failure sweeps pass separately
+(2,362 and 3,072 allocation sites). `qualified-seed-expectations/` retains the
+exact test-only patch and complete logs; no publication/rollback guard changed.
+
+Release-only guest inventory in 13 bounded groups, without fail-fast, passed
+1,393 tests and failed seven, with zero ignores. `bounded-release-guests/`
+contains all file selections, JUnit reports and failures. The unchanged LLVM
+binary is 13fe1a558ee6e5bba5383c9589fec9948ae7b0aa4a4a269858d0d2be7d23e16f.
+Packing succeeded but does not qualify that executable or bundle.
+
+The selected callback repair projects the checked reference signature through
+its current owned implementation context before physical wrapper layout. Its
+original callback law, both-tier U32/F32/Array Source/edit/checkpoint/JSPI laws,
+Foreign and same-ABI Bool forgery negatives pass. Quantified numeric annotations
+now replace temporary annotation representatives in persistent parameter types,
+just as in their returned signature. Imported proof aliases use actual proof
+kinds even without local proof syntax. Package readers traverse proof guards;
+independent numeric validation remains authoritative, and existential data
+witnesses still reject erased proofs. Portable Core copy/archive/OOM and forged
+slots/guards/storage/owners pass. The integrated executed set passes 18 tests.
+Opaque scalar-to-reference recovery counts primary plus fallback elaborations;
+its original byte equality and 500 calls remain, and the integrated law passes.
+Exact deltas: `selected-method-guest-repair/`, `quantified-proof-guest-repair/`,
+`opaque-invalidation-metrics/`.
+
+`pooled-call-regions/` recycles CallSummaries-owned ClosureRegion shells with
+Zig's MemoryPool. Each new job still initializes all solver/scratch state; every
+retired job deinitializes it before returning only raw shell storage. Session
+teardown frees the pool. Full OOM retry/SCC/no-store controls pass.
+Identical-path LLVM/Fast allocation falls 8,538,580 to 8,469,472 B (chain) and
+16,361,857 to 15,426,859 B (fanout), with identical work counters. All eight
+original release budgets pass unchanged. Development chain allocation is still
+8,177 B over its release-oriented threshold; it is not reported as a development
+budget pass.
+
+Two original guest failures still need integration: compound buffer constant
+receipts and public-example executable fragment reuse. No task is closed and no
+full-gate success is claimed by these repairs.
+
+## Retained-reuse repair union —15 October 2026
+
+The final two failures from the 1,393/7 release inventory are repaired without
+weakening either original reuse assertion. `buffer-creation-order-repair/`
+canonicalizes immutable primitive container types and empty-argument nominal
+identities, then retains original checker binding creation order in existing
+body recipes. An exact scratch permutation relocates facts, branch merges, loop
+carries/exits and path rebindings before publication. Ordered recipes pay no
+scratch allocation. Either omitted type normalization still fails the original
+law; source/catalog/receipt admission stays strict. Actual complete
+fresh/replayed Core references, carries, bindings and types agree through both
+capture and replay allocation-failure sweeps. All eight original receipt guests
+pass unchanged in both codegen tiers.
+
+`literal-fragment-repair/` admits semantic emission sites only through their
+existing exact executable declaration or closure owner. Sparse exact node
+membership is cached per immutable root; unrelated nodes, changed producers,
+wrong owners, mappings and rows still decline. The same declaration projection
+serves both declaration and expression proofs. A separate immutable capability
+reader fix accepts only a discarded canonical Unit constant, matching ordinary
+Source `use ()`. Noncanonical constants and effectful Unit calls still reject;
+this fixes a legitimate published summary in `examples/scalar.blot`. The two
+original public literal/state-provider laws pass unchanged, including positive
+ECS and scalar reuse assertions.
+
+The integrated union passes 29 executed tests (28
+callback/proof/constant/literal plus opaque import recovery), the new receipt
+capture/replay OOM law and two new fragment/Unit OOM laws. Private neighboring
+native/OOM and 32 literal/import/state executed controls are retained with each
+frozen patch. Unfiltered Safe/noLLVM compilation inventories 2,223 native laws;
+the full 455-file analyzer is zero. Development compiler
+SHA4356987350c7f18e5db58032a01e3fcaceda685079213ee471e119c0254fe223. Ordinary
+Cost remains 11,958 B,
+SHA1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad.
+Identical-path development chain/fanout allocations are unchanged versus the
+pooled-only control (8,514,140/15,584,621 B), with exact work counters.
+Explicitly disabling persistent cache storage also gives equality at
+8,253,857/14,039,271 B; those are separate environments, not a second budget
+baseline.
+
+All seven original guest failures now have integrated focused repairs. A new
+full release/native/guest gate is still mandatory. Task035's private ownership
+union and guard candidate require current-source performance qualification;
+these functional results do not promote either candidate or close any task.
+
+## Combined native failures and complete guest pass —15 October 2026
+
+The frozen `functional-final-gate/` attempt takes878.659s and passes smoke,
+harness, LLVM/Fast build308.176s and native compilation377.638s. Native
+execution 479.533s passes2220/2223 with zero skips/leaks/logged errors; packing
+and guests are not reached. Post-run verification matches all1303 source and41
+external pins. The two native shards execute sequentially (226.394s
+and253.054s), despite independent graph dependencies and -j2; no scheduler cause
+is established.
+
+Two body-cutoff laws depended on aggregate counts changed by successful fragment
+reuse. `targeted-cutoff-test-repair/` preserves refinement fallback with only
+the optional executable index disabled, actual refinement work and exact fresh
+bytes through854 allocation failures. The second law uses a value-changing edit,
+requires changed bytes and exact retained bytes, rejects the actual helper and
+caller targets through the existing executable gate, and admits an unrelated
+target. No production admission was weakened.
+
+The third failure is a real numeric alias regression: a let before the first
+proof introduction was omitted when tracking tested only current proof types.
+`check-proof-alias-repair/` combines the existing local syntax flag with actual
+imported proof kinds. The12 unchanged native laws pass3964 allocation failures;
+12 executed numeric/universal groups and affected402-file analyzer pass. The
+combined release/native gate remains required after this production correction.
+
+Separately, `functional-release-guests/` packs the unchanged failed-gate release
+and passes all1404 guest/client tests with zero failures/ignores, in33.268s.
+All8 original compilation allocation budgets also pass. Release SHA
+2c6834a7123bbe01876fb215507fd31fd5e7ff7cf0e50c473a9c5f62e872d83a and bundle
+SHA08312874b4accd365082feb703facbee3827a0d3721c44e01b672e0e9bf3b856 are not
+qualified by combining this guest-only pass with repaired native subsets.
+
+## Current ownership compiler screen rejected —15 October 2026
+
+`current035-screen/` preserves one CPU7 campaign with five balanced rounds, 15
+records, one discarded warm round, positive whole-server CPU deltas and no
+retries. Each record uses five fresh servers and20 retained edits. All three
+current-source development builds, actual HELLO identities, bytes and closed
+cycle counters pass preflight. Guard/control fresh1.114286 and edit1.010309
+produce geometric mean1.0610245972, above1.05. Union/control also fails1.066424.
+Guard caching changes union work by about0.5%, insufficient for admission.
+Timing stops here: no runtime screen, LLVM/release qualification or promotion.
+The private ownership changes stay out of the production source. Task035 and its
+dependent tasks073/074 remain open.
+
+## Qualified continuation, 15 October 2026
+
+The final full gate passes in 697.812 s: 2,223 native laws, 1,404 guest/client
+tests, 1,366 complete allocation-failure sweeps and two expected-error harness
+laws. Both shards have zero skips/failures/leaks/logged errors. All 455 Zig
+files have zero analyzer findings. Smoke/harness, LLVM release/native
+compilation, native execution, packing and all guest/client tests pass together;
+repaired subsets and preceding failed attempts remain separate.
+
+Frozen source `/var/tmp/blot2-final-proof-repaired-20261015/source` is based on
+uncommitted HEAD `ef57ec5b99b5ea25fc5532fd2d3023108d3f10bb`. Manifest SHA-256
+3548546cb8660905de9a83922bab67270376a2b955f840f2bc7cf13fcefa53ec; all 1,303
+source and 41 external pins match after the gate. Documentation/status updates
+have separate hashes; no compiler source changes after verification. Evidence:
+`build/bench/complete-program-20261015/final-proof-repaired-gate/`.
+
+Release/decompressed bundle SHA-256
+`6a83bad5560ec1a82220dc834dd366646fb8ab10370f82b26a2bcb775111ae6b`; packed
+bundle SHA-256
+`77ad409f11b952ba39fc3f752ceec30ffc1c762c95a76063ed4c2f77b75e1075`. Actual
+development/release HELLO values match installed identities and fresh
+independent configure runs: development
+`8784e4a5b9145fda7464d75d13f865fb977469416fd8e871157cf39ccc556cfd`; release
+`f6629ff06db42e26605376b8a4a3a81d0e0413dc492af05e541826a54003a2a2`. Qualified
+copies and exact Zig pins are retained with the input manifest. Nothing is
+committed or pushed.
+
+The final delta repairs local aliases before the first proof introduction
+without losing imported proof-kind activation. The two cutoff tests exercise
+refinement fallback and exact changed-target invalidation instead of obsolete
+aggregate counts. These repairs pass in the full native run. Tasks 070/071 now
+satisfy their finite design, import/ownership/erasure and bounded-cost criteria;
+the remaining 27 tasks retain their own broader acceptance requirements.
+
+Captured compatibility verifies 415 input pins before/after fresh/edit/revert,
+exact expected bytes and 70,330 source steps. Retained revisions reuse 1,152
+named and 369 closure bodies. Concurrent timings do not qualify CPU or the 100
+ms goal. Ordinary Cost remains 11,958 B/SHA-256
+1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad. One capture
+helper initially reused its prior evidence-directory template and reran the
+older release; this is explicitly recorded in capture-history.json and
+attempt1-error.json. The corrected capture pins the actual qualified release.
+The original compatibility summary is preserved; repeated raw output is named
+capture-repeat-20261015.json. No performance claim uses either repeat.
+
+The last ownership screen remains rejected on its own earlier 2cbbc4c3… source
+freeze; the final alias repair does not qualify that candidate. No private
+ownership code is promoted, runtime performance gate rerun or cache deletion is
+performed. Tasks 035/073/074, broader implementation/performance tasks,
+exact-source remote CI 082 and owner choice 083 remain open. CONTINUE.md stays.

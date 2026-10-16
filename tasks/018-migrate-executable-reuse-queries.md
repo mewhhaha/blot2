@@ -17,10 +17,10 @@ confusing interface stability with executable stability.
 
 ## Starting point
 
-[artifact_capture.zig](../zig-native/src/artifact_capture.zig),
-[optimized_bodies.zig](../zig-native/src/optimized_bodies.zig),
-[runtime_pipeline.zig](../zig-native/src/runtime_pipeline.zig) and
-[runtime_body_relocation.zig](../zig-native/src/runtime_body_relocation.zig)
+[artifact_capture.zig](../zig-native/src/reuse/artifact_capture.zig),
+[optimized_bodies.zig](../zig-native/src/backend/optimized_bodies.zig),
+[runtime_pipeline.zig](../zig-native/src/backend/runtime_pipeline.zig) and
+[runtime_body_relocation.zig](../zig-native/src/backend/runtime_body_relocation.zig)
 capture instructions, called bodies, signatures and lifetime facts. Demand
 inlining also consumes body dependencies.
 

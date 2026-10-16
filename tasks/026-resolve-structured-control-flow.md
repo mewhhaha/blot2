@@ -16,11 +16,11 @@ and request control.
 
 ## Starting point
 
-[core_backend.zig](../zig-native/src/core_backend.zig) emits structured flow;
-[wasm_control_flow.zig](../zig-native/src/wasm_control_flow.zig),
-[loop_targets.zig](../zig-native/src/loop_targets.zig) and
-[runtime_cleanup.zig](../zig-native/src/runtime_cleanup.zig) track edges and
-exits. Task 025 supplies resolved calls.
+[core_backend.zig](../zig-native/src/backend/core_backend.zig) emits structured
+flow; [wasm_control_flow.zig](../zig-native/src/backend/wasm_control_flow.zig),
+[loop_targets.zig](../zig-native/src/backend/loop_targets.zig) and
+[runtime_cleanup.zig](../zig-native/src/runtime/runtime_cleanup.zig) track edges
+and exits. Task 025 supplies resolved calls.
 
 ## Implementation checklist
 
@@ -58,15 +58,15 @@ development and the scenarios below.
 ## Completion evidence
 
 - Commit: `ae908fa` ("Prepare structured flow before emission").
-- Change: [resolved_flow.zig](../zig-native/src/resolved_flow.zig) plans exits
-  (`return`, `break`, a request handler's return and break) with their target
-  construct and label, the target scope's cleanup mark, values in source order
-  and the carries they replace; joins with their result type and per-arm local
-  versions; matches with inputs, arms and row/guard fallthrough; loops with
-  carries, refutable patterns and divergence; and request loops with their yield
-  arms and exited, broken and completion edges. Each is prepared before its
-  construct's first instruction, and `takeExit` discharges exactly the cleanup
-  above the target scope's mark.
+- Change: [resolved_flow.zig](../zig-native/src/backend/resolved_flow.zig) plans
+  exits (`return`, `break`, a request handler's return and break) with their
+  target construct and label, the target scope's cleanup mark, values in source
+  order and the carries they replace; joins with their result type and per-arm
+  local versions; matches with inputs, arms and row/guard fallthrough; loops
+  with carries, refutable patterns and divergence; and request loops with their
+  yield arms and exited, broken and completion edges. Each is prepared before
+  its construct's first instruction, and `takeExit` discharges exactly the
+  cleanup above the target scope's mark.
 - Validation: Zig 0.17.0; `deno task test:compiler` passes the full native suite
   and 646 guest/client tests; `deno task lint:zig` reports zero findings across
   314 files. A process law executes joins with rebinding merges, a guarded

@@ -15,10 +15,10 @@ Place local demand memo state in its creation scope across branches and loops.
 
 ## Starting point
 
-[demand_inline.zig](../zig-native/src/demand_inline.zig) and
-[core_backend.zig](../zig-native/src/core_backend.zig) already lower repeated
-admitted expression demands to invocation-local memo state; callee-loop cases
-still use runtime cells.
+[demand_inline.zig](../zig-native/src/backend/demand_inline.zig) and
+[core_backend.zig](../zig-native/src/backend/core_backend.zig) already lower
+repeated admitted expression demands to invocation-local memo state; callee-loop
+cases still use runtime cells.
 
 ## Implementation checklist
 

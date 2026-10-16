@@ -12,7 +12,7 @@ module structural. The compiler milestone is
 
 ## Admission rule
 
-[`catalogEqual`](src/principal_reuse_gate.zig) now compares the ordered
+[`catalogEqual`](src/reuse/principal_reuse_gate.zig) now compares the ordered
 operation-value catalog entry by entry, exactly like the other semantic
 catalogs: identity, arguments, signature, witness node and witness result must
 all be identical.
@@ -20,12 +20,12 @@ all be identical.
 This is sufficient because every entry is created by, and referenced from, a
 single `.operation_value` node, and its witness operand is lowered into that
 declaration's own prefix. Definition equality
-([declaration_projection.zig](src/declaration_projection.zig)) compares the
-entry and scans its witness; the dependency walk
-([declaration_dependencies.zig](src/declaration_dependencies.zig)) follows it. A
-changed provider, state initial value or witness therefore dirties exactly its
-declaration and that declaration's transitive consumers. Every other reader of
-the catalog (backend, evaluator, importer, relink) indexes it through such a
+([declaration_projection.zig](src/reuse/declaration_projection.zig)) compares
+the entry and scans its witness; the dependency walk
+([declaration_dependencies.zig](src/reuse/declaration_dependencies.zig)) follows
+it. A changed provider, state initial value or witness therefore dirties exactly
+its declaration and that declaration's transitive consumers. Every other reader
+of the catalog (backend, evaluator, importer, relink) indexes it through such a
 node or only remaps identities.
 
 Conservative fallbacks are unchanged:
@@ -43,11 +43,12 @@ revision. Previously each edit re-serialized a full structural image of every
 unit, prelude included. The gate now marks a unit `certified_images` when the
 old certificate's image exactly matched the old pin and `proveSame` proved the
 current module stream-equal to that pin. Those exact comparisons, not stamps,
-are the proof. [The certificate](src/dependency_certificate.zig) then retains
-the old image's lease instead of copying it, after rechecking the unit, producer
-path and stamp; every other unit is re-imaged. The next revision still walks
-every byte of every image against its pin, so tampering with retained memory is
-detected as before. `source_validation.reused_images` counts shared images.
+are the proof. [The certificate](src/reuse/dependency_certificate.zig) then
+retains the old image's lease instead of copying it, after rechecking the unit,
+producer path and stamp; every other unit is re-imaged. The next revision still
+walks every byte of every image against its pin, so tampering with retained
+memory is detected as before. `source_validation.reused_images` counts shared
+images.
 
 ## Qualification on 10 October 2026
 
@@ -59,20 +60,20 @@ Completed checks:
 - Zig 0.17.0 before every build batch. `deno task test:compiler` passes the full
   LLVM native suite and 629 guest/client tests; `deno task lint:zig` reports
   zero findings across 309 files.
-- [Native laws](src/literal_edit_tests.zig) cover an effectful module with a
-  witness: a top-level scalar edit (control), a body literal and a witness's
-  captured constant reuse unaffected bodies; a growing witness body and an added
-  operation value decline. Outputs equal fresh builds, including under an
-  allocation-failure sweep.
-- The [gate laws](src/principal_reuse_gate_tests.zig) now state that a changed
-  state-provider initial value rejects the provider and its consumer while
-  admitting independent declarations, and that published certificates share
-  exactly proven unchanged images, re-image edited units, decline a wrongly
-  marked unit by its stamp, never share a forged old image, and survive an
-  allocation-failure sweep. The
-  [principal cache law](src/principal_evidence_reuse_tests.zig) keeps global
-  rejection for type and associated-catalog edits and keeps the independent
-  proof across a provider edit.
+- [Native laws](src/backend/literal_edit_tests.zig) cover an effectful module
+  with a witness: a top-level scalar edit (control), a body literal and a
+  witness's captured constant reuse unaffected bodies; a growing witness body
+  and an added operation value decline. Outputs equal fresh builds, including
+  under an allocation-failure sweep.
+- The [gate laws](src/reuse/principal_reuse_gate_tests.zig) now state that a
+  changed state-provider initial value rejects the provider and its consumer
+  while admitting independent declarations, and that published certificates
+  share exactly proven unchanged images, re-image edited units, decline a
+  wrongly marked unit by its stamp, never share a forged old image, and survive
+  an allocation-failure sweep. The
+  [principal cache law](src/reuse/principal_evidence_reuse_tests.zig) keeps
+  global rejection for type and associated-catalog edits and keeps the
+  independent proof across a provider edit.
 - A mutant with the old catalog rule fails all four new or restated native laws
   above that depend on it.
 - [A process-level law](tests/literal_edit_reuse.test.ts) compares a retained

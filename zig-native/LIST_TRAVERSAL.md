@@ -28,9 +28,10 @@ loop. No library names, user types or source spelling select the optimization.
 ### Pinned inputs
 
 The ignored prototype remains at `build/experiments/list-span-source/`. Its only
-changed existing source files were `src/core_backend.zig` and
-`src/collection_tests.zig`; it also added `tests/list_span_execution.test.ts`.
-The production port formats the two tests without changing their semantics.
+changed existing source files were `src/backend/core_backend.zig` and
+`src/backend/collection_tests.zig`; it also added
+`tests/list_span_execution.test.ts`. The production port formats the two tests
+without changing their semantics.
 
 | Input                                      | SHA-256                                                            |
 | ------------------------------------------ | ------------------------------------------------------------------ |

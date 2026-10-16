@@ -574,22 +574,19 @@ borrow storage or transfer a proven fresh result to their caller. Escapes,
 unknown addresses, recursive calls without a usable summary and opaque calls
 keep the existing reclamation policy. When references stay within a proven group
 of allocations, each member's temporary owner is released after the group's
-final use. Other owners remain valid; tracing still reclaims cycles during the
-ownership transition. Numeric array payloads and numeric list leaves are marked
-as having no child pointers; integer bits do not become references in these
-payloads.
+final use. Other owners remain valid. Numeric array payloads and numeric List
+leaves have no child pointers; pointer-looking integer bits stay scalar.
 
-Dynamic sharing and otherwise unproved lifetimes still use an arena and a
-nonmoving tracing collector in linear memory, without the Wasm GC extension.
-Forever loops collect according to allocation traffic, retaining their carries,
-providers and earlier reachable objects. The guest API resets temporary arena
-storage between completed invocations while preserving module initialization
-values. Checked modules also use counted invocation, loop and module roots for
-returned/captured values and strong demand memos, including generated host
-callbacks and requests suspended through JSPI. Unknown layouts and imports
-retain the complete tracing fallback; tracing still reclaims cycles. See
-`zig-native/PERSISTENT_ROOTS.md` and `zig-native/SUSPENDED_OWNERSHIP.md` for the
-transition.
+Dynamic sharing uses counted strong edges, journal leases and a nonmoving
+allocator in linear memory. Trial deletion reclaims real unreachable cycles.
+Loop frames own incoming and outgoing carries; allocation traffic does not
+trigger a separate production tracing scan. Invocation retirement releases
+temporary owners while preserving module initialization values and independently
+held results. Generated host callbacks, suspended requests and demand memos keep
+counted roots until completion or cancellation. Production emission requires
+complete ownership facts and returns a diagnostic when that proof is incomplete.
+See `zig-native/TRACING_REPLACEMENT.md`, `zig-native/PERSISTENT_ROOTS.md` and
+`zig-native/SUSPENDED_OWNERSHIP.md` for ownership and qualification records.
 
 Direct `array.replace`, `list.append` and `list.prepend` calls preserve this
 ownership optimization, including aliases and source wrappers whose body passes
@@ -853,26 +850,27 @@ before an open tail. Instantiation preserves their exact declaration and family
 arguments. Reflection still requires complete closed descriptors; unresolved
 arguments cannot become a closed reflected effect set.
 
-[Scoped effect identities](../zig-native/SCOPED_EFFECTS.md) specifies that next
-representation: symbolic family arguments, distinct same-typed capabilities and
-checked scope/capture lifetimes. The direct annotated-family subset accepts
-`@effect.scope (fn (state: State U32) => body)`, with member operations such as
-`state.get ()`. Each entry creates fresh authority. Local aliases and providers
-preserve its identity; its operations must be handled before exit. Generic scope
-factories may use symbolic family payloads such as `State a`; returning the same
-inherited payload shape retains its original lifetime. A longer-lived outer
-capability may pass through an inner scope in structural data; only the exiting
-owner is forbidden in that result. Primitive and structural data may return;
-callable, demand, provider, nominal and unresolved results or transferred
-arguments conservatively reject. Direct source closures may return when a
-bounded capture proof excludes the exiting owner; unknown captures still reject.
-A direct anonymous adapter whose whole body invokes its callback may borrow a
-capturing callable with a structural result. Exact generic identity and Unit
-callback helpers own validated public flow contracts. A single annotated
-capability parameter may read a Unit operation through source or compiled
-helpers, for example `fn (state: State a) -> a ! {state.get} => state.get ()`;
-calls substitute the argument's exact identity in that row. Exact curried
-callback helpers also preserve it, for example
+[Scoped effect identities](../zig-native/SCOPED_EFFECTS.md) specifies the
+checked representation: symbolic family arguments, distinct same-typed
+capabilities and checked scope/capture lifetimes. The direct annotated-family
+subset accepts `@effect.scope (fn (state: State U32) => body)`, with member
+operations such as `state.get ()`. Each entry creates fresh authority. Local
+aliases and providers preserve its identity; its operations must be handled
+before exit. Generic scope factories may use symbolic family payloads such as
+`State a`; returning the same inherited payload shape retains its original
+lifetime. A longer-lived outer capability may pass through an inner scope in
+structural data; only the exiting owner is forbidden in that result. Primitive
+and structural data may return; callable, demand, provider, nominal and
+unresolved results or transferred arguments conservatively reject. Direct source
+closures may return when a bounded capture proof excludes the exiting owner;
+unknown captures still reject. A direct anonymous adapter whose whole body
+invokes its callback may borrow a capturing callable with a structural result.
+Exact generic identity and Unit callback helpers own validated public flow
+contracts. A single annotated capability parameter may read a Unit operation
+through source or compiled helpers, for example
+`fn (state: State a) -> a ! {state.get} => state.get ()`; calls substitute the
+argument's exact identity in that row. Exact curried callback helpers also
+preserve it, for example
 `fn (state: State a) => fn (callback: Unit -> a ! {state.get | e}) => callback ()`.
 Complete annotations may bind the same capability relationship:
 `const read: (state: State a) -> a ! {state.get} = fn input => input.get ()`.
@@ -904,9 +902,16 @@ up to 16 parameters and scalar constants, such as
 footprint records every retained input; unused inputs add no result footprint. A
 named helper may also directly invoke one callback with Unit, such as
 `fn unused => fn run => fn other => run ()`. Its contract retains the selected
-callback's exact operation row. Captures, stores and other helper bodies still
-reject capability arguments. Other hidden capture/store contracts and
-mixed-owner State pairs remain unsupported. See
+callback's exact operation row. Exact helpers may pass ordered formal inputs to
+one callback, such as `fn run => fn left => fn right => run left right`. The
+actual literal or checked named callback must prove that it does not store those
+inputs; earlier captures keep their own lifetimes. Local callback aliases
+preserve their selected owners. Repeated effect labels still require separate
+handler occurrences, including when two inputs alias one owner. These contracts
+use the existing 16-parameter bound. Named forwarding helpers compose those
+relationships through exact checked producers, including imported helpers.
+Factory/projected callbacks remain unsupported. Other hidden capture/store
+contracts and mixed-owner State pairs remain unsupported. See
 [qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
 
 ## Qualified bindings
@@ -1223,6 +1228,12 @@ providers active at the first force. An unused demand needs no provider. To
 forward an existing demand to another lazy parameter, pass `@demand value`. Unit
 callbacks remain available for work that should run on every call.
 
+A delayed argument is checked by its actual construction captures. Capture-free
+work can be delayed inside a scoped effect, including work that creates its own
+scope when forced. Capturing a fresh capability or operation still retains that
+authority, even when the expression returns a scalar or its memo is already
+ready.
+
 A request handler's `return` or `break` cancels an unfinished demand and makes
 it pending again. Its next demand starts the expression again under the then
 active providers. Effects already performed are not rolled back. A handler's
@@ -1271,3 +1282,40 @@ in a case arm. Parentheses also allow continuation across lines.
 alternatives, and removes parentheses that do not affect expression grouping.
 `--check` checks without writing. The formatter verifies that the parsed
 structure is unchanged before writing.
+
+## Structured tasks
+
+`@task.scope` calls a once callback with a fresh group. Spawn consumes a once
+Unit thunk; join consumes its handle and transfers the result. Cancel consumes
+its handle and waits for cleanup. Scope exit joins remaining children before
+releasing the group. Groups, handles and views cannot escape their region.
+
+```blot
+entry const answer = fn () => @task.scope (fn group => do:
+  let left = @task.spawn group (fn () => 20)
+  let right = @task.spawn group (fn () => 22)
+  return @u32.add (@task.join left) (@task.join right))
+```
+
+Unique captures move to one child. Immutable data can be shared. Read loans
+require an owner enclosing the destination group. Mutable state/provider
+capabilities and shared pending demands cannot cross tasks. A moved affine
+demand may be forced by its child when its captures transfer and its latent row
+is closed and empty.
+
+`@task.split owner ranges callback` moves a unique Array into exclusive views
+and returns `(owner, callback_result)` after every child finishes. Ranges are
+one to sixteen literal `(first, end)` pairs, half open and nonoverlapping.
+Runtime admission checks their ends against the actual Array length before
+calling the callback. `@task.read view index` and `@task.write view index value`
+use indices relative to that view and check bounds. A view moves into at most
+one child; the Array owner is unavailable until the callback finishes.
+
+Host callbacks used by a child require the explicit
+`concurrent (U32 -> U32 ! {Foreign})` qualifier, with scalar or numeric Array
+arguments/results. Bind them with `{ concurrent: true }` in the guest adapter.
+An ordinary Foreign callback grants no concurrent-use authority. Tasks run
+cooperatively in one instance; overlapping suspended host callbacks require JSPI
+and `callAsync`. Cancellation waits for an unabortable host callback to settle.
+See [the task contract](../zig-native/STRUCTURED_CONCURRENCY.md) and
+[the host boundary](guest-abi.md#structured-task-extension).

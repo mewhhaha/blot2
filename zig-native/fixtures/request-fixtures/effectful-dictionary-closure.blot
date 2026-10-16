@@ -1,0 +1,20 @@
+effect Read: U32 -> U32
+type Render a is contract = { const show: a -> (U32 -> U32) ! {Read} }
+impl Number : Render U32 = { const show = fn value => do:
+  use first <- Read value
+  return fn delta => @u32.add (@u32.add value first) delta
+}
+impl Flag : Render Bool = { const show = fn value => do:
+  use first <- Read (if value then 1 else 2)
+  return fn delta => @u32.add (@u32.add (if value then 7 else 9) first) delta
+}
+const helper = fn value => Render.show value
+const render: forall [a] where { Render a } => a -> U32 ! {Read} = fn value => do:
+  use callback <- helper value
+  use Read 1000
+  return @u32.add (callback 1) (callback 2)
+entry const answer = fn (host: U32 -> U32 ! {Foreign}) => do:
+  let provider = @effect.provider Read host
+  return do provider:
+    return @u32.add (render 42) (render #True)
+entry const snapshot = fn (value: U32) => #[value]

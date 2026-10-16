@@ -1,0 +1,4 @@
+const at: (values: Array a) -> (index: U32) -> (@proof.Index values index) -> a = fn values => fn index => fn proof => @array.get values index
+//                                              ^ function.builtin
+const valid = @proof.index #[1] 0
+//            ^ function.builtin

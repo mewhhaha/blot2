@@ -17,7 +17,7 @@ aggregates and roots surviving guest calls.
 
 ## Starting point
 
-[core_backend.zig](../zig-native/src/core_backend.zig) materializes
+[core_backend.zig](../zig-native/src/backend/core_backend.zig) materializes
 closures/demands and globals; [compiler/guest.ts](../compiler/guest.ts) manages
 guest invocation boundaries. Local lifetime proofs deliberately reject many
 escaping cases.

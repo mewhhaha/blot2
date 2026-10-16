@@ -16,11 +16,11 @@ Move refinement receipts and their indexes into the common query model.
 
 ## Starting point
 
-[refinement_receipt.zig](../zig-native/src/refinement_receipt.zig),
-[completed_specialization_query.zig](../zig-native/src/completed_specialization_query.zig)
-and [shared_query_gate.zig](../zig-native/src/shared_query_gate.zig) hold
+[refinement_receipt.zig](../zig-native/src/reuse/refinement_receipt.zig),
+[completed_specialization_query.zig](../zig-native/src/eval/completed_specialization_query.zig)
+and [shared_query_gate.zig](../zig-native/src/reuse/shared_query_gate.zig) hold
 current refinement lookups;
-[source_value_template_tests.zig](../zig-native/src/source_value_template_tests.zig)
+[source_value_template_tests.zig](../zig-native/src/reuse/source_value_template_tests.zig)
 exercises dynamic facts and publication.
 
 ## Implementation checklist

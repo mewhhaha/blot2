@@ -18,8 +18,8 @@ the specified laws.
 ## Starting point
 
 Task 044 defines summary APIs and task 045 establishes reducer behavior.
-[list_runtime.zig](../zig-native/src/list_runtime.zig) supplies persistent tree
-techniques, but no general summary-tree API is assumed.
+[list_runtime.zig](../zig-native/src/runtime/list_runtime.zig) supplies
+persistent tree techniques, but no general summary-tree API is assumed.
 
 ## Implementation checklist
 

@@ -17,11 +17,11 @@ dependencies.
 
 ## Starting point
 
-[core_eval.zig](../zig-native/src/core_eval.zig) owns evaluated values;
-[core_backend.zig](../zig-native/src/core_backend.zig) serializes them. Scalar
-constant admission already exists, while
-[source_value_template.zig](../zig-native/src/source_value_template.zig) records
-complete captured graphs and aggregate data remains separate.
+[core_eval.zig](../zig-native/src/eval/core_eval.zig) owns evaluated values;
+[core_backend.zig](../zig-native/src/backend/core_backend.zig) serializes them.
+Scalar constant admission already exists, while
+[source_value_template.zig](../zig-native/src/reuse/source_value_template.zig)
+records complete captured graphs and aggregate data remains separate.
 
 ## Implementation checklist
 

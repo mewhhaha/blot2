@@ -10,9 +10,9 @@ that admit an in-process previous revision. This record follows
 
 ## The persisted owner
 
-[semantic_archive.zig](src/semantic_archive.zig) encodes, under settings key
-`blot-semantic-archive-v1`, a section of claim `selected_complete_proof` (kind
-`specialization`, schema 1) together with the graphs those receipts name:
+[semantic_archive.zig](src/reuse/semantic_archive.zig) encodes, under settings
+key `blot-semantic-archive-v1`, a section of claim `selected_complete_proof`
+(kind `specialization`, schema 1) together with the graphs those receipts name:
 
 | Part                      | Contents                                                                                                                                                          |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -44,10 +44,10 @@ Decoding checks, in order:
   resolves, owner paths are nonempty UTF-8 without NUL, unique and equal to each
   unit's canonical path;
 - each unit's ordinal and Core unit, certificate length and width, then full
-  [frozen Core validation](src/frozen_core_validation.zig) against its sibling
-  units and the namespace's symbol bound. Stamps are accelerators: every Gate
-  recomputes them from the decoded Core and disables itself on a mismatch before
-  its exact graph comparison;
+  [frozen Core validation](src/check/frozen_core_validation.zig) against its
+  sibling units and the namespace's symbol bound. Stamps are accelerators: every
+  Gate recomputes them from the decoded Core and disables itself on a mismatch
+  before its exact graph comparison;
 - the evaluator snapshot: the shared evidence graph check, one evidence entry
   and one record entry per value, child spans and child ordinals, closure
   ordinals, mapping spans, mapping evidence and rows, record layouts within the
@@ -119,9 +119,9 @@ Completed checks:
 - Zig 0.17.0 before every build batch. `deno task test:compiler` passes the full
   LLVM native suite and **626** guest/client tests; `deno task lint:zig` reports
   zero findings across 305 files at analyzer pin `756bfd5`.
-- [Native laws](src/semantic_archive_tests.zig) cover restart replay with fresh
-  output parity under an allocation-failure sweep of decode, Gate, import and
-  publication; edited bodies, captured values and recursion plus a failing
+- [Native laws](src/reuse/semantic_archive_tests.zig) cover restart replay with
+  fresh output parity under an allocation-failure sweep of decode, Gate, import
+  and publication; edited bodies, captured values and recursion plus a failing
   source; forged namespaces, Core graphs, certificates, values, closures, slots,
   receipts and field locations; a forged stamp that decodes but admits nothing;
   and omission without a namespace or a replayable receipt.

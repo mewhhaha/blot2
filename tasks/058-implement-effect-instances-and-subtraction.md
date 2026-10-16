@@ -2,13 +2,9 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — direct scopes, scoped requests, symbolic rows and
-  exact generic capability/callback contracts, dependent arrow headers and exact
-  two-input capability member helpers, bounded local selected identities and
-  owned parameter footprints for pure product helpers are implemented. General
-  multi-input bodies, generative selection schemes and general capture contracts
-  remain open; see
-  [qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
+- **Status:** In progress — scope closed to fixed language-qualification rows by
+  owner decision on 15 October 2026; waiting for a passing full gate on current
+  source.
 - **Dependencies:** [057](057-specify-scoped-effect-identities.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / effect
   identities and handlers. Sources:
@@ -23,12 +19,12 @@ specialization and runtime handlers.
 
 ## Starting point
 
-[types.zig](../zig-native/src/types.zig),
-[check.zig](../zig-native/src/check.zig),
-[provider_chain.zig](../zig-native/src/provider_chain.zig) and
-[request_runtime.zig](../zig-native/src/request_runtime.zig) currently identify
-closed operations. Task 057 defines symbolic arguments, generative instances and
-row subtraction.
+[types.zig](../zig-native/src/check/types.zig),
+[check.zig](../zig-native/src/check/check.zig),
+[provider_chain.zig](../zig-native/src/backend/provider_chain.zig) and
+[request_runtime.zig](../zig-native/src/runtime/request_runtime.zig) currently
+identify closed operations. Task 057 defines symbolic arguments, generative
+instances and row subtraction.
 
 ## Implementation checklist
 
@@ -61,6 +57,32 @@ development and the scenarios below.
       valid effects and diagnostics.
 - [ ] Applicable checks pass and completion evidence records remaining
       limitations honestly.
+
+## Closed acceptance — owner decision, 15 October 2026
+
+The owner closed this task's scope to the rows of
+[language qualification](../zig-native/LANGUAGE_QUALIFICATION.md) listed below.
+Forms outside these rows ("general" captures, stores, transports and shapes) are
+not required work: they must reject or decline conservatively with a stable
+diagnostic and are recorded as limitations. The acceptance criteria below are
+read against these rows.
+
+| Contract          | Qualified requirements                                         |
+| ----------------- | -------------------------------------------------------------- |
+| Scoped identities | Fresh owners, routing, shadowing, forwarding, symbolic rows    |
+| Scoped identities | Aliases, dependent/generative contracts, multi-input callbacks |
+| Scoped identities | Requests, cancellation, revocation, imported recovery          |
+
+The task completes when every native law and guest test mapped to these rows
+passes in the full compiler gate (`deno task test:compiler` and
+`deno task lint:zig`) on the committed source. The rows passed in the 15 October
+freeze `3548546c…`, but the current working tree failed 20 native laws on the
+evening of 15 October, so completion waits for a passing gate on current source.
+The original acceptance index
+(`build/bench/finish-rest-20261015/language-acceptance/qualified-baseline.json`)
+was removed with `build/`; regenerate the row-to-law mapping from the passing
+gate's native test names and guest JUnit report and record it durably in
+[LANGUAGE_QUALIFICATION.md](../zig-native/LANGUAGE_QUALIFICATION.md).
 
 ## Completion evidence
 

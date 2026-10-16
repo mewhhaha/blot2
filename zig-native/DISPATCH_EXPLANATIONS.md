@@ -7,7 +7,7 @@ searched or why each was rejected.
 
 ## What a diagnostic carries
 
-[dispatch_explanation.zig](src/dispatch_explanation.zig) defines an owned
+[dispatch_explanation.zig](src/reuse/dispatch_explanation.zig) defines an owned
 `Explanation`: the operator symbol, the member looked up and up to four
 candidates in the order dispatch considered them. Each candidate has a side, its
 type as diagnostics spell it, and an outcome:
@@ -51,14 +51,14 @@ Explanations change no selection, no selection order and no reported diagnostic.
 - Zig 0.17.0. `deno task test:compiler` passes the full native suite and 645
   guest/client tests; `deno task lint:zig` reports zero findings across 313
   files. The milestone is `67e7912`.
-- [Native laws](src/dispatch_explanation_tests.zig) check, for each stage that
-  reports it: receiver lookup that ignores an argument's member, left before
-  right with `incompatible` and `no_member`, an identical right owner listed
-  once, result dispatch, a selected left member whose result conflicts while the
-  right member would fit, and a generic callback. A 300-byte type name is cut to
-  256 bytes on a UTF-8 boundary and marked truncated. An allocation-failure
-  sweep covers checker and backend explanations; a mutant that lists an
-  identical right owner fails the law.
+- [Native laws](src/reuse/dispatch_explanation_tests.zig) check, for each stage
+  that reports it: receiver lookup that ignores an argument's member, left
+  before right with `incompatible` and `no_member`, an identical right owner
+  listed once, result dispatch, a selected left member whose result conflicts
+  while the right member would fit, and a generic callback. A 300-byte type name
+  is cut to 256 bytes on a UTF-8 boundary and marked truncated. An
+  allocation-failure sweep covers checker and backend explanations; a mutant
+  that lists an identical right owner fails the law.
 - [A process law](tests/dispatch_explanation.test.ts) checks `1 + 2.5` and
   `#True + #False` through the CLI with the standard prelude; a project server
   session that fails on an imported type without `add`, explains a selected
@@ -96,7 +96,7 @@ released. The reference client accepts an optional `related` source object,
 rejects malformed filenames and byte ranges, and drops unknown fields.
 
 Regression laws live in
-[specialization_origin_tests.zig](src/specialization_origin_tests.zig),
+[specialization_origin_tests.zig](src/reuse/specialization_origin_tests.zig),
 [specialization_origin.test.ts](tests/specialization_origin.test.ts), the
 existing dispatch laws and project transport laws. They cover generic callbacks,
 nested calls, result-selected obligations, concrete body failures, compiled

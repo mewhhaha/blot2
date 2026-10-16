@@ -246,9 +246,8 @@ token. Source providers cannot remove it. Its descriptors are inspectable at
 const time, but calling a foreign function is not. Closed function annotations
 can also name source operations, as in `Unit -> U32 ! {Reader.ask}`.
 
-[The concrete host API proposal](host-api-proposal.md) describes cross-boundary
-record bundles, Text/buffers and persistent world values; these still need
-implementation. The executable
+Cross-boundary record bundles, Text/buffers and persistent world values still
+need implementation. The executable
 [Blot example](../examples/host_capabilities.blot) uses the current scalar ABI
 instead, constructing ordinary records of typed callbacks inside the guest.
 

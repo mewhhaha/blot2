@@ -17,11 +17,11 @@ storage.
 
 ## Starting point
 
-[exact_builder.zig](../zig-native/src/exact_builder.zig) handles up to four
-rectangular finite generators;
-[eval_indexed_builder.zig](../zig-native/src/eval_indexed_builder.zig) handles
-private staged updates. Ragged, filtered and effectful regions currently keep
-ordinary builders.
+[exact_builder.zig](../zig-native/src/backend/exact_builder.zig) handles up to
+four rectangular finite generators;
+[eval_indexed_builder.zig](../zig-native/src/eval/eval_indexed_builder.zig)
+handles private staged updates. Ragged, filtered and effectful regions currently
+keep ordinary builders.
 
 ## Implementation checklist
 

@@ -61,12 +61,23 @@ composed bodies use private functions. Runtime arguments evaluate once in their
 original order. Private functions have ordinary invocation-local cleanup and
 provider scopes.
 
-A generalized local call result with one concrete checked use may prepare its
-private storage at that instance. Only quantified local holes gain physical
-facts; known layouts still reconcile exactly. Captures, merges, carries and
-multiple or unresolved instances decline this bounded proof. The source scheme
-and semantic generalization remain unchanged. Substitutions belong to the owned
-resolved Body, including encoding; they never become solver evidence.
+A generalized local result from a call or selected named member with one
+concrete checked use may prepare its private storage at that instance. Only
+quantified local holes gain physical facts; known layouts still reconcile
+exactly. Captures, merges, carries and multiple or unresolved instances decline
+this bounded proof. The source scheme and semantic generalization remain
+unchanged. Substitutions belong to the owned resolved Body, including encoding;
+they never become solver evidence.
+
+Finite closed local data can instead retain its evaluator value, including
+independent generic uses and captures. The proof checks exact constructor
+wrappers and capture-free pure closures, recursively rejects authority-bearing
+types, and records every selected body dependency. Runtime captures, effects,
+traps and demands decline promotion. The promoted initializer's executable owner
+remains fresh and retains exact wrapper body reads. Captured closures may reuse
+through static-key graph admission, which compares current values, evidence,
+callable sources and capture relationships before importing code. These graphs
+do not authorize independent solved principal mapping receipts.
 
 Individual compilations use owned arrays and explicit deinitialization, not an
 unbounded arena of obsolete inference versions. Published syntax/typed bodies
@@ -399,9 +410,10 @@ checking, evaluation or required cleanup. Cross-tier optimized bodies cannot be
 reused. Optional machine-code sharing compares complete instruction/type
 sequences; hashes only select candidates. Source/evidence identities, logical
 fragments and indirect table slots remain separate. Public functions retain
-distinct Wasm identities. A previously folded body must run optimization if an
-edit separates it again; absence of an optimized result is not proof that no
-pass was needed.
+distinct Wasm identities. Every source body is independently prepared and
+retained before sharing compares final ownership-aware machine bodies. Shared
+emission never bypasses qualification or prevents a separated identity from
+reusing its exact prepared output. An absent output still requires preparation.
 
 Concurrent optimization borrows only immutable functions and fully prepared
 lifetime summaries. Each worker owns a bounded reusable scratch arena and clones
@@ -547,6 +559,23 @@ four-node budget, expanded to 64 for aggregate results inside loops or known
 callback arguments. Nesting is limited to six levels and expansion stops past
 4,096 emitted instructions. These are structural cost limits, independent of
 declaration names and source modules.
+
+Resolved generic List/Array iteration may use direct private progress only when
+its generated cursor, step and rest are unobservable and both selected methods
+are the exact ordinary pure cursor producers. The resolved selection preserves
+immutable Core and publishes the cursor's owned collection edge before reuse.
+Unknown methods, observable progress, packed rows and bounded-proof exhaustion
+retain the written protocol. Exact producer-body reads currently force the
+containing artifact code job to regenerate. Private List traversal storage is
+sized from the checked root height; only its descriptor word owns a reference,
+and pending node bases borrow the descriptor's tree.
+
+An exact empty collection cursor with the ordinary pure next method returns its
+nullary empty constructor without compiling the unreachable element payload.
+Receiver evaluation remains eager. Admission checks the exact cursor producer
+and next bodies and the empty literal; custom methods keep their written path.
+The producer reads force fresh artifact code. This preserves unresolved language
+types and never treats an unknown word as scalar or reference.
 
 Word-element cursors own a leaf base and its logical start, separate from the
 collection's lookup cache. Forks only consult that shared cache on a leaf
@@ -1018,3 +1047,78 @@ formal substitution, complete body/control-flow admission, transactional
 retained invalidation and no proof runtime storage. Optional limits retain
 checks; required evidence never guesses. The current compiler does not yet
 implement this proof surface.
+
+A checked host callback descriptor may store its own allocation base in its
+scalar environment word as a borrowed identity. An adjacent exact store fact
+qualifies only the same allocation base and an aligned checked scalar word. The
+identity carries field-load alias liveness but contributes no counted edge.
+Unmarked, malformed and interior identities keep the conservative escape rule;
+unknown reads, publication and overlapping writes retain ordinary invalidation.
+
+Persistent field updates carry the selected constructor payload's exact counted
+mask through allocation, copy and publication. All-scalar payloads keep the
+scalar allocator and local-elimination path. Distinct constructor arms may
+select different sizes and masks. Typed allocation's runtime mask remains the
+authority for checked stores/copies; an unknown mask never licenses scalar
+lifetime proofs. Unannotated raw storage and unsupported heterogeneous tails
+retain conservative ownership admission.
+
+Typed allocation initializes every reference-bearing payload to null before
+returning, including reused storage while counted ownership is disabled.
+Builders publish into that initialized storage and need no duplicate bulk fill.
+Scalar allocation retains its existing initialization contract.
+
+An adjacent checked scalar-store fact can qualify a complete aligned machine
+word or vector range through a returned or dynamically indexed address. It
+asserts physical nonowning storage, without alias or owner lifetime authority.
+Known contradictory layouts, fresh reference values, malformed widths/opcodes
+and detached facts decline. Mixed owning layouts at unknown offsets retain the
+ordinary publication proof. Packed lane stores remain the same Wasm operations.
+
+Payloads with distinct reference roles beyond word 31 use an immutable static
+shape: an exact physical word count followed by finite 32-bit reference bitmaps.
+The counted header stays 32 bytes; its shaped flag distinguishes a static shape
+address from the compact mask. Checked shaped allocation validates descriptor
+bounds, alignment and the exact payload size, then initializes storage to null.
+Publication, copying, destruction and trial deletion use the same bitmap. Each
+constructor arm selects its own shape and size. Unknown shapes still do not
+shorten owner lifetimes or certify scalar storage.
+
+The bitmap-reader demand is a compile-time bit in the symbolic ownership flag;
+encoding emits only the ordinary runtime boolean. Retained fragment replay
+preserves this demand and relocates static shape operands. Narrow modules fold
+away bitmap handling. This feature does not grant caller ownership authority.
+
+Source and retained modules reserve the legacy tracer signatures without
+materializing scanner instructions or locals. After final whole-module
+admission, complete output traps those unused signatures and omits the
+allocator's tracing chain/cache writes. Partial assembly alone generates its
+three legacy helper bodies in separate temporary ownership, without mutating
+source or cached IR. Empty tracer slots retain distinct machine identities even
+with code sharing.
+
+Runtime List literals publish exact reference elements through the descriptor's
+current leaf base, immediately after its checked address lookup. Scalar elements
+retain their scalar machine stores with a publication-only fact. Packed row
+stores retain their current path, and erased/unknown element layouts retain
+conservative admission. This reuses collection publication and adds no borrowed
+owner lifetime authority.
+
+Optional machine-code sharing preserves complete journal admission. Ownership
+facts do not participate in machine equality; their publication and cleanup
+consequences must already be present in every compared prepared body. Sharing
+counts final omitted machine bodies independently of optimized/reused source
+preparation counts. Parallel preparation likewise handles every source identity
+before emission sharing, without mutating source or evidence.
+
+Production source emission and artifact replay use checked whole-module
+assembly. They either emit complete ownership or return an owned emission
+diagnostic; the checked assembly instantiation cannot materialize legacy
+scanners. Deliberately raw private Module fixtures retain their separate partial
+assembly contract. A bounded Core proof may fill an erased computation
+completion slot only when its exact action cannot produce a normal value.
+Cancellation's ABI zero is scalar; this rule supplies no source type default or
+ownership authority for an arbitrary erased value. Function creation journals
+the resulting physical role. Aggregates, Array/List literals and constructor
+payloads stop emission after a checked Never operand, preserving the eager
+prefix before that operand.

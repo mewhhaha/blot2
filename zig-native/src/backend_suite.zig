@@ -1,0 +1,37 @@
+//! Independently compiled backend laws.
+comptime {
+    _ = @import("backend/activation_graph.zig");
+    _ = @import("backend/callable_origins.zig");
+    _ = @import("backend/wasm_inline.zig");
+    _ = @import("backend/wasm_sroa.zig");
+    _ = @import("backend/wasm_row_reduce.zig");
+    _ = @import("backend/runtime_operation_backend_tests.zig");
+    _ = @import("backend/provider_origins.zig");
+    _ = @import("check/scoped_effect_backend_tests.zig");
+    _ = @import("check/capability_lifetimes_tests.zig");
+    _ = @import("backend/layout_bridge_tests.zig");
+    _ = @import("backend/request_backend_tests.zig");
+    _ = @import("reuse/artifact_emitter_tests.zig");
+    _ = @import("reuse/artifact_backend_tests.zig");
+    _ = @import("reuse/code_artifacts_tests.zig");
+    _ = @import("reuse/artifact_import_tests.zig");
+    _ = @import("backend/optimized_bodies_tests.zig");
+    _ = @import("reuse/artifact_operation_admission_tests.zig");
+    _ = @import("reuse/dispatch_explanation.zig");
+    _ = @import("reuse/dispatch_explanation_tests.zig");
+    _ = @import("backend/wasm_row_products.zig");
+    _ = @import("reuse/code_artifacts.zig");
+    _ = @import("backend/wasm_lifetimes.zig");
+    _ = @import("runtime/cycles_runtime.zig");
+    _ = @import("backend/root_lowering.zig");
+    _ = @import("backend/empty_root_scopes.zig");
+    _ = @import("backend/root_borrows.zig");
+    _ = @import("backend/runtime_pipeline_tests.zig");
+    _ = @import("check/package_sequence_tests.zig");
+    _ = @import("check/usage_backend_tests.zig");
+    _ = @import("check/task_backend_tests.zig");
+    _ = @import("eval/closed_local_value_tests.zig");
+    _ = @import("backend/layout.zig");
+    _ = @import("backend/wasm_control_flow.zig");
+    _ = @import("backend/wasm_vectorize.zig");
+}

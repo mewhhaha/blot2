@@ -66,6 +66,57 @@ Deno.test("trial deletion reclaims self cycles and shared children without traci
   assert.equal(r.count("destroyed"), 3);
 });
 
+Deno.test("trial deletion accounts every self duplicate back and cross edge across leased and alias roots", async () => {
+  const r = await runtime();
+  const graph = [[0, 1, 1], [0, 2], [1, 3], [2, 4], [3, 0]];
+  const nodes = graph.map((edges) =>
+    r.call("allocate_typed", edges.length * 4, (1 << edges.length) - 1)
+  );
+  graph.forEach((edges, index) =>
+    edges.forEach((target, slot) => {
+      r.call(
+        "store_word",
+        nodes[index],
+        nodes[index] + slot * 4,
+        nodes[target],
+      );
+    })
+  );
+  nodes.forEach((node, index) => {
+    if (index !== 1) r.call("release_lease", node);
+  });
+  r.call("cycle_collect");
+  assert.equal(r.count("destroyed"), 0);
+  r.call("retain", nodes[3]);
+  r.call("release_lease", nodes[1]);
+  r.call("cycle_collect");
+  assert.equal(r.count("destroyed"), 0);
+  graph.forEach((edges, index) =>
+    edges.forEach((target, slot) => {
+      assert.equal(r.word(nodes[index] + slot * 4), nodes[target]);
+    })
+  );
+  r.call("release", nodes[3]);
+  r.call("cycle_collect");
+  assert.equal(r.count("destroyed"), nodes.length);
+  assert.equal(r.count("leases"), 0);
+  assert.equal(
+    Number((r.exports.cycle_vertices as WebAssembly.Global).value),
+    14,
+  );
+  assert.equal(Number((r.exports.cycle_edges as WebAssembly.Global).value), 31);
+  assert.equal(Number((r.exports.cycle_bytes as WebAssembly.Global).value), 44);
+  assert.equal(Number((r.exports.cycle_head as WebAssembly.Global).value), 0);
+
+  const broken = await runtime();
+  const node = broken.call("allocate_typed", 8, 3);
+  broken.call("store_word", node, node, node);
+  broken.call("store_word", node, node + 4, node);
+  broken.call("release_lease", node);
+  broken.put(node - 16, 1);
+  assert.throws(() => broken.call("cycle_collect"), WebAssembly.RuntimeError);
+});
+
 Deno.test("finite typed masks bound sparse cycles without interpreting scalar tails", async () => {
   const r = await runtime();
   const metric = (name: string) =>
@@ -588,4 +639,96 @@ Deno.test("force records distinguish exceptional terminal demands from canceled 
   assert.equal(view().getUint32(staticDemand + 8, true), 3);
   assert.equal((e.roots as WebAssembly.Global).value, 0);
   leave(2);
+});
+
+Deno.test("typed buffers initialize reused reference storage in counted and partial modes", async () => {
+  for (const enabled of [0, 1]) {
+    const r = await runtime();
+    (r.exports.allocator_mode as WebAssembly.Global).value = enabled;
+    for (let round = 0; round < 4; round++) {
+      const dirty = r.call("allocate_typed", 16, 0);
+      for (let word = 0; word < 4; word++) {
+        r.put(dirty + word * 4, 0xf0000000 + word + round);
+      }
+      if (enabled === 1) r.call("release_lease", dirty);
+      else r.call("collect", 0);
+      const clean = r.call("allocate_typed", 16, 0xffffffff);
+      assert.equal(clean, dirty, "the law must reuse dirty storage");
+      for (let word = 0; word < 4; word++) {
+        assert.equal(r.word(clean + word * 4), 0);
+      }
+      if (enabled === 1) r.call("release_lease", clean);
+      else r.call("collect", 0);
+    }
+    assert.equal(r.count("leases"), 0);
+  }
+});
+
+Deno.test("wide bitmaps count copy and retire exact edges across every mask boundary", async () => {
+  const r = await runtime();
+  const shape = Number((r.exports.wide_shape as WebAssembly.Global).value);
+  const parent = r.call("allocate_shaped", 384, shape);
+  const child = r.call("allocate_typed", 4, 0);
+  const strong = () => r.word(child - 32 + 16);
+  const edges = [31, 33, 63, 64, 95];
+  for (let word = 0; word < 96; word++) {
+    r.call("store_word", parent, parent + word * 4, child);
+  }
+  assert.equal(strong(), 1 + edges.length);
+  r.call("release_lease", child);
+  const copy = r.call("allocate_shaped", 384, shape);
+  r.call("copy_words", copy, copy, parent, 384);
+  assert.equal(strong(), edges.length * 2);
+  r.call("store_word", copy, copy + 33 * 4, 0);
+  r.call("store_word", copy, copy + 32 * 4, 0);
+  assert.equal(strong(), edges.length * 2 - 1);
+  const before = r.count("destroyed");
+  r.call("release_lease", parent);
+  assert.equal(strong(), edges.length - 1);
+  r.call("release_lease", copy);
+  assert.equal(r.count("destroyed") - before, 3);
+  assert.equal(r.count("leases"), 0);
+  for (let round = 0; round < 100; round++) {
+    const cyclic = r.call("allocate_shaped", 384, shape);
+    r.call("store_word", cyclic, cyclic + 33 * 4, cyclic);
+    r.call("release_lease", cyclic);
+    r.call("cycle_collect");
+    assert.equal(r.count("leases"), 0);
+  }
+  assert.throws(
+    () => r.call("allocate_shaped", 380, shape),
+    WebAssembly.RuntimeError,
+  );
+  assert.throws(
+    () => r.call("allocate_shaped", 384, shape + 1),
+    WebAssembly.RuntimeError,
+  );
+  assert.throws(
+    () => r.call("allocate_shaped", 384, 0),
+    WebAssembly.RuntimeError,
+  );
+});
+
+Deno.test("wide buffers initialize dirty reused storage in counted and partial modes", async () => {
+  for (const enabled of [0, 1]) {
+    const r = await runtime();
+    (r.exports.allocator_mode as WebAssembly.Global).value = enabled;
+    const shape = Number((r.exports.wide_shape as WebAssembly.Global).value);
+    for (let round = 0; round < 4; round++) {
+      const dirty = r.call("allocate_typed", 384, 0);
+      for (let word = 0; word < 96; word++) {
+        r.put(dirty + word * 4, 0xf0000000 + word);
+      }
+      if (enabled === 1) r.call("release_lease", dirty);
+      else r.call("collect", 0);
+      const clean = r.call("allocate_shaped", 384, shape);
+      assert.equal(clean, dirty, "the law must reuse dirty storage");
+      for (let word = 0; word < 96; word++) {
+        assert.equal(r.word(clean + word * 4), 0);
+      }
+      if (enabled === 1) r.call("release_lease", clean);
+      else r.call("collect", 0);
+    }
+    assert.equal(r.count("leases"), 0);
+  }
 });

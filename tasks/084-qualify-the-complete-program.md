@@ -43,9 +43,18 @@ results rather than the starting baseline.
 - [ ] Run final semantic/ownership, sync/JSPI, editor, packaging, analyzer,
       source-layout, dependency/checkpoint, retained/restart and failed-edit
       recovery gates.
-- [ ] Measure the final workload against pinned baselines in paired runs,
-      including cold/population/first-edit/later-edit/no-op/restart/recovery and
-      guest runtime/memory.
+- [ ] Pin a reproducible current workload (the frozen gdev manifest was waived
+      on 11 October 2026; the 415-input captured project is the candidate) and
+      record its manifest durably.
+- [ ] Measure that workload against pinned baselines in paired runs, including
+      cold/population/first-edit/later-edit/no-op/restart/recovery and guest
+      runtime/memory.
+- [ ] Record each performance row's measured value and gap in its follow-up
+      task: cold compilation [100](100-reach-the-cold-compilation-target.md),
+      literal edits [101](101-reach-the-literal-edit-target.md), general body
+      edits [102](102-reach-the-body-edit-target.md), largest inference region
+      [103](103-bound-the-largest-inference-region.md) and requested allocation
+      [104](104-reduce-requested-allocation-below-100-mb.md).
 - [ ] Keep every missed requirement open. Add bounded numbered follow-up tasks
       before 999, update coverage/dependencies and finish them before cleanup.
 
@@ -59,17 +68,19 @@ development and the scenarios below.
 
 - Run the final qualification command set in README with exact revisions, binary
   hashes and workload manifests.
-- Establish approximately 500 ms cold gdev CPU, literal edits under 30 ms,
-  general body edits under 100 ms, largest inference region under 50 ms and
-  cumulative requested allocation under 100 MB.
+- Measure cold CPU, literal edits, general body edits, the largest inference
+  region and cumulative requested allocation on the pinned workload. By owner
+  decision on 15 October 2026 these five targets are owned by tasks 100–104;
+  this task records the measurements and does not close them.
 - Verify no duplicate regions for a complete canonical key, qualified tracing
   replacement, closed traversal regression, full new language/demand gates and
   complete remote/tooling evidence.
 
 ## Acceptance criteria
 
-- [ ] Every row of the README final-gate table passes with durable evidence; a
-      missed target keeps the task incomplete.
+- [ ] Every non-performance row of the README final-gate table passes with
+      durable evidence; a missed target keeps the task incomplete. The five
+      performance rows are measured, recorded and handed to tasks 100–104.
 - [ ] All discovered follow-ups and external gates are complete and the
       directory is ready for the conditional cleanup audit.
 - [ ] Applicable checks pass and completion evidence records remaining

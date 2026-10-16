@@ -9,8 +9,8 @@ is recorded below.
 
 ## Leased pool fields
 
-[pool_leases.zig](src/pool_leases.zig) defines a `Lease`: one allocation, its
-owning allocator, alignment and a reference count. `Pools.leases` holds an
+[pool_leases.zig](src/eval/pool_leases.zig) defines a `Lease`: one allocation,
+its owning allocator, alignment and a reference count. `Pools.leases` holds an
 optional lease for each of 41 plain slices: the identity namespace (bytes,
 symbols, owners), layout graphs and rows, every evaluator snapshot array
 including its evidence graph and rows, captured templates, field locations,
@@ -69,14 +69,14 @@ Completed checks:
 - Zig 0.17.0 before every build batch. `deno task test:compiler` passes the full
   LLVM native suite and 626 guest/client tests; `deno task lint:zig` reports
   zero findings across 307 files at analyzer pin `756bfd5`.
-- [Lease laws](src/pool_lease_tests.zig): every nonempty leased field is shared
-  exactly when its content equals the previous revision's, for identical and
-  edited sources whose output matches fresh compilation; the earlier revision
-  can be torn down first; an allocation-failure sweep of leased captures leaves
-  every previous lease at one reference; twelve alternating edits plateau and
-  tear down to zero. [Unit laws](src/pool_leases.zig) cover sharing, copying,
-  release order and refusal to share unleased owners.
-- [A retained Session law](src/retained_candidate_tests.zig) sweeps every
+- [Lease laws](src/reuse/pool_lease_tests.zig): every nonempty leased field is
+  shared exactly when its content equals the previous revision's, for identical
+  and edited sources whose output matches fresh compilation; the earlier
+  revision can be torn down first; an allocation-failure sweep of leased
+  captures leaves every previous lease at one reference; twelve alternating
+  edits plateau and tear down to zero. [Unit laws](src/eval/pool_leases.zig)
+  cover sharing, copying, release order and refusal to share unleased owners.
+- [A retained Session law](src/reuse/retained_candidate_tests.zig) sweeps every
   allocation failure while preparing a leased entry edit: the published
   revision's leases stay at one reference and its exported checkpoint bytes are
   unchanged; the same Session then commits the edit.

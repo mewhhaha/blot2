@@ -139,9 +139,8 @@ releases: 8, 40 and 200 discarded 8,192-word Arrays per row commit 43,515,904,
 203,816,960 and 942,211,072 bytes. Its public Array entry selects whole-module
 fallback. This is neither a bounded-memory result nor evidence for tracer
 removal. It remains a mandatory counterexample for the
-[task 002 memory gate](../tasks/002-close-packed-list-traversal-regression.md)
-and the
-[task 035 tracing-removal gate](../tasks/035-remove-the-tracing-runtime.md).
+[List traversal memory gate](LIST_TRAVERSAL.md) and
+[tracing replacement qualification](TRACING_REPLACEMENT.md).
 
 The final release build, full native suite and all 771 guest/client laws pass.
 The unchanged eight compile allocation budgets pass with restart caches

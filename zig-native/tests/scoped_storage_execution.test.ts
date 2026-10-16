@@ -6,15 +6,18 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const library = `type State a is effect = {get: Unit -> a, set: a -> Unit}
 type Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}
+const identity = fn value => value
 `;
-const main = `import {State, Box} from "./state"
+const main = `import {State, Box, identity} from "./state"
 entry const answer = fn (host: Unit -> U32 ! {Foreign}) => @effect.scope (fn (s: State U32) => do:
   use boxed <- do (@effect.state Box.get Box.set (fn () => 0)):
-    use Box.set (fn () => do:
+    let original = fn () => do:
       let (state, value) = do (@effect.state s.get s.set 7):
         return s.get ()
       return value
-    )
+    let version = identity original
+    let bundle = {callback: version, nested: #[version]}
+    use Box.set bundle.callback
     use adjust <- host ()
     use callback <- Box.get ()
     return @u32.add (callback ()) adjust
@@ -22,7 +25,7 @@ entry const answer = fn (host: Unit -> U32 ! {Foreign}) => @effect.scope (fn (s:
   return result
 )
 `;
-const older = `import {State, Box} from "./state"
+const older = `import {State, Box, identity} from "./state"
 entry const invalid = fn () => do:
   let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
     return @effect.scope (fn (s: State U32) => do:

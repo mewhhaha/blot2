@@ -24,8 +24,8 @@ owned inferred principal graphs without unfolding open diamonds". Its parent
 `f7be6e7` edits in 770–900 ms with inference 388–553k µs; `099e700` takes
 1560–1860 ms with inference 1.14–1.33M µs; fresh functions are equal. With
 `Session.reuse_principal_graphs = false`
-([core_eval.zig](../zig-native/src/core_eval.zig)) `099e700` returns to 790–880
-ms. `ClosureRegion.collect` builds a principal graph for every admitted
+([core_eval.zig](../zig-native/src/eval/core_eval.zig)) `099e700` returns to
+790–880 ms. `ClosureRegion.collect` builds a principal graph for every admitted
 first-order global body with unresolved parameters or result (`principalGraph`,
 `describePrincipal` and `importPrincipal`), and `retainOpenPrincipal` walks
 every reachable callee; keeping an open edge invalidates call reads and marks

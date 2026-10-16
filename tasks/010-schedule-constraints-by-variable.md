@@ -18,8 +18,8 @@ worklists.
 ## Starting point
 
 `ClosureRegion.solveMode`, `solveStep` and `solveDataAliases` in
-[core_eval.zig](../zig-native/src/core_eval.zig) repeatedly scan work.
-[types.zig](../zig-native/src/types.zig) owns chronological writes;
+[core_eval.zig](../zig-native/src/eval/core_eval.zig) repeatedly scan work.
+[types.zig](../zig-native/src/check/types.zig) owns chronological writes;
 [work_counters.zig](../zig-native/src/work_counters.zig) records passes and
 visits.
 

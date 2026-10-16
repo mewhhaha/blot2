@@ -17,9 +17,9 @@ loops and control/provider boundaries.
 
 ## Starting point
 
-[demand_inline.zig](../zig-native/src/demand_inline.zig) uses a bounded 96-node
-`Plan` for known acyclic expression forwarding.
-[core.zig](../zig-native/src/core.zig) retains `suspend_`/`force`; broader
+[demand_inline.zig](../zig-native/src/backend/demand_inline.zig) uses a bounded
+96-node `Plan` for known acyclic expression forwarding.
+[core.zig](../zig-native/src/check/core.zig) retains `suspend_`/`force`; broader
 retained-body analysis is not implemented.
 
 ## Implementation checklist

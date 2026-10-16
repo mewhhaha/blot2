@@ -6,14 +6,14 @@ the child's stdin and stdout in length-prefixed frames. This document is enough
 to write a host without `@mewhhaha/blot`. It describes protocol version 1 as
 implemented by this repository:
 
-- the server: [zig_project_server.zig](src/zig_project_server.zig) and
-  [zig_project_frames.zig](src/zig_project_frames.zig);
+- the server: [zig_project_server.zig](src/reuse/zig_project_server.zig) and
+  [zig_project_frames.zig](src/reuse/zig_project_frames.zig);
 - the reference client:
   [compiler/zig_project_client.ts](../compiler/zig_project_client.ts), behind
   `createCompiler` and `createZigProjectCompiler`
   ([PROJECT_CLIENT.md](PROJECT_CLIENT.md));
-- making it a versioned public contract with conformance tests:
-  [task 095](../tasks/095-specify-and-version-the-project-protocol.md);
+- protocol conformance laws:
+  [protocol conformance laws](tests/zig_project_protocol.test.ts);
 - native typed imports and resource snapshots:
   [NATIVE_ASSETS.md](NATIVE_ASSETS.md).
 

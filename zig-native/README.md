@@ -16,7 +16,12 @@ Without Deno, build in this directory with
 `zig build test -Doptimize=safe`; the runner sets the fixture working directory.
 Use `deno task test:compiler:dev` from the root for incremental Safe/noLLVM
 development and focused laws. `zig build test-compile -Doptimize=safe` builds
-the native test binary separately.
+the native test binary separately. Native tests import immutable inputs through
+the `fixtures` module rooted at `fixtures/root.zig`; production builds have no
+fixture-module dependency. All 126 Blot fixtures and both frozen oracle files
+live outside `src/`. Their relocation byte manifest and focused discovery checks
+are in `build/bench/finish-rest-20261015/fixture-relocation/`. The full gate
+still qualifies the final combined source.
 `zig build test -Doptimize=safe
 -Doom-profile=true -Dtest-force-run=true --summary all`
 reports allocation-failure sweep timings while running the full suite.

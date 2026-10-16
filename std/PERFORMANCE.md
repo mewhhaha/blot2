@@ -64,13 +64,13 @@ evaluation order and once-only demand behavior.
 | Mechanism           | Current boundary                                                                                                                                                                                                                |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Exclusive updates   | Checked success branches, nested unique fields and loop exits can preserve ownership; surviving aliases, captures and extracted inner values prevent destructive updates.                                                       |
-| Small aggregates    | Fully initialized, nonescaping records, tuples and wrappers can become scalar locals. ABI values, captured values, unknown offsets and GC roots remain boxed.                                                                   |
+| Small aggregates    | Fully initialized, nonescaping records, tuples and wrappers can become scalar locals. ABI values, captured values, unknown offsets and runtime roots remain boxed.                                                              |
 | Small collections   | Up to eight scalar elements can use locals when all uses are admitted traversal or intrinsic length reads; escaping and updated collections remain boxed.                                                                       |
 | Exact builders      | Up to four rectangular finite generators can allocate final storage directly. Bounds must be independent of region binders, nonallocating, nontrapping and pure. Ragged, filtered and effectful regions keep ordinary builders. |
 | Staged construction | Private bounded indexed regions update scratch and freeze once. Published spans and observed intermediate versions remain immutable. Append/prepend can reuse unpublished end slack.                                            |
 | Traversal           | Word-element and packed-row cursors retain their own leaf cache. Cross-leaf fields use checked lookup. Generic iterator step/cursor allocations are not universally eliminated.                                                 |
 | Inlining            | A four-node source budget expands to 64 for aggregate results inside loops or known callbacks, with at most six nested expansions and a 4,096-instruction bound.                                                                |
-| SIMD and fusion     | Existing proofs apply to admitted typed loops. Broader row fusion, ragged builders, rolling reductions and composable summaries remain open.                                                                                    |
+| SIMD and fusion     | Existing proofs apply to admitted typed loops. Bounded ragged count/fill and rolling/summary modules are implemented and qualified. Broader fusion and SIMD keep ordinary fallbacks.                                            |
 
 `prefix_sums` uses recursive pair sums with linear work and intermediate
 storage, including constant evaluation. Array `indices`, `filter` and
@@ -80,11 +80,14 @@ filling. Both retain length-overflow checks. Vec2/Vec3 interpolation preserves
 the documented F32 operation order; sine and cosine share angle reduction in
 `F32.tan`.
 
-Runtime ownership optimizations coexist with a nonmoving tracing collector. They
-do not prove that every object has a finite lexical lifetime: State, closures
-and cached demands can form cycles. Guest memory readings report committed Wasm
-pages, including temporary capacity, rather than exact live objects or
-cumulative allocation.
+The current continuation uses counted strong edges and invocation/journal
+leases. Nonmoving trial deletion reclaims real cycles formed by State, closures
+and cached demands; typed payload masks describe their edges. Removal of the
+ordinary tracing paths still awaits the final combined CPU and compiler gates.
+Guest memory readings report committed Wasm pages, including temporary capacity,
+rather than exact live objects or cumulative allocation. See
+[shared ownership](../zig-native/SHARED_OWNERSHIP.md) and
+[cycle reclamation](../zig-native/CYCLIC_OWNERSHIP.md) for the contracts.
 
 ## Measuring changes
 

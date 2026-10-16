@@ -1,8 +1,9 @@
 # Language evolution
 
 The user approved all ten directions on 2026-10-06, plus typed external asset
-imports. This is one migration program, not a claim that the features below are
-implemented. `compiler/guide.md` remains the executable language reference.
+imports. This is one migration program. The implementations below have distinct
+qualification boundaries; [the guide](../compiler/guide.md) remains the
+executable language reference.
 
 All mechanisms must work for ordinary user modules. The compiler must not
 recognize prelude, JSON, shader, ECS, or framework declaration names. Keep the
@@ -20,27 +21,28 @@ literals, exact record aliases, field-preserving type-changing updates, and
 generic `@record.merge` now share stable layouts. `std/path` provides pure
 getter/setter paths, whole-value identity, composition, type-changing writes and
 effectful modification. Their contracts survive imports and serialized
-dependencies. Completion gates below remain open unless explicitly documented as
-current behavior in the language guide.
+dependencies. The table separates implemented behavior from remaining combined
+qualification; focused implementation does not complete a release gate.
 
-| Direction                   | First executable boundary                                                                            | Completion gate                                                                         |
-| --------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| 1. Explainable inference    | Implemented: typed holes, structured types, lexical scope and generic requirements                   | Dispatch explanations and editor completion                                             |
-| 2. Module abstraction       | Explicit exports and transparent aliases                                                             | Opaque representations, import/re-export privacy, interface cutoff, zero-cost wrappers  |
-| 3. Generic contracts        | Implemented: named, parameterized bundles of existing predicates with imports and dependency bundles | Associated type members, implementation declarations, richer evidence diagnostics       |
-| 4. Generic scoped effects   | Symbolic operation arguments in written rows                                                         | Distinct same-typed instances, handler subtraction, escaping-capability rejection       |
-| 5. Usage/lifetime contracts | Inferred usage/capture facts with checked boundaries                                                 | Unique/shared, borrowed, once/many, resource cleanup, sound separate compilation        |
-| 6. Extensible records       | Implemented: structural rows, stable layouts, type-changing updates and `std/path` composition       | Passed: aliases, captured callbacks, effect ordering, dependencies and checkpoints      |
-| 7. Polymorphic packages     | Annotated higher-rank inputs and existential packages                                                | Skolem-escape rejection, evidence passing, specialization, heterogeneous packages       |
-| 8. Typed staging            | Typed asset module construction at a host boundary                                                   | Typed Blot code values, descriptors, hygienic generation, exact staged dependencies     |
-| 9. Erased proofs            | Explicit witnesses for bounded numeric/index facts                                                   | Branch facts, bounds-check elimination, erased evidence, bounded checking costs         |
-| 10. Structured concurrency  | Capability/capture contracts from 4 and 5                                                            | Scoped tasks, defined cancellation, disjoint-access proofs, host execution              |
-| 11. External assets         | Implemented: explicit host parser references returning typed modules and host references             | Passed: JSON/shader adapter laws, snapshots, tracked reads, retained edits and recovery |
+| Direction              | Implemented boundary                                                                           | Remaining qualification                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Explainable inference  | Typed holes, bounded diagnostics, dispatch explanations, completion and LSP                    | Covered by prior compiler gates and current editor/client laws                 |
+| Module abstraction     | Public/private declarations, forwarding, opaque identities and wrapper erasure                 | General interface-cutoff and final performance qualification                   |
+| Generic contracts      | Named bundles, associated members, implementation declarations and evidence diagnostics        | Prior qualified language behavior; final combined regression gate              |
+| Scoped effects         | Fresh identities, symbolic rows, exact handler subtraction and bounded lifetime/capture proofs | Final combined portable composition; documented unknown-flow rejection remains |
+| Usage and lifetimes    | Unique/shared, loans, once/many, cleanup transfer and cancellation                             | Final combined ownership/portable proofs and tracing replacement               |
+| Extensible records     | Stable structural layouts, aliases, type-changing writes and std/path                          | Qualified; current combined regression gate                                    |
+| Polymorphic packages   | Annotated higher-rank carriers, skolems, existential openings and dictionary ownership         | General portable composition and final combined qualification                  |
+| Typed staging          | Typed code/descriptors, quote/lift/splice/emit, hygienic owners and exact input reuse          | Final combined staged capture, dependency and performance qualification        |
+| Erased proofs          | Numeric/index witnesses, branch facts and bounded check elimination                            | Qualified in the 15 October full freeze; later combined regressions pending    |
+| Structured concurrency | Cooperative scopes, spawn/join, cancellation, disjoint partitions and host Task ABI            | Final tracing replacement, portable composition and combined gate              |
+| External assets        | Typed host/native imports, tracked JSON/shader inputs, manifests and recovery                  | Qualified; current combined regression gate                                    |
 
-Implement 1–4 alongside the typed asset boundary, then usage contracts and
-structural records. Higher-rank packages and typed staging build on those type
-identities. Refinements must start with a bounded solver. Concurrency depends on
-proven capability identities and ownership, not merely effect labels.
+These dependencies govern the implementations: scoped identities precede usage
+and captures, packages/staging retain those identities, and tasks depend on
+checked lifetimes and ownership. Bounded conservative rejection remains part of
+the language contracts. None of these mechanisms recognizes a privileged source
+module or declaration spelling.
 
 ## External asset boundary
 
@@ -80,19 +82,32 @@ remain importable. Named contracts publish only parameter patterns and ordinary
 predicate templates; their source AST and inference scratch do not escape into
 dependency files.
 
-## Verification
+## Historical typed-path qualification
 
-The current native suite, 589 guest/client tests and zero-finding analyzer gate
-pass. Typed-path laws cover type-changing composition, identity, aliases,
-captured callbacks, twelve-level composition, large accessors, early returns,
-effect sequencing, incompatible source types, effectful accessor rejection,
-dependency bundles, checkpoints and failed-edit recovery. Native
-allocation-failure sweeps also check frozen-Core immutability. A separate
-725-invocation comparison preserves existing diagnostics, constant steps,
-code-instance counts and Wasm bytes.
+The typed-path milestone passed its native suite, 589 guest/client tests and
+zero-finding analyzer gate. Typed-path laws cover type-changing composition,
+identity, aliases, captured callbacks, twelve-level composition, large
+accessors, early returns, effect sequencing, incompatible source types,
+effectful accessor rejection, dependency bundles, checkpoints and failed-edit
+recovery. Native allocation-failure sweeps also check frozen-Core immutability.
+A separate 725-invocation comparison preserves existing diagnostics, constant
+steps, code-instance counts and Wasm bytes.
 
 Seven alternating gdev pairs preserve Wasm and deterministic work counters.
 Fresh CPU is 636 / 637 ms before/after the path change; population and first
 edit are unchanged, while subsequent edits measure 130 / 140 ms. The cold and
 retained-edit targets remain open. See [STATUS.md](STATUS.md) for current
 measurements and remaining compiler work.
+
+## Settled language contracts (13 October 2026)
+
+The reviewed design documents are complete:
+[usage/lifetimes](USAGE_CONTRACTS.md),
+[annotated polymorphism/packages](POLYMORPHIC_PACKAGES.md),
+[typed staging](TYPED_STAGING.md) and
+[structured tasks](STRUCTURED_CONCURRENCY.md). They share explicit
+type/row/region binders and portable ownership/evidence. Their implementations
+now have focused Source, immutable-Core and executed Wasm evidence. Final
+combined gates remain as listed above. Examples in design documents are
+contractual proposals unless the guide documents their exact executable syntax.
+[Design qualification](LANGUAGE_DESIGN_QUALIFICATION.md) records checks.

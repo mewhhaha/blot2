@@ -246,3 +246,54 @@ allocations, and temporary collection metadata. `blot:allocate(0)` observes that
 high-water cursor; cursor differences are not cumulative allocation counts once
 blocks are reused. The host must not reset memory while a suspended invocation
 still holds pointers.
+
+## Structured task extension
+
+Task modules carry exactly one `blot:tasks` custom section. Its unsigned LEB128
+payload is version `2` followed by a descriptor count, at most 4096. No trailing
+payload is allowed. Version `1` is rejected. Each descriptor names its exact
+typed start and move adapters; private compiler layout IDs are not exported. The
+adapter rejects missing or duplicate sections, unknown versions, invalid counts,
+mismatched exports and incompatible signatures before execution. Modules without
+tasks keep the ordinary ABI.
+
+The compiler imports `blot:task/1` operations `open`, `close`, `spawn`, `join`,
+`cancel`, `poll`, `drop`, `drain`, `checkpoint`, `current`, `resume` and
+`transfer`, with exact checked Wasm signatures. Hidden descriptor exports
+`blot:task_start/N`, `blot:task_move_captures/N` and `blot:task_move_result/N`
+invoke the checked thunk and transfer resource tokens through its selected
+layout. Native context helpers save and restore each task's counted root
+journal, frame, external lease and callback-reference baselines. They are
+private to the instance adapter.
+
+Group/task IDs are monotonically increasing generations, never guest pointers.
+The instance validates every live handle and descriptor before touching native
+state. Join moves one owned success result or reports terminal failure or
+cancellation. Result envelopes retain a native lease until their ownership is
+published or discarded. Resource cleanup journals move with owning captures and
+returned values, including cancellation and failed publication. Scope completion
+waits for children, including descendants published during an existing child's
+suspension. Independently observed failures are reported by spawn ordinal after
+every outstanding callback settles.
+
+Use a `concurrent` callback type in Source and an explicit host binding:
+
+```ts
+const guest = await instantiateGuest(bytes, { asynchronous: true });
+const host = guest.capabilityAsync({
+  parameter: "U32",
+  result: "U32",
+  concurrent: true,
+  call: async (value) => await compute(value),
+});
+await guest.callAsync("main", host);
+guest.dispose();
+```
+
+An ordinary callback cannot satisfy this qualifier. Numeric Array packets are
+copied on both crossings. Suspended sibling callbacks may settle in either
+order; each reaction restores its task generation before copying a result or
+allocating guest data. Public calls remain serial per instance; disposal rejects
+until the active invocation settles. Scheduling is cooperative and creates no
+workers or shared host memory. The active group/task and resource budgets are
+4096 per instance; generation exhaustion rejects without recycling identities.

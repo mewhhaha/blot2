@@ -1,0 +1,26 @@
+{
+  "toolchain": "Zig0.17.0 Safe/noLLVM",
+  "scope": "late runtime prerequisite; no production cohort consumer",
+  "private_patch": "c13d50e708276a7ec307359c461f24d05733593cec63667e98101a73c61996e3",
+  "compiler_at_runtime_integration": "514b2ecc8d176375314dfd01d746fc893463c40c8f05ea516e3ca255ed4ae1a6",
+  "source_sha256": {
+    "zig-native/src/cohort_runtime.zig": "8352643b3483395a6287bacbe221f77597cdf1eb210f5c15a2623c05e2da8a0d",
+    "zig-native/src/cohort_fixture.zig": "acd61857d40e8e5771f87922ed20106f1cab1ec5c54e7775af77ad0541628f56",
+    "zig-native/src/cohort_runtime_tests.zig": "af2855954277ca8cdb5910bfda418f467d3f442fec2af9b8c49e54b50de20d78",
+    "zig-native/src/wasm.zig": "e01d19bd9f65795a47a7cadbb3f17c4774c1016581c8e646b88e069d9eebd2ea",
+    "zig-native/src/runtime_suite.zig": "289b9b45414868dab02d9e6b784c1a95a41b855a5ce434fe0b8645d753b39ad0",
+    "zig-native/build.zig": "f10af005c29c1a1f1d5a22722b69603c9da51c968bf3651d5e73a42c736c0956",
+    "zig-native/tests/cohort_runtime_execution.test.ts": "81a287a4d3da7e2435b790642483996656d637e21286bf019831b8f8a961c6e0",
+    "scripts/compiler_fixtures.ts": "5b975c7ecfc327a165d8e8f7564fd36b70f6db8f16d197e4adeb79e13ee3209f",
+    "scripts/compiler_fixtures.test.ts": "860f59b547d06afd9e47f9eff3e6ef0bf8be341acf1f7ab71e496091c18b3433"
+  },
+  "native_laws": 3,
+  "wasm_protocol_groups": 10,
+  "fixture_dependency_laws": 2,
+  "ordinary_cost": {
+    "bytes": 11958,
+    "sha256": "1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad"
+  },
+  "full_compiler_gate": "pending",
+  "member_guard_correction": "29ab7d1566400808b99efff68bc6ff06202462dd611da1fe4ca73ae9ddcd6dec"
+}

@@ -2,7 +2,10 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — focused implementation checks pass (see
+  [STRUCTURED_TASK_QUALIFICATION](../zig-native/STRUCTURED_TASK_QUALIFICATION.md));
+  scope closed to fixed acceptance traces by owner decision on 15 October 2026;
+  task 035 and a passing full gate remain.
 - **Dependencies:** [072](072-specify-structured-concurrency.md),
   [035](035-remove-the-tracing-runtime.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 10 / task
@@ -18,8 +21,8 @@ qualified runtime ownership.
 ## Starting point
 
 Task 035 completes the tracing replacement and task 072 defines task semantics.
-[runtime_cleanup.zig](../zig-native/src/runtime_cleanup.zig),
-[request_runtime.zig](../zig-native/src/request_runtime.zig) and
+[runtime_cleanup.zig](../zig-native/src/runtime/runtime_cleanup.zig),
+[request_runtime.zig](../zig-native/src/runtime/request_runtime.zig) and
 [compiler/guest.ts](../compiler/guest.ts) handle current lifetimes and host
 suspension.
 
@@ -55,6 +58,31 @@ development and the scenarios below.
       concurrency contract.
 - [ ] Applicable checks pass and completion evidence records remaining
       limitations honestly.
+
+## Closed acceptance — owner decision, 15 October 2026
+
+The owner closed this task's scope to the acceptance traces of the
+[structured concurrency design](../zig-native/STRUCTURED_CONCURRENCY.md) listed
+below.
+
+| Acceptance trace                                       | Expected result                                                         |
+| ------------------------------------------------------ | ----------------------------------------------------------------------- |
+| Nested group exits normally with two unjoined children | Join children before closing group and releasing parent resource.       |
+| Sibling1 fails while sibling2 is suspended             | Request cancellation, await settlement, drop both, then report failure. |
+| Cancel before child starts                             | Do not invoke thunk; drop transferred owners once.                      |
+
+Forms outside these traces (detached tasks, shared mutable state across tasks,
+host worker transport, simultaneous Wasm reentry, unknown or overlapping
+partition evidence) must reject, as recorded in
+[the implementation record](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#deliberate-limits-and-remaining-qualification).
+
+Focused evidence: the private implementation passed 12 checker, four backend,
+one native-context, 26 task/context/resource and 35 guest/resource laws, with 34
+descriptors executed in sync and JSPI modes (see
+[the implementation record](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#focused-checks)).
+The task completes when each trace maps to named passing laws in the full
+compiler gate on the committed source and task
+[035](035-remove-the-tracing-runtime.md) is complete.
 
 ## Completion evidence
 

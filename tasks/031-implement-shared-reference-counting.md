@@ -16,9 +16,10 @@ while keeping tracing during the transition.
 
 ## Starting point
 
-[runtime_layout.zig](../zig-native/src/runtime_layout.zig) defines heap fields,
-[arena_runtime.zig](../zig-native/src/arena_runtime.zig) supplies storage, and
-[wasm_lifetimes.zig](../zig-native/src/wasm_lifetimes.zig) proves local
+[runtime_layout.zig](../zig-native/src/runtime/runtime_layout.zig) defines heap
+fields, [arena_runtime.zig](../zig-native/src/runtime/arena_runtime.zig)
+supplies storage, and
+[wasm_lifetimes.zig](../zig-native/src/backend/wasm_lifetimes.zig) proves local
 allocation groups. Task 030 defines the new shared ownership contract.
 
 ## Implementation checklist

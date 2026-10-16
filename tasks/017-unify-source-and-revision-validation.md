@@ -16,11 +16,11 @@ dependency records.
 
 ## Starting point
 
-[dependency_certificate.zig](../zig-native/src/dependency_certificate.zig),
-[revision_inputs.zig](../zig-native/src/revision_inputs.zig),
-[frozen_core_validation.zig](../zig-native/src/frozen_core_validation.zig) and
-[dependency_admission.zig](../zig-native/src/dependency_admission.zig) validate
-source images, bounds, pinned bytes and identities separately.
+[dependency_certificate.zig](../zig-native/src/reuse/dependency_certificate.zig),
+[revision_inputs.zig](../zig-native/src/reuse/revision_inputs.zig),
+[frozen_core_validation.zig](../zig-native/src/check/frozen_core_validation.zig)
+and [dependency_admission.zig](../zig-native/src/reuse/dependency_admission.zig)
+validate source images, bounds, pinned bytes and identities separately.
 
 ## Implementation checklist
 

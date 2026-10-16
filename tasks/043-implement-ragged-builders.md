@@ -16,10 +16,11 @@ preserving ordinary builders elsewhere.
 
 ## Starting point
 
-[exact_builder.zig](../zig-native/src/exact_builder.zig),
-[eval_indexed_builder.zig](../zig-native/src/eval_indexed_builder.zig) and
-[core_backend.zig](../zig-native/src/core_backend.zig) contain the current
-construction paths. The approved ragged design defines legal extra passes.
+[exact_builder.zig](../zig-native/src/backend/exact_builder.zig),
+[eval_indexed_builder.zig](../zig-native/src/eval/eval_indexed_builder.zig) and
+[core_backend.zig](../zig-native/src/backend/core_backend.zig) contain the
+current construction paths. The approved ragged design defines legal extra
+passes.
 
 ## Implementation checklist
 

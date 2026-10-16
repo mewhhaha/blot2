@@ -12,6 +12,14 @@ while rejecting different scalar heads, nominal identities, physical record
 slots and known effect rows. Queries that require physical projections publish
 no semantic receipt; they rebuild their shapes on the next query.
 
+Checked production emission also preserves an erased empty collection's explicit
+cursor protocol. When the receiver is exactly an empty literal through the
+ordinary pure cursor producer, the ordinary pure next method selects its nullary
+empty result. Receiver evaluation still occurs; the unreachable unknown element
+payload never acquires a fabricated ownership role. Edited/custom methods retain
+ordinary execution. Producer-body reads force fresh artifact code, and language
+variables remain open for subsequent U32/F32 instantiations.
+
 The abandoned checker default changed type-witness results and narrowed staged
 builders. Its experiments remain ignored under `build/wip/`; the checker has no
 new defaulting rule.

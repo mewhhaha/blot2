@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import { instantiateGuest } from "../../compiler/guest.ts";
 import { compileAndRun } from "./compile_helpers.ts";
+import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 
 const cycleDefinitions = `
 type State a is effect = { get: Unit -> a, set: a -> Unit }
@@ -37,8 +38,42 @@ entry const run = fn (count: U32) => do:
 entry const memory = fn () -> Array U32 => #[]
 `;
 
+async function compileCyclesInBothTiers(
+  source: string,
+  run: (
+    bytes: Uint8Array<ArrayBuffer>,
+    tier: "development" | "optimized",
+  ) => void,
+) {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-cycle-retirement-",
+  });
+  const entry = `${directory}/main.blot`;
+  try {
+    for (const codegenTier of ["development", "optimized"] as const) {
+      const compiler = await createZigProjectCompiler({
+        executable: Deno.args[0],
+        entry,
+        codegenTier,
+        cacheDirectory: false,
+        prelude: new URL("../../std/prelude.blot", import.meta.url),
+        stdRoot: new URL("../../std/", import.meta.url),
+      });
+      try {
+        const built = await compiler.build({ sources: { [entry]: source } });
+        assert(built.success, JSON.stringify(built));
+        run(built.bytes, codegenTier);
+      } finally {
+        await compiler.close();
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+}
+
 Deno.test("source State and strong demand cycles retire locally during sustained execution", async () => {
-  await compileAndRun(cycleSource, (_, bytes) => {
+  await compileCyclesInBothTiers(cycleSource, (bytes, tier) => {
     const module = new WebAssembly.Module(bytes);
     assert.deepEqual([
       ...new Uint8Array(
@@ -54,22 +89,89 @@ Deno.test("source State and strong demand cycles retire locally during sustained
     const count = (name: string) =>
       Number((raw[`blot:${name}`] as WebAssembly.Global).value);
     const run = raw.run as CallableFunction;
+    let allocationsPerCycle = 1;
+    // The scalar seed lives directly in its callback environment word.
+    if (tier === "development") allocationsPerCycle = 3;
+    const destroyed = count("rc_destroyed");
     assert.equal(run(512), 511 * 512 / 2);
     const memory = raw["blot:memory"] as WebAssembly.Memory;
     const warm = memory.buffer.byteLength;
     const passes = count("cycle_passes"), reclaimed = count("cycle_bytes");
-    assert(
-      reclaimed > 0,
-      "local deletion must reclaim source cycles; tracing alone cannot satisfy this law",
-    );
+    if (reclaimed === 0) {
+      assert.equal(passes, 0);
+      assert.equal(
+        count("rc_destroyed") - destroyed,
+        512 * allocationsPerCycle,
+      );
+    } else {
+      assert(passes > 0);
+    }
     assert.equal(run(20000), 19999 * 20000 / 2);
-    assert(count("cycle_passes") > passes);
-    assert(count("cycle_bytes") > reclaimed);
+    if (reclaimed === 0) {
+      for (
+        const name of [
+          "cycle_passes",
+          "cycle_vertices",
+          "cycle_edges",
+          "cycle_bytes",
+        ]
+      ) {
+        assert.equal(count(name), 0);
+      }
+      assert.equal(
+        count("rc_destroyed") - destroyed,
+        20512 * allocationsPerCycle,
+      );
+    } else {
+      assert(count("cycle_passes") > passes);
+      assert(count("cycle_bytes") > reclaimed);
+    }
     assert.equal(memory.buffer.byteLength, warm);
     assert.equal(count("rc_roots"), 0);
     assert.equal(count("rc_leases"), 0);
     (raw["blot:ownership_leave"] as CallableFunction)(2);
   });
+});
+
+Deno.test("an unconfined State graph retains real local cycle collection under sustained execution", async () => {
+  await compileCyclesInBothTiers(
+    cycleSource.replace(
+      "    use State.set #End",
+      "    use State.set (#Next delayed)",
+    ),
+    (bytes) => {
+      const module = new WebAssembly.Module(bytes);
+      assert.deepEqual([
+        ...new Uint8Array(
+          WebAssembly.Module.customSections(module, "blot:ownership")[0],
+        ),
+      ], [2, 2, 0]);
+      assert.deepEqual([
+        ...new Uint8Array(
+          WebAssembly.Module.customSections(module, "blot:cycles")[0],
+        ),
+      ], [1, 1]);
+      const raw = new WebAssembly.Instance(module).exports;
+      const count = (name: string) =>
+        Number((raw[`blot:${name}`] as WebAssembly.Global).value);
+      const run = raw.run as CallableFunction;
+      assert.equal(run(512), 511 * 512 / 2);
+      const memory = raw["blot:memory"] as WebAssembly.Memory;
+      const warm = memory.buffer.byteLength;
+      const passes = count("cycle_passes"), reclaimed = count("cycle_bytes");
+      assert(
+        reclaimed > 0,
+        "local deletion must reclaim source cycles; tracing alone cannot satisfy this law",
+      );
+      assert.equal(run(20000), 19999 * 20000 / 2);
+      assert(count("cycle_passes") > passes);
+      assert(count("cycle_bytes") > reclaimed);
+      assert.equal(memory.buffer.byteLength, warm);
+      assert.equal(count("rc_roots"), 0);
+      assert.equal(count("rc_leases"), 0);
+      (raw["blot:ownership_leave"] as CallableFunction)(2);
+    },
+  );
 });
 
 Deno.test("a large retained heap preserves its owner while local cycle passes use their own traffic trigger", async () => {
@@ -78,7 +180,7 @@ Deno.test("a large retained heap preserves its owner while local cycle passes us
     "  let older = @array.fill 1048576 7\n  let index = 0",
   )
     .replace("      return sum", "      return sum + older[1048575]");
-  await compileAndRun(source, (_, bytes) => {
+  await compileCyclesInBothTiers(source, (bytes, tier) => {
     const module = new WebAssembly.Module(bytes);
     assert.deepEqual([
       ...new Uint8Array(
@@ -86,9 +188,46 @@ Deno.test("a large retained heap preserves its owner while local cycle passes us
       ),
     ], [2, 2, 0]);
     const raw = new WebAssembly.Instance(module).exports;
+    const count = (name: string) =>
+      Number((raw[`blot:${name}`] as WebAssembly.Global).value);
+    let allocationsPerCycle = 1;
+    // The scalar seed lives directly in its callback environment word.
+    if (tier === "development") allocationsPerCycle = 3;
+    const destroyed = count("rc_destroyed");
     assert.equal((raw.run as CallableFunction)(20000), 199990007);
-    assert(Number((raw["blot:cycle_passes"] as WebAssembly.Global).value) > 1);
-    assert(Number((raw["blot:cycle_bytes"] as WebAssembly.Global).value) > 0);
+    const reclaimed = count("cycle_bytes");
+    if (reclaimed === 0) {
+      for (
+        const name of [
+          "cycle_passes",
+          "cycle_vertices",
+          "cycle_edges",
+          "cycle_bytes",
+        ]
+      ) {
+        assert.equal(count(name), 0);
+      }
+      assert.equal(
+        count("rc_destroyed") - destroyed,
+        20000 * allocationsPerCycle + 1,
+      );
+    } else {
+      assert(count("cycle_passes") > 1);
+    }
+    const memory = raw["blot:memory"] as WebAssembly.Memory;
+    const warm = memory.buffer.byteLength;
+    const warmedDestroyed = count("rc_destroyed");
+    assert.equal((raw.run as CallableFunction)(20000), 199990007);
+    assert.equal(memory.buffer.byteLength, warm);
+    if (reclaimed === 0) {
+      assert.equal(
+        count("rc_destroyed") - warmedDestroyed,
+        20000 * allocationsPerCycle + 1,
+      );
+      assert.equal(count("cycle_bytes"), 0);
+    } else {
+      assert(count("cycle_bytes") > reclaimed);
+    }
     assert.equal((raw["blot:rc_roots"] as WebAssembly.Global).value, 0);
     assert.equal((raw["blot:rc_leases"] as WebAssembly.Global).value, 0);
     (raw["blot:ownership_leave"] as CallableFunction)(2);

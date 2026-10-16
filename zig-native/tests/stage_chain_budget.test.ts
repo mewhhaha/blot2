@@ -7,13 +7,8 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const fixture = new URL(
-  "budget-fixture",
-  new URL(executable, `file://${Deno.cwd()}/`),
-).pathname;
-
-// Exercise unknown callback rows, rejection and recovery without spending the
-// production million-step budget. The fixture has a build-local 256-step limit.
+// Exercise unknown callback rows, rejection and recovery with the ordinary
+// compiler configured to a process-local 256-step inference limit.
 function chain(length: number): string {
   const fields = Array.from(
     { length: 2 },
@@ -41,11 +36,20 @@ Deno.test("CLI rejects inference budget exhaustion without publishing output", a
   const directory = await Deno.makeTempDir({ prefix: "blot-stage-budget-" });
   const entry = `${directory}/main.blot`;
   const output = `${directory}/main.wasm`;
+  let passed = false;
   try {
     const source = chain(32);
     await Deno.writeTextFile(entry, source);
-    const result = await new Deno.Command(fixture, {
-      args: ["build", entry, output, "--prelude", "none"],
+    const result = await new Deno.Command(executable, {
+      args: [
+        "build",
+        entry,
+        output,
+        "--prelude",
+        "none",
+        "--inference-budget",
+        "256",
+      ],
       env: { BLOT_CACHE_DIR: "" },
       stdout: "piped",
       stderr: "piped",
@@ -60,8 +64,10 @@ Deno.test("CLI rejects inference budget exhaustion without publishing output", a
     assert.equal(metrics.success, false);
     assert.equal(metrics.memory.live_bytes, 0);
     await assert.rejects(() => Deno.stat(output), Deno.errors.NotFound);
+    passed = true;
   } finally {
-    await Deno.remove(directory, { recursive: true });
+    if (passed) await Deno.remove(directory, { recursive: true });
+    else console.error(`Stage-chain failure source preserved at ${entry}`);
   }
 });
 
@@ -69,13 +75,15 @@ Deno.test("fresh and retained stage-chain rejection agrees and the server recove
   const directory = await Deno.makeTempDir({ prefix: "blot-stage-budget-" });
   const entry = `${directory}/main.blot`;
   const options = {
-    executable: fixture,
+    executable,
+    inferenceBudget: 256,
     entry,
     prelude: null,
     cacheDirectory: false as const,
   };
   const retained = await createZigProjectCompiler(options);
   let original: Uint8Array<ArrayBuffer> | undefined;
+  let passed = false;
   try {
     for (const length of [2, 32, 2]) {
       const source = chain(length);
@@ -96,6 +104,7 @@ Deno.test("fresh and retained stage-chain rejection agrees and the server recove
         const production = await createZigProjectCompiler({
           ...options,
           executable,
+          inferenceBudget: 1_000_000,
         });
         try {
           assert.notEqual(
@@ -125,8 +134,10 @@ Deno.test("fresh and retained stage-chain rejection agrees and the server recove
         guest.dispose();
       }
     }
+    passed = true;
   } finally {
     await retained.dispose();
-    await Deno.remove(directory, { recursive: true });
+    if (passed) await Deno.remove(directory, { recursive: true });
+    else console.error(`Stage-chain failure source preserved at ${entry}`);
   }
 });

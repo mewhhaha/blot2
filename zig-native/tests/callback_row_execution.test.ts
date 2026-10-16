@@ -8,7 +8,7 @@ import {
 for (const name of ["parameter", "record", "capture"] as const) {
   Deno.test(`Foreign callback ${name} use composes with handled effects`, async () => {
     const source = await Deno.readTextFile(
-      new URL(`../src/callback-fixtures/${name}.blot`, import.meta.url),
+      new URL(`../fixtures/callback-fixtures/${name}.blot`, import.meta.url),
     );
     for (const asynchronous of [false, true]) {
       await compileAndRun(source, async (guest) => {
@@ -47,7 +47,7 @@ for (const name of ["parameter", "record", "capture"] as const) {
 
 Deno.test("mixed Foreign Requests factories preserve captures cancellation and callback recovery", async () => {
   const source = await Deno.readTextFile(
-    new URL("../src/callback-fixtures/factory.blot", import.meta.url),
+    new URL("../fixtures/callback-fixtures/factory.blot", import.meta.url),
   );
   for (const asynchronous of [false, true]) {
     await compileAndRun(source, async (guest) => {

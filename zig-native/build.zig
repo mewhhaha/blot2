@@ -1,5 +1,5 @@
 const std = @import("std");
-const TestSuite = enum { all, syntax, types, runtime };
+const TestSuite = enum { all, syntax, types, runtime, checker, evaluator, backend, retained };
 
 pub fn build(b: *std.Build) void {
     if (comptime @import("builtin").zig_version.order(.{ .major = 0, .minor = 17, .patch = 0 }) == .lt)
@@ -31,79 +31,75 @@ pub fn build(b: *std.Build) void {
     module.addOptions("compiler_identity", identity);
     const exe = b.addExecutable(.{ .name = "blotc", .root_module = module, .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
     b.installArtifact(exe);
-    // The ordinary CLI and server paths, with a small build-local budget.
-    // A distinct identity keeps fixture artifacts out of production caches.
-    const budget_identity = b.addOptions();
-    budget_identity.addOption(bool, "artifact_replay", false);
-    budget_identity.addOption(usize, "inference_budget", 256);
-    var budget_digest = @import("compiler_fingerprint.zig").digest(b, target, .safe, false) catch @panic("Cannot read budget fixture identity");
-    var budget_hash = std.crypto.hash.sha2.Sha256.init(.{});
-    budget_hash.update(&budget_digest);
-    budget_hash.update("inference-budget-fixture=256");
-    budget_hash.final(&budget_digest);
-    budget_identity.addOption([32]u8, "digest", budget_digest);
-    const budget_module = b.createModule(.{ .root_source_file = b.path("src/main.zig"), .target = target, .optimize = .safe });
-    budget_module.addOptions("compiler_identity", budget_identity);
-    const budget_fixture = b.addExecutable(.{ .name = "budget-fixture", .root_module = budget_module, .use_llvm = false });
-    const install_budget = b.addInstallArtifact(budget_fixture, .{});
-    b.step("budget-fixture", "Build the small-budget CLI/server regression fixture").dependOn(&install_budget.step);
-    const suite = b.option(TestSuite, "test-suite", "Native test subsystem (all, syntax, types, runtime)") orelse .all;
+    const suite = b.option(TestSuite, "test-suite", "Native test subsystem (all, syntax, types, runtime, checker, evaluator, backend, retained)") orelse .all;
     const test_source = switch (suite) {
         .all => "src/production_suite.zig",
         .syntax => "src/syntax_suite.zig",
         .types => "src/types_suite.zig",
         .runtime => "src/runtime_suite.zig",
+        .checker => "src/checker_suite.zig",
+        .evaluator => "src/evaluator_suite.zig",
+        .backend => "src/backend_suite.zig",
+        .retained => "src/retained_suite.zig",
     };
-    const tests = b.addTest(.{ .filters = b.option([]const []const u8, "test-filter", "filter") orelse &.{}, .root_module = b.createModule(.{
+    const tests = b.addTest(.{ .name = "blot-tests", .test_runner = .{ .path = b.path("src/test_runner.zig"), .mode = .simple }, .filters = b.option([]const []const u8, "test-filter", "filter") orelse &.{}, .root_module = b.createModule(.{
         .root_source_file = b.path(test_source),
         .target = target,
         .optimize = optimize,
     }), .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
+    tests.root_module.addImport("fixtures", b.createModule(.{
+        .root_source_file = b.path("fixtures/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    }));
     const test_options = b.addOptions();
     test_options.addOption(bool, "oom_profile", b.option(bool, "oom-profile", "Report allocation-failure sweep timings and counts") orelse false);
     tests.root_module.addOptions("test_options", test_options);
-    b.step("test-compile", "Compile the native test suite without executing it").dependOn(&tests.step);
-    const run_tests = b.addRunArtifact(tests);
-    run_tests.setCwd(b.path(".."));
-    run_tests.has_side_effects = b.option(bool, "test-force-run", "Execute native tests even when their run is cached") orelse false;
-    b.step("test", "Test the handwritten compiler").dependOn(&run_tests.step);
+    const install_tests = b.addInstallArtifact(tests, .{});
+    b.step("test-compile", "Compile and install the native test suite without executing it").dependOn(&install_tests.step);
+    const test_step = b.step("test", "Test the handwritten compiler");
+    test_step.dependOn(&install_tests.step);
+    const shards = b.option(usize, "test-shards", "Number of isolated native execution processes") orelse 1;
+    if (shards == 0) @panic("test-shards must be positive");
+    const inventory = b.option(bool, "test-inventory", "List the compiled tests instead of executing them") orelse false;
+    const force_run = b.option(bool, "test-force-run", "Execute native tests even when their run is cached") orelse false;
+    for (0..shards) |shard| {
+        const run_tests = b.addRunArtifact(tests);
+        run_tests.expectExitCode(0);
+        run_tests.setCwd(b.path(".."));
+        run_tests.addArg(b.fmt("--shard={d}", .{shard}));
+        run_tests.addArg(b.fmt("--shards={d}", .{shards}));
+        if (inventory) run_tests.addArg("--list");
+        run_tests.has_side_effects = force_run;
+        test_step.dependOn(&run_tests.step);
+    }
     const run = b.addRunArtifact(exe);
     run.addPassthruArgs();
     b.step("run", "Run the source compiler").dependOn(&run.step);
-    const fixture = b.addExecutable(.{ .name = "arena-fixture", .root_module = b.createModule(.{
-        .root_source_file = b.path("src/arena_fixture.zig"),
+    addRuntimeFixture(b, target, optimize, use_llvm, .arena, "arena-fixture", "Generate the memory/array ABI execution fixture");
+    addRuntimeFixture(b, target, optimize, use_llvm, .shared_rc, "shared-rc-fixture", "Generate checked retain/release execution laws");
+    addRuntimeFixture(b, target, optimize, use_llvm, .cohort, "cohort-fixture", "Generate bounded activation cohort protocol laws");
+    addRuntimeFixture(b, target, optimize, use_llvm, .list, "list-runtime-fixture", "Generate list layout and sharing execution laws");
+    addRuntimeFixture(b, target, optimize, use_llvm, .resource, "resource-retire-fixture", "Generate deferred owning resource retirement laws");
+    addRuntimeFixture(b, target, optimize, use_llvm, .region, "region-owner-publication-fixture", "Generate region owner publication execution laws");
+    addRuntimeFixture(b, target, optimize, use_llvm, .task_context, "task-context-fixture", "Generate suspendable task ownership context laws");
+    addRuntimeFixture(b, target, optimize, use_llvm, .packed_layout, "packed-layout-fixture", "Generate the experimental dense scalar row fixture");
+}
+
+const RuntimeFixture = enum { arena, shared_rc, cohort, list, resource, region, task_context, packed_layout };
+fn addRuntimeFixture(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.Optimize, use_llvm: ?bool, kind: RuntimeFixture, name: []const u8, description: []const u8) void {
+    const module = b.createModule(.{
+        .root_source_file = b.path("src/fixture_main.zig"),
         .target = target,
         .optimize = optimize,
-    }), .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
-    const generate_fixture = b.addRunArtifact(fixture);
-    const fixture_file = generate_fixture.addOutputFileArg("arena-fixture.wasm");
-    const install_fixture = b.addInstallFile(fixture_file, "arena-fixture.wasm");
-    b.step("arena-fixture", "Generate the memory/array ABI execution fixture").dependOn(&install_fixture.step);
-    const rc_fixture = b.addExecutable(.{ .name = "shared-rc-fixture", .root_module = b.createModule(.{
-        .root_source_file = b.path("src/shared_rc_fixture.zig"),
-        .target = target,
-        .optimize = optimize,
-    }), .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
-    const generate_rc = b.addRunArtifact(rc_fixture);
-    const rc_file = generate_rc.addOutputFileArg("shared-rc-fixture.wasm");
-    const install_rc = b.addInstallFile(rc_file, "shared-rc-fixture.wasm");
-    b.step("shared-rc-fixture", "Generate checked retain/release execution laws").dependOn(&install_rc.step);
-    const list_fixture = b.addExecutable(.{ .name = "list-runtime-fixture", .root_module = b.createModule(.{
-        .root_source_file = b.path("src/list_runtime_fixture.zig"),
-        .target = target,
-        .optimize = optimize,
-    }), .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
-    const generate_list_fixture = b.addRunArtifact(list_fixture);
-    const list_fixture_file = generate_list_fixture.addOutputFileArg("list-runtime-fixture.wasm");
-    const install_list_fixture = b.addInstallFile(list_fixture_file, "list-runtime-fixture.wasm");
-    b.step("list-runtime-fixture", "Generate list layout and sharing execution laws").dependOn(&install_list_fixture.step);
-    const packed_fixture = b.addExecutable(.{ .name = "packed-layout-fixture", .root_module = b.createModule(.{
-        .root_source_file = b.path("src/packed_layout_fixture.zig"),
-        .target = target,
-        .optimize = optimize,
-    }), .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
-    const generate_packed = b.addRunArtifact(packed_fixture);
-    const packed_file = generate_packed.addOutputFileArg("packed-layout-fixture.wasm");
-    const install_packed = b.addInstallFile(packed_file, "packed-layout-fixture.wasm");
-    b.step("packed-layout-fixture", "Generate the experimental dense scalar row fixture").dependOn(&install_packed.step);
+    });
+    const options = b.addOptions();
+    options.addOption(RuntimeFixture, "kind", kind);
+    module.addOptions("fixture_options", options);
+    const executable = b.addExecutable(.{ .name = name, .root_module = module, .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
+    const generate = b.addRunArtifact(executable);
+    const filename = b.fmt("{s}.wasm", .{name});
+    const output = generate.addOutputFileArg(filename);
+    const install = b.addInstallFile(output, filename);
+    b.step(name, description).dependOn(&install.step);
 }

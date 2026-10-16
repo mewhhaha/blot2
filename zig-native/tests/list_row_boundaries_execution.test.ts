@@ -304,7 +304,11 @@ entry const memory_probe = fn (seed: U32) => #[seed]
       const { exports } = await WebAssembly.instantiate(module);
       assert.equal((exports.rows_length as () => number)(), 599);
       assert.equal((exports.cursor_probe as (repeat: number) => number)(0), 1);
-      assert.equal(ownership[1], 0, "exercise the tracing fallback cache path");
+      assert.deepEqual(
+        [...ownership],
+        [2, 2, 0],
+        "dynamic packed traversal has complete ownership",
+      );
       const memory = exports["blot:memory"] as WebAssembly.Memory;
       const reset = exports["blot:reset"] as (root: number) => number;
       const pressure = exports.pressure as (count: number) => number;

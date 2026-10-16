@@ -18,8 +18,8 @@ resumption, cancellation, traps and host exceptions.
 
 ## Starting point
 
-[request_runtime.zig](../zig-native/src/request_runtime.zig),
-[runtime_cleanup.zig](../zig-native/src/runtime_cleanup.zig),
+[request_runtime.zig](../zig-native/src/runtime/request_runtime.zig),
+[runtime_cleanup.zig](../zig-native/src/runtime/runtime_cleanup.zig),
 [compiler/guest.ts](../compiler/guest.ts) and
 [tests/demand_completion_execution.test.ts](../zig-native/tests/demand_completion_execution.test.ts)
 preserve request and demand completion behavior. Persistent payload ownership

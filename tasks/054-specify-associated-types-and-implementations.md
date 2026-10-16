@@ -19,8 +19,8 @@ selection and portable evidence.
 
 [compiler/guide.md](../compiler/guide.md#qualified-bindings) defines named
 predicate bundles and current associated dispatch.
-[check_contract_tests.zig](../zig-native/src/check_contract_tests.zig) and
-[associated_catalog_tests.zig](../zig-native/src/associated_catalog_tests.zig)
+[check_contract_tests.zig](../zig-native/src/check/check_contract_tests.zig) and
+[associated_catalog_tests.zig](../zig-native/src/eval/associated_catalog_tests.zig)
 cover existing contracts/catalogs; associated type members remain open.
 
 ## Implementation checklist

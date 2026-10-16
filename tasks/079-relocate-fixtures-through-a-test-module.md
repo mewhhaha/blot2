@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — fixtures and consumers are relocated; final combined
+  compiler/analyzer qualification remains pending.
 - **Dependencies:** [078](078-split-backend-state-and-emission.md)
 - **Originating requirements:** PLAN: Hills 15 and 20 / fixtures and test
   discovery. Sources: [PLAN.md](../PLAN.md).
@@ -23,9 +24,9 @@ test suite. Many `@embedFile` paths still point inside production `src/`.
 
 ## Implementation checklist
 
-- [ ] Create a dedicated fixture module rooted at `zig-native/fixtures/` and
+- [x] Create a dedicated fixture module rooted at `zig-native/fixtures/` and
       expose needed embedded data through it.
-- [ ] Move top-level `.blot` and fixture directories out of production sources,
+- [x] Move top-level `.blot` and fixture directories out of production sources,
       updating test consumers and build wiring.
 - [ ] Preserve complete comptime test import/discovery and correct module-root
       restrictions; do not make production depend on test data.
@@ -55,6 +56,18 @@ development and the scenarios below.
       limitations honestly.
 
 ## Completion evidence
+
+The `fixtures` native test module owns 126 Blot inputs and two frozen oracle
+files, all byte identical to their prior locations. Thirty Zig consumers and
+four guest helper/fixture readers use the new location. Test-only module wiring
+does not grant production imports fixture access. Focused discovery executes
+three relocated consumers (request graph/OOM, purity oracle and dynamically
+selected closure source), and all seven local analyzer dependency/cache laws
+pass, including fixture additions/deletions. The first broad filter selected 56
+staging/usage controls but no fixture consumers; the separate exact-name
+three-test run supplies that evidence. No full-gate completion is claimed. Byte
+manifests, original sources and logs:
+`build/bench/finish-rest-20261015/fixture-relocation/`.
 
 - Commit: pending; record the local milestone revision.
 - Validation: not run for this task; record commands, versions, results and

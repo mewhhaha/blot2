@@ -23,8 +23,8 @@ and its
 [acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
 
 At the task 006 baseline, active recursive targets fell back into their inline
-region in [core_eval.zig](../zig-native/src/core_eval.zig). Its call-summary
-queue already removes native recursion for admitted acyclic jobs;
+region in [core_eval.zig](../zig-native/src/eval/core_eval.zig). Its
+call-summary queue already removes native recursion for admitted acyclic jobs;
 [tests/compile_budget.test.ts](../zig-native/tests/compile_budget.test.ts)
 preserves deep-chain budgets.
 

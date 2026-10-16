@@ -16,11 +16,11 @@ checkpoints.
 
 ## Starting point
 
-[dependency_format.zig](../zig-native/src/dependency_format.zig),
-[backend_checkpoint.zig](../zig-native/src/backend_checkpoint.zig),
-[principal_archive.zig](../zig-native/src/principal_archive.zig) and
-[optimized_archive.zig](../zig-native/src/optimized_archive.zig) already encode
-bounded portable candidates, with compiler identity and checksums.
+[dependency_format.zig](../zig-native/src/reuse/dependency_format.zig),
+[backend_checkpoint.zig](../zig-native/src/backend/backend_checkpoint.zig),
+[principal_archive.zig](../zig-native/src/reuse/principal_archive.zig) and
+[optimized_archive.zig](../zig-native/src/reuse/optimized_archive.zig) already
+encode bounded portable candidates, with compiler identity and checksums.
 
 ## Implementation checklist
 
@@ -59,13 +59,14 @@ development and the scenarios below.
 ## Completion evidence
 
 - Commit: `ea4a7f3ef23ebf8506fe85eefa24f51ee65c3024` (compiler milestone).
-- Implementation: [portable_query.zig](../zig-native/src/portable_query.zig)
-  defines typed sections (`version`, kind, schema, claim). Principal archives
-  move to key v3 and optimizer captures to v2; backend checkpoints move to v2.
-  Only complete principal proofs with observations and sealed optimizer tables
-  are encoded. Decoding validates every structural ordinal, evidence edge, body
-  operand, control frame and record/input correspondence before exposing an
-  owner, then rebuilds native indexes; fingerprints are recomputed. Refinement,
+- Implementation:
+  [portable_query.zig](../zig-native/src/reuse/portable_query.zig) defines typed
+  sections (`version`, kind, schema, claim). Principal archives move to key v3
+  and optimizer captures to v2; backend checkpoints move to v2. Only complete
+  principal proofs with observations and sealed optimizer tables are encoded.
+  Decoding validates every structural ordinal, evidence edge, body operand,
+  control frame and record/input correspondence before exposing an owner, then
+  rebuilds native indexes; fingerprints are recomputed. Refinement,
   specialization, local templates, source validation and executable fragments
   are declined kinds that recompute after restart.
 - Validation: Zig 0.17.0 before every build batch. `deno task test:compiler`

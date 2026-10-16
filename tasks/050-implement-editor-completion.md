@@ -19,8 +19,8 @@ editor.
 
 Task 049 defines the API.
 [compiler/zig_project_client.ts](../compiler/zig_project_client.ts),
-[zig_project_server.zig](../zig-native/src/zig_project_server.zig),
-[source_overlays.zig](../zig-native/src/source_overlays.zig) and
+[zig_project_server.zig](../zig-native/src/reuse/zig_project_server.zig),
+[source_overlays.zig](../zig-native/src/reuse/source_overlays.zig) and
 [scripts/helix_languages.ts](../scripts/helix_languages.ts) are the existing
 integration boundaries.
 

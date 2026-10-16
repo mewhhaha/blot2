@@ -399,6 +399,12 @@ function materialize(
       } else throw new Error(`Unknown Baba edge category ${category}`);
       children.push(child);
     }
+    // One shared name island prevents contextual alternatives from expanding
+    // every parent plan. Keep the public CST's ordinary identifier leaf shape.
+    if (kind === "source_identifier" && children.length === 1) {
+      count--;
+      return { ...children[0], kind: "IDENT", field };
+    }
     return {
       $: "Cst",
       kind: kind === "atom" && field === "arguments" && adjacent.has(start)
@@ -472,11 +478,38 @@ export async function createFrontend(
     const start = options.start ?? 0;
     const offsetAt = options.offsetAt ??
       ((position: number) => BigInt(prepared.originalOffsets[position]));
-    return materializeProgram(
+    const parsed = materializeProgram(
       compactPrepared(prepared, options),
       prepared.source.slice(start, options.end),
       (position) => offsetAt(start + position),
     );
+    if (prepared.tokens.some((token) => token.text === "code")) {
+      const pending = [parsed.root];
+      while (pending.length > 0) {
+        const node = pending.pop()!;
+        if (node.kind === "type_application") {
+          let head = node.children.find((child) => child.field === "head");
+          let argument = node.children.find((child) =>
+            child.field === "arguments"
+          );
+          while (head?.children.length === 1) head = head.children[0];
+          while (argument?.children.length === 1) {
+            argument = argument.children[0];
+          }
+          if (head?.text === "code" && argument?.kind === "type_array") {
+            const closing = argument.children.at(-1)!;
+            throw new SourceError(
+              "GPU_FRONTEND_SYNTAX_ERROR",
+              "Typed code requires a result type and an explicit effect row",
+              Number(head.offset),
+              Number(closing.offset) + closing.text.length,
+            );
+          }
+        }
+        for (const child of node.children) pending.push(child);
+      }
+    }
+    return parsed;
   }
   return {
     lex(source: string) {

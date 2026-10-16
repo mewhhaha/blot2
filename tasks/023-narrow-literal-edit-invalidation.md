@@ -17,9 +17,9 @@ relocations after literal edits.
 ## Starting point
 
 The baseline gdev literal edit takes 150/140 ms and can rebuild the seed.
-[retained_revision.zig](../zig-native/src/retained_revision.zig),
-[core_backend.zig](../zig-native/src/core_backend.zig) and query dependency
-records now have the foundations for narrower invalidation.
+[retained_revision.zig](../zig-native/src/reuse/retained_revision.zig),
+[core_backend.zig](../zig-native/src/backend/core_backend.zig) and query
+dependency records now have the foundations for narrower invalidation.
 
 ## Implementation checklist
 

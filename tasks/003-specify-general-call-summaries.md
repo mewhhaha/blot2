@@ -16,11 +16,11 @@ captures, effects and recursive component boundaries.
 
 ## Starting point
 
-[core_eval.zig](../zig-native/src/core_eval.zig) has `Session.call_summaries`,
-`ClosureRegion.collectCall`, `principalEvidence` and iterative job draining.
-Predicate-free global schemes and closed first-order jobs are already shared;
-[zig-native/CONTRACT.md](../zig-native/CONTRACT.md) documents their fallback and
-publication rules.
+[core_eval.zig](../zig-native/src/eval/core_eval.zig) has
+`Session.call_summaries`, `ClosureRegion.collectCall`, `principalEvidence` and
+iterative job draining. Predicate-free global schemes and closed first-order
+jobs are already shared; [zig-native/CONTRACT.md](../zig-native/CONTRACT.md)
+documents their fallback and publication rules.
 
 ## Implementation checklist
 

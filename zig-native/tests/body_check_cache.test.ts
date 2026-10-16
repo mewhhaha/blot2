@@ -360,7 +360,13 @@ const read = fn (#Token value) => @array.get value 0
           const result = await retained.build({ sources });
           assert.ok(result.success && expected.success);
           assert.deepEqual(result.bytes, expected.bytes);
-          assert.ok(Number(result.stats.frontend.body_elaborations) >= 2);
+          const fallback = result.stats.attemptStats.fallback as {
+            body_elaborations: number;
+          };
+          assert.ok(
+            Number(result.stats.frontend.body_elaborations) +
+              Number(fallback.body_elaborations) >= 2,
+          );
           const guest = await instantiateGuest(result.bytes);
           for (let call = 0; call < 500; call++) {
             assert.equal(guest.call("run", 40), 45);
@@ -3093,6 +3099,75 @@ entry const absent = fn (host: U32 -> U32 ! {Foreign}) => action host none
       await pack();
     }
   } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
+Deno.test("body cache directory preserves dependency execution through bootstrap and reordered recovery", async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-body-directory-" });
+  const entry = `${directory}/main.blot`;
+  const producer = `${directory}/dep.blot`;
+  const earlier = `${directory}/earlier.blot`;
+  const text = (seed: string) =>
+    `const changed = ${seed}
+const read = fn (value: U32) => @u32.add (${primitiveSpine("value")}) changed
+const stable = fn (value: U32) => @u32.add (${primitiveSpine("value")}) 41
+`;
+  const main = `import * as dep from "./dep"
+entry const answer = fn (value: U32) => @u32.add (dep.read value) (dep.stable value)
+`;
+  const reordered = `import {value} from "./earlier"
+import * as dep from "./dep"
+entry const answer = fn (argument: U32) => @u32.add (dep.read argument) (@u32.add (dep.stable argument) value)
+`;
+  const retained = await createZigProjectCompiler({
+    executable,
+    entry,
+    prelude: null,
+  });
+  try {
+    for (
+      const [source, consumer, answer] of [
+        [text("8"), main, 129],
+        [text("@u32.add 8 1"), main, 130],
+        [text("@u32.add 8 1"), reordered, 130],
+        [text("#False"), reordered, null],
+        [text("8"), reordered, 129],
+      ] as const
+    ) {
+      const fresh = await createZigProjectCompiler({
+        executable,
+        entry,
+        prelude: null,
+      });
+      try {
+        const sources = {
+          [entry]: consumer,
+          [producer]: source,
+          [earlier]: "const value = 0\n",
+        };
+        const expected = await fresh.build({ sources });
+        const result = await retained.build({ sources });
+        assert.equal(result.success, expected.success);
+        if (!result.success || !expected.success) {
+          assert.ok(!result.success && !expected.success);
+          assert.equal(answer, null);
+          assert.deepEqual(result.diagnostics, expected.diagnostics);
+          continue;
+        }
+        assert.deepEqual(result.bytes, expected.bytes);
+        assert.equal(
+          result.stats.nativeWorkSteps,
+          expected.stats.nativeWorkSteps,
+        );
+        const guest = await instantiateGuest(result.bytes);
+        assert.equal(guest.call("answer", 40), answer);
+      } finally {
+        await fresh.close();
+      }
+    }
+  } finally {
+    await retained.close();
     await Deno.remove(directory, { recursive: true });
   }
 });

@@ -7,7 +7,7 @@ import {
 Deno.test("qualified pure associated calls compose with ambient handled effects", async () => {
   for (const name of ["associated", "associated-direct"]) {
     const source = await Deno.readTextFile(
-      new URL(`../src/qualified-row-fixtures/${name}.blot`, import.meta.url),
+      new URL(`../fixtures/qualified-row-fixtures/${name}.blot`, import.meta.url),
     );
     await compileAndRun(source, (guest) => {
       equal(guest.read("folded"), 42);
@@ -40,7 +40,7 @@ entry const folded=answer ()
 Deno.test("qualified clauses still enforce exact actual implementation rows", async () => {
   for (const name of ["reject-effectful", "reject-pure"]) {
     const source = await Deno.readTextFile(
-      new URL(`../src/qualified-row-fixtures/${name}.blot`, import.meta.url),
+      new URL(`../fixtures/qualified-row-fixtures/${name}.blot`, import.meta.url),
     );
     await compileExpectedFailure(source, "effect_mismatch", undefined, {
       prelude: "none",

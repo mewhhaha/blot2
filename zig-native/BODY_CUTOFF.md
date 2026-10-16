@@ -17,17 +17,17 @@ The compiler milestone is `a686304a31d49fe18f9f252e654995de7f10a951`.
 
 ## Receipt roots in edited modules
 
-[The refinement lookup](src/refinement_receipt.zig) now admits a root by its own
-declaration instead of its whole module:
+[The refinement lookup](src/reuse/refinement_receipt.zig) now admits a root by
+its own declaration instead of its whole module:
 
 - a body root when its declaration's exact projection and identity are admitted
   (`admitsLocalSource`);
 - a closure root when its unit is structural, or when the
-  [gate](src/principal_reuse_gate.zig) recorded, during the exact projection of
-  a declaration in an edited module, that this declaration reaches that closure
-  catalog entry, and that declaration's source and identity are admitted
-  (`admitsClosure`). The projection compares the closure entry at the same index
-  in both modules, so the old root names the same lexical closure.
+  [gate](src/reuse/principal_reuse_gate.zig) recorded, during the exact
+  projection of a declaration in an edited module, that this declaration reaches
+  that closure catalog entry, and that declaration's source and identity are
+  admitted (`admitsClosure`). The projection compares the closure entry at the
+  same index in both modules, so the old root names the same lexical closure.
 
 Everything else is unchanged. A receipt still replays only if every collected
 source body is exact, every consumed call judgment has an unchanged identity
@@ -47,9 +47,9 @@ callers need may come from receipts.
 
 ## Hygienic loop names
 
-[The parser](src/parser.zig) numbers `$collection.N` names within each top-level
-declaration. Names stay unique where they are visible, and an edit elsewhere no
-longer renames them.
+[The parser](src/parse/parser.zig) numbers `$collection.N` names within each
+top-level declaration. Names stay unique where they are visible, and an edit
+elsewhere no longer renames them.
 
 ## Qualification on 11 October 2026
 
@@ -61,14 +61,14 @@ Completed checks:
 - Zig 0.17.0 before every build batch. `deno task test:compiler` passes the full
   LLVM native suite and 632 guest/client tests; `deno task lint:zig` reports
   zero findings across 310 files.
-- [Native laws](src/body_cutoff_tests.zig): a same-size body edit replays the
-  three receipts rooted in unchanged declarations and their closures, with
+- [Native laws](src/reuse/body_cutoff_tests.zig): a same-size body edit replays
+  the three receipts rooted in unchanged declarations and their closures, with
   fresh-identical output under an allocation-failure sweep; a callee body edit
   with an unchanged interface keeps consumer receipts, declines the region that
   collected the callee's source, and regenerates its executable callers. A
   mutant with the old structural root rule replays none of them.
-- [A gate law](src/principal_reuse_gate_tests.zig) checks closure roots in an
-  edited module: an unrelated edit keeps both closures, a closure body edit
+- [A gate law](src/reuse/principal_reuse_gate_tests.zig) checks closure roots in
+  an edited module: an unrelated edit keeps both closures, a closure body edit
   revokes only that closure, a callee body edit keeps the caller's closure, and
   a changed callee annotation (a changed binding record) revokes the referencing
   owner's closure but not an unrelated one.
@@ -137,13 +137,13 @@ cost there. Neither is addressed by this task.
 ## Owned frontend body facts (task 024 first slice)
 
 Retained preparations now own sparse checked-body records in
-[body_check_cache.zig](src/body_check_cache.zig), beside `Prepared`. Immutable,
-independently leased chunks share frozen type graphs from `dependency_snapshot`;
-`SchemeCopier` reconstructs fresh live types and rows. Expression facts,
-parameter bindings and anonymous closed-row certificates relocate by
-declaration-relative syntax positions and binding spellings. No source tree,
-solver ID, substitution history, scratch pointer or previous revision owner
-escapes into a new preparation.
+[body_check_cache.zig](src/reuse/body_check_cache.zig), beside `Prepared`.
+Immutable, independently leased chunks share frozen type graphs from
+`dependency_snapshot`; `SchemeCopier` reconstructs fresh live types and rows.
+Expression facts, parameter bindings and anonymous closed-row certificates
+relocate by declaration-relative syntax positions and binding spellings. No
+source tree, solver ID, substitution history, scratch pointer or previous
+revision owner escapes into a new preparation.
 
 Admission compares exact declaration text, parsed syntax and declaration traits.
 Every consumed global interface must already be committed, with matching closed
@@ -1135,3 +1135,262 @@ The combined gate and release measurements are in
 falls about 22–29%; population costs about 15–39% more. General owned
 source-Core replay remains isolated and unqualified; this checkpoint does not
 close task 024.
+
+## Mixed implementation modules, 14 October 2026
+
+Ordinary declaration receipts can now survive an implementation in the same
+module. Selected members and implementation prerequisites remain fresh until a
+complete owned proof receipt exists. Four focused native laws and fourteen
+source/compiled/restart revisions preserve fresh bytes and diagnostics,
+including wrong or missing heads, changed associated types, overlap and removed
+prerequisites. General implementation cutoff remains open.
+
+A bounded development screen uses 48 independent bodies of 32 primitive steps
+and four alternating pairs. Median CPU is 135→155 ms on population, 145→90 ms on
+independent edit/revert, and 145→85 ms on a selected method edit (10 ms clock
+resolution). Two allocator pairs reduce edited allocations from about 31,000 to
+6,400–7,100; population adds about 1.47 MB cumulative allocation and retained
+metadata adds 0.36–0.38 MiB. All 60 samples preserve bytes, execution and source
+fuel. These are isolated Safe/noLLVM results, not general or release targets.
+Exact patch, measurements and limits are retained under
+`build/bench/continuation-20261014/mixed-implementation-cache/`.
+
+The next subtraction admits nominal/alias annotations through their existing
+owned recipe reads. It removes the blanket annotation decline; explicit selected
+uses, member templates, selection digests and predicates retain their guards.
+Same-layout nominal retargets and privacy changes revoke the recipe. An alias
+hiding an associated projection remains uncaptured. No proof graph or cache
+schema was added.
+
+Five native laws pass, including 1,054-position annotation replay OOM and the
+existing 758-position mixed-module sweep. Four guest groups exercise ordinary
+14-revision and annotated 23-revision sequences in both tiers, preserving fresh
+bytes, execution, diagnostics and source fuel. The annotated method edit checks
+two bodies instead of three; genuine selected-call receipts and broad cutoff
+remain open. These are focused checks awaiting root's combined gate. Evidence:
+`build/bench/continuation-20261014/annotation-recipes/`.
+
+### Current selected-name callers, 14 October 2026
+
+The next uncommitted slice admits selected-name calls by reading the complete
+bounded semantic implementation catalog. The digest includes losing heads,
+contract/member signatures, prerequisites, privacy, original declaration owners
+and capability relationships. Method bodies stay executable dependencies. Replay
+reinstantiates current references and reconstructs selected proofs; it never
+imports an old proof or method target. Catalogs above 64
+contracts/implementations or the 4,096-step proof budget decline to ordinary
+checking.
+
+Existing owned type graphs now relocate contract identities and associated
+member spellings alongside nominal identities. This covers generic global and
+local requirements, projection annotations and import ordinal changes. Unused
+global binding types no longer add redundant graph roots. Unsupported selection
+forms, row-parameter catalogs and authority-bearing schemes remain ordinary;
+broader cutoff and task 053 qualification are still open.
+
+A separate baseline backend defect surfaced during these checks: lexical sharing
+treated an associated projection's physical-result entry as a free type
+variable, even when its argument was quantified. Argument variables now own
+lexical sharing. Uninstantiated projection results publish no physical hint;
+concrete uses still resolve through ordinary implementation selection. Executed
+U32/F32 uses and captures remain independent.
+
+Ten focused body laws, including allocation-failure sweeps and storage growth,
+and twelve guest groups pass. Guest revisions cover changed methods, heads,
+associated types, overlap, prerequisites, privacy, missing members, failures and
+recovery in both code-generation tiers. Source and compiled dependencies retain
+fresh-identical Wasm and fuel through relocation; source producer-body edits
+also update execution. The pinned analyzer reports zero findings in the selected
+322-file dependency closure. The final full gate remains pending.
+
+Two three-pair development screens use 32 selected callers and precise child CPU
+clocks. Method/revert CPU is about 72→56–57 ms; literal edits are 63→47 ms
+(paired ratios 0.74–0.78). Edited body elaborations fall from 34 to 2. Initial
+population costs roughly 70→78–80 ms; ordinary retained edits stay near parity,
+while fresh samples vary. These are Safe/noLLVM screens, not release or captured
+project targets. The ordinary 64/128/256-body storage probe retains the same
+allocation counts and removes one 36-byte graph node.
+
+Exact source delta, binary pins, samples and logs are under
+`build/bench/finish-program-20261014/`. The source patch is
+`selected-body-source/source.patch`, SHA-256
+`18f59e84416cd42c8ab9f5df136b05ec5839159e6e2767772fe19dbeb74273c3`;
+`selected-body-pairs-first.json` and `selected-body-pairs.json` retain both
+screens. The qualified release executable is unchanged.
+
+## Ordinary loop and use receipts, 15 October 2026
+
+The immutable body cache owns carried predecessor bindings and lexical break
+snapshots by declaration-relative source positions. Replay reconstructs current
+loop metadata before ordinary Core lowering. Existing expression facts own
+ordinary `use` names, annotations and monomorphic bindings. Generated iterator
+bodies, Request loops and resolver blocks retain ordinary checking.
+
+Two complete capture/replay OOM laws, six loop/owner guest groups and 384-file
+zero lint pass for loops. The use extension adds one capture/replay OOM law and
+both executed tiers; the combined row/use union passes 388-file zero lint. Exact
+source and qualification are in
+`build/bench/complete-program-20261015/body-loop-receipts/` and
+`body-use-values/`.
+
+Five alternating CPU7 development pairs over 128 loop declarations preserve
+cross-compiler and fresh/replayed Wasm. Edit/revert CPU falls from 150/160 to
+120 ms, with elaborations 130 to 2. Population rises from 110 to 160 ms. Plain
+128 controls stay at 130 ms population, 90 ms edit and 100 ms revert. Linux CPU
+tick granularity is 10 ms. These costs do not complete the general body
+interface or total edit targets; tasks 024/053 and release qualification remain
+open.
+
+## Field and indexed update receipts, 15 October 2026
+
+One sparse update record retains root and old-leaf `self` bindings. Replay
+reconstructs selector paths and type endpoints from existing expression facts
+and physical projection proofs. Exact same-owner comparison admits separately
+allocated generic Array roots while preserving binder identity. Complete
+capture/ replay OOM and fresh/replayed Wasm pass for mixed nominal/Array updates
+and inferred generic replacement. Five root guest groups and 384-file zero lint
+pass; source and costs are pinned in
+`build/bench/complete-program-20261015/body-path-updates/`.
+
+Five alternating CPU7 development pairs over 128 update declarations reduce
+edit/revert CPU from 190/190 to 130/140 ms and elaborations from 130 to 2.
+Population rises from 130 to 180 ms. Plain wall controls stay within 0.3%; CPU
+sampling has 10 ms granularity. Broader residual/effect/control receipts,
+release qualification and tasks 024/053 remain open.
+
+## Ordinary demanded-body receipts, 15 October 2026
+
+Demanded parameters and supported Demand types now retain exact suspended-call
+signatures in the existing sparse signature list. Replay restores the original
+lazy classification and type. Later inference does not recreate that decision.
+Binary demand rewrites and unsupported operation/scoped/resource recipes remain
+ordinary; existing interface, identity and capture proofs are unchanged.
+
+Two native laws, two neighbors and complete allocation failures pass. Both new
+guest tiers preserve once-only/ignored Foreign effects, demanded owning arrays,
+lazy-to-eager signature changes, source/archive/checkpoint, failed revisions,
+recovery and sync/JSPI. Four loop/path neighbors and400affected zero-finding
+analyzer files pass. Five balanced development pairs reduce128demanded-body
+retained edit/revert160/150→120/120ms and elaborations130→2; population rises
+120→160ms. Plain retained controls stay100ms. All60phases preserve cross-binary
+bytes and executed values; process CPU has10ms resolution. This does not close
+the release/general under100ms gate. Source/binary pins, raw phases and failed
+controls are in `build/bench/complete-program-20261015/body-demand-receipts/`.
+
+## Nested callable fragment owners, 15 October 2026
+
+Callable-layout records inside a retained caller's range belong to their own
+checked jobs. Admission now validates the record's exact owner, function and
+declared layout before the existing callable-layout import. It previously used
+the outer caller's job and declined valid nested fragments. Missing/out-of-range
+owners and changed layouts still decline; no interface or import guard is
+relaxed.
+
+One native law with complete allocation failures,26executed groups and112
+affected zero-finding analyzer files pass. The unchanged captured project
+recovers489fragments, retaining1152named+369closures with240declines; every
+phase keeps its prior Wasm hash and70,330source steps. A single development wall
+screen changes edit/revert14.032/13.466→11.782/11.287s; fresh remains25.0s. This
+is compatibility and attribution evidence, not the release/CPU target. Exact
+sources, failed-before control and pins are in
+`build/bench/complete-program-20261015/nested-callable-reuse/`.
+
+## Chains with no clean dependency, 15 October 2026
+
+A private leaf edit can dirty every transitive dependency while leaving public
+interfaces unchanged. The retained loader now offers that complete dirty set to
+the existing mixed checker. Previously it required at least one clean dependency
+and rebuilt every semantic caller. Each cutoff still compares the current
+checked interface and namespace; executable lowering reads the current producer.
+
+An opaque3-module law now reuses the intermediate and entry callers, with
+fallback elaborations5→3. One native law with complete candidate allocation
+failures, 10executed groups, TypeScript and19affected zero-finding analyzer
+files pass. Source/archive/checkpoint, invalid-signature rollback, recovery and
+both codegen tiers/sync/JSPI preserve fresh bytes and values. Scalar wrappers
+still export no guest memory. No CPU target or general module-abstraction
+completion is claimed. Exact source/compiler pins and before/after counters:
+`build/bench/complete-program-20261015/all-dirty-module-cutoff/`.
+
+## User-effect callback rows, 15 October 2026
+
+Nongenerative declaration rows now retain the original producer, family/member
+names and complete bounded family/signature recipe, including privacy, callable
+form, parameters and patterns. Annotation lookup follows the actual checker
+catalog and import aliases. Frozen operation identities relocate through a
+separate current validated map; function and Demand traversals retain operation
+arguments. No spelling, physical layout or raw ordinal supplies authority.
+Invocation, scoped/generative and incomplete recipes remain ordinary.
+
+Root8native laws,4complete allocation sweeps,6executed groups, TypeScript and400
+affected zero-finding analyzer files pass. Controls cover changed declarations,
+wrong origins/aliases, ordinal relocation, malformed/ambiguous catalogs, open
+rows, Foreign compatibility and Demand boundaries. Both tiers/sync/JSPI preserve
+source/archive/checkpoint bytes, effects, host failure and recovery. One source
+dependency edit uses4retained versus5fresh elaborations. Archive parity is
+qualified; archive work reduction is not. Exact source/binary pins and logs:
+`build/bench/complete-program-20261015/body-user-effect-rows/`.
+
+## Inert principal suffixes, 15 October 2026
+
+Retained names may form an exact prefix of the current namespace. Every old
+symbol spelling and producer still matches. A checked interface can add/remove
+only a suffix of canonical empty local/parameter binding slots, with every
+shared slot, graph, catalog and recipe unchanged. Validating the shorter view
+proves no principal reference reaches an omitted slot. Export targets remain
+exact. This comparison neither changes the stored format nor relocates bindings.
+Edits that shift shared slots retain ordinary checking.
+
+An opaque dependency's last function can now add/remove a private local while
+its intermediate and entry callers retain semantic reuse. Root3native laws,
+complete candidate allocation failures,10executed groups, TypeScript and56
+affected zero-finding analyzer files pass. Changed spellings/producers,
+malformed views, suffix payloads, changed prefixes and references into omitted
+slots reject. Source/archive/checkpoint, invalid signatures/recovery and both
+tiers/sync/JSPI preserve fresh bytes/results. Ordinary Cost stays exact11958B.
+No general edit CPU or final qualification is claimed. Source/compiler pins and
+logs: `build/bench/complete-program-20261015/inert-principal-slot-cutoff/`.
+
+The lightweight principal validator also checks proof-header binding bounds and
+self-unit external/implementation/selected-member/predicate targets before slots
+are omitted. A new forged-header control fails before this guard and rejects
+after it. Eight focused native laws,22executed groups and60affected zero-finding
+analyzer files pass; cache-disabled ordinary Cost is unchanged. Exact delta,
+Debug counterexample and pins:
+`build/bench/complete-program-20261015/principal-local-target-bounds/`.
+
+The comparison now omits each interface's maximal canonical inert local suffix,
+then compares every remaining principal field exactly. This also handles earlier
+function edits that shift only erased local/parameter markers. Validation bounds
+all local shared-callee and self/unit0 target references; foreign predicates
+must resolve to an exact retained external alias. An ordinary scheme's
+shared-callee slot remains owner-local. No graph, export target or stored
+binding is remapped. Root8native laws/3complete allocation sweeps,25executed
+groups and266affected zero-finding analyzer files pass; general CPU
+qualification remains open. Exact counterexamples, source/binary pins and logs:
+`build/bench/complete-program-20261015/principal-local-suffix-normalization/`.
+
+## Static operation calls, 15 October 2026
+
+Receipts now retain static calls to unparameterized effect families through the
+existing sparse signature graph. Replay resolves the current Source name and
+requires the exact owned operation identity, complete family recipe and origin.
+It reconstructs operation-use metadata for fresh Core lowering. Scoped/State
+calls, parameterized families and invocation owners still use ordinary checking.
+The body/signature headers and portable format do not grow.
+
+Eight root native laws pass, including capture/replay allocation failures,
+producer relocation and equal-signature imported alias retarget rejection. Six
+selected guest groups cover source/archive dependencies, changed effects,
+failure recovery, checkpoint restart and sync/JSPI in both tiers. Shared
+affected analyzer coverage is 402/455 files with zero findings; TypeScript
+checks pass. Ordinary Cost remains byte-exact 11958 bytes.
+
+A five-pair combined development screen of 128 static-operation bodies reduces
+retained edit/revert CPU 240/250 to 110/110 ms and elaborations 130 to 2. Fresh
+population rises 220 to 240 ms; plain controls stay at 130/100/100 ms. Every
+before/after output is byte-exact and executes. CPU uses whole-process 10 ms
+ticks; this small screen includes the separate cursor proof and is neither an
+isolated feature ratio nor release qualification. Exact source pins and raw
+samples:
+`build/bench/complete-program-20261015/static-operation-body-receipts/`.

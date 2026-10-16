@@ -499,3 +499,516 @@ against `5378347` are 1.0049/1.0074/1.0051; public allocations and all Wasm
 controls are unchanged. Exact pins and the accompanying window change are in
 [combined qualification](CONTINUATION_QUALIFICATION.md). Later member-closure
 capture work is separate; tasks 058/059 remain open.
+
+## General value flow after checkpoint 17
+
+The checker now evaluates value relationships at lifetime boundaries, following
+immutable aliases/rebinding versions, closure captures, products, records,
+arrays, constructor payloads and validated retained-input calls. Public retained
+input algebra covers pure alias blocks, branch unions, opaque construction and
+pattern unwrapping. Core validates those relations from body references;
+coordinated summary/capture-catalog removal does not erase a capture. Unknown
+callee stores remain unavailable, including deferred calls that transfer
+captured inputs to an unknown sink. Earlier enclosing parameters have a
+value-origin proof relative to a newly entered scope; the new scope's own
+parameter is explicitly excluded.
+
+Focused evidence: Zig 0.17.0 Safe/noLLVM source/origin/publication group 18/18
+(3 named laws plus 15 wrappers); artifact capture-corruption group 16/16 (1
+named law plus 15 wrappers). Seven executed guest groups pass: value flow (1),
+existing product/record flow (4), aliased local State storage (2). Each
+source/compiled import path executes; value flow exercises sync, JSPI rejection
+and recovery, failed edits and checkpoint stability. The final allocation laws
+are registered for the parent batch gate. This is development evidence; no full
+gate or release performance qualification is claimed here.
+
+Remaining architectural boundaries: precise public result paths when aggregate
+members hide different pure captures; general callable storage-sink recipes;
+generative public selection binders and ordinary control-flow value versions;
+complete demand/provider/computation footprints; usage/cleanup contracts. The
+fixed retained-input union remains conservative where those relationships are
+unknown. It does not pretend to be a general result-path graph.
+
+## Trusted constructor and deferred capture relationships
+
+Deferred closure blocks and case-pattern bindings preserve their exact free
+inputs in source retention summaries, result-path recipes and independent Core
+reconstruction. Local binders cannot erase captures in their initializers.
+Record fields retain distinct owners even if their overall input union agrees;
+coordinated result-path and capture-catalog removal rejects under allocation
+failure.
+
+Trusted computation, provider and State constructors carry owned relationships
+for their action, selector, implementation and initial cell. The checker follows
+these edges at result and storage lifetime boundaries. Source/compiled factories
+may retain older authority across an inner scope; returning any younger action,
+selector or hidden pure capture rejects. This adds no grammar or binding fields.
+
+Private semantic evidence and provider token layouts now preserve the exact
+scoped owner beside its operation descriptor. Ordinary capability values retain
+their existing representation. A family and each operation can share one owner
+without equating their different descriptors. Semantic and closed-evidence
+imports preserve the carrier; portable queries, archives, receipts and runtime
+operation serialization decline it explicitly. It carries a static checked
+identity, never a newly serialized live runtime authority.
+
+Focused Zig 0.17.0 Safe/noLLVM controls: five named native laws cover the
+existing scoped identity equations, carrier projection/matching/imports, exact
+deferred field paths and constructor authority; four execute allocation-failure
+sweeps. Sixteen executed guest groups cover both tiers, source/compiled imports,
+provider/State/computation routing, sync/JSPI rejection and recovery, rejected
+edits, checkpoint parity, existing selections and local storage, plus all eight
+unchanged compile budgets. Analyzer checks 417 files with zero findings.
+
+Five paired development fanout/prelude runs preserve byte-exact Wasm across
+fresh, retained and restart paths, with identical type/work counters. Requested
+bytes differ by two bytes, matching the unequal executable path lengths. CPU
+ratios are fresh 1.008, restart 0.996, population 0.968, first edit 1.000 and
+subsequent edit 1.045; this small corpus is not release qualification. Exact
+binaries and raw samples live in the parent integration evidence.
+
+Selections borrow the chosen root pointer. Each scope activation owns its
+runtime root, and selected aliases continue routing to that root. The remaining
+invocation work concerns static binder ownership and version substitution;
+creating another runtime selection token would change existing alias semantics.
+General unknown-callee sink contracts and complete demand/abstraction graphs
+also remain open. Tasks 058/059 stay in progress pending implementation and the
+final combined gate.
+
+## Owned public invocation versions
+
+A Scheme now owns bounded pairs of declaring-arrow and selected-value type
+roots. Source instantiation relocates both roots together and freshens
+selections when that arrow is called. A rigid invocation version records the
+source unit, call endpoint and bounded ordinal; nested calls at one endpoint
+remain distinct. Source, Core and public schemes preserve these pairs
+independently. Core derives selection sites from executable bodies, validates
+their declaring arrows and rejects coordinated binder erasure, wrong-arrow
+claims and duplicate versions. Private descriptor evidence retains the exact
+version while portable evidence continues to decline scoped authority. Runtime
+selected-root alias routing is unchanged.
+
+Local complete calls compose independently reconstructed result paths and
+capture footprints. Multi-input Unit callbacks can retain their exact captured
+inputs; public records may retain a selected cell, callable and State provider.
+Source and compiled imports preserve those relationships through edits,
+checkpoint restore and failure recovery. Mixing independent invocation versions
+in a homogeneous aggregate rejects, as does exporting a younger scoped capture.
+
+Focused Zig 0.17.0 Safe/noLLVM laws cover invocation descriptor distinctions,
+independent artifact authority and existing identity/carrier controls, including
+allocation failure. Twenty-three executed guest groups pass across both tiers,
+including all eight unchanged compile budgets. Analyzer checks 419 Zig files
+with zero findings. Three paired fanout runs preserve exact Wasm and work
+counters; requested bytes decrease by 59,934 and peak bytes increase by 10,794.
+CPU ratios are fresh 0.935, restart 0.933, population 1.000 and both edit phases
+1.000. These development measurements do not replace the final combined gate.
+
+General higher-order and anonymous invocation binder transport remains to be
+qualified; returned Unit factories are covered by the next checkpoint.
+Foreign-callee result recipes and general storage/demand/abstraction contracts
+also remain open; unsupported paths still decline explicitly. Tasks 058/059
+remain in progress.
+
+## Returned invocation arrows
+
+Returned Unit factories preserve selections already evaluated by their producer,
+while each callback invocation freshens the selection declared by that callback.
+Source relocates dependent arrow and selection roots together after resolving
+inference aliases. Covariant result rows normalize before comparing declaring
+arrows; callback input requirements remain exact.
+
+Independent Core reconstruction normalizes complete named calls represented as
+either call nodes or application chains. Invocation claims require the exact
+consumed declaring arrow and checked argument types. A bounded readonly
+relocation proves the callee/result correspondence, preserves captured versions
+and reconstructs latent returned binders from the owned producer scheme. Public,
+private and body binder erasure or wrong-arrow claims reject. Forging only a
+private call signature rejects while public schemes and result recipes remain
+intact. Portable authority continues to decline.
+
+Both source and compiled imports execute returned records with their earlier and
+later selectors through retained edits and checkpoint restore. Independent
+callback evaluations cannot mix in a homogeneous aggregate. Twenty-three guest
+groups and all eight unchanged compile budgets pass; 420 analyzer files have
+zero findings. Original and returned artifact laws run separate complete OOM
+sweeps, approximately twenty and five seconds respectively. Final development
+fanout samples and exact source/binary pins are retained in integration
+evidence; these checks do not replace the final combined gate.
+
+Foreign invocation metadata makes validation contexts ineligible for reuse until
+an exact owned context projection exists. The ordinary retained screen preserves
+Wasm, work counters and allocations. General formal higher-order callbacks,
+inline anonymous/partial returned applications, foreign result recipe
+composition and general storage/demand/abstraction contracts remain open. Tasks
+058/059 stay in progress.
+
+## Deferred nominal pattern captures
+
+Core capture reconstruction follows nominal record destructuring initializers,
+then marks the introduced pattern names as local. Refutable fallback captures
+remain visible. Record-payload pattern wrappers preserve the same payload path;
+coordinated public/private mask erasure still rejects.
+
+Bounded application normalization validates every callee, argument and reference
+index before reading it. Malformed links and cycles decline before catalog
+admission. Two native laws complete allocation-failure sweeps; both executed
+tiers pass source/compiled imports, retained recovery and restored checkpoints.
+Analyzer checks 420 Zig files with zero findings. This repairs the captured
+application reset factory without broadening unknown-callee storage authority.
+
+## Quantified scope-owner relocation
+
+Invocation relocation maps each owned quantified scope variable to one exact
+symbolic or concrete instance. Scoped descriptors and operation rows share that
+correspondence. Captured concrete owners and invocation versions remain exact;
+structural cache certificates do not alter their semantic identity. Unowned
+variables, conflicting owners and reinterpretation as ordinary data reject.
+
+Two direct native laws cover matching descriptors and rows plus forged owner,
+variable and version controls. Thirty-one executed guest groups pass, including
+ordinary compound receipt reuse beside erased generative helper bodies and all
+eight unchanged compile budgets. Analyzer checks 426 files with zero findings.
+The conservative caller-aware validation-context guards remain in force.
+
+## Formal Unit invocation and complete application owners
+
+Existing owned Unit-invocation contracts transport the invoked callback's fresh
+result after argument unification. Single- and multi-input helpers preserve
+captured selections and freshen only the actual declaring arrow. Core proves the
+helper body, actual signature, executable callback initializer and exact result
+independently. Symbolic scope-owner aliases share only the same unresolved
+instance term; different terms still reject.
+
+Complete application chains own prospective callee annotations. One relocation
+checks every intermediate apply type and the final result; partially applied
+factories retain their remaining declaring arrows. Concrete captures inside
+ordinary closures now support selection creation, with the same escape checks as
+symbolic captures. Existing direct scope aliases and loop declines remain.
+
+Fourteen focused invocation laws pass, including the original and returned
+artifact OOM sweeps and a new split encoding/decoded-mutant sweep. Forged
+callback references, changed endpoints with erased caller binder catalogs,
+changed helper bodies and intermediate callee annotations reject. Three native
+scope-owner laws and 31 executed guest groups pass; all eight compile budgets
+remain unchanged. Analyzer checks 426 files with zero findings.
+
+Three paired fanout samples preserve Wasm, work counters, type nodes and
+allocation work; total requested/peak bytes differ by two executable-path bytes.
+CPU ratios are 0.985 fresh, 1.012 restart and 1.000/1.043 retained edits. These
+small screens do not replace final combined qualification. General callback
+argument recipes, projection/container callable provenance, demand/storage
+composition and full abstraction escape contracts remain open; tasks 058/059
+stay in progress.
+
+## Exact executable callback creators
+
+Formal invocation reads declarations from the actual executable callback
+creator, following owned local aliases. Equal-typed unrelated creators provide
+no authority. Every alternative creator must agree on the exact declaring
+version set, including empty capture-only sets; unequal sets decline. Captured
+versions remain exact. Fresh relocation preserves semantic source aliases and
+assigns distinct slots to distinct declaring versions.
+
+Native controls forge captured-versus-declared subsets, alternate creators,
+merged slots and split semantic aliases. Executed laws cover two declarations in
+one callback, capture-only invocation, source/compiled imports and retained
+recovery. Ordinary 16-input callbacks execute; unsupported 17-input generative
+calls reject through existing contract admission, and ordinary 17-input calls
+retain their existing complexity diagnostic. No new arity policy is introduced.
+
+Focused invocation/OOM laws, both executed tiers and unchanged compile budgets
+pass. Analyzer checks 426 files with zero findings. These checks supplement the
+formal-invocation checkpoint and do not replace the final combined gate.
+
+## Structural callback projection owners
+
+Nested literal record and product projections follow exact owned field recipes
+and local aliases to the executable creator. Physical record destinations, field
+names and result types must agree. Generic container correspondence uses the
+existing relocation proof with no fresh versions. Creator alternatives retain
+exact declaration-set agreement and share a bounded traversal budget.
+
+An unavailable creator route cannot use unchanged version-bearing output as
+invocation authority. A coordinated decoded-artifact mutation replaces a fresh
+result with its prototype, erases the caller's public/private binder catalogs
+and substitutes an unsupported owner path. Without the new guard that artifact
+passes validation; with it the artifact rejects. Known capture-only creators
+remain valid. Equal-typed field swaps, duplicate physical slots, changed field
+recipes and cyclic projection paths reject independently.
+
+Seventeen focused native invocation laws pass, including complete encoding and
+decoded-mutant OOM sweeps. Both execution tiers pass nested record/product
+callbacks, source/compiled imports and retained recovery. The 31-group guest
+screen includes ordinary receipt reuse and all eight unchanged compile budgets;
+426 analyzer files have zero findings. Nominal/container calls without a proven
+creator route remain unsupported; general callback-input and storage contracts
+remain open. Tasks 058/059 stay in progress pending those laws and final
+combined qualification.
+
+## Conditional typed-input invocation
+
+An owned helper may invoke one formal callback with another formal input. Its
+four-byte parameter summary encodes both ordinals under an explicit
+`invoke_input` discriminator. Source and immutable Core independently rebuild
+that exact application. A callable type alone supplies no no-store promise: live
+scoped input additionally requires the actual lexical callback or an
+independently checked unary owner. Earlier captures retain their own footprint,
+and declaring versions still come only from the executable creator.
+
+The initial frontier covers literal callbacks, local aliases, checked unary
+identity/member owners, exact result products/records and captured selections.
+Unit operation requests returning closed scalar values are admitted. Unknown
+calls, storing conditions/guards and input retained in callback-created
+closures, arrays or providers decline. Unit payloads cannot excuse handler
+captures. Unknown request payloads supply no result-lifetime recipe. The exact
+unary identity/member body also proves an empty declaring set, so named input
+aliases preserve prior versions. Input analysis has a separate Core adapter; the
+existing loan-result adapter stays strict. Named forwarding wrappers,
+projected/factory callback input recipes and arbitrary callable/storage
+compositions remain unsupported.
+
+Relocation mirrors the existing `openCovariant` frontier: closed covariant
+arrow/provider rows may acquire ambient extensions, while callback/input rows
+stay invariant. Owned row tails substitute consistently across all occurrences;
+explicit operation prefixes and instance identities remain exact. Forged pure
+versus effectful callbacks, inconsistent shared tails, unowned tails, reversed
+covariance and opaque callback owners reject independently. Context reuse
+conservatively declines conditional invocation owners whose foreign bodies can
+be observed. The ordinary absence route allocates no new scratch workspace.
+
+Operation-instance projection mirrors `Store.resolveInstance`: a resolved scoped
+carrier contributes its exact owner, never its carrier type as an instance term.
+Malformed carrier terms still reject.
+
+Twenty focused native invocation laws and three typed-input checker controls
+pass. The new split encoding/decoded-mutant OOM law validates public/private
+ordinals, helper arguments, erased summaries and callback signatures, including
+a live scoped invocation and malformed carrier-instance metadata. Both execution
+tiers pass source/compiled imports, input reads/aliases, ignored-input captured
+selection, retained recovery and
+array/record/provider/closure/younger-scope/storing-condition negatives,
+including a Unit handler retaining the input. The 31-group guest screen
+preserves ordinary receipts and all eight compile budgets; 427 analyzer files
+have zero findings. These focused checks do not replace the final combined gate.
+Tasks 058/059 remain in progress for the general unsupported composition laws.
+
+The integrated correction also checks the callee of a discarded non-scalar Unit
+request, preserves invariant/unowned row tails, and distinguishes covariance in
+comparison memo visits. Local aliases prove initializer to owned principal with
+their exact closing certificate, then principal to reference use. Captured
+variables stay identical within one immutable module; foreign or changed terms
+gain no substitution authority. Shared-type input mutants and deleted/forged
+alias certificates reject while the final creator/body/version checks remain.
+The merged root passes 29 native laws, 14 complete OOM sweeps over 9,011 fault
+points, 47 guest groups and 377-file affected lint with zero findings. Pins and
+logs are in `build/bench/finish-program-20261014/typed-input-invocation/`.
+
+## Ordered callback inputs
+
+Exact invocation helpers may pass an ordered list of formal inputs to one formal
+callback. The `invoke_inputs` receipt records the callback slot, argument count
+and four-bit argument ordinals, under the existing 16-parameter limit. The
+seven-byte wire payload for older parameter receipts remains unchanged. Source
+and immutable Core reconstruct the complete application chain and every argument
+reference; a changed order, callback slot or result footprint rejects.
+
+The actual callback must independently own a reconstructed no-store body and an
+empty generative declaring set. Literal and named two-input callbacks, including
+local aliases and compiled producers, retain the exact receiver instances when
+specialized. Distinct receivers route independently. Two formal receivers may
+alias, preserving both row occurrences; one handler occurrence cannot erase the
+second. Returning an input-capturing closure or transferring it to a Foreign
+callback remains an escape. General forwarding and unknown storage contracts
+retain their conservative admission.
+
+The executed law covers both codegen tiers, sync/JSPI, source and dependency
+archives, checkpoint restart, producer edits, byte-identical reverts and failed
+edit recovery. Native controls reconstruct ordered applications independently,
+reject changed callback/result claims and malformed parameter spans, and cover
+all failed allocations during lowering, validation and emission. Compact wire
+controls reject invalid counts, callback/input aliases and out-of-range
+ordinals. This focused qualification does not replace the final compiler gate.
+
+## Forwarded callback invocation
+
+A named forwarding helper can compose an invocation receipt with its own formal
+inputs. Source substitutes exact argument ordinals through local declarations or
+owned imported receipts. Immutable Core independently follows the executable
+producer chain, with one bounded work budget and exact owner lookup. Missing or
+ambiguous producers, recursive cycles, reordered arguments and a forged empty
+producer body cannot establish the claimed invocation. Existing coreCallBody and
+retainedCore wrappers remain present for package proof consumers.
+
+A three-unit executed law covers a separately compiled invocation helper, its
+forwarder and a scoped caller, in both tiers and sync/JSPI through
+source/archive, checkpoint restart, producer edits and failed-edit recovery.
+Native controls cover order/cycle/missing-owner/empty-body mutants, zero budget
+and all failed allocations through checking, lowering, validation and emission.
+Prior input invocation, covariance, request payload and opaque callback controls
+remain. The general immutable lifetime interpreter remains separate work; this
+receipt composition grants no authority to unknown or Foreign storage and does
+not replace the final compiler gate.
+
+## Projected named callbacks and pure factories
+
+Named callbacks retain their executable no-store relationship through local
+records, generic structural helpers and pure factory results. A sealed callable
+owns separate formal arguments and its capture/result graph. Source publishes
+that graph; immutable Core reconstructs the exact producer body and type/row
+relocation, including the declared result mask. Generalized receiver identities
+must belong to a real global or local declaration, with one shared admission
+budget. Missing owners, changed bodies, forged roles/effects and erased binder
+ownership reject.
+
+A generalized closed aggregate stays in the finite constructor evaluator until
+its projected callback is used. This constructor proof excludes effects, runtime
+calls, arbitrary captures and mutable values. The projected named value selects
+an owned reference and ordered receiver instance arguments; physical function
+layout equality never chooses those identities. These code paths retain the
+existing requirement for fresh code while no executable reuse receipt owns the
+promoted value graph.
+
+Executed controls cover both tiers, sync/JSPI, source/archive, checkpoint
+restart, producer edits, byte-identical reverts and failed-edit recovery. Native
+controls cover independent body/role/effect/binder forgeries, sealed-input
+ownership, and all failed allocations through source lowering, validation and
+emission. This slice does not certify arbitrary closure/Memo cycles, State
+installation lifetimes, unknown stores or the complete immutable scope-exit
+interpreter.
+
+## Demand construction captures (15 October 2026)
+
+Lazy-argument admission uses the actual lexical construction captures,
+separately from the Demand result and latent row. Local delayed values and
+body-generated nested scopes are admitted. A discarded capability/operation read
+remains a capture even when the cached result is scalar. Scoped and usage
+wrappers, nominal resources and bounded lexical/identity walks retain their
+guards.
+
+The Source law in `src/check/check_effect_tests.zig` runs complete
+allocation-failure injection. `tests/scoped_demand_capture_execution.test.ts`
+covers source and compiled dependencies, checkpoints, failed captures and
+recovery in both tiers and sync/JSPI. Older State, resource, usage and
+ambient-staging neighbors pass. The ordinary runtime control remains11958B with
+SHA256 `1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad`.
+
+The separate read-only `capability_lifetimes.zig` reports actual captures,
+mutable State locations, retained Memo environments, branch/Memo joins and owned
+call contexts. Its supported graph is independently tested against omitted
+captures, wrong constructor shapes, alternative stores and witness side effects.
+It does not certify unsupported paths or grant RC permission. General immutable
+scope coverage and the final compiler gate remain required.
+
+## Immutable supported-scope rejection (15 October 2026)
+
+Allocated and fixed-scratch frozen validation now inspect each owned scope root,
+including scopes in cold global functions. The pass reconstructs executable
+captures, local State contents, Memo environments and branch alternatives. It
+rejects a supported lifetime escape without relying on declared empty captures.
+Unsupported scopes retain independent Source/usage/invocation checks and confer
+no new confinement or no-store fact.
+
+Canonical node population and lazy producer validation remain separate from the
+shared semantic work budget. A tiny scope with70k unrelated owner nodes, and a
+scoped module with70k ordinary nodes, remain accepted. Repeated actual scope
+proof work exhausts one shared budget and rejects. Root ten native laws include
+seven complete allocation-failure laws. Sixteen selected guest groups pass; the
+imported-container scoped_value_flow emitter failure also reproduces before this
+guard and remains a separate repair. Union selected analyzer251/452files is
+zero. The private final25-pair development CPU control measures ordinary
+fresh/edit +1.11/-0.51% and scoped fresh/edit+0.55/+2.07%, with byte-identical
+output. Broader compiler qualification and complete immutable scope coverage
+remain open.
+
+The imported-container failure above is repaired separately: partial Code record
+expectations match exact field names and payload types independently of field
+order. Missing/duplicate names, wrong payloads and exhausted proof budgets
+reject. Two root native laws (including complete allocation failures) and six
+executed groups pass, covering both container tiers, callback factories and
+associated package payloads. The exact private25-pair CPU control preserves
+same-order bytes and measures retained edits+0.11%; reordered records previously
+rejected and have no before/after speed ratio. Pins and logs are in
+`build/bench/complete-program-20261015/record-code-shape-names1/`.
+
+## Generic State setters, 15 October 2026
+
+An inferred helper may invoke a known setter with a scoped closure when the
+actual installed State cell has the required lifetime. Source matches the exact
+selected operation, type arguments and receiver; a widened callback effect row
+does not change that identity. Immutable admission reconstructs the enclosing
+scope and matches the helper invocation to its actual State-write event. Unknown
+callbacks, older cells, ordinary providers and Foreign sinks retain conservative
+rejection. This is an invocation-specific proof, not a general no-store property
+of setters.
+
+Root three native laws cover Source, immutable events and termination, including
+complete allocation failures. The separate boundary-reader scale correction
+passes two native laws: unrelated 70k-node populations preserve semantic work,
+while malformed selected producers reject through allocation failures. All
+catalog owners remain available and executed producers receive lazy bounds
+validation. Fifteen guest groups pass with the alias union; TypeScript and the
+full 453-file zero-finding analyzer pass. Logs and source pins are under
+`build/bench/complete-program-20261015/generic-state-invocation/` and
+`immutable-boundary-owner-scale/`. Resource graphs, general immutable coverage
+and the final combined gate remain open.
+
+## Deferred closure construction, 15 October 2026
+
+Deferred ordinary calls retain their actual argument captures and exact owned
+global target without executing the callee. The reader follows external producer
+chains, rejects missing/local/ambiguous targets, validates constructor payload
+presence and handles suspended construction. The execution/no-store reader is
+unchanged. Local targets, missing owners and newly free arguments with omitted
+capture catalogs decline independent derivation.
+
+The root native law completes every allocation failure; two cross-file guest
+groups pass source/archive/checkpoint, edits, traps, recovery and sync/JSPI. The
+combined numeric repair passes six further guests and400affected analyzer files
+with zero findings. The unchanged captured project now passes fresh, edit and
+revert with70,330steps,11retained constant hits and61,383replayed steps;
+fresh/revert bytes agree. Wall durations25.493/14.275/13.628s are compatibility
+observations, not CPU qualification. Exact inputs, binaries, source images and
+logs are in `build/bench/complete-program-20261015/deferred-named-capture/` and
+`captured-after-capture-repair/`. General coverage and the final gate remain.
+
+## Resource callback results, 15 October 2026
+
+A checked scalar resource wrapper preserves its callback result's lifetime
+footprint. Acquisition and cleanup construction captures remain local to the
+invocation. A returned closure may retain an older live capability; a younger
+effect owner, fresh resource loan, cleanup store into an older cell or unknown
+sink still rejects. The immutable reader independently reconstructs exact once
+acquisition/callback, scalar owner/loan signatures, a bounded pure cleanup
+recipe and actual acquisition→callback→cleanup order. Cleanup failure marks the
+report incomplete without erasing the returned capture graph. Structural usage
+checking visits canonical enclosing effect scopes; shared alpha/cleanup work is
+bounded.
+
+Root3native laws with complete allocation failures,9executed groups, TypeScript
+and400affected zero-finding analyzer files pass. Mutations cover omitted capture
+catalogs, younger/loan captures, wrong cleanup roles, hidden State stores,
+invalid type IDs and proof-budget exhaustion. Both tiers and sync/JSPI preserve
+source/ archive/checkpoint, edits, invalid revisions, cleanup traps and
+recovery. General reference payloads, host cleanup and unknown/terminating
+callback recipes gain no new authority. Ordinary Cost stays byte-identical.
+Exact root/private sources, failed-before repro and pins are in
+`build/bench/complete-program-20261015/resource-scope-result/`. The final full
+gate and broader effect/resource qualification remain open.
+
+## Finite scope audit, 15 October 2026
+
+A read-only audit maps the design's finite matrix to existing laws for nested
+owners, aliases, selected/generic capabilities, storage, aggregates, requests,
+cancellation and imported recovery. It found no concrete legal matrix case
+rejected or invalid escape accepted. The immutable graph's conservative limits
+do not establish a Source-language gap.
+
+In particular, replacing the resource acquisition scalar with an Array already
+accepts an older live capture and rejects a younger owner on compiler
+`f4d5c9a9...`. The unchanged compiler passes this reference-payload probe
+through source/archive dependencies, both tiers, sync/JSPI, checkpoint restart,
+edits and failure recovery. No production change was needed. The probe and pins
+are in
+`/var/tmp/blot2-resource-data-footprint-close-20261015/build/bench/resource-data-footprint/`.
+This focused result leaves the final combined qualification open.

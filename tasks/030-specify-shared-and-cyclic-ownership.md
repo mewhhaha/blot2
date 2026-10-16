@@ -19,8 +19,8 @@ cycle-reclamation strategy.
 
 [zig-native/CONTRACT.md](../zig-native/CONTRACT.md) describes tracing, local
 lifetime groups and the State → closure → cached-demand cycle.
-[runtime_layout.zig](../zig-native/src/runtime_layout.zig),
-[arena_runtime.zig](../zig-native/src/arena_runtime.zig) and
+[runtime_layout.zig](../zig-native/src/runtime/runtime_layout.zig),
+[arena_runtime.zig](../zig-native/src/runtime/arena_runtime.zig) and
 [tests/arena_gc_execution.test.ts](../zig-native/tests/arena_gc_execution.test.ts)
 are the current layout, allocator and counterexample boundaries.
 

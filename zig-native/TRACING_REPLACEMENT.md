@@ -1,5 +1,33 @@
 # Tracing replacement work
 
+The current production candidate uses counted edges, leases and trial deletion;
+incomplete ownership diagnoses instead of selecting a tracer. The final common
+release/runtime performance gate remains open. Dated records below retain
+earlier implementations, rejected candidates and their original limits.
+
+The 15 October focused runtime screen rebuilds the pinned historical tracing
+compiler `b8023659` against the same fixture and frozen std. Its Wasm exactly
+matches the preserved artifact. Current cycle CPU is 13.30/13.19 ms versus
+5.47/5.70 ms in sync/JSPI, while warmed memory is 128 KiB versus 16,320 KiB.
+Scalar, Array and request controls also retain CPU gaps. Raw 25-pair rounds,
+compiler/source/std/Wasm pins and mode checks are in
+`build/bench/finish-program-20261014/ownership-vs-tracing/tracing-screen/`. This
+is development guest evidence; task 035 and release qualification stay open. An
+isolated 256 KiB collection cadence increased CPU 2.2–2.4% and doubled warmed
+memory. It was rejected; `cycle-cadence/` retains its exact sources.
+
+The integrated discovery/subtraction fusion removes one member edge sweep and
+seven runtime source lines. Against the frozen current ownership compiler, 25
+alternating pairs improve cycle CPU 2.41% sync / 3.54% JSPI with unchanged 128
+KiB warmed memory; cost Wasm shrinks 12,156 to 11,966 bytes. Both modes remain
+`[2,2,0]`. Exact graph counters, duplicate/self/back/cross edges, lease and
+alias roots, underflow traps and resource retirement remain qualified. Nine root
+native laws and 23 guest laws pass; the integrated compiler emits byte-identical
+cost Wasm to the measured candidate. Pins and raw rounds are in
+`build/bench/finish-program-20261014/cycle-edge-fusion/` and its referenced
+immutable private evidence. This is a small runtime improvement; the tracing
+comparison and final full gate remain open.
+
 Task 035 is in progress. Tracing remains for uncovered and partial routes; this
 record qualifies a development checkpoint, not final removal. The incoming
 implementation is qualified `dd6a66a`, with source tree
@@ -556,3 +584,238 @@ release. Merged cycle CPU falls about 13.7%; scalar/Array/request controls
 remain within roughly 1.5%. Exact pins and the separate merged costs are in
 [iterator state qualification](ITERATOR_STATE.md). Physical tracing removal,
 whole-module coverage and the historical relative CPU gate remain open.
+
+## Checked callback identities (13 October 2026)
+
+Host callback wrappers store their descriptor's own base in the scalar
+environment word as a borrowed identity. The exact adjacent store fact now
+preserves alias liveness without treating this identity as an owning edge.
+Unmarked, forged and interior identities decline. The focused native law passes
+its complete 952-failure allocation sweep; existing host callback and retained
+role laws execute with zero role conflicts.
+
+This removes the captured project's callback role conflict, but its first
+remaining unproven body still prevents whole-module admission. Physical tracing
+removal and the historical runtime gate remain open. No release or full gate was
+repeated for this isolated slice; combined qualification belongs to the parent
+integration batch.
+
+## Counted persistent field updates (13 October 2026)
+
+Record, product and nominal field updates now carry their checked payload mask
+through replacement allocation, copy and field publication. All-scalar payloads
+keep their scalar allocation/copy/store path for local elimination. Every
+constructor arm selects its own exact size/mask; nested paths preserve
+persistent aliases and captured old values. Unknown typed masks retain checked
+runtime publication and cannot license scalar lifetime shortening. Unannotated
+raw storage and heterogeneous tails beyond the counted mask stay conservative.
+
+The native dynamic-mask law passes its allocation-failure sweep, and the
+executed law covers distinct constructor layouts, persistent aliases, captured
+old values, F32 signed zero, both compilation tiers and fresh/edit/revert byte
+equality with complete journal admission. Fifteen existing update, payload,
+retained-record and role laws also pass. Captured body 585 is now covered; its
+next unproven body is 864. Production tracing deletion and the historical CPU
+acceptance remain open; no release/full gate was repeated for this slice.
+
+## One typed initialization contract (13 October 2026)
+
+Typed allocation now guarantees null reference storage in counted and partial
+modes. Exact Array builders drop their duplicate clear. This removes dynamic
+bulk initialization from the source ownership proof without granting a new
+compiler fact or shortening owner lifetimes. A permanent dirty-block reuse law
+executes both modes, all 21 shared runtime laws pass, and 12 Array/builder/
+tracing-replacement laws pass. Iterator allocation counts retain the qualified
+77,800-object window and zero-object strict/pipeline results. Captured body 864
+is covered; body 894's scalar Array-header update remains a separate blocker.
+Physical tracing deletion and historical runtime acceptance remain open.
+
+## Checked scalar publication (13 October 2026)
+
+Scalar Array headers and packed row lanes carry an adjacent physical scalar
+store fact. It qualifies publication without granting alias or lifetime facts,
+and preserves the original Wasm stores. Exact width/opcode/alignment checks,
+known scalar ranges and rejection of known fresh-reference values constrain
+admission. Unknown offsets in known mixed owning layouts still decline.
+
+The 16-test focused native batch includes the complete allocation-failure law
+for ten positive/negative store scenarios. Sixteen packed/revision/boundary/
+tracing-replacement guest laws pass, including both tiers and fresh/edit/revert
+byte parity. Dynamic slice/concat traversal now requires complete admission; its
+unchanged 100-call pressure and flat-memory law passes. Analyzer is zero across
+375 files. Optimizer interpretation is version 27.
+
+The captured project remains partial because a 144-byte allocation has distinct
+reference/scalar roles beyond the current mask's uniform tail (first mismatch at
+word 33). Extended ownership bitmaps, physical tracing deletion and the
+historical runtime gate remain outstanding. No release/full gate was repeated.
+
+## Finite wide shapes (13 October 2026)
+
+Wide payloads now use an exact immutable reference bitmap without enlarging the
+32-byte header. Checked publications and copies interpret only reference words,
+including sparse roles beyond the compact mask's uniform tail. Destruction and
+trial deletion share that representation. Scalar and compact-mask payloads keep
+their current representation. Different constructor layouts select both their
+own physical size and shape for persistent field replacement.
+
+The 93-unit captured project now has complete ownership `[2, 2, 0]` with 2,866
+prepared functions and zero role conflicts. Executed laws cover 96-word sparse
+layouts, pointer-shaped scalar bits, exact copy counts, self cycles, malformed
+shape descriptors, persistent record/constructor updates, snapshots, captured
+old values and F32 signed zero. Retained edits that move static data reproduce
+fresh bytes in both tiers; their immutable bitmap-reader demand survives replay.
+The native checked-publication and exact owned-replay law also passes its
+allocation-failure sweep. Physical tracing deletion and historical CPU
+acceptance remain open. Combined release qualification is deferred to the parent
+integration batch.
+
+## Deferred partial scanners (13 October 2026)
+
+The allocator no longer generates legacy mark/collect/root-mark bodies into
+source or retained artifacts. Complete emission needs no scanner materialization
+and removes its legacy chain/cache writes at words 4 and 12. Remaining partial
+contracts construct scanner bodies only after final admission, then release that
+temporary ownership after assembly. Partial scanners are isolated in
+`partial_tracing.zig`; empty signatures retain separate machine identities.
+
+Permanent laws check empty source signatures/locals, exact removal of two
+metadata stores, unchanged source during materialization, shifted function
+identities, partial machine sharing and complete OOM cleanup. The executed law
+pins metadata sentinels across repeated complete allocation/leave/reset and
+executes the shared partial route. Existing partial runtime, cycles, memoized
+state, host exchange, wide/retained and nested discarded-Array laws remain
+valid. Partial production contracts and the historical performance gate still
+keep physical deletion of the final fallback open. Release/full qualification
+remains owned by the combined integration batch.
+
+## Checked List literal publication (13 October 2026)
+
+A source inventory of 101 real feature laws/103 builds found six partial builds
+of the mixed role program. Its first unproven body constructed a nominal List
+literal with raw stores into returned leaf addresses; late whole-module fallback
+then masked the cause as `host_references` when Foreign callbacks were present.
+Callbacks alone already had complete admission.
+
+Exact reference literals now reuse checked collection publication with the
+actual current leaf base. Scalar literals carry the existing scalar-store fact;
+unknown layouts remain conservative and packed rows keep their current stores.
+The mixed program, with and without Foreign callbacks, now has complete
+admission. Permanent coverage pins fresh/edit/revert ownership and bytes, 260
+shared child references over multiple leaves, conversion snapshots, persistent
+Array edits, captured old values, signed F32 zero and bounded repeated
+invocations in both tiers. A native source-emission law exercises every
+allocation failure. The optional machine-code-sharing route and any uncovered
+production contracts still need admission repair before final legacy scanner
+deletion; historical performance and combined release qualification remain open.
+
+## Prepared machine sharing (13 October 2026)
+
+Machine sharing no longer forces otherwise complete source graphs into partial
+admission. Every source function receives independent ownership preparation and
+retains its own exact output before machine bodies are compared. Different
+checked roles can produce different publication/cleanup code even when their raw
+instructions match; sharing now observes those consequences. Public identities
+and indirect table slots remain distinct. Parallel preparation no longer
+consults a premature sharing map.
+
+Native laws cover conflicting scalar/reference payload masks, complete
+admission, separated retained duplicates, exact source immutability and complete
+allocation failure cleanup. Shared mixed source preserves fresh/edit/revert byte
+equality, complete ownership and sync/JSPI callbacks; complete metadata
+sentinels remain unchanged with either emission mode. Final shared count
+describes omitted machine output separately from source optimized/reused work.
+Uncovered source contracts and the historical performance gate still keep task
+035 open.
+
+## Checked production assembly (13 October 2026)
+
+Production source emission and artifact replay now select an assembly
+instantiation with no reachable legacy scanner generator. Incomplete ownership
+returns an owned emission diagnostic rather than selecting partial scanning. The
+deliberately raw Module fixtures retain their private partial contract.
+
+The remaining request cancellations carried erased, unused completion types. A
+bounded Core bottom proof supplies a physical scalar cancellation result only
+for an exact action with no normal result. Its consumer may fill that erased
+completion slot; retained factories remain free to specialize independently at
+U32 and F32. Normal returns, outward control, loops, partial calls and exhausted
+proofs supply no such fact. Function creation records the role in the artifact
+journal; no frozen source or source type is mutated.
+
+Bottom aggregate, Array/List and constructor operands now end emission after
+their checked Never value. The eager prefix still executes; dead construction
+and its unresolved field roles disappear. Existing bottom-flow laws cover those
+prefixes and generic captured callees. New laws cover production rejection,
+source immutability, fresh/retained/replay parity, complete OOM cleanup, and
+retained request cancellation in both execution tiers.
+
+This is a focused implementation checkpoint. Combined release/native/guest
+qualification, new checked/unchecked List helper variants, and the historical
+performance comparison remain integration obligations; task 035 is not yet
+claimed complete.
+
+## Bounded cohort runtime prerequisite (15 October 2026)
+
+`cohort_runtime.install` appends helpers only to a private admitted assembly
+view. Ordinary Source artifacts, arena registration and RC/cycle bodies are
+unchanged. One leased owner keeps a bounded member list; each member holds one
+real counted pin in addition to its ordinary journal lease. Retirement first
+validates the whole group, marks the complete set dead, consumes pins and uses
+the existing dead-set destructor. Live outgoing references keep ordinary
+ownership.
+
+The compiler must independently prove exact membership, internal stores,
+incoming calls and owner journal lifetime. Allocation order alone cannot prove
+that moved result roots retire before the owner. Candidate collector enqueue and
+discovery must both exclude grouped objects. Partial ownership, escaped retains,
+malformed lists, excessive membership and premature retirement trap.
+
+Three native laws include full OOM cleanup. Ten direct Wasm protocol groups
+cover cycles, outgoing children, bad protocols, journal page growth, trap unwind
+and repeated bounded memory. The direct fixture's mutable ownership switch is
+not Source admission evidence. This checkpoint enables no production rewrite and
+claims no historical performance win. Task035 remains open; the runtime
+candidate and final qualification remain separate.
+
+## Owned emission coordinates (15 October 2026)
+
+Compiler emission now retains typed call/allocation coordinates with owned Core
+unit, expression, body root, type-mapping evidence and row context. Artifact
+replay relocates functions; retained import reconstructs semantic owners before
+publishing coordinates. Diagnostic spans provide no authority. These receipts do
+not independently establish dispatch, lifetime, cohort membership or RC
+permission; a consumer must rederive those relationships from immutable Core.
+
+The root receipt law passes complete replay/import allocation failures and
+malformed-coordinate controls. Twenty-two selected executed groups and the
+full453-file zero-finding analyzer pass. Ordinary Cost remains byte-identical
+at11958B. Private25-pair controls measure wall geomean0.999058 over
+ordinary/Cost fresh/retained cases; CPU instrumentation was invalid and supplies
+no CPU gate. Exact source images, pins and root logs are in
+`build/bench/complete-program-20261015/semantic-emission/`. The production
+intersection/consumer and historical ownership performance gates remain open.
+
+## Rejected closed-activation consumer, 15 October 2026
+
+The private semantic/Core-to-runtime intersection and late assembly consumer
+pass focused lifecycle and retained/portable execution controls. They remain
+unpromoted. Thirty balanced CPU7 rounds preserve exact values and128KiB warmed
+memory but cycle CPU remains flat against the current compiler:median ratios
+0.99955sync and1.00105JSPI. Historical total median geomean1.28443 and cycle
+p951.64304/1.61003 fail the required gates. Removing measured cycle walks alone
+replaces their cost with per-member pins and group-list validation.
+
+Immutable source/patch/compiler pins, raw rounds, profiling samples and the
+rejection are preserved in
+`/var/tmp/blot2-closed-activation-cohort-evidence-20261015/`. Its production
+hook is absent from the root. Runtime prerequisites and tracing metadata remain;
+no ownership performance or full-program completion is claimed.
+
+The subsequent nested-callable reuse repair checks each callable-layout record
+against its own checked job rather than its enclosing caller. Semantic-site
+admission and immutable lifetime checks remain unchanged. Root complete-OOM,
+26executed groups and112affected analyzer files pass; ordinary Cost and captured
+project bytes remain exact. Captured retained reuse recovers489fragments. This
+compiler-work repair supplies no new ownership permission or tracing-removal
+evidence. See `build/bench/complete-program-20261015/nested-callable-reuse/`.

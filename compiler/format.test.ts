@@ -1,6 +1,34 @@
 import { deepStrictEqual as equal } from "node:assert/strict";
 import { formatSource } from "./format.ts";
 
+Deno.test("formatter preserves typed code descriptors and stage composition", async () => {
+  const source = `const code=1
+const descriptor=fn code=>code
+const left:code [U32,row {}]=@code.quote 40
+const shape:descriptor (code [U32,row {Foreign}])=@code.describe left
+const answer=@code.quote (@u32.add (@code.splice left) (@code.lift 2))
+entry const run=fn ()=>@code.emit answer
+`;
+  const formatted = await formatSource(source);
+  equal(formatted.includes("code [U32, row {}]"), true);
+  equal(formatted.includes("descriptor (code [U32, row { Foreign }])"), true);
+  equal(await formatSource(formatted), formatted);
+});
+
+Deno.test("formatter preserves erased proof annotations and exact operand grouping", async () => {
+  const source =
+    `const at:(values:Array a)->(index:U32)->(@proof.Index values index)->a=fn values=>fn index=>fn proof=>@array.get values index
+const less:(values:List U32)->@proof.U32Lt (0) (@list.length values)=fn values=>@proof.lt 0 (@list.length values)
+const last:@proof.U32Le 0 4294967295=@proof.le 0 4294967295
+`;
+  const formatted = await formatSource(source);
+  equal(await formatSource(formatted), formatted);
+  equal(await formatSource(source.replaceAll("\n", "\r\n")), formatted);
+  equal(formatted.includes("@proof.Index values index"), true);
+  equal(formatted.includes("(@list.length values)"), true);
+  equal(formatted.includes("4294967295"), true);
+});
+
 Deno.test("formatter preserves dependent arrow binders and staged row grouping", async () => {
   const source = `type State a is effect={get:Unit->a,set:a->Unit}
 const read:(state:State a)->a!{state.get}=fn input=>input.get ()
@@ -280,4 +308,40 @@ const impl=fn impl=>impl
     true,
   );
   equal(formatted.includes("const impl = fn impl => impl"), true);
+});
+
+Deno.test("formatter preserves usage qualifiers and contextual value names", async () => {
+  const source = `const unique=1
+const f:once (borrow r U32->shared U32)=fn x=>x
+const g:cleanup (unique U32->Unit)=fn x=>()
+const h:borrow_mut r [U32]=unique
+const i:many (U32->U32)=fn x=>x
+const j:concurrent (U32->U32 ! {Foreign})=host
+const concurrent=1
+const share=@usage.share unique
+const scope=@resource.scope acquire release (fn resource=>resource)
+`;
+  const formatted = await formatSource(source);
+  equal(await formatSource(formatted), formatted);
+  equal(formatted.includes("once (borrow r U32 -> shared U32)"), true);
+  equal(formatted.includes("borrow_mut r [U32]"), true);
+});
+
+Deno.test("formatter preserves quantified binders and package opening scope", async () => {
+  const source = `const forall=fn pack=>pack
+ type Id=forall [a]=>a->a
+ type Borrower=forall [a,row e,region r]=>borrow r a->a!{|e}
+ type Item=exists [a] where {Render a}=>a
+ const make=pack [U32] 42 as Item
+ const read=fn item=>unpack item as [a] value in Render.show value
+ const plain=fn unpack=>unpack 1
+`.replaceAll("\n ", "\n");
+  const formatted = await formatSource(source);
+  equal(await formatSource(formatted), formatted);
+  equal(await formatSource(source.replaceAll("\n", "\r\n")), formatted);
+  equal(formatted.includes("forall [a, row e, region r]"), true);
+  equal(
+    formatted.includes("unpack item as [a] value in Render.show value"),
+    true,
+  );
 });

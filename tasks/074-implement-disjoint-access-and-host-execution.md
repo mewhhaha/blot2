@@ -2,7 +2,10 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — focused implementation checks pass (see
+  [STRUCTURED_TASK_QUALIFICATION](../zig-native/STRUCTURED_TASK_QUALIFICATION.md));
+  scope closed to fixed acceptance traces by owner decision on 15 October 2026;
+  task 035 and a passing full gate remain.
 - **Dependencies:** [073](073-implement-scoped-tasks-and-cancellation.md),
   [071](071-eliminate-checks-from-proved-branch-facts.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 10 / disjoint
@@ -55,6 +58,33 @@ development and the scenarios below.
       nondeterminism and ownership contract.
 - [ ] Applicable checks pass and completion evidence records remaining
       limitations honestly.
+
+## Closed acceptance — owner decision, 15 October 2026
+
+The owner closed this task's scope to the acceptance traces of the
+[structured concurrency design](../zig-native/STRUCTURED_CONCURRENCY.md) listed
+below.
+
+| Acceptance trace                                           | Expected result                          |
+| ---------------------------------------------------------- | ---------------------------------------- |
+| Move unique capture to child, then parent uses old binding | Reject use after move.                   |
+| Two sibling writes through aliases/overlapping views       | Reject before scheduling.                |
+| Two siblings force one pending demand                      | Reject; independent cells remain legal.  |
+| Child returns scoped callback/package/task handle          | Reject escaped group/capability/loan.    |
+| Host completes a stale generation                          | Reject without touching a recycled task. |
+
+Forms outside these traces (detached tasks, shared mutable state across tasks,
+host worker transport, simultaneous Wasm reentry, unknown or overlapping
+partition evidence) must reject, as recorded in
+[the implementation record](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#deliberate-limits-and-remaining-qualification).
+
+Focused evidence: the private implementation passed 12 checker, four backend,
+one native-context, 26 task/context/resource and 35 guest/resource laws, with 34
+descriptors executed in sync and JSPI modes (see
+[the implementation record](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#focused-checks)).
+The task completes when each trace maps to named passing laws in the full
+compiler gate on the committed source and task
+[035](035-remove-the-tracing-runtime.md) is complete.
 
 ## Completion evidence
 

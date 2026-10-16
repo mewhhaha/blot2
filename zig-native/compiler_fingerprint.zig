@@ -21,6 +21,7 @@ fn content(b: *std.Build, hash: *std.crypto.hash.Blake3, path: []const u8) !void
     framed(hash, path);
     framed(hash, bytes);
 }
+const Selected = struct { scanned: bool, bytes: [:0]u8 };
 const Input = struct { path: []const u8, scan: bool };
 fn dependencies(allocator: std.mem.Allocator, source: [:0]const u8, path: []const u8, pending: *std.ArrayList(Input)) !void {
     var tokens = std.zig.Tokenizer.init(source);
@@ -73,7 +74,7 @@ fn dependencies(allocator: std.mem.Allocator, source: [:0]const u8, path: []cons
 }
 pub fn digest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize, use_llvm: ?bool) ![32]u8 {
     var hash = std.crypto.hash.Blake3.init(.{});
-    framed(&hash, "blotc compiler source identity v2");
+    framed(&hash, "blotc compiler source identity v3");
     framed(&hash, builtin.zig_version_string);
     // Use the resolved target, so a native CPU/OS default cannot hide a build
     // difference behind the same unresolved target query.
@@ -130,15 +131,22 @@ pub fn digest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lan
         for (pending.items) |input| b.allocator.free(input.path);
         pending.deinit(b.allocator);
     }
-    var selected = std.StringHashMap(bool).init(b.allocator);
-    defer selected.deinit();
+    var selected = std.StringHashMap(Selected).init(b.allocator);
+    defer {
+        var values = selected.valueIterator();
+        while (values.next()) |value| b.allocator.free(value.bytes);
+        selected.deinit();
+    }
     try pending.append(b.allocator, .{ .path = try b.allocator.dupe(u8, "src/main.zig"), .scan = true });
     var index: usize = 0;
     while (index < pending.items.len) : (index += 1) {
         const dependency = pending.items[index];
         const path = dependency.path;
-        if (selected.get(path)) |scanned| {
-            if (scanned or !dependency.scan) continue;
+        if (selected.getPtr(path)) |value| {
+            if (value.scanned or !dependency.scan) continue;
+            value.scanned = true;
+            try dependencies(b.allocator, value.bytes, path, &pending);
+            continue;
         }
         // Every dependency must have passed the source-tree symlink check.
         var found = false;
@@ -149,19 +157,23 @@ pub fn digest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lan
             }
         }
         if (!found) return error.CompilerDependencyOutsideSourceTree;
-        try selected.put(path, dependency.scan);
-        if (!dependency.scan) continue;
         b.dependOnFileContents(b.path(path));
         const input = try b.root.join(b.allocator, path);
         defer b.allocator.free(input.sub_path);
         const bytes = try input.root_dir.handle.readFileAllocOptions(b.graph.io, input.sub_path, b.allocator, .limited(64 * 1024 * 1024), .of(u8), 0);
-        defer b.allocator.free(bytes);
-        try dependencies(b.allocator, bytes, path, &pending);
+        selected.put(path, .{ .scanned = dependency.scan, .bytes = bytes }) catch |err| {
+            b.allocator.free(bytes);
+            return err;
+        };
+        if (dependency.scan) try dependencies(b.allocator, bytes, path, &pending);
     }
     try content(b, &hash, "build.zig");
     try content(b, &hash, "compiler_fingerprint.zig");
     for (paths.items) |path| {
-        if (selected.contains(path)) try content(b, &hash, path);
+        if (selected.get(path)) |value| {
+            framed(&hash, path);
+            framed(&hash, value.bytes);
+        }
     }
     var result: [32]u8 = undefined;
     hash.final(&result);

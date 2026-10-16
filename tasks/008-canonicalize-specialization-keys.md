@@ -23,10 +23,12 @@ and its
 [acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
 
 `specialized_closures` and frozen capture proofs in
-[core_eval.zig](../zig-native/src/core_eval.zig) still retain value-specific
-keys. [specialization.zig](../zig-native/src/specialization.zig),
-[specialization_receipt.zig](../zig-native/src/specialization_receipt.zig) and
-[completed_specialization_query.zig](../zig-native/src/completed_specialization_query.zig)
+[core_eval.zig](../zig-native/src/eval/core_eval.zig) still retain
+value-specific keys.
+[specialization.zig](../zig-native/src/eval/specialization.zig),
+[specialization_receipt.zig](../zig-native/src/reuse/specialization_receipt.zig)
+and
+[completed_specialization_query.zig](../zig-native/src/eval/completed_specialization_query.zig)
 provide the current selected-evidence boundaries.
 
 ## Implementation checklist

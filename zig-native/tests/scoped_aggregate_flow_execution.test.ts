@@ -65,7 +65,7 @@ const variants = [{
   body: "(third, (first, second), first)",
   changedBody: "(third, (second, first), second)",
   lostBody:
-    "do:\n  let saved = first\n  return (third, (saved, second), first)",
+    "do:\n  let saved = (fn value => value) first\n  return (third, (saved, second), first)",
 }, {
   shape: "record",
   library: library.replace(
@@ -83,7 +83,7 @@ const variants = [{
   changedBody:
     "{selected: third, nested: {first: second, second: first}, repeated: second}",
   lostBody:
-    "do:\n  let saved = first\n  return {selected: third, nested: {first: saved, second}, repeated: first}",
+    "do:\n  let saved = (fn value => value) first\n  return {selected: third, nested: {first: saved, second}, repeated: first}",
 }];
 const cases = variants.flatMap((variant) =>
   (["optimized", "development"] as const).map((codegenTier) => ({

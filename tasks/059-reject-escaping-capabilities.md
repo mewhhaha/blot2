@@ -2,11 +2,9 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — direct-scope guards, exact owned public flow
-  contracts and trusted local State lifetime proofs reject unsupported authority
-  transfers. Owned pure-product input summaries preserve legal nested lifetime
-  transfers. General footprint contracts and precise hidden escape proofs remain
-  open; see [qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
+- **Status:** In progress — scope closed to fixed language-qualification rows by
+  owner decision on 15 October 2026; waiting for a passing full gate on current
+  source.
 - **Dependencies:** [058](058-implement-effect-instances-and-subtraction.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / capability
   escape. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
@@ -21,9 +19,9 @@ their lifetime.
 ## Starting point
 
 Task 058 gives capabilities stable scoped identities.
-[check.zig](../zig-native/src/check.zig),
-[specialization.zig](../zig-native/src/specialization.zig) and captured evidence
-now need the escape rules from task 057.
+[check.zig](../zig-native/src/check/check.zig),
+[specialization.zig](../zig-native/src/eval/specialization.zig) and captured
+evidence now need the escape rules from task 057.
 
 ## Implementation checklist
 
@@ -57,6 +55,33 @@ development and the scenarios below.
       behavior.
 - [ ] Applicable checks pass and completion evidence records remaining
       limitations honestly.
+
+## Closed acceptance — owner decision, 15 October 2026
+
+The owner closed this task's scope to the rows of
+[language qualification](../zig-native/LANGUAGE_QUALIFICATION.md) listed below.
+Forms outside these rows ("general" captures, stores, transports and shapes) are
+not required work: they must reject or decline conservatively with a stable
+diagnostic and are recorded as limitations. The acceptance criteria below are
+read against these rows.
+
+| Contract             | Qualified requirements                       |
+| -------------------- | -------------------------------------------- |
+| Capability lifetimes | Closures, demands, aggregates, projections   |
+| Capability lifetimes | Sinks, opaque contracts, bounded diagnostics |
+
+Intentional rejections under the normative design: unproved storage lifetimes.
+
+The task completes when every native law and guest test mapped to these rows
+passes in the full compiler gate (`deno task test:compiler` and
+`deno task lint:zig`) on the committed source. The rows passed in the 15 October
+freeze `3548546c…`, but the current working tree failed 20 native laws on the
+evening of 15 October, so completion waits for a passing gate on current source.
+The original acceptance index
+(`build/bench/finish-rest-20261015/language-acceptance/qualified-baseline.json`)
+was removed with `build/`; regenerate the row-to-law mapping from the passing
+gate's native test names and guest JUnit report and record it durably in
+[LANGUAGE_QUALIFICATION.md](../zig-native/LANGUAGE_QUALIFICATION.md).
 
 ## Completion evidence
 

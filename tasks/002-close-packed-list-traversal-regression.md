@@ -22,10 +22,10 @@ qualification must pin its own inputs and reference implementation.
 
 [std/PERFORMANCE.md](../std/PERFORMANCE.md#choosing-collections) records roughly
 1.9× fold CPU and 1.5× cursor CPU.
-[core_backend.zig](../zig-native/src/core_backend.zig) contains
+[core_backend.zig](../zig-native/src/backend/core_backend.zig) contains
 `Emitter.readListRow`, direct loop lowering and cursor extraction;
-[list_runtime.zig](../zig-native/src/list_runtime.zig) owns leaf traversal. Task
-001 determines whether its narrower span change lands.
+[list_runtime.zig](../zig-native/src/runtime/list_runtime.zig) owns leaf
+traversal. Task 001 determines whether its narrower span change lands.
 
 ## Implementation checklist
 

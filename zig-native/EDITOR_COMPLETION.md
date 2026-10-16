@@ -1,7 +1,6 @@
 # Editor completion contract
 
-This specifies [task 050](../tasks/050-implement-editor-completion.md).
-Completion, the client method and the LSP bridge are implemented.
+Completion, the client method and the LSP bridge implement this contract.
 [Helix configuration](../editor/helix/languages.toml) supplies highlighting and
 the completion server. Language meaning comes from the
 [guide](../compiler/guide.md), ownership from [CONTRACT.md](CONTRACT.md), and
@@ -487,12 +486,13 @@ implementation evidence follows below.
 
 ## Implemented ownership and limits
 
-[editor_completion.zig](src/editor_completion.zig) acquires a private input
-snapshot, canonicalizes and captures each disk input once, then substitutes one
-exact-span marker. It verifies project membership even inside comments/strings.
-At most eight missing EOF closing delimiters are repaired; diagnostics map back
-to the original bytes. Ordinary checking has no marker. Queries publish no
-build, evaluator values, previous-revision owner or restart cache.
+[editor_completion.zig](src/reuse/editor_completion.zig) acquires a private
+input snapshot, canonicalizes and captures each disk input once, then
+substitutes one exact-span marker. It verifies project membership even inside
+comments/strings. At most eight missing EOF closing delimiters are repaired;
+diagnostics map back to the original bytes. Ordinary checking has no marker.
+Queries publish no build, evaluator values, previous-revision owner or restart
+cache.
 
 The checker captures actual lexical/import/member names and the expected type at
 that marker. RHS rebinding exposes the previous binding through both its

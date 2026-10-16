@@ -22,13 +22,13 @@ Use the
 and its
 [acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
 
-[check_shared_scheme_tests.zig](../zig-native/src/check_shared_scheme_tests.zig)
-covers frontend scheme sharing; [core_eval.zig](../zig-native/src/core_eval.zig)
-covers checked written predicates, owned inferred first-order graphs and
-source-only normalized graphs alongside the original predicate-free path.
-`collectCall`, the summary queue and `validated_calls` implement the boundaries
-specified in task 003. Higher-order/capture/component extensions follow in tasks
-005–007.
+[check_shared_scheme_tests.zig](../zig-native/src/check/check_shared_scheme_tests.zig)
+covers frontend scheme sharing;
+[core_eval.zig](../zig-native/src/eval/core_eval.zig) covers checked written
+predicates, owned inferred first-order graphs and source-only normalized graphs
+alongside the original predicate-free path. `collectCall`, the summary queue and
+`validated_calls` implement the boundaries specified in task 003.
+Higher-order/capture/component extensions follow in tasks 005–007.
 
 ## Implementation checklist
 

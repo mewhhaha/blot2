@@ -16,11 +16,11 @@ complete capture and evidence validation.
 
 ## Starting point
 
-[specialization_receipt.zig](../zig-native/src/specialization_receipt.zig),
-[principal_reuse_gate.zig](../zig-native/src/principal_reuse_gate.zig),
-[principal_evidence_reuse.zig](../zig-native/src/principal_evidence_reuse.zig)
-and [principal_archive.zig](../zig-native/src/principal_archive.zig) retain
-selected and principal answers under different checks.
+[specialization_receipt.zig](../zig-native/src/reuse/specialization_receipt.zig),
+[principal_reuse_gate.zig](../zig-native/src/reuse/principal_reuse_gate.zig),
+[principal_evidence_reuse.zig](../zig-native/src/reuse/principal_evidence_reuse.zig)
+and [principal_archive.zig](../zig-native/src/reuse/principal_archive.zig)
+retain selected and principal answers under different checks.
 
 ## Implementation checklist
 

@@ -18,10 +18,10 @@ checking.
 ## Starting point
 
 Current array accesses retain bounds checks, even inside guards.
-[types.zig](../zig-native/src/types.zig),
-[type_evidence.zig](../zig-native/src/type_evidence.zig) and
-[wasm_control_flow.zig](../zig-native/src/wasm_control_flow.zig) can carry
-facts, but numeric proof witnesses are a new feature.
+[types.zig](../zig-native/src/check/types.zig),
+[type_evidence.zig](../zig-native/src/eval/type_evidence.zig) and
+[wasm_control_flow.zig](../zig-native/src/backend/wasm_control_flow.zig) can
+carry facts, but numeric proof witnesses are a new feature.
 
 ## Implementation checklist
 

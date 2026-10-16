@@ -17,15 +17,15 @@ cutoff and transactional publication.
 
 ## Starting point
 
-[refinement_receipt.zig](../zig-native/src/refinement_receipt.zig),
-[specialization_receipt.zig](../zig-native/src/specialization_receipt.zig),
-[principal_inputs.zig](../zig-native/src/principal_inputs.zig),
-[dependency_certificate.zig](../zig-native/src/dependency_certificate.zig) and
-[revision_inputs.zig](../zig-native/src/revision_inputs.zig) implement separate
-validity paths.
-[declaration_dependencies.zig](../zig-native/src/declaration_dependencies.zig)
-and [dependency_closure.zig](../zig-native/src/dependency_closure.zig) supply
-dependency information.
+[refinement_receipt.zig](../zig-native/src/reuse/refinement_receipt.zig),
+[specialization_receipt.zig](../zig-native/src/reuse/specialization_receipt.zig),
+[principal_inputs.zig](../zig-native/src/reuse/principal_inputs.zig),
+[dependency_certificate.zig](../zig-native/src/reuse/dependency_certificate.zig)
+and [revision_inputs.zig](../zig-native/src/reuse/revision_inputs.zig) implement
+separate validity paths.
+[declaration_dependencies.zig](../zig-native/src/reuse/declaration_dependencies.zig)
+and [dependency_closure.zig](../zig-native/src/reuse/dependency_closure.zig)
+supply dependency information.
 
 ## Implementation checklist
 

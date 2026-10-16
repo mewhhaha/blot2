@@ -19,9 +19,9 @@ captured demands.
 ## Starting point
 
 Unknown, indirect and escaping callbacks currently retain cells.
-[known_call.zig](../zig-native/src/known_call.zig), resolved call evidence and
-demand-use summaries can prove complete local callback uses; task 032 covers
-fallback roots.
+[known_call.zig](../zig-native/src/backend/known_call.zig), resolved call
+evidence and demand-use summaries can prove complete local callback uses; task
+032 covers fallback roots.
 
 ## Implementation checklist
 

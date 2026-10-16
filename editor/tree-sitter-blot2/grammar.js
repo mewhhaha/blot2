@@ -360,7 +360,8 @@ export default grammar({
     integer: (_) => token(/0[xX][0-9A-Fa-f](_?[0-9A-Fa-f])*|[0-9](_?[0-9])*/),
     boolean: (_) => choice("True", "False"),
     self: (_) => "self",
-    intrinsic: (_) => token(/@[a-z_][A-Za-z0-9_]*(\.[a-z_][A-Za-z0-9_]*)*/),
+    intrinsic: (_) =>
+      token(/@[a-z_][a-z0-9_]*(\.([a-z_][a-z0-9_]*|[A-Z][A-Za-z0-9_]*))*/),
     _identifier: (_) => /[a-z_][A-Za-z0-9_]*/,
     identifier: ($) =>
       choice(

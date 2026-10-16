@@ -18,12 +18,32 @@ not parse, infer or stage source for compilation.
    dependency modules can be shared across revisions without retaining a chain
    of prior mutable solver states.
 
-Specialization lives in `specialization.zig`: it binds layout expectations,
-solves type/effect obligations and returns owned mappings for a source body. The
-service has no instruction builder or Wasm module. Retained refinement hooks
-keep the existing stable artifact-owner identity and validity checks. Dynamic
-member selection, closure captures and staging still request semantic work as
-needed; this boundary does not assume every expression was monomorphized early.
+[Source areas](SOURCE_AREAS.md) groups parsing, checking, evaluation, emission,
+reuse and runtime code by responsibility. Mutable construction and immutable
+publication have separate owners:
+
+- [Checker](CHECKER_OWNERSHIP.md): Engine owns catalog indexes; scheme import
+  owns its temporary maps and borrows only Source and the destination store.
+- [Core](CORE_OWNERSHIP.md): Module owns frozen tables; CoreBuilder owns mutable
+  tables and scratch through transactional freeze.
+- [Evaluator](EVALUATOR_OWNERSHIP.md): value storage, inference-region capacity,
+  specialization caches and retained receipts have distinct lifetimes.
+- [Backend](BACKEND_OWNERSHIP.md): planning, representations, static data and
+  function emission own their state; CompileRun owns one fallible attempt.
+
+The owned body auxiliary schema covers every checked metadata table and nested
+catalog edge. Relocation follows actual declaration syntax and parser ordinals;
+borrowed AST pointers and old proof receipts do not supply current authority.
+These refactors have focused parity evidence; the final combined gate remains
+required.
+
+Specialization lives in `src/eval/specialization.zig`: it binds layout
+expectations, solves type/effect obligations and returns owned mappings for a
+source body. The service has no instruction builder or Wasm module. Retained
+refinement hooks keep the existing stable artifact-owner identity and validity
+checks. Dynamic member selection, closure captures and staging still request
+semantic work as needed; this boundary does not assume every expression was
+monomorphized early.
 
 Constant aggregates can retain unobserved polymorphic accessors while selected
 fields lower with their own concrete use types. For an anonymous callable whose
@@ -78,15 +98,15 @@ those schemes directly, including function parameters and quantified rows.
 Computed function values still require their actual capture proofs. Independent
 closed proofs publish before unrelated caller constraints finish; source
 interface and retained capture checks keep their existing collection rules.
-General higher-order calls, lexical captures and recursive components still
-require shared inference regions. Occurs checks visit each resolved node once
-even when the type is a shared DAG.
+Complete callback interfaces admit parametric jobs. Lexical jobs key the actual
+captured value and alias graph; bounded recursive components infer jointly.
+Incomplete inputs retain ordinary shared-region inference. Occurs checks visit
+each resolved node once even when the type is a shared DAG.
 
-[General call summaries](CALL_SUMMARIES.md) specifies the next boundary:
-separate principal graphs and completed call judgments, explicit residual and
-callback obligations, capture inputs, recursive components, canonical keys and
-transactional publication. It is a design contract; the general implementation
-and qualification remain open.
+[General call summaries](CALL_SUMMARIES.md) records the implemented principal
+and call judgments, callback obligations, owned captures, recursive scheduling
+and canonical session keys, with qualification and remaining fallback
+boundaries.
 
 Current variable resolution can reuse a node-local certificate across unrelated
 substitutions. Closed results remain stable; open aliases watch the remaining

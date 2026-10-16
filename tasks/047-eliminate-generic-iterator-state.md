@@ -19,10 +19,10 @@ and loops.
 ## Starting point
 
 [std/iter.blot](../std/iter.blot),
-[known_call.zig](../zig-native/src/known_call.zig),
-[wasm_sroa.zig](../zig-native/src/wasm_sroa.zig) and
-[wasm_inline.zig](../zig-native/src/wasm_inline.zig) remove some wrappers, but
-generic step/cursor allocations persist.
+[known_call.zig](../zig-native/src/backend/known_call.zig),
+[wasm_sroa.zig](../zig-native/src/backend/wasm_sroa.zig) and
+[wasm_inline.zig](../zig-native/src/backend/wasm_inline.zig) remove some
+wrappers, but generic step/cursor allocations persist.
 [tests/iterator_execution.test.ts](../zig-native/tests/iterator_execution.test.ts)
 pins pull semantics.
 
@@ -82,3 +82,12 @@ binary, allocations, runtime/compiler costs and limits. Remaining inner fold,
 step/cursor and semantic-buffer allocations keep task 047 open. The separate
 window-fold experiments and all rejected variants remain preserved. No broader
 completion or push is claimed.
+
+The uncommitted 14 October continuation adds direct collection progress and
+single-leaf traversal. The latter reduces the development window screen from
+53,236 to 49,142 objects and 917,268 to 884,516 payload bytes, with flat memory
+and a warmed guest runtime ratio of 0.9526. Focused source/compiled/replay,
+reference-pressure and suspension laws pass. The
+[iterator record](../zig-native/ITERATOR_STATE.md#single-leaf-traversal-14-october-2026)
+retains pins and limits; combined qualification and remaining state elimination
+are still open.

@@ -17,12 +17,12 @@ emission.
 
 ## Starting point
 
-[specialization.zig](../zig-native/src/specialization.zig) already separates
-some semantic selection, but
-[core_backend.zig](../zig-native/src/core_backend.zig) still resolves calls
-while emitting. [known_call.zig](../zig-native/src/known_call.zig) and
-[layout_bridge.zig](../zig-native/src/layout_bridge.zig) carry current
-call/layout knowledge.
+[specialization.zig](../zig-native/src/eval/specialization.zig) already
+separates some semantic selection, but
+[core_backend.zig](../zig-native/src/backend/core_backend.zig) still resolves
+calls while emitting. [known_call.zig](../zig-native/src/backend/known_call.zig)
+and [layout_bridge.zig](../zig-native/src/backend/layout_bridge.zig) carry
+current call/layout knowledge.
 
 ## Implementation checklist
 
@@ -63,12 +63,12 @@ development and the scenarios below.
 - Commits: `b0c9168` ("Prepare named, operator, resolver and closure calls
   before emission") and `29aaa98` ("Prepare static closure applications and
   count prepared calls").
-- Change: [resolved_call.zig](../zig-native/src/resolved_call.zig) plans carry
-  each call's specialization key or callable wrapper, consumed arguments and the
-  semantic arrows of closures applied afterwards; static closure plans carry
-  closure identity, captured values and specialized mappings. Every source call
-  is prepared before its first instruction, and indirect signatures come from
-  the callee's arrow. Function creation stays where emission reaches it.
+- Change: [resolved_call.zig](../zig-native/src/backend/resolved_call.zig) plans
+  carry each call's specialization key or callable wrapper, consumed arguments
+  and the semantic arrows of closures applied afterwards; static closure plans
+  carry closure identity, captured values and specialized mappings. Every source
+  call is prepared before its first instruction, and indirect signatures come
+  from the callee's arrow. Function creation stays where emission reaches it.
 - Validation: Zig 0.17.0; `deno task test:compiler` passes the full native suite
   and 641 guest/client tests; `deno task lint:zig` reports zero findings across
   311 files; a process law executes each call shape and checks prepared-call

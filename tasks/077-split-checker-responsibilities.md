@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — owned scheme import and checker rule separation are
+  implemented; focused and final common qualification remain required.
 - **Dependencies:** [076](076-split-core-module-and-builder.md)
 - **Originating requirements:** PLAN: Hill 14 / checker structure and function
   size. Sources: [PLAN.md](../PLAN.md).
@@ -16,17 +17,17 @@ validation, reducing large handwritten functions.
 
 ## Starting point
 
-[check.zig](../zig-native/src/check.zig) combines these roles;
+[check.zig](../zig-native/src/check/check.zig) combines these roles;
 `checkInternalExecution` and related large routines own order-sensitive checking
 and diagnostics.
 
 ## Implementation checklist
 
-- [ ] Extract cohesive checker responsibilities with explicit shared context and
+- [x] Extract cohesive checker responsibilities with explicit shared context and
       ownership.
-- [ ] Split large functions toward approximately 120 lines while keeping
+- [x] Split large functions toward approximately 120 lines while keeping
       diagnostic order, scope and chronological substitution visible.
-- [ ] Avoid duplicate validation and forwarding-only modules; update all callers
+- [x] Avoid duplicate validation and forwarding-only modules; update all callers
       and adjacent tests.
 
 ## Validation
@@ -55,10 +56,17 @@ development and the scenarios below.
 ## Completion evidence
 
 - Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Validation: Zig 0.17.0 Safe/noLLVM; eight focused checker laws including
+  complete allocation-failure sweeps, two retained body laws, the extended
+  prepared-prefix snapshot law, ten executed guest groups, all native test
+  interfaces compiled, and 425 affected Zig files with zero findings. Logs and
+  exact source/executable pins:
+  `build/bench/finish-rest-20261015/checker-owners/`.
+- Comparison: fresh/edit/revert/failed-edit repair/restart output, diagnostics,
+  native work and portable owner payload agree. Ordinary Cost Wasm and requested
+  allocations/count/peak/live bytes are exact. Engine fields fall 210 to 192;
+  expression/statement dispatch falls 476/200 to 46/18 lines.
+- Remaining limitations: the lifecycle coordinator remains 407 lines; final
+  common performance/compiler qualification and prerequisite closure are open.
+  No completion, commit or push is claimed.
+- Durable record: [Checker ownership](../zig-native/CHECKER_OWNERSHIP.md).

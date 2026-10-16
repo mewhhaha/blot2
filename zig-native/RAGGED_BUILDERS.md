@@ -1,14 +1,16 @@
 # Ragged builders: counting without observable replay
 
-This is the design for [task 043](../tasks/043-implement-ragged-builders.md),
-specified by [task 042](../tasks/042-specify-ragged-builders.md). It does not
-claim an implemented ragged fast path. The baseline is `d9172ec`.
+This specifies the bounded ragged construction fast path.
+[Implementation qualification](RAGGED_BUILDERS_QUALIFICATION.md) records its
+accepted cases, declines and measurements. The design baseline is `d9172ec`.
 
 The [guide](../compiler/guide.md) defines source behavior. The
-[ownership contract](CONTRACT.md), [runtime layouts](src/runtime_layout.zig),
-[packed rows](src/packed_layout.zig) and [list runtime](src/list_runtime.zig)
-remain authoritative. There is no new collection representation, public API,
-diagnostic, iteration order or source-level mutability.
+[ownership contract](CONTRACT.md),
+[runtime layouts](src/runtime/runtime_layout.zig),
+[packed rows](src/backend/packed_layout.zig) and
+[list runtime](src/runtime/list_runtime.zig) remain authoritative. There is no
+new collection representation, public API, diagnostic, iteration order or
+source-level mutability.
 
 ## Decision
 
@@ -21,10 +23,11 @@ forcing/creation, callable creation, unproved invocation, provider/control
 boundaries and intermediate builder observations keep ordinary construction.
 
 This deliberately gives task 043 a smaller admission than a general two-pass
-builder. It extends [exact_builder](src/exact_builder.zig) to dependent bounds
-and filters; it does not widen the existing rectangular path's payload rules.
-The [indexed evaluator proof](src/eval_indexed_builder.zig) supplies the private
-buffer ownership model, not permission to mutate published constant values.
+builder. It extends [exact_builder](src/backend/exact_builder.zig) to dependent
+bounds and filters; it does not widen the existing rectangular path's payload
+rules. The [indexed evaluator proof](src/eval/eval_indexed_builder.zig) supplies
+the private buffer ownership model, not permission to mutate published constant
+values.
 
 Typechecking and dispatch resolution still inspect the complete body, including
 zero-iteration and always-false branches. Counting is an optional implementation

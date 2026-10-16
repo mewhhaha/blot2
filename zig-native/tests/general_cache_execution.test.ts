@@ -1,16 +1,7 @@
 import { strict as assert } from "node:assert";
 import { createCompiler, instantiateGuest } from "../../mod.ts";
 
-Deno.test("retained code validates static capture graphs and per-body inline dependencies", async () => {
-  const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`, library = `${directory}/lib.blot`;
-  const options = {
-    entry,
-    executable: Deno.args[0] ??
-      new URL("../zig-out/bin/blotc", import.meta.url),
-  };
-  const compiler = await createCompiler(options);
-  const declarations = `
+const declarations = `
 type Pack [unused, selected] is data = #Pack { unused: unused, selected: selected }
 const identity = fn value => value
 const packed = #Pack { unused: identity, selected: fn (value: U32) => value + 1 }
@@ -25,10 +16,20 @@ const work = fn (value: U32) => do:
   return total
 const unrelated = 10
 `;
-  const main = `import * as lib from "./lib"
+const main = `import * as lib from "./lib"
 const offset = 10
 entry const answer = fn (value: U32) => lib.work value + offset
 `;
+
+Deno.test("retained code validates static capture graphs and per-body inline dependencies", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`, library = `${directory}/lib.blot`;
+  const options = {
+    entry,
+    executable: Deno.args[0] ??
+      new URL("../zig-out/bin/blotc", import.meta.url),
+  };
+  const compiler = await createCompiler(options);
   try {
     for (
       const [lib, app, expected, reused] of [
@@ -85,6 +86,112 @@ entry const answer = fn (value: U32) => lib.work value + offset
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+for (const codegenTier of ["optimized", "development"] as const) {
+  Deno.test(`static executable captures validate values callback sources and producer relocation (${codegenTier})`, async () => {
+    const directory = await Deno.makeTempDir();
+    const entry = `${directory}/main.blot`, library = `${directory}/lib.blot`;
+    const options = {
+      entry,
+      executable: Deno.args[0] ??
+        new URL("../zig-out/bin/blotc", import.meta.url),
+      codegenTier,
+      cacheDirectory: false as const,
+    };
+    const compiler = await createCompiler(options);
+    const captured =
+      "const choose = fn amount => fn (value: U32) => value + amount\n" +
+      declarations.replace(
+        "selected: fn (value: U32) => value + 1",
+        "selected: choose 1",
+      );
+    const moved = "const earlier = fn (value: U32) => value + 2\n" + captured;
+    try {
+      const revisions = [
+        [captured, main, 75, false, false],
+        [captured, main.replace("offset = 10", "offset = 11"), 76, true, false],
+        [
+          captured.replace("selected: choose 1", "selected: choose 2"),
+          main,
+          85,
+          false,
+          true,
+        ],
+        [
+          captured.replace("value + amount", "value + amount + 1"),
+          main,
+          85,
+          false,
+          true,
+        ],
+        [captured.replace("callback 1", "callback 2"), main, 85, false, true],
+        [moved, main, 75, false, false],
+        [
+          moved.replace("selected: choose 1", "selected: identity"),
+          main,
+          65,
+          false,
+          true,
+        ],
+        [
+          moved.replace("selected: choose 1", "selected: choose missing"),
+          main,
+          null,
+          false,
+          false,
+        ],
+        [moved, main, 75, false, false],
+        [
+          moved.replace("unrelated = 10", "unrelated = 12"),
+          main,
+          75,
+          true,
+          false,
+        ],
+      ] as const;
+      for (const [lib, app, answer, reuse, captureChanged] of revisions) {
+        const fresh = await createCompiler(options);
+        try {
+          const sources = { [entry]: app, [library]: lib };
+          const expected = await fresh.build({ sources });
+          const result = await compiler.build({ sources });
+          assert.equal(result.success, expected.success);
+          if (!result.success || !expected.success) {
+            assert(!result.success && !expected.success);
+            assert.equal(answer, null);
+            assert.deepEqual(result.diagnostics, expected.diagnostics);
+            continue;
+          }
+          assert.notEqual(answer, null);
+          assert.deepEqual(result.bytes, expected.bytes);
+          assert.equal(
+            result.stats.nativeWorkSteps,
+            expected.stats.nativeWorkSteps,
+          );
+          const counters = result.stats.backend as Record<string, number>;
+          if (reuse) {
+            assert(counters.reused_named > 0, JSON.stringify(counters));
+            assert.equal(counters.fresh_closures, 0);
+          }
+          if (captureChanged) {
+            assert(counters.fresh_closures > 0, JSON.stringify(counters));
+          }
+          const guest = await instantiateGuest(result.bytes);
+          try {
+            assert.equal(guest.call("answer", 10), answer);
+          } finally {
+            guest.dispose();
+          }
+        } finally {
+          await fresh.dispose();
+        }
+      }
+    } finally {
+      await compiler.dispose();
+      await Deno.remove(directory, { recursive: true });
+    }
+  });
+}
 
 Deno.test("editing an unrelated function preserves callers of an inlined body", async () => {
   const directory = await Deno.makeTempDir();

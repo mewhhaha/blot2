@@ -88,9 +88,9 @@ const rejectedSelections = [
   return result`,
   },
   {
-    code: "effect_identity_scope",
+    code: "capability_escape",
     body: `let later = fn () => if flag then left else right
-  return 42`,
+  return later`,
   },
   {
     code: "effect_identity_scope",

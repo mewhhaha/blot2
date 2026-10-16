@@ -1,11 +1,10 @@
 # Module abstraction
 
-This is the contract for
-[052](../tasks/052-implement-opaque-types-and-privacy.md) and
-[053](../tasks/053-qualify-module-cutoffs-and-wrapper-erasure.md). It specifies
-new language behavior. The
-[guide](../compiler/guide.md#modules-constants-current-limits) continues to
-describe implemented behavior until those tasks qualify.
+This specifies module visibility, abstraction and wrapper erasure. See
+[implementation qualification](MODULE_ABSTRACTION_QUALIFICATION.md) for the
+implemented representation and its limits, and the
+[guide](../compiler/guide.md#modules-constants-current-limits) for Source
+behavior.
 
 ## Declarations and names
 

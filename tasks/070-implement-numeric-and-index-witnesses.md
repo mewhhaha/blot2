@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — isolated foundation only; no completion is claimed.
+- **Status:** Complete — exact witness contracts, portable validation and erased
+  lowering qualify in the final combined gate.
 - **Dependencies:** [069](069-specify-bounded-erased-proofs.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 9 / explicit
   witnesses. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
@@ -18,40 +19,33 @@ evidence.
 
 Task 069 defines
 [proof forms and acceptance examples](../zig-native/ERASED_PROOFS.md);
-[types.zig](../zig-native/src/types.zig),
-[type_evidence.zig](../zig-native/src/type_evidence.zig) and
-[dependency_format.zig](../zig-native/src/dependency_format.zig) need the
+[types.zig](../zig-native/src/check/types.zig),
+[type_evidence.zig](../zig-native/src/eval/type_evidence.zig) and
+[dependency_format.zig](../zig-native/src/reuse/dependency_format.zig) need the
 corresponding checked evidence representation.
 
 ## Progress
 
-`/var/tmp/blot2-erased-proofs-070` owns an unmerged native parser, exact
-value-term owner and bounded public-contract validator. Focused native laws pass
-26/26, full syntax passes 41/41, frontend checks pass 23/23, editor checks pass,
-and the analyzer has zero findings across 377 files. Term import and portable
-ownership cover every allocation failure. Importing 256 propositions shares one
-2,049-term validation and costs 2,817 charged visits. This is deterministic
-import work, not compiler performance qualification.
+Owned witness contracts preserve exact value versions, collection lengths and
+lexical scopes through source/compiled imports, portable Core and retained
+edits. Independent admission rejects forged guards, recipes, rebinding,
+contradictions and data-kind escapes. Both runtime tiers erase witness
+representation. Local aliases preceding the first proof introduction and
+imported proof aliases have unchanged semantic laws and complete
+allocation-failure coverage.
 
-SCC consistency replaces transitive edge expansion. The 256-requirement case now
-validates in 4,902 charged visits; the previous algorithm exhausted 65,536
-visits at 32 requirements. Requested bytes at 256 fall 74,548→53,332, with zero
-live bytes after teardown. All source syntax layers are implemented in the
-isolated prototype; proof-kind checking and execution remain unfinished.
-
-Source patch/pins and remaining integration are recorded under
-`build/bench/continuation-20261013/proof-consistency-foundation/`. Distinct
-proof-kind checking, constructor execution, use/guard validation, erasure and
-full release qualification remain unfinished. The prototype grants no runtime
-witness authority and is not included in the qualified main compiler.
+The
+[finite acceptance audit](../zig-native/NUMERIC_PROOFS_QUALIFICATION.md#finite-acceptance-audit-15-october-2026)
+records the documented inference rules and bounded checking costs. Unknown or
+exhausted optional analysis retains checks; exhausted required evidence rejects.
 
 ## Implementation checklist
 
-- [ ] Implement witness construction/use and bind proofs to exact values,
+- [x] Implement witness construction/use and bind proofs to exact values,
       arithmetic semantics and lexical scopes.
-- [ ] Validate evidence at abstraction/dependency boundaries and reject invalid
+- [x] Validate evidence at abstraction/dependency boundaries and reject invalid
       casts, contradictions and scope escapes.
-- [ ] Preserve conservative checking at limits and serialize only complete
+- [x] Preserve conservative checking at limits and serialize only complete
       portable proofs.
 
 ## Validation
@@ -74,29 +68,37 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Accepted witnesses establish exactly their documented facts across
+- [x] Accepted witnesses establish exactly their documented facts across
       separate compilation.
-- [ ] Forged, contradictory or escaping evidence fails safely with the specified
+- [x] Forged, contradictory or escaping evidence fails safely with the specified
       diagnostics.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: focused prototype checks above; full compiler/guest/release
-  qualification remains required.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: source/runtime/boundary integration listed above; all
-  acceptance criteria remain open.
-- Durable record:
-  [prototype qualification](../zig-native/NUMERIC_PROOF_QUALIFICATION.md).
-
-The isolated source body/call checkpoint is `7cfa6e5d`, with 41 numeric-proof
-native laws, 41 full syntax laws, eight unchanged compilation budgets and 380
-analyzer files at zero. Constructor and local-call metadata preserves exact
-value versions, prior operands and lexical owners with bounded shared work.
-Runtime guards, compiled authority and erasure remain unfinished. Exact pins and
-limits are in
-[proof qualification](../zig-native/NUMERIC_PROOF_QUALIFICATION.md).
+- Revision: uncommitted source based on
+  `ef57ec5b99b5ea25fc5532fd2d3023108d3f10bb`; no commit or push, as requested.
+  Frozen manifest SHA-256
+  `3548546cb8660905de9a83922bab67270376a2b955f840f2bc7cf13fcefa53ec`.
+- Validation: final Zig 0.17.0 LLVM/Fast/Safe gate passes **2,223 native laws,
+  1,404 guest/client tests and 1,366 complete allocation-failure sweeps** plus
+  two expected-error harness laws, with zero skips/leaks/logged errors. Full
+  455-file analyzer has zero findings. Gate wall 697.812 s.
+- Release executable/decompressed bundle SHA-256
+  `6a83bad5560ec1a82220dc834dd366646fb8ab10370f82b26a2bcb775111ae6b`. Exact
+  inputs, identities, logs, per-phase timings and post-run verification:
+  `build/bench/complete-program-20261015/final-proof-repaired-gate/`.
+- Comparison: finite cost measurements include 256 required consistency
+  requirements in 4,902 visits/44,620 peak bytes and a shared 2,049-term graph
+  in 2,817 visits/11,560 peak bytes. Twenty-five balanced whole-process pairs
+  measure proof fresh/edit ratios 1.003/1.001; these are near-parity focused
+  results, not release speedup claims. The ordinary Cost control remains
+  byte-exact at 11,958 B/SHA-256
+  1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad.
+- Limits: the approved finite design retains necessary checks for unknown,
+  wrapping, effectful or exhausted optional analysis. Invalid/exhausted required
+  contracts reject; no arbitrary theorem solving is promised. Broader program
+  performance and remote CI remain in tasks 084/093 and 082.
+- Durable acceptance, erasure/import/retained/OOM controls and historical pins:
+  [numeric qualification](../zig-native/NUMERIC_PROOFS_QUALIFICATION.md).

@@ -1,10 +1,10 @@
 # Rolling reductions and composable summaries
 
-[Task044](../tasks/044-specify-rolling-and-summary-operations.md) specifies
-ordinary source modules `std/rolling` and `std/summary`. Tasks045–046 implement
-them. No source declaration name grants compiler privileges; existing folds,
-windows and collection representations keep their behavior. The qualified
-starting compiler is `2689ad5` (completed040). The
+This specifies the ordinary source modules `std/rolling` and `std/summary`.
+[Implementation qualification](ROLLING_SUMMARIES_QUALIFICATION.md) records their
+algorithms, ownership and measurements. No source declaration name grants
+compiler privileges; existing folds, windows and collection representations keep
+their behavior. The qualified starting compiler is `2689ad5` (completed040). The
 [guide](../compiler/guide.md), [ownership contract](CONTRACT.md) and current
 [iterator module](../std/iter.blot) remain authoritative for existing behavior.
 

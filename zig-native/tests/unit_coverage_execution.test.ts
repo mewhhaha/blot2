@@ -4,7 +4,7 @@ import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.
 // proof. Accepted controls must execute, including dynamic Unit arguments;
 // numeric and incomplete Boolean matches must still reject.
 const cases: { name: string; source: string; success: boolean; code: string }[] =
-  JSON.parse(await Deno.readTextFile(new URL("../src/unit-coverage-oracle.json", import.meta.url)));
+  JSON.parse(await Deno.readTextFile(new URL("../fixtures/unit-coverage-oracle.json", import.meta.url)));
 
 for (const item of cases) {
   Deno.test(`Unit match coverage: ${item.name}`, async () => {

@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — implementation and focused checks are recorded;
+  final common qualification remains required.
 - **Dependencies:** [075](075-split-evaluator-state-and-dispatch.md)
 - **Originating requirements:** PLAN: Hill 14 / Core module and builder.
   Sources: [PLAN.md](../PLAN.md).
@@ -16,17 +17,17 @@ reduce oversized state.
 
 ## Starting point
 
-[core.zig](../zig-native/src/core.zig) defines `Module` and `Builder` alongside
-dense node/side tables. Published Core must remain immutable while builders own
-temporary construction state.
+[core.zig](../zig-native/src/check/core.zig) defines `Module` and `Builder`
+alongside dense node/side tables. Published Core must remain immutable while
+builders own temporary construction state.
 
 ## Implementation checklist
 
-- [ ] Move immutable module representation and mutable builder operations into
+- [x] Move immutable module representation and mutable builder operations into
       distinct cohesive units.
-- [ ] Keep IDs, spans, source ownership and freeze/clone/deinit behavior
+- [x] Keep IDs, spans, source ownership and freeze/clone/deinit behavior
       explicit at the boundary.
-- [ ] Reduce oversized state rather than introducing forwarding-only
+- [x] Reduce oversized state rather than introducing forwarding-only
       abstractions; update direct users and imports.
 
 ## Validation
@@ -54,10 +55,14 @@ development and the scenarios below.
 ## Completion evidence
 
 - Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Validation: Zig 0.17.0 Safe/noLLVM dev build; seven focused native laws,
+  including complete allocation-failure sweeps; 24 executed guest groups; 423
+  affected Zig files with zero findings. Exact source/executable pins and logs:
+  `build/bench/finish-rest-20261015/core-owner-integration/`.
+- Comparison: fresh/edit/revert/failed-edit repair/restart Wasm, ordered
+  diagnostics, native work and portable owner payload agree with the control.
+  Builder fields fall from 89 to four; Tables owns 59 publication buffers and
+  Scratch owns 25 temporary fields. No allocator is introduced.
+- Remaining limitations: prerequisite completion, final common full gate and
+  performance qualification remain open. No commit or push is authorized.
+- Durable record: [Core ownership](../zig-native/CORE_OWNERSHIP.md).

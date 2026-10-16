@@ -1,7 +1,6 @@
 # Rolling and summary implementation qualification
 
-Tasks [045](../tasks/045-implement-rolling-reductions.md) and
-[046](../tasks/046-implement-composable-summary-trees.md) implement the
+The rolling and summary modules implement the
 [accepted contract](ROLLING_SUMMARIES.md) in ordinary source at local
 implementation `4013b10` on 12 October 2026. Both tasks are complete. Broader
 compiler cutoff and tracing replacement remain assigned to 024/035.
@@ -70,8 +69,8 @@ The tests are in [rolling_execution](tests/rolling_execution.test.ts),
 [summary_execution](tests/summary_execution.test.ts),
 [reductions_ownership_execution](tests/reductions_ownership_execution.test.ts)
 and [reductions_revision](tests/reductions_revision.test.ts). The registered
-[native law](src/rolling_tests.zig) releases frontend ownership before backend
-emission, checks frozen-Core immutability and injects backend allocation
+[native law](src/reuse/rolling_tests.zig) releases frontend ownership before
+backend emission, checks frozen-Core immutability and injects backend allocation
 failures, including reference-bearing summaries.
 
 ## Counts and storage

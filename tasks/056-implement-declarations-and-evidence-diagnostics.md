@@ -18,9 +18,9 @@ incompatible and ambiguous evidence.
 ## Starting point
 
 Task 055 adds associated members and task 048 bounded explanations.
-[associated_catalog_tests.zig](../zig-native/src/associated_catalog_tests.zig),
-[check.zig](../zig-native/src/check.zig) and client diagnostic schemas are the
-selection/publication boundaries.
+[associated_catalog_tests.zig](../zig-native/src/eval/associated_catalog_tests.zig),
+[check.zig](../zig-native/src/check/check.zig) and client diagnostic schemas are
+the selection/publication boundaries.
 
 ## Implementation checklist
 

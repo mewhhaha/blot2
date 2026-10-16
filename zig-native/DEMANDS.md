@@ -149,8 +149,8 @@ One dynamic creation has one shared result. A demand created before a loop
 remains shared across iterations; a demand created inside the loop is fresh on
 each execution of that creation. Returning a demand, storing it in a record or
 collection, and retaining it across guest calls require correct lifetime and
-garbage-collection roots. Avoid allocating a memo slot per iteration for a
-demand created outside the loop.
+runtime and host roots. Avoid allocating a memo slot per iteration for a demand
+created outside the loop.
 
 ### Completion and cancellation
 
@@ -182,16 +182,17 @@ Those would need their own state and synchronization contract.
 
 ## Current implementation and evidence
 
-Typed [Core](src/core.zig) already has `suspend_` and `force` nodes, typed
+Typed [Core](src/check/core.zig) already has `suspend_` and `force` nodes, typed
 captures, and source origins. `suspensionExpression` creates a deferred body; it
 does not itself allocate a guest object. Extend this representation and its
 consumers instead of adding another frontend or re-inferring source bodies.
 
-The runtime materialization happens in [the Wasm emitter](src/core_backend.zig):
-`newTemplate` allocates captures, `demandDescriptor` allocates a 16-byte cell,
-and `forceDemand` emits memo-state checks and an indirect call. The new bounded
-analysis in [demand_inline.zig](src/demand_inline.zig) lets the emitter bypass
-that representation for admitted calls without changing retained Core.
+The runtime materialization happens in
+[the Wasm emitter](src/backend/core_backend.zig): `newTemplate` allocates
+captures, `demandDescriptor` allocates a 16-byte cell, and `forceDemand` emits
+memo-state checks and an indirect call. The new bounded analysis in
+[demand_inline.zig](src/backend/demand_inline.zig) lets the emitter bypass that
+representation for admitted calls without changing retained Core.
 
 At commit `775d3707d27c5c5d64504206c6b3824a458d8929`, release compiler identity
 `2d8050d273b5baa98107c2a38d4144b92885bbe16d0e510e5b2b41b23968c850`, this runtime
@@ -345,8 +346,9 @@ and dependency path.
 Reuse [demand execution cases](tests/demand_cases.ts),
 [lifetime checks](tests/demand_execution.test.ts),
 [effect execution checks](tests/effect_execution.test.ts), and the
-[checker](src/check_demand_tests.zig) and [Core](src/core_demand_tests.zig)
-laws. Add behavioral and structural regressions for the new transformations:
+[checker](src/check/check_demand_tests.zig) and
+[Core](src/check/core_demand_tests.zig) laws. Add behavioral and structural
+regressions for the new transformations:
 
 | Case                                       | Required observation                                                                        |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------- |

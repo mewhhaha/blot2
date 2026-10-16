@@ -48,6 +48,10 @@ do not establish the historical target or complete task 093. See
 [collection shape members](../zig-native/COLLECTION_SHAPE_MEMBERS.md) and
 [retained assembly](../zig-native/RETAINED_ASSEMBLY_WORKLIST.md).
 
+The 30 ms literal-edit target in the final gates is owned by task
+[101](101-reach-the-literal-edit-target.md); finishing this task does not meet
+it.
+
 ## Implementation checklist
 
 - [x] Attribute the residual inference regions and the lookup, capture and

@@ -1,9 +1,7 @@
 # Scoped effect identities
 
-This is the design for tasks
-[057](../tasks/057-specify-scoped-effect-identities.md),
-[058](../tasks/058-implement-effect-instances-and-subtraction.md) and
-[059](../tasks/059-reject-escaping-capabilities.md). It extends the
+This specifies scoped effect identities, subtraction and escape checking. It
+extends the
 [current closed-family behavior](../compiler/guide.md#effect-families-and-scoped-state).
 The full design below remains the target. A direct annotated scope subset is
 implemented; see
@@ -111,10 +109,11 @@ empty effects.
 
 Nearest matching provider lookup compares the complete runtime key. A callback
 runs under the matched frame's outer chain, excluding itself and younger
-installations, as in [the current provider chain](src/provider_chain.zig).
-Unrelated keys forward. Reinstalling the same capability is ordinary nested
-shadowing; creating a new capability is generativity. Each State installation
-still allocates a fresh state cell, separately from capability creation.
+installations, as in
+[the current provider chain](src/backend/provider_chain.zig). Unrelated keys
+forward. Reinstalling the same capability is ordinary nested shadowing; creating
+a new capability is generativity. Each State installation still allocates a
+fresh state cell, separately from capability creation.
 
 Request clauses use the same exact key. Two different scoped keys are distinct
 clauses; duplicate clauses for one substituted key reject. Captured

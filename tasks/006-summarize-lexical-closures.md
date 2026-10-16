@@ -22,10 +22,11 @@ Use the
 and its
 [acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
 
-[core_eval.zig](../zig-native/src/core_eval.zig) tracks closure values and
+[core_eval.zig](../zig-native/src/eval/core_eval.zig) tracks closure values and
 frozen capture proofs;
-[completed_specialization_query.zig](../zig-native/src/completed_specialization_query.zig)
-and [source_value_template.zig](../zig-native/src/source_value_template.zig)
+[completed_specialization_query.zig](../zig-native/src/eval/completed_specialization_query.zig)
+and
+[source_value_template.zig](../zig-native/src/reuse/source_value_template.zig)
 compare captured graphs. Selected live accessor hints deliberately cannot
 certify reusable semantic results.
 

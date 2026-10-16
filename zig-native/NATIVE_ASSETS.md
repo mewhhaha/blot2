@@ -7,10 +7,10 @@ Source-only sessions retain their existing request/reply behavior. The
 TypeScript parser wrapper in [compiler/assets.ts](../compiler/assets.ts) remains
 available for custom parsers.
 
-Implementation: [native_assets.zig](src/native_assets.zig),
-[native_asset_readers.zig](src/native_asset_readers.zig),
-[native_asset_wgsl.zig](src/native_asset_wgsl.zig). Independent framing and
-conformance tests live in
+Implementation: [native_assets.zig](src/backend/native_assets.zig),
+[native_asset_readers.zig](src/backend/native_asset_readers.zig),
+[native_asset_wgsl.zig](src/backend/native_asset_wgsl.zig). Independent framing
+and conformance tests live in
 [native_asset_protocol.test.ts](tests/native_asset_protocol.test.ts).
 
 ## Open and acquire inputs

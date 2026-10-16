@@ -17,9 +17,10 @@ without changing chronological substitution semantics.
 
 ## Starting point
 
-[types.zig](../zig-native/src/types.zig) has node-local variable certificates;
-[resolution_cache.zig](../zig-native/src/resolution_cache.zig) and
-[epoch_resolution_cache.zig](../zig-native/src/epoch_resolution_cache.zig)
+[types.zig](../zig-native/src/check/types.zig) has node-local variable
+certificates;
+[resolution_cache.zig](../zig-native/src/reuse/resolution_cache.zig) and
+[epoch_resolution_cache.zig](../zig-native/src/reuse/epoch_resolution_cache.zig)
 support generation checks. At task start, composite resolution still lost reuse
 across unrelated writes; occurs-DAG traversal was already complete.
 

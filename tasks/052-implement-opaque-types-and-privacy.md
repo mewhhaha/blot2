@@ -17,10 +17,10 @@ compiled imports.
 
 ## Starting point
 
-[parser.zig](../zig-native/src/parser.zig),
-[check.zig](../zig-native/src/check.zig),
-[project_check.zig](../zig-native/src/project_check.zig) and
-[dependency_interface_validation.zig](../zig-native/src/dependency_interface_validation.zig)
+[parser.zig](../zig-native/src/parse/parser.zig),
+[check.zig](../zig-native/src/check/check.zig),
+[project_check.zig](../zig-native/src/reuse/project_check.zig) and
+[dependency_interface_validation.zig](../zig-native/src/reuse/dependency_interface_validation.zig)
 implement current declarations/imports. Task 051 defines the new syntax and
 visibility model.
 

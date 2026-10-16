@@ -1,11 +1,10 @@
 # Typed reuse queries
 
-This is the approved design for task 014 and the implementation contract for
-[015](../tasks/015-migrate-refinement-queries.md)–[020](../tasks/020-persist-complete-semantic-artifacts.md).
-It specifies a migration. Task 015 implements the common owned-record,
-transaction and position-index primitives for refinement; see
-[the qualified adapter](REFINEMENT_QUERIES.md). Task 016 migrates selected,
-principal and local source-template owners; see
+This is the design and implementation contract for the typed reuse query table
+and its claim-specific adapters. It specifies a migration. Task 015 implements
+the common owned-record, transaction and position-index primitives for
+refinement; see [the qualified adapter](REFINEMENT_QUERIES.md). Task 016
+migrates selected, principal and local source-template owners; see
 [its qualification](SPECIALIZATION_PRINCIPAL_QUERIES.md). Task 017 migrates
 singleton source/revision validation records; see
 [its qualification](SOURCE_VALIDATION.md). Task 018 implements capture-owned
@@ -217,13 +216,14 @@ removing gates because storage is unified.
 
 ## Portable representation and compatibility
 
-Portable records go through [dependency_format.zig](src/dependency_format.zig),
-inside the owned dependency/checkpoint envelope. The envelope format version is
-1 with reflected schema and bounded decoding. Task 019 adds typed section
-headers and moves the principal archive to key v3, the optimizer capture to v2
-and the backend checkpoint to v2; [portable query records](PORTABLE_QUERIES.md)
-lists the represented and declined kinds. Task 019 round-trips every supported
-kind through dependency/principal and optimizer archive envelopes and backend
+Portable records go through
+[dependency_format.zig](src/reuse/dependency_format.zig), inside the owned
+dependency/checkpoint envelope. The envelope format version is 1 with reflected
+schema and bounded decoding. Task 019 adds typed section headers and moves the
+principal archive to key v3, the optimizer capture to v2 and the backend
+checkpoint to v2; [portable query records](PORTABLE_QUERIES.md) lists the
+represented and declined kinds. Task 019 round-trips every supported kind
+through dependency/principal and optimizer archive envelopes and backend
 checkpoints in separate processes, preserving each path's current error/fallback
 contract. Adding a query payload changes the schema. Use a deliberately
 versioned tagged payload and update the envelope version when wire

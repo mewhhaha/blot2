@@ -38,7 +38,7 @@ through function constants that compile-time evaluation does not apply. The
 other 593 constants took under 5 ms together. Reusing `sandbox` therefore means
 publishing a constant slot and its fuel from a validated receipt, which the
 value-template boundary in
-[source_value_template.zig](../zig-native/src/source_value_template.zig)
+[source_value_template.zig](../zig-native/src/reuse/source_value_template.zig)
 explicitly excludes today ("does not publish constant slots, callable
 certificates, or skip source fuel"). The owner approved the dedicated
 [constant-receipt design](../zig-native/CONSTANT_REUSE.md) on12 October2026. The
@@ -74,7 +74,7 @@ before the local milestone commit.
 - [ ] Unaffected constants are not re-evaluated across admitted edits, with
       counters and laws.
 - [ ] The literal-edit target is measured or remains explicitly open for task
-      [084](084-qualify-the-complete-program.md).
+      [101](101-reach-the-literal-edit-target.md).
 - [ ] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
@@ -91,3 +91,25 @@ fallback assembly, not a fulfilled edit target.
 pins actual release/source, measurements, failures and ordinary fallbacks.
 Growth/enclosing judgments, typed-view publication, broader relocation/data
 retention and portable member authority remain open. Task086 is incomplete.
+
+The current uncommitted continuation owns ordered ordinary dependency reads,
+reachable typed-view publication and compound collection buffer frontiers. Any
+post-demand mismatch destroys the attempt before one ordinary retry; OOM is
+never retried. Exact local callable templates use the tape's separate executed
+source/read owner. Ordinary graph inspection keeps transitive admission.
+
+The eight-file delta is frozen in
+`/var/tmp/blot2-task086-demand-frontier-freeze-v2-20261015`, patch SHA-256
+`2a1cb59e6cc374e861da4250b3c63231b61b41a02d25badc396b5d241d6fb202`. Ten focused
+native laws and seven guest groups pass in isolation; root integration passes
+three frontier/view ownership laws and the same seven guest groups. Complete
+deterministic allocation-failure controls cover retry teardown, frontiers,
+suspended dependency spans, views and relocated closure descriptors.
+
+One captured development pair preserves exact fresh/edit/revert bytes and 70,330
+source steps. Retained edits replay 61,383 local steps in eleven hits, with zero
+declines/retries. CPU is near parity, not a speedup. Snapshot copying falls from
+1,073,244 to 615,084 bytes; copied metadata falls from 2,059,944 to 1,660,593
+bytes. Unchanged inference and backend preparation dominate the remaining cost.
+General authority admission and final combined release qualification remain
+open.

@@ -1,9 +1,10 @@
 # Owned refinement queries
 
 Task 015 migrates refinement records into
-[semantic_query_table.zig](src/semantic_query_table.zig), the first adapter of
-the [typed query design](QUERY_TABLE.md). The refinement adapter is implemented
-and qualified below. Subsequent claim migrations remain separate tasks.
+[semantic_query_table.zig](src/reuse/semantic_query_table.zig), the first
+adapter of the [typed query design](QUERY_TABLE.md). The refinement adapter is
+implemented and qualified below. Subsequent claim migrations remain separate
+tasks.
 
 ## Representation and ownership
 
@@ -188,9 +189,9 @@ bytes match the baseline; retained bytes plateau after the first round and all
 contains complete CPU/wall/traffic/peak/live distributions and native refinement
 snapshots. Reused-output no-op phases report zero compilation/query counters;
 they perform no new semantic queries. Per-phase CPU/allocation deltas measure
-the no-op itself. The pin manifest contains
-all entry/edit/dependency fixture hashes, both complete driver source maps,
-library hashes, scheduler settings and measurement-helper/report hashes.
+the no-op itself. The pin manifest contains all entry/edit/dependency fixture
+hashes, both complete driver source maps, library hashes, scheduler settings and
+measurement-helper/report hashes.
 
 | Retained fixture / phase   | CPU µs, old → new | Retained live bytes, old → new | Peak overlap bytes, old → new |
 | -------------------------- | ----------------- | ------------------------------ | ----------------------------- |

@@ -99,7 +99,12 @@
   [096](096-compile-typed-asset-imports-natively.md),
   [097](097-resolve-array-cursor-representation-in-gdev-fixtures.md),
   [098](098-type-check-recursive-demand-forwarding.md),
-  [099](099-survive-long-stage-chains-without-crashing.md)
+  [099](099-survive-long-stage-chains-without-crashing.md),
+  [100](100-reach-the-cold-compilation-target.md),
+  [101](101-reach-the-literal-edit-target.md),
+  [102](102-reach-the-body-edit-target.md),
+  [103](103-bound-the-largest-inference-region.md),
+  [104](104-reduce-requested-allocation-below-100-mb.md)
 - **Originating requirements:** Approved task manifest / final conditional
   cleanup. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the

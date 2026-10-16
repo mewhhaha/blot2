@@ -17,8 +17,9 @@ semantic-selection paths after parity.
 ## Starting point
 
 Task 025–027 preparation covers calls, flow and ownership.
-[core_backend.zig](../zig-native/src/core_backend.zig) still combines generator
-planning, layout conversion, selection, serialization and instruction emission.
+[core_backend.zig](../zig-native/src/backend/core_backend.zig) still combines
+generator planning, layout conversion, selection, serialization and instruction
+emission.
 
 ## Implementation checklist
 

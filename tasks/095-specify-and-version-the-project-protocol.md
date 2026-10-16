@@ -19,8 +19,8 @@ implement, with an explicit version that both sides check.
 
 ## Starting point
 
-Only [zig_project_server.zig](../zig-native/src/zig_project_server.zig) and
-[compiler/zig_project_client.ts](../compiler/zig_project_client.ts) know the
+Only [zig_project_server.zig](../zig-native/src/reuse/zig_project_server.zig)
+and [compiler/zig_project_client.ts](../compiler/zig_project_client.ts) know the
 length-prefixed frames (JSON metadata plus a binary payload), the request kinds
 (open, build with source overlays, dispose), the reply shapes (build success
 with Wasm, stats and assets; diagnostics with `details`) and the failure rules.

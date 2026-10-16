@@ -23,9 +23,9 @@ reports `type_mismatch` over the whole declaration, with or without the
 annotation and with `fn ~value`. Forwarding to another lazy function
 (`fn ~(value: U32) => twice (@demand value)`) checks. The law "recursive demand
 forwarding declines its bounded inline proof" in
-[demand_inline_tests.zig](../zig-native/src/demand_inline_tests.zig) expects the
-recursive program to check and is skipped until this task completes; it never
-ran before its file was registered.
+[demand_inline_tests.zig](../zig-native/src/backend/demand_inline_tests.zig)
+expects the recursive program to check and is skipped until this task completes;
+it never ran before its file was registered.
 
 ## Implementation checklist
 

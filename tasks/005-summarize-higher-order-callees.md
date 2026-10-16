@@ -23,9 +23,9 @@ and its
 [acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
 
 Predicate-free callbacks already use checked schemes. `ClosureRegion` and
-`principalEvidence` in [core_eval.zig](../zig-native/src/core_eval.zig) still
-combine general higher-order graphs;
-[callback_row_tests.zig](../zig-native/src/callback_row_tests.zig) and
+`principalEvidence` in [core_eval.zig](../zig-native/src/eval/core_eval.zig)
+still combine general higher-order graphs;
+[callback_row_tests.zig](../zig-native/src/backend/callback_row_tests.zig) and
 [tests/callback_row_execution.test.ts](../zig-native/tests/callback_row_execution.test.ts)
 cover latent callback rows.
 

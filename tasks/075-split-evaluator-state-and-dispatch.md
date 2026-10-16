@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — implementation and focused checks are recorded;
+  final common qualification remains required.
 - **Dependencies:** [001](001-qualify-list-span-prototype.md),
   [002](002-close-packed-list-traversal-regression.md),
   [003](003-specify-general-call-summaries.md),
@@ -88,18 +89,18 @@ state, and split large dispatch functions.
 
 ## Starting point
 
-[core_eval.zig](../zig-native/src/core_eval.zig) owns the large `Session` and
-`ClosureRegion`, including `expressionInner` and `collect`. Earlier feature
+[core_eval.zig](../zig-native/src/eval/core_eval.zig) owns the large `Session`
+and `ClosureRegion`, including `expressionInner` and `collect`. Earlier feature
 tasks touch these same responsibilities, so this structural task follows all of
 them.
 
 ## Implementation checklist
 
-- [ ] Measure the resulting structures/functions before refactoring and identify
+- [x] Measure the resulting structures/functions before refactoring and identify
       actual ownership seams.
-- [ ] Extract value storage, region management, specialization caches and
+- [x] Extract value storage, region management, specialization caches and
       retained-reuse state into cohesive owners.
-- [ ] Split evaluation/collection dispatch by node kind while preserving source
+- [x] Split evaluation/collection dispatch by node kind while preserving source
       order, state lifetimes and failure cleanup; avoid forwarding-only
       wrappers.
 
@@ -129,11 +130,18 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+The focused implementation separates value storage, region backing,
+specialization caches and retained records. Evaluation dispatch is 380 → 117
+lines; collection dispatch is 341 → 76. Session fields are 113 → 87 with
+unchanged structure sizes. Atomic value publication and snapshot cleanup live
+with storage.
+
+Ten native/OOM laws, 25 guest groups, all native test-interface compilation and
+422 selected analyzer files pass. Ordinary Wasm, work and allocation counts
+agree; imported fresh/edit/revert/failed-edit repair/restart bytes, diagnostics,
+source work and archive schema/payload agree. Exact pins and failed attempts:
+`build/bench/finish-rest-20261015/evaluator-owners/`.
+
+[Durable ownership](../zig-native/EVALUATOR_OWNERSHIP.md) records boundaries and
+limits. Final common performance/compiler qualification and preceding feature
+qualification remain required. No commit or completion is claimed.

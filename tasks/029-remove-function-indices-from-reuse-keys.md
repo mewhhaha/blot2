@@ -17,9 +17,10 @@ final indices during assembly.
 
 ## Starting point
 
-[optimized_bodies.zig](../zig-native/src/optimized_bodies.zig),
-[runtime_function_key.zig](../zig-native/src/runtime_function_key.zig) and
-[runtime_body_relocation.zig](../zig-native/src/runtime_body_relocation.zig)
+[optimized_bodies.zig](../zig-native/src/backend/optimized_bodies.zig),
+[runtime_function_key.zig](../zig-native/src/backend/runtime_function_key.zig)
+and
+[runtime_body_relocation.zig](../zig-native/src/backend/runtime_body_relocation.zig)
 currently include incidental function positions in reuse matching, despite
 existing relocation proofs.
 

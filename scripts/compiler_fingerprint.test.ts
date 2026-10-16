@@ -56,6 +56,7 @@ const root = @import("root");
 test "ignored dependencies" {
     _ = @import("standalone_tests.zig");
     _ = @embedFile("test-only.blot");
+    _ = @import("fixtures").source("external.blot");
 }
 // @import("missing-comment.zig")
 const text = "@import(\\\"missing-string.zig\\\")";
@@ -72,7 +73,34 @@ const cycle = @import("../main.zig");
     await write("src/opaque.zig", "@import(computed)\n");
     await write("src/test-only.blot", "entry const test_answer = 1\n");
     await write("src/standalone_tests.zig", "test {}\n");
+    await Deno.mkdir(`${directory}/fixtures`);
+    await write("fixtures/external.blot", "entry const answer = 1\n");
     const baseline = await build();
+    const originalMain = await Deno.readTextFile(`${directory}/src/main.zig`);
+    await write(
+      "src/main.zig",
+      originalMain.replace(
+        'test "ignored dependencies"',
+        'test "changed inline law"',
+      ).replace("test-only.blot", "new-test-only.blot"),
+    );
+    assert.notEqual(
+      await build(),
+      baseline,
+      "source byte edit did not change identity",
+    );
+    await write(
+      "src/main.zig",
+      originalMain +
+        '\ntest "new inline law" { @compileError("test only"); }\n',
+    );
+    assert.notEqual(
+      await build(),
+      baseline,
+      "source byte addition did not change identity",
+    );
+    await write("src/main.zig", originalMain);
+
     await write(
       "src/standalone_tests.zig",
       'test { @compileError("test edit"); }\n',
@@ -84,6 +112,12 @@ const cycle = @import("../main.zig");
     );
     await write("src/test-only.blot", "entry const test_answer = 2\n");
     assert.equal(await build(), baseline, "test fixture edit changed identity");
+    await write("fixtures/external.blot", "entry const answer = 2\n");
+    assert.equal(
+      await build(),
+      baseline,
+      "external test fixture changed identity",
+    );
     await write("src/nested/new_tests.zig", "test {}\n");
     assert.equal(await build(), baseline, "test addition changed identity");
     await write("src/.zig-cache/ignored.zig", "@import(computed)\n");
@@ -126,6 +160,8 @@ const changed = true;
     await Deno.remove(`${directory}/src/linked.blot`);
     await write("src/main.zig", "const data = @embedFile(computed);\n");
     assert.match(await build([], false), /UnsupportedCompilerDependency/);
+    await write("src/main.zig", 'const data = @import("fixtures");\n');
+    assert.match(await build([], false), /UnsupportedCompilerModule/);
   } finally {
     await Deno.remove(directory, { recursive: true });
   }

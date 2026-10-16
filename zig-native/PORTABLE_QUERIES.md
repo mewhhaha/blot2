@@ -2,23 +2,24 @@
 
 Task 019 serializes the complete query records that already have a portable
 graph: completed principal proofs and ready optimizer outputs. Both travel
-inside [backend checkpoints](src/backend_checkpoint.zig) through the bounded
-[dependency format](src/dependency_format.zig). This record follows
+inside [backend checkpoints](src/backend/backend_checkpoint.zig) through the
+bounded [dependency format](src/reuse/dependency_format.zig). This record
+follows
 [the typed query contract](QUERY_TABLE.md#portable-representation-and-compatibility).
 The compiler milestone is `ea4a7f3ef23ebf8506fe85eefa24f51ee65c3024`;
 qualification is recorded below.
 
 ## Typed sections
 
-[portable_query.zig](src/portable_query.zig) defines one section per archive: a
-header `{version, kind, schema, claim}` followed by complete records of that
-claim. The section interpretation version is 1. Each claim fixes its query kind
-and schema.
+[portable_query.zig](src/reuse/portable_query.zig) defines one section per
+archive: a header `{version, kind, schema, claim}` followed by complete records
+of that claim. The section interpretation version is 1. Each claim fixes its
+query kind and schema.
 
-| Claim                      | Kind         | Schema | Archive                                                |
-| -------------------------- | ------------ | -----: | ------------------------------------------------------ |
-| `principal_complete_proof` | `principal`  |      1 | [principal archive](src/principal_archive.zig), key v3 |
-| `optimizer_output`         | `executable` |      1 | [optimizer capture](src/optimized_archive.zig), key v2 |
+| Claim                      | Kind         | Schema | Archive                                                      |
+| -------------------------- | ------------ | -----: | ------------------------------------------------------------ |
+| `principal_complete_proof` | `principal`  |      1 | [principal archive](src/reuse/principal_archive.zig), key v3 |
+| `optimizer_output`         | `executable` |      1 | [optimizer capture](src/reuse/optimized_archive.zig), key v2 |
 
 Decoding requires the exact header. A different section version reports
 `UnsupportedVersion`; a different kind, schema or claim reports

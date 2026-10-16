@@ -15,11 +15,11 @@ Extend SIMD admission to additional proved numeric loops and row shapes.
 
 ## Starting point
 
-[wasm_vectorize.zig](../zig-native/src/wasm_vectorize.zig),
-[wasm_simd_ops.zig](../zig-native/src/wasm_simd_ops.zig) and
-[simd_intrinsics.zig](../zig-native/src/simd_intrinsics.zig) implement current
-vectorization; [compiler/guide.md](../compiler/guide.md#simd) pins wrapping and
-F32 behavior.
+[wasm_vectorize.zig](../zig-native/src/backend/wasm_vectorize.zig),
+[wasm_simd_ops.zig](../zig-native/src/backend/wasm_simd_ops.zig) and
+[simd_intrinsics.zig](../zig-native/src/backend/simd_intrinsics.zig) implement
+current vectorization; [compiler/guide.md](../compiler/guide.md#simd) pins
+wrapping and F32 behavior.
 
 ## Implementation checklist
 

@@ -16,11 +16,11 @@ resolved IR.
 
 ## Starting point
 
-[runtime_layout.zig](../zig-native/src/runtime_layout.zig),
-[runtime_ir.zig](../zig-native/src/runtime_ir.zig) and
-[wasm_lifetimes.zig](../zig-native/src/wasm_lifetimes.zig) describe layouts and
-machine-level lifetime facts. Ownership is not inferable from arbitrary i32
-words; task 026 provides explicit edges.
+[runtime_layout.zig](../zig-native/src/runtime/runtime_layout.zig),
+[runtime_ir.zig](../zig-native/src/backend/runtime_ir.zig) and
+[wasm_lifetimes.zig](../zig-native/src/backend/wasm_lifetimes.zig) describe
+layouts and machine-level lifetime facts. Ownership is not inferable from
+arbitrary i32 words; task 026 provides explicit edges.
 
 ## Implementation checklist
 
@@ -59,15 +59,15 @@ development and the scenarios below.
 
 - Commit: `c226967` ("Carry ownership roles from checked layouts into runtime
   IR").
-- Change: [runtime_ir.zig](../zig-native/src/runtime_ir.zig) adds roles (scalar,
-  reference, value, unknown), per-function parameter roles and an `ownership`
-  annotation op whose runs give each constant-size allocation's word roles. The
-  emitter derives both from checked layouts and the runtime structures' role
-  tables; the journal records parameter roles and both replays restore them. The
-  encoder drops annotations, and size heuristics and machine-code sharing ignore
-  them. The lifetime pass treats only non-scalar `i32` parameters as candidate
-  addresses, lets a scalar word never carry a followed reference, and counts
-  contrary stores as `role_conflicts`.
+- Change: [runtime_ir.zig](../zig-native/src/backend/runtime_ir.zig) adds roles
+  (scalar, reference, value, unknown), per-function parameter roles and an
+  `ownership` annotation op whose runs give each constant-size allocation's word
+  roles. The emitter derives both from checked layouts and the runtime
+  structures' role tables; the journal records parameter roles and both replays
+  restore them. The encoder drops annotations, and size heuristics and
+  machine-code sharing ignore them. The lifetime pass treats only non-scalar
+  `i32` parameters as candidate addresses, lets a scalar word never carry a
+  followed reference, and counts contrary stores as `role_conflicts`.
 - Edges: releases stay on the control-flow edges the lifetime plan chooses,
   transfers are owned-result summaries, borrows are parameter extents, unproved
   values escape to arena policy, and structured exits discharge scoped cleanup

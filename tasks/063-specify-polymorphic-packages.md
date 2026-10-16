@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete design — implementation and dependency qualification
+  remain separate; no executable feature completion is claimed.
 - **Dependencies:**
   [056](056-implement-declarations-and-evidence-diagnostics.md),
   [059](059-reject-escaping-capabilities.md)
@@ -18,20 +19,20 @@ portable evidence.
 
 ## Starting point
 
-Current [types.zig](../zig-native/src/types.zig) and
-[check.zig](../zig-native/src/check.zig) support ordinary generic schemes; task
-056 adds richer contract evidence and task 059 capability scope checking.
+Current [types.zig](../zig-native/src/check/types.zig) and
+[check.zig](../zig-native/src/check/check.zig) support ordinary generic schemes;
+task 056 adds richer contract evidence and task 059 capability scope checking.
 Explicit higher-rank/package syntax remains open.
 
 ## Implementation checklist
 
-- [ ] Define annotation, packing/unpacking and heterogeneous-package syntax with
+- [x] Define annotation, packing/unpacking and heterogeneous-package syntax with
       precise introduction/elimination rules.
-- [ ] Specify skolem scopes, evidence transport, associated types, effect/usage
+- [x] Specify skolem scopes, evidence transport, associated types, effect/usage
       boundaries and specialization.
-- [ ] Set inference/checking limits, ambiguity/escape diagnostics and portable
+- [x] Set inference/checking limits, ambiguity/escape diagnostics and portable
       interface representation.
-- [ ] Provide positive/negative examples for tasks 064–065 without promising
+- [x] Provide positive/negative examples for tasks 064–065 without promising
       unrestricted inference.
 
 ## Validation
@@ -48,20 +49,22 @@ change.
 
 ## Acceptance criteria
 
-- [ ] Durable syntax, type rules, representation, diagnostics and compatibility
+- [x] Durable syntax, type rules, representation, diagnostics and compatibility
       are settled.
-- [ ] Skolem/evidence scope and bounded checking are explicit enough for
+- [x] Skolem/evidence scope and bounded checking are explicit enough for
       implementation tests.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Source milestone: isolated design checkpoint based on `ef57ec5`; no compiler
+  source or executable fixtures changed in this specification checkpoint.
+- Durable record: [Polymorphic Packages](../zig-native/POLYMORPHIC_PACKAGES.md).
+- Validation: `deno fmt --no-config --check` on the four specifications and task
+  records, plus local path/heading validation; results recorded in
+  [design qualification](../zig-native/LANGUAGE_DESIGN_QUALIFICATION.md).
+- Comparison: documentation only; no runtime or compiler performance claim.
+- Remaining limitations: dependent implementation tasks remain open. The design
+  fixes syntax, ownership/identity, portable evidence and rejection boundaries;
+  it does not claim those mechanisms are executable or qualified yet.

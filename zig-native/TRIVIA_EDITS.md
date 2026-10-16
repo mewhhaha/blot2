@@ -8,7 +8,7 @@ byte-identical Wasm. The compiler milestone is
 
 ## Rule
 
-[`revision_inputs.Snapshot.triviaEqualsPrevious`](src/revision_inputs.zig)
+[`revision_inputs.Snapshot.triviaEqualsPrevious`](src/reuse/revision_inputs.zig)
 compares a new input snapshot with the last compiled one exactly like
 `equalsPrevious` (options, canonical paths, import resolutions and every source
 read), except that a source may also differ when `sameTokens` holds: both sides
@@ -19,7 +19,7 @@ select calls and indexing), so such sources parse to the same program at other
 positions. Hygienic loop names no longer depend on positions (task 024). Size
 limits still apply to the new sources.
 
-[The retained session](src/retained_revision.zig) then reuses the previous
+[The retained session](src/reuse/retained_revision.zig) then reuses the previous
 output as for an unchanged revision when the previous revision compiled, the
 settings and canonical entry path are equal, and the inputs are trivia-equal.
 The retained state is kept, so the next real edit diffs against the last
@@ -31,7 +31,7 @@ A trivia shift that accompanies a real edit, or any body edit that changes a
 module's length, moved obligation spans. `catalogEqual` compared obligations
 exactly, so the reuse gate turned off for the whole program and every function
 was rebuilt (960 fresh functions on gdev for a comment edit). Obligation spans
-locate diagnostics only, so [the gate](src/principal_reuse_gate.zig) now
+locate diagnostics only, so [the gate](src/reuse/principal_reuse_gate.zig) now
 compares obligations with their spans cleared; declarations still compare node
 spans, so shifted declarations are revoked individually.
 
@@ -43,16 +43,16 @@ pinned in [the pins](qualification/trivia-edits-pins.json).
 - Zig 0.17.0 before every build batch. `deno task test:compiler` passes the full
   LLVM native suite and 633 guest/client tests; `deno task lint:zig` reports
   zero findings across 310 files.
-- [Native laws](src/revision_input_tests.zig) fix which edits are trivia:
+- [Native laws](src/reuse/revision_input_tests.zig) fix which edits are trivia:
   comment changes, trailing comments and spacing between separated tokens are;
   spacing that makes `values[0]` an argument or `helper(…)` a call, leaving a
   suite, a changed literal and a source with lexer diagnostics are not; with an
   allocation-failure sweep.
-  [A retained-session law](src/source_overlay_tests.zig) reuses the output for a
-  commented dependency and compiles the next real edit.
-- [A gate law](src/principal_reuse_gate_tests.zig) shifts obligation spans with
-  a longer comment and a scalar edit: the gate stays enabled and the shifted
-  declarations are revoked. It fails with exact obligation comparison.
+  [A retained-session law](src/reuse/source_overlay_tests.zig) reuses the output
+  for a commented dependency and compiles the next real edit.
+- [A gate law](src/reuse/principal_reuse_gate_tests.zig) shifts obligation spans
+  with a longer comment and a scalar edit: the gate stays enabled and the
+  shifted declarations are revoked. It fails with exact obligation comparison.
 - [A process-level law](tests/trivia_edit_reuse.test.ts) edits ecs, syntax and
   monads through comment, trailing-comment and spacing edits, an added
   declaration, a failing edit, recovery and a trivia revert: bytes and

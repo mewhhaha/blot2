@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — implementation and focused checks are recorded;
+  final common qualification remains required.
 - **Dependencies:** [052](052-implement-opaque-types-and-privacy.md),
   [024](024-apply-general-body-interface-cutoff.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 2 / interface
@@ -19,7 +20,7 @@ wrappers add no runtime representation cost.
 ## Starting point
 
 Task 052 supplies opacity and task 024 general interface cutoff.
-[module_frontend_cutoff.zig](../zig-native/src/module_frontend_cutoff.zig),
+[module_frontend_cutoff.zig](../zig-native/src/reuse/module_frontend_cutoff.zig),
 resolved layouts and optimizer captures provide the reuse/representation
 boundaries.
 

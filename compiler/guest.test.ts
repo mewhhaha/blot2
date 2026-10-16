@@ -584,3 +584,63 @@ Deno.test("ABI v3 validates both ownership signatures before entering the guest"
     ]
   ) await rejects(() => instantiateGuest(module), errorCode("invalid_abi"));
 });
+
+Deno.test("cleanup descriptors independently enforce the actual Wasm import signature", async () => {
+  const make = (floating: boolean) => {
+    let parameter = 127;
+    let argument = [65, 42];
+    if (floating) {
+      parameter = 125;
+      argument = [67, 0, 0, 40, 66];
+    }
+    const body = [0, 32, 0, ...argument, 16, 0, 26, 65, 42, 11];
+    return wasm(
+      section(1, [2, 96, 2, 111, parameter, 1, 127, 96, 1, 111, 1, 127]),
+      section(2, [
+        1,
+        ...name("blot:cleanup/1"),
+        ...name("call_u32_unit"),
+        0,
+        0,
+      ]),
+      section(3, [1, 1]),
+      section(7, [1, ...name("answer"), 0, 1]),
+      section(10, [1, ...leb(body.length), ...body]),
+      manifest([2, 1, ...name("answer"), 7, 1, 0, 1, 0]),
+    );
+  };
+  await rejects(
+    () => instantiateGuest(make(true)),
+    (err: unknown) => err instanceof GuestError && err.code === "invalid_abi",
+  );
+  const guest = await instantiateGuest(make(false));
+  try {
+    const trace: number[] = [];
+    const descriptor = guest.cleanupCapability({
+      parameter: "U32",
+      result: "Unit",
+      maxSteps: 32,
+      maxCalls: 1,
+      call: (value) => {
+        trace.push(value);
+        return null;
+      },
+    });
+    equal(guest.call("answer", descriptor), 42);
+    equal(trace, [42]);
+    throws(
+      () =>
+        guest.call(
+          "answer",
+          guest.capability({
+            parameter: "U32",
+            result: "Unit",
+            call: () => null,
+          }),
+        ),
+      GuestError,
+    );
+  } finally {
+    guest.dispose();
+  }
+});

@@ -428,8 +428,8 @@ Each task owns one bounded reviewable result. If new required work is
 discovered, add a numbered task before 999, update this index, coverage and
 dependency graph, and link it from the originating task. Do not silently reduce
 scope. Task [075] follows all 001–074; task [999] follows every required task,
-including additions. External evidence in [082] and the owner decision in [083]
-must actually exist before those tasks or final cleanup are complete.
+including additions. Local analyzer evidence in [082] and the owner decision in
+[083] must actually exist before those tasks or final cleanup are complete.
 
 Keep local milestone commits on `main`; **nothing is pushed without
 authorization**. Stage only the intended changes and preserve unrelated or
@@ -558,8 +558,9 @@ does not demonstrate an application-wide gain.
 
 The ignored prototype checkout is `build/experiments/list-span-source/`. Its
 tracked-source differences from the starting revision are in
-`zig-native/src/core_backend.zig` and `zig-native/src/collection_tests.zig`; it
-also adds `zig-native/tests/list_span_execution.test.ts`.
+`zig-native/src/backend/core_backend.zig` and
+`zig-native/src/backend/collection_tests.zig`; it also adds
+`zig-native/tests/list_span_execution.test.ts`.
 
 - `Emitter.readListRow` receives an optional `span_end`; direct loops pass the
   resolved leaf end and can use a row-end comparison. Other paths retain their
@@ -610,116 +611,141 @@ preserves pins, distributions, failed runs and remaining scope.
 The documentation-only [erased proof design](../zig-native/ERASED_PROOFS.md)
 completes [069]. It settles exact value identities, checked constructors, proof
 kinds, finite arithmetic/branch rules, portable admission, erasure and bounded
-fallback. Task [070] has an isolated parser/owned-term/contract prototype; its
-checker, runtime and compiled-body authority are unfinished. Task [071] follows
-complete witness implementation.
+fallback. Tasks [070]/[071] now have integrated owned contracts, executable
+portable admission, finite check plans and erased lowering. The documented
+finite inference rules and final combined qualification pass; [070]/[071] are
+complete. Unknown or exhausted optional analysis retains checks. See
+[numeric qualification](../zig-native/NUMERIC_PROOFS_QUALIFICATION.md).
 
 ## Task index
 
-Dependency numbers below link to their task files. All tasks are initially open.
+Dependency numbers below link to their task files. The 15 October uncommitted
+batch passes **2,223 native laws, 1,404 guest/client tests and 1,366 complete
+allocation sweeps** plus two expected-error harness laws. All 455 analyzer files
+have zero findings; the full gate takes 697.812 s. Exact frozen inputs and
+release qualification are in
+[the checkpoint](../zig-native/CONTINUATION_QUALIFICATION.md#qualified-continuation-15-october-2026).
+Tasks 070/071 now satisfy their finite acceptance criteria. Statuses are **74
+complete** (including four designs), **23 in progress** and **8 pending**: **31
+remain open**. The broader program and performance targets remain open.
 
-| Task                                                    | Status      | Dependencies                           |
-| ------------------------------------------------------- | ----------- | -------------------------------------- |
-| [001] — Qualify list span prototype                     | Complete    | None                                   |
-| [002] — Close packed list traversal regression          | Complete    | [001]                                  |
-| [003] — Specify general call summaries                  | Complete    | None                                   |
-| [004] — Summarize predicate bearing callees             | Complete    | [003]                                  |
-| [005] — Summarize higher order callees                  | Complete    | [004]                                  |
-| [006] — Summarize lexical closures                      | Complete    | [005]                                  |
-| [007] — Infer recursive components jointly              | Complete    | [006]                                  |
-| [008] — Canonicalize specialization keys                | Complete    | [007]                                  |
-| [009] — Cache composite type resolutions                | Complete    | None                                   |
-| [010] — Schedule constraints by variable                | Complete    | [009]                                  |
-| [011] — Reduce semantic allocation traffic              | Complete    | [007], [008], [010]                    |
-| [012] — Schedule independent semantic jobs              | Complete    | [007], [008], [010]                    |
-| [013] — Qualify parallel inference                      | Complete    | [011], [012]                           |
-| [014] — Specify unified query table                     | Complete    | [008]                                  |
-| [015] — Migrate refinement queries                      | Complete    | [014]                                  |
-| [016] — Migrate specialization and principal queries    | Complete    | [015]                                  |
-| [017] — Unify source and revision validation            | Complete    | [016]                                  |
-| [018] — Migrate executable reuse queries                | Complete    | [017]                                  |
-| [019] — Serialize the query table                       | Complete    | [018]                                  |
-| [020] — Persist complete semantic artifacts             | Complete    | [019]                                  |
-| [021] — Publish transactional revision deltas           | Complete    | [017], [020]                           |
-| [022] — Retain constants and relocatable data           | Complete    | [020], [021]                           |
-| [023] — Narrow literal edit invalidation                | Complete    | [022]                                  |
-| [024] — Apply general body interface cutoff             | In progress | [023]                                  |
-| [025] — Resolve calls before emission                   | Complete    | —                                      |
-| [026] — Resolve structured control flow                 | Complete    | —                                      |
-| [027] — Represent ownership in resolved ir              | Complete    | —                                      |
-| [028] — Make emission consume resolved bodies           | Complete    | [027]                                  |
-| [029] — Remove function indices from reuse keys         | Complete    | [018], [028]                           |
-| [030] — Specify shared and cyclic ownership             | Complete    | [027]                                  |
-| [031] — Implement shared reference counting             | Complete    | [030]                                  |
-| [032] — Own escaping values and persistent roots        | Complete    | [031]                                  |
-| [033] — Own suspended effects and cancellation          | Complete    | [032]                                  |
-| [034] — Reclaim cyclic ownership                        | Complete    | [033]                                  |
-| [035] — Remove the tracing runtime                      | In progress | [034]                                  |
-| [036] — Summarize demand control flow                   | Complete    | [007], [014]                           |
-| [037] — Lower loop aware local memos                    | Complete    | [036]                                  |
-| [038] — Eliminate demands through known callbacks       | Complete    | [037], [032]                           |
-| [039] — Guarantee and explain demand lowering           | Complete    | [038], [033]                           |
-| [040] — Fuse packed row producers and consumers         | Complete    | [002], [027]                           |
-| [041] — Broaden numeric simd                            | Complete    | [040]                                  |
-| [042] — Specify ragged builders                         | Complete    | [011], [027]                           |
-| [043] — Implement ragged builders                       | Complete    | [042]                                  |
-| [044] — Specify rolling and summary operations          | Complete    | [040]                                  |
-| [045] — Implement rolling reductions                    | Complete    | [044]                                  |
-| [046] — Implement composable summary trees              | Complete    | [045]                                  |
-| [047] — Eliminate generic iterator state                | In progress | [040], [027]                           |
-| [048] — Explain dispatch and evidence                   | Complete    | —                                      |
-| [049] — Specify editor completion                       | Complete    | [048]                                  |
-| [050] — Implement editor completion                     | Complete    | [049]                                  |
-| [051] — Specify module abstraction                      | Complete    | [020]                                  |
-| [052] — Implement opaque types and privacy              | Complete    | [051]                                  |
-| [053] — Qualify module cutoffs and wrapper erasure      | Pending     | [052], [024]                           |
-| [054] — Specify associated types and implementations    | Complete    | [052]                                  |
-| [055] — Implement associated type members               | Complete    | [054]                                  |
-| [056] — Implement declarations and evidence diagnostics | Complete    | [055]                                  |
-| [057] — Specify scoped effect identities                | Complete    | [052]                                  |
-| [058] — Implement effect instances and subtraction      | In progress | [057]                                  |
-| [059] — Reject escaping capabilities                    | Pending     | [058]                                  |
-| [060] — Specify usage and lifetime contracts            | Pending     | [059], [030]                           |
-| [061] — Check usage and call multiplicity               | Pending     | [060]                                  |
-| [062] — Implement resource cleanup contracts            | Pending     | [061], [033], [020]                    |
-| [063] — Specify polymorphic packages                    | Pending     | [056], [059]                           |
-| [064] — Check higher rank types and skolems             | Pending     | [063]                                  |
-| [065] — Implement existential packages                  | Pending     | [064], [020]                           |
-| [066] — Specify typed staging                           | Pending     | [053], [065]                           |
-| [067] — Implement typed code and descriptors            | Pending     | [066]                                  |
-| [068] — Implement hygienic generation and reuse         | Pending     | [067], [024]                           |
-| [069] — Specify bounded erased proofs                   | Complete    | [056]                                  |
-| [070] — Implement numeric and index witnesses           | In progress | [069]                                  |
-| [071] — Eliminate checks from proved branch facts       | Pending     | [070], [026]                           |
-| [072] — Specify structured concurrency                  | Pending     | [059], [062]                           |
-| [073] — Implement scoped tasks and cancellation         | Pending     | [072], [035]                           |
-| [074] — Implement disjoint access and host execution    | Pending     | [073], [071]                           |
-| [075] — Split evaluator state and dispatch              | Pending     | All [001]–[074]                        |
-| [076] — Split core module and builder                   | Pending     | [075]                                  |
-| [077] — Split checker responsibilities                  | Pending     | [076]                                  |
-| [078] — Split backend state and emission                | Pending     | [077]                                  |
-| [079] — Relocate fixtures through a test module         | Pending     | [078]                                  |
-| [080] — Organize the source tree                        | Pending     | [079]                                  |
-| [081] — Finalize durable documentation                  | Pending     | [080]                                  |
-| [082] — Qualify the remote analyzer workflow            | Pending     | [081]                                  |
-| [083] — Review and clean old build artifacts            | Pending     | [081]                                  |
-| [084] — Qualify the complete program                    | Pending     | [082], [083], [085]–[099]              |
-| [085] — Gate principal-graph sharing on payoff          | Complete    | —                                      |
-| [086] — Retain constant evaluation across revisions     | In progress | [023]                                  |
-| [087] — Skip rebuilds for trivia-only edits             | Complete    | —                                      |
-| [088] — Restore summary-job inference cost              | Complete    | —                                      |
-| [089] — Report inference budget exhaustion              | Complete    | —                                      |
-| [090] — Make pending-check solving incremental          | Complete    | —                                      |
-| [091] — Bound compile-time evaluation by call depth     | Complete    | —                                      |
-| [092] — Format current Blot syntax                      | Complete    | —                                      |
-| [093] — Close the gdev edit gap                         | In progress | [088]                                  |
-| [094] — Locate specialization failures at their use     | Complete    | [048]                                  |
-| [095] — Specify and version the project protocol        | Complete    | None                                   |
-| [096] — Compile typed asset imports natively            | Complete    | [095]                                  |
-| [097] — Resolve array cursor representation in gdev     | Complete    | None                                   |
-| [098] — Type-check recursive demand forwarding          | Complete    | None                                   |
-| [099] — Survive long stage chains without crashing      | Complete    | None                                   |
-| [999] — Remove tasks and plan                           | Pending     | All [001]–[099], plus every added task |
+Owner decisions of 15 October 2026: language tasks 058/059/061/062/064/065,
+067/068 and 073/074 close against fixed acceptance rows or traces recorded in
+each task; the five final performance targets move to follow-up tasks
+[100]–[104]; task [035] is gated on running without crashes or memory
+exhaustion, not on CPU parity with tracing; task [082] uses a local analyzer
+build instead of a remote run; and task [083] is complete after the approved
+cache deletion. The owner also removed `build/`, so `build/bench/...` evidence
+paths are historical. On the evening of 15 October the current working tree
+failed 20 of 2,354 native laws in `deno task test:compiler`.
+
+| Task                                                    | Status          | Dependencies                           |
+| ------------------------------------------------------- | --------------- | -------------------------------------- |
+| [001] — Qualify list span prototype                     | Complete        | None                                   |
+| [002] — Close packed list traversal regression          | Complete        | [001]                                  |
+| [003] — Specify general call summaries                  | Complete        | None                                   |
+| [004] — Summarize predicate bearing callees             | Complete        | [003]                                  |
+| [005] — Summarize higher order callees                  | Complete        | [004]                                  |
+| [006] — Summarize lexical closures                      | Complete        | [005]                                  |
+| [007] — Infer recursive components jointly              | Complete        | [006]                                  |
+| [008] — Canonicalize specialization keys                | Complete        | [007]                                  |
+| [009] — Cache composite type resolutions                | Complete        | None                                   |
+| [010] — Schedule constraints by variable                | Complete        | [009]                                  |
+| [011] — Reduce semantic allocation traffic              | Complete        | [007], [008], [010]                    |
+| [012] — Schedule independent semantic jobs              | Complete        | [007], [008], [010]                    |
+| [013] — Qualify parallel inference                      | Complete        | [011], [012]                           |
+| [014] — Specify unified query table                     | Complete        | [008]                                  |
+| [015] — Migrate refinement queries                      | Complete        | [014]                                  |
+| [016] — Migrate specialization and principal queries    | Complete        | [015]                                  |
+| [017] — Unify source and revision validation            | Complete        | [016]                                  |
+| [018] — Migrate executable reuse queries                | Complete        | [017]                                  |
+| [019] — Serialize the query table                       | Complete        | [018]                                  |
+| [020] — Persist complete semantic artifacts             | Complete        | [019]                                  |
+| [021] — Publish transactional revision deltas           | Complete        | [017], [020]                           |
+| [022] — Retain constants and relocatable data           | Complete        | [020], [021]                           |
+| [023] — Narrow literal edit invalidation                | Complete        | [022]                                  |
+| [024] — Apply general body interface cutoff             | In progress     | [023]                                  |
+| [025] — Resolve calls before emission                   | Complete        | —                                      |
+| [026] — Resolve structured control flow                 | Complete        | —                                      |
+| [027] — Represent ownership in resolved ir              | Complete        | —                                      |
+| [028] — Make emission consume resolved bodies           | Complete        | [027]                                  |
+| [029] — Remove function indices from reuse keys         | Complete        | [018], [028]                           |
+| [030] — Specify shared and cyclic ownership             | Complete        | [027]                                  |
+| [031] — Implement shared reference counting             | Complete        | [030]                                  |
+| [032] — Own escaping values and persistent roots        | Complete        | [031]                                  |
+| [033] — Own suspended effects and cancellation          | Complete        | [032]                                  |
+| [034] — Reclaim cyclic ownership                        | Complete        | [033]                                  |
+| [035] — Remove the tracing runtime                      | In progress     | [034]                                  |
+| [036] — Summarize demand control flow                   | Complete        | [007], [014]                           |
+| [037] — Lower loop aware local memos                    | Complete        | [036]                                  |
+| [038] — Eliminate demands through known callbacks       | Complete        | [037], [032]                           |
+| [039] — Guarantee and explain demand lowering           | Complete        | [038], [033]                           |
+| [040] — Fuse packed row producers and consumers         | Complete        | [002], [027]                           |
+| [041] — Broaden numeric simd                            | Complete        | [040]                                  |
+| [042] — Specify ragged builders                         | Complete        | [011], [027]                           |
+| [043] — Implement ragged builders                       | Complete        | [042]                                  |
+| [044] — Specify rolling and summary operations          | Complete        | [040]                                  |
+| [045] — Implement rolling reductions                    | Complete        | [044]                                  |
+| [046] — Implement composable summary trees              | Complete        | [045]                                  |
+| [047] — Eliminate generic iterator state                | In progress     | [040], [027]                           |
+| [048] — Explain dispatch and evidence                   | Complete        | —                                      |
+| [049] — Specify editor completion                       | Complete        | [048]                                  |
+| [050] — Implement editor completion                     | Complete        | [049]                                  |
+| [051] — Specify module abstraction                      | Complete        | [020]                                  |
+| [052] — Implement opaque types and privacy              | Complete        | [051]                                  |
+| [053] — Qualify module cutoffs and wrapper erasure      | In progress     | [052], [024]                           |
+| [054] — Specify associated types and implementations    | Complete        | [052]                                  |
+| [055] — Implement associated type members               | Complete        | [054]                                  |
+| [056] — Implement declarations and evidence diagnostics | Complete        | [055]                                  |
+| [057] — Specify scoped effect identities                | Complete        | [052]                                  |
+| [058] — Implement effect instances and subtraction      | In progress     | [057]                                  |
+| [059] — Reject escaping capabilities                    | In progress     | [058]                                  |
+| [060] — Specify usage and lifetime contracts            | Complete design | [059], [030]                           |
+| [061] — Check usage and call multiplicity               | In progress     | [060]                                  |
+| [062] — Implement resource cleanup contracts            | In progress     | [061], [033], [020]                    |
+| [063] — Specify polymorphic packages                    | Complete design | [056], [059]                           |
+| [064] — Check higher rank types and skolems             | In progress     | [063]                                  |
+| [065] — Implement existential packages                  | In progress     | [064], [020]                           |
+| [066] — Specify typed staging                           | Complete design | [053], [065]                           |
+| [067] — Implement typed code and descriptors            | In progress     | [066]                                  |
+| [068] — Implement hygienic generation and reuse         | In progress     | [067], [024]                           |
+| [069] — Specify bounded erased proofs                   | Complete        | [056]                                  |
+| [070] — Implement numeric and index witnesses           | Complete        | [069]                                  |
+| [071] — Eliminate checks from proved branch facts       | Complete        | [070], [026]                           |
+| [072] — Specify structured concurrency                  | Complete design | [059], [062]                           |
+| [073] — Implement scoped tasks and cancellation         | In progress     | [072], [035]                           |
+| [074] — Implement disjoint access and host execution    | In progress     | [073], [071]                           |
+| [075] — Split evaluator state and dispatch              | In progress     | All [001]–[074]                        |
+| [076] — Split core module and builder                   | In progress     | [075]                                  |
+| [077] — Split checker responsibilities                  | In progress     | [076]                                  |
+| [078] — Split backend state and emission                | In progress     | [077]                                  |
+| [079] — Relocate fixtures through a test module         | In progress     | [078]                                  |
+| [080] — Organize the source tree                        | In progress     | [079]                                  |
+| [081] — Finalize durable documentation                  | In progress     | [080]                                  |
+| [082] — Qualify the analyzer workflow locally           | Pending         | [081]                                  |
+| [083] — Review and clean old build artifacts            | Complete        | [081]                                  |
+| [084] — Qualify the complete program                    | Pending         | [082], [083], [085]–[099]              |
+| [085] — Gate principal-graph sharing on payoff          | Complete        | —                                      |
+| [086] — Retain constant evaluation across revisions     | In progress     | [023]                                  |
+| [087] — Skip rebuilds for trivia-only edits             | Complete        | —                                      |
+| [088] — Restore summary-job inference cost              | Complete        | —                                      |
+| [089] — Report inference budget exhaustion              | Complete        | —                                      |
+| [090] — Make pending-check solving incremental          | Complete        | —                                      |
+| [091] — Bound compile-time evaluation by call depth     | Complete        | —                                      |
+| [092] — Format current Blot syntax                      | Complete        | —                                      |
+| [093] — Close the gdev edit gap                         | In progress     | [088]                                  |
+| [094] — Locate specialization failures at their use     | Complete        | [048]                                  |
+| [095] — Specify and version the project protocol        | Complete        | None                                   |
+| [096] — Compile typed asset imports natively            | Complete        | [095]                                  |
+| [097] — Resolve array cursor representation in gdev     | Complete        | None                                   |
+| [098] — Type-check recursive demand forwarding          | Complete        | None                                   |
+| [099] — Survive long stage chains without crashing      | Complete        | None                                   |
+| [100] — Reach the cold compilation target               | Pending         | [084]                                  |
+| [101] — Reach the literal-edit target                   | Pending         | [084], [086], [093]                    |
+| [102] — Reach the general body-edit target              | Pending         | [084], [024]                           |
+| [103] — Bound the largest inference region              | Pending         | [084]                                  |
+| [104] — Reduce requested allocation below 100 MB        | Pending         | [084]                                  |
+| [999] — Remove tasks and plan                           | Pending         | All [001]–[104], plus every added task |
 
 ## Coverage matrix
 
@@ -735,15 +761,15 @@ obligations remain part of applicable tasks and final qualification.
 | PLAN hill 5: composite resolution across unrelated writes, history, rollback and physical edits               | [009]                                                  |
 | PLAN hill 5: variable-indexed constraints and alias fixed-point worklists                                     | [010]                                                  |
 | PLAN hill 5: incremental checker pending checks, reported from gdev                                           | [090]                                                  |
-| PLAN hill 6: changed-only metadata, retained constants, literal invalidation and body/interface cutoff        | [020]–[024], [086]–[088], [093]                        |
-| PLAN hill 7: semantic graph sharing and under-100-MB cumulative requested allocation                          | [011], [085], [084]                                    |
+| PLAN hill 6: changed-only metadata, retained constants, literal invalidation and body/interface cutoff        | [020]–[024], [086]–[088], [093], [101], [102]          |
+| PLAN hill 7: semantic graph sharing and under-100-MB cumulative requested allocation                          | [011], [085], [084], [104]                             |
 | PLAN hill 9: isolated workers, deterministic publication and CPU/wall-qualified default                       | [012], [013]                                           |
 | PLAN hill 12: typed query design, dependency recording and exact fingerprints/early cutoff                    | [014]                                                  |
 | PLAN hill 12: refinement, specialization and principal migration                                              | [015], [016]                                           |
 | PLAN hill 12: shared source/revision validation, executable reuse and archive serialization                   | [017], [018], [019]                                    |
 | PLAN hill 14: evaluator, Core, checker and backend responsibilities; approximately 120-line functions         | [075], [076], [077], [078]                             |
 | PLAN hill 15 and hill 20 fixtures: dedicated test module, full filtered discovery, source layout              | [079], [080]                                           |
-| PLAN hill 17: successful authorized remote analyzer workflow on relevant code                                 | [082]                                                  |
+| PLAN hill 17: analyzer workflow qualified on relevant code (local build by owner decision)                    | [082]                                                  |
 | PLAN hill 19: current durable guide, architecture, contracts, status and library guidance                     | [081]                                                  |
 | PLAN hill 20: owner decision and cleanup of unapproved old artifacts                                          | [083]                                                  |
 | Earlier semantic compilation: portable complete semantic artifacts and their dependencies                     | [019], [020]                                           |
@@ -793,7 +819,7 @@ obligations remain part of applicable tasks and final qualification.
 | Reported from gdev: positioned budget diagnostics, evaluation depth by calls, current-syntax formatting       | [089], [091], [092], [097], [099]                      |
 | Owner decision (pen migration): versioned public project protocol and native typed asset imports              | [095], [096]                                           |
 | Shared gates: no name recognition; chronological semantics, diagnostic order and immutable atomic publication | [084]                                                  |
-| Final performance: cold ~500 ms; literal <30 ms; body <100 ms; largest region <50 ms; allocation <100 MB      | [084]                                                  |
+| Final performance: cold ~500 ms; literal <30 ms; body <100 ms; largest region <50 ms; allocation <100 MB      | [084] measures; [100]–[104] own the targets            |
 | Final qualification: every semantic/runtime/language/tooling and external gate, follow-ups before cleanup     | [082], [083], [084]                                    |
 | Final cleanup: durable evidence, all required tasks complete, remove tasks and PLAN, local commit             | [999]                                                  |
 
@@ -801,24 +827,26 @@ obligations remain part of applicable tasks and final qualification.
 
 Task [084] must establish every condition below. These are requirements, not
 forecast measurements. A missed target remains unfinished and requires bounded
-follow-up work before [999].
+follow-up work before [999]. The five performance rows already miss their
+targets; by owner decision on 15 October 2026 tasks [100]–[104] own them and 084
+records their measurements on a re-pinned workload.
 
 | Requirement                   | Completion condition                                                                                 |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Cold compilation              | Approximately 500 ms gdev CPU, supported by paired measurements                                      |
-| Literal edits                 | Under 30 ms                                                                                          |
-| General body edits            | Under 100 ms                                                                                         |
-| Largest inference region      | Under 50 ms                                                                                          |
-| Requested compiler allocation | Under 100 MB cumulative requested allocation, distinct from live memory/RSS                          |
+| Cold compilation              | Approximately 500 ms CPU on the 084 workload, supported by paired measurements ([100])               |
+| Literal edits                 | Under 30 ms ([101])                                                                                  |
+| General body edits            | Under 100 ms ([102])                                                                                 |
+| Largest inference region      | Under 50 ms ([103])                                                                                  |
+| Requested compiler allocation | Under 100 MB cumulative requested allocation, distinct from live memory/RSS ([104])                  |
 | Specialization sharing        | No duplicate regions for the same complete canonical key                                             |
-| Runtime ownership             | Legal cycles and suspended values remain correct; replacement of tracing is qualified                |
+| Runtime ownership             | Legal cycles and suspended values remain correct; tracing replacement runs without crashes or OOM    |
 | Collections                   | Traversal regression closed; new operations/optimizations pass behavioral and measurement gates      |
 | Language and demands          | Every mapped completion gate passes, including separate compilation and recovery                     |
 | Tooling and structure         | Analyzer, editor, packaging, source layout, fixture relocation and remote workflow evidence complete |
 
 ## Planning-directory validation
 
-For this documentation change, verify exactly 001–099 plus 999, unique numbered
+For this documentation change, verify exactly 001–104 plus 999, unique numbered
 filenames, all seven required sections, concrete unchecked acceptance criteria,
 existing relative links/anchors, and exact manifest dependencies forming an
 acyclic graph. Check that every task is indexed and every open source
@@ -931,4 +959,9 @@ external gate or durable-documentation obligation remains open.
 [097]: 097-resolve-array-cursor-representation-in-gdev-fixtures.md
 [098]: 098-type-check-recursive-demand-forwarding.md
 [099]: 099-survive-long-stage-chains-without-crashing.md
+[100]: 100-reach-the-cold-compilation-target.md
+[101]: 101-reach-the-literal-edit-target.md
+[102]: 102-reach-the-body-edit-target.md
+[103]: 103-bound-the-largest-inference-region.md
+[104]: 104-reduce-requested-allocation-below-100-mb.md
 [999]: 999-remove-tasks-and-plan.md

@@ -16,11 +16,11 @@ Broaden packed-row fusion through ordinary typed source producers and consumers.
 
 ## Starting point
 
-[packed_layout.zig](../zig-native/src/packed_layout.zig),
-[collection_edit_call.zig](../zig-native/src/collection_edit_call.zig),
-[core_backend.zig](../zig-native/src/core_backend.zig) and scalar replacement
-handle admitted flat rows. Task 002 qualifies traversal and task 027 provides
-explicit layout/ownership facts.
+[packed_layout.zig](../zig-native/src/backend/packed_layout.zig),
+[collection_edit_call.zig](../zig-native/src/backend/collection_edit_call.zig),
+[core_backend.zig](../zig-native/src/backend/core_backend.zig) and scalar
+replacement handle admitted flat rows. Task 002 qualifies traversal and task 027
+provides explicit layout/ownership facts.
 
 ## Implementation checklist
 

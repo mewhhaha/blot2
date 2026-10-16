@@ -18,7 +18,7 @@ change or reject it with reproducible evidence.
 
 The prototype is in `build/experiments/list-span-source/`. Its
 `Emitter.readListRow` accepts an optional span end and direct loops pass that
-bound. Changes also include `src/collection_tests.zig` and
+bound. Changes also include `src/backend/collection_tests.zig` and
 `tests/list_span_execution.test.ts` in that checkout. The supplied continuation
 records a successful experimental release and corrected native
 allocation-failure test; these are prior results, not a completed qualification.

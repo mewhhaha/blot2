@@ -19,9 +19,9 @@ capability capture and identity transport.
 
 [compiler/guide.md](../compiler/guide.md#effect-families-and-scoped-state)
 supports closed family instances and rejects symbolic generic effect labels.
-[provider_chain.zig](../zig-native/src/provider_chain.zig) and
-[request_runtime.zig](../zig-native/src/request_runtime.zig) route current
-operations.
+[provider_chain.zig](../zig-native/src/backend/provider_chain.zig) and
+[request_runtime.zig](../zig-native/src/runtime/request_runtime.zig) route
+current operations.
 
 ## Implementation checklist
 

@@ -19,11 +19,11 @@ while preserving bounded durable ownership.
 
 ## Starting point
 
-[region_arena.zig](../zig-native/src/region_arena.zig) already leases resettable
-scratch with a 64 MiB retained cap.
-[type_evidence.zig](../zig-native/src/type_evidence.zig),
-[frozen_types.zig](../zig-native/src/frozen_types.zig) and
-[core_eval.zig](../zig-native/src/core_eval.zig) copy graphs at semantic
+[region_arena.zig](../zig-native/src/eval/region_arena.zig) already leases
+resettable scratch with a 64 MiB retained cap.
+[type_evidence.zig](../zig-native/src/eval/type_evidence.zig),
+[frozen_types.zig](../zig-native/src/check/frozen_types.zig) and
+[core_eval.zig](../zig-native/src/eval/core_eval.zig) copy graphs at semantic
 boundaries. Baseline cumulative requested allocation is 321.2 MB.
 
 ## Implementation checklist

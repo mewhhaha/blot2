@@ -70,6 +70,11 @@ export interface ZigProjectDiagnostic {
   explanation?: DispatchExplanation;
   /** Original callee location for a caller-dependent specialization failure. */
   related?: ZigProjectSourceLocation | null;
+  origins?: Array<
+    ZigProjectSourceLocation & {
+      kind: "quote" | "generator" | "splice" | "invocation";
+    }
+  >;
   details?: unknown;
 }
 export type ZigProjectBuildResult =
@@ -108,6 +113,8 @@ export interface ZigProjectCompilerOptions {
   codegenWorkers?: number;
   /** Opt-in private semantic components with 1..16 workers; default stays serial. */
   semanticWorkers?: number;
+  /** Process-local inference limit, included in compiler identity. */
+  inferenceBudget?: number;
   /** Optional backend checkpoint from exportCheckpoint; copied at startup. */
   checkpoint?: Uint8Array<ArrayBuffer>;
   /** Native restart cache root. Defaults to the platform cache directory when
@@ -264,6 +271,34 @@ function diagnostic(value: unknown): ZigProjectDiagnostic {
     }
     object.related = { filename, start, end, offset_encoding: "utf8_bytes" };
   }
+  if (object.origins !== undefined) {
+    if (!Array.isArray(object.origins) || object.origins.length > 8) {
+      throw new ZigProjectProtocolError("Invalid generated origins");
+    }
+    object.origins = object.origins.map((item) => {
+      const location = record(item, "generated origin");
+      const kind = location.kind;
+      if (
+        typeof kind !== "string" ||
+        !["quote", "generator", "splice", "invocation"].includes(kind)
+      ) {
+        throw new ZigProjectProtocolError("Invalid generated origin kind");
+      }
+      const filename = location.filename;
+      if (
+        typeof filename !== "string" || !filename.length ||
+        filename.includes("\0") || !filename.isWellFormed()
+      ) {
+        throw new ZigProjectProtocolError("Invalid generated origin filename");
+      }
+      const start = natural(location.start, "generated origin start");
+      const end = natural(location.end, "generated origin end");
+      if (start > end || location.offset_encoding !== "utf8_bytes") {
+        throw new ZigProjectProtocolError("Invalid generated origin offsets");
+      }
+      return { kind, filename, start, end, offset_encoding: "utf8_bytes" };
+    });
+  }
   // These convenience fields are derived only from the validated wire payload.
   delete object.hole;
   delete object.explanation;
@@ -332,14 +367,17 @@ class ProjectProcess implements ZigProjectCompiler {
     executable: string,
     cacheEnvironment: Record<string, string>,
     semanticWorkers?: number,
+    inferenceBudget?: number,
   ) {
+    const args = ["serve-project"];
+    if (semanticWorkers !== undefined) {
+      args.push("--semantic-workers", String(semanticWorkers));
+    }
+    if (inferenceBudget !== undefined) {
+      args.push("--inference-budget", String(inferenceBudget));
+    }
     this.#child = new Deno.Command(executable, {
-      args: [
-        "serve-project",
-        ...(semanticWorkers === undefined
-          ? []
-          : ["--semantic-workers", String(semanticWorkers)]),
-      ],
+      args,
       clearEnv: true,
       env: cacheEnvironment,
       stdin: "piped",
@@ -1035,6 +1073,7 @@ export async function createZigProjectCompiler(
     "shareMachineCode",
     "codegenWorkers",
     "semanticWorkers",
+    "inferenceBudget",
     "checkpoint",
     "cacheDirectory",
     "startupTimeoutMs",
@@ -1173,10 +1212,18 @@ export async function createZigProjectCompiler(
       if (value !== undefined) cacheEnvironment[variable] = value;
     }
   }
+  if (
+    options.inferenceBudget !== undefined &&
+    (!Number.isSafeInteger(options.inferenceBudget) ||
+      options.inferenceBudget < 1)
+  ) {
+    throw new RangeError("inferenceBudget must be a positive safe integer");
+  }
   const process = new ProjectProcess(
     executable,
     cacheEnvironment,
     options.semanticWorkers,
+    options.inferenceBudget,
   );
   await process.initialize(open, timeout, identity, checkpoint);
   if (assets !== undefined) {

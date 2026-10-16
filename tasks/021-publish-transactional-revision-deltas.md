@@ -17,10 +17,10 @@ unchanged immutable data.
 
 ## Starting point
 
-[retained_revision.zig](../zig-native/src/retained_revision.zig),
-[project.zig](../zig-native/src/project.zig),
-[revision_inputs.zig](../zig-native/src/revision_inputs.zig) and
-[frozen_dependency.zig](../zig-native/src/frozen_dependency.zig) preserve
+[retained_revision.zig](../zig-native/src/reuse/retained_revision.zig),
+[project.zig](../zig-native/src/reuse/project.zig),
+[revision_inputs.zig](../zig-native/src/reuse/revision_inputs.zig) and
+[frozen_dependency.zig](../zig-native/src/reuse/frozen_dependency.zig) preserve
 last-good revisions but still reconstruct metadata on edits.
 
 ## Implementation checklist
@@ -58,14 +58,15 @@ development and the scenarios below.
 ## Completion evidence
 
 - Commit: `696051e6db35a5464636131706e559092c9f37e6` (compiler milestone).
-- Implementation: [pool_leases.zig](../zig-native/src/pool_leases.zig) gives 41
-  plain artifact pool slices refcounted leases. Captures with an in-process
-  previous revision compare each field with its leased predecessor and retain
-  equal leases, copying only changed fields. Leases are taken during preparation
-  and released by failed, rejected or discarded candidates; commit remains an
-  allocation-free move and old revisions release their references. Leases name
-  single allocations, so edits never chain revisions. The unread per-body pins
-  (`Pools.bodies`) are removed. Work counters report shared and copied metadata.
+- Implementation: [pool_leases.zig](../zig-native/src/eval/pool_leases.zig)
+  gives 41 plain artifact pool slices refcounted leases. Captures with an
+  in-process previous revision compare each field with its leased predecessor
+  and retain equal leases, copying only changed fields. Leases are taken during
+  preparation and released by failed, rejected or discarded candidates; commit
+  remains an allocation-free move and old revisions release their references.
+  Leases name single allocations, so edits never chain revisions. The unread
+  per-body pins (`Pools.bodies`) are removed. Work counters report shared and
+  copied metadata.
 - Validation: Zig 0.17.0 before every build batch. `deno task test:compiler`
   passes the full LLVM native suite and 626 guest/client tests;
   `deno task

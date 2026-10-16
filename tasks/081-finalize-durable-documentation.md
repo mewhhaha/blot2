@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — source paths, ownership contracts and temporary task
+  links are reconciled; final measurements and qualification remain open.
 - **Dependencies:** [080](080-organize-the-source-tree.md)
 - **Originating requirements:** PLAN: Hill 19; LANGUAGE_EVOLUTION and DEMANDS
   status. Sources: [PLAN.md](../PLAN.md),
@@ -33,7 +34,7 @@ are temporary.
       ownership contracts with the final code and examples.
 - [ ] Publish one qualified current measurement table with revisions/workloads
       and retain essential decisions, limitations and evidence outside `tasks/`.
-- [ ] Update moved paths and distinguish completed behavior from proposals; keep
+- [x] Update moved paths and distinguish completed behavior from proposals; keep
       private workloads and unnecessary historical journals out of the
       repository.
 

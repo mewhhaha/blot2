@@ -17,11 +17,11 @@ selected evidence in native diagnostics and the client schema.
 
 ## Starting point
 
-[hole_diagnostics.zig](../zig-native/src/hole_diagnostics.zig),
-[type_display.zig](../zig-native/src/type_display.zig) and
+[hole_diagnostics.zig](../zig-native/src/reuse/hole_diagnostics.zig),
+[type_display.zig](../zig-native/src/reuse/type_display.zig) and
 [compiler/type_diagnostics.ts](../compiler/type_diagnostics.ts) already expose
 owned bounded type graphs and lexical requirements. Dispatch/member evidence is
-selected in [check.zig](../zig-native/src/check.zig) and specialization.
+selected in [check.zig](../zig-native/src/check/check.zig) and specialization.
 
 ## Implementation checklist
 
@@ -59,7 +59,8 @@ development and the scenarios below.
 ## Completion evidence
 
 - Commit: `67e7912` ("Explain failed dispatch candidates in diagnostics").
-- Change: [dispatch_explanation.zig](../zig-native/src/dispatch_explanation.zig)
+- Change:
+  [dispatch_explanation.zig](../zig-native/src/reuse/dispatch_explanation.zig)
   defines an owned explanation (operator, member, up to four candidates with
   side, spelled type and outcome). The checker attaches it to operator,
   associated, result-dispatch and receiver failures and to a selected member's

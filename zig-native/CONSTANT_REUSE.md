@@ -4,7 +4,7 @@ The owner approved this design and requested implementation on12 October2026.
 Task086 is in progress. Primitive constant-slot receipts are qualified on main;
 broader constant authority and whole-task qualification remain pending.
 
-## Current evidence
+## Historical attribution before the current continuation
 
 The current captured game has 93 units. At qualified implementation `2798ff9`,
 an LLVM release profile of a retained scalar edit reports 51–53 ms in constant
@@ -224,3 +224,48 @@ constant-receipt activity. [Merged qualification](CONTINUATION_QUALIFICATION.md)
 records final source/binary pins and all measured costs. Compound graphs,
 inference/query publication, escaping views and portable data authority remain
 open in 086.
+
+## Current continuation — 15 October 2026
+
+The uncommitted continuation integrates ordinary inference-query barriers with
+owned input/output frames. Replay uses current solver judgments; it transports
+only immutable outputs after validating their actual producer, binder, type, row
+and source owners. Unchanged output frames share input storage; changed frames
+own their maps and clean up failed publication. Cheap closed structural matches
+retain their allocation-free ordinary path.
+
+The immutable graph importer retains closed universal/existential metadata,
+actual dictionary closure graphs and immutable package/proof temporaries.
+Generative scoped identities, live lifetimes, capabilities, instanced rows and
+staged closure edges still use ordinary evaluation. Guard failures and source
+fuel keep their ordinary positions. Quantified callable fields serialize through
+the existing parametric carrier and dictionary ABI, including actual captures,
+constructors and effect-row instantiations.
+
+Root focused evidence is under
+`build/bench/finish-rest-20261015/{constant-frame-integration,immutable-graphs-integration,rank-field-integration}/`.
+Native complete-OOM and executed guest controls cover exact bytes/work, forged
+producers, source/archive/restart, changed payloads and failed-edit recovery.
+The rich combined portable module still needs the separate general Package
+reader amendment; these slices do not establish complete portable closure.
+
+A single matched Safe/noLLVM captured-project pair preserves exact Wasm and
+70,330 source steps. Retained edits replay 59,915 steps through six receipts and
+96 solver queries. The prior dev control has eleven receipts and 61,383 replayed
+steps; differences in receipt count alone do not establish a speedup. The pair
+is unscored and lacks release CPU qualification. Exact427 external pins and
+records are in `build/bench/finish-rest-20261015/captured-current/` and
+`captured-dev-control/`. Literal-edit and cumulative-allocation targets, final
+release costs and the combined full gate remain open.
+
+Pure temporary allocation now follows the same rule: the final reachable graph
+determines transportability. Reflection metadata, unused or purely installed
+providers, completed pure requests and pure resolver temporaries can replay.
+Recording declines at actual suspension creation, every force, staging,
+operation execution and state successor read. Scope generation and live
+authority keep their existing boundaries. Ten actual positive/negative cases
+cover full OOM and tight source-work budgets;
+Source/archive/edit/recovery/checkpoint tests run both tiers and host modes.
+Root integration evidence is in
+`build/bench/finish-rest-20261015/pure-temporary-integration/`. This removes a
+blanket syntax/value deny switch without widening the portable graph authority.

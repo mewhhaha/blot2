@@ -22,7 +22,7 @@ secondary context.
 `#Box 1 + #Box 2` in a program without `Box.add` reports `missing_associated` at
 `std/prelude.blot` 603–630, the `@type.call` inside `add`, because the checker
 leaves the concrete dispatch to specialization and
-[core_eval.zig](../zig-native/src/core_eval.zig) fails while validating the
+[core_eval.zig](../zig-native/src/eval/core_eval.zig) fails while validating the
 specialized `add` body. Task 048's explanation names the operand types, but the
 location is still the prelude. `anchorRecursion` already moves recursion
 diagnostics to a call site.

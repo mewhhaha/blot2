@@ -9,8 +9,8 @@ qualification is recorded below.
 
 ## Admission
 
-[artifact_fragment.zig](src/artifact_fragment.zig) admits an aggregate constant
-child of a retained fragment when all of the following hold:
+[artifact_fragment.zig](src/reuse/artifact_fragment.zig) admits an aggregate
+constant child of a retained fragment when all of the following hold:
 
 - the old job completed with a value that is not a scalar, demand suspension,
   computation, request decision, type constructor, resolver or provider, and
@@ -61,10 +61,10 @@ Completed checks:
 - Zig 0.17.0 before every build batch. `deno task test:compiler` passes the full
   LLVM native suite and 627 guest/client tests; `deno task lint:zig` reports
   zero findings across 308 files.
-- [Native laws](src/aggregate_constant_tests.zig): an unrelated edit replays
-  both aggregate callers with fresh-identical output under an allocation-failure
-  sweep; a changed array element, a changed nominal payload or both rebuild
-  exactly the affected callers.
+- [Native laws](src/backend/aggregate_constant_tests.zig): an unrelated edit
+  replays both aggregate callers with fresh-identical output under an
+  allocation-failure sweep; a changed array element, a changed nominal payload
+  or both rebuild exactly the affected callers.
 - [A process-level law](tests/aggregate_constant_reuse.test.ts) compares a
   retained server with fresh servers through an unrelated edit, inserted
   functions and data that move every later address, an element edit, a trapping

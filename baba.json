@@ -646,6 +646,92 @@
         "boundary": {
           "kind": "root"
         }
+      },
+      {
+        "rule": "proof_type",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "proof_operand",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "proof_length",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "proof_group",
+        "boundary": {
+          "kind": "paired",
+          "open": "(",
+          "close": ")"
+        }
+      },
+      {
+        "rule": "usage_type",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "quantified_type",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "quantified_where",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "package_pack",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "package_unpack",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "quantified_binder",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "source_identifier",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "code_type",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "code_row",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "descriptor_type",
+        "boundary": {
+          "kind": "root"
+        }
       }
     ],
     "semantics": {

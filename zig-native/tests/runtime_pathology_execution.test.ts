@@ -218,6 +218,14 @@ entry const stop = fn (host: U32 -> Bool ! {Foreign}) => do:
   return case outcome of
     #Ok value => value[0]
     #Err error => F32.from error
+const keep = fn host => fn candidate => case candidate of
+  #Ok value => do:
+    use observed <- host value
+    return #Ok value
+  #Err error => #Err error
+entry const prefix = fn (host: U32 -> Bool ! {Foreign}) => do:
+  use candidate <- keep host (#Ok 7)
+  return Result.unwrap_or 0 candidate
 `,
     (guest) => {
       equal(guest.call("run", 100000), 100000);
@@ -233,6 +241,18 @@ entry const stop = fn (host: U32 -> Bool ! {Foreign}) => do:
       });
       equal(guest.call("stop", host), 3);
       assert.deepEqual(calls, [0, 1, 2, 3]);
+      calls.length = 0;
+      equal(guest.call("prefix", host), 7);
+      assert.deepEqual(calls, [7]);
+      const failing = guest.capability({
+        parameter: "U32",
+        result: "Bool",
+        call() {
+          throw new Error("prefix effect");
+        },
+      });
+      assert.throws(() => guest.call("prefix", failing));
+      equal(guest.call("prefix", host), 7);
     },
   );
 });

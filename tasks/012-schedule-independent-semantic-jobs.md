@@ -19,9 +19,9 @@ publication.
 
 ## Starting point
 
-[semantic_parallel.zig](../zig-native/src/semantic_parallel.zig) has an opt-in
-independent-proof batch;
-[independent_call_proof.zig](../zig-native/src/independent_call_proof.zig)
+[semantic_parallel.zig](../zig-native/src/eval/semantic_parallel.zig) has an
+opt-in independent-proof batch;
+[independent_call_proof.zig](../zig-native/src/reuse/independent_call_proof.zig)
 records owned judgments and
 [execution_policy.zig](../zig-native/src/execution_policy.zig) selects worker
 counts. General component jobs still need task-level isolation.

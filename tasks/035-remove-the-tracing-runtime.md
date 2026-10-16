@@ -2,7 +2,9 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — no completion is claimed.
+- **Status:** In progress — the CPU comparison against tracing is no longer a
+  gate (owner decision, 15 October 2026); bounded-memory stress and a passing
+  full gate on current source remain.
 - **Dependencies:** [034](034-reclaim-cyclic-ownership.md)
 - **Originating requirements:** PLAN: Earlier programs / qualified tracing
   replacement. Sources: [PLAN.md](../PLAN.md).
@@ -12,11 +14,17 @@
 ## Outcome
 
 Remove tracing only after the replacement ownership system passes cycle,
-suspension, memory and performance gates.
+suspension and memory gates: programs must run on the development machine
+without crashing or exhausting memory.
+
+**Owner decision, 15 October 2026:** the performance bar is "runs on this
+computer without crashing". The historical tracing CPU baseline (about 4.9x on
+the cycle workload) and the 1.05 overhead screen no longer gate completion; CPU
+and memory figures are recorded for information only.
 
 ## Starting point
 
-[arena_runtime.zig](../zig-native/src/arena_runtime.zig) and runtime
+[arena_runtime.zig](../zig-native/src/runtime/arena_runtime.zig) and runtime
 layout/cleanup code still support tracing during tasks 031–034. Local allocation
 optimizations and public guest behavior must remain valid.
 
@@ -47,15 +55,16 @@ development and the scenarios below.
   from 43,515,904 to 942,211,072 committed bytes when a 90-row outer traversal
   increased each inner loop from 8 to 200 discarded 8,192-word arrays. Preserve
   live outer rows while bounding dead storage within one guest invocation.
-- Compare runtime CPU, allocation, peak/live memory and compiler overhead with
-  the pinned tracing baseline.
+- Record runtime CPU, allocation, peak/live memory and compiler overhead against
+  the tracing baseline for information; no ratio is a pass/fail gate.
 
 ## Acceptance criteria
 
 - [ ] No production path relies on tracing, and all reachable values/cycles
       remain correct.
-- [ ] Long-running memory and performance qualification passes; a failing
-      replacement gate keeps this task open.
+- [ ] The long-running stress scenarios above complete on the development
+      machine without traps, crashes or out-of-memory failures, and committed
+      memory stays bounded after warmup. CPU ratios are recorded, not gated.
 - [ ] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
@@ -99,3 +108,12 @@ unchanged budgets and 351 analyzer files/zero. Merged cycle CPU improves about
 13.7% with flat 128-KiB storage; ordinary controls remain within roughly 1.5%.
 This is another measured checkpoint, not physical tracing removal or the final
 task CPU gate. See [the integrated record](../zig-native/ITERATOR_STATE.md).
+
+Current-source compiler screen,15 October: the private union/guard candidate
+fails its1.05 overhead limit (guard/control fresh1.114286, edit1.010309,
+geometric mean1.061025; union1.066424). One balanced campaign, no retries.
+Timing stopped before runtime/release qualification; no candidate was promoted.
+Exact pins and rejection:
+`build/bench/complete-program-20261015/current035-screen/`. Under the 15 October
+owner decision this CPU screen no longer gates task 035; it remains recorded for
+information.

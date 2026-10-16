@@ -17,8 +17,8 @@ interfaces remain unchanged.
 
 ## Starting point
 
-[module_frontend_cutoff.zig](../zig-native/src/module_frontend_cutoff.zig) and
-refinement receipts provide limited cutoffs. The unified queries distinguish
+[module_frontend_cutoff.zig](../zig-native/src/reuse/module_frontend_cutoff.zig)
+and refinement receipts provide limited cutoffs. The unified queries distinguish
 semantic dependencies from executable and staging reads.
 
 ## Implementation checklist
@@ -51,7 +51,8 @@ development and the scenarios below.
 - [ ] Unchanged interfaces stop semantic propagation without hiding executable
       or staged changes.
 - [x] The under-100-ms body-edit target is measured or remains an explicit
-      unfinished performance gate.
+      unfinished performance gate (owned by task
+      [102](102-reach-the-body-edit-target.md) since 15 October 2026).
 - [ ] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
@@ -83,7 +84,7 @@ development and the scenarios below.
   type IDs are module-global, so edits that add nodes or types renumber later
   declarations or change the type catalog and disable the gate; the symbol table
   is ordered by first use, so a new identifier spelling disables the gate. The
-  under-100-ms target stays an unfinished gate for task 084.
+  under-100-ms target is owned by task [102](102-reach-the-body-edit-target.md).
 - Durable record: [body interface cutoff](../zig-native/BODY_CUTOFF.md),
   [distributions](../zig-native/qualification/body-cutoff.csv) and
   [pins](../zig-native/qualification/body-cutoff-pins.json).

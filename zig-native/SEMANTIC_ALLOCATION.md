@@ -7,21 +7,22 @@ the private application allocation target is met.
 
 ## Allocation categories before changing publication
 
-The top-level [memory tracker](src/memory.zig) measures successful backing
-allocation requests, positive resize/remap growth, peak requested live storage
-and teardown. Arena block capacity contributes to these totals. Solver/scratch
-client requests inside a block are separate logical traffic; adding them to the
-backing total would double count. Process RSS is another measurement.
+The top-level [memory tracker](src/runtime/memory.zig) measures successful
+backing allocation requests, positive resize/remap growth, peak requested live
+storage and teardown. Arena block capacity contributes to these totals.
+Solver/scratch client requests inside a block are separate logical traffic;
+adding them to the backing total would double count. Process RSS is another
+measurement.
 
-Each exclusively leased heap-stable [Arena](src/region_arena.zig) now contains
-separate solver and scratch adapters. `ClosureRegion` receives allocator
-pointers to those stable fields, never to a returned-by-value region. Adapters
-forward all four allocation operations unchanged, with no counter-driven
-decisions or allocations. Their successful logical bytes/calls and individual
-peak live bytes roll up at region release, before the pool resets or destroys
-the owner. Every lease resets its meters; nested regions get separate adapters
-and raw storage. The existing pool retention bound remains **64 MiB**. Logical
-peaks are per owner, not the concurrent total or RSS.
+Each exclusively leased heap-stable [Arena](src/eval/region_arena.zig) now
+contains separate solver and scratch adapters. `ClosureRegion` receives
+allocator pointers to those stable fields, never to a returned-by-value region.
+Adapters forward all four allocation operations unchanged, with no
+counter-driven decisions or allocations. Their successful logical bytes/calls
+and individual peak live bytes roll up at region release, before the pool resets
+or destroys the owner. Every lease resets its meters; nested regions get
+separate adapters and raw storage. The existing pool retention bound remains
+**64 MiB**. Logical peaks are per owner, not the concurrent total or RSS.
 
 Evidence import records the outer import's solver/scratch request deltas,
 avoiding double counting recursively imported children. These are subsets of

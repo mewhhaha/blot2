@@ -2,7 +2,9 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — source areas and live references are moved; dev
+  build, interfaces, discovery, fingerprints and analyzer pass; release,
+  packaging and final qualification remain required.
 - **Dependencies:** [079](079-relocate-fixtures-through-a-test-module.md)
 - **Originating requirements:** PLAN: Hill 15 / source layout. Sources:
   [PLAN.md](../PLAN.md).
@@ -24,11 +26,11 @@ and packaging/analyzer scripts depend on paths.
 
 ## Implementation checklist
 
-- [ ] Organize files by responsibility and keep tests near their production
+- [x] Organize files by responsibility and keep tests near their production
       areas while retaining the fixture module.
-- [ ] Update every import, build root, test aggregator, compiler fingerprint
+- [x] Update every import, build root, test aggregator, compiler fingerprint
       input and packaging path.
-- [ ] Update analyzer traversal, scripts, documentation links and any
+- [x] Update analyzer traversal, scripts, documentation links and any
       generated-input lists; preserve intended compiler identity changes.
 
 ## Validation
@@ -48,7 +50,7 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] The planned source areas exist with correct imports, nearby tests and
+- [x] The planned source areas exist with correct imports, nearby tests and
       external fixtures.
 - [ ] Builds, tests, fingerprints, analyzer, packaging and links all use the new
       layout.
@@ -57,11 +59,15 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- No commit or push, as required by the current continuation.
+- Zig0.17.0 dev build passes in5.48s; all native interfaces compile in9.16s.
+  Fingerprint law, focused checker/retained discovery and eleven tooling laws
+  pass. All483 source files and the fixture module have zero analyzer findings.
+- Matched dev comparison preserves five phases of exact Wasm, ordered
+  diagnostics, work and archive payload. Compiler/schema identity changes are
+  intentional consequences of the physical source move.
+- Move map, original before tree, pins and failed/repaired tooling/parity
+  attempts: `build/bench/finish-rest-20261015/source-areas/`.
+- Remaining: release and the final common full gate. No new full qualification
+  is claimed.
+- Durable record: [source areas](../zig-native/SOURCE_AREAS.md).

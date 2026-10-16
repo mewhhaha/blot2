@@ -17,10 +17,10 @@ specialization.
 
 ## Starting point
 
-[types.zig](../zig-native/src/types.zig),
-[check.zig](../zig-native/src/check.zig),
-[type_evidence.zig](../zig-native/src/type_evidence.zig) and
-[specialization.zig](../zig-native/src/specialization.zig) carry current
+[types.zig](../zig-native/src/check/types.zig),
+[check.zig](../zig-native/src/check/check.zig),
+[type_evidence.zig](../zig-native/src/eval/type_evidence.zig) and
+[specialization.zig](../zig-native/src/eval/specialization.zig) carry current
 contract evidence. Task 054 defines associated members and projection syntax.
 
 ## Implementation checklist

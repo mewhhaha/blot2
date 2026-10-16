@@ -1,12 +1,13 @@
 // deno run --allow-read --allow-write --allow-run scripts/bench_list_traversal.ts \
-//   BASELINE CURRENT STD OUTPUT [record|tuple] [REPEAT] [u32|f32]
+//   BASELINE CURRENT STD OUTPUT [record|tuple] [REPEAT] [u32|f32] [WIDTHS]
+// WIDTHS is a comma-separated focused subset; omit it for all-width qualification.
 import { strict as assert } from "node:assert";
 import { resolve } from "node:path";
 import { cpuUsage } from "node:process";
 import { fileURLToPath } from "node:url";
 import { instantiateGuest } from "../compiler/guest.ts";
 
-assert(Deno.args.length >= 4 && Deno.args.length <= 7);
+assert(Deno.args.length >= 4 && Deno.args.length <= 8);
 const [baseline, candidate, std, output] = Deno.args.slice(0, 4).map((p) =>
   resolve(p)
 );
@@ -16,6 +17,20 @@ const repeat = Number(Deno.args[5] ?? 16);
 assert(Number.isSafeInteger(repeat) && repeat > 0 && repeat <= 4096);
 const scalar = Deno.args[6] ?? "u32";
 assert(scalar === "u32" || scalar === "f32");
+let firstWidth = 1;
+if (shape === "tuple") firstWidth = 2;
+let widths = Array.from({ length: 17 - firstWidth }, (_, i) => i + firstWidth);
+if (Deno.args[7] !== undefined) {
+  assert(/^\d+(,\d+)*$/.test(Deno.args[7]), "Expected comma-separated widths");
+  widths = Deno.args[7].split(",").map(Number);
+  assert(
+    widths.every((width) =>
+      Number.isSafeInteger(width) && width >= firstWidth && width <= 16
+    ),
+    `Widths must be between ${firstWidth} and 16`,
+  );
+  assert(new Set(widths).size === widths.length, "Duplicate widths");
+}
 await Deno.mkdir(output, { recursive: true });
 const hash = async (path: string | URL) =>
   [
@@ -51,7 +66,7 @@ const loadStart = await readLoad();
 const median = (values: number[]) =>
   [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
-for (let width = shape === "tuple" ? 2 : 1; width <= 16; width++) {
+for (const width of widths) {
   const fields = Array.from(
     { length: width },
     (_, i) => {
@@ -204,14 +219,15 @@ await Deno.writeTextFile(
   JSON.stringify(
     {
       note:
-        `${scalar.toUpperCase()} ${shape} rows, widths ${
-          shape === "tuple" ? 2 : 1
-        }–16, ` +
+        `${scalar.toUpperCase()} ${shape} rows, widths ${widths.join(",")}, ` +
         "immutable retained Lists, full fold and explicit cursor. " +
         `20 warmups, 31 alternating paired samples, each ${repeat} traversals. ` +
         "Per-traversal process CPU includes V8/host overhead. " +
         "Guest memory is committed pages; compiler allocation is separate.",
       pins,
+      shape,
+      scalar,
+      widths,
       count,
       repeat,
       versions: Deno.version,

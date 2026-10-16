@@ -17,6 +17,8 @@ const program = (offset: number) => `
 type Shape is data = #Circle U32 | #Square { side: U32, label: Shape }
 type Validate is effect = { check: U32 -> U32 }
 
+entry const callback_identity = fn (host: U32 -> U32 ! {Foreign}) => host (41 + ${offset})
+
 entry const templates = fn (v: U32) -> U32 => do:
   let add = fn (x: U32) => x + v + ${offset}
   let twice = fn (x: U32) => add (add x)
@@ -67,7 +69,12 @@ function counter(stats: unknown, key: string): number {
 Deno.test("ownership roles from checked layouts reach every allocation without conflicts", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-ownership-" });
   const entry = `${directory}/main.blot`;
-  const options = { executable, entry, prelude, cacheDirectory: false as const };
+  const options = {
+    executable,
+    entry,
+    prelude,
+    cacheDirectory: false as const,
+  };
   const retained = await createZigProjectCompiler(options);
   try {
     for (const offset of [0, 10, 0]) {
@@ -78,8 +85,27 @@ Deno.test("ownership roles from checked layouts reach every allocation without c
         const expected = await fresh.build({ sources });
         assert(result.success && expected.success, JSON.stringify(result));
         assert.deepEqual(result.bytes, expected.bytes);
+        for (const build of [result, expected]) {
+          const module = new WebAssembly.Module(build.bytes);
+          assert.deepEqual([
+            ...new Uint8Array(
+              WebAssembly.Module.customSections(module, "blot:ownership")[0],
+            ),
+          ], [2, 2, 0]);
+        }
         const guest = await instantiateGuest(result.bytes);
         try {
+          assert.equal(
+            guest.call(
+              "callback_identity",
+              guest.capability({
+                parameter: "U32",
+                result: "U32",
+                call: (value) => value + 1,
+              }),
+            ),
+            42 + offset,
+          );
           assert.equal(guest.call("templates", 5), 1 + 3 * (5 + offset));
           assert.equal(guest.call("cells", 7), 16);
           assert.equal(guest.call("arrays", 4), 7);
@@ -93,6 +119,63 @@ Deno.test("ownership roles from checked layouts reach every allocation without c
         }
         assert(counter(expected.stats, "allocation_role_runs") > 0);
         assert(counter(expected.stats, "parameter_role_functions") > 0);
+      } finally {
+        await fresh.dispose();
+      }
+    }
+  } finally {
+    await retained.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
+Deno.test("prepared machine sharing retains complete mixed ownership and sync JSPI callbacks", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const options = {
+    executable,
+    entry,
+    prelude,
+    cacheDirectory: false as const,
+    shareMachineCode: true,
+  };
+  const retained = await createZigProjectCompiler(options);
+  try {
+    for (const offset of [0, 10, 0]) {
+      const sources = { [entry]: program(offset) };
+      const result = await retained.build({ sources });
+      const fresh = await createZigProjectCompiler(options);
+      try {
+        const expected = await fresh.build({ sources });
+        assert(result.success && expected.success, JSON.stringify(result));
+        assert.deepEqual(result.bytes, expected.bytes);
+        const module = new WebAssembly.Module(result.bytes);
+        assert.deepEqual([
+          ...new Uint8Array(
+            WebAssembly.Module.customSections(module, "blot:ownership")[0],
+          ),
+        ], [2, 2, 0]);
+        const guest = await instantiateGuest(result.bytes);
+        try {
+          const callback = guest.capability({
+            parameter: "U32",
+            result: "U32",
+            call: (value) => value + 1,
+          });
+          assert.equal(guest.call("callback_identity", callback), 42 + offset);
+          assert.equal(guest.call("templates", 5), 1 + 3 * (5 + offset));
+          assert.equal(guest.call("cells", 7), 16);
+          assert.equal(guest.call("arrays", 4), 7);
+          assert.equal(guest.call("requested", 40), 42);
+          assert.equal(guest.call("requested", 0), 0);
+          assert.equal(
+            await guest.callAsync("callback_identity", callback),
+            42 + offset,
+          );
+          assert.equal(await guest.callAsync("requested", 40), 42);
+        } finally {
+          guest.dispose();
+        }
       } finally {
         await fresh.dispose();
       }

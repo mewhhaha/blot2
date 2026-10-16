@@ -16,12 +16,13 @@ dependencies across processes.
 
 ## Starting point
 
-Existing [backend_checkpoint.zig](../zig-native/src/backend_checkpoint.zig) and
-[dependency_bundle.zig](../zig-native/src/dependency_bundle.zig) retain only
-eligible subsets.
-[source_value_template.zig](../zig-native/src/source_value_template.zig) and
-evidence import code represent ownership-sensitive graphs; unsupported providers
-and generative domains currently decline.
+Existing
+[backend_checkpoint.zig](../zig-native/src/backend/backend_checkpoint.zig) and
+[dependency_bundle.zig](../zig-native/src/reuse/dependency_bundle.zig) retain
+only eligible subsets.
+[source_value_template.zig](../zig-native/src/reuse/source_value_template.zig)
+and evidence import code represent ownership-sensitive graphs; unsupported
+providers and generative domains currently decline.
 
 ## Implementation checklist
 
@@ -61,10 +62,11 @@ development and the scenarios below.
 ## Completion evidence
 
 - Commit: `88034529833783de881e59a0aca3e2b93fab69bb` (compiler milestone).
-- Implementation: [semantic_archive.zig](../zig-native/src/semantic_archive.zig)
-  persists the previous revision's complete selected-specialization owner: exact
-  checked Core per unit with type-node certificate bytes, namespace, evaluator
-  snapshot, slots, field locations and completed receipts under claim
+- Implementation:
+  [semantic_archive.zig](../zig-native/src/reuse/semantic_archive.zig) persists
+  the previous revision's complete selected-specialization owner: exact checked
+  Core per unit with type-node certificate bytes, namespace, evaluator snapshot,
+  slots, field locations and completed receipts under claim
   `selected_complete_proof`. Decoding validates namespace, every Core graph,
   snapshot ordinal, slot and receipt, then rebuilds a Capture used only as the
   query predecessor of a compile without an in-process previous revision; the

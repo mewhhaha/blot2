@@ -1651,10 +1651,9 @@ region, lexical capture selection projected every scope the region held
 
 With sharing on, the default, two more rules dropped the same key. A consumed
 principal graph whose description collected a source scope from another unit
-counted as an untracked read. A plain-nominal memo fact that a graph
-description decided inside the region, with the recorder detached, was later
-replayed as an input present before the region, so the key never matched on the
-next edit.
+counted as an untracked read. A plain-nominal memo fact that a graph description
+decided inside the region, with the recorder detached, was later replayed as an
+input present before the region, so the key never matched on the next edit.
 
 ### Rules
 
@@ -1669,8 +1668,8 @@ next edit.
 - A graph description reports its nominal memo reads and publications to the
   recorder it detached, in order.
 - Lexical capture selection projects only the scopes of values reachable from
-  the closure's captures, and capture-free closures, which have no key, skip
-  it. A new work counter, `lexical_interface_projections`, records the scopes
+  the closure's captures, and capture-free closures, which have no key, skip it.
+  A new work counter, `lexical_interface_projections`, records the scopes
   projected.
 
 [The contract](CONTRACT.md) states these rules.
@@ -1693,8 +1692,8 @@ next edit.
   sources keeps the recorder eligible but marks the receipt tape unknown, and an
   untracked graph still rejects both (`core_eval.zig`); it fails if foreign
   sources reject the recorder.
-- [A process law](tests/lexical_capture_scan.test.ts) builds tables of 8, 32
-  and 96 closures, with scalar and with shared aggregate captures: at most four
+- [A process law](tests/lexical_capture_scan.test.ts) builds tables of 8, 32 and
+  96 closures, with scalar and with shared aggregate captures: at most four
   projections per closure. The old scan projected 36, 528 and 4,656 scopes for
   the scalar tables.
 - Measurements, pinned in [the pins](qualification/summary-job-cost-pins.json):
@@ -1705,13 +1704,13 @@ next edit.
   ([results](qualification/summary-job-cost-public.jsonl)); and the synthetic
   `bench:compile` corpus, five pairs.
 
-| gdev, medians of edits 2–4   | `f7be6e7` | Before (`6275e38`) | Candidate |
-| ---------------------------- | --------: | -----------------: | --------: |
-| Retained edit CPU            |    400 ms |             780 ms |    570 ms |
-| Inference per edit           |    199 ms |             448 ms |    240 ms |
-| Inference regions per edit   |       433 |              2,026 |     1,034 |
-| Fresh named functions        |       264 |                102 |       102 |
-| Cold build CPU               |  1,480 ms |           1,260 ms |  1,170 ms |
+| gdev, medians of edits 2–4 | `f7be6e7` | Before (`6275e38`) | Candidate |
+| -------------------------- | --------: | -----------------: | --------: |
+| Retained edit CPU          |    400 ms |             780 ms |    570 ms |
+| Inference per edit         |    199 ms |             448 ms |    240 ms |
+| Inference regions per edit |       433 |              2,026 |     1,034 |
+| Fresh named functions      |       264 |                102 |       102 |
+| Cold build CPU             |  1,480 ms |           1,260 ms |  1,170 ms |
 
 Every pair favoured the candidate (edits 0.73× the current compiler). Diamonds
 and public examples keep identical work counters and CPU within noise. The

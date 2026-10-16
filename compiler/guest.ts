@@ -1,3 +1,24 @@
+import {
+  copyData,
+  type DataNode,
+  type DataValue,
+  readDataSchemas,
+  validateDataRoots,
+} from "./cleanup_data.ts";
+import {
+  type ResourceAdapter,
+  type ResourceBindings,
+  ResourceJournal,
+  ResourceTokens,
+} from "./resource_journal.ts";
+
+import {
+  taskExports,
+  TaskGuest,
+  taskImports,
+  typedTaskFunctions,
+} from "./task_guest.ts";
+
 const littleEndian = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 
 const scalarTypes = ["Unit", "U32", "Bool", "F32"] as const;
@@ -20,15 +41,30 @@ function isArrayType(type: ValueType): type is ArrayType {
 }
 
 export interface CallbackType {
-  readonly kind: "callback";
+  readonly kind: "callback" | "cleanup";
+  readonly concurrent?: true;
+  readonly lifetime?: "owned";
+  readonly dataSchema?: number;
   readonly parameter: ValueType;
   readonly result: ValueType;
 }
 
+export interface OwnerType {
+  readonly kind: "owner";
+  readonly usage: "unique" | "shared";
+  readonly schema: number;
+  readonly fresh?: ValueType;
+}
+const ownerBrand = Symbol("GuestOwner");
+export interface GuestOwner {
+  readonly [ownerBrand]: true;
+  readonly usage: "unique" | "shared";
+}
 export interface GuestFunction {
   readonly name: string;
-  readonly parameter: ValueType | CallbackType;
-  readonly result: ValueType;
+  readonly multiplicity?: "once";
+  readonly parameter: ValueType | CallbackType | OwnerType;
+  readonly result: ValueType | OwnerType;
 }
 
 export interface GuestConstant {
@@ -37,11 +73,32 @@ export interface GuestConstant {
 }
 
 export interface GuestAbi {
-  readonly version: 2 | 3;
+  readonly version: 2 | 3 | 4 | 5 | 6 | 7;
   readonly functions: readonly GuestFunction[];
   readonly constants: readonly GuestConstant[];
+  readonly taskDescriptorCount?: number;
+  readonly resourceAdapterCount?: number;
+  readonly resourceTransfer?: boolean;
+  readonly publicOwners?: boolean;
 }
 
+const dataTypeBrand = Symbol("CleanupDataType");
+export interface CleanupDataType {
+  readonly [dataTypeBrand]: true;
+  readonly name: string;
+}
+export interface CleanupDataDefinition {
+  readonly type: CleanupDataType;
+  readonly maxSteps: number;
+  readonly maxCalls: number;
+  readonly call: (value: DataValue) => null;
+}
+const dataTypeOwners = new WeakMap<
+  object,
+  { lifetime: Lifetime; schema: number }
+>();
+const abiDataSchemas = new WeakMap<GuestAbi, ReadonlyMap<number, DataNode>>();
+export type { DataValue } from "./cleanup_data.ts";
 const capabilityBrand = Symbol("HostCapability");
 export interface HostCapability {
   readonly [capabilityBrand]: true;
@@ -50,12 +107,22 @@ export interface HostCapability {
 }
 
 export interface HostCallback<P extends ValueType, R extends ValueType> {
+  readonly concurrent?: true;
   readonly parameter: P;
   readonly result: R;
   readonly call: (value: ValueOf<P>) => ValueOf<R>;
 }
 
+/** Trusted host promise: each call completes synchronously within maxSteps.
+ * maxCalls is independently enforced for each guest invocation. */
+export interface HostCleanup<P extends ValueType>
+  extends HostCallback<P, "Unit"> {
+  readonly maxSteps: number;
+  readonly maxCalls: number;
+}
+
 export interface AsyncHostCallback<P extends ValueType, R extends ValueType> {
+  readonly concurrent?: true;
   readonly parameter: P;
   readonly result: R;
   readonly call: (value: ValueOf<P>) => ValueOf<R> | PromiseLike<ValueOf<R>>;
@@ -74,7 +141,13 @@ export type GuestErrorCode =
   | "unsupported_async"
   | "reentrant_call"
   | "disposed_guest"
-  | "unknown_export";
+  | "unknown_export"
+  | "once_reused"
+  | "invalid_owner"
+  | "foreign_owner"
+  | "stale_owner"
+  | "use_after_move"
+  | "owner_type";
 
 export class GuestError extends Error {
   constructor(
@@ -89,7 +162,12 @@ export class GuestError extends Error {
 
 class AbiReader {
   #offset = 0;
-  constructor(readonly bytes: Uint8Array) {}
+  tasks = false;
+  constructor(
+    readonly bytes: Uint8Array,
+    public owners = false,
+    public structured = false,
+  ) {}
 
   byte(): number {
     if (this.#offset === this.bytes.length) {
@@ -147,15 +225,72 @@ class AbiReader {
     return this.scalar(tag);
   }
 
-  parameter(): ValueType | CallbackType {
+  publicValue(tag = this.byte()): ValueType | OwnerType {
+    if (tag !== 8 && tag !== 9) return this.value(tag);
+    if (!this.owners) {
+      throw new GuestError("invalid_abi", "Owner type requires ABI 6");
+    }
+    const schema = this.count();
+    if (schema === 0) {
+      throw new GuestError("invalid_abi", "Invalid owner schema");
+    }
+    const fresh = this.byte();
+    let usage: OwnerType["usage"] = "unique";
+    if (tag === 9) usage = "shared";
+    if (fresh === 255) return Object.freeze({ kind: "owner", usage, schema });
+    return Object.freeze({
+      kind: "owner",
+      usage,
+      schema,
+      fresh: this.value(fresh),
+    });
+  }
+  parameter(): ValueType | CallbackType | OwnerType {
     const tag = this.byte();
-    return tag === 4
-      ? Object.freeze({
-        kind: "callback",
-        parameter: this.value(),
-        result: this.value(),
-      })
-      : this.value(tag);
+    if ((tag === 11 || tag === 12 && this.owners) && this.structured) {
+      const schema = this.count();
+      if (schema === 0) {
+        throw new GuestError("invalid_abi", "Empty cleanup data schema");
+      }
+      if (tag === 12) {
+        return Object.freeze({
+          kind: "cleanup",
+          parameter: "U32",
+          result: "Unit",
+          lifetime: "owned",
+          dataSchema: schema,
+        });
+      }
+      return Object.freeze({
+        kind: "cleanup",
+        parameter: "U32",
+        result: "Unit",
+        dataSchema: schema,
+      });
+    }
+    if (
+      tag === 4 || tag === 7 || tag === 10 && this.owners ||
+      tag === 13 && this.tasks
+    ) {
+      const parameter = this.value();
+      const result = this.value();
+      if ((tag === 7 || tag === 10) && result !== "Unit") {
+        throw new GuestError(
+          "invalid_abi",
+          "Cleanup callback must return Unit",
+        );
+      }
+      let kind: CallbackType["kind"] = "callback";
+      if (tag === 7 || tag === 10) kind = "cleanup";
+      if (tag === 10) {
+        return Object.freeze({ kind, parameter, result, lifetime: "owned" });
+      }
+      if (tag === 13) {
+        return Object.freeze({ kind, parameter, result, concurrent: true });
+      }
+      return Object.freeze({ kind, parameter, result });
+    }
+    return this.publicValue(tag);
   }
 
   end(): void {
@@ -165,7 +300,20 @@ class AbiReader {
   }
 }
 
+function importModule(signature: CallbackType): string {
+  if (signature.dataSchema !== undefined) {
+    if (signature.lifetime === "owned") return "blot:cleanup_data/2";
+    return "blot:cleanup_data/1";
+  }
+  if (signature.lifetime === "owned") return "blot:cleanup/2";
+  if (signature.kind === "cleanup") return "blot:cleanup/1";
+  return "blot:host/1";
+}
+function importKey(signature: CallbackType): string {
+  return `${importModule(signature)}/${importName(signature)}`;
+}
 function importName(signature: CallbackType): string {
+  if (signature.dataSchema !== undefined) return "call_data_unit";
   return `call_${signature.parameter.toLowerCase().replaceAll(" ", "_")}_${
     signature.result.toLowerCase().replaceAll(" ", "_")
   }`;
@@ -181,10 +329,30 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   }
   const reader = new AbiReader(new Uint8Array(sections[0]));
   const version = reader.count();
-  if (version !== 2 && version !== 3) {
+  if (
+    version !== 2 && version !== 3 && version !== 4 && version !== 5 &&
+    version !== 6 && version !== 7
+  ) {
     throw new GuestError(
       "invalid_abi",
       `Unsupported guest ABI version ${version}`,
+    );
+  }
+  reader.owners = version === 6;
+  reader.structured = version === 7;
+  let publicOwners = reader.owners;
+  let dataSchemas: ReadonlyMap<number, DataNode> | undefined;
+  try {
+    dataSchemas = readDataSchemas(module);
+  } catch (cause) {
+    throw new GuestError("invalid_abi", "Invalid cleanup data schemas", {
+      cause,
+    });
+  }
+  if ((version === 7) !== (dataSchemas !== undefined)) {
+    throw new GuestError(
+      "invalid_abi",
+      "Cleanup data feature differs from ABI version",
     );
   }
   const functions: GuestFunction[] = [];
@@ -197,18 +365,83 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     }
     exports.set(name, kind);
   };
-  if (version === 3) {
+  if (version >= 3) {
     declare("blot:ownership_enter", "function");
     declare("blot:ownership_leave", "function");
     declare("blot:rc_roots", "global");
   }
+  const taskSections = WebAssembly.Module.customSections(module, "blot:tasks");
+  let taskCount: number | undefined;
+  if (taskSections.length > 1) {
+    throw new GuestError("invalid_abi", "Duplicate task feature section");
+  }
+  if (taskSections.length === 1) {
+    const feature = new AbiReader(new Uint8Array(taskSections[0]));
+    if (version < 3 || feature.byte() !== 2) {
+      throw new GuestError(
+        "invalid_abi",
+        "Unsupported task ownership contract",
+      );
+    }
+    reader.tasks = true;
+    taskCount = feature.count();
+    if (taskCount > 4096) {
+      throw new GuestError("invalid_abi", "Invalid task descriptor count");
+    }
+    feature.end();
+    for (const name of taskExports(taskCount)) declare(name, "function");
+  }
+  let resources = 0;
+  if (version >= 4) {
+    resources = reader.count();
+    if ((resources === 0 && version < 6) || resources > 4096) {
+      throw new GuestError("invalid_abi", "Invalid resource adapter count");
+    }
+  }
+  let transfer = version === 5;
+  if (version >= 6) {
+    const flags = reader.byte();
+    let limit = 1;
+    if (version === 7) limit = 3;
+    if (flags > limit || (resources === 0 && (flags & 1) !== 0)) {
+      throw new GuestError("invalid_abi", "Invalid owner ABI flags");
+    }
+    transfer = (flags & 1) !== 0;
+    if (version === 7) publicOwners = (flags & 2) !== 0;
+    reader.owners = publicOwners;
+    if (publicOwners) {
+      declare("blot:owner_release", "function");
+      declare("blot:owner_token", "function");
+    }
+  }
+
   const functionCount = reader.count();
   for (let index = 0; index < functionCount; index++) {
     const name = reader.name();
     declare(name, "function");
     const parameter = reader.parameter();
-    if (typeof parameter !== "string") signatures.add(importName(parameter));
-    functions.push(Object.freeze({ name, parameter, result: reader.value() }));
+    if (typeof parameter !== "string" && parameter.kind !== "owner") {
+      signatures.add(importKey(parameter));
+      if (parameter.lifetime === "owned") {
+        let binder = "blot:cleanup_bind/1";
+        if (parameter.dataSchema !== undefined) {
+          binder = "blot:cleanup_data_bind/1";
+        }
+        signatures.add(`${binder}/${importName(parameter)}`);
+      }
+    }
+    const result = reader.publicValue();
+    if (typeof result !== "string" && result.fresh !== undefined) {
+      throw new GuestError(
+        "invalid_abi",
+        "Owner results cannot declare fresh arguments",
+      );
+    }
+    if (
+      typeof parameter !== "string" && parameter.kind === "owner" &&
+      parameter.fresh !== undefined
+    ) declare(`blot:owner_call/${name}`, "function");
+    functions.push(Object.freeze({ name, parameter, result }));
   }
   const constantCount = reader.count();
   for (let index = 0; index < constantCount; index++) {
@@ -217,12 +450,64 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     constants.push(Object.freeze({ name, type: reader.scalar() }));
   }
   reader.end();
+  try {
+    validateDataRoots(
+      dataSchemas,
+      functions.flatMap((fn) => {
+        if (
+          typeof fn.parameter === "string" || fn.parameter.kind === "owner" ||
+          fn.parameter.dataSchema === undefined
+        ) return [];
+        return [fn.parameter.dataSchema];
+      }),
+    );
+  } catch (cause) {
+    throw new GuestError("invalid_abi", "Invalid cleanup data schema roots", {
+      cause,
+    });
+  }
+  const multiplicity = WebAssembly.Module.customSections(
+    module,
+    "blot:multiplicity",
+  );
+  if (multiplicity.length > 1) {
+    throw new GuestError("invalid_abi", "Duplicate multiplicity section");
+  }
+  if (multiplicity.length === 1) {
+    const usage = new AbiReader(new Uint8Array(multiplicity[0]));
+    if (usage.count() !== 1) {
+      throw new GuestError("invalid_abi", "Unsupported multiplicity version");
+    }
+    const count = usage.count();
+    if (count === 0 || count > functions.length) {
+      throw new GuestError("invalid_abi", "Invalid multiplicity count");
+    }
+    const seen = new Set<string>();
+    const positions = new Map(functions.map((fn, index) => [fn.name, index]));
+    for (let index = 0; index < count; index++) {
+      const name = usage.name();
+      const position = positions.get(name);
+      if (position === undefined || seen.has(name) || usage.byte() !== 1) {
+        throw new GuestError("invalid_abi", "Invalid once function entry");
+      }
+      seen.add(name);
+      functions[position] = Object.freeze({
+        ...functions[position],
+        multiplicity: "once",
+      });
+    }
+    usage.end();
+  }
   if (
+    version === 5 || version >= 6 && resources !== 0 ||
     functions.some((fn) =>
       (typeof fn.parameter === "string" && isArrayType(fn.parameter)) ||
-      isArrayType(fn.result) ||
-      (typeof fn.parameter !== "string" &&
-        (isArrayType(fn.parameter.parameter) ||
+      (typeof fn.result === "string" && isArrayType(fn.result)) ||
+      (typeof fn.parameter !== "string" && fn.parameter.kind === "owner" &&
+        fn.parameter.fresh !== undefined && isArrayType(fn.parameter.fresh)) ||
+      (typeof fn.parameter !== "string" && fn.parameter.kind !== "owner" &&
+        (fn.parameter.dataSchema !== undefined ||
+          isArrayType(fn.parameter.parameter) ||
           isArrayType(fn.parameter.result)))
     )
   ) {
@@ -230,8 +515,33 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     declare("blot:allocate", "function");
     declare("blot:reset", "function");
   }
-  if (version === 3 && signatures.size !== 0) {
+  if (version >= 3 && (signatures.size !== 0 || taskCount !== undefined)) {
     declare("blot:rc_host_refs", "global");
+  }
+  if (resources !== 0) {
+    for (let index = 0; index < resources; index++) {
+      declare(resourceExport(index, false), "function");
+      declare(resourceExport(index, true), "function");
+    }
+  }
+  if (taskCount !== undefined && !exports.has("blot:memory")) {
+    declare("blot:memory", "memory");
+  }
+  const expectedTaskImports = new Set<string>();
+  if (taskCount !== undefined) {
+    for (const [name] of taskImports) expectedTaskImports.add(name);
+  }
+  const resourceImports = new Set<string>();
+  if (resources !== 0) {
+    resourceImports.add("reserve");
+    resourceImports.add("register");
+    resourceImports.add("release");
+  }
+  const transferImports = new Set<string>();
+  if (transfer) {
+    transferImports.add("register_owned");
+    transferImports.add("retire");
+    transferImports.add("drain");
   }
   const actualExports = WebAssembly.Module.exports(module);
   const ownership = WebAssembly.Module.customSections(module, "blot:ownership");
@@ -244,7 +554,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
       state.length !== 3 || (state[0] !== 1 && state[0] !== 2) ||
       state[1] > state[0] || state[2] > 7 ||
       (state[1] !== 0) !== (state[2] === 0) ||
-      (version === 3) !== (state[0] === 2 && state[1] === 2)
+      (version >= 3) !== (state[0] === 2 && state[1] === 2)
     ) throw new GuestError("invalid_abi", "Invalid ownership section");
     if (state[2] !== 1) {
       for (const counter of ["leases", "retains", "releases", "destroyed"]) {
@@ -269,7 +579,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
       declare(`blot:cycle_${counter}`, "global");
     }
   }
-  if (version === 3 && ownership.length !== 1) {
+  if (version >= 3 && ownership.length !== 1) {
     throw new GuestError("invalid_abi", "Missing root ownership section");
   }
   if (
@@ -280,8 +590,26 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   }
   for (const entry of WebAssembly.Module.imports(module)) {
     if (
-      entry.module !== "blot:host/1" || entry.kind !== "function" ||
-      !signatures.delete(entry.name)
+      entry.module === "blot:task/1" && entry.kind === "function" &&
+      expectedTaskImports.delete(entry.name)
+    ) continue;
+    if (
+      entry.module === "blot:resource/1" && entry.kind === "function" &&
+      resourceImports.delete(entry.name)
+    ) continue;
+    if (
+      entry.module === "blot:resource/2" && entry.kind === "function" &&
+      transferImports.delete(entry.name)
+    ) continue;
+    if (
+      (entry.module !== "blot:host/1" && entry.module !== "blot:cleanup/1" &&
+        entry.module !== "blot:cleanup/2" &&
+        entry.module !== "blot:cleanup_bind/1" &&
+        entry.module !== "blot:cleanup_data/1" &&
+        entry.module !== "blot:cleanup_data/2" &&
+        entry.module !== "blot:cleanup_data_bind/1") ||
+      entry.kind !== "function" ||
+      !signatures.delete(`${entry.module}/${entry.name}`)
     ) {
       throw new GuestError(
         "invalid_abi",
@@ -289,14 +617,33 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
       );
     }
   }
+  if (expectedTaskImports.size !== 0) {
+    throw new GuestError("invalid_abi", "Missing task protocol import");
+  }
+  if (resourceImports.size !== 0 || transferImports.size !== 0) {
+    throw new GuestError("invalid_abi", "Missing resource journal import");
+  }
   if (signatures.size !== 0) {
     throw new GuestError("invalid_abi", "Missing generic callback import");
   }
-  return Object.freeze({
+  const result: GuestAbi = {
     version,
     functions: Object.freeze(functions),
     constants: Object.freeze(constants),
-  });
+  };
+  if (taskCount !== undefined) {
+    Object.assign(result, {
+      taskDescriptorCount: taskCount,
+    });
+  }
+  if (resources !== 0) {
+    Object.assign(result, { resourceAdapterCount: resources });
+  }
+  if (version >= 6) {
+    Object.assign(result, { resourceTransfer: transfer, publicOwners });
+  }
+  if (dataSchemas) abiDataSchemas.set(result, dataSchemas);
+  return Object.freeze(result);
 }
 
 function scalarToWasm(
@@ -475,9 +822,18 @@ interface CapabilityOwner {
   readonly lifetime: Lifetime;
   readonly signature: CallbackType;
   readonly asynchronous: boolean;
+  readonly maxCalls?: number;
 }
 const capabilityOwners = new WeakMap<object, CapabilityOwner>();
-type InvokeCallback = (value: GuestValue) => unknown;
+interface PublicOwnerState {
+  readonly lifetime: Lifetime;
+  readonly schema: number;
+  readonly usage: "unique" | "shared";
+  readonly token: number;
+  live: boolean;
+}
+const publicOwnerStates = new WeakMap<object, PublicOwnerState>();
+type InvokeCallback = (value: GuestValue | DataValue) => unknown;
 
 export interface Guest {
   /** Committed linear-memory bytes, including temporary allocation capacity. */
@@ -486,12 +842,18 @@ export interface Guest {
   capability<P extends ValueType, R extends ValueType>(
     callback: HostCallback<P, R>,
   ): HostCapability;
+  cleanupCapability<P extends ValueType>(
+    callback: HostCleanup<P>,
+  ): HostCapability;
   capabilityAsync<P extends ValueType, R extends ValueType>(
     callback: AsyncHostCallback<P, R>,
   ): HostCapability;
-  call(name: string, argument: unknown): GuestValue;
-  callAsync(name: string, argument: unknown): Promise<GuestValue>;
+  call(name: string, argument: unknown): GuestValue | GuestOwner;
+  callAsync(name: string, argument: unknown): Promise<GuestValue | GuestOwner>;
   read(name: string): ScalarValue;
+  cleanupDataType(name: string): CleanupDataType;
+  cleanupDataCapability(definition: CleanupDataDefinition): HostCapability;
+  releaseOwner(owner: GuestOwner): void;
   dispose(): void;
 }
 
@@ -504,6 +866,146 @@ interface PromiseIntegration {
   ) => (value: unknown) => Promise<unknown>;
 }
 
+function resourceExport(index: number, drop: boolean): string {
+  if (drop) return `blot:resource_drop/${index}`;
+  return `blot:resource_cleanup/${index}`;
+}
+function resourceU32(value: number): number[] {
+  const bytes: number[] = [];
+  do {
+    let byte = value & 127;
+    value >>>= 7;
+    if (value !== 0) byte |= 128;
+    bytes.push(byte);
+  } while (value !== 0);
+  return bytes;
+}
+function resourceName(value: string): number[] {
+  const bytes = [...new TextEncoder().encode(value)];
+  return [...resourceU32(bytes.length), ...bytes];
+}
+function resourceModule(
+  sections: readonly (readonly number[])[],
+): WebAssembly.Module {
+  return new WebAssembly.Module(
+    new Uint8Array([
+      0,
+      97,
+      115,
+      109,
+      1,
+      0,
+      0,
+      0,
+      ...sections.flatMap((section, index) => {
+        if (section.length === 0) return [];
+        return [index + 1, ...resourceU32(section.length), ...section];
+      }),
+    ]),
+  );
+}
+function typedCleanupImport(
+  signature: CallbackType,
+  callback: CallableFunction,
+): WebAssembly.ImportValue {
+  let parameter = 127;
+  if (signature.parameter === "F32") parameter = 125;
+  let handle = 111;
+  if (signature.lifetime === "owned") handle = 127;
+  let parameters = [2, handle, parameter];
+  if (signature.dataSchema !== undefined) parameters = [3, handle, 127, 127];
+  const module = resourceModule([
+    [1, 96, ...parameters, 1, 127],
+    [1, ...resourceName("h"), ...resourceName("c"), 0, 0],
+    [],
+    [],
+    [],
+    [],
+    [1, ...resourceName("c"), 0, 0],
+  ]);
+  return new WebAssembly.Instance(module, { h: { c: callback } }).exports.c;
+}
+function typedCleanupBind(
+  callback: CallableFunction,
+  data = false,
+): WebAssembly.ImportValue {
+  let parameters = [1, 111];
+  if (data) parameters = [2, 111, 127];
+  const module = resourceModule([
+    [1, 96, ...parameters, 1, 127],
+    [1, ...resourceName("h"), ...resourceName("c"), 0, 0],
+    [],
+    [],
+    [],
+    [],
+    [1, ...resourceName("c"), 0, 0],
+  ]);
+  return new WebAssembly.Instance(module, { h: { c: callback } }).exports.c;
+}
+function typedResourceImports(
+  imports: Record<string, WebAssembly.ImportValue>,
+  transfers = false,
+): Record<string, WebAssembly.ImportValue> {
+  let names = ["reserve", "register", "release"];
+  let parameters = [0, 5, 1];
+  if (transfers) {
+    names = ["register_owned", "retire", "drain"];
+    parameters = [6, 1, 0];
+  }
+  const types: number[] = [names.length];
+  for (let index = 0; index < names.length; index++) {
+    types.push(96, parameters[index]);
+    for (let count = 0; count < parameters[index]; count++) types.push(127);
+    if (!transfers && index === 0) types.push(1, 127);
+    else types.push(0);
+  }
+  const linked = [names.length];
+  const exports = [names.length];
+  for (const [index, name] of names.entries()) {
+    linked.push(...resourceName("j"), ...resourceName(name), 0, index);
+    exports.push(...resourceName(name), 0, index);
+  }
+  // Typed re-exports independently check actual import signatures before use.
+  const module = resourceModule([types, linked, [], [], [], [], exports]);
+  return new WebAssembly.Instance(module, { j: imports }).exports;
+}
+function resourceAdapters(
+  instance: WebAssembly.Instance,
+  count: number,
+): ResourceAdapter[] {
+  const adapters: ResourceAdapter[] = [];
+  const imported: Record<string, WebAssembly.ExportValue> = {};
+  const imports = resourceU32(count * 2);
+  for (let index = 0; index < count; index++) {
+    const cleanup = instance.exports[resourceExport(index, false)];
+    const drop = instance.exports[resourceExport(index, true)];
+    if (typeof cleanup !== "function" || typeof drop !== "function") {
+      throw new GuestError("invalid_abi", "Missing resource adapter");
+    }
+    for (const [suffix, fn] of [["c", cleanup], ["d", drop]] as const) {
+      const name = `${suffix}${index}`;
+      imported[name] = fn;
+      imports.push(...resourceName("o"), ...resourceName(name), 0, 0);
+    }
+    adapters.push({
+      cleanup: cleanup as ResourceAdapter["cleanup"],
+      drop: drop as ResourceAdapter["drop"],
+    });
+  }
+  // Link exact (i32,i32,i32)->Unit exports without invoking cleanup.
+  try {
+    new WebAssembly.Instance(
+      resourceModule([[1, 96, 3, 127, 127, 127, 0], imports]),
+      { o: imported },
+    );
+  } catch (cause) {
+    throw new GuestError("invalid_abi", "Invalid resource adapter signature", {
+      cause,
+    });
+  }
+  return adapters;
+}
+
 /** Invocation-scoped capabilities. Async invocations retain memory while suspended. */
 export async function instantiateGuest(
   bytes: Uint8Array<ArrayBuffer> | WebAssembly.Module,
@@ -513,6 +1015,7 @@ export async function instantiateGuest(
     ? bytes
     : await WebAssembly.compile(bytes);
   const abi = readGuestAbi(module);
+  const dataSchemas = abiDataSchemas.get(abi);
   const functions = new Map(abi.functions.map((fn) => [fn.name, fn]));
   const constants = new Map(
     abi.constants.map((constant) => [constant.name, constant]),
@@ -536,7 +1039,25 @@ export async function instantiateGuest(
     readonly invoke: InvokeCallback;
     readonly exportName: string;
     readonly asynchronous: boolean;
+    readonly maxCalls?: number;
+    calls: number;
+    binding?: number;
   } | undefined;
+  let epoch = 0;
+  let nextBinding = 1;
+  let bindings:
+    | Map<number, {
+      reference: object;
+      signature: CallbackType;
+      invoke: InvokeCallback;
+      exportName: string;
+      asynchronous: boolean;
+      maxCalls: number;
+      calls: number;
+      epoch: number;
+      refs: number;
+    }>
+    | undefined;
   let running = false;
 
   function idle(): void {
@@ -569,22 +1090,76 @@ export async function instantiateGuest(
     }
     return arrayToWasm(arena, type, value, label, "host_result");
   }
+  async function asynchronousResult(
+    type: ValueType,
+    result: unknown,
+    name: string,
+    taskContext: number | undefined,
+  ): Promise<number> {
+    let value: unknown;
+    try {
+      value = await result;
+    } catch (cause) {
+      if (taskContext !== undefined) tasks!.imports.resume(taskContext);
+      throw new GuestError(
+        "host_exception",
+        `Host callback rejected during ${name}`,
+        { cause },
+      );
+    }
+    if (taskContext !== undefined) tasks!.imports.resume(taskContext);
+    return hostResult(type, value, name);
+  }
   const imports: Record<string, WebAssembly.ImportValue> = {};
+  const cleanupImports: Record<string, WebAssembly.ImportValue> = {};
+  const ownedCleanupImports: Record<string, WebAssembly.ImportValue> = {};
+  const cleanupBindImports: Record<string, WebAssembly.ImportValue> = {};
+  const dataCleanupImports: Record<string, WebAssembly.ImportValue> = {};
+  const ownedDataCleanupImports: Record<string, WebAssembly.ImportValue> = {};
+  const dataBindImports: Record<string, WebAssembly.ImportValue> = {};
   for (const fn of abi.functions) {
-    if (typeof fn.parameter === "string") continue;
+    if (typeof fn.parameter === "string" || fn.parameter.kind === "owner") {
+      continue;
+    }
     const signature = fn.parameter;
+    if (signature.lifetime === "owned") bindings ??= new Map();
     const invokeImport = (
       reference: unknown,
       value: number,
+      data?: number,
     ): number | Promise<number> => {
-      const invocation = active;
-      if (!invocation || reference !== invocation.reference) {
+      let invocation: NonNullable<typeof active> | undefined = active;
+      if (signature.lifetime === "owned") {
+        const binding = bindings!.get(Number(reference) >>> 0);
+        invocation = binding;
+        if (!running || !binding) invocation = undefined;
+        if (binding && binding.epoch !== epoch) {
+          binding.epoch = epoch;
+          binding.calls = 0;
+        }
+      }
+      if (
+        !invocation ||
+        signature.lifetime !== "owned" && reference !== invocation.reference
+      ) {
         throw new GuestError(
           "stale_capability",
           "Host call has no active capability reference",
         );
       }
       if (
+        signature.dataSchema !== undefined &&
+          (value >>> 0) !== invocation.signature.dataSchema ||
+        signature.dataSchema === undefined &&
+          invocation.signature.dataSchema !== undefined
+      ) {
+        throw new GuestError(
+          "capability_signature",
+          "Cleanup data call differs from its exact schema",
+        );
+      }
+      if (
+        signature.kind !== invocation.signature.kind ||
         signature.parameter !== invocation.signature.parameter ||
         signature.result !== invocation.signature.result
       ) {
@@ -593,7 +1168,37 @@ export async function instantiateGuest(
           "Host call signature does not match its capability",
         );
       }
-      const argument = fromWasm(signature.parameter, value);
+      if (signature.kind === "cleanup") {
+        if (
+          invocation.maxCalls === undefined ||
+          invocation.calls >= invocation.maxCalls
+        ) {
+          throw new GuestError(
+            "host_exception",
+            "Cleanup invocation limit exceeded",
+          );
+        }
+        invocation.calls++;
+      }
+      let argument: GuestValue | DataValue;
+      if (signature.dataSchema !== undefined) {
+        if (!arena || !dataSchemas || data === undefined) {
+          throw new GuestError("invalid_abi", "Missing cleanup data memory");
+        }
+        try {
+          argument = copyData(
+            arena.memory,
+            dataSchemas,
+            value >>> 0,
+            data >>> 0,
+          );
+        } catch (cause) {
+          throw new GuestError("invalid_abi", "Invalid cleanup data value", {
+            cause,
+          });
+        }
+      } else argument = fromWasm(signature.parameter, value);
+      const taskContext = tasks?.imports.current();
       let result: unknown;
       try {
         result = invocation.invoke(argument);
@@ -610,21 +1215,22 @@ export async function instantiateGuest(
         "then" in result
       ) {
         if (invocation.asynchronous) {
-          return Promise.resolve(result).then(
-            (value) =>
-              hostResult(signature.result, value, invocation.exportName),
-            (cause) => {
-              throw new GuestError(
-                "host_exception",
-                `Host callback rejected during ${invocation.exportName}`,
-                { cause },
-              );
-            },
+          return asynchronousResult(
+            signature.result,
+            result,
+            invocation.exportName,
+            taskContext,
           );
+        }
+        let message =
+          `Host callback returned a Promise/thenable during ${invocation.exportName}; use capabilityAsync() and callAsync()`;
+        if (signature.kind === "cleanup") {
+          message =
+            `Cleanup callback must complete synchronously during ${invocation.exportName}`;
         }
         const failure = new GuestError(
           "async_host_call",
-          `Host callback returned a Promise/thenable during ${invocation.exportName}; use capabilityAsync() and callAsync()`,
+          message,
         );
         // The intrinsic checks Promise identity across realms without calling
         // a user-supplied then/catch. Non-Promise thenables throw here; report
@@ -638,16 +1244,311 @@ export async function instantiateGuest(
       }
       return hostResult(signature.result, result, invocation.exportName);
     };
-    imports[importName(signature)] = options.asynchronous
-      ? new (requireAsync().Suspending)(invokeImport)
-      : invokeImport;
+    if (signature.lifetime === "owned") {
+      let invocationImports = ownedCleanupImports;
+      let bindingImports = cleanupBindImports;
+      if (signature.dataSchema !== undefined) {
+        invocationImports = ownedDataCleanupImports;
+        bindingImports = dataBindImports;
+      }
+      invocationImports[importName(signature)] = typedCleanupImport(
+        signature,
+        invokeImport,
+      );
+      bindingImports[importName(signature)] = typedCleanupBind(
+        (reference: unknown, schema?: number) => {
+          const invocation = active;
+          if (
+            !running || !invocation || reference !== invocation.reference ||
+            invocation.signature.kind !== "cleanup" ||
+            (signature.dataSchema !== undefined &&
+              invocation.signature.dataSchema !== (schema! >>> 0)) ||
+            (signature.dataSchema === undefined &&
+              invocation.signature.dataSchema !== undefined) ||
+            invocation.signature.parameter !== signature.parameter ||
+            invocation.signature.result !== "Unit" || invocation.asynchronous ||
+            invocation.maxCalls === undefined
+          ) {
+            throw new GuestError(
+              "stale_capability",
+              "Owned cleanup binding requires an active synchronous cleanup capability",
+            );
+          }
+          if (
+            bindings!.size === 4096 || nextBinding > 0xFFFFFFFF ||
+            invocation.binding !== undefined
+          ) {
+            throw new GuestError("host_exception", "Cleanup binding limit");
+          }
+          const binding = nextBinding++;
+          bindings!.set(binding, {
+            ...invocation,
+            maxCalls: invocation.maxCalls,
+            refs: 0,
+            epoch,
+          });
+          invocation.binding = binding;
+          return binding;
+        },
+        signature.dataSchema !== undefined,
+      );
+    } else if (signature.kind === "cleanup") {
+      let invocationImports = cleanupImports;
+      if (signature.dataSchema !== undefined) {
+        invocationImports = dataCleanupImports;
+      }
+      invocationImports[importName(signature)] = typedCleanupImport(
+        signature,
+        invokeImport,
+      );
+    } else if (options.asynchronous) {
+      imports[importName(signature)] = new (requireAsync().Suspending)(
+        invokeImport,
+      );
+    } else {
+      imports[importName(signature)] = invokeImport;
+    }
   }
-  const instance = await WebAssembly.instantiate(module, {
+  let resources: ResourceJournal | undefined;
+  let rootResources: ResourceJournal | undefined;
+  let makeTaskJournal: (() => ResourceJournal) | undefined;
+  let tasks: TaskGuest | undefined;
+  let initializing = true;
+  const modules: WebAssembly.Imports = {
     "blot:host/1": imports,
-  });
+    "blot:cleanup/1": cleanupImports,
+    "blot:cleanup/2": ownedCleanupImports,
+    "blot:cleanup_bind/1": cleanupBindImports,
+    "blot:cleanup_data/1": dataCleanupImports,
+    "blot:cleanup_data/2": ownedDataCleanupImports,
+    "blot:cleanup_data_bind/1": dataBindImports,
+  };
+  if (abi.taskDescriptorCount !== undefined) {
+    const callbacks: Record<string, WebAssembly.ImportValue> = {};
+    for (const [name] of taskImports) {
+      const invoke = (...args: number[]) => {
+        if (!tasks) {
+          throw new GuestError("invalid_abi", "Task runtime is not active");
+        }
+        return (tasks.imports[name] as (...values: number[]) => unknown)(
+          ...args,
+        );
+      };
+      if (
+        options.asynchronous &&
+        ["close", "join", "cancel", "drop", "drain"].includes(name)
+      ) callbacks[name] = new (requireAsync().Suspending)(invoke);
+      else callbacks[name] = invoke;
+    }
+    modules["blot:task/1"] = typedTaskFunctions(callbacks);
+  }
+  const count = abi.resourceAdapterCount ?? 0;
+  if (count !== 0) {
+    modules["blot:resource/1"] = typedResourceImports({
+      reserve: () => {
+        if (!resources) {
+          throw new GuestError("invalid_abi", "Resource journal is not active");
+        }
+        return resources.reserve();
+      },
+      register: (
+        token: number,
+        adapter: number,
+        payload: number,
+        callable: number,
+        provider: number,
+      ) => {
+        if (!resources) {
+          throw new GuestError("invalid_abi", "Resource journal is not active");
+        }
+        resources.register(
+          token >>> 0,
+          adapter >>> 0,
+          payload >>> 0,
+          callable >>> 0,
+          provider >>> 0,
+        );
+      },
+      release: (token: number) => {
+        if (!resources) {
+          throw new GuestError("invalid_abi", "Resource journal is not active");
+        }
+        resources.release(token >>> 0);
+      },
+    });
+  }
+  if (abi.version === 5 || abi.version >= 6 && abi.resourceTransfer) {
+    modules["blot:resource/2"] = typedResourceImports({
+      register_owned: (
+        token: number,
+        adapter: number,
+        payload: number,
+        callable: number,
+        provider: number,
+        owner: number,
+      ) => {
+        if (!resources) {
+          throw new GuestError("invalid_abi", "Resource journal is not active");
+        }
+        token >>>= 0;
+        owner >>>= 0;
+        adapter >>>= 0;
+        payload >>>= 0;
+        callable >>>= 0;
+        provider >>>= 0;
+        let words: Uint32Array;
+        const memory = instance.exports["blot:memory"];
+        if (
+          !(memory instanceof WebAssembly.Memory) || owner < 32 ||
+          owner % 4 !== 0 || owner > memory.buffer.byteLength - 8
+        ) throw new GuestError("invalid_abi", "Invalid resource owner address");
+        try {
+          words = new Uint32Array(memory.buffer);
+        } catch (cause) {
+          // Acquisition has already succeeded. Unexpected host allocation
+          // failure still transfers the retained roots to one cleanup attempt.
+          resources.register(token, adapter, payload, callable, provider);
+          try {
+            resources.release(token);
+          } catch {
+            // Preserve failed publication after consuming the cleanup attempt.
+          }
+          throw cause;
+        }
+        const slot = owner / 4;
+        let layout = 0;
+        if (adapter === 2) layout = 1;
+        if (
+          adapter > 2 || words[slot - 7] !== 8 ||
+          (words[slot - 6] & 3092) !== 4 || words[slot - 4] === 0 ||
+          words[slot - 3] !== layout || words[slot] !== payload ||
+          words[slot + 1] !== 0
+        ) {
+          throw new GuestError(
+            "invalid_abi",
+            "Resource owner identity changed",
+          );
+        }
+        resources.registerOwned(
+          token,
+          adapter,
+          payload,
+          callable,
+          provider,
+          owner,
+        );
+        // Journal capacity, identity and retained roots are established before
+        // this allocation-free publication. No user code runs between stores.
+        words[slot + 1] = token;
+        words[slot - 6] |= 2048;
+      },
+      retire: (token: number) => {
+        if (!resources) {
+          throw new GuestError("invalid_abi", "Resource journal is not active");
+        }
+        resources.retire(token >>> 0);
+      },
+      drain: () => {
+        // Startup cannot reserve/register a resource. A typed root initializer
+        // may still emit its empty deferred-retirement safe point.
+        if (!resources && initializing) return;
+        if (!resources) {
+          throw new GuestError("invalid_abi", "Resource journal is not active");
+        }
+        resources.drain();
+      },
+    }, true);
+  }
+  let instance: WebAssembly.Instance;
+  try {
+    instance = await WebAssembly.instantiate(module, modules);
+    initializing = false;
+  } catch (cause) {
+    if (
+      count !== 0 || Object.keys(cleanupImports).length !== 0 ||
+      Object.keys(ownedCleanupImports).length !== 0 ||
+      Object.keys(dataCleanupImports).length !== 0 ||
+      Object.keys(ownedDataCleanupImports).length !== 0
+    ) {
+      throw new GuestError(
+        "invalid_abi",
+        "Invalid checked guest import signature",
+        { cause },
+      );
+    }
+    throw cause;
+  }
+  if (count !== 0 || abi.taskDescriptorCount !== undefined) {
+    let invalidate: ((owner: number, token: number) => void) | undefined;
+    if (abi.version === 5 || abi.version >= 6 && abi.resourceTransfer) {
+      const memory = instance.exports["blot:memory"];
+      if (!(memory instanceof WebAssembly.Memory)) {
+        throw new GuestError(
+          "invalid_abi",
+          "Resource transfer requires owned memory",
+        );
+      }
+      invalidate = (owner, token) => {
+        if (
+          owner < 32 || owner % 4 !== 0 || owner > memory.buffer.byteLength - 8
+        ) throw new GuestError("invalid_abi", "Invalid resource owner address");
+        const words = new Uint32Array(memory.buffer);
+        const slot = owner / 4;
+        // ABI 5's owning box is eight bytes after the 32-byte counted header.
+        // A live weak edge must still name this exact registration, not a
+        // recycled allocation or a host-provided scalar that resembles a pointer.
+        if (
+          words[slot - 7] !== 8 || (words[slot - 6] & 3092) !== 2052 ||
+          words[slot - 4] === 0 || words[slot + 1] !== token
+        ) {
+          throw new GuestError(
+            "invalid_abi",
+            "Resource owner identity changed",
+          );
+        }
+        words[slot + 1] = 0;
+      };
+    }
+    let resourceBindings: ResourceBindings | undefined;
+    if (bindings) {
+      resourceBindings = {
+        capture: () => active?.binding ?? 0,
+        retain: (id) => {
+          const binding = bindings!.get(id);
+          if (!binding) {
+            throw new GuestError("stale_capability", "Missing cleanup binding");
+          }
+          binding.refs++;
+        },
+        release: (id) => {
+          const binding = bindings!.get(id);
+          if (!binding || binding.refs === 0) {
+            throw new GuestError(
+              "stale_capability",
+              "Cleanup binding is not owned",
+            );
+          }
+          binding.refs--;
+        },
+      };
+    }
+    const adapters = resourceAdapters(instance, count).map((adapter) => ({
+      drop: adapter.drop,
+      cleanup: (payload: number, callable: number, provider: number) => {
+        const invoke = () => adapter.cleanup(payload, callable, provider);
+        if (tasks) tasks.cleanup(invoke);
+        else invoke();
+      },
+    }));
+    const tokens = new ResourceTokens();
+    makeTaskJournal = () =>
+      new ResourceJournal(adapters, invalidate, resourceBindings, tokens);
+    rootResources = makeTaskJournal();
+    resources = rootResources;
+  }
 
   let ownership: { enter(): void; leave(outcome: number): void } | undefined;
-  if (abi.version === 3) {
+  if (abi.version >= 3) {
     const enter = instance.exports["blot:ownership_enter"];
     const leave = instance.exports["blot:ownership_leave"];
     if (typeof enter !== "function" || typeof leave !== "function") {
@@ -705,11 +1606,33 @@ export async function instantiateGuest(
       leave: leave as (outcome: number) => void,
     };
   }
+  if (abi.taskDescriptorCount !== undefined) {
+    try {
+      tasks = new TaskGuest(
+        instance.exports,
+        abi.taskDescriptorCount,
+        makeTaskJournal!,
+        (journal) => {
+          resources = journal;
+        },
+        ownership!,
+        options.asynchronous ? requireAsync().promising : undefined,
+      );
+    } catch (cause) {
+      throw new GuestError("invalid_abi", "Invalid task adapter signatures", {
+        cause,
+      });
+    }
+  }
   let entered = false;
   const memory = instance.exports["blot:memory"];
   const allocate = instance.exports["blot:allocate"];
   const reset = instance.exports["blot:reset"];
-  if (memory !== undefined) {
+  if (
+    memory !== undefined &&
+    (allocate !== undefined || reset !== undefined ||
+      abi.taskDescriptorCount === undefined)
+  ) {
     if (
       !(memory instanceof WebAssembly.Memory) ||
       typeof allocate !== "function" || typeof reset !== "function"
@@ -727,6 +1650,7 @@ export async function instantiateGuest(
   function createCapability<P extends ValueType, R extends ValueType>(
     definition: AsyncHostCallback<P, R>,
     asynchronous: boolean,
+    cleanup?: HostCleanup<P>,
   ): HostCapability {
     idle();
     if (typeof definition !== "object" || definition === null) {
@@ -735,31 +1659,207 @@ export async function instantiateGuest(
         "Expected a callback definition",
       );
     }
-    const { parameter, result, call } = definition;
+    const { parameter, result, call, concurrent } = definition;
     if (
       !valueTypes.includes(parameter) || !valueTypes.includes(result) ||
-      typeof call !== "function"
+      typeof call !== "function" ||
+      (concurrent !== undefined && concurrent !== true)
     ) {
       throw new GuestError(
         "invalid_capability",
         "A capability needs supported value types and a callable",
       );
     }
-    const signature: CallbackType = Object.freeze({
-      kind: "callback",
-      parameter,
-      result,
-    });
+    let kind: CallbackType["kind"] = "callback";
+    let maxCalls: number | undefined;
+    if (cleanup) {
+      const maxSteps = cleanup.maxSteps;
+      maxCalls = cleanup.maxCalls;
+      if (
+        result !== "Unit" || !Number.isSafeInteger(maxSteps) ||
+        maxSteps <= 0 || maxSteps > 65_536 ||
+        !Number.isSafeInteger(maxCalls) || maxCalls <= 0 ||
+        maxCalls > 65_536
+      ) {
+        throw new GuestError(
+          "invalid_capability",
+          "Cleanup needs finite positive maxSteps and maxCalls up to 65536 and Unit result",
+        );
+      }
+      kind = "cleanup";
+    }
+    const selected: CallbackType = { kind, parameter, result };
+    if (concurrent) Object.assign(selected, { concurrent: true });
+    const signature = Object.freeze(selected);
     const capability: HostCapability = Object.freeze({
       [capabilityBrand]: true as const,
       parameter,
       result,
     });
-    capabilityOwners.set(capability, { lifetime, signature, asynchronous });
+    capabilityOwners.set(capability, {
+      lifetime,
+      signature,
+      asynchronous,
+      maxCalls,
+    });
     callbacks.set(capability, (value) => call(value as ValueOf<P>));
     return capability;
   }
 
+  let ownerHooks: {
+    release: (id: number) => void;
+    token: (id: number, schema: number, kind: number) => number;
+  } | undefined;
+  let liveOwners: Map<number, PublicOwnerState> | undefined;
+  let pendingOwner: PublicOwnerState | undefined;
+  if (abi.publicOwners) {
+    const release = instance.exports["blot:owner_release"];
+    const token = instance.exports["blot:owner_token"];
+    if (typeof release !== "function" || typeof token !== "function") {
+      throw new GuestError("invalid_abi", "Missing public owner hooks");
+    }
+    const types: number[] = [2, 96, 1, 127, 0, 96, 3, 127, 127, 127, 1, 127];
+    const imported: Record<string, WebAssembly.ImportValue> = {
+      r: release,
+      t: token,
+    };
+    try {
+      new WebAssembly.Instance(
+        resourceModule([types, [
+          2,
+          ...resourceName("o"),
+          ...resourceName("r"),
+          0,
+          0,
+          ...resourceName("o"),
+          ...resourceName("t"),
+          0,
+          1,
+        ]]),
+        { o: imported },
+      );
+    } catch (cause) {
+      throw new GuestError(
+        "invalid_abi",
+        "Invalid public owner hook signatures",
+        { cause },
+      );
+    }
+    // Validate every public owner entry against its exact physical signature.
+    for (const fn of abi.functions) {
+      const ownerInput = typeof fn.parameter !== "string" &&
+        fn.parameter.kind === "owner";
+      if (!ownerInput && typeof fn.result === "string") continue;
+      let parameter = 127;
+      if (typeof fn.parameter === "string") {
+        if (fn.parameter === "F32") parameter = 125;
+      } else if (fn.parameter.kind === "owner") {
+        if (fn.parameter.fresh === "F32") parameter = 125;
+      } else parameter = 111;
+      let result = 127;
+      if (fn.result === "F32") result = 125;
+      const entries: [string, number][] = [[fn.name, parameter]];
+      if (ownerInput && (fn.parameter as OwnerType).fresh !== undefined) {
+        entries.push([`blot:owner_call/${fn.name}`, 127]);
+      }
+      for (const [name, argument] of entries) {
+        try {
+          new WebAssembly.Instance(
+            resourceModule([
+              [1, 96, 1, argument, 1, result],
+              [1, ...resourceName("o"), ...resourceName("f"), 0, 0],
+            ]),
+            { o: { f: instance.exports[name] } },
+          );
+        } catch (cause) {
+          throw new GuestError(
+            "invalid_abi",
+            `Invalid public owner entry signature ${name}`,
+            { cause },
+          );
+        }
+      }
+    }
+    ownerHooks = {
+      release: release as (id: number) => void,
+      token: token as (id: number, schema: number, kind: number) => number,
+    };
+    liveOwners = new Map();
+  }
+  function checkedOwner(value: unknown): PublicOwnerState {
+    const state = typeof value === "object" && value !== null
+      ? publicOwnerStates.get(value)
+      : undefined;
+    if (!state) {
+      throw new GuestError("invalid_owner", "Expected a guest owner handle");
+    }
+    if (state.lifetime.disposed) {
+      throw new GuestError("stale_owner", "Owner belongs to a disposed guest");
+    }
+    if (state.lifetime !== lifetime) {
+      throw new GuestError("foreign_owner", "Owner belongs to another guest");
+    }
+    if (!state.live) {
+      throw new GuestError("use_after_move", "Owner has already been consumed");
+    }
+    return state;
+  }
+  function publicResult(
+    type: ValueType | OwnerType,
+    value: unknown,
+  ): GuestValue | GuestOwner {
+    if (typeof type === "string") return fromWasm(type, value);
+    if (
+      !ownerHooks || !liveOwners || typeof value !== "number" ||
+      !Number.isInteger(value) || value < -2147483648 || value > 4294967295
+    ) throw new GuestError("invalid_abi", "Invalid public owner result");
+    const token = value >>> 0;
+    if (token === 0 || liveOwners.has(token)) {
+      throw new GuestError(
+        "invalid_owner",
+        "Owner result is not a fresh lease",
+      );
+    }
+    let kind = 1;
+    if (type.usage === "shared") kind = 2;
+    try {
+      const resource = ownerHooks.token(token, type.schema, kind) >>> 0;
+      const handle: GuestOwner = Object.freeze({
+        [ownerBrand]: true as const,
+        usage: type.usage,
+      });
+      const state: PublicOwnerState = {
+        lifetime,
+        schema: type.schema,
+        usage: type.usage,
+        token,
+        live: true,
+      };
+      if (resource !== 0) {
+        if (!resources) {
+          throw new GuestError(
+            "invalid_abi",
+            "Owner resource has no cleanup journal",
+          );
+        }
+        resources.promote(resource);
+      }
+      publicOwnerStates.set(handle, state);
+      liveOwners.set(token, state);
+      pendingOwner = state;
+      return handle;
+    } catch (cause) {
+      try {
+        ownerHooks.release(token);
+      } catch { /* Preserve publication failure. */ }
+      liveOwners.delete(token);
+      throw cause;
+    }
+  }
+  let consumedOnce: Set<string> | undefined;
+  if (abi.functions.some((fn) => fn.multiplicity === "once")) {
+    consumedOnce = new Set<string>();
+  }
   function begin(
     name: string,
     argument: unknown,
@@ -773,7 +1873,13 @@ export async function instantiateGuest(
         `Unknown function export ${name}`,
       );
     }
+    if (fn.multiplicity === "once" && consumedOnce!.has(name)) {
+      throw new GuestError("once_reused", `${name} has already been invoked`);
+    }
     let value: number | object;
+    let exportedName = name;
+    let movedOwner: PublicOwnerState | undefined;
+    let argumentType: ValueType | undefined;
     if (typeof fn.parameter === "string") {
       value = isArrayType(fn.parameter) ? 0 : scalarToWasm(
         fn.parameter,
@@ -781,6 +1887,44 @@ export async function instantiateGuest(
         "invalid_argument",
         `${name} argument`,
       );
+    } else if (fn.parameter.kind === "owner") {
+      const state = typeof argument === "object" && argument !== null
+        ? publicOwnerStates.get(argument)
+        : undefined;
+      if (state) {
+        const owned = checkedOwner(argument);
+        if (
+          owned.schema !== fn.parameter.schema ||
+          owned.usage !== fn.parameter.usage
+        ) {
+          throw new GuestError(
+            "owner_type",
+            "Owner does not match the entry's exact type",
+          );
+        }
+        value = owned.token;
+        if (fn.parameter.fresh !== undefined) {
+          exportedName = `blot:owner_call/${name}`;
+        }
+        if (owned.usage === "unique") movedOwner = owned;
+      } else {
+        if (fn.parameter.fresh === undefined) {
+          throw new GuestError(
+            "invalid_owner",
+            "Entry requires an existing owner handle",
+          );
+        }
+        argumentType = fn.parameter.fresh;
+        value = 0;
+        if (!isArrayType(argumentType)) {
+          value = scalarToWasm(
+            argumentType,
+            argument,
+            "invalid_argument",
+            `${name} argument`,
+          );
+        }
+      }
     } else {
       const owner = typeof argument === "object" && argument !== null
         ? capabilityOwners.get(argument)
@@ -804,6 +1948,10 @@ export async function instantiateGuest(
         );
       }
       if (
+        owner.signature.kind !== fn.parameter.kind ||
+        fn.parameter.concurrent === true &&
+          owner.signature.concurrent !== true ||
+        owner.signature.dataSchema !== fn.parameter.dataSchema ||
         owner.signature.parameter !== fn.parameter.parameter ||
         owner.signature.result !== fn.parameter.result
       ) {
@@ -827,44 +1975,184 @@ export async function instantiateGuest(
         invoke,
         exportName: name,
         asynchronous: asynchronous && owner.asynchronous,
+        maxCalls: owner.maxCalls,
+        calls: 0,
       };
     }
+    pendingOwner = undefined;
+    epoch++;
     running = true;
     try {
       entered = ownership !== undefined;
       ownership?.enter();
+      resources?.begin();
+      if (rootResources) tasks?.begin(rootResources, asynchronous);
       arena?.reset(0);
       if (typeof fn.parameter === "string" && isArrayType(fn.parameter)) {
         if (!arena) throw new Error("Validated array export has no arena");
         value = arrayToWasm(arena, fn.parameter, argument, name);
       }
-      const exported = instance.exports[name];
+      if (argumentType !== undefined && isArrayType(argumentType)) {
+        if (!arena) throw new Error("Validated owner input has no arena");
+        value = arrayToWasm(arena, argumentType, argument, name);
+      }
+      const exported = instance.exports[exportedName];
       if (typeof exported !== "function") {
         throw new Error("Validated function export disappeared");
       }
+      if (fn.multiplicity === "once") consumedOnce!.add(name);
+      if (movedOwner) {
+        movedOwner.live = false;
+        liveOwners!.delete(movedOwner.token);
+      }
       return { fn, value, exported };
     } catch (cause) {
-      finish(1);
+      finish(1, true);
       throw cause;
     }
   }
-  function finish(outcome: number): void {
+  function finish(outcome: number, priorFailure = false): void {
+    if (rootResources) resources = rootResources;
+    let failed = false;
+    let failure: unknown;
     try {
-      if (entered) {
-        ownership!.leave(outcome);
-        entered = false;
+      try {
+        resources?.finish();
+      } catch (cause) {
+        failed = true;
+        failure = cause;
       }
-      arena?.reset(0);
+      try {
+        if (entered) {
+          ownership!.leave(outcome);
+          entered = false;
+        }
+      } catch (cause) {
+        if (!failed) {
+          failed = true;
+          failure = cause;
+        }
+      }
+      try {
+        arena?.reset(0);
+      } catch (cause) {
+        if (!failed) {
+          failed = true;
+          failure = cause;
+        }
+      }
     } finally {
+      if (bindings) {
+        for (const [id, binding] of bindings) {
+          if (binding.refs === 0) bindings!.delete(id);
+        }
+      }
       active = undefined;
       running = false;
     }
+    if (failed && pendingOwner) {
+      const owner = pendingOwner;
+      owner.live = false;
+      liveOwners!.delete(owner.token);
+      pendingOwner = undefined;
+      try {
+        epoch++;
+        running = true;
+        entered = ownership !== undefined;
+        ownership?.enter();
+        resources?.begin();
+        ownerHooks!.release(owner.token);
+      } catch {
+        /* Preserve the earlier invocation failure. */
+      } finally {
+        finish(1, true);
+      }
+    }
+    pendingOwner = undefined;
+    if (failed && !priorFailure) throw failure;
   }
 
   return {
     abi,
-    memoryBytes: () => arena?.memory.buffer.byteLength ?? 0,
+    memoryBytes: () => {
+      if (memory instanceof WebAssembly.Memory) return memory.buffer.byteLength;
+      return 0;
+    },
+    cleanupDataType(name) {
+      idle();
+      const parameter = functions.get(name)?.parameter;
+      if (
+        typeof parameter !== "object" || parameter.kind !== "cleanup" ||
+        parameter.dataSchema === undefined || !dataSchemas
+      ) {
+        throw new GuestError(
+          "capability_signature",
+          "Export has no structured cleanup parameter",
+        );
+      }
+      const root = dataSchemas.get(parameter.dataSchema)!;
+      let description = root.tag as string;
+      if (root.name !== "") description = root.name;
+      const type: CleanupDataType = Object.freeze({
+        [dataTypeBrand]: true as const,
+        name: description,
+      });
+      dataTypeOwners.set(type, { lifetime, schema: parameter.dataSchema });
+      return type;
+    },
+    cleanupDataCapability(definition) {
+      idle();
+      if (typeof definition !== "object" || definition === null) {
+        throw new GuestError(
+          "invalid_capability",
+          "Expected structured cleanup definition",
+        );
+      }
+      const { type, maxSteps, maxCalls, call } = definition;
+      let owner: { lifetime: Lifetime; schema: number } | undefined;
+      if (typeof type === "object" && type !== null) {
+        owner = dataTypeOwners.get(type);
+      }
+      if (
+        !owner || owner.lifetime !== lifetime || owner.lifetime.disposed ||
+        typeof call !== "function"
+      ) {
+        throw new GuestError(
+          "invalid_capability",
+          "Cleanup data type belongs to another lifetime",
+        );
+      }
+      const capability = createCapability(
+        {
+          parameter: "U32",
+          result: "Unit",
+          call: () => null,
+        },
+        false,
+        {
+          parameter: "U32",
+          result: "Unit",
+          call: () => null,
+          maxSteps,
+          maxCalls,
+        },
+      );
+      const state = capabilityOwners.get(capability)!;
+      capabilityOwners.set(capability, {
+        ...state,
+        signature: Object.freeze({
+          kind: "cleanup",
+          parameter: "U32",
+          result: "Unit",
+          dataSchema: owner.schema,
+        }),
+      });
+      callbacks.set(capability, (value) => call(value));
+      return capability;
+    },
     capability: (definition) => createCapability(definition, false),
+    cleanupCapability: (definition) =>
+      createCapability(definition, false, definition),
     capabilityAsync: (definition) => {
       requireAsync();
       if (!options.asynchronous) {
@@ -885,11 +2173,21 @@ export async function instantiateGuest(
       const { fn, value, exported } = begin(name, argument, false);
       let outcome = 1;
       try {
-        const result = fromWasm(fn.result, exported(value));
+        const result = publicResult(fn.result, exported(value));
         outcome = 0;
         return result;
       } finally {
-        finish(outcome);
+        try {
+          const completion = tasks?.finish(outcome !== 0);
+          if (completion instanceof Promise) {
+            throw new GuestError(
+              "async_host_call",
+              "Synchronous task cleanup suspended",
+            );
+          }
+        } finally {
+          finish(outcome, outcome !== 0);
+        }
       }
     },
     async callAsync(name, argument) {
@@ -897,14 +2195,18 @@ export async function instantiateGuest(
       const { fn, value, exported } = begin(name, argument, true);
       let outcome = 1;
       try {
-        const result = fromWasm(
+        const result = publicResult(
           fn.result,
           await integration.promising(exported)(value),
         );
         outcome = 0;
         return result;
       } finally {
-        finish(outcome);
+        try {
+          await tasks?.finish(outcome !== 0);
+        } finally {
+          finish(outcome, outcome !== 0);
+        }
       }
     },
     read(name) {
@@ -922,13 +2224,69 @@ export async function instantiateGuest(
       }
       return scalarFromWasm(constant.type, exported.value);
     },
+    releaseOwner(handle) {
+      idle();
+      const owner = checkedOwner(handle);
+      pendingOwner = undefined;
+      epoch++;
+      running = true;
+      let outcome = 1;
+      try {
+        entered = ownership !== undefined;
+        ownership?.enter();
+        resources?.begin();
+        owner.live = false;
+        liveOwners!.delete(owner.token);
+        ownerHooks!.release(owner.token);
+        outcome = 0;
+      } finally {
+        finish(outcome, outcome !== 0);
+      }
+    },
     dispose() {
       if (lifetime.disposed) return;
       idle();
-      ownership?.leave(2);
-      if (ownership) arena?.reset(0);
-      lifetime.disposed = true;
-      callbacks = new WeakMap();
+      let failed = false;
+      let failure: unknown;
+      if (abi.publicOwners) {
+        pendingOwner = undefined;
+        epoch++;
+        running = true;
+        try {
+          entered = ownership !== undefined;
+          ownership?.enter();
+          resources?.begin();
+          resources?.dispose();
+        } catch (cause) {
+          failed = true;
+          failure = cause;
+        } finally {
+          try {
+            finish(0, failed);
+          } catch (cause) {
+            if (!failed) {
+              failed = true;
+              failure = cause;
+            }
+          }
+        }
+      }
+      try {
+        ownership?.leave(2);
+        tasks?.dispose();
+        if (ownership) arena?.reset(0);
+      } catch (cause) {
+        if (!failed) {
+          failed = true;
+          failure = cause;
+        }
+      } finally {
+        lifetime.disposed = true;
+        liveOwners?.clear();
+        callbacks = new WeakMap();
+        bindings?.clear();
+      }
+      if (failed) throw failure;
     },
   };
 }
