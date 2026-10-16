@@ -112,7 +112,7 @@ fn Builder(comptime Module: type) type {
                 if (binding.capability_flow == .identity) {
                     if (!flow.unaryCore(producer, body, .identity)) return error.Unavailable;
                     arity = 1;
-                } else if (binding.capability_flow != .input_shape and (binding.capability_flow != .unknown or binding.capability_parameters.kind != .product or !binding.capability_parameters.valid())) return null;
+                } else if (binding.capability_flow != .input_shape and (binding.capability_flow != .unknown or binding.capability_parameters.kind != .product or !binding.capability_parameters.valid() or !binding.capability_parameters.present())) return null;
                 if (arity == 0 or arity > 16 or body.parameters.len != arity or body.parameters.start > producer.parameters.len or body.parameters.len > producer.parameters.len - body.parameters.start) return error.Unavailable;
                 var reader: Builder(@TypeOf(producer)) = .{ .allocator = self.allocator, .store = self.store, .module = producer, .owners = self.owners, .remaining = self.remaining, .input_globals = true, .closed_rows = body.closed_rows };
                 defer reader.deinit();

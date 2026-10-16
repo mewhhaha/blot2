@@ -225,6 +225,30 @@ test "prelude bootstrap imports remain directed dependencies without an implicit
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, freezeFail, .{ &source, &checked });
 }
 
+test "unpublished named function returned across modules keeps a controlled-flow body freezable" {
+    // `pick` publishes an input-shape contract whose body returns the global `glyph`.
+    // `glyph` has no published contract (its prelude comparison keeps the source producer
+    // from deriving one), so the frozen-Core reader must treat it as a closed global value.
+    var dir = std.testing.tmpDir(.{});
+    defer dir.cleanup();
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "prelude.blot", .data = "infix 30 (<) = lt\nconst lt = fn left => fn right => @type.call \"lt\" left right\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "font.blot", .data = "const glyph = fn (code: U32) => if code < 127 then 1.0 else 2.0\nconst pick = fn (material: U32) => glyph\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import * as f from \"./font\"\nentry const main = fn (c: U32) -> F32 => (f.pick 0) c\n" });
+    const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
+    defer a.free(path);
+    const prelude = try dir.dir.realPathFileAlloc(std.testing.io, "prelude.blot", a);
+    defer a.free(prelude);
+    var source = try project.load(a, std.testing.io, path, .{ .prelude_path = prelude });
+    defer source.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), source.diagnostics.items.len);
+    var checked = try checker.checkProject(a, &source);
+    defer checked.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    var value = try closure.freeze(a, &source, &checked);
+    defer format.deinit(a, &value);
+    try closure.validate(a, &value);
+}
+
 test "source record payload declaration order survives prior symbol identities and duplicate fields reject" {
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
