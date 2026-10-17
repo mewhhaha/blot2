@@ -3323,7 +3323,14 @@ pub const Owner = struct {
             try self.emit(.local_get, place.offset);
             try self.emit(.i32_add, 0);
             try self.emit(.local_get, changed);
-            if ((place.array_scalar != null or place.mask != null or place.shape != null) and place.row_words == 0) try self.storeCollectionWord(container, false, changed_scalar.machine(), 0) else try self.storeElement(changed_scalar.machine(), 0, place.row_words, changed_scalar != .pointer);
+            // A numeric Array's checked element layout has no edges, so its
+            // word takes the annotated scalar store `arrayFill` uses. The
+            // bounds check stays in `indexLocation`; only the runtime layout
+            // lookup of `store_word` goes. Owning and masked words keep it.
+            const numeric_word = place.array_scalar == true and place.mask == null and place.shape == null and place.row_words == 0;
+            if (numeric_word) {
+                try self.storeElement(changed_scalar.machine(), 0, 0, true);
+            } else if ((place.array_scalar != null or place.mask != null or place.shape != null) and place.row_words == 0) try self.storeCollectionWord(container, false, changed_scalar.machine(), 0) else try self.storeElement(changed_scalar.machine(), 0, place.row_words, changed_scalar != .pointer);
             if (place.wrapped) {
                 // A copy of a constructor cell: its tag, then its payload.
                 const wrapper = if (reuse) place.owner else try self.allocate(8, .{ .words = &.{ .scalar, .reference } });
@@ -4395,7 +4402,9 @@ pub const Owner = struct {
                 }
                 try self.arrayAddress(changed, locals[1], stride);
                 try self.emit(.local_get, locals[2]);
-                if (row_words == 0) try self.storeCollectionWord(changed, false, machines[2], 4) else try self.storeElement(machines[2], 4, row_words, true);
+                // Numeric elements are checked scalar words, as in `arrayFill`.
+                const numeric = g.representations.store.scalar(g.representations.store.node(result_layout).a) != null;
+                if (row_words == 0 and !numeric) try self.storeCollectionWord(changed, false, machines[2], 4) else try self.storeElement(machines[2], 4, row_words, true);
                 try self.emit(.local_get, changed);
             },
             .fill => try self.arrayFill(locals[0], locals[1], machines[1], false, g.representations.store.node(result_layout).tag == .list, null, g.representations.store.node(result_layout).a),

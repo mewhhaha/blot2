@@ -40,6 +40,31 @@ lexical alias used later in that iteration. Packed List traversal closes each
 logical row, not just each leaf. Breaks publish all outgoing carries before
 closing the scopes they leave; reference returns move through those scopes.
 
+When a carry is edited in place, these owners are duplicates, and
+`root_borrows.zig` removes them (task 109). A strong store into a slot with one
+dominating reservation in the same frame opens a region that lasts until that
+frame closes. A forward must-copy dataflow over the part of the region the store
+dominates tracks which locals still hold the stored pointer. Identity comes only
+from exact local copies, such as the `locals[0]` result of an in-place `set`,
+never from equal bits. If every strong store into the slot that can follow
+stores that same value, the slot owns it until its frame closes. Later stores
+into the slot are then no-ops and are removed. So are the region's lexical
+publications of the value, and any other slot reserved in the region whose every
+store holds it, such as an inner loop's carry slot. A live alias, a fresh
+allocation or a copy-path edit is a new producer: its store stays real, and so
+does each iteration's publication. Calls, closures, allocation, field RC, List
+helpers, object writes and traps keep the proof: they open and close frames only
+above the current one and release only owners they hold, and slot addresses
+never leave scope directives. Journal helpers, host imports, global writes,
+forces and reference exits decline.
+
+`empty_root_scopes.zig` then drops a lexical frame that owns nothing. Checked
+scalar stores, traps, journal-neutral leaf calls and nested frames it has
+already proved empty count as empty. The proof does not depend on the function's
+result role, because a lexical close never carries the result. Each removed
+close keeps its conditional collector safe point, so an in-place Array loop
+executes no journal call per iteration.
+
 A local lifetime summary transfers a single allocation only when its result has
 no owning fields or embedded aliases. Loading a closure environment borrows the
 child; freeing its descriptor before the indirect call would destroy that child.
@@ -309,3 +334,50 @@ The isolated runtime measurements above remain tied to their original pins. In
 particular, the +46.7% short reference-Array batch cost is material. Host and
 JSPI roots (033), cycles (034), tracing removal and its final CPU/memory gates
 (035) remain open. Completing 032 does not qualify those later tasks.
+
+## Array loop throughput (17 October 2026)
+
+Task 109 answers [issue #9](https://github.com/mewhhaha/blot2/issues/9). On main
+`48eda0a`, in-place Array loops paid journal work in every iteration: a frame
+open and close, a publication per reference carry, and a slot store per carry
+assignment. Numeric element writes also went through `store_word`. The changes
+are numeric element stores with checked scalar annotations, duplicate-owner
+removal in `root_borrows.zig` and the wider empty-frame proof described under
+[counted owners](#counted-owners). No admission changed: every probe still
+declares revision 2, mode 2.
+
+Release guests ran on the same host and harness. Each probe used a fresh guest
+with 400 interleaved warm-up rounds at half and full size, then 101 timed calls
+that include result decoding. Median ms:
+
+| Probe                         | `86a527b` | main `48eda0a` | Task 109 |
+| ----------------------------- | --------: | -------------: | -------: |
+| Issue repro `guarded_sum` 256 |     0.116 |          1.821 |    0.134 |
+| Issue repro `with_break` 256  |     8.699 |          1.800 |    0.118 |
+| Ink `inline_writes` 2000      |    0.0063 |         0.0490 |   0.0053 |
+| Ink `break_writes` 2000       |    0.8273 |         0.0542 |   0.0058 |
+| Ink `unsigned_sort` 2000      |    0.0677 |         0.6434 |   0.0711 |
+| Ink `pathfinding` 2000        |    0.2386 |         3.1595 |   0.1799 |
+
+The task build is the gated release compiler, SHA-256
+`80192a70e7d4ffa7484777cf5dc1d4cc8f6b5808d81427d865f37c632d7588d0`. The
+microsecond `inline_writes` rows move by about 20% between runs on this host.
+
+Ink's own `tools/compiler-probe.ts` on the task build reports doubling ratios of
+1.36, 1.42, 2.26 and 1.85 for the four probes, all subquadratic. The
+`with_break` and `break_writes` rows on `86a527b` show its copy cliff, which
+stays fixed. Backend emit time on Ink's library bench is unchanged at about 258
+ms per build.
+
+The executed law in `tests/persistent_roots_execution.test.ts` is the throughput
+guard. It counts journal retains per call with the exported `blot:rc_retains`
+counter. For counts of 2, 64 and 512 the task build retains the same number on
+every call; main retains 8, 2,416 and 133,298. The source law in
+`src/backend/persistent_roots_tests.zig` checks the prepared bodies directly:
+inside any loop there is no call to `root_open`, `root_reserve`, `root_store` or
+`root_close`. Shared, freshly replaced and owning-element carries keep those
+calls.
+
+`deno task test:compiler` passes 2,365 native laws with zero leaks, plus 1,517
+guest, 48 smoke and 28 harness tests. The analyzer reports zero findings across
+487 Zig files. Ink's suite passes 362 of 362 tests on the task build.

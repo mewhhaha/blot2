@@ -1276,3 +1276,148 @@ test "scalar closure environments preserve snapshots physical roles replay check
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
     try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
 }
+
+// An Array-returning insertion sort with breaks: both carried numeric Arrays
+// are edited in place, so every iteration journal operation is a duplicate.
+const in_place_sort_source =
+    \\const sort = fn (count: U32) -> Array U32 => do:
+    \\  let keys = @array.generate count (fn (i: U32) => @u32.sub count i)
+    \\  let ids = @array.generate count (fn (i: U32) => i)
+    \\  for i in 1..count:
+    \\    let j = i
+    \\    for 0..i:
+    \\      if @u32.eq j 0:
+    \\        break
+    \\      let previous = keys[@u32.sub j 1]
+    \\      let current = keys[j]
+    \\      if @u32.lt previous (@u32.add current 1):
+    \\        break
+    \\      keys[j] := previous
+    \\      keys[@u32.sub j 1] := current
+    \\      let previous_id = ids[@u32.sub j 1]
+    \\      let current_id = ids[j]
+    \\      ids[j] := previous_id
+    \\      ids[@u32.sub j 1] := current_id
+    \\      j := @u32.sub j 1
+    \\  return ids
+    \\entry const run = fn (count: U32) => (sort count)[0]
+;
+const LoopJournal = struct { loops: usize = 0, calls: usize = 0, opens: usize = 0 };
+/// Root journal helper calls executed inside loops of the prepared bodies.
+fn loopJournal(result: *const backend.Result) LoopJournal {
+    const optimized = &result.capture.?.optimized.?;
+    const arena = optimized.arena.?;
+    var total: LoopJournal = .{};
+    for (optimized.entries.items) |entry| {
+        const body = entry.output orelse continue;
+        var loops: [256]bool = undefined;
+        var depth: usize = 0;
+        var inside: usize = 0;
+        for (body.instructions.items) |inst| switch (inst.op) {
+            .block, .loop, .if_ => {
+                loops[depth] = inst.op == .loop;
+                depth += 1;
+                if (inst.op == .loop) {
+                    inside += 1;
+                    total.loops += 1;
+                }
+            },
+            .end => {
+                depth -= 1;
+                if (loops[depth]) inside -= 1;
+            },
+            .call => if (inside != 0) {
+                if (inst.operand == arena.root_open) total.opens += 1;
+                if (inst.operand == arena.root_open or inst.operand == arena.root_reserve or inst.operand == arena.root_store or inst.operand == arena.root_close) total.calls += 1;
+            },
+            else => {},
+        };
+    }
+    return total;
+}
+fn inPlaceLoopScenario(allocator: std.mem.Allocator, fixture: *const Fixture, previous: ?*const @import("../reuse/artifact_capture.zig").Capture, expected: []const u8) !void {
+    var result = try fixture.emit(allocator, previous, null);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try ownership(result.bytes);
+    try std.testing.expectEqualSlices(u8, expected, result.bytes);
+    const journal = loopJournal(&result);
+    try std.testing.expect(journal.loops >= 2);
+    try std.testing.expectEqual(@as(usize, 0), journal.calls);
+}
+
+test "in-place Array-returning loops emit no per-iteration journal operations through replay checkpoint and OOM" {
+    var fixture = try Fixture.initSource(in_place_sort_source);
+    defer fixture.deinit();
+    const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
+    defer a.free(nodes);
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    try ownership(first.bytes);
+    // Both carried Arrays keep one stable slot and its first strong store
+    // outside the loops; no iteration opens, reserves, stores or closes.
+    const journal = loopJournal(&first);
+    try std.testing.expect(journal.loops >= 2);
+    try std.testing.expectEqual(@as(usize, 0), journal.calls);
+    var developed = try backend.compileWithOptions(a, &fixture.units, 1, .{ .identity = fixture.names.view(), .retain_artifacts = true, .policy = .{ .codegen_tier = .development } });
+    defer developed.deinit(a);
+    try std.testing.expect(developed.diagnostic == null);
+    try ownership(developed.bytes);
+    try std.testing.expectEqual(@as(usize, 0), loopJournal(&developed).calls);
+    var retained = try fixture.emit(a, &first.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
+    const compiler: [32]u8 = @splat(36);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    var portable = try fixture.emit(a, null, &checkpoint);
+    defer portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, portable.bytes);
+    var replayed = try backend.compileWithOptions(a, &fixture.units, 1, .{ .identity = fixture.names.view(), .artifact_replay = true });
+    defer replayed.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, replayed.bytes);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, inPlaceLoopScenario, .{ &fixture, null, first.bytes });
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, inPlaceLoopScenario, .{ &fixture, &first.capture.?, first.bytes });
+    try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
+}
+
+test "shared carries, fresh replacements and owning element stores keep their loop journal operations" {
+    for ([_][]const u8{
+        // A live alias makes every edit copy: the slot store is real and the
+        // iteration keeps owning its incoming version.
+        \\entry const run = fn (count: U32) => do:
+        \\  let values = @array.fill count 0
+        \\  let before = values
+        \\  for i in 0..count:
+        \\    values[i] := i
+        \\  return @u32.add before[0] values[@u32.sub count 1]
+        ,
+        // A fresh replacement each iteration is a real new owner.
+        \\entry const run = fn (count: U32) => do:
+        \\  let values = @array.fill 2 0
+        \\  for i in 0..count:
+        \\    values := @array.fill 2 i
+        \\  return values[1]
+        ,
+        // Owning element stores publish a counted edge per iteration.
+        \\entry const run = fn (count: U32) => do:
+        \\  let rows = @array.fill count (@array.fill 1 0)
+        \\  for i in 0..count:
+        \\    rows[i] := @array.fill 1 i
+        \\  return rows[0][0]
+        ,
+    }) |text| {
+        var fixture = try Fixture.initSource(text);
+        defer fixture.deinit();
+        var result = try fixture.emit(a, null, null);
+        defer result.deinit(a);
+        try std.testing.expect(result.diagnostic == null);
+        try ownership(result.bytes);
+        const journal = loopJournal(&result);
+        try std.testing.expect(journal.calls != 0);
+        try std.testing.expect(journal.opens != 0);
+    }
+}

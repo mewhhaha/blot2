@@ -28,7 +28,9 @@ Zero-byte typed allocation returns null and acquires no lease. Allocation
 initializes reference payloads before publication. Each nonempty allocation
 starts with one explicitly counted tracer lease; every owning field adds its own
 count. Stores retain the replacement, publish, then release the old edge.
-Self-stores preserve the count. Copies check the destination range once,
+Numeric Array elements have zero-child layouts, so element writes are checked
+scalar stores. They skip the `store_word` layout lookup but keep the bounds
+check. Self-stores preserve the count. Copies check the destination range once,
 preserve overlap direction and account for every changed reference slot;
 identical slots need no count change. Scalar copies use the original bulk-copy
 path.

@@ -6,6 +6,7 @@ const check = @import("../check/check.zig");
 const core = @import("../check/core.zig");
 const ownership = @import("owned_arrays.zig");
 const wasm = @import("wasm.zig");
+const ir = @import("runtime_ir.zig");
 
 fn lower(a: std.mem.Allocator, source: []const u8) !core.Module {
     return lowerWithCatalog(a, source, false);
@@ -765,16 +766,34 @@ test "finite cursor carry owners cover duplicate row publications and preserve r
     try std.testing.expect(result.diagnostic == null);
     var dummy = wasm.Module.init(a);
     defer dummy.deinit();
-    var removed: usize = 0;
+    // Removed scope directives, counted by chunk.
+    var removed: [16]usize = @splat(0);
     for (result.capture.?.optimized.?.entries.items) |*entry| {
         if (try @import("root_borrows.zig").run(a, &dummy, &entry.source)) |body| {
             var owned = body;
             defer owned.deinit(a);
-            const difference = entry.source.instructions.items.len - body.instructions.items.len;
-            removed += difference;
+            // Removal preserves order; every other instruction survives.
+            var kept: usize = 0;
+            for (entry.source.instructions.items) |inst| {
+                if (kept < body.instructions.items.len and std.meta.eql(inst, body.instructions.items[kept])) {
+                    kept += 1;
+                    continue;
+                }
+                try std.testing.expectEqual(ir.Op.ownership, inst.op);
+                const marker: ir.Ownership = @bitCast(inst.operand);
+                try std.testing.expectEqual(ir.Ownership.Kind.scope, marker.kind);
+                removed[marker.chunk] += 1;
+            }
+            try std.testing.expectEqual(body.instructions.items.len, kept);
         }
     }
-    try std.testing.expectEqual(@as(usize, 1), removed);
+    // The cursor's root slot holds the canonical collection base on every
+    // edge: the row publication and the outgoing, backedge and both break
+    // stores into that slot are duplicates. Reservations and frames stay.
+    var expected: [16]usize = @splat(0);
+    expected[4] = 5;
+    expected[5] = 1;
+    try std.testing.expectEqualSlices(usize, &expected, &removed);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, collectionIterationEmission, .{ &units, null, result.bytes });
 }
 

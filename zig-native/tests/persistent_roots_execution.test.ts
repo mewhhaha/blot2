@@ -639,3 +639,218 @@ entry const memory = fn () -> Array U32 => #[]
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+// Issue 9: in-place Array loops must not pay journal work per iteration, and
+// shared or replaced carries must keep their counted owners.
+const inPlaceLoopSource = `
+const sorted_ids = fn (count: U32) -> Array U32 => do:
+  let keys = @array.generate count (fn (i: U32) => (i * 7919 + 13) % 1009)
+  let ids = @array.generate count (fn (i: U32) => i)
+  for i in 1..count:
+    let j = i
+    for 0..i:
+      if j == 0:
+        break
+      let previous = keys[j - 1]
+      let current = keys[j]
+      if previous <= current:
+        break
+      keys[j] := previous
+      keys[j - 1] := current
+      let previous_id = ids[j - 1]
+      let current_id = ids[j]
+      ids[j] := previous_id
+      ids[j - 1] := current_id
+      j := self - 1
+  return ids
+entry const order = sorted_ids
+entry const order_checksum = fn (count: U32) => do:
+  let ids = sorted_ids count
+  let total = 0
+  for i in 0..count:
+    total := self + (i + 1) * ids[i]
+  return total
+entry const paths = fn (count: U32) -> Array F32 => do:
+  let rows = @array.generate 8 (fn (r: U32) => @array.fill 4 r)
+  let costs = @array.fill count 1.0
+  let total = 0
+  for step in 0..count:
+    let slot = step % 8
+    let row = rows[slot]
+    rows[slot] := #[row[0] + 1, row[1] + step, row[2], row[3] + row[0]]
+    costs[step] := costs[step] + U32.to_f32 (row[1] % 1000)
+    total := self + rows[slot][1] % 1000
+  let sum = 0.0
+  for cost in costs:
+    sum := self + cost
+  return #[U32.to_f32 total, sum, U32.to_f32 rows[7][0], U32.to_f32 rows[3][3]]
+entry const snapshots = fn (count: U32) => do:
+  let values = @array.fill count 0
+  let before = values
+  let seen = 0
+  for i in 0..count:
+    let snapshot = values
+    values[i] := i + 1
+    seen := self + snapshot[i] + values[i]
+  let total = 0
+  for value in before:
+    total := self + value
+  return seen * 1000 + total
+entry const escapes = fn (count: U32) => do:
+  let values = @array.fill 4 0
+  let holder = @array.generate count (fn (i: U32) => @array.fill 1 i)
+  for i in 0..count:
+    values[i % 4] := i
+    holder[i] := values
+  let total = 0
+  for i in 0..count:
+    let row = holder[i]
+    total := self + row[0] + row[1] * 3 + row[2] * 5 + row[3] * 7
+  return total
+entry const swaps = fn (count: U32) => do:
+  let a = @array.fill 8 1
+  let b = @array.fill 8 2
+  let total = 0
+  for i in 0..count:
+    a[i % 8] := a[i % 8] + 1
+    let t = a
+    a := b
+    b := t
+    total := self + a[0] + b[0]
+  return total
+`;
+function expectedEscapes(count: number): number {
+  const values = [0, 0, 0, 0];
+  let total = 0;
+  for (let i = 0; i < count; i++) {
+    values[i % 4] = i;
+    total += values[0] + values[1] * 3 + values[2] * 5 + values[3] * 7;
+  }
+  return total >>> 0;
+}
+function expectedSwaps(count: number): number {
+  let a = new Array(8).fill(1);
+  let b = new Array(8).fill(2);
+  let total = 0;
+  for (let i = 0; i < count; i++) {
+    a = [...a];
+    a[i % 8] += 1;
+    [a, b] = [b, a];
+    total += a[0] + b[0];
+  }
+  return total >>> 0;
+}
+function expectedOrder(count: number): number[] {
+  const keys = Array.from({ length: count }, (_, i) => (i * 7919 + 13) % 1009);
+  return Array.from({ length: count }, (_, i) => i).sort((left, right) =>
+    keys[left] - keys[right] || left - right
+  );
+}
+function expectedPaths(count: number): number[] {
+  const rows = Array.from({ length: 8 }, (_, r) => [r, r, r, r]);
+  const costs = new Float32Array(count).fill(1);
+  let total = 0;
+  for (let step = 0; step < count; step++) {
+    const row = rows[step % 8];
+    rows[step % 8] = [row[0] + 1, row[1] + step, row[2], row[3] + row[0]];
+    costs[step] = Math.fround(costs[step] + (row[1] % 1000));
+    total += rows[step % 8][1] % 1000;
+  }
+  let sum = 0;
+  for (const cost of costs) sum = Math.fround(sum + cost);
+  return [total, sum, rows[7][0], rows[3][3]];
+}
+
+Deno.test("in-place Array loops keep exact results, constant journal work and plateaued memory", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  try {
+    for (const tier of ["development", "optimized"] as const) {
+      const compiler = await createZigProjectCompiler({
+        executable,
+        entry,
+        prelude: new URL("../../std/prelude.blot", import.meta.url),
+        cacheDirectory: false,
+        codegenTier: tier,
+      });
+      try {
+        const result = await compiler.build({
+          sources: { [entry]: inPlaceLoopSource },
+        });
+        assert(result.success, JSON.stringify(result));
+        const module = new WebAssembly.Module(result.bytes);
+        assert.deepEqual([
+          ...new Uint8Array(
+            WebAssembly.Module.customSections(module, "blot:ownership")[0],
+          ),
+        ], [2, 2, 0]);
+        const raw = new WebAssembly.Instance(module).exports;
+        const counter = (name: string) =>
+          Number((raw[`blot:rc_${name}`] as WebAssembly.Global).value);
+        const checksum = raw.order_checksum as CallableFunction;
+        const snapshots = raw.snapshots as CallableFunction;
+        // Journal retains per call do not grow with the iteration count: the
+        // carried Arrays keep one stable slot and no iteration republishes.
+        const retained: number[] = [];
+        for (const count of [2, 64, 512, 64, 512]) {
+          const before = counter("retains");
+          const order = expectedOrder(count);
+          let expected = 0;
+          for (let i = 0; i < count; i++) expected += (i + 1) * order[i];
+          assert.equal(checksum(count), expected);
+          retained.push(counter("retains") - before);
+          assert.equal(counter("roots"), 0);
+          assert.equal(counter("leases"), 0);
+        }
+        assert.equal(new Set(retained).size, 1, `retains ${retained}`);
+        // A live snapshot, an escape into another Array and swapped carries
+        // force the copy path or a real slot store on every edit.
+        const escapes = raw.escapes as CallableFunction;
+        const swaps = raw.swaps as CallableFunction;
+        for (const count of [0, 1, 17, 300]) {
+          assert.equal(snapshots(count), count * (count + 1) / 2 * 1000);
+          assert.equal(escapes(count), expectedEscapes(count));
+          assert.equal(swaps(count), expectedSwaps(count));
+          assert.equal(counter("roots"), 0);
+          assert.equal(counter("leases"), 0);
+        }
+        const guest = await instantiateGuest(module);
+        try {
+          for (const count of [0, 1, 2, 3, 100, 257]) {
+            assert.deepEqual(
+              Array.from(guest.call("order", count) as Uint32Array),
+              expectedOrder(count),
+            );
+          }
+          for (const count of [0, 1, 9, 1000]) {
+            assert.deepEqual(
+              Array.from(guest.call("paths", count) as Float32Array),
+              expectedPaths(count),
+            );
+          }
+          // Thousands of calls carrying an Array of references: replaced
+          // children retire and committed memory stays at its warmed size.
+          const expected = expectedPaths(256);
+          for (let index = 0; index < 50; index++) guest.call("paths", 256);
+          const warm = guest.memoryBytes();
+          assert(warm > 0);
+          for (let index = 0; index < 3000; index++) {
+            const values = guest.call("paths", 256) as Float32Array;
+            if (index % 500 === 0) assert.deepEqual(Array.from(values), expected);
+          }
+          assert.equal(guest.memoryBytes(), warm);
+          for (let index = 0; index < 20; index++) guest.call("order", 512);
+          const sorted = guest.memoryBytes();
+          for (let index = 0; index < 200; index++) guest.call("order", 512);
+          assert.equal(guest.memoryBytes(), sorted);
+        } finally {
+          guest.dispose();
+        }
+      } finally {
+        await compiler.dispose();
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});

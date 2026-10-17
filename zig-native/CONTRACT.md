@@ -420,7 +420,11 @@ status without widening `runtime_ir.Function`. Scope annotations lower only on
 the whole-module admitted route. Each allocation's counted lease belongs to one
 journal slot; moves preserve that owner and copied slots retain independently.
 Lease retirement clears the slot/header links before releasing. The reserved
-cycle link cannot serve both the journal and a cycle queue simultaneously.
+cycle link cannot serve both the journal and a cycle queue simultaneously. A
+slot that provably keeps one value until its frame closes covers duplicate
+stores, publications and slots of that value. A lexical frame that owns nothing
+loses its open/close but keeps its collector safe point. Both proofs use exact
+copies and current executable control flow, never pointer bits.
 Checked globals and mutable static reference fields publish through one typed
 module owner table. Scalar fields never add edges. Optimizer context includes
 root mode and owner-table geometry; start bodies cannot reuse an old table size.
