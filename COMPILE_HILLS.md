@@ -126,6 +126,13 @@ phases omit them.
   current files.
 - **Target:** paired runs on the re-frozen manifest with no Wasm difference
   between a binary and itself.
+- **Result (18 October 2026):** CT1, "Run bench:compile on the current gdev
+  through serve-project". Fresh, restart and retained phases use `serve-project`
+  with pen.json's mappings and native asset roots (`scripts/bench/gdev.ts`); CPU
+  is per-thread schedstat over the build with median and range; `--snapshot`
+  selects the tree. Main's binary paired against itself, 5 runs at load 8.5–9.3:
+  game 3,925 / 3,882 ms (ratio 0.989, ranges 3,799–4,230 and 3,827–4,450),
+  devtools 1,325 / 1,359 ms (1.025), Wasm identical.
 
 ### CT2: frontend clocks
 
