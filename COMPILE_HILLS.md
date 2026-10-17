@@ -786,6 +786,12 @@ Blake3 keys in-process caches with 4-byte updates
 
 - **Fix:** reserve capacity in bulk-built maps (`Session.init`
   `field_locations`, region maps) from known counts.
+- **Result (18 October 2026):**
+  `CT77: size Session field tables once from counted
+  families`. Cold builds
+  are unchanged and a retained revert runs 0.4% fewer instructions. Region maps
+  have no known counts. The larger growth cost is the per-call pair set in
+  `types.Store.equalGraph` (1.1% of cold samples), left to CT36.
 
 ### CT78: find the memcpy and memset callers
 

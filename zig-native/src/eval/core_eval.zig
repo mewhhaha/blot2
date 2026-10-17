@@ -1467,20 +1467,41 @@ pub const Session = struct {
         errdefer field_locations.deinit(allocator);
         var families: std.AutoHashMapUnmanaged(u64, void) = .empty;
         defer families.deinit(allocator);
+        // Count first so both tables are sized once instead of rehashing as
+        // they grow; the first owner of each family supplies its fields.
+        const First = struct { module: usize, nominal: usize, family: u64 };
+        var firsts: std.ArrayList(First) = .empty;
+        defer firsts.deinit(allocator);
+        var nominal_count: usize = 0;
+        for (units) |module| nominal_count += module.nominals.len;
+        try families.ensureTotalCapacity(allocator, std.math.cast(u32, nominal_count) orelse return error.OutOfMemory);
+        try firsts.ensureTotalCapacityPrecise(allocator, nominal_count);
+        var field_count: usize = 0;
         for (units, 0..) |module, index| {
             const unit_id: u32 = if (module.unit != 0) module.unit else @intCast(index + 1);
-            for (module.nominals) |nominal| {
+            for (module.nominals, 0..) |nominal, nominal_index| {
                 if (nominal.identity.decl == 0) continue;
                 const family = (@as(u64, if (nominal.identity.unit == 0) unit_id else nominal.identity.unit) << 32) | nominal.identity.decl;
-                const entry = try families.getOrPut(allocator, family);
-                if (entry.found_existing) continue;
+                if (families.getOrPutAssumeCapacity(family).found_existing) continue;
+                firsts.appendAssumeCapacity(.{ .module = index, .nominal = nominal_index, .family = family });
                 for (module.extra[nominal.constructors.start..][0..nominal.constructors.len]) |constructor_index| {
                     const constructor = module.constructor(constructor_index);
                     if (constructor.payload == 0) continue;
                     const payload = module.types.node(constructor.payload);
-                    if (payload.tag != .record) continue;
-                    for (0..payload.b) |field| try field_locations.put(allocator, .{ .family = family, .tag = constructor.tag, .name = module.types.recordField(payload, field).name }, .{ .field = @intCast(field), .len = payload.b });
+                    if (payload.tag == .record) field_count += payload.b;
                 }
+            }
+        }
+        try field_locations.ensureTotalCapacity(allocator, std.math.cast(u32, field_count) orelse return error.OutOfMemory);
+        for (firsts.items) |first| {
+            const module = &units[first.module];
+            const nominal = module.nominals[first.nominal];
+            for (module.extra[nominal.constructors.start..][0..nominal.constructors.len]) |constructor_index| {
+                const constructor = module.constructor(constructor_index);
+                if (constructor.payload == 0) continue;
+                const payload = module.types.node(constructor.payload);
+                if (payload.tag != .record) continue;
+                for (0..payload.b) |field| field_locations.putAssumeCapacity(.{ .family = first.family, .tag = constructor.tag, .name = module.types.recordField(payload, field).name }, .{ .field = @intCast(field), .len = payload.b });
             }
         }
         return .{ .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .visited_nodes = visited_nodes, .field_locations = field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = has_implementations, .has_generative_sources = has_generative_sources };

@@ -187,6 +187,8 @@ fn importedScenario(allocator: std.mem.Allocator) !void {
     defer consumer_core.deinit(allocator);
     var session = try evaluator.Session.init(allocator, &.{ producer_core, consumer_core });
     defer session.deinit();
+    // The consumer's imported copy shares the producer's family: one field.
+    try std.testing.expectEqual(@as(u32, 1), session.field_locations.count());
     try std.testing.expectEqual(@as(u32, 42), (try session.value(target(&consumer_core, "unsigned"))).bits);
     try std.testing.expectEqual(@as(u32, @bitCast(@as(f32, 42.5))), (try session.value(target(&consumer_core, "floating"))).bits);
     var result = try backend.compile(allocator, &.{ producer_core, consumer_core }, 2);
@@ -210,6 +212,9 @@ fn wideScenario(allocator: std.mem.Allocator, module: *const core.Module) !void 
     defer std.debug.assert(before == graphHash(module));
     var session = try evaluator.Session.init(allocator, &.{module.*});
     defer session.deinit();
+    // Sized once from the counted record fields.
+    try std.testing.expectEqual(@as(u32, 36), session.field_locations.count());
+    try std.testing.expect(session.field_locations.capacity() >= 36);
     try std.testing.expectEqual(@as(u32, @bitCast(@as(f32, 42.5))), (try session.value(target(module, "answer"))).bits);
     try emitScenario(allocator, module);
 }
