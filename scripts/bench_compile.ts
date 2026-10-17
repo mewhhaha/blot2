@@ -19,7 +19,10 @@
 //
 // Workloads: the frozen gdev snapshot under build/bench/gdev-snapshot (private
 // source, never committed; verified against scripts/bench/gdev-manifest.json)
-// and the synthetic corpus in scripts/bench/corpus.ts.
+// and the synthetic corpus in scripts/bench/corpus.ts. Retained sessions run
+// the edit suite (scripts/bench/gdev.ts on the game, `edit_suite` in the
+// corpus): population, no-op, then each scenario's edit and revert, reported
+// with reuse and recheck counters.
 import { parseArgs } from "node:util";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,7 +31,12 @@ import {
   type ZigProjectBuildResult,
   type ZigProjectCompiler,
 } from "../compiler/zig_project_client.ts";
-import { syntheticCorpus, type SyntheticProgram } from "./bench/corpus.ts";
+import {
+  editSuite,
+  syntheticCorpus,
+  type SyntheticProgram,
+  type SyntheticProject,
+} from "./bench/corpus.ts";
 import {
   editedSources,
   gdevWorkloads,
@@ -44,8 +52,8 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   [--write-manifest] [--restart-cache]
 
   --baseline/--candidate  blotc executables. Pass one binary twice to measure noise.
-  --workload              gdev entries (game, devtools), the synthetic corpus,
-                          or one workload by name.
+  --workload              gdev entries (game, devtools), the synthetic corpus
+                          (with the edit_suite project), or one workload by name.
   --no-retained           skip the retained-session phases.
   --profile               open every session with profileBackend (detailed
                           clocks cost a few percent of CPU).
@@ -182,6 +190,29 @@ async function syntheticWorkload(
       name: "edit",
       replacements: [{ file: "main.blot", ...program.edit }],
     }],
+  };
+}
+
+/** A multi-module synthetic project with its retained scenarios. */
+async function projectWorkload(
+  project: SyntheticProject,
+  scratch: string,
+): Promise<Workload> {
+  const root = `${scratch}/synthetic/${project.name}`;
+  await Deno.mkdir(root, { recursive: true });
+  for (const [file, source] of Object.entries(project.files)) {
+    await Deno.writeTextFile(`${root}/${file}`, source);
+  }
+  return {
+    name: project.name,
+    group: "synthetic",
+    root,
+    entry: `${root}/${project.entry}`,
+    stdRoot: `${repo}/std`,
+    prelude: `${repo}/std/prelude.blot`,
+    imports: {},
+    nativeAssetRoots: null,
+    scenarios: project.scenarios,
   };
 }
 
@@ -423,6 +454,9 @@ async function main(): Promise<number> {
       ["all", "synthetic", program.name, `${program.name}_${program.size}`]
         .includes(selected)
     ) workloads.push(await syntheticWorkload(program, out));
+  }
+  if (["all", "synthetic", editSuite.name].includes(selected)) {
+    workloads.push(await projectWorkload(editSuite, out));
   }
   if (!workloads.length) {
     throw new Error(`No workload matches --workload ${selected}`);
@@ -670,6 +704,7 @@ async function main(): Promise<number> {
     console.log("\ncandidate fresh-build work counters (deterministic)");
     printTable(counterRows);
   }
+  const reuse = reuseTables(workloads, samples, medians);
   const phases = args.profile ? phaseTables(workloads, samples) : {};
 
   const loadEnd = loadAverage();
@@ -703,6 +738,7 @@ async function main(): Promise<number> {
         })),
         medians,
         counters,
+        reuse,
         phases,
         wasm,
         problems,
@@ -733,6 +769,105 @@ async function main(): Promise<number> {
     }.`,
   );
   return 0;
+}
+
+/** What a retained revision reused and redid; deterministic per phase. */
+interface Reuse {
+  reused_named: number;
+  fresh_named: number;
+  reused_closures: number;
+  fresh_closures: number;
+  rebuilt_seed: boolean;
+  reused_output: boolean;
+  trivia_only: boolean;
+  validated_modules: number;
+  recheck_body_elaborations: number;
+  reused_check_body_elaborations: number;
+}
+function reuseOf(stats: Record<string, unknown>): Reuse {
+  const backend = (stats.backend ?? {}) as Record<string, number>;
+  const attempt = (stats.attemptStats ?? {}) as Record<string, unknown>;
+  const fallback = (attempt.fallback ?? {}) as Record<string, number>;
+  return {
+    reused_named: backend.reused_named,
+    fresh_named: backend.fresh_named,
+    reused_closures: backend.reused_closures,
+    fresh_closures: backend.fresh_closures,
+    rebuilt_seed: Boolean(attempt.rebuilt_seed),
+    reused_output: Boolean(attempt.reused_output),
+    trivia_only: Boolean(attempt.trivia_only),
+    validated_modules: fallback.validated_modules,
+    recheck_body_elaborations: fallback.recheck_body_elaborations,
+    reused_check_body_elaborations: fallback.reused_check_body_elaborations,
+  };
+}
+/**
+ * The retained edit suite: CPU with reuse and recheck counters per phase. A
+ * `*` marks a counter in which the baseline differed from the candidate.
+ */
+function reuseTables(
+  workloads: Workload[],
+  samples: Sample[],
+  medians: Record<string, Record<string, { candidate: Spread | null }>>,
+) {
+  const tables: Record<string, Record<string, Record<string, Reuse>>> = {};
+  const rows = [[
+    "workload",
+    "phase",
+    "cand cpu ms",
+    "reused/fresh named",
+    "fresh closures",
+    "seed",
+    "output",
+    "validated",
+    "recheck",
+  ]];
+  for (const workload of workloads) {
+    const phases = [
+      ...new Set(
+        samples.filter((s) =>
+          s.kind === "retained" && s.workload === workload.name
+        )
+          .map((s) => s.phase),
+      ),
+    ];
+    if (!phases.length) continue;
+    tables[workload.name] = {};
+    for (const phase of phases) {
+      const byVariant: Record<string, Reuse> = {};
+      for (const variant of ["baseline", "candidate"]) {
+        const sample = samples.findLast((s) =>
+          s.kind === "retained" && s.workload === workload.name &&
+          s.variant === variant && s.phase === phase
+        );
+        if (sample) byVariant[variant] = reuseOf(sample.stats);
+      }
+      tables[workload.name][phase] = byVariant;
+      const cand = byVariant.candidate, base = byVariant.baseline;
+      const mark = (...fields: (keyof Reuse)[]) =>
+        base && fields.some((field) => base[field] !== cand[field]) ? "*" : "";
+      rows.push([
+        workload.name,
+        phase,
+        medians[workload.name]?.[phase]?.candidate?.median.toFixed(1) ?? "-",
+        `${cand.reused_named}/${cand.fresh_named}${
+          mark("reused_named", "fresh_named")
+        }`,
+        `${cand.fresh_closures}${mark("fresh_closures")}`,
+        `${cand.rebuilt_seed ? "rebuilt" : "kept"}${mark("rebuilt_seed")}`,
+        `${
+          cand.reused_output ? (cand.trivia_only ? "trivia" : "reused") : "new"
+        }${mark("reused_output", "trivia_only")}`,
+        `${cand.validated_modules}${mark("validated_modules")}`,
+        `${cand.recheck_body_elaborations}${mark("recheck_body_elaborations")}`,
+      ]);
+    }
+  }
+  if (rows.length > 1) {
+    console.log("\nretained edit suite (candidate counters, deterministic)");
+    printTable(rows);
+  }
+  return tables;
 }
 
 interface PhaseProfile {

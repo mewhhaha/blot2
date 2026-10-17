@@ -108,14 +108,88 @@ async function penSettings(snapshotRoot: string): Promise<PenSettings> {
   return { imports, nativeAssetRoots };
 }
 
-/** Retained edits on the game entry. Anchors must stay unique in the snapshot. */
+/**
+ * The retained edit suite on the game entry, one scenario per kind of edit.
+ * Anchors must stay unique in the snapshot. scripts/bench/corpus.ts mirrors
+ * the suite on a small public project for the reuse budgets.
+ */
 export const gameScenarios: readonly Scenario[] = [
+  {
+    name: "trivia",
+    replacements: [{
+      file: "src/robots.blot",
+      search: "const count = 10000\n",
+      replace: "// trivia: an added comment line\nconst count = 10000\n",
+    }],
+  },
   {
     name: "literal_constant",
     replacements: [{
       file: "src/robots.blot",
       search: "const floor_half_extent = 60.0",
       replace: "const floor_half_extent = 61.0",
+    }],
+  },
+  {
+    name: "literal_in_body",
+    replacements: [{
+      file: "src/robots.blot",
+      search: "if pose.position.y >= 0.1875 * old_scale:",
+      replace: "if pose.position.y >= 0.1876 * old_scale:",
+    }],
+  },
+  {
+    name: "body_change",
+    replacements: [{
+      file: "src/robots.blot",
+      search:
+        "const walk_material = fn phase => first_material + from (floor phase)",
+      replace:
+        "const walk_material = fn phase => first_material + from (ceil phase)",
+    }],
+  },
+  {
+    name: "type_change",
+    replacements: [
+      {
+        file: "src/robots.blot",
+        search:
+          "type Carry is data = #Carry { depth: F32, width: F32, height: F32, age: F32, random: U32 }",
+        replace:
+          "type Carry is data = #Carry { depth: F32, width: F32, height: F32, age: F32, random: U32, spare: F32 }",
+      },
+      {
+        file: "src/robots.blot",
+        search: "        random: lanes.join values[5] values[8],\n      }",
+        replace:
+          "        random: lanes.join values[5] values[8], spare: 0.0,\n      }",
+      },
+      {
+        file: "src/robots.blot",
+        search: "      age: 0.0, random: current.random,\n    }",
+        replace: "      age: 0.0, random: current.random, spare: 0.0,\n    }",
+      },
+    ],
+  },
+  {
+    // ink/math is imported by most of the game and the Ink library.
+    name: "imported_body",
+    replacements: [{
+      file: "ink/math.blot",
+      search:
+        "const Quat.dot: Quat -> Quat -> F32 = fn a => fn b =>\n  a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w",
+      replace:
+        "const Quat.dot: Quat -> Quat -> F32 = fn a => fn b =>\n  a.w * b.w + a.z * b.z + a.y * b.y + a.x * b.x",
+    }],
+  },
+  {
+    // Leaves the Wasm unchanged.
+    name: "unused_export",
+    replacements: [{
+      file: "ink/math.blot",
+      search: "const zero2 = #Vec2 { x: 0.0, y: 0.0 }\n",
+      replace:
+        "const zero2 = #Vec2 { x: 0.0, y: 0.0 }\nconst probe_unused_export = fn (x: F32) => x + 1.0\n",
     }],
   },
 ];

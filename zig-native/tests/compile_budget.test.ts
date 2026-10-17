@@ -15,13 +15,19 @@ import {
   chainGeneric,
   chainMono,
   diamond,
+  editSuite,
   fanout,
   type SyntheticProgram,
 } from "../../scripts/bench/corpus.ts";
+import {
+  createZigProjectCompiler,
+  type ZigProjectBuildResult,
+} from "../../compiler/zig_project_client.ts";
 
 const compiler = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+const stdRoot = new URL("../../std", import.meta.url).pathname;
 const scratchRoot = new URL("../../build/tmp/", import.meta.url).pathname;
 
 /** Headroom over the measured value; a later hill should tighten `today`. */
@@ -214,3 +220,234 @@ for (
     assert(actual.counters.solver_constraint_visits <= program.size * 16 + 32);
   });
 }
+
+/**
+ * Work a retained revision redoes, from serve-project stats. Lower is better:
+ * a budget is the count when it was set, with no headroom.
+ */
+interface Reuse {
+  /** Named and closure instances specialized afresh (`stats.backend`). */
+  fresh_named: number;
+  fresh_closures: number;
+  /** Modules whose frontend was validated again (`attemptStats.fallback`). */
+  validated_modules: number;
+  recheck_body_elaborations: number;
+  /** The dependency seed was rebuilt; true permits either outcome. */
+  rebuilt_seed: boolean;
+  /** The previous output was published unchanged; true requires it. */
+  reused_output: boolean;
+}
+function reuse(result: ZigProjectBuildResult): Reuse {
+  assert(result.success, JSON.stringify(result));
+  const backend = result.stats.backend as Record<string, number>;
+  const attempt = result.stats.attemptStats as Record<string, unknown>;
+  const fallback = attempt.fallback as Record<string, number>;
+  return {
+    fresh_named: backend.fresh_named,
+    fresh_closures: backend.fresh_closures,
+    validated_modules: fallback.validated_modules,
+    recheck_body_elaborations: fallback.recheck_body_elaborations,
+    rebuilt_seed: attempt.rebuilt_seed as boolean,
+    reused_output: attempt.reused_output as boolean,
+  };
+}
+
+// One retained session over the edit suite: population, then each scenario's
+// edit and revert. Retained hills (seeding reuse on population, output and
+// body cutoffs) are expected to LOWER these; re-measure and tighten `today`.
+// Every edit must still match a fresh build of the same sources.
+const retainedToday: Record<string, Reuse> = {
+  "population": {
+    fresh_named: 10,
+    fresh_closures: 0,
+    validated_modules: 5,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: true,
+    reused_output: false,
+  },
+  "edit:trivia": {
+    fresh_named: 0,
+    fresh_closures: 0,
+    validated_modules: 0,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: false,
+    reused_output: true,
+  },
+  "revert:trivia": {
+    fresh_named: 0,
+    fresh_closures: 0,
+    validated_modules: 0,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: false,
+    reused_output: true,
+  },
+  "edit:literal_constant": {
+    fresh_named: 2,
+    fresh_closures: 0,
+    validated_modules: 1,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: true,
+    reused_output: false,
+  },
+  "revert:literal_constant": {
+    fresh_named: 2,
+    fresh_closures: 0,
+    validated_modules: 1,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: true,
+    reused_output: false,
+  },
+  "edit:literal_in_body": {
+    fresh_named: 3,
+    fresh_closures: 0,
+    validated_modules: 1,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: true,
+    reused_output: false,
+  },
+  "revert:literal_in_body": {
+    fresh_named: 3,
+    fresh_closures: 0,
+    validated_modules: 1,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: true,
+    reused_output: false,
+  },
+  "edit:body_change": {
+    fresh_named: 3,
+    fresh_closures: 0,
+    validated_modules: 1,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: true,
+    reused_output: false,
+  },
+  "revert:body_change": {
+    fresh_named: 3,
+    fresh_closures: 0,
+    validated_modules: 1,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: true,
+    reused_output: false,
+  },
+  // A changed data type re-specializes every instance today.
+  "edit:type_change": {
+    fresh_named: 10,
+    fresh_closures: 0,
+    validated_modules: 2,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: true,
+    reused_output: false,
+  },
+  "revert:type_change": {
+    fresh_named: 10,
+    fresh_closures: 0,
+    validated_modules: 2,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: true,
+    reused_output: false,
+  },
+  "edit:imported_body": {
+    fresh_named: 4,
+    fresh_closures: 0,
+    validated_modules: 1,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: true,
+    reused_output: false,
+  },
+  "revert:imported_body": {
+    fresh_named: 4,
+    fresh_closures: 0,
+    validated_modules: 1,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: true,
+    reused_output: false,
+  },
+  // An unused export leaves the Wasm unchanged but rebuilds everything today.
+  "edit:unused_export": {
+    fresh_named: 10,
+    fresh_closures: 0,
+    validated_modules: 4,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: true,
+    reused_output: false,
+  },
+  "revert:unused_export": {
+    fresh_named: 10,
+    fresh_closures: 0,
+    validated_modules: 4,
+    recheck_body_elaborations: 0,
+    rebuilt_seed: true,
+    reused_output: false,
+  },
+};
+
+Deno.test("budget: retained edit suite reuses at least today's work", async () => {
+  await Deno.mkdir(scratchRoot, { recursive: true });
+  const directory = await Deno.makeTempDir({
+    dir: scratchRoot,
+    prefix: "budget-edit-suite-",
+  });
+  const options = {
+    executable: compiler,
+    entry: `${directory}/${editSuite.entry}`,
+    prelude,
+    stdRoot,
+    cacheDirectory: false as const,
+  };
+  const retained = await createZigProjectCompiler(options);
+  const observed: Record<string, Reuse> = {};
+  try {
+    for (const [file, source] of Object.entries(editSuite.files)) {
+      await Deno.writeTextFile(`${directory}/${file}`, source);
+    }
+    observed.population = reuse(await retained.build());
+    for (const scenario of editSuite.scenarios) {
+      const sources: Record<string, string> = {};
+      for (const { file, search, replace } of scenario.replacements) {
+        const path = `${directory}/${file}`;
+        const original = sources[path] ?? editSuite.files[file];
+        assert.equal(original.split(search).length, 2, `${scenario.name}`);
+        sources[path] = original.replace(search, replace);
+      }
+      const edited = await retained.build({ sources });
+      observed[`edit:${scenario.name}`] = reuse(edited);
+      const fresh = await createZigProjectCompiler(options);
+      try {
+        const expected = await fresh.build({ sources });
+        assert(edited.success && expected.success, scenario.name);
+        assert.deepEqual(edited.bytes, expected.bytes, scenario.name);
+      } finally {
+        await fresh.dispose();
+      }
+      observed[`revert:${scenario.name}`] = reuse(await retained.build());
+    }
+  } finally {
+    await retained.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+  assert.deepEqual(Object.keys(observed), Object.keys(retainedToday));
+  const failures: string[] = [];
+  const improved: string[] = [];
+  for (const [phase, budget] of Object.entries(retainedToday)) {
+    const actual = observed[phase];
+    for (const [name, limit] of Object.entries(budget)) {
+      const value = actual[name as keyof Reuse];
+      if (name === "reused_output") {
+        if (limit && !value) failures.push(`${phase} ${name}: lost`);
+        else if (!limit && value) improved.push(`${phase} ${name}`);
+      } else if (Number(value) > Number(limit)) {
+        failures.push(`${phase} ${name}: ${value} exceeds ${limit}`);
+      } else if (Number(value) < Number(limit)) improved.push(`${phase} ${name}`);
+    }
+  }
+  if (improved.length) {
+    console.log(`Tighten retainedToday: ${improved.join(", ")} improved.`);
+  }
+  assert.equal(
+    failures.length,
+    0,
+    `retained edit suite redid more work:\n${failures.join("\n")}\nobserved ${
+      JSON.stringify(observed)
+    }`,
+  );
+});
