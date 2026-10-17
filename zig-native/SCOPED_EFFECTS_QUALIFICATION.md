@@ -1,15 +1,18 @@
 # Direct scoped effect qualification
 
 This is an implementation slice of [the reviewed design](SCOPED_EFFECTS.md).
-Tasks058 and059 remain open. No milestone commit or full compiler gate is
-claimed here.
+Tasks 058 and 059 closed on 17 October 2026 against the scoped-identity and
+capability-lifetime rows of the
+[language qualification index](LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
+with the full gate at `05401a9`. The sections below record earlier checkpoints;
+where they say 058/059 remain open, or claim no full gate, they are historical.
 
 ## Supported boundary
 
 Direct `@effect.scope (fn (capability: Family Arguments) => body)` creates fresh
 authority on every guest entry. Member operations, local aliases, capturing
 local thunks and ordinary providers preserve the exact owner. Nested same-typed
-State capabilities return `[11,102,10,100]`; callback forwarding returns119 and
+State capabilities return `[11,102,10,100]`; callback forwarding returns 119 and
 reinstalling one capability shadows its own installation. Scoped request clauses
 carry an exact operation selector and a separate counted authority edge; two
 same-family owners route to distinct clauses, while aliases of one owner reject
@@ -66,12 +69,12 @@ and unresolved results or transferred arguments reject conservatively, including
 pure handled closures and longer-lived builtin State writes. Associated dispatch
 arguments use the same guard. This also rejects some authority-free values and
 legal storage/callback flows. Precise footprints, opaque/generic/compiled store
-contracts, origin traces and the complete059 acceptance matrix remain open.
-Structural escape checking is bounded at128 depth and65536 visits per query.
+contracts, origin traces and the complete 059 acceptance matrix remain open.
+Structural escape checking is bounded at 128 depth and 65536 visits per query.
 
 ## Validation
 
-Zig0.17.0, Safe/noLLVM, CPU4 for development:
+Zig 0.17.0, Safe/noLLVM, CPU 4 for development:
 
 - Focused `zig build test` filters: `scoped effect`, `effect authority` and
   `scoped provider keys`; passing allocation-failure laws cover checking,
@@ -80,7 +83,7 @@ Zig0.17.0, Safe/noLLVM, CPU4 for development:
   substituted request selectors. Request checking/lowering/emission have
   allocation-failure coverage. Generic payload checking/lowering/emission and
   static-operation storage rejection also have allocation-failure laws.
-- Executed controls:23 groups across direct scopes, scoped requests, the
+- Executed controls: 23 groups across direct scopes, scoped requests, the
   authority journal, symbolic rows, generic scope factories and storage
   diagnostics pass, including both codegen tiers, sync/JSPI, suspension,
   rejection, trap recovery, aliases, forwarding, source/compiled effect
@@ -103,7 +106,7 @@ Zig0.17.0, Safe/noLLVM, CPU4 for development:
   proof.
 - The lifecycle fixture proves retained identity is inactive before teardown on
   success and failure, with zero journal roots and leases.
-- Zig analyzer:369 files, zero findings.
+- Zig analyzer: 369 files, zero findings.
 
 The full LLVM/compiler gate belongs to the combined qualification. This slice
 was developed against staged source tree
@@ -112,23 +115,24 @@ costs are separate.
 
 ## Measurement
 
-CPU6, Safe/noLLVM compiler, seven alternating fresh compiler pairs and31 warmed
-guest pairs,2048 calls per guest sample. Both programs return the same four
-numeric values. The static control uses two distinct declared families; the
+CPU 6, Safe/noLLVM compiler, seven alternating fresh compiler pairs and 31
+warmed guest pairs, 2048 calls per guest sample. Both programs return the same
+four numeric values. The static control uses two distinct declared families; the
 scoped program uses two fresh owners of one family.
 
 | Measurement                                        | Control median | Candidate median | Median paired ratio |
 | -------------------------------------------------- | -------------: | ---------------: | ------------------: |
-| Static compiler, source baseline versus this slice |       19.311ms |         19.413ms |              1.0105 |
-| Candidate compiler, static versus scoped program   |       19.461ms |         21.229ms |              1.0917 |
-| Candidate guest, static versus scoped program      |   1.158µs/call |     1.682µs/call |              1.5084 |
+| Static compiler, source baseline versus this slice |      19.311 ms |        19.413 ms |              1.0105 |
+| Candidate compiler, static versus scoped program   |      19.461 ms |        21.229 ms |              1.0917 |
+| Candidate guest, static versus scoped program      |  1.158 µs/call |    1.682 µs/call |              1.5084 |
 
 Compiler samples include process loading and fresh checking/emission. Retained
 and restart behavior is verified separately; these are not retained-edit
 timings. Guest overhead includes both fresh owners, callbacks, exact routing,
-journals and cleanup. It is about0.52µs per call on this small workload. A
+journals and cleanup. It is about 0.52 µs per call on this small workload. A
 direct-member shortcut removes transient operation closures created solely to
-recover the provider owner; an earlier run measured1.744µs for the scoped guest.
+recover the provider owner; an earlier run measured 1.744 µs for the scoped
+guest.
 
 Raw inputs, binaries, Wasm hashes, samples and distributions are recorded in
 `build/bench/scoped-058/results.json` (SHA-256
@@ -193,7 +197,7 @@ active permission.
 Two executed groups cover separate same-typed State owners, U32/F32 payloads,
 written parameter rows, source/compiled imports, sync/JSPI, rejection recovery,
 retained edits, revert, checkpoint byte parity, and a same-header helper edit
-that loses its flow claim. The focused regression batch has32 executed groups.
+that loses its flow claim. The focused regression batch has 32 executed groups.
 Native allocation-failure laws cover identity freshening, precise repeated rows,
 rollback rerouting, owned principal copying, worklist wakeups,
 checking/lowering/ emission, and storage rejection. Frozen validation rejects
@@ -202,7 +206,7 @@ instances. Solver regressions and the analyzer pass. No combined gate or new CPU
 claim is made.
 
 Complete dependent arrows, selections, general callback/capture contracts, and
-precise same-lifetime State stores remain open in058/059.
+precise same-lifetime State stores remain open in 058/059.
 
 ## Curried callback boundary
 
@@ -237,11 +241,11 @@ Two executed groups cover source/compiled imported declarations, stored captures
 across JSPI suspension, rejection recovery, checkpoint parity, older cells,
 ordinary providers and returned state negatives. Native laws cover handler
 shadowing, construction-time frame rejection and checking/lowering/emission
-allocation failure. The focused batch passes36 executed groups and all8
-unchanged compile budgets; the analyzer reports369 files and zero findings.
-Fixed-path fanout128 requests16,136,290 bytes in 53,920 allocations with exactly
-equal work counters before and after this slice. Full combined qualification and
-CPU measurement remain separate.
+allocation failure. The focused batch passes 36 executed groups and all 8
+unchanged compile budgets; the analyzer reports 369 files and zero findings.
+Fixed-path fanout128 requests 16,136,290 bytes in 53,920 allocations with
+exactly equal work counters before and after this slice. Full combined
+qualification and CPU measurement remain separate.
 
 ## Complete arrow binder boundary
 
@@ -268,20 +272,20 @@ proof-loss rollback. Native checking/lowering/emission allocation-failure laws
 cover complete binders, their annotation scope and hidden storage rejection.
 Multiple capability inputs, selected identities, general hidden capture/store
 contracts and arbitrary opaque footprints remain open. This is a focused
-boundary, not full058/059 completion.
+boundary, not full 058/059 completion.
 
-Final controls pass38 executed guest groups,8 unchanged compile budgets and19
+Final controls pass 38 executed guest groups, 8 unchanged compile budgets and 19
 source frontend/formatter groups. Native scoped and complete-arrow laws include
-allocation-failure recovery;369 analyzer files have zero findings. Fresh Safe/
+allocation-failure recovery; 369 analyzer files have zero findings. Fresh Safe/
 noLLVM controls with isolated equal-length restart-cache directories request
-exactly16,136,392 bytes in 53,920 allocations with18,504 type nodes and equal
+exactly 16,136,392 bytes in 53,920 allocations with 18,504 type nodes and equal
 work counters before and after this slice. A restored CLI checkpoint must not be
 compared with a fresh run; an early mixed-state comparison was discarded.
 
 Tree-sitter's existing permissive annotation grammar needs no production change.
 The named-binder corpus and highlight controls pass with pinned upstream CLI
-v0.27.1:7 corpus parses and15 highlight fixtures, including5 new assertions. The
-official release archive SHA-256 is
+v0.27.1: 7 corpus parses and 15 highlight fixtures, including 5 new assertions.
+The official release archive SHA-256 is
 `d01042f94ba3d6827ddc9788e235f75d8366431be42bdf90ade534d960c98b7d`; the
 installed executable SHA-256 is
 `6de5f5c0f6d2e281ad2643d3874b66cf240fa77140c5346b670889483982b0c7`. Full
@@ -309,18 +313,18 @@ inputs, shadowing, mixed U32/F32 payloads, sync/JSPI, rejection recovery,
 checkpoints, edits and proof-loss/unhandled-owner rollback. Native checking,
 lowering, emission, ordered interning and complete snapshot
 publication/replacement laws include allocation failure. The focused batch
-passes34 scoped guest groups and all 8 unchanged compile budgets;370 analyzer
+passes 34 scoped guest groups and all 8 unchanged compile budgets; 370 analyzer
 files report zero findings. The activation fixture prerequisite was generated
 and its revocation law then passed.
 
 With identical source/prelude bytes and fresh equal-length cache paths, ordinary
-fanout128 requests16,104,454 bytes in 53,920 allocations, versus16,136,398 bytes
-in the previous slice. Type nodes remain18,504. All inference/solver counters
-remain equal; metadata copied bytes fall360 because ordinary specialization keys
-shrink. These are allocation controls, not a CPU or full combined qualification
-claim.
+fanout128 requests 16,104,454 bytes in 53,920 allocations, versus 16,136,398
+bytes in the previous slice. Type nodes remain 18,504. All inference/solver
+counters remain equal; metadata copied bytes fall 360 because ordinary
+specialization keys shrink. These are allocation controls, not a CPU or full
+combined qualification claim.
 
-Remaining058/059 boundaries are owned value-flow identity terms for selections
+Remaining 058/059 boundaries are owned value-flow identity terms for selections
 and aliases; general parameter/capture/result/store footprints across
 aggregates, demands, providers and computations; fresh invocation binder
 substitution through generative/captured generic calls; opaque/associated
@@ -890,7 +894,7 @@ The Source law in `src/check/check_effect_tests.zig` runs complete
 allocation-failure injection. `tests/scoped_demand_capture_execution.test.ts`
 covers source and compiled dependencies, checkpoints, failed captures and
 recovery in both tiers and sync/JSPI. Older State, resource, usage and
-ambient-staging neighbors pass. The ordinary runtime control remains11958B with
+ambient-staging neighbors pass. The ordinary runtime control remains 11958B with
 SHA256 `1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad`.
 
 The separate read-only `capability_lifetimes.zig` reports actual captures,
@@ -910,13 +914,13 @@ Unsupported scopes retain independent Source/usage/invocation checks and confer
 no new confinement or no-store fact.
 
 Canonical node population and lazy producer validation remain separate from the
-shared semantic work budget. A tiny scope with70k unrelated owner nodes, and a
-scoped module with70k ordinary nodes, remain accepted. Repeated actual scope
+shared semantic work budget. A tiny scope with 70k unrelated owner nodes, and a
+scoped module with 70k ordinary nodes, remain accepted. Repeated actual scope
 proof work exhausts one shared budget and rejects. Root ten native laws include
 seven complete allocation-failure laws. Sixteen selected guest groups pass; the
 imported-container scoped_value_flow emitter failure also reproduces before this
-guard and remains a separate repair. Union selected analyzer251/452files is
-zero. The private final25-pair development CPU control measures ordinary
+guard and remains a separate repair. Union selected analyzer 251/452 files is
+zero. The private final 25-pair development CPU control measures ordinary
 fresh/edit +1.11/-0.51% and scoped fresh/edit+0.55/+2.07%, with byte-identical
 output. Broader compiler qualification and complete immutable scope coverage
 remain open.
@@ -926,7 +930,7 @@ expectations match exact field names and payload types independently of field
 order. Missing/duplicate names, wrong payloads and exhausted proof budgets
 reject. Two root native laws (including complete allocation failures) and six
 executed groups pass, covering both container tiers, callback factories and
-associated package payloads. The exact private25-pair CPU control preserves
+associated package payloads. The exact private 25-pair CPU control preserves
 same-order bytes and measures retained edits+0.11%; reordered records previously
 rejected and have no before/after speed ratio. Pins and logs are in
 `build/bench/complete-program-20261015/record-code-shape-names1/`.
@@ -964,12 +968,13 @@ capture catalogs decline independent derivation.
 
 The root native law completes every allocation failure; two cross-file guest
 groups pass source/archive/checkpoint, edits, traps, recovery and sync/JSPI. The
-combined numeric repair passes six further guests and400affected analyzer files
-with zero findings. The unchanged captured project now passes fresh, edit and
-revert with70,330steps,11retained constant hits and61,383replayed steps;
-fresh/revert bytes agree. Wall durations25.493/14.275/13.628s are compatibility
-observations, not CPU qualification. Exact inputs, binaries, source images and
-logs are in `build/bench/complete-program-20261015/deferred-named-capture/` and
+combined numeric repair passes six further guests and 400 affected analyzer
+files with zero findings. The unchanged captured project now passes fresh, edit
+and revert with 70,330 steps, 11 retained constant hits and 61,383 replayed
+steps; fresh/revert bytes agree. Wall durations 25.493/14.275/13.628s are
+compatibility observations, not CPU qualification. Exact inputs, binaries,
+source images and logs are in
+`build/bench/complete-program-20261015/deferred-named-capture/` and
 `captured-after-capture-repair/`. General coverage and the final gate remain.
 
 ## Resource callback results, 15 October 2026
@@ -985,14 +990,14 @@ report incomplete without erasing the returned capture graph. Structural usage
 checking visits canonical enclosing effect scopes; shared alpha/cleanup work is
 bounded.
 
-Root3native laws with complete allocation failures,9executed groups, TypeScript
-and400affected zero-finding analyzer files pass. Mutations cover omitted capture
-catalogs, younger/loan captures, wrong cleanup roles, hidden State stores,
-invalid type IDs and proof-budget exhaustion. Both tiers and sync/JSPI preserve
-source/ archive/checkpoint, edits, invalid revisions, cleanup traps and
-recovery. General reference payloads, host cleanup and unknown/terminating
-callback recipes gain no new authority. Ordinary Cost stays byte-identical.
-Exact root/private sources, failed-before repro and pins are in
+Root 3 native laws with complete allocation failures, 9 executed groups,
+TypeScript and 400 affected zero-finding analyzer files pass. Mutations cover
+omitted capture catalogs, younger/loan captures, wrong cleanup roles, hidden
+State stores, invalid type IDs and proof-budget exhaustion. Both tiers and
+sync/JSPI preserve source/ archive/checkpoint, edits, invalid revisions, cleanup
+traps and recovery. General reference payloads, host cleanup and
+unknown/terminating callback recipes gain no new authority. Ordinary Cost stays
+byte-identical. Exact root/private sources, failed-before repro and pins are in
 `build/bench/complete-program-20261015/resource-scope-result/`. The final full
 gate and broader effect/resource qualification remain open.
 

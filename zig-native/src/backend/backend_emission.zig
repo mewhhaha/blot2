@@ -132,9 +132,13 @@ pub const Owner = struct {
             }
         }
     };
+    /// One evaluation of a generalized local's producer at one checked use
+    /// layout, prepared under the local's instance facts.
+    const LocalInstance = struct { layout: layout.Id, body: *Body };
     const Plan = union(enum) {
         staging: StagingPlan,
         static_binding: core_eval.ValueId,
+        instances: []LocalInstance,
         operation: struct { ty: layout.Id, label: type_evidence.Effects.Label },
         provider: ProviderPlan,
         projection: ?ProjectionPlan,
@@ -166,6 +170,13 @@ pub const Owner = struct {
         pub fn deinit(self: *Plan, a: Allocator) void {
             switch (self.*) {
                 .staging => |*staged| staged.deinit(a),
+                .instances => |instances| {
+                    for (instances) |instance| {
+                        instance.body.deinit(a);
+                        a.destroy(instance.body);
+                    }
+                    a.free(instances);
+                },
                 .request => |request| a.free(request.operations),
                 .pattern => |bindings| if (bindings) |owned| a.free(owned),
                 .template => |*metadata| metadata.deinit(a),
@@ -190,6 +201,52 @@ pub const Owner = struct {
         }
     };
     const Body = resolved_body.Body(Plan);
+    const max_local_instances = 4;
+    /// Local reads of an instanced producer. Each instance repeats them.
+    const InstanceReads = struct { nodes: [32]core.Id = undefined, len: usize = 0 };
+    /// A generalized local whose concrete checked uses disagree evaluates its
+    /// pure producer once per distinct use layout (issue #10).
+    const FactRange = struct { start: usize = 0, len: usize = 0 };
+    const InstanceDecision = struct {
+        statement: core.Id,
+        count: usize = 0,
+        layouts: [max_local_instances]layout.Id = undefined,
+        /// Ranges of `InstanceDecisions.facts` and `.rows` that close the
+        /// local's quantified type and row holes at each instance.
+        facts: [max_local_instances]FactRange = @splat(.{}),
+        rows: [max_local_instances]FactRange = @splat(.{}),
+        reads: InstanceReads = .{},
+    };
+    const InstanceDecisions = struct {
+        decisions: std.ArrayList(InstanceDecision) = .empty,
+        facts: std.ArrayList(Mapping) = .empty,
+        rows: std.ArrayList(RowMapping) = .empty,
+        fn deinit(self: *InstanceDecisions, a: Allocator) void {
+            self.decisions.deinit(a);
+            self.facts.deinit(a);
+            self.rows.deinit(a);
+        }
+        fn find(self: *const InstanceDecisions, statement: core.Id) ?*const InstanceDecision {
+            for (self.decisions.items) |*decision| if (decision.statement == statement) return decision;
+            return null;
+        }
+        fn factsAt(self: *const InstanceDecisions, decision: *const InstanceDecision, index: usize) []const Mapping {
+            const range = decision.facts[index];
+            return self.facts.items[range.start..][0..range.len];
+        }
+        fn rowsAt(self: *const InstanceDecisions, decision: *const InstanceDecision, index: usize) []const RowMapping {
+            const range = decision.rows[index];
+            return self.rows.items[range.start..][0..range.len];
+        }
+        /// The instanced producer containing a reference, if any.
+        fn reader(self: *const InstanceDecisions, node: core.Id) ?*const InstanceDecision {
+            for (self.decisions.items) |*decision| {
+                if (std.mem.findScalar(core.Id, decision.reads.nodes[0..decision.reads.len], node) != null) return decision;
+            }
+            return null;
+        }
+    };
+    const InstanceLocals = struct { count: usize = 0, layouts: [max_local_instances]layout.Id = undefined, locals: [max_local_instances]u32 = undefined };
 
     const RowView = struct { binding: core.BindingId, row: layout.Id, address: u32, limit_address: u32 };
     const ListDirectory = struct { storage: u32, array: u32, offset: u32 };
@@ -235,6 +292,10 @@ pub const Owner = struct {
     owned_edit: ?core.Id = null,
     inline_depth: u8 = 0,
     inline_loop: bool = false,
+    /// Preparation borrows the decisions of the body being prepared.
+    local_instances: ?*const InstanceDecisions = null,
+    /// Encoding: the instance locals of each instanced generalized local.
+    instance_locals: std.AutoHashMapUnmanaged(core.BindingId, InstanceLocals) = .empty,
 
     // Source owner and mappings are immutable for this emitter's lifetime.
     // Cache only completed root conversions, preserving recursive work limits.
@@ -264,9 +325,11 @@ pub const Owner = struct {
     /// use that instance's private storage. Only its quantified holes acquire
     /// facts; captures, merges and carries decline. Statements are visited
     /// last to first, so a later local's facts close the instances of an
-    /// alias or rebinding chain feeding it (issue #10). This never unifies the
-    /// semantic producer scheme.
-    fn localStorageMappings(self: *Emitter, root: core.Id, mappings: *std.ArrayList(Mapping)) Error!void {
+    /// alias or rebinding chain feeding it (issue #10). Uses that disagree
+    /// may instead evaluate a pure producer once per use layout
+    /// (`decideInstances`); a read inside such a producer occurs once per
+    /// instance. This never unifies the semantic producer scheme.
+    fn localStorageMappings(self: *Emitter, root: core.Id, mappings: *std.ArrayList(Mapping), instances: *InstanceDecisions) Error!void {
         const g = self.generator;
         const source = g.unit(self.unit_id);
         if (source.nodes.len > 4096) return;
@@ -275,6 +338,10 @@ pub const Owner = struct {
         // References read only by an unused local alias need no instance.
         var dead_aliases: [16]core.Id = undefined;
         var dead_count: usize = 0;
+        var scratch: std.ArrayList(Mapping) = .empty;
+        defer scratch.deinit(g.allocator);
+        var scratch_rows: std.ArrayList(RowMapping) = .empty;
+        defer scratch_rows.deinit(g.allocator);
         var position = statements.len;
         while (position > 0) {
             position -= 1;
@@ -282,7 +349,10 @@ pub const Owner = struct {
             const n = source.node(statement);
             if (n.tag != .bind or n.a == 0) continue;
             const producer = source.node(n.b);
-            if (producer.tag != .call and producer.tag != .apply and producer.tag != .project and producer.tag != .reference) continue;
+            // Built data never takes the shared storage below; only distinct
+            // instances may serve it.
+            const built = producer.tag == .construct or producer.tag == .product or producer.tag == .record;
+            if (!built and producer.tag != .call and producer.tag != .apply and producer.tag != .project and producer.tag != .reference) continue;
             const binding = source.binding(n.a);
             if (binding.kind != .local or binding.scheme.variables.len == 0) continue;
             const produced = try self.codeLayout(binding.ty, source.span(statement));
@@ -299,24 +369,45 @@ pub const Owner = struct {
                 if (source.binding(aliased.binding).kind != .local) continue;
             }
             const previous = if (mappings.items.len == 0) self.mappings else mappings.items;
-            var actual: ?layout.Id = null;
-            var agreed = true;
-            for (source.nodes, 0..) |node, index| {
+            var uses: [max_local_instances]layout.Id = undefined;
+            var use_count: usize = 0;
+            var open = false;
+            scan: for (source.nodes, 0..) |node, index| {
                 if (budget == 0) return;
                 budget -= 1;
                 if (node.tag != .reference) continue;
                 const reference = source.reference(@intCast(index));
                 if (reference.binding != n.a or (reference.unit != 0 and reference.unit != self.unit_id)) continue;
                 if (std.mem.findScalar(core.Id, dead_aliases[0..dead_count], @intCast(index)) != null) continue;
-                const instance = try g.codeLayoutWithRows(self.unit_id, source.typeOf(@intCast(index)), previous, self.row_mappings, source.span(@intCast(index)));
-                if (self.hasErasedType(instance, 0) or (actual != null and actual.? != instance)) {
-                    agreed = false;
-                    break;
+                const reader = instances.reader(@intCast(index));
+                const contexts = if (reader) |held| held.count else 1;
+                for (0..contexts) |context| {
+                    var context_mappings = previous;
+                    var context_rows = self.row_mappings;
+                    if (reader) |held| {
+                        scratch.clearRetainingCapacity();
+                        try withFacts(Mapping, g.allocator, previous, instances.factsAt(held, context), &scratch);
+                        context_mappings = scratch.items;
+                        scratch_rows.clearRetainingCapacity();
+                        try withFacts(RowMapping, g.allocator, self.row_mappings, instances.rowsAt(held, context), &scratch_rows);
+                        context_rows = scratch_rows.items;
+                    }
+                    const instance = try g.codeLayoutWithRows(self.unit_id, source.typeOf(@intCast(index)), context_mappings, context_rows, source.span(@intCast(index)));
+                    if (self.hasErasedType(instance, 0)) {
+                        open = true;
+                        break :scan;
+                    }
+                    if (std.mem.findScalar(layout.Id, uses[0..use_count], instance) != null) continue;
+                    if (use_count == uses.len) {
+                        open = true;
+                        break :scan;
+                    }
+                    uses[use_count] = instance;
+                    use_count += 1;
                 }
-                actual = instance;
             }
-            if (!agreed) continue;
-            if (actual == null and producer.tag == .reference) {
+            if (open) continue;
+            if (use_count == 0 and producer.tag == .reference) {
                 if (dead_count < dead_aliases.len) {
                     dead_aliases[dead_count] = n.b;
                     dead_count += 1;
@@ -340,6 +431,12 @@ pub const Owner = struct {
                 if (carry.incoming == n.a or carry.iteration == n.a or carry.backedge == n.a or carry.outgoing == n.a) indirect = true;
             }
             if (indirect) continue;
+            if (use_count > 1) {
+                try self.decideInstances(statement, previous, uses[0..use_count], instances);
+                continue;
+            }
+            if (built) continue;
+            const actual: ?layout.Id = if (use_count == 1) uses[0] else null;
             var next: std.ArrayList(Mapping) = .empty;
             defer next.deinit(g.allocator);
             try next.appendSlice(g.allocator, previous);
@@ -372,6 +469,147 @@ pub const Owner = struct {
             next = .empty;
         }
     }
+    /// Uses of one generalized local at different layouts share no physical
+    /// value: closure ABI and field words depend on the layout. A pure
+    /// producer with a representation-free value instead runs once per
+    /// distinct use layout, each under facts closing only the local's
+    /// quantified holes. Authority, usage contracts and effects decline.
+    fn decideInstances(self: *Emitter, statement: core.Id, previous: []const Mapping, uses: []const layout.Id, decisions: *InstanceDecisions) Error!void {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const n = source.node(statement);
+        const binding = source.binding(n.a);
+        const span = source.span(statement);
+        // Qualified and generative schemes choose evidence per use, not storage.
+        if (binding.scheme.obligations.len != 0 or binding.scheme.generative.len != 0) return;
+        if (!@import("../eval/closed_local_value.zig").dataShape(g.units, self.unit_id, binding.ty)) return;
+        if (source.has_usage_contracts and (@import("../check/usage_check.zig").containsNominal(&source.types, source.nominals, binding.ty) catch true)) return;
+        var decision: InstanceDecision = .{ .statement = statement, .count = uses.len };
+        var scan: ProducerScan = .{ .source = source, .reads = &decision.reads };
+        if (!scan.visit(n.b, 0)) return;
+        // An edit proven to consume its collection in place may run only once.
+        for (scan.edits[0..scan.edit_count]) |edit| if (try g.ownsArrayUpdate(self.unit_id, edit)) return;
+        const fact_start = decisions.facts.items.len;
+        const row_start = decisions.rows.items.len;
+        var next: std.ArrayList(Mapping) = .empty;
+        defer next.deinit(g.allocator);
+        var next_rows: std.ArrayList(RowMapping) = .empty;
+        defer next_rows.deinit(g.allocator);
+        var closed: std.ArrayList(Mapping) = .empty;
+        defer closed.deinit(g.allocator);
+        var closed_rows: std.ArrayList(RowMapping) = .empty;
+        defer closed_rows.deinit(g.allocator);
+        const variables = source.types.list(binding.scheme.variables);
+        const row_variables = source.types.list(binding.scheme.row_variables);
+        const admitted = admitted: for (uses, 0..) |selected, index| {
+            next.clearRetainingCapacity();
+            next_rows.clearRetainingCapacity();
+            try next.appendSlice(g.allocator, previous);
+            try next_rows.appendSlice(g.allocator, self.row_mappings);
+            try g.mapTypeDepth(self.unit_id, &next, &next_rows, binding.ty, selected, span, 0);
+            try g.mapTypeDepth(self.unit_id, &next, &next_rows, source.typeOf(n.b), selected, span, 0);
+            // Only the local's own quantified holes may differ by instance.
+            const facts_first = decisions.facts.items.len;
+            for (next.items) |mapping| {
+                const old = for (previous) |prior| {
+                    if (prior.variable == mapping.variable) break prior.layout;
+                } else layout.erased;
+                if (mapping.layout == old) continue;
+                if (std.mem.findScalar(types.Id, variables, mapping.variable) == null) break :admitted false;
+                try decisions.facts.append(g.allocator, mapping);
+            }
+            // A row the body leaves unknown closes to the row this use sees;
+            // a known row still reconciles exactly.
+            const rows_first = decisions.rows.items.len;
+            for (next_rows.items) |mapping| {
+                const old = for (self.row_mappings) |prior| {
+                    if (prior.variable == mapping.variable) break prior.row;
+                } else layout.unknown_row;
+                if (mapping.row == old) continue;
+                if (old != layout.unknown_row and std.mem.findScalar(u32, row_variables, mapping.variable) == null) break :admitted false;
+                try decisions.rows.append(g.allocator, mapping);
+            }
+            decision.facts[index] = .{ .start = facts_first, .len = decisions.facts.items.len - facts_first };
+            decision.rows[index] = .{ .start = rows_first, .len = decisions.rows.items.len - rows_first };
+            decision.layouts[index] = selected;
+            closed.clearRetainingCapacity();
+            closed_rows.clearRetainingCapacity();
+            try withFacts(Mapping, g.allocator, previous, decisions.factsAt(&decision, index), &closed);
+            try withFacts(RowMapping, g.allocator, self.row_mappings, decisions.rowsAt(&decision, index), &closed_rows);
+            if (try g.codeLayoutWithRows(self.unit_id, binding.ty, closed.items, closed_rows.items, span) != selected) break :admitted false;
+        } else true;
+        if (!admitted) {
+            decisions.facts.shrinkRetainingCapacity(fact_start);
+            decisions.rows.shrinkRetainingCapacity(row_start);
+            return;
+        }
+        try decisions.decisions.append(g.allocator, decision);
+    }
+    /// `base` with `facts` replacing or extending its substitutions.
+    fn withFacts(comptime Fact: type, a: Allocator, base: []const Fact, facts: []const Fact, out: *std.ArrayList(Fact)) Allocator.Error!void {
+        try out.appendSlice(a, base);
+        for (facts) |fact| {
+            for (out.items) |*mapping| {
+                if (mapping.variable == fact.variable) {
+                    mapping.* = fact;
+                    break;
+                }
+            } else try out.append(a, fact);
+        }
+    }
+    /// A producer built only from pure construction, calls, applications and
+    /// local reads. Pure `let` initializers generalize, so repeating one per
+    /// instance repeats no effect. Blocks, matches, effects, usage operations,
+    /// suspensions and any value of a usage-contract type decline. Possible
+    /// in-place collection edits are collected for the exact ownership proof.
+    const ProducerScan = struct {
+        source: *const core.Module,
+        reads: *InstanceReads,
+        edits: [32]core.Id = undefined,
+        edit_count: usize = 0,
+        remaining: usize = 256,
+        fn visit(self: *ProducerScan, id: core.Id, depth: usize) bool {
+            if (id == 0 or depth >= 64 or self.remaining == 0) return false;
+            self.remaining -= 1;
+            const source = self.source;
+            const n = source.node(id);
+            // A repeated read or capture would duplicate a unique owner.
+            if (source.has_usage_contracts) {
+                const usage = @import("../check/usage_check.zig");
+                if (usage.containsNominal(&source.types, source.nominals, n.ty) catch true) return false;
+                if (n.tag == .closure) {
+                    const metadata = source.closure(id);
+                    for (source.extra[metadata.captures.start..][0..metadata.captures.len]) |held| {
+                        if (usage.containsNominal(&source.types, source.nominals, source.binding(held).ty) catch true) return false;
+                    }
+                }
+            }
+            if (n.tag == .call or n.tag == .apply or n.tag == .array_op) {
+                if (self.edit_count == self.edits.len) return false;
+                self.edits[self.edit_count] = id;
+                self.edit_count += 1;
+            }
+            switch (n.tag) {
+                .constant, .constructor_function, .primitive_function, .closure => return true,
+                .reference => {
+                    if (self.reads.len == self.reads.nodes.len) return false;
+                    self.reads.nodes[self.reads.len] = id;
+                    self.reads.len += 1;
+                    return true;
+                },
+                .scalar => return self.visit(n.a, depth + 1) and (n.b == 0 or self.visit(n.b, depth + 1)),
+                .logical, .associated, .apply, .record_merge => return self.visit(n.a, depth + 1) and self.visit(n.b, depth + 1),
+                .if_value => return self.visit(n.a, depth + 1) and self.visit(n.b, depth + 1) and self.visit(n.c, depth + 1),
+                .project => return self.visit(n.a, depth + 1),
+                .construct => return n.b == 0 or self.visit(n.b, depth + 1),
+                .call, .product, .record, .array, .array_op => {
+                    for (source.children(id)) |child| if (!self.visit(child, depth + 1)) return false;
+                    return true;
+                },
+                else => return false,
+            }
+        }
+    };
     /// Every source-body route enters here after its exact capture bindings
     /// exist. Preparation owns decisions; encoding alone owns runtime locals,
     /// labels, environments and the original lazy function-index order.
@@ -380,7 +618,9 @@ pub const Owner = struct {
         if (self.preparation_depth >= 256) return g.fail(self.unit_id, root, .complexity);
         var storage: std.ArrayList(Mapping) = .empty;
         defer storage.deinit(g.allocator);
-        try self.localStorageMappings(root, &storage);
+        var instances: InstanceDecisions = .{};
+        defer instances.deinit(g.allocator);
+        try self.localStorageMappings(root, &storage, &instances);
         const source = g.unit(self.unit_id);
         if (@import("bottom_result.zig").proves(g.units, self.unit_id, root) and try self.codeLayout(source.typeOf(root), source.span(root)) == layout.erased) {
             if (storage.items.len == 0) try storage.appendSlice(g.allocator, self.mappings);
@@ -388,9 +628,16 @@ pub const Owner = struct {
             defer rows.deinit(g.allocator);
             try g.mapTypeDepth(self.unit_id, &storage, &rows, source.typeOf(root), 5, source.span(root), 0);
         }
-        var body = try Body.init(g.allocator, self.unit_id, root, if (storage.items.len == 0) self.mappings else storage.items, self.row_mappings);
+        return self.prepareMapped(root, depth, template, if (storage.items.len == 0) self.mappings else storage.items, self.row_mappings, if (instances.decisions.items.len == 0) null else &instances);
+    }
+    /// Prepares `root` under exact physical substitutions. Instance bodies
+    /// enter here directly with their facts and no storage decisions.
+    fn prepareMapped(self: *Emitter, root: core.Id, depth: usize, template: bool, mappings: []const Mapping, rows: []const RowMapping, instances: ?*const InstanceDecisions) Error!Body {
+        const g = self.generator;
+        if (self.preparation_depth >= 256) return g.fail(self.unit_id, root, .complexity);
+        var body = try Body.init(g.allocator, self.unit_id, root, mappings, rows);
         errdefer body.deinit(g.allocator);
-        body.rows_evidence = try g.rowMappingEvidence(self.row_mappings);
+        body.rows_evidence = try g.rowMappingEvidence(rows);
         for (body.mappings) |mapping| if (g.representations.store.hasOwners(mapping.layout) catch return g.fail(self.unit_id, root, .complexity)) {
             body.has_owners = true;
             break;
@@ -402,6 +649,7 @@ pub const Owner = struct {
         preparer.locals = try self.locals.clone(g.allocator);
         preparer.templates = try self.templates.clone(g.allocator);
         preparer.static_values = try self.static_values.clone(g.allocator);
+        preparer.local_instances = instances;
         try preparer.prepareNode(&body, root, depth, template);
         if (preparer.has_collection_steps) try preparer.prepareCursorFamilies(&body);
         try preparer.prepareNumeric(&body);
@@ -524,11 +772,16 @@ pub const Owner = struct {
     pub fn bodyExpression(self: *Emitter, root: core.Id, depth: usize, template: bool) Error!void {
         var body = try self.prepareBody(root, depth, template);
         defer body.deinit(self.generator.allocator);
+        try self.preparedExpression(&body, root, depth, template);
+    }
+    /// Encodes `root` under a body prepared for it, with that body's exact
+    /// substitutions in force until it returns.
+    fn preparedExpression(self: *Emitter, body: *const Body, root: core.Id, depth: usize, template: bool) Error!void {
         const previous_context = self.semantic_context;
         self.semantic_context = null;
         defer self.semantic_context = previous_context;
         const previous = self.body;
-        self.body = &body;
+        self.body = body;
         defer self.body = previous;
         const old_mappings = self.mappings;
         var changed = old_mappings.len != body.mappings.len;
@@ -538,10 +791,23 @@ pub const Owner = struct {
                 break;
             }
         };
+        // Ordinary bodies copy the caller's row substitutions; an instance
+        // body may close the local's quantified rows.
+        const old_rows = self.row_mappings;
+        var rows_changed = old_rows.len != body.rows.len;
+        if (!rows_changed) for (old_rows, body.rows) |old, current| {
+            if (old.variable != current.variable or old.row != current.row) {
+                rows_changed = true;
+                break;
+            }
+        };
+        if (rows_changed) self.row_mappings = body.rows;
+        changed = changed or rows_changed;
         self.mappings = body.mappings;
         if (changed) self.layout_cache = @splat(.{});
         defer {
             self.mappings = old_mappings;
+            self.row_mappings = old_rows;
             if (changed) self.layout_cache = @splat(.{});
         }
         if (template) try self.templateExpression(root, depth) else try self.expression(root, depth);
@@ -629,6 +895,54 @@ pub const Owner = struct {
         const ty = try self.codeLayout(g.unit(self.unit_id).typeOf(id), g.unit(self.unit_id).span(id));
         try g.emitValue(self.function_id, .{ .scalar = .pointer, .bits = try g.static_data.serialize(g, plan.value, ty, 0) });
     }
+    /// Plans are keyed by node, and one body has one set of substitutions, so
+    /// each instance of a producer owns a body prepared under its facts.
+    fn prepareInstances(self: *Emitter, decisions: *const InstanceDecisions, decision: *const InstanceDecision, depth: usize) Error![]LocalInstance {
+        const g = self.generator;
+        const producer = g.unit(self.unit_id).node(decision.statement).b;
+        const instances = try g.allocator.alloc(LocalInstance, decision.count);
+        var prepared: usize = 0;
+        errdefer {
+            for (instances[0..prepared]) |instance| {
+                instance.body.deinit(g.allocator);
+                g.allocator.destroy(instance.body);
+            }
+            g.allocator.free(instances);
+        }
+        var mappings: std.ArrayList(Mapping) = .empty;
+        defer mappings.deinit(g.allocator);
+        var rows: std.ArrayList(RowMapping) = .empty;
+        defer rows.deinit(g.allocator);
+        for (instances, 0..) |*instance, index| {
+            mappings.clearRetainingCapacity();
+            rows.clearRetainingCapacity();
+            try withFacts(Mapping, g.allocator, self.mappings, decisions.factsAt(decision, index), &mappings);
+            try withFacts(RowMapping, g.allocator, self.row_mappings, decisions.rowsAt(decision, index), &rows);
+            const body = try g.allocator.create(Body);
+            errdefer g.allocator.destroy(body);
+            body.* = try self.prepareMapped(producer, depth + 1, false, mappings.items, rows.items, null);
+            instance.* = .{ .layout = decision.layouts[index], .body = body };
+            prepared += 1;
+        }
+        return instances;
+    }
+    /// Evaluates each instance once, in order, at the binding. Its free
+    /// locals are immutable, so every instance reads the same values. A use
+    /// reads the instance of its own checked layout (`emitReference`).
+    fn bindInstances(self: *Emitter, statement: core.Id, instances: []const LocalInstance, depth: usize) Error!void {
+        const g = self.generator;
+        const n = g.unit(self.unit_id).node(statement);
+        var held: InstanceLocals = .{};
+        for (instances) |instance| {
+            try self.preparedExpression(instance.body, n.b, depth + 1, false);
+            const local = try self.temporary(g.representations.store.machine(instance.layout));
+            try self.emit(.local_set, local);
+            held.layouts[held.count] = instance.layout;
+            held.locals[held.count] = local;
+            held.count += 1;
+        }
+        try self.instance_locals.put(g.allocator, n.a, held);
+    }
     /// Each use serializes, and so checks, a promoted value. An unused value
     /// would skip those checks, so it keeps its ordinary path.
     fn useCount(self: *Emitter, binding: core.BindingId) usize {
@@ -712,6 +1026,16 @@ pub const Owner = struct {
                     }
                 }
             }
+            // A runtime producer whose uses disagree runs once per use layout.
+            if (self.local_instances) |decisions| if (decisions.find(id)) |decision| {
+                const instances = try self.prepareInstances(decisions, decision, depth);
+                body.put(g.allocator, id, .{ .instances = instances }) catch |err| {
+                    var owned: Plan = .{ .instances = instances };
+                    owned.deinit(g.allocator);
+                    return err;
+                };
+                return;
+            };
         }
         var entry: ?Plan = switch (n.tag) {
             .resource_acquire, .resource_scope => .{ .resource_scope = try self.prepareResourceScope(id) },
@@ -1890,6 +2214,7 @@ pub const Owner = struct {
         self.templates.deinit(self.generator.allocator);
         self.static_values.deinit(self.generator.allocator);
         self.computation_values.deinit(self.generator.allocator);
+        self.instance_locals.deinit(self.generator.allocator);
     }
     fn recordSemantic(self: *Emitter, op: wasm.Op, operand: u32) Error!void {
         if (self.semantic_node == 0 or (op != .call and op != .call_indirect and op != .call_import)) return;
@@ -7011,6 +7336,13 @@ pub const Owner = struct {
                 try self.templateValue(try self.templateAt(template, id), try self.codeLayout(n.ty, unit_.span(id)));
                 return;
             }
+            if (self.instance_locals.get(reference.binding)) |held| {
+                const actual = try self.codeLayout(unit_.typeOf(id), unit_.span(id));
+                for (held.layouts[0..held.count], held.locals[0..held.count]) |instance, local| {
+                    if (instance == actual) return self.emit(.local_get, local);
+                }
+                return g.fail(self.unit_id, id, .unsupported);
+            }
             if (self.locals.get(reference.binding)) |local| {
                 try self.emit(.local_get, local);
                 return;
@@ -8250,6 +8582,10 @@ pub const Owner = struct {
                         const plan = self.body.?.get(statement);
                         if (plan == .static_binding) {
                             try self.static_values.put(g.allocator, n.a, plan.static_binding);
+                            continue;
+                        }
+                        if (plan == .instances) {
+                            try self.bindInstances(statement, plan.instances, depth);
                             continue;
                         }
                     }

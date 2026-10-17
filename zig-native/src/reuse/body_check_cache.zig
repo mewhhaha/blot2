@@ -2366,7 +2366,7 @@ fn checkedField(comptime name: []const u8) CheckedField {
         .proof_contracts, .capability_contracts, .parameter_patterns, .effect_families, .effect_templates, .associated, .nominals, .contracts, .contract_predicates, .contract_members, .implementations, .implementation_predicates, .implementation_members, .member_templates, .selected_proofs, .selected_members, .selected_edges, .selected_uses, .constructors, .tag_origins, .unit => .catalog,
         .editor, .initializer_rejected, .diagnostics, .body_elaborations, .imported_schemes, .counters => .transient,
         .usage_loans, .dictionary_selections, .dictionary_uses => .source_records,
-        .rank_implementations, .generative_bindings, .computations, .request_loops, .request_arms, .request_controls, .reflections, .effect_scopes, .effect_runners, .provider_blocks, .resolver_blocks, .resolver_ops, .resolver_joins, .resolver_completions, .resolver_loops => .node_records,
+        .rank_implementations, .generative_bindings, .computations, .request_loops, .request_arms, .request_controls, .reflections, .effect_scopes, .effect_runners, .provider_blocks, .resolver_blocks, .resolver_ops, .resolver_joins, .resolver_completions, .resolver_loops, .statement_arms => .node_records,
         .iterator_bodies, .effect_scope_ids, .effect_runner_ids, .provider_block_ids, .resolver_block_ids, .resolver_op_ids, .resolver_join_ids, .resolver_loop_ids => .node_indices,
         .proof_bodies => .proof_bodies,
     };

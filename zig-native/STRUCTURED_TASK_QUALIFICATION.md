@@ -59,7 +59,7 @@ retained semantic edits, invalid-edit rollback, revert and compiler restart
 produce executable descriptors. Quoted groups and locally owned partitions
 execute after emission. Missing/duplicate/stale task manifests, invalid counts,
 trailing metadata and incompatible actual adapter signatures reject. Task
-feature version2 carries only the descriptor count; exact typed start/move
+feature version 2 carries only the descriptor count; exact typed start/move
 adapters own capture transfer and the result envelope. Private layout interning
 IDs are not published.
 
@@ -96,3 +96,102 @@ before/source hashes and the separate shared staging delta are in its frozen
 integration artifact. Root must merge that artifact, preserve its independently
 qualified staging loan/resource work, and run the combined gate. No full-gate,
 release-performance, commit or completed task status is claimed here.
+
+## Trace-to-law index, 17 October 2026
+
+This index maps the eight acceptance traces that the owner fixed for tasks 073
+and 074 on 15 October 2026 to named laws in the passing gate at commit `05401a9`
+(17 October 2026: 2,355 native laws with zero leaks, 1,501 guest tests). The
+structured task laws above are now part of that full gate. Every law named below
+appears in its output and is declared in the committed source. Paths are
+relative to `zig-native/`. Seven traces are fully covered; one 074 trace is
+partly covered, as noted under it.
+
+Tasks 073 and 074 remain open: their closure also requires task 035 (tracing
+removal) to be complete, and it is not.
+
+### 073: Nested group exits normally with two unjoined children
+
+Expected: Join children before closing group and releasing parent resource.
+Coverage: complete.
+
+```text
+native src/check/task_backend_tests.zig: structured task backend owns replay retained helpers and every failed allocation
+guest  ../compiler/task_runtime.test.ts: tasks: nested groups finish before parent cleanup and capture retirement
+guest  ../compiler/task_runtime.test.ts: tasks: join moves a result once and close drops unused siblings in order
+guest  ../compiler/task_resources.test.ts: task resource cancellation waits for settlement then cleans children before parent
+guest  tests/task_execution.test.ts: structured source tasks execute sync JSPI affine join cancel and nested groups
+```
+
+### 073: Sibling 1 fails while sibling 2 is suspended
+
+Expected: Request cancellation, await settlement, drop both, then report
+failure. Coverage: complete.
+
+```text
+guest  ../compiler/task_runtime.test.ts: tasks: sibling failure waits for an unabortable suspension before reporting
+guest  ../compiler/task_runtime.test.ts: tasks: primary failure uses spawn ordinal after every suspended child settles
+guest  tests/task_context_execution.test.ts: task scheduler cancellation retains a native suspended child until settlement
+guest  tests/task_context_execution.test.ts: JSPI task resumption restores its exact frame before cancellation and nested failure cleanup
+```
+
+### 073: Cancel before child starts
+
+Expected: Do not invoke thunk; drop transferred owners once. Coverage: complete.
+
+```text
+guest  ../compiler/task_runtime.test.ts: tasks: cancellation before start drops captures without invoking the thunk
+guest  ../compiler/task_resources.test.ts: task resource transfer does not retain or release the moved cleanup binding
+```
+
+### 074: Move unique capture to child, then parent uses old binding
+
+Expected: Reject use after move. Coverage: complete.
+
+```text
+native src/check/task_check_tests.zig: structured task checking transfers unique captures and rejects ordinary Foreign contracts
+native src/check/task_check_tests.zig: structured tasks move one affine demand and reject its parent reuse
+```
+
+### 074: Two sibling writes through aliases/overlapping views
+
+Expected: Reject before scheduling. Coverage: complete.
+
+```text
+native src/check/task_check_tests.zig: structured task checking rejects overlapping unknown forged and escaping views
+native src/check/task_backend_tests.zig: portable task partitions reject overlapping ranges and a forged moved owner version
+native src/check/task_check_tests.zig: structured tasks retain read loans whose enclosing borrow owns the group
+```
+
+### 074: Two siblings force one pending demand
+
+Expected: Reject; independent cells remain legal. Coverage: complete.
+
+```text
+native src/check/task_check_tests.zig: structured task checking rejects shared pending demand forcing and accepts ready immutable values
+```
+
+### 074: Child returns scoped callback/package/task handle
+
+Expected: Reject escaped group/capability/loan. Coverage: partial. Group,
+task-handle, view and loan escapes have task-specific named laws. A child
+returning a scoped callback or a package relies on the ordinary capability and
+package escape laws; no task-specific named law returns one from a child.
+
+```text
+native src/check/task_check_tests.zig: structured task checking rejects escaped groups and consumed handles
+native src/check/task_check_tests.zig: task captures must enclose their actual destination group
+native src/check/task_backend_tests.zig: portable task capture authority encloses the destination rather than only the spawn site
+native src/check/task_check_tests.zig: task owner payload does not erase scoped resource cleanup authority
+```
+
+### 074: Host completes a stale generation
+
+Expected: Reject without touching a recycled task. Coverage: complete; a retired
+handle polls as `task_host_contract` and task IDs never recycle.
+
+```text
+guest  ../compiler/task_runtime.test.ts: tasks: join moves a result once and close drops unused siblings in order
+guest  ../compiler/task_runtime.test.ts: tasks: a saved task context cannot introduce work after terminal cleanup
+guest  tests/task_abi_execution.test.ts: task ABI rejects missing duplicate stale versions counts and forged adapter contracts
+```

@@ -175,21 +175,22 @@ zero findings. Exact pins and focused logs are in
 `build/bench/complete-program-20261015/numeric-conditional/`; the full compiler
 gate and general selected-body coverage remain pending.
 
-## Returned selected closures,15 October2026
+## Returned selected closures, 15 October 2026
 
 Exact prepared associated calls may now finish their two arguments through an
 owned returned closure. The existing reader preserves its parameters and
 literal/ alias captures under the same bounded work and depth. It does not
 select a target again. Unknown bodies/captures and wrapping arithmetic retain
 required checks. Root five focused native laws (complete OOM and journal
-replay), five executed groups and244-file zero analyzer pass.
+replay), five executed groups and 244-file zero analyzer pass.
 Source/archive/checkpoint/restart, changed capture values, failure recovery and
-sync/JSPI execute in both tiers. Development IR has0 identity bounds comparisons
-and1 wrapping comparison; ordinary Cost Wasm stays exact. Source/binary/log pins
-are in `build/bench/complete-program-20261015/numeric-curried-methods/`. Nested
+sync/JSPI execute in both tiers. Development IR has 0 identity bounds
+comparisons and 1 wrapping comparison; ordinary Cost Wasm stays exact.
+Source/binary/log pins are in
+`build/bench/complete-program-20261015/numeric-curried-methods/`. Nested
 selected helper graphs, broader inference and final qualification remain.
 
-## Exact U32 bit identities,15 October2026
+## Exact U32 bit identities, 15 October 2026
 
 Checked operand inference preserves unit multiplication/division, all-ones
 masks,self AND/OR,zero OR/XOR and shifts with masked-zero counts. The value
@@ -197,7 +198,7 @@ identity is independent of input bits; arithmetic evaluation remains in place.
 Root five native/full-OOM/replay laws,four executed groups,both tiers,archives,
 checkpoint/restart,changed shift/revert,trap recovery and maximum-bit controls
 pass. Exact identities emit zero bounds comparisons; changed operands retain
-one. Selected analyzer244/445 and TypeScript pass; ordinary Cost Wasm is exact.
+one. Selected analyzer 244/445 and TypeScript pass; ordinary Cost Wasm is exact.
 Pins and failed-fixture provenance:
 `../build/bench/complete-program-20261015/numeric-bit-identities/`. General
 selected helper graphs and final combined qualification remain open.
@@ -216,9 +217,9 @@ allocation failures; three selected/curried/conditional neighbors pass. Six
 guest groups cover both tiers, captured values, source/archive imports, edits,
 traps, recovery and checkpoint restart. An exact three-argument identity emits
 zero bounds comparisons; changing its final argument to one retains one.
-Selected analyzer251/453files is zero and TypeScript checks pass. Ordinary Cost
-stays byte-identical11958B; no compiler/runtime CPU improvement is claimed. Pins
-and the initial fixture failures are preserved in
+Selected analyzer 251/453 files is zero and TypeScript checks pass. Ordinary
+Cost stays byte-identical11958B; no compiler/runtime CPU improvement is claimed.
+Pins and the initial fixture failures are preserved in
 `build/bench/complete-program-20261015/numeric-remaining-arguments/`. The direct
 literal-receiver lowering case is repaired by the next checkpoint; general
 selected helper graphs and the final compiler gate remain open.

@@ -1759,6 +1759,51 @@ test "body check cache owns if let pattern scopes and predecessor joins" {
     try parity(source, changed, 1);
 }
 
+test "body check cache owns statement case arm suites and level joins" {
+    const source =
+        \\type Tri is data = #Rise | #Fall | #Still
+        \\const choose = fn (beat: Tri) => do:
+        \\  let count = 2
+        \\  case beat of
+        \\    #Rise => do:
+        \\      count := @u32.add self 5
+        \\    #Fall => do:
+        \\      let unused = 1
+        \\    #Still => do:
+        \\      count := 9
+        \\      return ()
+        \\  return count
+        \\const pack = fn (beat: Tri) => do:
+        \\  let values = #[2]
+        \\  case beat of
+        \\    #Rise => do:
+        \\      values := #[3, 4]
+        \\    #Fall => do:
+        \\      values[0] := 7
+        \\    #Still => ()
+        \\  return values
+        \\entry const run = fn (value: U32) => choose #Rise
+        \\entry const fallen = fn () => choose #Fall
+        \\entry const still = fn () => choose #Still
+        \\entry const packed = fn () => pack #Fall
+    ;
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("choose") != null);
+    try std.testing.expect(before.bodies.find("pack") != null);
+    const inserted = try a.print("const earlier_spelling = {{head: 3.0, tail: 2}}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
+    const changed = try std.mem.replaceOwned(u8, a, source, "count := 9", "count := 10");
+    defer a.free(changed);
+    try parity(source, changed, 1);
+}
+
 test "body check cache owns pure collection unary and value pattern recipes" {
     const source =
         \\const marker = 2

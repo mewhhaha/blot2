@@ -162,9 +162,9 @@ private payloads. Source and compiled callers enforce the same relationships. An
 opaque wrapper, associated witness or polymorphic identity function cannot hide
 a shorter-lived capability. Recursive footprint analysis is bounded and
 conservative; exhausting it reports a diagnostic instead of claiming emptiness.
-The default per-binding limits are128 graph depth,65536 visits and4096 identity
-terms. Diagnostic traces retain at most four origins/eight steps/2048 encoded
-bytes; truncating a trace never truncates the semantic escape check.
+The default per-binding limits are 128 graph depth, 65536 visits and 4096
+identity terms. Diagnostic traces retain at most four origins/eight steps/2048
+encoded bytes; truncating a trace never truncates the semantic escape check.
 
 ## Runtime and transport
 
@@ -187,8 +187,8 @@ host cannot construct or deserialize fresh authority.
 
 Scopes nested inside resumable computations belong to those computation
 activations, not the native/C stack that first entered them. Cancellation
-detaches the owned activation once. This is required in058 even before the
-broader resource contracts in062; a synchronous-only cleanup is insufficient.
+detaches the owned activation once. This is required in 058 even before the
+broader resource contracts in 062; a synchronous-only cleanup is insufficient.
 
 The existing demand-force journal alone does not provide scope-end cleanup. A
 canceled pending request may retry under current request semantics; rerunning
@@ -245,8 +245,8 @@ family are reported as distinct keys.
 | Source/dependency/restart/failed edit/OOM                | Same routing, diagnostics and owned evidence; no fresh authority restored |
 
 058 must measure added checking/key work and runtime routing against closed
-static controls, with seven alternating compiler pairs and31 warmed guest
-pairs.059 must test every hidden escape path and accepted local use in both
+static controls, with seven alternating compiler pairs and 31 warmed guest
+pairs. 059 must test every hidden escape path and accepted local use in both
 codegen tiers and sync/JSPI execution. Both require native allocation-failure
 laws, fresh/retained/checkpoint parity, zero teardown owners, the full compiler
 gate and zero analyzer findings. This design does not complete either task.

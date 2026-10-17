@@ -77,9 +77,9 @@ development and the scenarios below.
   retained workloads × seven pairs give 238 native runs / 19,992 phases and 714
   CLI builds. Paired Wasm agrees, committed memory plateaus and all teardown is
   zero. Positive executable controls reuse one fragment and one optimizer body;
-  their held memory grows by 6,000 bytes. Refinement128 adds 7.94% requested
-  allocation, 4.29% CPU and 14.84% peak memory. No general speedup or allocation
-  reduction is claimed.
+  their held memory grows by 6,000 bytes. The `refinement128` workload adds
+  7.94% requested allocation, 4.29% CPU and 14.84% peak memory. No general
+  speedup or allocation reduction is claimed.
 - Remaining limitations: local graph ordinals belong to immutable captures;
   portable query representation and further archive validation remain task 019,
   broader persisted graphs task 020. Unsupported jobs and saturated tables

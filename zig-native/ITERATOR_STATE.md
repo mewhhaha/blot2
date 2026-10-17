@@ -73,12 +73,12 @@ Nothing is pushed and rejected/provisional artifacts remain preserved.
 
 ## Owning-field and packed cursor checkpoint
 
-Compiler6a57437 adds reusable roots for exact private reference fields and
+Compiler 6a57437 adds reusable roots for exact private reference fields and
 bounded producer exposure, plus four-local checked packed List cursor families.
 The [merged qualification](ITERATOR_CONSTANTS_QUALIFICATION.md) records actual
-release counts, CPU/compiler costs, full native/973 guests and355-file zero
-analyzer. Array cursors lose4097 objects; range/map/take loses4096. Repeated F32
-all-width cursors qualify; U32 boxed tails and other tagged adapters remain
+release counts, CPU/compiler costs, full native/973 guests and 355-file zero
+analyzer. Array cursors lose 4097 objects; range/map/take loses 4096. Repeated
+F32 all-width cursors qualify; U32 boxed tails and other tagged adapters remain
 open. Late ownership rollback keeps ordinary source bodies and scalar-only reuse
 exact. Projection and word-progress experiments remain separate.
 
@@ -158,15 +158,15 @@ body reads participate in retained admission. Saved/captured steps, other uses,
 unknown/effectful or dictionary-bearing methods, opaque constructor families and
 packed rows keep the ordinary path.
 
-Root3native laws, complete emission allocation failures,5executed guest groups,
-TypeScript and111affected zero-finding analyzer files pass. Controls cover
-constructor/predicate changes, escaping steps, immutable replay, source/archive
-producer edits, checkpoint, reference pressure, forks and ordered suspended
-receiver effects. The private Windows screen changes41→39allocation sites,
-56→52publications and18412→17846B Wasm. Seven tiny wall pairs suggest a local
-gain; they do not qualify CPU, compiler overhead or the all-width packed gate.
-Root ordinary Cost stays byte-identical. Exact source/compiler pins and logs:
-`build/bench/complete-program-20261015/immediate-collection-step/`.
+Root 3 native laws, complete emission allocation failures, 5 executed guest
+groups, TypeScript and 111 affected zero-finding analyzer files pass. Controls
+cover constructor/predicate changes, escaping steps, immutable replay,
+source/archive producer edits, checkpoint, reference pressure, forks and ordered
+suspended receiver effects. The private Windows screen changes 41→39 allocation
+sites, 56→52 publications and 18412→17846B Wasm. Seven tiny wall pairs suggest a
+local gain; they do not qualify CPU, compiler overhead or the all-width packed
+gate. Root ordinary Cost stays byte-identical. Exact source/compiler pins and
+logs: `build/bench/complete-program-20261015/immediate-collection-step/`.
 
 ## Local cursor successor families, 15 October 2026
 
@@ -177,20 +177,20 @@ breaks and backedges copy all fields, preserving old forks. Calls, captures,
 merges, unknown producers and packed rows decline. Existing whole-loop lowering
 owns its families independently.
 
-Root3native laws with complete emission allocation failures,11executed groups,
-TypeScript and111affected zero-finding analyzer files pass. Controls include
-returned snapshots, reference pressure, nested progress, suspended failures,
-source/archive edits and checkpoint restart. The private fork screen removes
-2allocation sites, keeps7publications and changes7086→7053B Wasm. Tiny wall
-samples do not qualify CPU or compiler cost. Ordinary Cost stays byte-identical.
-Exact source/compiler pins and logs:
+Root 3 native laws with complete emission allocation failures, 11 executed
+groups, TypeScript and 111 affected zero-finding analyzer files pass. Controls
+include returned snapshots, reference pressure, nested progress, suspended
+failures, source/archive edits and checkpoint restart. The private fork screen
+removes 2 allocation sites, keeps 7 publications and changes 7086→7053B Wasm.
+Tiny wall samples do not qualify CPU or compiler cost. Ordinary Cost stays
+byte-identical. Exact source/compiler pins and logs:
 `build/bench/complete-program-20261015/local-cursor-successors/`.
 
-The representative packed width1 comparison remains slower than boxed/task002
+The representative packed width1 comparison remains slower than boxed/task 002
 references. Diagnostic existing-counter exports preserve every code section and
-identify per-row retain/release and root-journal work, with only64allocated
-bytes per16384-row cursor traversal. The width1 output is byte-identical
-before/after this successor delta. No all-width or task047 completion is
+identify per-row retain/release and root-journal work, with only 64 allocated
+bytes per 16384-row cursor traversal. The width1 output is byte-identical
+before/after this successor delta. No all-width or task 047 completion is
 claimed. Raw rounds, section parity and diagnostic-only source pins are under
 `/var/tmp/blot2-collection-successor-20261015/build/bench/task047-final-preparation-20261015/`.
 
@@ -203,13 +203,13 @@ invocation frames remain; each removed close preserves its conditional collector
 boundary. Changed cleanup-drain presence now invalidates optimizer reuse, fixing
 a separate stale-body case caught by a native add/remove-drain mutant.
 
-Root3native laws with complete allocation failures,29executed groups and266
+Root 3 native laws with complete allocation failures, 29 executed groups and 266
 affected zero-finding analyzer files pass. The root width1 output is byte-exact
-with the timed private candidate. For16384U32record rows,31paired samples of16
-traversals measure fold process CPU0.133625→0.0105ms. Cursor code/counters
-remain unchanged. Ordinary Cost is exact11958B. These results establish the
-local fold cause and fix; all-width cursor/adapter and compiler qualification
-stay open. Exact source, raw measurements and pins:
+with the timed private candidate. For 16384 U32 record rows, 31 paired samples
+of 16 traversals measure fold process CPU 0.133625→0.0105 ms. Cursor
+code/counters remain unchanged. Ordinary Cost is exact 11958B. These results
+establish the local fold cause and fix; all-width cursor/adapter and compiler
+qualification stay open. Exact source, raw measurements and pins:
 `build/bench/complete-program-20261015/empty-lexical-row-frames/`.
 
 ## Persistent cursor publications, 15 October 2026
@@ -243,7 +243,7 @@ cap preserved 43 of 80 samples; one continuation collected only the missing 37.
 Exact paired records, cross-slot sensitivity and the read-only 949-instruction
 List helper attribution are frozen in
 `/var/tmp/blot2-cursor-owner-20261015/build/bench/persistent-cursor-borrows-followup-final-20261015/`.
-The original List and broad task047 performance gates remain open.
+The original List and broad task 047 performance gates remain open.
 
 ## Persistent descriptor snapshots, 15 October 2026
 
@@ -332,6 +332,6 @@ A separate compiler subtraction borrows the immutable Outcome slice returned by
 a direct activation-graph call. Only multi-target calls concatenate outcomes.
 This removes an arena copy without changing flow states, guard checks, call
 order or proof admission. Diagnostic paired reports preserve complete and
-rejected graph results. Final common LLVM, boxed/task002 CPU comparisons and the
-full compiler gate remain pending; focused development results do not close Task
-047 or Task 035.
+rejected graph results. Final common LLVM, boxed/task 002 CPU comparisons and
+the full compiler gate remain pending; focused development results do not close
+Task 047 or Task 035.

@@ -1008,10 +1008,10 @@ removal is claimed here.
 
 ### Merged private cursor checkpoint
 
-Compiler6a57437 qualifies the private cursor source lowering with the full
-native/973-guest gate, eight budgets and355-file zero analyzer. Three complete
+Compiler 6a57437 qualifies the private cursor source lowering with the full
+native/973-guest gate, eight budgets and 355-file zero analyzer. Three complete
 merged F32 record/tuple batches retain all widths and oracle values; largest
-median-of-three boxed cursor ratios are0.9473/0.9515. U32 tails remain open. The
-[merged qualification](ITERATOR_CONSTANTS_QUALIFICATION.md) pins this result
-separately from the isolated52f682b0 source and later unqualified word-progress
-experiment. No memory or full task047 completion claim is added.
+median-of-three boxed cursor ratios are 0.9473/0.9515. U32 tails remain open.
+The [merged qualification](ITERATOR_CONSTANTS_QUALIFICATION.md) pins this result
+separately from the isolated 52f682b0 source and later unqualified word-progress
+experiment. No memory or full task 047 completion claim is added.

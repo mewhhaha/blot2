@@ -78,7 +78,7 @@ discarding about 16 MB of images.
 - Certificate images are full structural images, not digests, so retained memory
   grows with program size.
 
-## Exact shared foreign owners —15 October2026
+## Exact shared foreign owners — 15 October 2026
 
 Private retained validation now follows physically shared transitive Core
 owners, with exact current nominal/bound facts. A changed owner invalidates

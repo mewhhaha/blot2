@@ -74,11 +74,24 @@ constructor is evaluated instead; it keeps its evaluator value and each use
 serializes it at its own layout. That attempt reads no enclosing local,
 publishes no diagnostic when it declines and marks its code fresh. A
 compilation that fails after such a promotion runs once more without
-promotions, and that attempt owns the reported outcome. A
-runtime-dependent initializer whose uses disagree still reports
-`ownership_unproved`. The source scheme and semantic generalization remain
-unchanged. Substitutions belong to the owned resolved Body, including encoding;
-they never become solver evidence.
+promotions, and that attempt owns the reported outcome. Otherwise a producer
+built only from pure calls, applications, projections, construction and local
+reads, whose value has a representation-free shape, runs once per distinct
+concrete use layout (at most four), in order at its binding. Each instance
+owns a Body prepared under facts that close only the local's quantified type
+holes and its quantified or still unknown rows; each use reads the instance of
+its own layout. A read inside an instanced producer counts once per instance,
+so alias and rebinding chains instance every link. The producer's free locals
+are immutable, so every instance reads the same values. Captures, merges,
+carries, qualified or generative schemes, authority-bearing or usage-contract
+values, effects, blocks, matches, collection edits proven to run in place and
+any use that leaves a hole open decline. A declined runtime-dependent
+initializer whose uses disagree still reports `ownership_unproved`. That is not
+only an ownership limit: no single physical value serves both uses, because
+closure signatures and field words depend on the layout, and emitting one
+traps with a signature mismatch. The source scheme and semantic generalization
+remain unchanged. Substitutions belong to the owned resolved Body, including
+encoding; they never become solver evidence.
 
 Finite closed local data can instead retain its evaluator value, including
 independent generic uses and captures. The proof checks exact constructor
@@ -821,6 +834,17 @@ all frames, staged predicates and diagnostic payloads.
 types, resolved local/global identities and diagnostics. Validate unused source
 declarations too. Report unsupported semantic features explicitly; no silent
 fallback or pretending an unsupported construct is valid.
+
+A branch merge is binary: one result binding chosen from the binding of a then
+arm or an else arm. `if` lowers to `if_stmt` and `if let` to a two-arm statement
+match. A statement `case` whose `do:` arms rebind enclosing locals keeps that
+shape as nested two-arm statement matches, keyed by arm syntax: level k tests
+arm k and otherwise binds every input once to a fresh Core local for level k+1;
+the last level tests the last two arms, and a lone arm falls back to its
+incoming versions. `Checked.statement_arms` names the arm blocks whose
+statements lower inline as their level's suite, like an if branch, with a direct
+`return` reduced to its discarded value. Exiting arms join no merge. Consumers
+therefore never see a merge with more than two arms.
 
 Typed-hole snapshots own a bounded flat diagnostic graph and the strings inside
 its node, edge, binding and requirement arrays. Cloning copies each nested name;

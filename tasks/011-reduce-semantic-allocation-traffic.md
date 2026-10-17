@@ -73,13 +73,13 @@ development and the scenarios below.
   10,500 calls.
 - Comparison: immutable canonical baseline and allocation candidate hashes are
   recorded in the durable qualification. Eighty fresh workloads / 15 alternating
-  pairs / 2,400 invocations have median workload CPU ratio 1.00023. Width128's
-  16 distinct factories remove 14,720 requested bytes and 32 allocation calls.
-  Seventy-six retained/restart workloads / seven pairs / 6,384 phase samples
-  preserve strict parity. Four direct retained workloads / seven pairs / 4,704
-  revision samples plateau per phase through 20 edit/revert cycles and release
-  to zero; 168 additional production CLI invocations measure fresh,
-  cache-population and restart bytes/counts/peaks and CPU separately.
+  pairs / 2,400 invocations have median workload CPU ratio 1.00023. The
+  width-128 workload's 16 distinct factories remove 14,720 requested bytes and
+  32 allocation calls. Seventy-six retained/restart workloads / seven pairs /
+  6,384 phase samples preserve strict parity. Four direct retained workloads /
+  seven pairs / 4,704 revision samples plateau per phase through 20 edit/revert
+  cycles and release to zero; 168 additional production CLI invocations measure
+  fresh, cache-population and restart bytes/counts/peaks and CPU separately.
 - Remaining limitations: small controls and no-op adapters add bounded traffic;
   no general CPU or memory-peak improvement is claimed. Attribution is not a
   complete disjoint partition. Private gdev remains absent and task 084 retains

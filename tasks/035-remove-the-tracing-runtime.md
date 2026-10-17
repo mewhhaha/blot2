@@ -70,50 +70,31 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Partial implementation: `850793f` additionally qualifies capture-free static
-  descriptors, checked direct result forwarding and paired guest State frames.
-  Late immutable flags, eight-byte journals, checked results, frame-demand
-  identity and scalar stores remain qualified.
-- Full compiler gate: complete native suite,936 guest/client laws, eight
-  unchanged budgets; analyzer 350/zero; Zig 0.17.0. Nested discarded-Array
-  memory law preserves outer rows and roots/leases at 8/40/200 inner iterations.
-- Open gates: conservative partial paths still use tracing. Physical removal,
-  complete layout/scope coverage and CPU acceptance remain unfinished. The prior
-  compact-marker cycle workload is about 4.89–4.96× the old tracing baseline,
-  about 14.1% faster than the isolated flag-only control. Those exact isolated
-  pins are separate from merged public compiler costs. The merged descriptor/
-  forwarding/State slices reduce cycle CPU about 35.5% versus 2689 ad 5, but
-  still fail the historical tracing comparison. JSPI Array CPU is+1.7% on the
-  merged screen. Conditional activation is later isolated work; no completion is
-  claimed.
-- Durable record: [TRACING_REPLACEMENT](../zig-native/TRACING_REPLACEMENT.md)
-  and
-  [combined qualification](../zig-native/FRONTEND_OWNERSHIP_QUALIFICATION.md).
-
-### Qualified conditional and immutable storage —12 October 2026
-
-`4013b10` additionally qualifies conditional activation, static nullary
-constructors, explicit Array-copy publication, single-use private storage and
-same-unit immutable acyclic proofs. Full native/OOM and 961 guest/client tests,
-eight unchanged budgets and 351 analyzer files/zero pass. Original cancellation
-and cyclic-summary fixtures regain strict ownership/flat storage; scalar trees
-avoid repeated trials. Joint sync/JSPI cycle CPU is about 13% below 850793 f,
-with mixed controls. Physical tracing, uncovered layouts and the historical CPU
-gate remain open. See
-[TRACING_REPLACEMENT](../zig-native/TRACING_REPLACEMENT.md).
-
-The direct named reference environment is qualified at `cb3ebec` with
-scalar-only local replacement: full native/OOM, 965 guest/client laws, eight
-unchanged budgets and 351 analyzer files/zero. Merged cycle CPU improves about
-13.7% with flat 128-KiB storage; ordinary controls remain within roughly 1.5%.
-This is another measured checkpoint, not physical tracing removal or the final
-task CPU gate. See [the integrated record](../zig-native/ITERATOR_STATE.md).
-
-Current-source compiler screen,15 October: the private union/guard candidate
-fails its1.05 overhead limit (guard/control fresh1.114286, edit1.010309,
-geometric mean1.061025; union1.066424). One balanced campaign, no retries.
-Timing stopped before runtime/release qualification; no candidate was promoted.
-Exact pins and rejection:
-`build/bench/complete-program-20261015/current035-screen/`. Under the 15 October
-owner decision this CPU screen no longer gates task 035; it remains recorded for
-information.
+- Latest qualified checkpoint: `cb3ebec` adds the direct named reference
+  environment with scalar-only local replacement. Full native/OOM suite, 965
+  guest/client laws, eight unchanged budgets and 351 analyzer files with zero
+  findings pass (Zig 0.17.0). Merged cycle CPU improves about 13.7% with flat
+  128 KiB storage; ordinary controls stay within roughly 1.5%.
+- Milestones: `850793f` qualified capture-free static descriptors, checked
+  direct result forwarding and paired guest State frames (936 guest/client laws,
+  analyzer 350/zero; cycle CPU about 35.5% below `2689ad5`); `4013b10` qualified
+  conditional activation, static nullary constructors, explicit Array-copy
+  publication, single-use private storage and same-unit immutable acyclic proofs
+  (961 guest/client laws, analyzer 351/zero; joint sync/JSPI cycle CPU about 13%
+  below `850793f`). Late immutable flags, eight-byte journals, checked results,
+  frame-demand identity and scalar stores remain qualified. The nested
+  discarded-Array memory law preserves outer rows and roots/leases at 8/40/200
+  inner iterations.
+- Informational CPU (not gating since the 15 October owner decision): the
+  compact-marker cycle workload is about 4.89–4.96× the old tracing baseline.
+  The 15 October current-source screen of a private union/guard candidate
+  exceeded the former 1.05 overhead limit (guard/control fresh 1.114286, edit
+  1.010309, geometric mean 1.061025; union 1.066424) in one balanced campaign
+  without retries; it was not promoted.
+- Remaining work: conservative partial paths still use tracing; physical
+  removal, complete layout/scope coverage, the bounded-memory stress scenarios
+  and a passing full gate on current source remain. No completion is claimed.
+- Durable record: [TRACING_REPLACEMENT](../zig-native/TRACING_REPLACEMENT.md),
+  [combined qualification](../zig-native/FRONTEND_OWNERSHIP_QUALIFICATION.md),
+  [the integrated record](../zig-native/ITERATOR_STATE.md) and
+  [merged qualification](../zig-native/CONTINUATION_QUALIFICATION.md).

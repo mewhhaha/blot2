@@ -38,6 +38,14 @@ const source =
     \\    used := 12
     \\    object.field := 13
     \\    array[0] := 14
+    \\    case candidate of
+    \\      #Some arm_payload => do:
+    \\        arm_payload := 17
+    \\        carried := 18
+    \\      #None => do:
+    \\        let arm_local = 0
+    \\        arm_local := 19
+    \\        carried_other := 20
     \\    let ignored = do:
     \\      separate := 15
     \\      return 0
@@ -72,12 +80,12 @@ const Fixture = struct {
 };
 
 fn verify(fixture: *const Fixture, found: []const symbols.Symbol) !void {
-    const expected = [_][]const u8{ "before", "branch", "conditional", "parent", "unnamed", "repeated", "object", "array" };
+    const expected = [_][]const u8{ "before", "branch", "conditional", "parent", "unnamed", "repeated", "object", "array", "carried", "carried_other" };
     try std.testing.expectEqual(expected.len, found.len);
     for (expected, found) |name, symbol| try std.testing.expectEqualStrings(name, fixture.pool.get(symbol));
 }
 
-test "loop targets retain outer successors through nested scopes without carrying shadowed locals" {
+test "loop targets retain outer successors through nested scopes and statement case arms without carrying shadowed locals" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
     const found = try targets.collect(a, &fixture.tree, &fixture.pool, fixture.pattern, fixture.body);

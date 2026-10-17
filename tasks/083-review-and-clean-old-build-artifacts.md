@@ -56,57 +56,37 @@ changes; run code gates only when code or build inputs change.
 ## Completion evidence
 
 - Commit: pending; record the local milestone revision.
-- Validation: 14 October inventory examined 71 top-level benchmark directories,
-  46 inactive Zig cache directories, 10,353 retained metadata/source/log files,
-  tracked documentation references and active process working directories. No
-  proposed cache has a known external hardlink or active process dependency.
-- Comparison: the proposal contains 14,582 regular files totaling 4,946,001,920
-  bytes. This is estimated reclaimable space, not reclaimed space. Exact paths
-  and checks are in
-  `build/bench/continuation-20261014/cache-cleanup-proposal.json`.
-- Remaining limitations: the explicit owner decision is pending; nothing has
-  been deleted. Recheck active use and exact paths before any approved deletion.
-  Broader artifact cleanup and task 081 remain open.
-- Revalidation:15October2026 confirms the same46directories,14,582regular files
-  and4,946,001,920disk bytes, with no observed process cwd/open-file users.
-  `build/bench/complete-program-20261015/cache-proposal-revalidation.json` pins
-  the unchanged proposal. An exact owner-decision request is pending; no files
-  were deleted.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
-
-### Unapproved cleanup incident —15 October
-
-A delegated task removed exactly
-`/var/tmp/blot2-structured-tasks-20261015/source/zig-native/.zig-cache` before
-receiving an owner decision. This violated the requirement above; it is not an
-approved cleanup or task completion. Reported pre-deletion size was about15GiB,
-rounded; an exact reclaimed-byte count was not captured. Further deletion
-stopped. Root verified the three current semantic slice source manifests and
-reproduced Task-v1 failure binaries plus their compiler outside the removed
-cache. Sources, manifests and logs outside the cache remain. The two exact
-owner-decision proposals remain pending and untouched. Incident evidence:
-`build/bench/finish-rest-20261015/unapproved-cache-deletion.json`.
-
-### Owner decisions and cleanup — 15 October 2026
-
-- The owner removed the repository's ignored `build/` directory, including all
-  of `build/bench/`. Every `build/bench/...` path cited in task files,
-  CONTINUE.md and durable records is now historical and unavailable; the
-  committed durable documents under `zig-native/` (including
-  `zig-native/qualification/`) are the remaining evidence of record. The 14
-  October 46-directory proposal file went with it and is superseded.
-- Inventory: `/var/tmp` held 566 `blot2-*` freeze directories (about 1.3 TB
-  apparent size) with 659 `.zig-cache` directories. No process had a working
-  directory in them. The disk was 97% full.
-- Decision: delete every `.zig-cache` directory under `/var/tmp/blot2-*`, and
-  nothing else. The `/var/tmp/blot2` symlink to this repository and the active
-  `zig-native/.zig-cache` were excluded.
+- Owner decisions, 15 October 2026:
+  - The owner removed the repository's ignored `build/` directory, including all
+    of `build/bench/`. Every `build/bench/...` path cited in task files,
+    CONTINUE.md and durable records is now historical and unavailable; the
+    committed durable documents under `zig-native/` (including
+    `zig-native/qualification/`) are the remaining evidence of record. Any
+    boxed/packed baseline binaries or measurement evidence that lived only in
+    `build/` left with it.
+  - Delete every `.zig-cache` directory under `/var/tmp/blot2-*`, and nothing
+    else. The `/var/tmp/blot2` symlink to this repository and the active
+    `zig-native/.zig-cache` were excluded.
+- Inventory before deletion: `/var/tmp` held 566 `blot2-*` freeze directories
+  (about 1.3 TB apparent size) with 659 `.zig-cache` directories; no process had
+  a working directory in them; the disk was 97% full.
 - Result: all 659 cache directories were removed; used space on `/home` fell
   from 957,115,154,432 to 518,810,796,032 bytes (438 GB reclaimed; 53% used).
-  Frozen sources, patches, manifests and logs in `/var/tmp` remain. The
-  remaining freeze directories themselves were not part of the decision.
-- Any boxed/packed baseline binaries or measurement evidence that lived only in
-  `build/` left with the owner's removal; nothing else required by open tasks
-  was deleted by this cleanup.
-- Task 081 must carry this decision into durable documentation before 999.
+  Frozen sources, patches, manifests and logs in `/var/tmp` remain; the freeze
+  directories themselves were not part of the decision. Nothing else required by
+  open tasks was deleted.
+- Superseded proposal: the 14 October inventory (71 benchmark directories; 46
+  inactive Zig caches, 14,582 files, 4,946,001,920 bytes, revalidated on 15
+  October) went with `build/` and was replaced by the decision above.
+- Incident, 15 October 2026: before any owner decision, a delegated task removed
+  exactly
+  `/var/tmp/blot2-structured-tasks-20261015/source/zig-native/.zig-cache` (about
+  15 GiB reported; exact bytes not captured). This violated the approval
+  requirement and is not an approved cleanup. Further deletion stopped; the
+  three semantic slice source manifests and the Task-v1 failure binaries were
+  verified or reproduced outside the removed cache.
+- Comparison: not applicable; this is an inventory and deletion task.
+- Remaining: task 081 must carry the `build/` removal and cache decision into
+  durable documentation before 999.
+- Durable record: pending through task 081; [CONTINUE.md](../CONTINUE.md)
+  currently summarizes the decision.

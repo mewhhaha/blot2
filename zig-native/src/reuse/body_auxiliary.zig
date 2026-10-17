@@ -11,7 +11,7 @@ comptime {
         if (!std.mem.eql(u8, field, "debits") and !std.mem.eql(u8, field, "operands") and !std.mem.eql(u8, field, "introductions") and !std.mem.eql(u8, field, "parameters") and !std.mem.eql(u8, field, "uses")) @compileError("Unregistered numeric body owner " ++ field);
     }
 }
-pub const fields = [_][]const u8{ "usage_loans", "rank_implementations", "generative_bindings", "dictionary_selections", "dictionary_uses", "computations", "request_loops", "request_arms", "request_controls", "reflections", "effect_scopes", "effect_runners", "provider_blocks", "resolver_blocks", "resolver_ops", "resolver_joins", "resolver_completions", "resolver_loops", "operation_uses" };
+pub const fields = [_][]const u8{ "usage_loans", "rank_implementations", "generative_bindings", "dictionary_selections", "dictionary_uses", "computations", "request_loops", "request_arms", "request_controls", "reflections", "effect_scopes", "effect_runners", "provider_blocks", "resolver_blocks", "resolver_ops", "resolver_joins", "resolver_completions", "resolver_loops", "operation_uses", "statement_arms" };
 fn tableType() type {
     var types: [fields.len]type = undefined;
     var attrs: [fields.len]std.lang.Type.Struct.FieldAttributes = undefined;
@@ -50,6 +50,7 @@ pub fn route(comptime Record: type, comptime field: []const u8) Route {
     if (Record == check.ResolverJoin) return fieldRoute(field, .{ .node = .node, .parameter = .binding, .ty = .ty, .result = .ty });
     if (Record == check.ResolverCompletion) return fieldRoute(field, .{ .node = .node, .bind = .resolver_ops, .pure = .resolver_ops, .completed_types = .types, .done_constructor = .constructor });
     if (Record == check.ResolverLoop) return fieldRoute(field, .{ .node = .node, .cursor_parameter = .binding, .first_binding = .binding, .end_binding = .binding, .cursor = .ty, .step_result = .ty, .suffix_result = .ty, .iterate = .resolver_ops, .continued = .resolver_ops, .finish = .resolver_completions, .continue_constructor = .constructor, .done_constructor = .constructor });
+    if (Record == check.StatementArm) return fieldRoute(field, .{ .node = .node });
     if (Record == check.OperationUse) return fieldRoute(field, .{ .node = .node, .template = .template, .arguments = .types, .signature = .ty, .instance = .instance, .capability = .node, .capability_binding = .binding, .call = .word, .operand = .node });
     @compileError("Unregistered checked auxiliary record " ++ @typeName(Record));
 }

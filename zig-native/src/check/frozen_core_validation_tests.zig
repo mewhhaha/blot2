@@ -157,20 +157,19 @@ test "portable typed staging rejects loop carry and merge ownership forgeries" {
     defer m.deinit(a);
     try verified(a, &m);
     const quote = m.node(m.bodies[m.bodies.len - 1].root);
-    const rows = m.bodies[m.bodies.len - 1].closed_rows;
     var remaining: usize = 65536;
-    _ = try @import("staging_core.zig").namedCall(&m, quote.a, rows, &remaining);
+    _ = try @import("staging_core.zig").namedCall(&m, quote.a, &remaining);
     const carry = &m.loop_carries[0];
     const saved_carry = carry.*;
     carry.backedge = carry.outgoing;
     remaining = 65536;
-    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, &remaining));
     carry.* = saved_carry;
     const merge = &m.merges[0];
     const saved_merge = merge.*;
     merge.then_binding = merge.else_binding;
     remaining = 65536;
-    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, &remaining));
     merge.* = saved_merge;
     try verified(a, &m);
 }
@@ -920,7 +919,7 @@ test "portable typed staging named operation bodies reject identity result and s
     const quote = for (m.nodes) |node| {
         if (node.tag == .staging) break node;
     } else return error.MissingQuote;
-    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, m.bodies[m.bodies.len - 1].closed_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, &remaining));
     operation.* = saved;
     try verified(a, &m);
 }
@@ -1686,7 +1685,7 @@ test "portable typed staging generic helpers reject inconsistent and unowned sub
     m.types.nodes[selected].b = T.f32_type;
     m.nodes[call_id].ty = T.f32_type;
     var remaining: usize = 4096;
-    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, call_id, m.bodies[m.bodies.len - 1].closed_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, call_id, &remaining));
     m.types.nodes[selected] = original;
     m.nodes[call_id].ty = saved_result;
     const target = m.call(call_id).target.binding;
@@ -1694,7 +1693,7 @@ test "portable typed staging generic helpers reject inconsistent and unowned sub
         const variables = body.scheme.variables;
         body.scheme.variables = .{};
         remaining = 4096;
-        try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, call_id, m.bodies[m.bodies.len - 1].closed_rows, &remaining));
+        try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, call_id, &remaining));
         body.scheme.variables = variables;
         const variable = m.types.list(variables)[0];
         const other = for (m.bodies) |candidate| {
@@ -1708,7 +1707,7 @@ test "portable typed staging generic helpers reject inconsistent and unowned sub
         m.types.nodes[other] = m.types.nodes[variable];
         parameter.ty = other;
         remaining = 4096;
-        try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, call_id, m.bodies[m.bodies.len - 1].closed_rows, &remaining));
+        try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, call_id, &remaining));
         parameter.ty = saved_parameter;
         m.types.nodes[other] = saved_node;
     };
@@ -1755,7 +1754,7 @@ test "portable typed staging producer data rejects runtime foreign and cyclic ow
     } else return error.MissingDataBody;
     owner.runtime = true;
     var remaining: usize = 4096;
-    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, call_id, m.bodies[m.bodies.len - 1].closed_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, call_id, &remaining));
     owner.runtime = false;
     const read = for (m.nodes, 0..) |node, id| {
         if (node.tag == .reference and m.reference(@intCast(id)).binding == owner.binding) break @as(core.Id, @intCast(id));
@@ -1764,12 +1763,12 @@ test "portable typed staging producer data rejects runtime foreign and cyclic ow
     const saved_unit = reference.unit;
     reference.unit = 2;
     remaining = 4096;
-    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, call_id, m.bodies[m.bodies.len - 1].closed_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, call_id, &remaining));
     reference.unit = saved_unit;
     const saved_root = owner.root;
     owner.root = read;
     remaining = 4096;
-    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, call_id, m.bodies[m.bodies.len - 1].closed_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, call_id, &remaining));
     owner.root = saved_root;
     try verified(a, &m);
 }
@@ -1890,7 +1889,6 @@ test "portable typed staging helper locals reject future reads caller capture du
     const call_id = for (m.nodes, 0..) |node, id| {
         if (node.tag == .call and m.call(@intCast(id)).target.binding == helper.binding) break @as(core.Id, @intCast(id));
     } else return error.MissingCall;
-    const rows = m.bodies[m.bodies.len - 1].closed_rows;
     for (0..4) |mutation| {
         var reference: ?*core.BindingRef = null;
         var saved_reference: core.BindingRef = undefined;
@@ -1922,7 +1920,7 @@ test "portable typed staging helper locals reject future reads caller capture du
         // Every index still names an existing owner. Check staging independently
         // of the ordinary capability/usage contracts on these changed bodies.
         var remaining: usize = 4096;
-        try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, call_id, rows, &remaining));
+        try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, call_id, &remaining));
         if (reference) |value| value.* = saved_reference;
         if (changed_node) |value| value.* = saved_node;
     }
@@ -2048,40 +2046,40 @@ test "portable typed staging nominal helpers retain private producer rights and 
         const body = m.body(target.binding) orelse continue;
         if (m.node(body.root).tag == .construct and m.types.node(m.typeOf(body.root)).tag == .nominal and m.types.nominalArguments(m.types.node(m.typeOf(body.root))).len != 0) break @as(core.Id, @intCast(id));
     } else return error.MissingNominalHelper;
-    const caller_rows = for (m.bodies) |caller| {
+    for (m.bodies) |caller| {
         const root = m.node(caller.root);
-        if (root.tag == .staging and root.c == @backingInt(@import("typed_staging.zig").Op.quote) and root.a == call_id) break caller.closed_rows;
+        if (root.tag == .staging and root.c == @backingInt(@import("typed_staging.zig").Op.quote) and root.a == call_id) break;
     } else return error.MissingQuoteOwner;
     var remaining: usize = 4096;
-    const body = try proof.namedCall(&m, call_id, caller_rows, &remaining);
+    const body = try proof.namedCall(&m, call_id, &remaining);
     const construction = m.node(body.root);
     const constructor = &m.constructors[construction.a];
     const family = &m.nominals[constructor.nominal];
     family.private = true;
     remaining = 4096;
-    _ = try proof.namedCall(&m, call_id, caller_rows, &remaining);
+    _ = try proof.namedCall(&m, call_id, &remaining);
     const identity = family.identity;
     family.identity.unit = m.unit + 1;
     remaining = 4096;
-    try std.testing.expectError(error.InvalidArtifact, proof.namedCall(&m, call_id, caller_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, proof.namedCall(&m, call_id, &remaining));
     family.identity = identity;
     family.private = false;
     const variables = constructor.scheme.variables;
     constructor.scheme.variables = .{};
     remaining = 4096;
-    try std.testing.expectError(error.InvalidArtifact, proof.namedCall(&m, call_id, caller_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, proof.namedCall(&m, call_id, &remaining));
     constructor.scheme.variables = variables;
     const arrow = &m.types.nodes[constructor.scheme.root];
     const input = arrow.a;
     arrow.a = T.boolean;
     remaining = 4096;
-    try std.testing.expectError(error.InvalidArtifact, proof.namedCall(&m, call_id, caller_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, proof.namedCall(&m, call_id, &remaining));
     arrow.a = input;
     const payload = &m.nodes[construction.b];
     const payload_type = payload.ty;
     payload.ty = T.boolean;
     remaining = 4096;
-    try std.testing.expectError(error.InvalidArtifact, proof.namedCall(&m, call_id, caller_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, proof.namedCall(&m, call_id, &remaining));
     payload.ty = payload_type;
     try verified(a, &m);
 }
@@ -2105,7 +2103,7 @@ test "portable typed staging nominal helpers admit closed callable payloads and 
     const call_ = m.call(call_id);
     // A pure closure stored in a nominal payload is ordinary closed data.
     var remaining: usize = 4096;
-    try std.testing.expectEqual(call_.target.binding, (try staging_core.namedCall(&m, call_id, caller_rows, &remaining)).binding);
+    try std.testing.expectEqual(call_.target.binding, (try staging_core.namedCall(&m, call_id, &remaining)).binding);
     const constructor = m.constructors[m.node(call_.arguments[0]).a];
     const field = &m.types.nodes[m.types.recordField(m.types.node(constructor.payload), 0).ty];
     const closure_type = for (m.nodes) |node| {
@@ -2121,7 +2119,7 @@ test "portable typed staging nominal helpers admit closed callable payloads and 
     const declared_row = field.c;
     field.c = foreign_row;
     remaining = 4096;
-    try std.testing.expectError(error.InvalidArtifact, staging_core.namedCall(&m, call_id, caller_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, staging_core.namedCall(&m, call_id, &remaining));
     field.c = declared_row;
     // An owned open row still cannot inhabit the declared closed field.
     const use_tail = m.types.row(selected.c).tail;
@@ -2130,21 +2128,21 @@ test "portable typed staging nominal helpers admit closed callable payloads and 
     const closure_row = closure_type.c;
     closure_type.c = selected.c;
     remaining = 4096;
-    try std.testing.expectError(error.InvalidArtifact, staging_core.namedCall(&m, call_id, caller_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, staging_core.namedCall(&m, call_id, &remaining));
     closure_type.c = closure_row;
     const input = selected.a;
     selected.a = T.boolean;
     remaining = 4096;
-    try std.testing.expectError(error.InvalidArtifact, staging_core.namedCall(&m, call_id, caller_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, staging_core.namedCall(&m, call_id, &remaining));
     selected.a = input;
     // Rows come from the enclosing body's certificate, so genuine caller rows
     // cannot vouch for a use row that certificate no longer owns.
     owner.closed_rows.len -= 1;
     remaining = 4096;
-    try std.testing.expectError(error.InvalidArtifact, staging_core.namedCall(&m, call_id, caller_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, staging_core.namedCall(&m, call_id, &remaining));
     owner.closed_rows = caller_rows;
     remaining = 4096;
-    _ = try staging_core.namedCall(&m, call_id, caller_rows, &remaining);
+    _ = try staging_core.namedCall(&m, call_id, &remaining);
     try verified(a, &m);
 }
 
@@ -2218,7 +2216,6 @@ test "portable typed staging collection helpers reject forged inputs outputs and
     const quote = for (m.nodes) |node| {
         if (node.tag == .staging and node.c == @backingInt(@import("typed_staging.zig").Op.quote) and m.node(node.a).tag == .call and m.typeOf(node.a) == T.u32_type) break node;
     } else return error.MissingQuote;
-    const owner = &m.bodies[m.bodies.len - 2];
     const staging = @import("staging_core.zig");
     for (m.nodes, 0..) |*node, id| {
         if (node.tag != .array_op) continue;
@@ -2226,25 +2223,25 @@ test "portable typed staging collection helpers reject forged inputs outputs and
         const operation = m.arrayOperation(@intCast(id));
         var remaining: usize = 65536;
         node.ty = T.boolean;
-        try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, owner.closed_rows, &remaining));
+        try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, &remaining));
         node.* = saved;
         const arguments = m.children(@intCast(id));
         const input = &m.nodes[arguments[0]];
         const saved_input = input.*;
         input.ty = T.u32_type;
         remaining = 65536;
-        try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, owner.closed_rows, &remaining));
+        try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, &remaining));
         input.* = saved_input;
         if (operation == .get) {
             node.c = @backingInt(core.ArrayOp.concat);
             remaining = 65536;
-            try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, owner.closed_rows, &remaining));
+            try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, &remaining));
             node.* = saved;
         }
         if (operation == .length) {
             node.c = @backingInt(core.ArrayOp.cursor_has);
             remaining = 65536;
-            try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, owner.closed_rows, &remaining));
+            try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, &remaining));
             node.* = saved;
         }
     }
@@ -2286,7 +2283,6 @@ test "portable typed staging nominal readers reject wrong physical fields varian
     const quote = for (m.nodes) |node| {
         if (node.tag == .staging and node.c == @backingInt(@import("typed_staging.zig").Op.quote) and m.node(node.a).tag == .call and m.typeOf(node.a) == T.u32_type) break node;
     } else return error.MissingQuote;
-    const rows = m.bodies[m.bodies.len - 2].closed_rows;
     const staging = @import("staging_core.zig");
     for (m.projections[1..]) |*projection| {
         if (m.types.node(projection.source_type).tag != .nominal) continue;
@@ -2295,19 +2291,19 @@ test "portable typed staging nominal readers reject wrong physical fields varian
         const saved_variant = variant.*;
         variant.field = 1 - variant.field;
         var remaining: usize = 65536;
-        try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, rows, &remaining));
+        try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, &remaining));
         variant.* = saved_variant;
         variant.tag += 1;
         remaining = 65536;
-        try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, rows, &remaining));
+        try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, &remaining));
         variant.* = saved_variant;
         projection.variants.len -= 1;
         remaining = 65536;
-        try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, rows, &remaining));
+        try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, &remaining));
         projection.* = saved;
         projection.nominal.decl += 1;
         remaining = 65536;
-        try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, rows, &remaining));
+        try std.testing.expectError(error.InvalidArtifact, staging.namedCall(&m, quote.a, &remaining));
         projection.* = saved;
     }
     try verified(a, &m);
@@ -2362,7 +2358,6 @@ test "portable typed staging statement if rejects foreign return owners branch l
     const quote = for (m.nodes) |node| {
         if (node.tag == .staging and node.a != 0 and m.node(node.a).tag == .call) break node;
     } else return error.MissingQuote;
-    const rows = m.bodies[2].closed_rows;
     for (0..5) |mutation| {
         const id = switch (mutation) {
             0 => branch[branch.len - 1],
@@ -2383,7 +2378,7 @@ test "portable typed staging statement if rejects foreign return owners branch l
             else => unreachable,
         }
         var remaining: usize = 65536;
-        try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, rows, &remaining));
+        try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, &remaining));
         m.nodes[id] = saved;
     }
     try verified(a, &m);
@@ -2402,7 +2397,7 @@ test "portable typed staging statement if proves unselected effectful branches" 
     const quote = m.node(m.bodies[m.bodies.len - 1].root);
     try std.testing.expectEqual(core.Tag.staging, quote.tag);
     var remaining: usize = 65536;
-    _ = try @import("staging_core.zig").namedCall(&m, quote.a, m.bodies[m.bodies.len - 1].closed_rows, &remaining);
+    _ = try @import("staging_core.zig").namedCall(&m, quote.a, &remaining);
     // Coordinate a forged pure declaration and selected signature. Admission
     // must still inspect the unexecuted suite instead of trusting either row.
     const saved_types = try a.dupe(T.Node, m.types.nodes);
@@ -2411,7 +2406,7 @@ test "portable typed staging statement if proves unselected effectful branches" 
         if (node.tag == .function) node.c = 0;
     }
     remaining = 65536;
-    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, m.bodies[m.bodies.len - 1].closed_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, &remaining));
     @memcpy(m.types.nodes, saved_types);
 }
 
@@ -2456,7 +2451,6 @@ test "portable typed staging Boolean case rejects missing overlapping forged and
     const first_children = m.children(arms[0].body);
     const second_children = m.children(arms[1].body);
     const quote = m.node(m.bodies[2].root);
-    const rows = m.bodies[2].closed_rows;
     for (0..11) |mutation| {
         const pattern = m.patterns[first];
         const arm = m.match_arms[info.arms.start];
@@ -2480,7 +2474,7 @@ test "portable typed staging Boolean case rejects missing overlapping forged and
             else => unreachable,
         }
         var remaining: usize = 65536;
-        try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, rows, &remaining));
+        try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, &remaining));
         m.patterns[first] = pattern;
         m.match_arms[info.arms.start] = arm;
         m.matches[m.node(match_id).a] = match_;
@@ -2505,7 +2499,7 @@ test "portable typed staging Boolean case reconstructs unselected effects despit
         if (node.tag == .function) node.c = 0;
     }
     var remaining: usize = 65536;
-    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, m.bodies[m.bodies.len - 1].closed_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, &remaining));
     @memcpy(m.types.nodes, saved_types);
 }
 
@@ -2657,7 +2651,7 @@ test "portable typed staging scalar and product cases reject missing coverage fo
             else => unreachable,
         }
         var remaining: usize = 65536;
-        try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, m.bodies[2].closed_rows, &remaining));
+        try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&m, quote.a, &remaining));
         m.patterns[first] = literal;
         m.patterns[second] = fallback;
         m.matches[match_index] = match_;
@@ -2674,7 +2668,7 @@ test "portable typed staging scalar and product cases reject missing coverage fo
     product.patterns[children[0]].a = product.patterns[children[1]].a;
     var remaining: usize = 65536;
     const product_quote = product.node(product.bodies[2].root);
-    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&product, product_quote.a, product.bodies[2].closed_rows, &remaining));
+    try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").namedCall(&product, product_quote.a, &remaining));
     product.patterns[children[0]] = saved;
     try verified(a, &product);
 }

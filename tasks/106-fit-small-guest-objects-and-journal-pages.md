@@ -59,10 +59,10 @@ and after.
   and lint reported zero findings; the combined gate is pending. Only
   `zig-native/tests/arena.test.ts` changed expectations: 128-byte payloads plus
   the 32-byte header now take 192-byte blocks instead of 256.
-- Comparison: guest memory after `gen N` on a fresh guest, before → after: 1024
-  192K → 192K, 2048 256K → 256K, 4096 448K → 384K, 8192 832K → 640K. The heap at
-  4096 drops from 360.1 to 260.0 KiB: inner arrays move from 64- to 48-byte
-  blocks and nine journal pages from 8192 to 4096 bytes.
+- Comparison: guest memory after `gen N` on a fresh guest, before → after: 1024:
+  192 → 192 KiB, 2048: 256 → 256 KiB, 4096: 448 → 384 KiB, 8192: 832 → 640 KiB.
+  The heap at 4096 drops from 360.1 to 260.0 KiB: inner arrays move from 64- to
+  48-byte blocks and nine journal pages from 8192 to 4096 bytes.
 - Remaining limitations: blocks of 2 KiB and more stay power-of-two, and list
   leaves keep doubling through power classes.
 - Durable record: [SHARED_RC.md](../zig-native/SHARED_RC.md) and

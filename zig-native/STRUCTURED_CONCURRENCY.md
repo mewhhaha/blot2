@@ -126,7 +126,7 @@ relevant owner and scope.
 | Acceptance trace                                           | Expected result                                                         |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
 | Nested group exits normally with two unjoined children     | Join children before closing group and releasing parent resource.       |
-| Sibling1 fails while sibling2 is suspended                 | Request cancellation, await settlement, drop both, then report failure. |
+| Sibling 1 fails while sibling 2 is suspended               | Request cancellation, await settlement, drop both, then report failure. |
 | Cancel before child starts                                 | Do not invoke thunk; drop transferred owners once.                      |
 | Move unique capture to child, then parent uses old binding | Reject use after move.                                                  |
 | Two sibling writes through aliases/overlapping views       | Reject before scheduling.                                               |

@@ -2,9 +2,10 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — scope closed to fixed language-qualification rows by
-  owner decision on 15 October 2026; waiting for a passing full gate on current
-  source.
+- **Status:** Complete — closed on 17 October 2026 against the two resource rows
+  of
+  [language qualification](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
+  gate at `05401a9`.
 - **Dependencies:** [061](061-check-usage-and-call-multiplicity.md),
   [033](033-own-suspended-effects-and-cancellation.md),
   [020](020-persist-complete-semantic-artifacts.md)
@@ -27,12 +28,12 @@ suspended ownership. Portable semantic interfaces come from task 020.
 
 ## Implementation checklist
 
-- [ ] Lower checked cleanup obligations on returns, breaks, branch exits, scope
+- [x] Lower checked cleanup obligations on returns, breaks, branch exits, scope
       completion and cancellation.
-- [ ] Transfer cleanup responsibility with ownership, never with a mere borrow;
+- [x] Transfer cleanup responsibility with ownership, never with a mere borrow;
       handle suspended frames and host exceptions according to the specified
       contract.
-- [ ] Serialize resource/usage evidence so compiled callers cannot omit cleanup
+- [x] Serialize resource/usage evidence so compiled callers cannot omit cleanup
       or return invalid borrows.
 
 ## Validation
@@ -51,11 +52,11 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Each owned resource receives exactly the cleanup required on every
+- [x] Each owned resource receives exactly the cleanup required on every
       supported exit.
-- [ ] Separate compilation preserves usage/lifetime contracts and invalid
+- [x] Separate compilation preserves usage/lifetime contracts and invalid
       borrowed escapes are rejected.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Closed acceptance — owner decision, 15 October 2026
@@ -77,55 +78,69 @@ Intentional rejections under the normative design: unknown cleanup termination.
 The task completes when every native law and guest test mapped to these rows
 passes in the full compiler gate (`deno task test:compiler` and
 `deno task lint:zig`) on the committed source. The rows passed in the 15 October
-freeze `3548546c…`, but the current working tree failed 20 native laws on the
-evening of 15 October, so completion waits for a passing gate on current source.
-The original acceptance index
+freeze `3548546c…`. The 20 native-law failures seen on the evening of 15 October
+were fixed in `23a934f`, and the gate at `05401a9` passed on 17 October. The
+original acceptance index
 (`build/bench/finish-rest-20261015/language-acceptance/qualified-baseline.json`)
-was removed with `build/`; regenerate the row-to-law mapping from the passing
-gate's native test names and guest JUnit report and record it durably in
-[LANGUAGE_QUALIFICATION.md](../zig-native/LANGUAGE_QUALIFICATION.md).
+was removed with `build/`. The row-to-law mapping regenerated from that gate's
+native test names and guest JUnit report is recorded in
+[LANGUAGE_QUALIFICATION.md](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026).
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Focused evidence: Zig 0.17.0, 24 combined usage/resource native laws and four
-  backend laws pass, including complete allocation sweeps (177 source/Core and
-  311 backend failures). Three resource guests cover scalar payloads, managed
-  callback results, early returns/breaks, reverse cleanup, traps, failed
-  acquisition/cleanup and host throw/rejection in both tiers and sync/JSPI.
-  Across 4096 failure/recovery calls, roots, leases and host references return
-  to zero and warmed memory stays flat. Pending JSPI retains ownership until
-  settlement and blocks reentry/disposal. Imports, failed revisions, portable
-  checkpoint and restart preserve bytes. Four journal controls include 10000
-  sequential scopes and the 4096 live-reservation limit; typed ABI mutants
-  reject before invocation. The earlier isolated 416-file analyzer claim is
-  withdrawn because its Zig/std backend was missing. The isolated candidate
-  still needs combined release qualification.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Reference continuation: Array/List payloads of unqualified primitives reuse
-  ABI 4 and the same journal, with independently checked source/Core shapes and
-  a reference adapter that drops payload/closure/provider roots after cleanup.
-  Four new native laws, eleven related laws and two both-tier guest groups pass,
-  including allocation sweeps, trap/host rejection, JSPI settlement, returned
-  managed results, archive/checkpoint restart and failed revisions. Selected
-  328-file Zig lint has zero findings under the verified Zig/std backend.
-- Remaining limitations: other reference shapes, cross-invocation resource
-  obligations, host cleanup authority, finite loop/recursive adapter evidence
-  and request cancellation through resource-carrying frames remain open.
-  Unsupported cleanup calls/projections and standalone cleanup qualifiers
-  reject. No broader ownership or cancellation completion is claimed.
+- Revision: committed source at `05401a9` (17 October 2026), the tree the gate
+  ran on; `23a934f` also passed the full gate. The closure itself is
+  documentation only.
+- Validation (Zig 0.17.0): the full gate at `05401a9` passes 2,355 native laws
+  in two shards with zero failures and zero leaks, 1,501 guest tests with zero
+  failures, and the harness and smoke phases; `deno task lint:zig` reports zero
+  zig-analyzer findings over 486 files. The run's final native-input check
+  refused only because another session edited `../gdev` during the run; every
+  phase passed. The earlier gate at `23a934f` passed 2,354 native laws with zero
+  leaks, 1,486 guest, 28 harness, 21 preflight and 48 smoke tests and zero
+  analyzer findings.
+- Row-to-law mapping: the
+  [index](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026)
+  names 19 native laws and 22 guest tests for the seven requirements of the two
+  resource rows; all passed in the `05401a9` gate.
+- Implemented at the focused checkpoints (Zig 0.17.0; later continuations in the
+  durable record supersede some rejections listed here, such as owning public
+  outputs): checked cleanup lowering for scalar payloads, managed callback
+  results, early returns/breaks, reverse cleanup, traps, failed
+  acquisition/cleanup and host throw/rejection in both tiers and sync/JSPI;
+  pending JSPI retains ownership until settlement and blocks reentry/disposal.
+  Array/List payloads of unqualified primitives reuse ABI 4 and the same
+  journal. Counted owning boxes preserve one journal obligation through moves,
+  shared aliases and once captures within an invocation; owning
+  scalar/numeric-Array inputs are freshly boxed and owning public outputs
+  reject. Imports, failed revisions, portable checkpoint and restart preserve
+  bytes; typed ABI mutants reject before invocation.
+- Focused evidence: 24 combined usage/resource native laws and four backend laws
+  with complete allocation sweeps (177 source/Core and 311 backend failures),
+  plus reference and transfer continuation laws and both-tier guest groups.
+  Ownership counters return to zero with flat warmed memory over 4096
+  failure/recovery calls and 4608 repeated transfer calls; journal controls
+  cover 10,000 sequential scopes, 5,000 sequential resources and the 4096
+  live-reservation limit. Selected 328-file Zig lint has zero findings under the
+  verified Zig/std backend; an earlier 416-file claim is withdrawn because its
+  backend was missing.
+- Comparison: performance measurement does not apply; the closed rows set no
+  performance target. Retained resource-scope phase times (population 1.8337 ms,
+  first edit 1.6419 ms, revert 1.4306 ms) are recorded in
+  [measured scope cost](../zig-native/LANGUAGE_QUALIFICATION.md#measured-scope-cost);
+  they include IPC and qualify no CPU target.
+- Remaining limitations: unknown cleanup termination remains an intentional
+  rejection under the normative design, so unknown, recursive and named adapter
+  calls and pure cleanup parameters gain no cleanup authority. Host cleanup
+  `maxSteps` is a trusted host completion promise that the compiler cannot
+  prove; only `maxCalls` is enforced. Payload and host shapes without a closed
+  checked representation (loans, providers, demands, nested usage and callable
+  payloads) cannot become owners or cleanup payloads. Raw Wasm traps drain host
+  journals rather than promising source-level unwinding. Forms outside the rows
+  are excluded scope under the owner decision of 15 October 2026 (closed
+  acceptance above; [README owner decisions](README.md#task-index)), not open
+  work. Such forms reject or decline conservatively.
 - Durable record:
+  [row-to-law index](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026)
+  and
   [bounded qualification](../zig-native/USAGE_CONTRACTS.md#bounded-implementation-and-qualification).
-
-- Transfer continuation: counted owning boxes preserve one journal obligation
-  through moves, shared aliases and once captures within an invocation. Normal
-  block/branch/loop exits, break, explicit release, traps and JSPI rejection run
-  cleanup outside heap transactions. Source/Core startup and captured-loan
-  negatives, live weak-box/child-mask mutants, atomic publication failure,
-  source/archive/restart and complete backend OOM/replay controls pass. Both
-  tiers and sync/JSPI run 4608 repeated calls with zero ownership counters and
-  flat warmed memory; 5000 sequential resources do not exhaust journal capacity.
-  Owning scalar/numeric-Array inputs are freshly boxed; owning public outputs
-  reject. The combined gate and broader host/request lifetime contracts remain
-  required. This continuation does not mark the task complete.

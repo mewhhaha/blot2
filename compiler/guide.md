@@ -99,9 +99,28 @@ paths such as `world.camera.position := self + offset` are supported.
 
 `return` exits the nearest `do` block in the current function. Falling through
 returns Unit; a last expression statement is discarded. Branch-local bindings do
-not escape. Rebinding an existing outer name flows out of `if` and `if let`; a
-branch that leaves it alone carries its previous value. Both outcomes must have
-the same type. For a value, use `if condition then value else alternative`.
+not escape. Rebinding an existing outer name flows out of `if`, `if let`, and
+the `do:` arms of a `case` used as a statement; a branch or arm that leaves it
+alone carries its previous value. Outcomes that reach the join must have the
+same type; a branch that returns, or a branch or arm that panics or breaks,
+contributes nothing. A `return` written directly in such an arm still exits only
+the arm's `do:`: its value is discarded and the arm's rebindings carry out. A
+`return` nested in an `if` or loop inside an arm that rebinds an outer name is
+rejected with `case_arm_return`. For a value, use
+`if condition then value else alternative`.
+
+```blot
+type Beat is data = #Up | #Down
+entry const count = fn (up: Bool) -> U32 => do:
+  let beat = if up then #Up else #Down
+  let total = 0
+  case beat of
+    #Up => do:
+      total := 7
+    #Down => do:
+      total := 3
+  return total
+```
 
 ```blot
 type Builder is data = #Builder U32
@@ -140,13 +159,14 @@ An outer local rebound directly in the loop with `:=` carries its new value to
 the next iteration and after the loop. Its type must stay the same across
 iterations. New locals and the index remain inside the loop. Nested loops carry
 successors through their enclosing loop. Rebindings inside `if`/`if let`
-branches also carry outward. A separately nested `do:`, including a `case` arm
-body, keeps its own scope: a `:=` of an outer local there that is never read
-inside that block is rejected with `dead_rebinding`. Rebind with `if`/`else`, or
-assign the value of a `case` expression. `return` exits the enclosing `do`; a
-loop creates no new return boundary. `break` exits the nearest loop and carries
-its latest local values into the statements after it. In a request loop it also
-cancels the captured computation. There is no `continue` statement yet.
+branches and statement `case` arms also carry outward. Any other nested `do:`,
+such as a statement-level `do:` or an arm of a `case` whose value is used, keeps
+its own scope: a `:=` of an outer local there that is never read inside that
+block is rejected with `dead_rebinding`. Rebind with `if`/`else` or a statement
+`case`, or assign the value of a `case` expression. `return` exits the enclosing
+`do`; a loop creates no new return boundary. `break` exits the nearest loop and
+carries its latest local values into the statements after it. In a request loop
+it also cancels the captured computation. There is no `continue` statement yet.
 
 ```blot
 entry const sum_to = fn (end: U32) => do:

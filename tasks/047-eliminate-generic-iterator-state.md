@@ -69,25 +69,21 @@ development and the scenarios below.
 
 ## Completion evidence
 
-`0d77afc` passes the full gate: 1,701 native tests, 1,075 guests, 1,050 complete
-OOM sweeps plus two expected-error harness laws, and 375 analyzer files with
-zero findings. Strict zip retains zero objects. Narrow completed-empty-producer
-handling reduces windows at 4,096 rows from 81,894 to 77,800 objects and
-1,277,540 to 1,244,788 payload bytes. Root stores increase; the combined release
-runtime ratio 0.9933 is near parity. All 62 packed width/type outputs remain
-exact.
-
-[The merged record](../zig-native/CONTINUATION_QUALIFICATION.md) pins source,
-binary, allocations, runtime/compiler costs and limits. Remaining inner fold,
-step/cursor and semantic-buffer allocations keep task 047 open. The separate
-window-fold experiments and all rejected variants remain preserved. No broader
-completion or push is claimed.
-
-The uncommitted 14 October continuation adds direct collection progress and
-single-leaf traversal. The latter reduces the development window screen from
-53,236 to 49,142 objects and 917,268 to 884,516 payload bytes, with flat memory
-and a warmed guest runtime ratio of 0.9526. Focused source/compiled/replay,
-reference-pressure and suspension laws pass. The
-[iterator record](../zig-native/ITERATOR_STATE.md#single-leaf-traversal-14-october-2026)
-retains pins and limits; combined qualification and remaining state elimination
-are still open.
+- Last full-gate checkpoint: `0d77afc` passes 1,701 native tests, 1,075 guests,
+  1,050 complete OOM sweeps plus two expected-error harness laws, and 375
+  analyzer files with zero findings. Strict zip retains zero objects; windows at
+  4,096 rows fall from 81,894 to 77,800 objects (1,277,540 to 1,244,788 payload
+  bytes) at release runtime ratio 0.9933; all 62 packed width/type outputs stay
+  exact
+  ([checkpoint](../zig-native/CONTINUATION_QUALIFICATION.md#callback-and-record-footprints-completed-window-producers-13-october-2026)).
+- Since then: direct collection progress and
+  [single-leaf traversal](../zig-native/ITERATOR_STATE.md#single-leaf-traversal-14-october-2026)
+  (window screen 53,236 → 49,142 objects, runtime ratio 0.9526) joined the
+  [qualified 14 October continuation](../zig-native/CONTINUATION_QUALIFICATION.md#qualified-continuation-14-october-2026);
+  later focused cursor, frame, snapshot and closure-capture slices are pinned in
+  [the iterator record](../zig-native/ITERATOR_STATE.md).
+- Remaining (why the task is open): Window state and reducer captures, inner
+  fold/step/cursor and semantic-buffer allocations, the all-width packed cursor
+  comparison against the boxed and task 002 references, compiler cost and final
+  common release qualification. Rejected variants remain preserved; nothing is
+  pushed.

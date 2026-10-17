@@ -57,23 +57,21 @@ development and the scenarios below.
 
 ## Completion evidence
 
-The `fixtures` native test module owns 126 Blot inputs and two frozen oracle
-files, all byte identical to their prior locations. Thirty Zig consumers and
-four guest helper/fixture readers use the new location. Test-only module wiring
-does not grant production imports fixture access. Focused discovery executes
-three relocated consumers (request graph/OOM, purity oracle and dynamically
-selected closure source), and all seven local analyzer dependency/cache laws
-pass, including fixture additions/deletions. The first broad filter selected 56
-staging/usage controls but no fixture consumers; the separate exact-name
-three-test run supplies that evidence. No full-gate completion is claimed. Byte
-manifests, original sources and logs:
-`build/bench/finish-rest-20261015/fixture-relocation/`.
-
 - Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Implementation: the `fixtures` native test module owns 126 Blot inputs and two
+  frozen oracle files, all byte identical to their prior locations. Thirty Zig
+  consumers and four guest helper/fixture readers use the new location;
+  test-only module wiring gives production imports no fixture access.
+- Validation: an exact-name focused run executes three relocated consumers
+  (request graph/OOM, purity oracle and dynamically selected closure source); a
+  broader filter selected 56 staging/usage controls but no fixture consumer. All
+  seven local analyzer dependency/cache laws pass, including fixture additions
+  and deletions. No full-gate result is claimed.
+- Comparison: byte manifests show every relocated file unchanged; no performance
+  comparison is recorded. Manifests, original sources and logs:
+  `build/bench/finish-rest-20261015/fixture-relocation/`.
+- Remaining limitations: complete comptime test import/discovery under the
+  module-root restrictions and the final combined compiler/analyzer gate.
+- Durable record: the fixture module is described in
+  [zig-native/README.md](../zig-native/README.md); a final qualification record
+  is pending.

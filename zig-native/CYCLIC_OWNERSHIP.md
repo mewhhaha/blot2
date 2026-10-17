@@ -154,7 +154,7 @@ The joint LLVM release passes full native/OOM and 961 guest/client tests,
 including original strong cycles, suspension/cancellation and all eight budgets;
 351 analyzer files have zero findings. The scalar summary build no longer
 rescans alive immutable trees: its isolated 16384-leaf control drops 4309740
-trial vertices to zero. Real cyclic windows still pay candidate-closure cost;31
+trial vertices to zero. Real cyclic windows still pay candidate-closure cost; 31
 warmed release samples charge those visits explicitly and retain bounded
 committed memory. See
 [rolling qualification](ROLLING_SUMMARIES_QUALIFICATION.md) and

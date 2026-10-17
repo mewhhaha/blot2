@@ -271,9 +271,12 @@ pub const ResolverCompletion = struct { node: ast.Id, bind: u32, pure: u32, comp
 pub const ResolverLoop = struct { node: ast.Id, cursor_parameter: BindingId, first_binding: BindingId, end_binding: BindingId, cursor: T.Id, step_result: T.Id, suffix_result: T.Id, iterate: u32, continued: u32, finish: u32, continue_constructor: u32, done_constructor: u32 };
 pub const LoopCarry = struct { node: ast.Id, incoming: BindingId, iteration: BindingId, backedge: BindingId, outgoing: BindingId };
 pub const LoopExit = struct { node: ast.Id, loop: ast.Id, bindings: T.List };
+/// A do: arm of a statement case whose rebinding carries out of the case.
+/// Core lowers its statements as that arm's suite, as for an if branch.
+pub const StatementArm = struct { node: ast.Id };
 pub const ClosedRow = struct { owner: BindingId, variable: u32 };
 pub const Merge = struct { node: ast.Id, result: BindingId, then_binding: BindingId, else_binding: BindingId };
-pub const Code = enum { task_escape, task_handle_consumed, task_capture_transfer, task_capability_shared, task_demand_shared, task_regions_overlap, task_host_contract, task_budget, invalid_proof_operand, proof_scope_escape, proof_runtime_use, proof_mismatch, contradictory_proof, proof_analysis_limit, effect_identity_scope, capability_escape, capability_analysis_limit, undetermined_implementation, orphan_implementation, overlapping_implementation, incompatible_implementation, recursive_evidence, missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, unknown_rebinding, dead_rebinding, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget, skolem_escape, rank_mismatch, package_expected, package_witness_mismatch, package_escape, abstract_representation_access, use_after_move, duplicate_owner, borrow_conflict, borrow_escape, once_reused, multiplicity_unknown, cleanup_not_safe, usage_evidence_mismatch, usage_analysis_limit, code_shape_mismatch, stage_unavailable, cross_stage_authority, descriptor_private, generated_binding_escape, staging_budget };
+pub const Code = enum { task_escape, task_handle_consumed, task_capture_transfer, task_capability_shared, task_demand_shared, task_regions_overlap, task_host_contract, task_budget, invalid_proof_operand, proof_scope_escape, proof_runtime_use, proof_mismatch, contradictory_proof, proof_analysis_limit, effect_identity_scope, capability_escape, capability_analysis_limit, undetermined_implementation, orphan_implementation, overlapping_implementation, incompatible_implementation, recursive_evidence, missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, unknown_rebinding, dead_rebinding, case_arm_return, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget, skolem_escape, rank_mismatch, package_expected, package_witness_mismatch, package_escape, abstract_representation_access, use_after_move, duplicate_owner, borrow_conflict, borrow_escape, once_reused, multiplicity_unknown, cleanup_not_safe, usage_evidence_mismatch, usage_analysis_limit, code_shape_mismatch, stage_unavailable, cross_stage_authority, descriptor_private, generated_binding_escape, staging_budget };
 pub const PurityWitness = @import("../reuse/purity_diagnostics.zig").Witness;
 pub const Diagnostic = struct {
     pub const TypeApplication = enum { missing_array, missing_nominal, extra };
@@ -441,7 +444,8 @@ pub const Diagnostic = struct {
             .invalid_operator => "This operator is not declared or supported",
             .return_outside_block => "Return requires an enclosing do block in this function",
             .unknown_rebinding => if (self.symbol != 0) ":= requires an existing local binding" else "Rebinding requires an existing lexical name",
-            .dead_rebinding => "This := inside a nested do: block is never read and leaves the enclosing binding unchanged; rebind it with if/else or assign a case expression",
+            .dead_rebinding => "This := inside a nested do: block is never read and leaves the enclosing binding unchanged; rebind it with if/else or a statement case, or assign a case expression",
+            .case_arm_return => "This return would leave only its case arm and skip the rebinding the arm carries out; return directly in the arm's do: block or restructure with if/else",
             .nesting_limit => "Semantic nesting exceeds the compiler limit",
             .inference_budget => "Type inference exceeded this module's work budget",
             .constructor_marker => "Record constructors require # before the name",
@@ -578,6 +582,7 @@ pub const Checked = struct {
     demand_binary_left_types: []T.Id = &.{},
     demand_binary_left: []bool = &.{},
     loop_exits: []LoopExit = &.{},
+    statement_arms: []StatementArm = &.{},
     pub fn reflection(self: *const Checked, id: ast.Id) ?Reflection {
         var low: usize = 0;
         var high = self.reflections.len;
@@ -675,6 +680,7 @@ pub const Checked = struct {
         allocator.free(self.demand_binary_left_types);
         allocator.free(self.demand_binary_left);
         allocator.free(self.loop_exits);
+        allocator.free(self.statement_arms);
         self.* = undefined;
     }
 };
@@ -742,6 +748,10 @@ const CatalogIndex = struct {
         inline for (@typeInfo(CatalogIndex).@"struct".field_names) |field| @field(self, field).deinit(allocator);
     }
 };
+
+/// The versions of enclosing locals a statement case arm block leaves, read
+/// before its scope closes. `carrying` is set when one of them is a successor.
+const ArmCapture = struct { block: ast.Id, versions: []BindingId, carrying: bool = false };
 
 const Engine = struct {
     catalogs: CatalogIndex = .{},
@@ -867,6 +877,13 @@ const Engine = struct {
     env: std.ArrayList(Entry) = .empty,
     /// The block that is a lambda's own body, as opposed to a nested do:.
     function_body: ast.Id = 0,
+    /// The case being checked as a statement, whose value is discarded.
+    statement_case: ast.Id = 0,
+    /// The statement case arm block awaiting its carried versions.
+    arm_capture: ?*ArmCapture = null,
+    /// The arm block being checked, and its first return nested below it.
+    arm_block: ast.Id = 0,
+    arm_nested_return: ast.Id = 0,
     current: BindingId = 0,
     pending_start: usize = 0,
     owner: ast.Id = 0,
@@ -952,6 +969,7 @@ const Engine = struct {
     demand_binary_left_types: []T.Id = &.{},
     demand_binary_left: []bool = &.{},
     loop_exits: std.ArrayList(LoopExit) = .empty,
+    statement_arms: std.ArrayList(StatementArm) = .empty,
     loop_stack: std.ArrayList(LoopFrame) = .empty,
     cases: std.ArrayList(ast.Id) = .empty,
     associated: std.ArrayList(Associated) = .empty,
@@ -7892,6 +7910,8 @@ const Engine = struct {
     }
     fn caseExpression(self: *Engine, id: ast.Id) T.Error!T.Id {
         const n = self.tree.node(id);
+        const statement_position = self.statement_case == id;
+        self.statement_case = 0;
         const inputs = self.tree.extra.items[n.a..][0..2];
         var types_: std.ArrayList(T.Id) = .empty;
         defer types_.deinit(self.allocator);
@@ -7902,9 +7922,19 @@ const Engine = struct {
             diverges = diverges or try self.types.resolve(value, 0) == T.never;
         }
         const scope = self.env.items.len;
-        defer self.env.shrinkRetainingCapacity(scope);
+        var kept = scope;
+        defer self.env.shrinkRetainingCapacity(kept);
         const result = try self.types.fresh();
-        for (self.tree.list(.{ .start = n.b, .len = n.c })) |arm_id| {
+        const arms = self.tree.list(.{ .start = n.b, .len = n.c });
+        // A statement case carries rebinding of enclosing locals out of its
+        // do: arms, as if/if let statements do (issue #11 follow-up).
+        const carry = statement_position and !diverges and self.resolver_scope.block == 0 and arms.len != 0;
+        const version_count = if (carry) std.math.mul(usize, arms.len, scope) catch return error.TypeLimit else 0;
+        const versions = try self.allocator.alloc(BindingId, version_count);
+        defer self.allocator.free(versions);
+        const exits = try self.allocator.alloc(bool, if (carry) arms.len else 0);
+        defer self.allocator.free(exits);
+        for (arms, 0..) |arm_id, arm_index| {
             const arm = self.tree.node(arm_id);
             const meta = self.tree.extra.items[arm.c..][0..2];
             var first: []Entry = &.{};
@@ -7938,10 +7968,73 @@ const Engine = struct {
             self.env.shrinkRetainingCapacity(scope);
             try self.env.appendSlice(self.allocator, first);
             if (meta[0] != 0) try self.constrain(try self.expression(meta[0]), T.boolean, meta[0]);
-            try self.constrain(result, try self.expression(meta[1]), arm_id);
+            if (!carry) {
+                try self.constrain(result, try self.expression(meta[1]), arm_id);
+                continue;
+            }
+            const arm_versions = versions[arm_index * scope ..][0..scope];
+            for (self.env.items[0..scope], arm_versions) |entry, *version| version.* = entry.binding;
+            var capture: ArmCapture = .{ .block = meta[1], .versions = arm_versions };
+            const saved_capture = self.arm_capture;
+            self.arm_capture = &capture;
+            const arm_type = self.expression(meta[1]);
+            self.arm_capture = saved_capture;
+            try self.constrain(result, try arm_type, arm_id);
+            exits[arm_index] = try self.types.resolve(try arm_type, 0) == T.never;
+            if (capture.carrying) try self.statement_arms.append(self.allocator, .{ .node = meta[1] });
         }
         try self.cases.append(self.allocator, id);
+        if (carry) {
+            self.env.shrinkRetainingCapacity(scope);
+            try self.joinCaseArms(id, arms, versions, exits);
+            kept = self.env.items.len;
+        }
         return if (diverges) T.never else result;
+    }
+    /// Carries each enclosing local that a statement case's arms rebind out
+    /// of the case. Core tests the arms with nested two-arm statement matches:
+    /// level k selects arm k or the levels below it, the last level selects
+    /// between the last two arms, and a lone arm falls back to its incoming
+    /// version. Each level keeps an if let's binary merges. An arm that exits
+    /// contributes nothing, like an exiting if branch, and the versions of the
+    /// arms that reach the join must agree in type.
+    fn joinCaseArms(self: *Engine, id: ast.Id, arms: []const ast.Id, versions: []const BindingId, exits: []const bool) T.Error!void {
+        const scope = self.env.items.len;
+        for (0..scope) |index| {
+            const entry = self.env.items[index];
+            const shadowed = for (self.env.items[index + 1 .. scope]) |later| {
+                if (later.name == entry.name) break true;
+            } else false;
+            if (shadowed) continue;
+            var changed = false;
+            var live: BindingId = 0;
+            for (arms, 0..) |arm_id, arm_index| {
+                const version = versions[arm_index * scope + index];
+                changed = changed or version != entry.binding;
+                if (exits[arm_index]) continue;
+                if (live == 0) live = version else try self.constrain(self.bindings.items[live].ty, self.bindings.items[version].ty, arm_id);
+            }
+            if (!changed or live == 0) continue;
+            var level = if (arms.len == 1) arms.len else arms.len - 1;
+            var joined = if (arms.len == 1) entry.binding else versions[(arms.len - 1) * scope + index];
+            var joined_exits = arms.len != 1 and exits[arms.len - 1];
+            while (level != 0) {
+                level -= 1;
+                const version = versions[level * scope + index];
+                if (exits[level]) continue;
+                if (joined_exits) {
+                    joined = version;
+                    joined_exits = false;
+                    continue;
+                }
+                if (version == joined) continue;
+                if (arms.len == 1) try self.constrain(self.bindings.items[version].ty, self.bindings.items[joined].ty, arms[level]);
+                const merged = try self.addBinding(.{ .name = entry.name, .declaration = id, .owner = self.owner, .kind = .local, .ty = self.bindings.items[version].ty, .predecessor = entry.binding });
+                try self.merges.append(self.allocator, .{ .node = arms[level], .result = merged, .then_binding = version, .else_binding = joined });
+                joined = merged;
+            }
+            if (!joined_exits and joined != entry.binding) try self.env.append(self.allocator, .{ .name = entry.name, .binding = joined });
+        }
     }
     fn annotationEffects(self: *Engine, id: ast.Id) T.Error!T.Effects.Id {
         const row = self.tree.node(id);
@@ -11958,6 +12051,13 @@ const Engine = struct {
         const old_target = self.return_target;
         const old_owner = self.owner;
         const old_resolver = self.resolver_scope;
+        const arm: ?*ArmCapture = if (self.arm_capture) |capture| (if (capture.block == id and resolver_type == 0) capture else null) else null;
+        const old_arm_block = self.arm_block;
+        const old_arm_return = self.arm_nested_return;
+        if (arm != null) {
+            self.arm_block = id;
+            self.arm_nested_return = 0;
+        }
         var result = try self.types.fresh();
         if (self.expected_lambda_source == id and self.types.node(self.types.head(self.expected_lambda_type, 0)).tag == .erased_proof) result = self.expected_lambda_type;
         self.resolver_scope = .{};
@@ -11980,9 +12080,24 @@ const Engine = struct {
             self.return_target = old_target;
             self.owner = old_owner;
             self.resolver_scope = old_resolver;
+            self.arm_block = old_arm_block;
+            self.arm_nested_return = old_arm_return;
         }
         const flow = try self.suite(id);
-        if (nested) try self.deadRebindings(scope, first_binding);
+        // A statement case arm reports its final versions of the enclosing
+        // locals. Like an if branch, it carries those it rebinds out of the
+        // case, or out of a loop it breaks, instead of letting them die here.
+        var carried: usize = 0;
+        if (arm) |capture| {
+            const enclosing = self.env.items[0..capture.versions.len];
+            for (enclosing, capture.versions) |entry, *version| version.* = self.latestSuccessor(entry.binding);
+            capture.carrying = for (enclosing, capture.versions) |entry, version| {
+                if (version != entry.binding) break true;
+            } else false;
+            carried = capture.versions.len;
+            if (capture.carrying and self.arm_nested_return != 0) try self.diagnostic(.case_arm_return, self.arm_nested_return);
+        }
+        if (nested) try self.deadRebindings(scope, first_binding, carried);
         if (!flow.exits) {
             if (block_index == 0) try self.constrain(result, T.unit, id) else {
                 const op = try self.resolverMethod(id, .pure, T.unit, self.resolver_scope.result, 0, false);
@@ -12612,11 +12727,12 @@ const Engine = struct {
         self.expr_types[id] = if (exits) T.never else T.unit;
         return .{ .exits = exits, .breaks = exits };
     }
-    /// A nested do: keeps its own scope (issue #11): only if/if let and loops
-    /// carry a rebinding outward. A := of an enclosing name none of whose
-    /// versions made in the block is ever read, including versions inside its
-    /// branches, therefore changes nothing, so it is rejected.
-    fn deadRebindings(self: *Engine, scope: usize, first_binding: usize) T.Error!void {
+    /// A nested do: keeps its own scope (issue #11): only if/if let, loops and
+    /// the do: arms of a statement case carry a rebinding outward. A := of an
+    /// enclosing name none of whose versions made in the block is ever read,
+    /// including versions inside its branches, therefore changes nothing, so
+    /// it is rejected. Names below `carried` leave a carrying case arm.
+    fn deadRebindings(self: *Engine, scope: usize, first_binding: usize, carried: usize) T.Error!void {
         for (self.env.items[scope..], scope..) |entry, index| {
             if (entry.name == self.self_name) continue;
             const binding = self.bindings.items[entry.binding];
@@ -12628,7 +12744,7 @@ const Engine = struct {
             var root = binding.predecessor;
             const enclosing = for (0..64) |_| {
                 if (root == 0) break false;
-                if (for (self.env.items[0..scope]) |prior| {
+                if (for (self.env.items[carried..scope]) |prior| {
                     if (prior.binding == root) break true;
                 } else false) break true;
                 root = self.bindings.items[root].predecessor;
@@ -12663,6 +12779,9 @@ const Engine = struct {
     }
     fn returnStatement(self: *Engine, id: ast.Id) T.Error!Flow {
         const node = self.tree.node(id);
+        // A return directly in a statement case arm ends the arm like falling
+        // off its end. One nested below it would skip the arm's merge.
+        if (self.arm_block != 0 and self.owner == self.arm_block and self.arm_nested_return == 0 and std.mem.findScalar(ast.Id, self.tree.children(self.arm_block), id) == null) self.arm_nested_return = id;
         if (self.request_scope.invalid_outer_return and self.owner == self.request_scope.return_scope) {
             try self.diagnostic(.invalid_return, id);
             return .{ .exits = true, .returns = true };
@@ -12742,12 +12861,21 @@ const Engine = struct {
             .break_stmt => return self.breakStatement(id),
             .yield_stmt => return self.requestReply(id),
             .if_stmt, .if_let_stmt => return self.conditional(id),
+            .case_expr => return self.caseStatement(id),
             else => {
                 const ty = try self.expression(id);
                 const exits = self.types.node(try self.types.resolve(ty, 0)).tag == .never;
                 return .{ .exits = exits, .breaks = exits };
             },
         }
+    }
+    fn caseStatement(self: *Engine, id: ast.Id) T.Error!Flow {
+        const saved = self.statement_case;
+        self.statement_case = id;
+        defer self.statement_case = saved;
+        const ty = try self.expression(id);
+        const exits = self.types.node(try self.types.resolve(ty, 0)).tag == .never;
+        return .{ .exits = exits, .breaks = exits };
     }
     fn suite(self: *Engine, id: ast.Id) T.Error!Flow {
         var result: Flow = .{};
@@ -15015,6 +15143,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     errdefer engine.resolver_loops.deinit(allocator);
     errdefer engine.loop_carries.deinit(allocator);
     errdefer engine.loop_exits.deinit(allocator);
+    errdefer engine.statement_arms.deinit(allocator);
     defer engine.loop_stack.deinit(allocator);
     defer engine.scope_lifetimes.deinit(allocator);
     defer engine.storage_frames.deinit(allocator);
@@ -15175,6 +15304,8 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     errdefer allocator.free(loop_carries);
     const loop_exits = try engine.loop_exits.toOwnedSlice(allocator);
     errdefer allocator.free(loop_exits);
+    const statement_arms = try engine.statement_arms.toOwnedSlice(allocator);
+    errdefer allocator.free(statement_arms);
     const resolver_blocks = try engine.resolver_blocks.toOwnedSlice(allocator);
     errdefer allocator.free(resolver_blocks);
     const resolver_ops = try engine.resolver_ops.toOwnedSlice(allocator);
@@ -15232,7 +15363,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     errdefer allocator.free(usage_loans);
     const generative_bindings = try allocator.dupe(@import("generative_schemes.zig").Binder, engine.generative_bindings.items);
     errdefer allocator.free(generative_bindings);
-    var checked: Checked = .{ .generative_bindings = generative_bindings, .dictionary_uses = dictionary_uses, .dictionary_selections = dictionary_selections, .usage_loans = usage_loans, .capability_contracts = capability_contracts, .rank_implementations = rank_implementations, .proof_contracts = proof_contracts, .proof_bodies = owned_proof_body, .editor = engine.editor_capture, .iterator_bodies = engine.iterator_bodies, .computations = computations, .request_loops = request_loops, .request_arms = request_arms, .request_controls = request_controls, .reflections = reflections, .tag_origins = engine.tag_origins, .effect_scopes = effect_scopes, .effect_scope_ids = engine.effect_scope_ids, .effect_runners = effect_runners, .effect_runner_ids = engine.effect_runner_ids, .provider_blocks = provider_blocks, .provider_block_ids = engine.provider_block_ids, .body_closed_rows = body_closed_rows, .lambda_closed_rows = engine.lambda_closed_rows, .dispatch_signatures = engine.dispatch_signatures, .covered_requirements = covered_requirements, .effect_families = effect_families, .effect_templates = effect_templates, .operation_uses = operation_uses, .operation_refs = engine.operation_refs, .resolver_completions = resolver_completions, .resolver_loops = resolver_loops, .resolver_loop_ids = engine.resolver_loop_ids, .resolver_blocks = resolver_blocks, .resolver_ops = resolver_ops, .resolver_joins = resolver_joins, .resolver_block_ids = engine.resolver_block_ids, .resolver_op_ids = engine.resolver_op_ids, .resolver_join_ids = engine.resolver_join_ids, .demand_calls = engine.demand_calls, .demand_once = engine.demand_once, .demand_types = engine.demand_types, .demand_binary_left_types = engine.demand_binary_left_types, .demand_binary_left = engine.demand_binary_left, .loop_carries = loop_carries, .loop_ranges = engine.loop_ranges, .loop_exits = loop_exits, .unit = unit, .associated = associated, .nominals = nominals, .contracts = contracts, .contract_predicates = contract_predicates, .contract_members = contract_members, .implementations = implementations, .implementation_predicates = implementation_predicates, .implementation_members = implementation_members, .member_templates = member_templates, .selected_proofs = selected_proofs, .selected_members = selected_members, .selected_edges = selected_edges, .selected_uses = selected_uses, .constructors = constructors, .constructor_resolved = engine.constructor_resolved, .projections = engine.projections, .access_paths = engine.access_paths, .access_nodes = engine.access_nodes, .access_types = engine.access_types, .projection_resolved = engine.projection_resolved, .projection_catalog = projection_catalog, .rebindings = engine.rebindings, .types = engine.types, .parameter_patterns = engine.parameter_patterns, .expr_types = engine.expr_types, .resolved = engine.resolved, .bindings = bindings, .merges = merges, .obligations = obligations, .diagnostics = diagnostics, .body_elaborations = engine.body_elaborations, .imported_schemes = if (source_validation) 0 else engine.catalogs.external_targets.count(), .counters = counters: {
+    var checked: Checked = .{ .generative_bindings = generative_bindings, .dictionary_uses = dictionary_uses, .dictionary_selections = dictionary_selections, .usage_loans = usage_loans, .capability_contracts = capability_contracts, .rank_implementations = rank_implementations, .proof_contracts = proof_contracts, .proof_bodies = owned_proof_body, .editor = engine.editor_capture, .iterator_bodies = engine.iterator_bodies, .computations = computations, .request_loops = request_loops, .request_arms = request_arms, .request_controls = request_controls, .reflections = reflections, .tag_origins = engine.tag_origins, .effect_scopes = effect_scopes, .effect_scope_ids = engine.effect_scope_ids, .effect_runners = effect_runners, .effect_runner_ids = engine.effect_runner_ids, .provider_blocks = provider_blocks, .provider_block_ids = engine.provider_block_ids, .body_closed_rows = body_closed_rows, .lambda_closed_rows = engine.lambda_closed_rows, .dispatch_signatures = engine.dispatch_signatures, .covered_requirements = covered_requirements, .effect_families = effect_families, .effect_templates = effect_templates, .operation_uses = operation_uses, .operation_refs = engine.operation_refs, .resolver_completions = resolver_completions, .resolver_loops = resolver_loops, .resolver_loop_ids = engine.resolver_loop_ids, .resolver_blocks = resolver_blocks, .resolver_ops = resolver_ops, .resolver_joins = resolver_joins, .resolver_block_ids = engine.resolver_block_ids, .resolver_op_ids = engine.resolver_op_ids, .resolver_join_ids = engine.resolver_join_ids, .demand_calls = engine.demand_calls, .demand_once = engine.demand_once, .demand_types = engine.demand_types, .demand_binary_left_types = engine.demand_binary_left_types, .demand_binary_left = engine.demand_binary_left, .loop_carries = loop_carries, .loop_ranges = engine.loop_ranges, .loop_exits = loop_exits, .statement_arms = statement_arms, .unit = unit, .associated = associated, .nominals = nominals, .contracts = contracts, .contract_predicates = contract_predicates, .contract_members = contract_members, .implementations = implementations, .implementation_predicates = implementation_predicates, .implementation_members = implementation_members, .member_templates = member_templates, .selected_proofs = selected_proofs, .selected_members = selected_members, .selected_edges = selected_edges, .selected_uses = selected_uses, .constructors = constructors, .constructor_resolved = engine.constructor_resolved, .projections = engine.projections, .access_paths = engine.access_paths, .access_nodes = engine.access_nodes, .access_types = engine.access_types, .projection_resolved = engine.projection_resolved, .projection_catalog = projection_catalog, .rebindings = engine.rebindings, .types = engine.types, .parameter_patterns = engine.parameter_patterns, .expr_types = engine.expr_types, .resolved = engine.resolved, .bindings = bindings, .merges = merges, .obligations = obligations, .diagnostics = diagnostics, .body_elaborations = engine.body_elaborations, .imported_schemes = if (source_validation) 0 else engine.catalogs.external_targets.count(), .counters = counters: {
         var counters = engine.counters;
         counters.inference_steps = engine.inference_transitions + engine.types.projection_steps;
         counters.associated_steps = engine.types.projection_steps;

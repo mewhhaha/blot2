@@ -84,7 +84,7 @@ counters are not live-memory measurements. The parent owns the independent
 boxed-baseline/repeat 16 qualification.
 
 Focused 27 native tests include 11 SROA laws/10 complete allocator-failure
-sweeps and one new symbolic-fact law. Focused 26 guests,8 unchanged allocation
+sweeps and one new symbolic-fact law. Focused 26 guests, 8 unchanged allocation
 budgets and 366 analyzer files/zero findings pass. Guest laws cover chained
 forks, saved steps/windows, dynamic reference elements, pressure, effects, early
 exit, retained/replay edits, both codegen tiers and existing JSPI

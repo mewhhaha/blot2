@@ -3,8 +3,10 @@
 ## Status, dependencies, and originating requirements
 
 - **Status:** In progress — scope closed to fixed typed-staging acceptance
-  traces by owner decision on 15 October 2026; trace-to-law index and a passing
-  full gate on current source remain.
+  traces by owner decision on 15 October 2026. The trace-to-law index is
+  recorded and the gate at `05401a9` passes; population and retained costs are
+  not yet measured on gated source, and two traces lack a named law for part of
+  their expected result.
 - **Dependencies:** [066](066-specify-typed-staging.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 8 / typed code and
   descriptors. Sources:
@@ -80,102 +82,66 @@ measured and recorded; they are not a pass/fail target.
 
 The task completes when each trace maps to named passing native laws or guest
 tests in the full compiler gate on the committed source, recorded durably in
-[STAGING_QUALIFICATION.md](../zig-native/STAGING_QUALIFICATION.md). No such
-trace-to-law index exists yet; build it from the passing gate.
+[STAGING_QUALIFICATION.md](../zig-native/STAGING_QUALIFICATION.md). The
+[trace-to-law index](../zig-native/STAGING_QUALIFICATION.md#trace-to-law-index-17-october-2026)
+built from the gate at `05401a9` is recorded there.
 
 ## Completion evidence
 
-Native and client syntax own `code [T, row E]`, descriptor targets and stage
-intrinsics, retaining contextual value names. Native syntax/OOM passes 17
-filtered laws; client syntax/formatting passes 25 tests with one existing
-ignored test. Logs:
-`build/bench/continuation-20261013/staging-syntax-{native,client-v3}.log`.
-
-Owned staging now passes seven executed guest laws, including imported callable
-descriptors, independent expansion sites, same-type input/body edits, failed
-revision recovery and restart parity. Portable native laws reject forged shapes,
-effects, capture stages and replacement payloads; source teardown, roundtrip and
-allocation-failure controls pass. Callable descriptors retain the quoted
-closure's exact row certificate and preserve declared operation effects. The
-previous imported `InvalidArtifact` blocker is repaired for this admitted
-frontier. [The durable staging record](../zig-native/STAGING_QUALIFICATION.md)
-pins the focused implementation and remaining limits. These results do not
-qualify complete staging or generation.
-
-- Commit: pending; record the local milestone revision.
-- Validation: focused laws above; full compiler qualification remains open. Pure
-  statement-if helpers additionally pass six native and twelve selected staging
-  guest groups, with complete portable/restart OOM and exact both-tier
-  source/archive/checkpoint parity. Pins:
-  `build/bench/finish-program-20261014/staging-statement-if/`.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: general named pattern/request/resolver helpers and
-  staged borrow/resource captures and general qualified producer transport
-  remain open.
+- Commit: pending; no local milestone revision is recorded for this task.
+- Validation: the full gate at `05401a9` (17 October 2026) passes 2,355 native
+  laws with zero leaks, 1,501 guest tests and zero analyzer findings over 486
+  files. The
+  [trace-to-law index](../zig-native/STAGING_QUALIFICATION.md#trace-to-law-index-17-october-2026)
+  maps the first trace completely. Before closure: (1) measure population and
+  retained costs on gated source and record them in STAGING_QUALIFICATION.md
+  (not a pass/fail target); (2) the splice trace has named laws for result and
+  effect shapes but none that splices code whose usage qualifier differs; (3)
+  the lift trace has named laws for callable authority, affine nominal/opaque
+  payloads, scoped capabilities and escaping loans but none that quotes or lifts
+  a value whose type mentions a live skolem. Items (2) and (3) need a named law
+  each, or an owner decision to accept the partial mapping.
+- Current focused frontier (15 October 2026): the combined stage-owner batch
+  passes 73 native laws (60 portable staging laws plus operation, task and usage
+  controls), 25 executed guest groups and 413 selected analyzer files with zero
+  findings. Both-tier source/archive/cache/checkpoint edits and recovery
+  preserve fresh bytes and last-good execution. Pins were in
+  `build/bench/finish-rest-20261015/staging-stage-owners/` (historical; `build/`
+  was removed). See
+  [current continuation](../zig-native/STAGING_QUALIFICATION.md#current-continuation-15-october-2026).
+- Implemented: native and client syntax own `code [T, row E]`, descriptor
+  targets and stage intrinsics (17 native syntax/OOM laws; 25 client
+  syntax/formatting tests, one existing ignored test). Owned staging passes
+  seven executed guest laws (imported callable descriptors, independent
+  expansion sites, same-type input/body edits, failed-revision recovery and
+  restart parity). Portable laws reject forged shapes, effects, capture stages
+  and replacement payloads; callable descriptors retain the quoted closure's
+  exact row certificate; the imported `InvalidArtifact` blocker is repaired for
+  the admitted frontier.
+- Helper frontier (14–15 October 2026, focused only): statement-if helpers (six
+  native laws, twelve guest groups, 31 work steps), generic named helpers and
+  public nominal lifts (six-file patch SHA-256
+  `928b4dd9a1bd80147ce1ae18dc89c7356b1ea4313a8ef52e82b0a6bbbda8595d`), immutable
+  producer data and public nominal field descriptors are recorded in
+  [STAGING_QUALIFICATION.md](../zig-native/STAGING_QUALIFICATION.md). Recorded
+  only here, with pins formerly under `build/bench/finish-program-20261014/`:
+  straight-line helper blocks (two native laws, four guest groups, 38 steps),
+  pure nominal-constructing helpers (five native laws, five guest groups), pure
+  collection helpers for length, indexing, identity, concatenation, slicing and
+  Array/List conversion (four native laws, seven guest groups, 64 roundtrip
+  allocation failures, 76 steps) and nominal field-reader helpers (seven native
+  laws, nine guest groups, 40 steps).
+- Comparison: pending; population and retained costs must be measured and
+  recorded, but they are not a pass/fail target. The only recorded screen is the
+  three-pair development screen of 14 October (staged
+  fresh/body-edit/literal-edit/revert median CPU ratios
+  0.959/0.966/1.045/1.059), which predates the 15 October stage-owner
+  continuation and the gated source.
+- Remaining limitations: general named pattern/request/resolver helpers,
+  captured loans and general resource captures, general qualified producer
+  transport and complete generated declaration/source maps remain open and must
+  reject or decline conservatively.
 - Durable record:
-  [staging qualification](../zig-native/STAGING_QUALIFICATION.md); full gate and
-  cost qualification remain pending.
-
-The 14 October follow-on admits bounded first-order generic named helpers and
-public nominal lifts. Substitution and constructor payload ownership are
-reconstructed independently at portable boundaries. Focused malformed-owner,
-payload, allocation-failure and all twelve staging guest groups pass; tracked
-JSON byte edits, recovery and restart now have executed controls. The exact
-six-file patch SHA-256 is
-`928b4dd9a1bd80147ce1ae18dc89c7356b1ea4313a8ef52e82b0a6bbbda8595d`. The single
-final full compiler gate remains outstanding.
-
-The later stage-owner batch passes 60 portable staging laws, including declared
-request signatures, actual Foreign clauses, unused handlers, earlier-stage
-affine lift/splice operands, nested quotes and once generators. Together with
-operation/task/usage controls, 73 native laws, 25 guest groups and 413 selected
-analyzer files pass. Source/archive/checkpoint/cache edits preserve fresh bytes
-and last-good execution. Exact focused pins:
-`build/bench/finish-rest-20261015/staging-stage-owners/`. General transport and
-the final common gate remain required.
-
-A further owned-data slice admits immutable producer-local initializers and
-aliases while rejecting runtime, foreign and cyclic owners. Seven focused native
-laws and the three changed imported-helper groups pass; thirteen guest groups
-now have focused coverage. Exact source and pins are in
-`build/bench/finish-program-20261014/staging-producer-data-source/`.
-
-Public nominal field descriptors now reconstruct common constructor fields and
-their generic substitutions. Four focused native laws and all fourteen staging
-guest groups pass, including changed field types, source/compiled imports,
-failed-edit recovery, restart and portable allocation failures. Exact pins are
-in `build/bench/finish-program-20261014/nominal-descriptor-source/`.
-
-Straight-line helper blocks now validate earlier local bindings and their exact
-return target. Nested generic aliases survive producer teardown, roundtrip and
-complete allocation failures. Forward reads, caller-local capture, duplicate
-binding owners and foreign return targets reject. Two focused native laws and
-four helper guest groups pass; fresh/retained/restart work agrees at 38 steps
-for the new local-helper fixture. Exact pins are in
-`staging-local-blocks-source/`.
-
-Pure named helpers now construct ordinary nominal data, including generic,
-nullary and positional constructors. Portable readers reconstruct result and
-payload substitutions; private families, forged inputs and hidden callables
-reject. Five native laws and five imported helper guest groups pass. Exact pins
-are in `build/bench/finish-program-20261014/staging-nominal-helpers/`; full
-qualification remains outstanding.
-
-Pure collection helper bodies now reconstruct element, index and result types
-for length, indexing, identity, concatenation, slicing and Array/List
-conversion. Four focused native laws and seven helper guest groups pass,
-including producer teardown, 64 complete roundtrip allocation failures, forged
-shapes and both-tier out-of-bounds edit recovery. Fresh/retained/restarted work
-agrees at 76 steps; unchanged/recovered input uses zero. The exact three-file
-delta and pins are in
-`build/bench/finish-program-20261014/staging-collection-helpers/`. General
-staging and the final compiler gate remain outstanding.
-
-Pure nominal field-reader helper bodies now own exact public family identities,
-constructor tags, physical payload positions and generic substitutions. Seven
-native laws and nine helper guest groups pass, including 64 complete roundtrip
-allocation failures and forged same-type field paths. Both guest tiers preserve
-40 work steps through edits and restart. Pins and the three-file delta are in
-`build/bench/finish-program-20261014/staging-nominal-reads/`; general staging
-and the final compiler gate remain outstanding.
+  [staging qualification](../zig-native/STAGING_QUALIFICATION.md) and the
+  [design's implementation frontier](../zig-native/TYPED_STAGING.md#current-implementation-frontier);
+  cost qualification remains pending; the full gate passed at `05401a9`.

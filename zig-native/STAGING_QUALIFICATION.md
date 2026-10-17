@@ -5,6 +5,115 @@ evaluator own the admitted code/descriptor graphs; no generated strings or
 second frontend are used. Focused results below do not establish release or
 performance qualification.
 
+## Trace-to-law index, 17 October 2026
+
+This index maps the seven acceptance traces that the owner fixed for tasks 067
+and 068 on 15 October 2026 to named laws in the passing gate at commit `05401a9`
+(17 October 2026: 2,355 native laws with zero leaks, 1,501 guest tests). Every
+law named below appears in that gate output and is declared in the committed
+source. Paths are relative to `zig-native/`. Five traces are fully covered; two
+067 traces are only partly covered, as noted under them.
+
+Tasks 067 and 068 remain open. The traces' closure also asks for measured and
+recorded population and retained costs. The only recorded cost screen is the
+three-pair development screen of 14 October
+([generic helpers](#generic-helpers-and-nominal-lifts-14-october-2026)), which
+predates the 15 October stage-owner continuation and the gated source.
+
+### 067: Quote calls an imported opaque operation
+
+Expected: Preserve its original abstraction/evidence. Coverage: complete.
+
+```text
+native src/check/frozen_core_validation_tests.zig: portable typed staging retains sealed package identities and stored operations
+native src/reuse/semantic_archive_tests.zig: persisted typed staging seals package recipes and never exposes cached bound descriptors through OOM
+native src/check/frozen_core_validation_tests.zig: portable typed staging admits named operation calls and rejects forged pure claims
+guest  tests/typed_staging_sealed.test.ts: quoted opaque operations preserve abstraction through imports and restart (consumer quote: false)
+guest  tests/typed_staging_sealed.test.ts: quoted opaque operations preserve abstraction through imports and restart (consumer quote: true)
+guest  tests/typed_staging_packages.test.ts: quoted heterogeneous sealed packages preserve descriptor shape stored operations hygiene and restart
+```
+
+### 067: Splice a different result/effect/usage shape
+
+Expected: Reject at splice site. Coverage: partial. Result shapes (a Bool splice
+into a U32 operand, `type_mismatch`) and effect rows (`effect_mismatch`,
+`const_effect`, unrelated row certificates) have named laws. No named law
+splices code whose usage qualifier differs from the expected shape.
+
+```text
+native src/check/typed_staging_tests.zig: typed staging rejects bare earlier values malformed shapes and authority crossing
+native src/check/typed_staging_tests.zig: typed staging row widening retains missing handlers callback rows and pure run restrictions
+native src/check/frozen_core_validation_tests.zig: portable typed staging never closes splice rows using an unrelated body certificate
+native src/check/frozen_core_validation_tests.zig: portable typed staging validates complete shapes and rejects forged operands and stage references
+```
+
+### 067: Lift a resource or descriptor for a live scope/skolem
+
+Expected: Reject before publication. Coverage: partial. Callable authority,
+affine nominal/opaque payloads, scoped capabilities and escaping loans reject
+with named laws. No named law quotes or lifts a value whose type mentions a live
+skolem (the checker's `rank_walk` path that reports `cross_stage_authority`).
+
+```text
+native src/check/typed_staging_tests.zig: typed staging rejects bare earlier values malformed shapes and authority crossing
+native src/check/usage_check_tests.zig: usage nominal affinity cannot be lifted across a stage through an opaque payload
+native src/check/usage_check_tests.zig: usage nominal repeatable owners still carry lifetime authority across lift and package boundaries
+native src/check/frozen_core_validation_tests.zig: portable typed staging refuses scoped authority hidden in quoted closure capture tables
+native src/check/frozen_core_validation_tests.zig: portable typed staging loan captures reject phantom missing and escaping executable owners
+guest  tests/typed_staging_execution.test.ts: nominal lifts reject hidden callable payloads before publication
+```
+
+### 068: Two emissions each bind a local `value` beside a caller `value`
+
+Expected: Three distinct lexical identities. Coverage: complete.
+
+```text
+native src/check/typed_staging_tests.zig: typed staging checks owned shapes stage locals and explicit composition through OOM
+native src/check/frozen_core_validation_tests.zig: portable typed staging helper locals reject future reads caller capture duplicate owners and foreign returns
+guest  tests/typed_staging_execution.test.ts: repeated typed-code emissions preserve independent locals beside caller bindings
+guest  tests/typed_staging_execution.test.ts: imported typed generators preserve hygiene retained edits failures and restart
+guest  tests/typed_staging_statement_if.test.ts: staged statement if helpers preserve branch hygiene source archive edits recovery and checkpoint restart
+```
+
+### 068: Asset bytes change, type remains U32
+
+Expected: Rerun tracked generator and affected executable users. Coverage:
+complete.
+
+```text
+native src/check/frozen_core_validation_tests.zig: typed staging declaration projection retains exact inputs and invalidates same-type quoted edits
+native src/reuse/principal_reuse_gate_tests.zig: principal gate invalidates direct and transitive staged declaration dependencies
+guest  tests/typed_staging_execution.test.ts: typed generators track exact host asset bytes through edits failures and restart
+guest  tests/typed_staging_execution.test.ts: imported staging tracks fixed-type inputs and future bodies across independent expansions
+```
+
+### 068: Generator fails after allocating a partial graph
+
+Expected: Keep prior code/assets usable; release candidate owners. Coverage:
+complete.
+
+```text
+native src/reuse/revision_input_tests.zig: revision input backend staging failure after fresh dependency freeze retains published old owners
+native src/reuse/principal_input_tests.zig: principal input image does not hide staged errors or change the last good capture
+native src/check/typed_staging_tests.zig: typed staging owns composed graphs after frontend teardown through OOM
+native src/check/frozen_core_validation_tests.zig: portable typed staging owns roundtrip graphs after producer release through allocation failures
+guest  tests/typed_staging_execution.test.ts: imported typed generators preserve hygiene retained edits failures and restart
+guest  tests/typed_staging_execution.test.ts: typed generators track exact host asset bytes through edits failures and restart
+```
+
+### 068: Restart from dependency/checkpoint code records
+
+Expected: Same bindings, bytes, source fuel and failure behavior. Coverage:
+complete.
+
+```text
+native src/reuse/semantic_archive_tests.zig: persisted typed staging validates code owners replacements descriptors and restart through OOM
+native src/reuse/semantic_archive_tests.zig: persisted generated origins own exact source nodes and reject forged catalogs through OOM
+guest  tests/typed_staging_execution.test.ts: imported typed generators preserve hygiene retained edits failures and restart
+guest  tests/typed_staging_origins.test.ts: generated diagnostics retain the selected generator through imports records and recovery
+guest  tests/typed_staging_composition.test.ts: named stateful requests preserve lexical owners source archive edits recovery and checkpoint restart
+```
+
 ## Current continuation, 15 October 2026
 
 The current focused batches pass 60 portable staging native laws, including
@@ -80,7 +189,7 @@ mutants and coordinated unselected effect-row forgeries reject. Seven staged
 native laws pass, including complete portable and semantic restart sweeps; four
 numeric-rank controls and eleven combined guest groups also pass. Both tiers
 preserve source/archive/checkpoint/cached restart bytes and 30 work steps;
-statement-if remains31, unchanged/recovery0. The affected 236-file analyzer
+statement-if remains 31, unchanged/recovery 0. The affected 236-file analyzer
 closure is clean. Exact delta and root logs:
 `build/bench/finish-program-20261014/staging-bool-case/`. This closes another
 live-source/export mismatch without a new interpreter, schema or cache. General

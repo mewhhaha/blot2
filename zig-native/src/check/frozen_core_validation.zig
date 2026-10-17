@@ -1757,7 +1757,7 @@ fn stagingScopes(graph: Graph, context: Context, scratch: Scratch, allocator: ?s
                                 if (workspace) |owner| if (owner.oom) return error.OutOfMemory;
                                 return err;
                             };
-                        } else _ = @import("staging_core.zig").namedCallContextWorkspace(m, context.units, id, closed_rows, &remaining, workspace) catch |err| {
+                        } else _ = @import("staging_core.zig").namedCallContextWorkspace(m, context.units, id, &remaining, workspace) catch |err| {
                             if (workspace) |owner| if (owner.oom) return error.OutOfMemory;
                             return err;
                         };

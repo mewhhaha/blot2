@@ -59,9 +59,9 @@ development and the scenarios below.
 - Validation: Zig 0.17.0; `deno task test:compiler` passes full native/OOM and
   961 guest/client tests, both tiers, all eight unchanged budgets. Analyzer
   351/zero.
-- Comparison: seven alternating compiler pairs against `850793f`;31 warmed guest
-  pairs, private callback counts and requested/live/committed memory. Qualified
-  LLVM SHA starts `44af80a9`; source/report pins are in
+- Comparison: seven alternating compiler pairs against `850793f`; 31 warmed
+  guest pairs, private callback counts and requested/live/committed memory.
+  Qualified LLVM SHA starts `44af80a9`; source/report pins are in
   `build/bench/joint-024-035-045-046/qualification-pins.json`.
 - Remaining limitations: caller-provided algebra; ordinary reference/cycle
   collection costs; generic iterator elimination remains 047. No universal CPU

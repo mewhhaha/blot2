@@ -3,8 +3,11 @@
 ## Status, dependencies, and originating requirements
 
 - **Status:** In progress — scope closed to fixed typed-staging acceptance
-  traces by owner decision on 15 October 2026; trace-to-law index and a passing
-  full gate on current source remain.
+  traces by owner decision on 15 October 2026. The trace-to-law index is
+  recorded and all four traces have named passing laws in the gate at `05401a9`;
+  population and retained costs on gated source remain unmeasured, and
+  dependency [024](024-apply-general-body-interface-cutoff.md) is still in
+  progress.
 - **Dependencies:** [067](067-implement-typed-code-and-descriptors.md),
   [024](024-apply-general-body-interface-cutoff.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 8 / hygiene and
@@ -80,56 +83,46 @@ measured and recorded; they are not a pass/fail target.
 
 The task completes when each trace maps to named passing native laws or guest
 tests in the full compiler gate on the committed source, recorded durably in
-[STAGING_QUALIFICATION.md](../zig-native/STAGING_QUALIFICATION.md). No such
-trace-to-law index exists yet; build it from the passing gate.
+[STAGING_QUALIFICATION.md](../zig-native/STAGING_QUALIFICATION.md). The
+[trace-to-law index](../zig-native/STAGING_QUALIFICATION.md#trace-to-law-index-17-october-2026)
+built from the gate at `05401a9` is recorded there.
 
 ## Completion evidence
 
-The statement-if follow-on preserves branch shadowing and independent emissions
-through both-tier source/archive/checkpoint/restart, edited helpers and failed
-revisions. Six native and twelve selected staging guest groups pass; fresh/edit/
-restart uses31 work steps and unchanged/recovery uses zero. Exact pins:
-`build/bench/finish-program-20261014/staging-statement-if/`. General generation
-and the final full gate remain open.
-
-- Commit: pending; record the local milestone revision.
-- Validation: seven staging guest laws pass. The combined imported law compares
-  fresh, retained and restarted Wasm after fixed-type scalar input edits and
-  quoted executable-body edits; three emissions preserve shadowed locals. A
-  failing second expansion preserves the last accepted executable. Two callable
-  descriptor native laws include exhaustive allocation failure. Full compiler
-  qualification remains pending.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: general qualified producer transport and population/
-  edit cost qualification remain open. Staged fragments conservatively rebuild
-  when an entire unchanged output cannot be reused.
+- Commit: pending; no local milestone revision is recorded for this task.
+- Validation: the full gate at `05401a9` (17 October 2026) passes 2,355 native
+  laws with zero leaks, 1,501 guest tests and zero analyzer findings over 486
+  files. The
+  [trace-to-law index](../zig-native/STAGING_QUALIFICATION.md#trace-to-law-index-17-october-2026)
+  maps all four traces to named passing laws. Before closure: measure population
+  and edit costs on gated source and record them in STAGING_QUALIFICATION.md
+  (not a pass/fail target), and complete dependency
+  [024](024-apply-general-body-interface-cutoff.md).
+- Implemented (focused only): seven staging guest laws pass. The combined
+  imported law compares fresh, retained and restarted Wasm after fixed-type
+  scalar input edits and quoted executable-body edits; three emissions preserve
+  shadowed locals; a failing second expansion preserves the last accepted
+  executable. Two callable-descriptor native laws include exhaustive allocation
+  failure.
+- Follow-on helpers (14–15 October 2026, focused only): tracked JSON asset
+  bytes, imported generic helpers and ordinary nominal lifts match fresh
+  execution after same-type edits; invalid JSON, wrong payload types and illegal
+  stage crossings preserve accepted output; corrected inputs and restarted
+  compilers agree in the twelve-group staging guest screen. Statement-if helpers
+  preserve branch shadowing and independent emissions (six native laws, twelve
+  guest groups, 31 work steps; unchanged/recovery zero). Immutable
+  producer-local data, collection helpers (76 steps) and nominal field-reader
+  helpers (40 steps) keep exact fresh/retained/restart output in both codegen
+  tiers; failed revisions preserve the accepted output and correction uses zero
+  work. Pins were under `build/bench/finish-program-20261014/` (historical;
+  `build/` was removed). The collection and field-reader slices are summarized
+  in
+  [task 067](067-implement-typed-code-and-descriptors.md#completion-evidence).
+- Comparison: pending; population and edit costs must be measured and recorded,
+  but they are not a pass/fail target.
+- Remaining limitations: general qualified producer transport, complete
+  generated declaration/source maps and cost qualification remain open. Staged
+  fragments conservatively rebuild when an entire unchanged output cannot be
+  reused.
 - Durable record:
   [staging qualification](../zig-native/STAGING_QUALIFICATION.md).
-
-The 14 October follow-on verifies tracked JSON asset bytes, imported generic
-helpers and ordinary nominal lifts. Same-type byte/body edits match fresh
-execution; invalid JSON, wrong payload types and illegal stage crossings
-preserve the accepted output. Corrected inputs and restarted compilers agree in
-the twelve-group staging guest screen. Portable substitution/payload corruption
-and complete restart allocation-failure checks pass. This remains focused
-evidence pending general declaration/source-map work, cost qualification and the
-final compiler gate.
-
-Immutable producer-local data now has exact executable-body ownership too.
-Imported data edits and failed helper revisions preserve fresh bytes, fuel,
-last-good execution and restart in the three changed helper groups. Runtime,
-foreign and cyclic owner controls reject; focused ownership/OOM checks pass.
-
-Collection helper edits now have the same owned body and input checks. Both
-codegen tiers preserve exact fresh/retained/restart output at 76 steps; a
-failing out-of-bounds read preserves the accepted output, and correction uses
-zero work. Portable roundtrip and forged-shape controls pass. Exact pins are in
-`build/bench/finish-program-20261014/staging-collection-helpers/`.
-
-Nominal field-reader edits preserve exact family, constructor and physical-field
-ownership too. Both codegen tiers match fresh/restart output at 40 steps;
-unchanged and recovered inputs use zero work. Complete portable roundtrip OOM
-and forged same-type field paths pass. The delta and pins are in
-`build/bench/finish-program-20261014/staging-nominal-reads/`; final
-qualification remains outstanding.

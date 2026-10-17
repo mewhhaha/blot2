@@ -24,7 +24,9 @@ to about 440 ms against 400 ms at `f7be6e7`; that is about 13x the target, so
 finishing 093 does not finish this task. Task
 [086](086-retain-constant-evaluation-across-revisions.md) found unchanged
 inference and backend preparation, not constant evaluation, dominating the
-captured project's retained edit.
+captured project's retained edit. Since 17 October 2026, 086 is gated on a
+release measurement of unaffected-constant work; if 086 closes as not needed,
+that measured constant cost becomes one of the costs this task attributes.
 
 ## Implementation checklist
 

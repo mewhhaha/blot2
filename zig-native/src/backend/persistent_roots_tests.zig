@@ -597,6 +597,40 @@ test "promoted generalized local initializers retain fresh code and exact wrappe
     try std.testing.expect(reads_wrapper);
 }
 
+test "generalized runtime locals used at different layouts evaluate one checked instance per layout through replay checkpoint and OOM" {
+    var fixture = try Fixture.initSource(
+        \\const pair = fn a => fn b => (a, b)
+        \\entry const run = fn (seed: U32) => do:
+        \\  let k = pair (@array.fill 2 seed)
+        \\  let alias = k
+        \\  let (whole, _) = alias seed
+        \\  let (_, half) = k 1.5
+        \\  let (_, next) = alias (@u32.add seed 1)
+        \\  return @u32.add (@u32.add whole[0] next) (@f32.to_u32 half)
+    );
+    defer fixture.deinit();
+    const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
+    defer a.free(nodes);
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    try ownership(first.bytes);
+    var retained = try fixture.emit(a, &first.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
+    const compiler: [32]u8 = @splat(36);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    var portable = try fixture.emit(a, null, &checkpoint);
+    defer portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, portable.bytes);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, null, first.bytes });
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
+    try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
+}
+
 test "persistent source roots preserve fresh retained and portable checkpoint Wasm" {
     var fixture = try Fixture.init();
     defer fixture.deinit();

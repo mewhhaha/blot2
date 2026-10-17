@@ -4,8 +4,8 @@ This specifies the ordinary source modules `std/rolling` and `std/summary`.
 [Implementation qualification](ROLLING_SUMMARIES_QUALIFICATION.md) records their
 algorithms, ownership and measurements. No source declaration name grants
 compiler privileges; existing folds, windows and collection representations keep
-their behavior. The qualified starting compiler is `2689ad5` (completed040). The
-[guide](../compiler/guide.md), [ownership contract](CONTRACT.md) and current
+their behavior. The qualified starting compiler is `2689ad5` (completed 040).
+The [guide](../compiler/guide.md), [ownership contract](CONTRACT.md) and current
 [iterator module](../std/iter.blot) remain authoritative for existing behavior.
 
 ## API
@@ -65,7 +65,7 @@ not. In a group window, remove the oldest value from the left:
 noncommutative groups. Cached tree/query combinations follow contiguous source
 interval order.
 
-U32 addition modulo2^32 qualifies with identity0 and inverse
+U32 addition modulo 2^32 qualifies with identity 0 and inverse
 `fn value => @u32.sub 0 value`; overflow retains wrapping behavior. F32
 addition/multiplication do not satisfy this associativity contract, including
 ordinary finite values, NaNs, infinities and signed zero. Use `rolling.fold`
@@ -81,9 +81,9 @@ this result. A trapping/effectful reducer is always supported here.
 
 ## Windows, laziness and failures
 
-All rolling APIs emit full overlapping windows only. Width1 yields one result
+All rolling APIs emit full overlapping windows only. Width 1 yields one result
 per item; width greater than the input length yields none. Empty input yields
-none. Width0 traps at adapter construction with
+none. Width 0 traps at adapter construction with
 `rolling requires a positive width`, before obtaining/pulling the input cursor.
 This adds no new compiler diagnostic.
 
@@ -148,16 +148,16 @@ keeps O(width) work. No amortized bound is substituted for a claimed worst-case
 operation bound. A reference/callback summary's underlying graph may exceed one
 word; include its real retained size in memory measurements.
 
-## Acceptance laws for045–046
+## Acceptance laws for 045–046
 
 Compare every operation against ordinary folds/windows at input sizes
-0,1,2,3,31,63,257,4096 and widths1,2,3,31,257,n,n+1. Check width0 separately.
+0,1,2,3,31,63,257,4096 and widths 1,2,3,31,257,n,n+1. Check width 0 separately.
 Use U32 wrapping sums, products/count summaries, an associative noncommutative
 composition and a noncommutative group. For U32 input `[4294967295,2,3]`, sum
-windows of width2 are `[1,5]`. F32 ordered input `[16777216.0,1.0,-16777216.0]`
-at width3/initial0 must return0, while the reassociated result1 demonstrates why
-it receives no inferred fast evidence. Include signed-zero/NaN/Inf inputs with
-bitwise comparisons where no arithmetic changes their bits.
+windows of width 2 are `[1,5]`. F32 ordered input `[16777216.0,1.0,-16777216.0]`
+at width 3/initial 0 must return 0, while the reassociated result 1 demonstrates
+why it receives no inferred fast evidence. Include signed-zero/NaN/Inf inputs
+with bitwise comparisons where no arithmetic changes their bits.
 
 Trace effectful inputs and ordered reducers through short input, `take0`, early
 stop, thrown host callbacks, suspended/resumed requests and cancellation.
@@ -173,7 +173,7 @@ independently: doubling width must preserve the group inverse/two-combine steady
 count; monoid work follows height, ordered work follows width. Tree build counts
 are linear; query/set/concat examined and copied paths are logarithmic,
 including an adversarial sequence of uneven concatenations. Keep at least seven
-alternating compiler pairs and31 warmed guest pairs, plus raw outliers,
+alternating compiler pairs and 31 warmed guest pairs, plus raw outliers,
 versions, source/ binary hashes, requested/live/committed memory and
 source/artifact phase parity. Long streams retaining only the current
 cursor/tree must stay bounded by the documented live state; explicit retained
@@ -185,11 +185,12 @@ claims no executable feature or measured speedup.
 
 ## Design qualification
 
-This044 milestone changes documentation only. Review on12October2026 uses the
-qualified compiler's ordinary curried functions, inferred/closed effect rows,
-nominal opaque/reference ABI, persistent collection snapshots and iterator pull
-order. No new syntax or compiler intrinsic is specified. Link/format checks and
-independent U32/F32/noncommutative trace assertions validate the design;
-executed APIs and their CPU/storage gates remain tasks045–046. Algebra contracts
-are explicit caller promises, never automatically inferred or advertised as
-compiler-certified proofs. No runtime compatibility registry is introduced.
+This 044 milestone changes documentation only. Review on 12 October 2026 uses
+the qualified compiler's ordinary curried functions, inferred/closed effect
+rows, nominal opaque/reference ABI, persistent collection snapshots and iterator
+pull order. No new syntax or compiler intrinsic is specified. Link/format checks
+and independent U32/F32/noncommutative trace assertions validate the design;
+executed APIs and their CPU/storage gates remain tasks 045–046. Algebra
+contracts are explicit caller promises, never automatically inferred or
+advertised as compiler-certified proofs. No runtime compatibility registry is
+introduced.

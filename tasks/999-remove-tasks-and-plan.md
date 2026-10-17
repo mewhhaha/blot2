@@ -104,7 +104,11 @@
   [101](101-reach-the-literal-edit-target.md),
   [102](102-reach-the-body-edit-target.md),
   [103](103-bound-the-largest-inference-region.md),
-  [104](104-reduce-requested-allocation-below-100-mb.md)
+  [104](104-reduce-requested-allocation-below-100-mb.md),
+  [105](105-admit-agreeing-generalized-local-instances.md),
+  [106](106-fit-small-guest-objects-and-journal-pages.md),
+  [107](107-reject-dead-rebinding-in-nested-blocks.md),
+  [108](108-widen-stored-callback-rows-in-static-captures.md)
 - **Originating requirements:** Approved task manifest / final conditional
   cleanup. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the

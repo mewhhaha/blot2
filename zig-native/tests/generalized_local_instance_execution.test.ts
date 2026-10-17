@@ -64,8 +64,7 @@ entry const main = fn (x: U32) => do:
 `);
 });
 
-Deno.test("rebound generalized builders close every link of the chain", async () => {
-  await returnsArgument(`
+const cells = `
 type Builder [world, scope, schema] is data = #Builder { initial: world, scope: world -> scope, schema: schema }
 type End is data = #End
 type State a is effect = {
@@ -87,6 +86,10 @@ const insert_cell = fn initial => fn builder => do:
 const create = fn builder => fn action => do:
   let #Builder { initial, scope } = builder
   return scope initial action
+`;
+
+Deno.test("rebound generalized builders close every link of the chain", async () => {
+  await returnsArgument(`${cells}
 entry const main = fn (x: U32) => do:
   let builder = empty ()
   builder := insert_cell 1 self
@@ -119,6 +122,9 @@ entry const main = fn (x: U32) => do:
 `);
 });
 
+// A closure capturing a local whose uses disagree keeps it on its unproven
+// runtime path, so both the promoting attempt and the retry without
+// promotions fail; the retry owns the reported diagnostic.
 Deno.test("a compilation that fails after promoting a generalized local reports the ordinary diagnostic", async () => {
   await compileExpectedFailure(`${builder}
 const pair = fn a => fn b => (a, b)
@@ -127,19 +133,141 @@ entry const main = fn (x: U32) => do:
   let (_, first) = run b (fn () => x)
   let (_, second) = run b (fn () => (x, 1.5))
   let k = pair x
-  let (a, _) = k first
+  let later = fn (y: U32) => k y
+  let (a, _) = later first
   let (c, _) = k 1.0
   return a
 `, "ownership_unproved");
 });
 
-Deno.test("runtime-dependent generalized locals used at different layouts still decline checked storage", async () => {
-  await compileExpectedFailure(`
-const pair = fn a => fn b => (a, b)
+// Uses at different layouts share no physical value: closure ABI and field
+// words depend on the layout. A pure runtime producer instead runs once per
+// distinct use layout, and each use reads its own instance.
+const pair = "const pair = fn a => fn b => (a, b)";
+
+Deno.test("runtime-dependent generalized locals used at different layouts evaluate one instance per layout", async () => {
+  await returnsArgument(`
+${pair}
 entry const main = fn (x: U32) => do:
   let k = pair x
   let (a, _) = k x
-  let (b, _) = k 1.0
+  let (b, _) = k 1.5
   return a
+`);
+});
+
+Deno.test("each instance of a runtime-dependent generalized local keeps its own field layout", async () => {
+  await compileAndRun(`
+${pair}
+entry const main = fn (x: U32) => do:
+  let k = pair x
+  let (a, _) = k x
+  let (b, _) = k 1.5
+  return a
+entry const fraction = fn (x: F32) => do:
+  let k = pair x
+  let (_, count) = k 3
+  let (_, b) = k (x * 2.0)
+  return b
+`, (guest) => {
+    equal(guest.call("main", 7), 7);
+    equal(guest.call("fraction", 1.25), 2.5);
+    for (let index = 0; index < 16; index++) guest.call("fraction", index);
+    const settled = guest.memoryBytes();
+    for (let index = 0; index < 2048; index++) {
+      equal(guest.call("fraction", index + 0.5), index * 2 + 1);
+      equal(guest.call("main", index), index);
+    }
+    equal(guest.memoryBytes(), settled);
+  });
+});
+
+Deno.test("allocating runtime producers release every instance", async () => {
+  await compileAndRun(`
+${pair}
+entry const main = fn (x: U32) => do:
+  let k = pair (@array.fill 64 x)
+  let (first, _) = k x
+  let (second, _) = k 1.5
+  return first[3] + second.length - 64
+entry const memory = fn () -> Array U32 => #[]
+`, (guest) => {
+    equal(guest.call("main", 7), 7);
+    for (let index = 0; index < 16; index++) guest.call("main", index);
+    const settled = guest.memoryBytes();
+    if (settled === 0) throw new Error("Expected exported guest memory");
+    for (let index = 0; index < 4096; index++) equal(guest.call("main", index), index);
+    equal(guest.memoryBytes(), settled);
+  });
+});
+
+// A second evaluation would edit the already edited array (and return 909).
+Deno.test("producers with a proven in-place collection edit still decline", async () => {
+  await compileExpectedFailure(`
+${pair}
+entry const main = fn (x: U32) => do:
+  let values = @array.fill 4 x
+  let k = pair (@array.set values 0 (values[0] + 1))
+  let (first, _) = k x
+  let (second, _) = k 1.5
+  return first[0] * 100 + second[0]
 `, "ownership_unproved");
+});
+
+Deno.test("repeated uses at one layout share their instance", async () => {
+  await returnsArgument(`
+${pair}
+entry const main = fn (x: U32) => do:
+  let k = pair x
+  let (_, whole) = k (x + 1)
+  let (_, half) = k 1.5
+  let (a, same) = k whole
+  return same - 1
+`);
+});
+
+Deno.test("uses in loops and early-returning branches read their own instance", async () => {
+  await compileAndRun(`
+${pair}
+entry const main = fn (x: U32) => do:
+  let k = pair x
+  let total = 0
+  for index in 0..3:
+    let (a, step) = k index
+    total := total + a + step
+  let (_, fraction) = k 1.5
+  if fraction > 1.0:
+    let (c, _) = k 2
+    return total + c
+  return total
+`, (guest) => {
+    equal(guest.call("main", 7), 31);
+    for (let index = 0; index < 16; index++) guest.call("main", index);
+    const settled = guest.memoryBytes();
+    for (let index = 0; index < 2048; index++) equal(guest.call("main", index), index * 4 + 3);
+    equal(guest.memoryBytes(), settled);
+  });
+});
+
+Deno.test("an alias of a runtime-dependent generalized local instances both links", async () => {
+  await returnsArgument(`
+${pair}
+entry const main = fn (x: U32) => do:
+  let k = pair x
+  let g = k
+  let (a, _) = g x
+  let (b, _) = g 1.5
+  return a
+`);
+});
+
+Deno.test("rebound runtime builders used at different layouts instance every link", async () => {
+  await returnsArgument(`${cells}
+entry const main = fn (x: U32) => do:
+  let builder = empty ()
+  builder := insert_cell x self
+  let (_, first) = create builder (fn () => x)
+  let (_, (_, fraction)) = create builder (fn () => (x, 1.5))
+  return first
+`);
 });

@@ -1,9 +1,10 @@
 # Continue here
 
 Finish the entire program in [tasks/README.md](tasks/README.md), continuing past
-individual milestones. **Nothing is committed or pushed by this continuation.**
-There are 74 complete tasks (including four designs), 23 in progress and 8
-pending: **31 remain open**. Keep this handoff until every required task
+individual milestones. Commit or push only with the owner's approval. As of 17
+October 2026 there are 80 complete tasks (including four designs), 21 in
+progress and 8 pending: **29 remain open**; see the counts in
+[tasks/README.md](tasks/README.md). Keep this handoff until every required task
 verifies.
 
 ## Owner decisions — 15 October 2026, evening
@@ -61,7 +62,7 @@ original before tree are retained in `source-areas/`. No source forwarding stubs
 were added. Dev build succeeds; final common source, release/full compiler/CPU
 gates and external/cleanup prerequisites remain open.
 
-## Current qualification —15 October
+## Current qualification — 15 October
 
 The final combined gate passes **2,223 native laws, 1,404 guest/client tests and
 1,366 complete allocation-failure sweeps** plus two expected-error harness laws.
@@ -100,7 +101,7 @@ compatibility evidence, not CPU qualification or the 100 ms goal. Ordinary Cost
 stays byte-exact at 11,958 B. No remote workflow, deletion, commit or push is
 performed.
 
-## Prior qualified batch —14 October
+## Prior qualified batch — 14 October
 
 The uncommitted source based on `ef57ec5` passes the full compiler gate: **1,869
 native laws, 1,170 guest/client tests, 1,133 complete allocation-failure sweeps
@@ -148,12 +149,12 @@ The user again requests **all remaining tasks**, continuing through milestones.
 Use focused batches and reserve the full gate for the final combined source. No
 additional task is marked complete by the focused slices below.
 
-- Current Root integrates075 evaluator owners,076 Core model/builder,024 general
-  checked-fragment owners and077 checker responsibilities. Their exact partial
-  source/executable freezes and focused validation are under
+- Current Root integrates 075 evaluator owners, 076 Core model/builder, 024
+  general checked-fragment owners and 077 checker responsibilities. Their exact
+  partial source/executable freezes and focused validation are under
   `build/bench/finish-rest-20261015/{evaluator-owners,core-owner-integration,body-owner-integration,checker-owners}/`.
   Read `zig-native/{EVALUATOR,CORE,CHECKER}_OWNERSHIP.md` for actual boundaries.
-  The current Cost fixture is12902B; the11958B statements below belong to the
+  The current Cost fixture is 12902B; the 11958B statements below belong to the
   older qualified freeze. Final common full/compiler/runtime performance gates,
   mixed portable composition and broad language closure remain required.
 
@@ -256,7 +257,7 @@ additional task is marked complete by the focused slices below.
   pins 1,304 source/document files plus one preserved untracked generated
   fixture. Later Root staging edits are outside that measurement freeze. The
   final matched release CPU geomean was 1.076653 (limit 1.05), so runtime
-  qualification was skipped. The CPU7 quiet window is released; the agent is
+  qualification was skipped. The CPU 7 quiet window is released; the agent is
   subtracting runtime work after removing two graph passes and a redundant
   invocation frame. Its next compiler screen passes 1.017550; corrected warmed
   runtime median passes 1.089459 and seven of eight p95 limits pass. JSPI
@@ -272,8 +273,8 @@ through individual milestones. Keep independent edits in private checkouts and
 review exact deltas before integration. Freeze source for the final full gate.
 For a focused native failure that reports only an error name, rerun that exact
 filter once with `-Doptimize=debug -Dllvm=false` before instrumenting source.
-Zig0.17.0 Safe omitted the return trace in a local probe; Debug returned exact
-source lines. Probe builds took0.422/0.530s respectively; these are toy compile
+Zig 0.17.0 Safe omitted the return trace in a local probe; Debug returned exact
+source lines. Probe builds took 0.422/0.530s respectively; these are toy compile
 measurements, not compiler-suite timings. Evidence:
 `build/bench/complete-program-20261015/error-trace-screen/`.
 
@@ -682,7 +683,7 @@ release gate above supplies complete guest coverage. Never raise the cap merely
 to finish an exploratory sweep. `scripts/bench_list_traversal.ts` now accepts an
 optional eighth argument of widths, e.g. `tuple 1 u32 3` or `record 1 u32 1,16`.
 Omit it for the required all-width matrix. The two-edge-width functional smoke
-took1.229s; evidence is in `focused-list-widths/`. Before compiler commits,
+took 1.229s; evidence is in `focused-list-widths/`. Before compiler commits,
 require the complete `deno task test:compiler` and zero-finding
 `deno task lint:zig`.
 
@@ -733,7 +734,7 @@ negatives now pass three root native laws, eleven guests and selected lint in
 `build/bench/complete-program-20261015/provider-lifetime/`. Cost Wasm and
 runtime counters remain unchanged; task 035 remains open.
 
-Structural synchronous host cleanup ABI7 is integrated with exact schema/import
+Structural synchronous host cleanup ABI 7 is integrated with exact schema/import
 roles, detached copies for closed products/records/packed sequences/public
 recursive variants and opaque witnesses. Root four native laws with replay/full
 OOM, 22 guests plus seven corrected copy/execution groups, selected lint and
@@ -840,9 +841,9 @@ seven-file prototype
 `/var/tmp/blot2-guarded-provider-expansion-evidence-20261015/`. Five
 native/full-OOM, fourteen guest and 435 analyzer controls pass, but 25 balanced
 runtime rounds regress sync/JSPI medians 4.74%/4.32% and p95 4.35%/3.47% against
-endpoint/lifetime baseline. Wasm grows 11958 to13061B; counters and128KiB stay
-flat. Historical median geomean1.702165>1.10 and p95
-ratios1.709610/1.595137>1.20 fail. Do not integrate or claim task035 completion.
+endpoint/lifetime baseline. Wasm grows 11958 to 13061B; counters and 128 KiB
+stay flat. Historical median geomean 1.702165>1.10 and p95 ratios
+1.709610/1.595137>1.20 fail. Do not integrate or claim task 035 completion.
 Exact rejection is in its EVIDENCE.md and runtime-summary.json; final pins SHA
 cb036c71f9647b4184aa70a5ec755257004b776045256db6f014cef4a337de94.
 
@@ -887,12 +888,11 @@ All 29 tasks and the final full compiler gate remain open.
 existing universal/static backend laws are preserved. The optional law tracks
 allocation origins, owned parent links and CFG retirement, rejecting stale
 aliases, transitive borrowers and repeated/early retirement. Root three
-native/full-OOM laws,22 executed groups and243 selected analyzer files pass.
-Cost remains exactly
-11958B/SHA1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad.
-Exact pins:
+native/full-OOM laws, 22 executed groups and 243 selected analyzer files pass.
+Cost remains exactly 11958B/SHA
+1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad. Exact pins:
 `build/bench/complete-program-20261015/provider-activation-lifetime/`. No
-optimizer consumes this proof yet; historical gates, task035 and final gate
+optimizer consumes this proof yet; historical gates, task 035 and final gate
 remain open. All 29 tasks remain open.
 
 2026-10-15 ordinary associated schemes: seven-file delta integrated. Exact
@@ -908,11 +908,10 @@ qualification remain open. All 29 tasks remain open.
 lexical and universal dictionary owners now transport opaque scalar/Float/Array
 results; static methods use their evaluator-owned concrete signature. Concrete
 forall sealing reconstructs its checked given before selecting representation.
-Root two native/full-OOM laws,16 executed groups,244 selected analyzer files and
-two affected TypeScript files pass. Source/archive/checkpoint/restart and warmed
-ownership pass. Ordinary Cost Wasm remains
-exactly11958B/SHA1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad.
-Exact pins:
+Root two native/full-OOM laws, 16 executed groups, 244 selected analyzer files
+and two affected TypeScript files pass. Source/archive/checkpoint/restart and
+warmed ownership pass. Ordinary Cost Wasm remains exactly 11958B/SHA
+1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad. Exact pins:
 `build/bench/complete-program-20261015/associated-dictionary-results/`.
 Associated package payload normalization is the next separate Source slice;
 nested sealed closure recipes and implicit helper evidence transport remain
@@ -921,24 +920,24 @@ open. All 29 tasks and the final full compiler gate remain open.
 2026-10-15 curried numeric methods: four-file delta integrated. Existing
 prepared selected targets now preserve numeric operands/conditions through exact
 owned returned closures and literal/alias captures. Root five native laws
-including complete OOM/replay sweeps, five executed groups,244 selected analyzer
-files and affected TypeScript pass. Identity comparisons fall1 to0; wrapping
-retains1. Ordinary Cost Wasm remains
-exact11958B/SHA1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad.
-Exact pins: `build/bench/complete-program-20261015/numeric-curried-methods/`.
-Nested selected helper graphs, general inference and the final full gate remain;
-all 29 tasks remain open. No compiler CPU improvement is claimed.
+including complete OOM/replay sweeps, five executed groups, 244 selected
+analyzer files and affected TypeScript pass. Identity comparisons fall 1 to 0;
+wrapping retains 1. Ordinary Cost Wasm remains exact 11958B/SHA
+1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad. Exact pins:
+`build/bench/complete-program-20261015/numeric-curried-methods/`. Nested
+selected helper graphs, general inference and the final full gate remain; all 29
+tasks remain open. No compiler CPU improvement is claimed.
 
 2026-10-15 rejected raw provider storage: eight-file candidate stays private at
 `/var/tmp/blot2-provider-activation-storage-evidence-20261015`. Four
-native/full-OOM laws,47 guest groups,two raw boundary laws and434-file zero
-analyzer pass, but the quiet CPU7 balanced25-round screen is slower: paired
-medians1.06273 sync/1.06007 JSPI vs current baseline, memory192KiB vs128KiB.
-Historical median geomean1.60943 exceeds1.10 and p95 ratios1.48794/1.47942
-exceed1.20. It is rejected; fewer allocations alone do not qualify task035.
-Patch0ccd6835eeb4db5bc8798137ac0a00109e61d0204d0ba83263ad7c27a7b447cb;
-final-pinsSHAa09dadd742774e0fa5218eb799698fb81f0482df0927f1cba552c1a00e1428fa.
-Root summary:
+native/full-OOM laws, 47 guest groups,two raw boundary laws and 434-file zero
+analyzer pass, but the quiet CPU 7 balanced 25-round screen is slower: paired
+medians 1.06273 sync/1.06007 JSPI vs current baseline, memory 192 KiB vs 128
+KiB. Historical median geomean 1.60943 exceeds 1.10 and p95 ratios
+1.48794/1.47942 exceed 1.20. It is rejected; fewer allocations alone do not
+qualify task 035. Patch
+0ccd6835eeb4db5bc8798137ac0a00109e61d0204d0ba83263ad7c27a7b447cb; final-pins SHA
+a09dadd742774e0fa5218eb799698fb81f0482df0927f1cba552c1a00e1428fa. Root summary:
 `build/bench/complete-program-20261015/provider-activation-storage-rejected/`.
 No tracing deletion, runtime integration or full compiler gate occurred.
 
@@ -947,47 +946,47 @@ scope quantified annotations; ordinary payload positions infer witnesses before
 this exact pack's selected type members normalize associated positions.
 Evaluator normalizes only the substituted payload copy; partial physical shape
 holes grant no semantic associated equation. Root seven native/full-OOM laws
-with four Core corruptions,11 executed groups,392 selected analyzer files and
+with four Core corruptions, 11 executed groups, 392 selected analyzer files and
 affected TypeScript pass. Heterogeneous U32/U32 versus Bool/F32 payloads,
 resealing, arrays, archives, checkpoint/restart, invalid edits and sync/JSPI
 execute with flat warmed memory. Exact pins:
 `build/bench/complete-program-20261015/associated-package-payloads/`. This
-package graph rebuilds all63 runtime fragments after checkpoint; no fragment
+package graph rebuilds all 63 runtime fragments after checkpoint; no fragment
 reuse is claimed. Semantic associated layout inverse remains closed. Ordinary
-Cost Wasm remains
-exact11958B/SHA1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad.
-Nested sealed closure recipes, inferred helper transport, broader rank/staging
-coexistence and final qualification remain. All29 tasks remain open.
+Cost Wasm remains exact 11958B/SHA
+1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad. Nested sealed
+closure recipes, inferred helper transport, broader rank/staging coexistence and
+final qualification remain. All 29 tasks remain open.
 
-2026-10-15 rejected direct provider stores: three-file follow-up over
-rejectedraw8 stays private at
-`/var/tmp/blot2-provider-direct-store-evidence-20261015`. Four native/full-OOM
-laws,48 guest groups and434-file zero lint pass. The quiet CPU7 balanced25-round
-screen improves raw8 about1% but remains slower than the qualified baseline
-(paired medians1.05256 sync/1.04591 JSPI), with192KiB vs128KiB. Historical
-median geomean1.41608 and p95 ratios1.35326/1.40726 still fail. No runtime
-changes integrated. Root evidence: `provider-direct-store-rejected/`.
-Final-pinsSHA c7acab325cbb231f37ce46f56fad2adee93c06309b0ddec27d65e07086e41d2a.
-The next substantial035 hill is independently checked closed-activation graph
-ownership, after Core lifetime/sink authority; factory no-store facts alone do
-not authorize Memo/State-cycle retirement. All29 tasks remain open.
+2026-10-15 rejected direct provider stores: three-file follow-up over rejected
+raw8 stays private at `/var/tmp/blot2-provider-direct-store-evidence-20261015`.
+Four native/full-OOM laws, 48 guest groups and 434-file zero lint pass. The
+quiet CPU 7 balanced 25-round screen improves raw8 about 1% but remains slower
+than the qualified baseline (paired medians 1.05256 sync/1.04591 JSPI), with 192
+KiB vs 128 KiB. Historical median geomean 1.41608 and p95 ratios 1.35326/1.40726
+still fail. No runtime changes integrated. Root evidence:
+`provider-direct-store-rejected/`. Final-pinsSHA
+c7acab325cbb231f37ce46f56fad2adee93c06309b0ddec27d65e07086e41d2a. The next
+substantial 035 hill is independently checked closed-activation graph ownership,
+after Core lifetime/sink authority; factory no-store facts alone do not
+authorize Memo/State-cycle retirement. All 29 tasks remain open.
 
-2026-10-15 projected callback factories:13-file delta plus corrected negative
+2026-10-15 projected callback factories: 13-file delta plus corrected negative
 integrated, preserving current dictionary/package/ordinary scheme readers. Exact
 Source/Core executable graphs seal callable arguments separately from captured
 outer inputs; records,pure Unit factories and generic structural keep preserve
 ordered receiver identities. Closed constructor evaluation defers callback code
 until its concrete projection use. Root six native/full-OOM laws,nine executed
-groups,393 selected analyzer files and affected TypeScript pass. Forged role,
+groups, 393 selected analyzer files and affected TypeScript pass. Forged role,
 required executed effect row,body result mask and generalized receiver owner
 reject; valid unused outer-row widening remains allowed.
 Source/archive/checkpoint/restart, producer edits,reverts,failures and sync/JSPI
 pass in both tiers. Pins:
 `build/bench/complete-program-20261015/projected-callback-factories/`. Ordinary
-Cost Wasm remains
-exact11958B/SHA1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad.
-A general lifetime/sink interpreter remains next; factory no-store facts do not
-prove closed activation cycles. All29 tasks and final full gate remain open.
+Cost Wasm remains exact 11958B/SHA
+1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad. A general
+lifetime/sink interpreter remains next; factory no-store facts do not prove
+closed activation cycles. All 29 tasks and final full gate remain open.
 
 2026-10-15 callable construction/result graph facts: two sequential two-file
 deltas integrated. Initial environment input and a complete straight-line
@@ -995,21 +994,21 @@ factory result now retain exact allocation/return owner and parameter edges.
 Changed owner type/return, later stores, imports, global sinks and malformed
 tails decline; creation alone grants no dispatch or retirement authority. Root
 four native/import/replay/full-OOM laws,two executed groups and five selected
-analyzer files pass. Compiler remains
-exact4cd0422a166196be3e0e6dba0623e2c8cef5a11c334eeb44918902ae366ddc13. Evidence:
+analyzer files pass. Compiler remains exact
+4cd0422a166196be3e0e6dba0623e2c8cef5a11c334eeb44918902ae366ddc13. Evidence:
 `build/bench/complete-program-20261015/callable-result/`. State/Memo lifetime
-graph and measured ownership qualification remain open; all29 tasks and final
+graph and measured ownership qualification remain open; all 29 tasks and final
 full gate remain open.
 
 2026-10-15 exact U32 identities: three-file delta integrated. Numeric operands
 retain their exact value through unit multiplication/division, all-ones masks,
 self AND/OR, zero OR/XOR and masked-zero shifts. Exact identities remove one
 bounds comparison; changed operands retain it and arithmetic/traps still
-execute. Five native/full-OOM/replay laws,four executed groups,244 selected
-analyzer files and affected TypeScript pass; Cost Wasm remains
-exact11958B/1ddc5f2d… . Pins:
+execute. Five native/full-OOM/replay laws,four executed groups, 244 selected
+analyzer files and affected TypeScript pass; Cost Wasm remains exact
+11958B/1ddc5f2d… . Pins:
 `build/bench/complete-program-20261015/numeric-bit-identities/`. General
-selected helper graphs,inference and final qualification remain; all29 tasks
+selected helper graphs,inference and final qualification remain; all 29 tasks
 remain open.
 
 2026-10-15 stored-Memo force facts: two-file delta integrated. The complete
@@ -1018,20 +1017,20 @@ actual environment/provider/producer edges,guarded reset and cache-before-ready
 order. Callsite cell identity and matching constructor producer remain
 mandatory; this read-only fact grants no dispatch or retirement. Root five
 native/full-OOM /import/replay laws,eight executed groups and six selected
-analyzer files pass. Compiler remains
-exactad2c6702b6e4f435614d1a00def5cfa64316605bcdeee52acd28ecab217c59ae. Evidence:
+analyzer files pass. Compiler remains exact
+ad2c6702b6e4f435614d1a00def5cfa64316605bcdeee52acd28ecab217c59ae. Evidence:
 `build/bench/complete-program-20261015/demand-force-edges/`. State writes and
-complete Core/runtime lifetime graph remain; all29 tasks and final full gate
+complete Core/runtime lifetime graph remain; all 29 tasks and final full gate
 remain open.
 
 2026-10-15 State write graph facts: two-file delta integrated. Shared checked
 lookup retains existing State read behavior; write facts identify the selected
-frame,value slot,argument1 and owning publication,including F32 bits. Root four
-native/full-OOM laws,eight executed groups and245 selected analyzer files pass;
-ordinary Cost Wasm remains exact11958B/1ddc5f2d… . Pins:
+frame,value slot,argument 1 and owning publication,including F32 bits. Root four
+native/full-OOM laws,eight executed groups and 245 selected analyzer files pass;
+ordinary Cost Wasm remains exact 11958B/1ddc5f2d… . Pins:
 `build/bench/complete-program-20261015/state-write-edges/`. Whole-activation
 graph composition and qualified ownership replacement remain; no new RC omission
-or tracing deletion. All29 tasks and final full gate remain.
+or tracing deletion. All 29 tasks and final full gate remain.
 
 2026-10-15 staging ambient rows: three-file Source repair integrated.
 Emit/splice contribute latent effects through the established covariant use
@@ -1042,17 +1041,17 @@ Wasm is exact. Pins:
 `build/bench/complete-program-20261015/staging-ambient-rows/`. Two existing
 named-operation archive neighbors fail InvalidArtifact on both before and
 candidate compilers; the separate rank/staging reader repair is held for
-capture-parity correction. All29 tasks and final full gate remain open.
+capture-parity correction. All 29 tasks and final full gate remain open.
 
 2026-10-15 direct scope/older cell: three-file Source repair integrated. Exact
 immediate scope callbacks retain enclosing State installation frames; deferred
 closures continue clearing them. Root five checker/full-OOM laws,four executed
-groups,393 selected analyzer files and affected TypeScript pass. A capturing
+groups, 393 selected analyzer files and affected TypeScript pass. A capturing
 younger edit specifically rejects capability_escape and recovers
 byte-identically. Pins:
 `build/bench/complete-program-20261015/direct-scope-state/`. General immutable
-lifetime graph remains separate and unfinished. Cost Wasm is
-exact11958B/1ddc5f2d…; all29 tasks and final full gate remain open.
+lifetime graph remains separate and unfinished. Cost Wasm is exact
+11958B/1ddc5f2d…; all 29 tasks and final full gate remain open.
 
 2026-10-15 rank/staging coexistence: corrected seven-file reader/checker union
 and isolated scalar-action publication follow-up integrated. Exact future rows,
@@ -1061,117 +1060,120 @@ capture footprints validate independently; imported certificates check unused
 slots too. Initial root failures were traced to irrelevant effectful
 Unit->scalar constructor metadata and repaired by declining that publication,
 preserving pure factories. Root seven native/full-OOM laws,eleven both-tier
-sync/JSPI guest groups,446 Zig analyzer files with zero
-findings,TypeScript/lint/format and dev build pass.
-Compiler9cb9ce2a2b4f50b5ae5ce0dd95b5c18ed6cd3ef2501e33adadf29585b64173d4.
-Pins/evidence: `build/bench/complete-program-20261015/rank-staging-coexistence/`
-and sibling `rank-staging-actions/`; initial failed logs remain preserved.
-Earlier named-operation archive/capture hold is resolved. Ordinary inferred
-helper dictionary transport and broader Core forms remain; all29 tasks and final
-full gate remain open. No new runtime performance claim.
+sync/JSPI guest groups, 446 Zig analyzer files with zero
+findings,TypeScript/lint/format and dev build pass. Compiler
+9cb9ce2a2b4f50b5ae5ce0dd95b5c18ed6cd3ef2501e33adadf29585b64173d4. Pins/evidence:
+`build/bench/complete-program-20261015/rank-staging-coexistence/` and sibling
+`rank-staging-actions/`; initial failed logs remain preserved. Earlier
+named-operation archive/capture hold is resolved. Ordinary inferred helper
+dictionary transport and broader Core forms remain; all 29 tasks and final full
+gate remain open. No new runtime performance claim.
 
-### Qualified cohort/runtime and construction-capture prerequisites —15 October2026
+### Qualified cohort/runtime and construction-capture prerequisites — 15 October 2026
 
-Root rank/staging coexistence and scalar-action publication fix
-pass7native/fullOOM, 11guest groups and446-file zero analyzer; see
-`rank-staging-coexistence/`. Late-only bounded cohort helpers/fixture now
-pass3native/fullOOM and9direct Wasm protocol groups plus2fixture dependency
-laws. The owner must outlive all member journal leases; malformed lists,
-unexpected retains and premature retirement trap before group liveness changes.
-Live outgoing references preserve ordinary RC. No production cohort rewrite is
+Root rank/staging coexistence and scalar-action publication fix pass 7
+native/fullOOM, 11 guest groups and 446-file zero analyzer; see
+`rank-staging-coexistence/`. Late-only bounded cohort helpers/fixture now pass 3
+native/fullOOM and 9 direct Wasm protocol groups plus 2 fixture dependency laws.
+The owner must outlive all member journal leases; malformed lists, unexpected
+retains and premature retirement trap before group liveness changes. Live
+outgoing references preserve ordinary RC. No production cohort rewrite is
 integrated; ordinary helpers/Source IDs remain unchanged. See `cohort-runtime/`
 and `cohort-root-order/`. Source Demand construction proof admits capture-free
 delayed work while retaining capability/operation/resource/usage capture guards.
-Root4native/fullOOM including neighbors and10guest groups pass. The two
-read-only activation readers pass their combined7native/fullOOM; runtime graph
+Root 4 native/fullOOM including neighbors and 10 guest groups pass. The two
+read-only activation readers pass their combined 7 native/fullOOM; runtime graph
 and semantic graph confer no RC authority. Semantic type_same/overloaded-scalar
 audit corrections remain required before a consumer. See
 `demand-construction-captures/`, `activation-graph/` and
-`immutable-lifetime-graph/`. Union analyzer399/452files zero; affected TS
+`immutable-lifetime-graph/`. Union analyzer 399/452 files zero; affected TS
 passes. Current root dev compiler
 c13b051cab335adf1e6b1981cd758a0bde46783d4f604a58b947eb64fa77cbed; ordinary Cost
-remains11958B/1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad.
-All29 tasks remain open. Historical ownership performance, general semantic
+remains 11958B/1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad.
+All 29 tasks remain open. Historical ownership performance, general semantic
 coverage and the single final compiler gate remain pending; no commit/release.
 
 The read-only semantic graph witness/dispatch hold above is superseded by
 `immutable-lifetime-correction1/`: actual type_same witnesses execute;
-overloaded scalar c!=0 declines pending exact implementation proof. Root3focused
-native laws (two allOOM) and5selected analyzer files pass. No RC consumer is
-integrated. An exact per-scope-root rejection-only immutable guard is being
-qualified privately; unsupported paths will grant no completeness or confinement
-fact.
+overloaded scalar c!=0 declines pending exact implementation proof. Root 3
+focused native laws (two allOOM) and 5 selected analyzer files pass. No RC
+consumer is integrated. An exact per-scope-root rejection-only immutable guard
+is being qualified privately; unsupported paths will grant no completeness or
+confinement fact.
 
 `cohort-member-guard/` supersedes the early runtime protocol guard: nested
 member checks avoid bit-mask/Boolean AND. A new dropped-pin control fails the
-oldfixture and passes the correction. Root10direct Wasm protocol groups
-+3native/fullOOM and affected TS/analyzer pass. This remains a late runtime
+oldfixture and passes the correction. Root 10 direct Wasm protocol groups +3
+native/fullOOM and affected TS/analyzer pass. This remains a late runtime
 prerequisite with no production consumer; historical CPU gates remain open.
-Scope3 staged above was held before apply after review found whole-context
+Scope 3 staged above was held before apply after review found whole-context
 preflight could reject >65k unrelated nodes; a corrected combined scope freeze
 is being qualified privately.
 
 Corrected immutable scope guard is integrated in
-`immutable-scope-rejection-corrected/` (combined rootd54f78a3...); the held
-original Scope3 stage remains unapplied. Root10native laws pass (7fullOOM),
-including70k unrelated/current-module population and hard shared semantic budget
-controls. 16neighbor guest groups pass. Both scoped_value_flow tiers fail the
-same emit type_mismatch under pre-hook ac8 and corrected f19; this existing
-emitter defect is being localized, not attributed to the scope guard. Private
-final25-pair compiler CPU controls: ordinary fresh/edit+1.11/-0.51%,
+`immutable-scope-rejection-corrected/` (combined root d54f78a3...); the held
+original Scope 3 stage remains unapplied. Root 10 native laws pass (7 fullOOM),
+including 70k unrelated/current-module population and hard shared semantic
+budget controls. 16 neighbor guest groups pass. Both scoped_value_flow tiers
+fail the same emit type_mismatch under pre-hook ac8 and corrected f19; this
+existing emitter defect is being localized, not attributed to the scope guard.
+Private final 25-pair compiler CPU controls: ordinary fresh/edit+1.11/-0.51%,
 scoped+0.55/+2.07%, equal Wasm. Unsupported scope paths grant no new fact. Full
-gate remains deferred; all29tasks stay open. See exact qualification pins/logs
+gate remains deferred; all 29 tasks stay open. See exact qualification pins/logs
 in the integrationdir.
 
-15 October2026 follow-up: corrected inferred dictionary helper10 is integrated
-(root patchf8260274...), with4native/fullOOM laws and19selected guest groups.
-Immutable Scheme owners transport dictionaries through direct/reference/partial
-calls; missing data witnesses and exhausted matching reject. Unsupported key
-imports decline reuse. See `inferred-dictionary-helpers/`.
+15 October 2026 follow-up: corrected inferred dictionary helper 10 is integrated
+(root patch f8260274...), with 4 native/fullOOM laws and 19 selected guest
+groups. Immutable Scheme owners transport dictionaries through
+direct/reference/partial calls; missing data witnesses and exhausted matching
+reject. Unsupported key imports decline reuse. See
+`inferred-dictionary-helpers/`.
 
-Record shape repair1 (patch8fe2e9ac...) fixes the existing imported-container
+Record shape repair 1 (patch 8fe2e9ac...) fixes the existing imported-container
 failure above by exact field names/types with duplicate/missing/budget
-rejection. Root2native laws and6guests pass; private25-pair same-order retained
-CPU+0.11% with byte equality. Reordered baseline rejects, so no speed ratio is
-claimed. See `record-code-shape-names1/`.
+rejection. Root 2 native laws and 6 guests pass; private 25-pair same-order
+retained CPU+0.11% with byte equality. Reordered baseline rejects, so no speed
+ratio is claimed. See `record-code-shape-names1/`.
 
-Semantic emission6 receipts are integrated (root804d8788...), preserving newer
-dictionary transport and omitting unrelated private cohort prototype tests.
-Root1native/fullOOM and22executed groups pass; full453-file analyzer is zero.
-Root dev334c38e8f4ddee18a1587b4b1ac40cbbf8997252382bca33e95345d8ec17e9a5;
-release/lock remain unchanged. Cost stays exact11958B/1ddc5f2d... . Private wall
-control geomean0.999058 is not a CPU claim: leader-only CPU instrumentation was
-invalid. See `semantic-emission/`. No production cohort consumer, tracing
-removal, full gate, commit or task completion yet. All29 remain open.
+Semantic emission 6 receipts are integrated (root 804d8788...), preserving newer
+dictionary transport and omitting unrelated private cohort prototype tests. Root
+1 native/fullOOM and 22 executed groups pass; full 453-file analyzer is zero.
+Root dev 334c38e8f4ddee18a1587b4b1ac40cbbf8997252382bca33e95345d8ec17e9a5;
+release/lock remain unchanged. Cost stays exact 11958B/1ddc5f2d... . Private
+wall control geomean 0.999058 is not a CPU claim: leader-only CPU
+instrumentation was invalid. See `semantic-emission/`. No production cohort
+consumer, tracing removal, full gate, commit or task completion yet. All 29
+remain open.
 
 Numeric remaining-argument slice is integrated in
 `build/bench/complete-program-20261015/numeric-remaining-arguments/`. A15-line
 reader change retains exact prepared-method operands across further
-applications. Root3new native laws (2completeOOM),3neighbors and6guest groups
-pass; selected 251/453analyzer files are zero and TypeScript passes.
-Three-argument identity has0bounds comparisons; changed final argument retains1.
-Rootdev1f856e8a...; Cost remains11958B/1ddc... . Initial call_arity fixture and
-non-generic direct literal-receiver unsupported lowering logs are retained, not
-reported as passes. General helper graphs, all29tasks and final qualification
-remain open.
+applications. Root 3 new native laws (2 completeOOM), 3 neighbors and 6 guest
+groups pass; selected 251/453analyzer files are zero and TypeScript passes.
+Three-argument identity has 0 bounds comparisons; changed final argument
+retains 1. Root dev 1f856e8a...; Cost remains 11958B/1ddc... . Initial
+call_arity fixture and non-generic direct literal-receiver unsupported lowering
+logs are retained, not reported as passes. General helper graphs, all 29 tasks
+and final qualification remain open.
 
-Root generic State6, boundary-reader scale2 and alias/safety10 are integrated:
-`generic-state-invocation/` patch71a7b220..., `immutable-boundary-owner-scale/`
-patchce2880ad..., and `member-alias/` patchcdb6cd27... in the current evidence
-directory. Root11native laws (including fullOOM),15guest groups,3TS files and
-full453-file zero analyzer pass.
-Compiler524251f1255348f5a5ddbda6bb24c5dc3012f62a5f909832303739d751cb8cfc;
-ordinary Cost remains exact11958B/1ddc... . No task completion or full gate yet.
+Root generic State 6, boundary-reader scale 2 and alias/safety 10 are
+integrated: `generic-state-invocation/` patch 71a7b220...,
+`immutable-boundary-owner-scale/` patch ce2880ad..., and `member-alias/` patch
+cdb6cd27... in the current evidence directory. Root 11 native laws (including
+fullOOM), 15 guest groups, 3 TS files and full 453-file zero analyzer pass.
+Compiler 524251f1255348f5a5ddbda6bb24c5dc3012f62a5f909832303739d751cb8cfc;
+ordinary Cost remains exact 11958B/1ddc... . No task completion or full gate
+yet.
 
 Captured-project construction capture repair is now integrated and compatible:
-`deferred-named-capture/` patch56b834bd... separates deferred call construction
+`deferred-named-capture/` patch 56b834bd... separates deferred call construction
 from execution/no-store proof, retaining exact owned callees and actual lexical
-captures. Root native fullOOM,8combined guests and400affected-file zero lint
-pass. Compiler0b7fe9e1692a5ea478466c90d08564589ff778f305e38259ba22b99adec04242
-passes the unchanged captured project's fresh/edit/revert:25.493/14.275/13.628s
-wall,70,330source steps,11retained hits/61,383replayed steps,no retries.
-Fresh/revert
-SHA24315d616b3785e12d07270bd5295bb92c56563df84229a4b9f744340fe5758a. These are
+captures. Root native fullOOM, 8 combined guests and 400 affected-file zero lint
+pass. Compiler 0b7fe9e1692a5ea478466c90d08564589ff778f305e38259ba22b99adec04242
+passes the unchanged captured project's fresh/edit/revert: 25.493/14.275/13.628s
+wall, 70,330 source steps, 11 retained hits/61,383 replayed steps,no retries.
+Fresh/revert SHA
+24315d616b3785e12d07270bd5295bb92c56563df84229a4b9f744340fe5758a. These are
 compatibility checks, not CPU qualification or a speed claim.
 `captured-after-capture-repair/` owns the exact compiler/input pins and phases;
 `captured-attribution/` preserves failed controls and restored diagnostic
@@ -1180,221 +1182,225 @@ fullOOM law; removing only that guard fails independent reconstruction. Exact
 root and private controls are in `nonfunction-global-control/`.
 
 The literal selected-method regression is repaired in
-`numeric-literal-dispatch/` patch33e708bb... . A function-result selected call
-uses the existing curried reference/apply path. Root2native laws (one complete
+`numeric-literal-dispatch/` patch 33e708bb... . A function-result selected call
+uses the existing curried reference/apply path. Root 2 native laws (one complete
 emission/replay OOM) and both new guest tiers pass; identity removes its bounds
 comparison while the changed final argument retains it. Source/archives,
 checkpoint,changed callee,trap/recovery and JSPI remain exact. Broader numeric
-helper graphs and all29tasks remain open.
+helper graphs and all 29 tasks remain open.
 
-Private closed-activation cohort11 is rejected for speed and is NOT integrated.
-Thirty balanced CPU7 rounds pass values and128KiB memory but median cycles
-ratios are0.99955sync/1.00105JSPI against current, historical totalgeo1.28443,
-cycle ratios1.76635/1.70898 andp951.64304/1.61003. Preserve the immutable
-private freeze and raw report; grouped pin/list work replaces collector work
-without payoff. The next private experiment must remove proved member lifetime
-work. The complete-program, exact remote workflow, owner cleanup decision and
-final full gate remain required. Keep this handoff and all task statuses
-unchanged.
+Private closed-activation cohort 11 is rejected for speed and is NOT integrated.
+Thirty balanced CPU 7 rounds pass values and 128 KiB memory but median cycles
+ratios are 0.99955 sync/1.00105 JSPI against current, historical totalgeo
+1.28443, cycle ratios 1.76635/1.70898 and p95 1.64304/1.61003. Preserve the
+immutable private freeze and raw report; grouped pin/list work replaces
+collector work without payoff. The next private experiment must remove proved
+member lifetime work. The complete-program, exact remote workflow, owner cleanup
+decision and final full gate remain required. Keep this handoff and all task
+statuses unchanged.
 
 ### Latest qualified small sets, 15 October 2026
 
 Root development compiler
 cebe3efd38ce72a26f9ef8dacc57d30ab0d7c510d5fef1f4f508c15677f76434 includes
 demanded-body receipts and effectful returned-closure row repair.
-`body-demand-receipts/` owns4files:2native laws/2neighbors,completeOOM, 2new
-guest tiers plus4loop/path neighbors,400affected analyzer files zero. Five
-paired development screens:128demanded-body edit/revert160/150→120/120ms,
-elaborations130→2; population120→160ms. Plain retained controls100→100ms.
-Exact60phase bytes and results; process CPU resolution10ms. No general/release
-speed target claim. Binary demand rewrites and unsupported effect rows decline.
+`body-demand-receipts/` owns 4 files: 2 native laws/2 neighbors, completeOOM, 2
+new guest tiers plus 4 loop/path neighbors, 400 affected analyzer files zero.
+Five paired development screens: 128 demanded-body edit/revert 160/150→120/120
+ms, elaborations 130→2; population 120→160 ms. Plain retained controls 100→100
+ms. Exact 60 phase bytes and results; process CPU resolution 10 ms. No
+general/release speed target claim. Binary demand rewrites and unsupported
+effect rows decline.
 
-`effectful-method-closure/` integrated patch4f996bd8... repairs covariant
+`effectful-method-closure/` integrated patch 4f996bd8... repairs covariant
 returned-function rows while keeping callback parameters invariant and exact
 selected operation identities/instances/arguments. Independently closed declared
-rows may use the existing conservative source-view relation. Root3native laws
-(2completeOOM),16guest groups,256affected analyzer files zero,3TS files pass.
-Ordinary Cost stays11958B/1ddc... . Stored unknown-forall dictionary forwarding
-remains an explicit private frontier, not an ambient/witness fallback.
+rows may use the existing conservative source-view relation. Root 3 native laws
+(2 completeOOM), 16 guest groups, 256 affected analyzer files zero, 3 TS files
+pass. Ordinary Cost stays 11958B/1ddc... . Stored unknown-forall dictionary
+forwarding remains an explicit private frontier, not an ambient/witness
+fallback.
 
 `captured-after-demand-rank/` passes the unchanged captured inputs after both
-repairs:25.038/14.032/13.466s wall,exact same fresh/edit/revert hashes as the
-previous captured repair,70,330steps,11hits/61,383replays,no retries. This is
-combined compatibility only. Final full gate, release/historical/compiler
-performance qualification and all29tasks remain open. Private ownership region
+repairs: 25.038/14.032/13.466s wall,exact same fresh/edit/revert hashes as the
+previous captured repair, 70,330 steps, 11 hits/61,383 replays,no retries. This
+is combined compatibility only. Final full gate, release/historical/compiler
+performance qualification and all 29 tasks remain open. Private ownership region
 and iterator-step work continues; no production cohort hook is applied.
 
-Nested callable reuse is repaired in `nested-callable-reuse/` patch65450b87... .
-An outer fragment includes nested callable records; each record now checks its
+Nested callable reuse is repaired in `nested-callable-reuse/` patch 65450b87...
+. An outer fragment includes nested callable records; each record now checks its
 own exact job owner, function and callable layout. Invalid owner/layout controls
-decline without changing fresh output. Root1native/completeOOM,26guests and
-112affected zero-finding analyzer files pass. Compiler5530630c... preserves
-ordinary Cost11958B and all captured phase hashes. The unchanged captured
-project now reuses1152named+369closure fragments, recovering489declines;
-remaining declines240. Fresh/edit/revert wall25.023/11.782/11.287s versus
+decline without changing fresh output. Root 1 native/completeOOM, 26 guests and
+112 affected zero-finding analyzer files pass. Compiler 5530630c... preserves
+ordinary Cost 11958B and all captured phase hashes. The unchanged captured
+project now reuses 1152 named+369 closure fragments, recovering 489 declines;
+remaining declines 240. Fresh/edit/revert wall 25.023/11.782/11.287s versus
 25.038/14.032/13.466s before. This single wall screen is not CPU qualification.
-See `captured-after-nested-callable/`. All29tasks and final gates remain open.
+See `captured-after-nested-callable/`. All 29 tasks and final gates remain open.
 
 Immediate collection-step sinks are integrated in `immediate-collection-step/`
-patchb28e8205... . Exact pure cursor producer/constructor and a single adjacent
+patch b28e8205... . Exact pure cursor producer/constructor and a single adjacent
 pattern permit emitting the original has/value/advance operations directly.
 Saved/captured steps, unknown/effectful dispatch and packed rows keep fallback.
-Root3native laws/completeOOM,5guest groups and111affected zero-finding analyzer
-files pass; compilerbd7cab47... keeps ordinary Cost exact11958B. The private
-Windows screen removes2allocation sites and4publications,18412→17846B Wasm. Tiny
-wall samples are diagnostic only. Remaining successor/adapter state, all-width
-packed comparisons and final qualification keep047 open.
+Root 3 native laws/completeOOM, 5 guest groups and 111 affected zero-finding
+analyzer files pass; compiler bd7cab47... keeps ordinary Cost exact 11958B. The
+private Windows screen removes 2 allocation sites and 4 publications,
+18412→17846B Wasm. Tiny wall samples are diagnostic only. Remaining
+successor/adapter state, all-width packed comparisons and final qualification
+keep 047 open.
 
 Resource callback-result footprints are integrated in `resource-scope-result/`
-patchbe149e10... . A scalar resource wrapper can return a closure retaining an
+patch be149e10... . A scalar resource wrapper can return a closure retaining an
 older live effect owner; younger owners, the fresh resource loan, cleanup stores
 and unknown sinks still reject. Immutable Core reconstructs actual acquisition,
 callback and cleanup order with shared proof budgets. A cleanup failure retains
-the result graph while marking the report incomplete. Root3native/fullOOM,
-9guest groups and400affected zero-finding analyzer files pass;
-compiler70e345b8... keeps ordinary Cost exact11958B. General resource/lifetime
-forms and final gates remain open.
+the result graph while marking the report incomplete. Root 3 native/fullOOM, 9
+guest groups and 400 affected zero-finding analyzer files pass; compiler
+70e345b8... keeps ordinary Cost exact 11958B. General resource/lifetime forms
+and final gates remain open.
 
 All-dirty module cutoffs are repaired in
-`build/bench/complete-program-20261015/all-dirty-module-cutoff/`,
-patch1103c1a8... . A leaf edit may dirty every dependency while preserving
-public interfaces; the mixed checker now offers those ordinary semantic
-comparisons even without an already reusable dependency. An opaque3-module
-screen reuses both callers, reducing fallback elaborations5→3; executable
-values42→43→42 and fresh bytes remain exact. Root1native/completeOOM,10guests
-and19affected zero-finding analyzer files pass. Source/archive/checkpoint,
-invalid signatures and recovery pass in both tiers and sync/JSPI.
-Compilerdc7c3149... keeps Cost exact11958B. This is a work-counter result;
-tasks024/053 and the final gates remain open.
+`build/bench/complete-program-20261015/all-dirty-module-cutoff/`, patch
+1103c1a8... . A leaf edit may dirty every dependency while preserving public
+interfaces; the mixed checker now offers those ordinary semantic comparisons
+even without an already reusable dependency. An opaque 3-module screen reuses
+both callers, reducing fallback elaborations 5→3; executable values 42→43→42 and
+fresh bytes remain exact. Root 1 native/completeOOM, 10 guests and 19 affected
+zero-finding analyzer files pass. Source/archive/checkpoint, invalid signatures
+and recovery pass in both tiers and sync/JSPI. Compiler dc7c3149... keeps Cost
+exact 11958B. This is a work-counter result; tasks 024/053 and the final gates
+remain open.
 
 Nongenerative user-effect callback rows now retain complete family/member
-recipes and exact producer-origin/alias reads in `body-user-effect-rows/`,
-patchdb78cbc8... . Frozen operation identities relocate through their own
-validated map; function/Demand row arguments retain their reads. Invocation,
-scoped/generative and unsupported recipes remain ordinary. Root8native laws,
-4complete allocation sweeps,6guest groups and400affected zero-finding analyzer
-files pass. Source edits use4versus5fresh elaborations; archives preserve exact
-execution without a demonstrated work reduction. Compilerf8b5818c... keeps
-ordinary Cost11958B. No CPU/general-cutoff or final-gate completion is claimed.
+recipes and exact producer-origin/alias reads in `body-user-effect-rows/`, patch
+db78cbc8... . Frozen operation identities relocate through their own validated
+map; function/Demand row arguments retain their reads. Invocation,
+scoped/generative and unsupported recipes remain ordinary. Root 8 native laws, 4
+complete allocation sweeps, 6 guest groups and 400 affected zero-finding
+analyzer files pass. Source edits use 4 versus 5 fresh elaborations; archives
+preserve exact execution without a demonstrated work reduction. Compiler
+f8b5818c... keeps ordinary Cost 11958B. No CPU/general-cutoff or final-gate
+completion is claimed.
 
-The separate append-only symbol-prefix experiment was rejected and all4files
+The separate append-only symbol-prefix experiment was rejected and all 4 files
 restored byte-exact: `growing-symbol-cutoff/`. Its reuse assertion still fails.
 Read-only attribution identifies extra inert local slots in the positional
 principal binding table; broader normalization needs its own complete proof.
 
 Local cursor successor families are integrated in `local-cursor-successors/`,
-patch64f04180... . Exact nonescaping ordinary Array/List cursor versions keep
+patch 64f04180... . Exact nonescaping ordinary Array/List cursor versions keep
 collection/index/leaf/base in locals and materialize an immutable header at an
 actual return or aggregate escape. Calls, captures, merges, unknown producers
 and packed rows retain fallback; already selected whole-loop families remain
-separate. Root3native laws/completeOOM,11guest groups and111affected
-zero-finding analyzer files pass. Compiler2ebd8b48... keeps ordinary Cost
-exact11958B. The private fork screen removes2allocation sites without
-changing7publications. The width1 packed comparison still regresses against
-boxed/task002 references; typed ownership publication is being attributed before
-any all-width run. This regression predates the successor change: its width1
-Wasm is byte-identical to the prior immediate-step compiler. Task047 and final
+separate. Root 3 native laws/completeOOM, 11 guest groups and 111 affected
+zero-finding analyzer files pass. Compiler 2ebd8b48... keeps ordinary Cost exact
+11958B. The private fork screen removes 2 allocation sites without changing 7
+publications. The width1 packed comparison still regresses against boxed/task
+002 references; typed ownership publication is being attributed before any
+all-width run. This regression predates the successor change: its width1 Wasm is
+byte-identical to the prior immediate-step compiler. Task 047 and final
 qualification stay open.
 
 A separate bounded principal-suffix proof is now qualified in
-`inert-principal-slot-cutoff/`, patch984c6ff5... . Old symbol IDs still require
+`inert-principal-slot-cutoff/`, patch 984c6ff5... . Old symbol IDs still require
 exact spellings/producers; new spellings may append. Shared binding slots and
 every other principal field remain exact. Only canonical inert local/parameter
 suffixes may differ, after validating the truncated principal to reject any
 reference into omitted slots. An opaque leaf's last function can add/remove a
 private local while both callers retain semantic reuse. Earlier insertions that
 shift shared slots still decline; no interface compaction/remapping is
-attempted. Root3native laws/completeOOM,10guest groups and56affected
+attempted. Root 3 native laws/completeOOM, 10 guest groups and 56 affected
 zero-finding analyzer files pass, including source/archive/checkpoint, signature
-failure/recovery and both tiers/sync/JSPI. Compiler42dff30d... preserves
-ordinary Cost11958B. These work counters do not complete024/053 or establish the
-general edit CPU target.
+failure/recovery and both tiers/sync/JSPI. Compiler 42dff30d... preserves
+ordinary Cost 11958B. These work counters do not complete 024/053 or establish
+the general edit CPU target.
 
 Principal suffix validation is hardened in `principal-local-target-bounds/`,
-patch716d2e2b... . The shallow validator now bounds proof-header bindings and
+patch 716d2e2b... . The shallow validator now bounds proof-header bindings and
 self-unit external/implementation/selected-member/predicate targets before a
 cutoff can omit slots. A forged proof-header reference passed the earlier
-comparison; the preserved Debug counterexample now rejects. Root8native laws,
-22guest groups and60affected zero-finding analyzer files pass.
-Compilerdc4c6b84... keeps cache-disabled ordinary Cost exact11958B. No format or
+comparison; the preserved Debug counterexample now rejects. Root 8 native laws,
+22 guest groups and 60 affected zero-finding analyzer files pass. Compiler
+dc4c6b84... keeps cache-disabled ordinary Cost exact 11958B. No format or
 authority expansion.
 
 The combined source through the original suffix proof preserves all captured
-fresh/edit/revert hashes in `captured-after-principal-cursor/`
-(compiler42dff30d...). It retains70,330source steps,11constant
-hits/61,383replayed steps and no retry. Wall25.302/11.854/11.414s is
-compatibility evidence only. The independent fresh configure audit also matches
-the current root compiler identity; sharing one symlinked Zig configure cache
-across private roots is not a supported evidence setup. Private controls now use
-separate local caches.
+fresh/edit/revert hashes in `captured-after-principal-cursor/` (compiler
+42dff30d...). It retains 70,330 source steps, 11 constant hits/61,383 replayed
+steps and no retry. Wall 25.302/11.854/11.414s is compatibility evidence only.
+The independent fresh configure audit also matches the current root compiler
+identity; sharing one symlinked Zig configure cache across private roots is not
+a supported evidence setup. Private controls now use separate local caches.
 
 Current combined compiler is f4d5c9a9... . Unreferenced local principal suffixes
-are normalized in `principal-local-suffix-normalization/`, patchcca2dc62... .
+are normalized in `principal-local-suffix-normalization/`, patch cca2dc62... .
 Both earlier/later private function edits retain caller reuse despite shifted
 inert parameter/local markers. Remaining bindings, catalogs, graphs and exports
 stay exact; no persisted format or binding remap changes. Proof headers, usage
 binders, self/unit0 targets and local shared-callee predicates cannot reference
-omitted slots. Foreign predicates require exact retained external aliases.
-Root8native/3completeOOM,25guests and266affected zero-finding analyzer files
+omitted slots. Foreign predicates require exact retained external aliases. Root
+8 native/3completeOOM, 25 guests and 266 affected zero-finding analyzer files
 pass. An initial overbroad bounds rule and the unrelated rank-row repro are
 preserved separately. General edit CPU and the final gate remain open.
 
 Finite numeric qualification is integrated in `numeric-finite-qualification/`,
-patch244fa5be... . Current bounded summaries already compose nested selected
+patch 244fa5be... . Current bounded summaries already compose nested selected
 helpers/returned closures; old general-inference notes are not new requirements.
 The production correction reports consumed Plan.visits before copying a return.
-Root3native/fullOOM and8guest groups pass. No-feature proof work/allocations
-are0; the composed case uses385visits/2144Bpeak,
-and256requirements4902visits/44620Bpeak. Private25balanced CPU pairs are near
-parity (proof fresh/edit1.003/1.001), not a speedup. Final combined/release
-qualification still keeps070/071 open.
+Root 3 native/fullOOM and 8 guest groups pass. No-feature proof work/allocations
+are 0; the composed case uses 385 visits/2144B peak, and 256 requirements 4902
+visits/44620B peak. Private 25 balanced CPU pairs are near parity (proof
+fresh/edit 1.003/1.001), not a speedup. Final combined/release qualification
+still keeps 070/071 open.
 
-Empty scalar lexical frames are eliminated in `empty-lexical-row-frames/`,
-patch3993478d... . Fresh executable CFG proves every action/path acquires and
+Empty scalar lexical frames are eliminated in `empty-lexical-row-frames/`, patch
+3993478d... . Fresh executable CFG proves every action/path acquires and
 publishes no owner. Public invocation frames, resource drains and collector
 boundaries remain. The optimizer now invalidates when a cleanup drain appears;
-the preserved mutant exposed stale body reuse. Root3native/fullOOM,29guests and
-266affected zero-finding analyzer files pass. The exact root width1 Wasm matches
-the privately timed candidate: fold CPU0.133625→0.0105ms (12.7×),31paired
-samples. Cursor speed is unchanged. All-width, compiler-cost and final047 gates
-remain.
+the preserved mutant exposed stale body reuse. Root 3 native/fullOOM, 29 guests
+and 266 affected zero-finding analyzer files pass. The exact root width1 Wasm
+matches the privately timed candidate: fold CPU 0.133625→0.0105 ms (12.7×), 31
+paired samples. Cursor speed is unchanged. All-width, compiler-cost and final
+047 gates remain.
 
 The older quantified-row dependency regression is repaired in
-`rank-row-scope-repair/`, patch32f82098... . An exact closed Foreign callback
+`rank-row-scope-repair/`, patch 32f82098... . An exact closed Foreign callback
 read through an unowned inference tail now publishes closure after the whole
 endpoint matches. Generic/formal/wider ambient rows retain their separate owner
-checks; failed payload matches publish nothing. Root5relevant
-native/2completeOOM laws, 9guest groups and266affected zero-finding analyzer
-files pass. All four slices preserve cache-disabled ordinary Cost exact11958B.
-Full gate/release/performance and all29task completion claims remain pending.
+checks; failed payload matches publish nothing. Root 5 relevant
+native/2completeOOM laws, 9 guest groups and 266 affected zero-finding analyzer
+files pass. All four slices preserve cache-disabled ordinary Cost exact 11958B.
+Full gate/release/performance and all 29 task completion claims remain pending.
 
 The combined compiler f4d5c9a9... passes captured fresh/edit/revert in
-`captured-after-finite-repairs/`: wall25.377/11.902/11.419s,70,330source steps,
-11constant hits/61,383replayed steps,1152named+369closure reuses and240declines.
-All415inputs match before/after. Fresh/revert bytes agree; bytes legitimately
-change from the earlier compiler after empty-frame optimization. These are
-compatibility observations, not CPU/release qualification.
+`captured-after-finite-repairs/`: wall 25.377/11.902/11.419s, 70,330 source
+steps, 11 constant hits/61,383 replayed steps, 1152 named+369 closure reuses and
+240 declines. All 415 inputs match before/after. Fresh/revert bytes agree; bytes
+legitimately change from the earlier compiler after empty-frame optimization.
+These are compatibility observations, not CPU/release qualification.
 
-Compiler0c17e2de... adds `static-operation-body-receipts/`, patch73c393da... .
+Compiler 0c17e2de... adds `static-operation-body-receipts/`, patch 73c393da... .
 Static unparameterized operation bodies reconstruct exact current targets from
 owned family/origin/signature reads; parameterized/scoped/State recipes decline.
 Eight native laws, capture/replay/fullOOM, six selected guests, TypeScript and
-shared402/455zero-finding analyzer files pass. A5-pair combined development
-screen cuts128-body edit/revert240/250→110/110ms and elaborations130→2; fresh
-population220→240ms, plain controls unchanged. The metric is whole-process CPU
-at10ms resolution; no isolated or release claim. A first invalid duplicate-name
-control was corrected to a legal renamed-family/global-shadow program.
+shared 402/455 zero-finding analyzer files pass. A 5-pair combined development
+screen cuts 128-body edit/revert 240/250→110/110 ms and elaborations 130→2;
+fresh population 220→240 ms, plain controls unchanged. The metric is
+whole-process CPU at 10 ms resolution; no isolated or release claim. A first
+invalid duplicate-name control was corrected to a legal
+renamed-family/global-shadow program.
 
-The same compiler integrates `persistent-cursor-borrows/`, patchd5e71f05... .
+The same compiler integrates `persistent-cursor-borrows/`, patch d5e71f05... .
 Fresh CFG proves a real persistent owner covers exact copied row values; calls,
-writes, missing/bypassed owners and uncertain provenance decline. Root3native/
-fullOOM and4guest groups pass. Array root Wasm exactly matches timed59b837...;
-16384rows retain/release16385→1 and CPU ratios.388sync/.372JSPI,31balanced
-pairs. List leaf-cache and old tracing packet paths still decline; task047 stays
-open. The compiler-cost control is being completed in bounded sets, without
-rerunning finished samples.
+writes, missing/bypassed owners and uncertain provenance decline. Root 3 native/
+fullOOM and 4 guest groups pass. Array root Wasm exactly matches timed
+59b837...; 16384 rows retain/release 16385→1 and CPU ratios .388 sync/.372 JSPI,
+31 balanced pairs. List leaf-cache and old tracing packet paths still decline;
+task 047 stays open. The compiler-cost control is being completed in bounded
+sets, without rerunning finished samples.
 
-`region-forall/` is test-only, patch7336d28e... . Current compiler already
+`region-forall/` is test-only, patch 7336d28e... . Current compiler already
 accepts the annotated region-polymorphic borrow reader. Two root groups pass
 both tiers, source/archive/checkpoint, independent owners, actual JSPI await,
 invalid loan escape, host cleanup and producer edit/revert. No production
@@ -1402,22 +1408,22 @@ feature was added. Ordinary Cost remains byte-exact11958B for all three slices.
 Task status/counts, the final full gate, release, remote CI and owner cache
 decision remain open.
 
-The cursor compiler-cost control is now complete:20pairs each, ordinary retained
-CPU+1.09% and finiteArray+2.53%. Fresh medians are10ms-quantized, not zero-cost
-proof. One60s cap preserved43/80samples; one bounded continuation collected only
-the missing37. Exact followup freeze is
+The cursor compiler-cost control is now complete: 20 pairs each, ordinary
+retained CPU+1.09% and finiteArray+2.53%. Fresh medians are 10 ms-quantized, not
+zero-cost proof. One 60s cap preserved 43/80 samples; one bounded continuation
+collected only the missing 37. Exact followup freeze is
 `/var/tmp/blot2-cursor-owner-20261015/build/bench/persistent-cursor-borrows-followup-final-20261015/`,
-pins523e8059... . List helper949instructions are attributed read-only; no call
-authority was added. All jobs are reaped.
+pins 523e8059... . List helper 949 instructions are attributed read-only; no
+call authority was added. All jobs are reaped.
 
-`affine-forall/` adds one test only, patch4671ec0e... . Existing0c17compiler
+`affine-forall/` adds one test only, patch 4671ec0e... . Existing 0c17 compiler
 accepts `forall[a] => unique a -> unique a` across source/archive/checkpoint,
 actualJSPI suspension, host cleanup, edits/revert and exactuse_after_move
 rejection. Two root groups and TypeScript/lint/format pass. The earlier
 generic-shared screen omitted this explicit affine contract; no production
 change was necessary.
 
-The 15 October final combined gate supersedes the historical open29-task counts
+The 15 October final combined gate supersedes the historical open 29-task counts
 in earlier focused updates above. Current counts and frozen qualification are at
 the top: 070/071 complete, 27 tasks open. The next work should establish a
 current failing acceptance case or measured bottleneck before implementation;

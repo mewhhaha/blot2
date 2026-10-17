@@ -60,9 +60,10 @@ development and the scenarios below.
 ## Completion evidence
 
 - No commit or push, as required by the current continuation.
-- Zig0.17.0 dev build passes in5.48s; all native interfaces compile in9.16s.
-  Fingerprint law, focused checker/retained discovery and eleven tooling laws
-  pass. All483 source files and the fixture module have zero analyzer findings.
+- Zig 0.17.0: the dev build passes in 5.48 s and all native interfaces compile
+  in 9.16 s. Fingerprint law, focused checker/retained discovery and eleven
+  tooling laws pass. All 483 source files and the fixture module have zero
+  analyzer findings.
 - Matched dev comparison preserves five phases of exact Wasm, ordered
   diagnostics, work and archive payload. Compiler/schema identity changes are
   intentional consequences of the physical source move.

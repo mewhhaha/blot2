@@ -1,10 +1,10 @@
 # Implementation and iterator continuation
 
-The latest uncommitted batch passes the complete compiler gate on15 October:
+The latest uncommitted batch passes the complete compiler gate on 15 October:
 2,223 native laws, 1,404 guest/client tests, 1,366 complete allocation sweeps
 plus two expected-error harness laws, and zero analyzer findings across 455
-files. Tasks 070/071 are complete;27 program tasks remain open. Exact final pins
-and remaining boundaries are in
+files. Tasks 070/071 are complete; 27 program tasks remain open. Exact final
+pins and remaining boundaries are in
 [the current checkpoint](#qualified-continuation-15-october-2026). Earlier
 sections below retain their historical qualification scope.
 
@@ -789,7 +789,7 @@ publication/rollback controls still required. The logging patch is unmerged; it
 establishes no release timing claim. Pins, logs and assessment are preserved in
 `constant-current-diagnostic/` under the evidence directory.
 
-## Native gate repairs —15 October 2026
+## Native gate repairs — 15 October 2026
 
 The later combined gate failed after 2,182/2,209 native laws passed; 27 failed,
 with no skips, leaks or logged errors. LLVM/Fast release and LLVM/Safe native
@@ -846,7 +846,7 @@ compilation (2,215-law inventory) and 455-file zero analyzer pass. Evidence:
 `sparse-owner-snapshot-repair/`. The failed attempt remains pinned in
 `repaired-final-gate/`; it is not counted as a completed native run.
 
-## Release guest repairs —15 October 2026
+## Release guest repairs — 15 October 2026
 
 The next exact full attempt (`repaired-final-v2-gate/`) compiled release and
 native programs, then passed 2,214/2,215 native laws. Wall 652.497 s; release
@@ -892,7 +892,7 @@ Two original guest failures still need integration: compound buffer constant
 receipts and public-example executable fragment reuse. No task is closed and no
 full-gate success is claimed by these repairs.
 
-## Retained-reuse repair union —15 October 2026
+## Retained-reuse repair union — 15 October 2026
 
 The final two failures from the 1,393/7 release inventory are repaired without
 weakening either original reuse assertion. `buffer-creation-order-repair/`
@@ -922,65 +922,65 @@ callback/proof/constant/literal plus opaque import recovery), the new receipt
 capture/replay OOM law and two new fragment/Unit OOM laws. Private neighboring
 native/OOM and 32 literal/import/state executed controls are retained with each
 frozen patch. Unfiltered Safe/noLLVM compilation inventories 2,223 native laws;
-the full 455-file analyzer is zero. Development compiler
-SHA4356987350c7f18e5db58032a01e3fcaceda685079213ee471e119c0254fe223. Ordinary
-Cost remains 11,958 B,
-SHA1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad.
-Identical-path development chain/fanout allocations are unchanged versus the
-pooled-only control (8,514,140/15,584,621 B), with exact work counters.
-Explicitly disabling persistent cache storage also gives equality at
-8,253,857/14,039,271 B; those are separate environments, not a second budget
-baseline.
+the full 455-file analyzer is zero. Development compiler SHA
+4356987350c7f18e5db58032a01e3fcaceda685079213ee471e119c0254fe223. Ordinary Cost
+remains 11,958 B, SHA
+1ddc5f2d50cad1760b66f7279651194cacb220d75fd747db616e06493bd133ad. Identical-path
+development chain/fanout allocations are unchanged versus the pooled-only
+control (8,514,140/15,584,621 B), with exact work counters. Explicitly disabling
+persistent cache storage also gives equality at 8,253,857/14,039,271 B; those
+are separate environments, not a second budget baseline.
 
 All seven original guest failures now have integrated focused repairs. A new
-full release/native/guest gate is still mandatory. Task035's private ownership
+full release/native/guest gate is still mandatory. Task 035's private ownership
 union and guard candidate require current-source performance qualification;
 these functional results do not promote either candidate or close any task.
 
-## Combined native failures and complete guest pass —15 October 2026
+## Combined native failures and complete guest pass — 15 October 2026
 
-The frozen `functional-final-gate/` attempt takes878.659s and passes smoke,
-harness, LLVM/Fast build308.176s and native compilation377.638s. Native
-execution 479.533s passes2220/2223 with zero skips/leaks/logged errors; packing
-and guests are not reached. Post-run verification matches all1303 source and41
-external pins. The two native shards execute sequentially (226.394s
-and253.054s), despite independent graph dependencies and -j2; no scheduler cause
-is established.
+The frozen `functional-final-gate/` attempt takes 878.659s and passes smoke,
+harness, LLVM/Fast build 308.176s and native compilation 377.638s. Native
+execution 479.533s passes 2220/2223 with zero skips/leaks/logged errors; packing
+and guests are not reached. Post-run verification matches all 1303 source and 41
+external pins. The two native shards execute sequentially (226.394s and
+253.054s), despite independent graph dependencies and -j2; no scheduler cause is
+established.
 
 Two body-cutoff laws depended on aggregate counts changed by successful fragment
 reuse. `targeted-cutoff-test-repair/` preserves refinement fallback with only
 the optional executable index disabled, actual refinement work and exact fresh
-bytes through854 allocation failures. The second law uses a value-changing edit,
-requires changed bytes and exact retained bytes, rejects the actual helper and
-caller targets through the existing executable gate, and admits an unrelated
+bytes through 854 allocation failures. The second law uses a value-changing
+edit, requires changed bytes and exact retained bytes, rejects the actual helper
+and caller targets through the existing executable gate, and admits an unrelated
 target. No production admission was weakened.
 
 The third failure is a real numeric alias regression: a let before the first
 proof introduction was omitted when tracking tested only current proof types.
 `check-proof-alias-repair/` combines the existing local syntax flag with actual
-imported proof kinds. The12 unchanged native laws pass3964 allocation failures;
-12 executed numeric/universal groups and affected402-file analyzer pass. The
-combined release/native gate remains required after this production correction.
+imported proof kinds. The 12 unchanged native laws pass 3964 allocation
+failures; 12 executed numeric/universal groups and affected 402-file analyzer
+pass. The combined release/native gate remains required after this production
+correction.
 
 Separately, `functional-release-guests/` packs the unchanged failed-gate release
-and passes all1404 guest/client tests with zero failures/ignores, in33.268s.
-All8 original compilation allocation budgets also pass. Release SHA
-2c6834a7123bbe01876fb215507fd31fd5e7ff7cf0e50c473a9c5f62e872d83a and bundle
-SHA08312874b4accd365082feb703facbee3827a0d3721c44e01b672e0e9bf3b856 are not
+and passes all 1404 guest/client tests with zero failures/ignores, in 33.268s.
+All 8 original compilation allocation budgets also pass. Release SHA
+2c6834a7123bbe01876fb215507fd31fd5e7ff7cf0e50c473a9c5f62e872d83a and bundle SHA
+08312874b4accd365082feb703facbee3827a0d3721c44e01b672e0e9bf3b856 are not
 qualified by combining this guest-only pass with repaired native subsets.
 
-## Current ownership compiler screen rejected —15 October 2026
+## Current ownership compiler screen rejected — 15 October 2026
 
-`current035-screen/` preserves one CPU7 campaign with five balanced rounds, 15
+`current035-screen/` preserves one CPU 7 campaign with five balanced rounds, 15
 records, one discarded warm round, positive whole-server CPU deltas and no
-retries. Each record uses five fresh servers and20 retained edits. All three
+retries. Each record uses five fresh servers and 20 retained edits. All three
 current-source development builds, actual HELLO identities, bytes and closed
-cycle counters pass preflight. Guard/control fresh1.114286 and edit1.010309
-produce geometric mean1.0610245972, above1.05. Union/control also fails1.066424.
-Guard caching changes union work by about0.5%, insufficient for admission.
-Timing stops here: no runtime screen, LLVM/release qualification or promotion.
-The private ownership changes stay out of the production source. Task035 and its
-dependent tasks073/074 remain open.
+cycle counters pass preflight. Guard/control fresh 1.114286 and edit 1.010309
+produce geometric mean 1.0610245972, above 1.05. Union/control also fails
+1.066424. Guard caching changes union work by about 0.5%, insufficient for
+admission. Timing stops here: no runtime screen, LLVM/release qualification or
+promotion. The private ownership changes stay out of the production source. Task
+035 and its dependent tasks 073/074 remain open.
 
 ## Qualified continuation, 15 October 2026
 

@@ -27,31 +27,6 @@ residual regions were not attributed. The backend's lookup (+46 ms), capture
 instead of 264 functions. Principal regions that consume non-source-complete
 graphs, or jobs finished outside their recording, still drop their input keys.
 
-## Progress
-
-Milestone `aef65e7` cuts gdev retained edits from 570 to 440 ms (`f7be6e7`: 400
-ms) by indexing old signatures, matching retained values through a reused
-scratch, and giving dependency certificates their own budget so gdev keeps them.
-See [retained edit cost](../zig-native/RETAINED_EDIT_COST.md). Remaining: about
-39 ms of module-stamp integrity checks (a design decision), 26 ms of extra
-constant evaluation (task 086's area) and about 27 ms in fragment lookup,
-assembly and journal freezing.
-
-The 13 October isolated collection-length path removes 220 inference regions and
-170,960 scopes per captured revision. LLVM/Fast seven-pair edit CPU falls
-1232.855→961.714 ms, with exact Wasm and source fuel; fresh/revert CPU also
-falls. The optimizer invalidation worklist separately restores 2,862/2,864
-retained body matches. Combined `ae001bb` passes the full gate; seven pairs
-measure edit 1247.822→906.212 ms and revert 1147.918→813.715 ms against
-`38e822d`, with exact Wasm and source fuel. These current-snapshot improvements
-do not establish the historical target or complete task 093. See
-[collection shape members](../zig-native/COLLECTION_SHAPE_MEMBERS.md) and
-[retained assembly](../zig-native/RETAINED_ASSEMBLY_WORKLIST.md).
-
-The 30 ms literal-edit target in the final gates is owned by task
-[101](101-reach-the-literal-edit-target.md); finishing this task does not meet
-it.
-
 ## Implementation checklist
 
 - [x] Attribute the residual inference regions and the lookup, capture and
@@ -77,11 +52,23 @@ before the local milestone commit.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Milestone `aef65e7` cuts gdev retained edits from 570 to 440 ms (`f7be6e7`:
+  400 ms) by indexing old signatures, matching retained values through a reused
+  scratch, and giving dependency certificates their own 64 MiB budget so gdev
+  keeps them. Full LLVM native suite, 638 guest/client tests and 310 analyzer
+  files at zero; three alternating triples on the frozen gdev copy. See
+  [retained edit cost](../zig-native/RETAINED_EDIT_COST.md).
+- Later captured-project milestones (the frozen gdev copy is no longer
+  available): the collection-length path removes 220 inference regions per
+  revision, and `ae001bb` (full gate) measures seven-pair edit CPU 1247.822 →
+  906.212 ms and revert 1147.918 → 813.715 ms against `38e822d`, with exact Wasm
+  and source fuel. See
+  [collection shape members](../zig-native/COLLECTION_SHAPE_MEMBERS.md) and
+  [retained assembly](../zig-native/RETAINED_ASSEMBLY_WORKLIST.md). These do not
+  establish the historical `f7be6e7` comparison.
+- Remaining on gdev after `aef65e7`: about 39 ms of module-stamp integrity
+  checks (a design decision), 26 ms of extra constant evaluation (task 086's
+  area) and about 27 ms in fragment lookup, assembly and journal freezing. The
+  30 ms literal-edit target is task [101](101-reach-the-literal-edit-target.md);
+  finishing this task does not meet it.
+- Durable record: [retained edit cost](../zig-native/RETAINED_EDIT_COST.md).

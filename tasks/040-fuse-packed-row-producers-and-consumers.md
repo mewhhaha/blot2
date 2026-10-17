@@ -57,19 +57,19 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: `2689ad5`; qualified tree `92e09418…51fb6a`, Zig0.17.0 LLVM/Fast
+- Commit: `2689ad5`; qualified tree `92e09418…51fb6a`, Zig 0.17.0 LLVM/Fast
   release SHA256 `9ea894d4…8b21`.
-- Validation: full native suite,925 guest/client tests, eight unchanged
-  allocation budgets and349 analyzer files/zero. Widths1–16, F32/U32 order,
+- Validation: full native suite, 925 guest/client tests, eight unchanged
+  allocation budgets and 349 analyzer files/zero. Widths 1–16, F32/U32 order,
   slices/snapshots, escapes, effects/traps, source/compiled/checkpoint edits and
   exhaustive OOM controls pass.
 - Comparison: native optimized callers eliminate temporary scalar row boxes; 31
-  alternating100,000-row guest pairs have named/composed CPU ratios .0212–.0521
-  versus qualified039/055. Direct controls, committed memory and seven
+  alternating 100,000-row guest pairs have named/composed CPU ratios .0212–.0521
+  versus qualified 039/055. Direct controls, committed memory and seven
   fresh/retained compiler pairs are reported separately; no general compiler
   speedup is claimed.
 - Remaining limits: bounded small-body fusion; lazy/escaped/nested/reference/
-  width17/unknown uses retain owned fallback. Collection construction and
+  width-17/unknown uses retain owned fallback. Collection construction and
   general iterator-state elimination remain separate work.
 - Durable record: [ROW_FUSION](../zig-native/ROW_FUSION.md), including exact
   pins, rejected prototypes, raw distributions and combined costs.

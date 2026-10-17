@@ -64,45 +64,37 @@ development and the scenarios below.
 - Commit: `88034529833783de881e59a0aca3e2b93fab69bb` (compiler milestone).
 - Implementation:
   [semantic_archive.zig](../zig-native/src/reuse/semantic_archive.zig) persists
-  the previous revision's complete selected-specialization owner: exact checked
+  the previous revision's complete selected-specialization owner (exact checked
   Core per unit with type-node certificate bytes, namespace, evaluator snapshot,
-  slots, field locations and completed receipts under claim
-  `selected_complete_proof`. Decoding validates namespace, every Core graph,
-  snapshot ordinal, slot and receipt, then rebuilds a Capture used only as the
-  query predecessor of a compile without an in-process previous revision; the
-  ordinary Gate, Importer and graph Plan admit every receipt against current
-  source. Principal imports admit builtin State/Computation nominals. Owners
-  with no namespace or no replayable receipt are omitted.
-- Fixes found on the way: frozen Core validation rejected resolver
-  continuations' `.local` parameters, so libraries with a monadic `do` could not
-  be packed as dependency artifacts; an OOM in the backend's fresh query Gate
-  left a partial non-null state that crashed at teardown; artifact encoding
-  allocated roughly six times the encoded bytes and now uses one exact buffer.
+  slots, field locations and completed receipts) under claim
+  `selected_complete_proof`. Decoding validates every graph and ordinal, then
+  rebuilds a Capture used only as the query predecessor of a compile without an
+  in-process previous revision; the ordinary Gate, Importer and graph Plan admit
+  every receipt against current source. Owners with no namespace or no
+  replayable receipt are omitted.
+- Fixes found on the way: libraries with a monadic `do` can now be packed as
+  dependency artifacts; an OOM in the backend's fresh query Gate no longer
+  crashes at teardown; artifact encoding uses one exact buffer instead of
+  roughly six times the encoded bytes.
 - Validation: Zig 0.17.0 before every build batch. `deno task test:compiler`
   passes the full LLVM native suite and 626 guest/client tests;
-  `deno task
-  lint:zig` reports zero findings across 305 files at analyzer pin
-  `756bfd5`. Native laws cover restart replay with fresh parity under an
-  allocation-failure sweep, edited bodies/captures/recursion and a failing
-  source, forged namespaces, graphs, certificates, values, closures, slots,
-  receipts and field locations, a forged stamp that admits nothing, and owner
-  omission. TS laws require selected replay after every example restart that
-  records a receipt, pack and execute a monadic dependency artifact, and restart
-  a dependency-loaded project with selected replay plus edited, failing and
-  corrected revisions compared to fresh servers.
-- Comparison: task-019 compiler (`69e8692e…`) versus candidate (`640c744d…`). 31
-  alternating rounds over 18 workloads (3,348 CLI builds) give identical Wasm in
-  every phase with equal principal/optimizer reuse; seven examples replay 1–3
-  selected receipts after restart. Their checkpoints grow 177–338 KB, decode CPU
-  rises from 66–252 to 552–1,114 µs, restart requested allocation 1.12–1.86 MB
-  and restart median CPU 14–26% (1.2–3.4 ms). The other 11 workloads grow by 4
-  bytes and allocate 4–135 KB less. No restart speedup is claimed.
+  `deno task lint:zig` reports zero findings across 305 files (analyzer pin
+  `756bfd5`). Native laws cover restart replay with fresh parity under an
+  allocation-failure sweep, edits, failing sources, forged inputs and owner
+  omission; TS laws cover example restarts, a packed monadic dependency and a
+  dependency-loaded project through edited, failing and corrected revisions.
+- Comparison: task-019 compiler (`69e8692e…`) versus candidate (`640c744d…`), 31
+  alternating rounds over 18 workloads (3,348 CLI builds): identical Wasm in
+  every phase with equal reuse. Seven examples replay 1–3 selected receipts
+  after restart at 14–26% (1.2–3.4 ms) more restart median CPU and 177–338 KB
+  larger checkpoints; the other 11 workloads allocate 4–135 KB less. No restart
+  speedup is claimed.
 - Remaining limitations: on small programs the owner costs more restart CPU than
   it saves; Core is validated at decode and again by the Gate. Executable
   fragments, retained principal evidence, layouts, templates, provider/request
   state, canonical plans and builtin effect operations remain declined and
-  recompute. Large-program benefit is unmeasured without private gdev (tasks 002
-  and 084).
+  recompute. Large-program benefit was unmeasured without private gdev and is
+  left to task 084.
 - Durable record:
   [persisted semantic artifacts](../zig-native/SEMANTIC_ARTIFACTS.md),
   [restart distributions](../zig-native/qualification/semantic-artifacts-restart.csv),

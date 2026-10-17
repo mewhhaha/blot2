@@ -2694,6 +2694,32 @@ test "refutable patterns and conditional matches preserve exiting suites and bra
     try expectValue(&module, "fallback", .{ .scalar = .u32, .bits = 2 });
 }
 
+test "statement case arms carry rebinding through nested level merges during immutable evaluation" {
+    var module = try lower(
+        \\type Tri is data = #Rise | #Fall | #Still
+        \\const choose = fn beat => do:
+        \\  let total = 1
+        \\  let other = 100
+        \\  case beat of
+        \\    #Rise => do:
+        \\      total := 7
+        \\    #Fall => do:
+        \\      other := 200
+        \\      return ()
+        \\    #Still => do:
+        \\      if @u32.lt total 5:
+        \\        total := @u32.add self 10
+        \\  return @u32.add total other
+        \\entry const rise = choose #Rise
+        \\entry const fall = choose #Fall
+        \\entry const still = choose #Still
+    );
+    defer module.deinit(a);
+    try expectValue(&module, "rise", .{ .scalar = .u32, .bits = 107 });
+    try expectValue(&module, "fall", .{ .scalar = .u32, .bits = 201 });
+    try expectValue(&module, "still", .{ .scalar = .u32, .bits = 111 });
+}
+
 test "nested field paths copy only immutable descendants and retain omitted pattern slots" {
     var module = try lower(
         \\type Point is data = #Point { x: U32, y: U32 }

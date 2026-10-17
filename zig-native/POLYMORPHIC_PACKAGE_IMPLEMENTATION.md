@@ -1,5 +1,12 @@
 # Polymorphic package implementation
 
+Tasks 064 and 065 closed on 17 October 2026 against the higher-rank and package
+rows of the
+[language qualification index](LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
+with the full gate at `05401a9`. The checkpoints below are historical; where
+they say 064/065 or the final gate remain open, that was true when they were
+written.
+
 Canonical quantifier evidence now carries explicit sorted binder lists,
 including unused binders and formal loan edges. Fresh wire tags make older
 readers reject the new layout. Nested imports and lazy evaluator frames preserve
@@ -342,7 +349,7 @@ goals, and proof-budget exhaustion rejects rather than selecting a fallback.
 Root four native laws pass, including complete allocation-failure sweeps and
 phantom-header rejection; nineteen selected guest groups pass. The two new
 TypeScript files pass checking, lint and format. The subsequent receipt union
-passes the full453-file analyzer with zero findings. Exact source deltas and
+passes the full 453-file analyzer with zero findings. Exact source deltas and
 logs are in
 `build/bench/complete-program-20261015/inferred-dictionary-helpers/`.
 Dictionary-key artifact import still declines unsupported reuse. Interface
@@ -383,8 +390,8 @@ Read-to-pure, changed owners and unproved open rows reject.
 Root three native laws include two complete allocation-failure sweeps. Sixteen
 guest groups preserve first-application effects before returned-closure calls,
 exact traces/traps/recovery, source/archive/checkpoint and both codegen/host
-modes. Affected256/453analyzer files report zero findings; TypeScript passes.
-Ordinary Cost stays11958B and captured-project phase bytes remain unchanged.
+modes. Affected 256/453 analyzer files report zero findings; TypeScript passes.
+Ordinary Cost stays 11958B and captured-project phase bytes remain unchanged.
 Pins/logs: `build/bench/complete-program-20261015/effectful-method-closure/`.
 Stored unknown-forall helper forwarding remains an explicit frontier. No CPU,
 general artifact-reuse or final compiler-gate completion is claimed.
@@ -432,7 +439,7 @@ witness and remains an intentional rejection. Older broad forwarding notes alone
 do not establish a missing legal case. Broader row/region/predicate portability
 and the final combined qualification remain explicit limits.
 
-## Portable ordinary composition —15 October2026
+## Portable ordinary composition — 15 October 2026
 
 The frozen reader imports an actual producer declaration scheme into a temporary
 ordinary Store. Only its quantified formals become fresh; current caller
@@ -446,9 +453,9 @@ authority ends before arguments and nested callable bodies.
 One Fcv Workspace shares only completed module proofs and successful bounds
 checks within an immutable validation. Bounds reuse compares the physical unit
 list, source length and symbol count; failures never publish receipts. An actual
-standard-library case repeated the same foreign bounds check2,283times: the
-focused dev artifact-create observation falls21.39s to0.170s with the same
-source work and281,272-byte artifact. This causal observation is separate from
+standard-library case repeated the same foreign bounds check 2,283 times: the
+focused dev artifact-create observation falls 21.39s to 0.170s with the same
+source work and 281,272-byte artifact. This causal observation is separate from
 release qualification.
 
 Source qualification equates an associated clause's method row with an actual
@@ -457,10 +464,10 @@ separate selected-method checks. Lazy operands retain their actual Demand type
 and Source-owned latent-row certificates through lowering and body-cache
 transport. No default type, invented closed row or archive schema is added.
 
-Root31native controls,17executed lifecycle groups and433affected analyzer files
-pass. Full-OOM mutants cover wrong lexical choices, swapped conditional arms,
-forged effects, generic cursor predicates and abstract representation theft.
-Source/archive/restart/edit/failure/recovery execute both codegen tiers and
-sync/JSPI. Final combined release and performance gates remain pending. Exact
-mapped source pins, initial failures and corrected runs are under
+Root 31 native controls, 17 executed lifecycle groups and 433 affected analyzer
+files pass. Full-OOM mutants cover wrong lexical choices, swapped conditional
+arms, forged effects, generic cursor predicates and abstract representation
+theft. Source/archive/restart/edit/failure/recovery execute both codegen tiers
+and sync/JSPI. Final combined release and performance gates remain pending.
+Exact mapped source pins, initial failures and corrected runs are under
 `build/bench/finish-rest-20261015/{generic-composition-integration-attempt-2,bounds-receipt-integration-attempt-2,selected-scope-and-pure-row}/`.

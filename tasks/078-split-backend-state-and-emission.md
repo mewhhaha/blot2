@@ -55,25 +55,23 @@ development and the scenarios below.
 
 ## Completion evidence
 
-The four storage/work owners and the compilation-attempt owner are implemented.
-Generator falls from 59 to 30 fields; `core_backend.zig` from 13,374 to 3,127
-lines. The largest dispatch/ABI exceptions and their responsibilities are
-recorded in [Backend ownership](../zig-native/BACKEND_OWNERSHIP.md).
-
-Root qualification in `build/bench/finish-rest-20261015/backend-owners/` records
-8 native laws with complete allocation failures, 38 guest groups, and exact
-five-phase retained bytes, ordered diagnostics, work and archive payloads.
-Ordinary Cost remains 12,902 bytes with the matched allocation record unchanged
-(4,731,000 allocated bytes, 12,609 allocations, 1,162,755 peak, zero live).
-These totals use Root's fixed paths; the private-agent path totals differ.
-
-The first affected-closure analyzer run found an unchecked static-data range
-endpoint. Root's bounded-slice amendment preserves the same output and
-allocation behavior; the rerun passes all 429 affected files with zero findings.
-The agent's earlier 17-file zero-finding statement was premature and is
-corrected in the durable record. Failed logs and exact before/source pins are
-retained.
-
-Status remains in progress pending the final common release/full compiler gate
-and matched CPU/performance qualification. No commit or push is authorized by
-the continuation handoff.
+- Commit: pending; the continuation handoff authorizes no commit or push.
+- Implementation: the four storage/work owners and the compilation-attempt owner
+  exist. Generator falls from 59 to 30 fields and `core_backend.zig` from 13,374
+  to 3,127 lines; the largest remaining dispatch/ABI exceptions are recorded
+  with their responsibilities.
+- Validation: Root's qualification passes 8 native laws with complete allocation
+  failures and 38 guest groups. After Root's bounded-slice amendment for an
+  unchecked static-data range endpoint (same output and allocation), the
+  affected-closure analyzer passes all 429 files with zero findings; an earlier
+  17-file zero-finding claim was premature and is corrected in the durable
+  record.
+- Comparison: five-phase retained bytes, ordered diagnostics, work and archive
+  payloads are exact. Ordinary Cost remains 12,902 bytes with its matched
+  allocation record unchanged (4,731,000 allocated bytes, 12,609 allocations,
+  1,162,755 peak, zero live) on Root's fixed paths; private-agent path totals
+  differ. Pins and failed logs:
+  `build/bench/finish-rest-20261015/backend-owners/`.
+- Remaining limitations: the final common release/full compiler gate and matched
+  CPU/performance qualification keep the task in progress.
+- Durable record: [Backend ownership](../zig-native/BACKEND_OWNERSHIP.md).

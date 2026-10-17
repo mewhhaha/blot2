@@ -2,10 +2,11 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — focused implementation checks pass (see
-  [STRUCTURED_TASK_QUALIFICATION](../zig-native/STRUCTURED_TASK_QUALIFICATION.md));
-  scope closed to fixed acceptance traces by owner decision on 15 October 2026;
-  task 035 and a passing full gate remain.
+- **Status:** In progress — scope closed to fixed acceptance traces by owner
+  decision on 15 October 2026; all three traces map to named passing laws in the
+  gate at `05401a9` (see
+  [STRUCTURED_TASK_QUALIFICATION](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#trace-to-law-index-17-october-2026));
+  only task 035 remains.
 - **Dependencies:** [072](072-specify-structured-concurrency.md),
   [035](035-remove-the-tracing-runtime.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 10 / task
@@ -68,7 +69,7 @@ below.
 | Acceptance trace                                       | Expected result                                                         |
 | ------------------------------------------------------ | ----------------------------------------------------------------------- |
 | Nested group exits normally with two unjoined children | Join children before closing group and releasing parent resource.       |
-| Sibling1 fails while sibling2 is suspended             | Request cancellation, await settlement, drop both, then report failure. |
+| Sibling 1 fails while sibling 2 is suspended           | Request cancellation, await settlement, drop both, then report failure. |
 | Cancel before child starts                             | Do not invoke thunk; drop transferred owners once.                      |
 
 Forms outside these traces (detached tasks, shared mutable state across tasks,
@@ -82,15 +83,26 @@ descriptors executed in sync and JSPI modes (see
 [the implementation record](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#focused-checks)).
 The task completes when each trace maps to named passing laws in the full
 compiler gate on the committed source and task
-[035](035-remove-the-tracing-runtime.md) is complete.
+[035](035-remove-the-tracing-runtime.md) is complete. The
+[trace-to-law index](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#trace-to-law-index-17-october-2026)
+built from the gate at `05401a9` is recorded in the implementation record.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: pending; record the local milestone revision when the task closes.
+- Validation: the full gate at `05401a9` (17 October 2026) passes 2,355 native
+  laws with zero leaks, 1,501 guest tests and zero analyzer findings over 486
+  files, including every law in the
+  [trace-to-law index](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#trace-to-law-index-17-october-2026).
+  All three traces are fully mapped.
+- Comparison: pending; the fixed traces set no performance target. Record the
+  comparison, or why it does not apply, when the task closes.
+- Remaining limitations: task [035](035-remove-the-tracing-runtime.md) must
+  complete before closure. Forms outside the traces (detached tasks, shared
+  mutable state across tasks, host worker transport, simultaneous Wasm reentry,
+  unknown or overlapping partition evidence) reject, as recorded in the
+  [implementation record](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#deliberate-limits-and-remaining-qualification).
+- Durable record:
+  [trace-to-law index](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#trace-to-law-index-17-october-2026),
+  [implementation record](../zig-native/STRUCTURED_TASK_QUALIFICATION.md) and
+  the [structured concurrency design](../zig-native/STRUCTURED_CONCURRENCY.md).

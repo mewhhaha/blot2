@@ -85,7 +85,7 @@ payload separately from unmodified guest CPU.
 Private instrumentation widens callback arrows and sequences their calls with
 `use`, preserving algorithm bodies/grouping to count user calls. Shipped
 callbacks stay closed and pure. Five outputs at width 257 take 1285 ordered
-combines,322 monoid combines, or 265 group combines and four inverses. At 4096
+combines, 322 monoid combines, or 265 group combines and four inverses. At 4096
 leaves, build takes 4095 combines; representative query/set/concat paths take
 10/12/12. All 4096 singleton concatenations retain height 13 with at most 13
 combines per operation. An uneven 257-leaf build takes 263 combines because

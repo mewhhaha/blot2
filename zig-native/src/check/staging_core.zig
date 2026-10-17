@@ -1895,8 +1895,8 @@ pub fn taskNamedContextWorkspace(m: *const core.Module, units: []const *const co
     }
     try require(found);
 }
-pub fn namedCall(m: *const core.Module, id: core.Id, closed_rows: T.List, remaining: *usize) Error!*const core.Body {
-    return namedCallContext(m, &.{}, id, closed_rows, remaining);
+pub fn namedCall(m: *const core.Module, id: core.Id, remaining: *usize) Error!*const core.Body {
+    return namedCallContext(m, &.{}, id, remaining);
 }
 pub fn namedReferenceContext(m: *const core.Module, units: []const *const core.Module, id: core.Id, closed_rows: T.List, remaining: *usize) Error!void {
     return namedReferenceContextWorkspace(m, units, id, closed_rows, remaining, null);
@@ -1905,11 +1905,10 @@ pub fn namedReferenceContextWorkspace(m: *const core.Module, units: []const *con
     var proof: Named = .{ .workspace = workspace, .m = m, .units = units, .remaining = remaining };
     try proof.node(id, &.{}, closed_rows, 0);
 }
-pub fn namedCallContext(m: *const core.Module, units: []const *const core.Module, id: core.Id, closed_rows: T.List, remaining: *usize) Error!*const core.Body {
-    return namedCallContextWorkspace(m, units, id, closed_rows, remaining, null);
+pub fn namedCallContext(m: *const core.Module, units: []const *const core.Module, id: core.Id, remaining: *usize) Error!*const core.Body {
+    return namedCallContextWorkspace(m, units, id, remaining, null);
 }
-pub fn namedCallContextWorkspace(m: *const core.Module, units: []const *const core.Module, id: core.Id, closed_rows: T.List, remaining: *usize, workspace: ?*@import("scheme_equations.zig").Workspace) Error!*const core.Body {
-    _ = closed_rows;
+pub fn namedCallContextWorkspace(m: *const core.Module, units: []const *const core.Module, id: core.Id, remaining: *usize, workspace: ?*@import("scheme_equations.zig").Workspace) Error!*const core.Body {
     try taskNamedContextWorkspace(m, units, id, false, remaining, workspace);
     const call_ = try executableCall(m, units, id, remaining, workspace);
     const producer = try targetOwner(m, units, call_.target, workspace);

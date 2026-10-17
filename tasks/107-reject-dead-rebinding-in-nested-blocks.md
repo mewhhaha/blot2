@@ -13,7 +13,10 @@
 
 ## Outcome
 
-A `:=` that cannot change anything is rejected instead of silently compiled.
+A `:=` in a statement `case` arm carries out of the case like an `if` branch
+(owner-approved language change, 17 October 2026), and a `:=` that still cannot
+change anything — in any other nested `do:` — is rejected instead of silently
+compiled.
 
 ## Starting point
 
@@ -32,7 +35,16 @@ Already wrong on `86a527b`.
 - [x] At the exit of a nested `do:` (not a lambda's own body), report
       `dead_rebinding` for each last version of an enclosing name rebound in the
       block that is never read.
-- [x] Document the rule in the guide's rebinding paragraph.
+- [x] Count a read of any version made in the block, including versions in
+      branches, so Ink's `lib/ui/tree.blot` focus blur is not rejected.
+- [x] Carry statement-`case` arm rebinding outward as chained binary merges
+      (nested two-arm statement matches, like `if let`); rebinding arms inline
+      their `do:` suite (`Checked.statement_arms`, cached and replayed); a
+      `return` nested in an `if` or loop of a rebinding arm is rejected with
+      `case_arm_return`; loops carry names rebound in statement-case arms
+      (`zig-native/src/backend/loop_targets.zig`, which dropped them before).
+- [x] Document the rules in the guide's rebinding and loop paragraphs and the
+      merge shape in `zig-native/CONTRACT.md`.
 - [x] Add executed-Wasm laws in
       `zig-native/tests/nested_block_rebinding_execution.test.ts`, and a
       cross-module generic receiver dispatch law in
@@ -47,19 +59,27 @@ commit.
 
 ## Acceptance criteria
 
-- [ ] The issue repro, a one-arm variant and a statement `do:` are rejected;
-      rebinding read in its block, carried out by `if`, assigned from a `case`
-      value or carried by a loop still compiles and executes correctly.
+- [ ] The issue repro returns 7 and 3; one-arm, single-arm, three-arm, field,
+      guarded, type-changing, looped and owned-array arms execute correctly with
+      stable guest memory; a plain statement `do:` with an unread `:=` is
+      rejected with `dead_rebinding`; a nested `return` in a rebinding arm is
+      rejected with `case_arm_return`.
 - [ ] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
 - Commit: pending.
-- Validation: the new laws pass with the patched compiler; Ink's ECS probes, its
-  66 test modules and the repository examples raise no `dead_rebinding`.
+- Validation: in the implementation worktree the full gate passed with 2,360
+  native laws (zero leaks), 1,506 guest, 48 smoke and 28 harness tests, and lint
+  reported zero findings. Ink's ECS probes, its 66 test modules and the
+  repository examples raise no `dead_rebinding`. New Zig laws:
+  `zig-native/src/check/core_case_statement_tests.zig`, plus evaluator,
+  body-cache replay and loop-target laws.
 - Comparison: not applicable; checker diagnostic only.
-- Remaining limitations: a rebinding that is read inside its block but expected
-  to reach the enclosing suite is still accepted; the guide states that nested
-  blocks keep their own scope.
+- Remaining limitations: a plain nested `do:` and arms of a `case` whose value
+  is used keep their own scope; a `return` nested in an `if` or loop of a
+  rebinding statement-case arm is rejected rather than supported. Existing
+  statement-case arms that rebind an outer local now carry it out, which can
+  surface `type_mismatch` when arms disagree.
 - Durable record: [compiler/guide.md](../compiler/guide.md) rebinding paragraph.

@@ -57,7 +57,7 @@ change.
 ## Completion evidence
 
 - Commit: `07cbc62`.
-- Validation: Markdown formatting,19 local links and 23 declarative identity/
+- Validation: Markdown formatting, 19 local links and 23 declarative identity/
   provider/row/escape traces pass. Independent runtime review addressed explicit
   pre-exposure cleanup, revocation before retirement, pending retry versus
   ready/terminal memos, JSPI rejection and longer-lived/private journal sinks.

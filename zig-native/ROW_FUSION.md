@@ -1,10 +1,10 @@
 # Checked packed-row producer and consumer fusion
 
-Task040 extends flat scalar row borrowing into ordinary named source consumers
+Task 040 extends flat scalar row borrowing into ordinary named source consumers
 and small producer/consumer compositions. Admission uses checked layouts and
 bounded use evidence, with no library-name recognition. Array/List storage,
 logical lengths, saved snapshots and evaluation order keep their existing
-contracts. Widths1–16 qualify; reference-bearing, nested and larger rows keep
+contracts. Widths 1–16 qualify; reference-bearing, nested and larger rows keep
 ordinary storage.
 
 The emitter already owns loop row views. An admitted named consumer rebinds that
@@ -18,8 +18,8 @@ emitter field, map, collection ABI or general interprocedural escape analysis.
 Direct Array loops now use the same checked view rule as List leaves. A call may
 use a bare row only through a known eager function arrow; demand parameters
 decline. A consumer that needs a whole value receives a newly owned row base,
-copied as raw32-bit words in field order. It never receives an interior Array or
-List-leaf pointer. Aliases, captures, loop carries and unsupported forms keep
+copied as raw 32-bit words in field order. It never receives an interior Array
+or List-leaf pointer. Aliases, captures, loop carries and unsupported forms keep
 the ordinary representation. Unknown calls may materialize a value; they grant
 no permission to borrow it across a call or defer its evaluation.
 
@@ -33,18 +33,19 @@ types and root-frame demand; stale settings are optional misses.
 
 ## Focused laws and rejected attempts
 
-The native consumer control fills either collection with a static3-field row,
+The native consumer control fills either collection with a static 3-field row,
 then consumes each row through an ordinary named function. Its optimized caller
 has no scalar row allocation call. List directory scratch retains its mixed
 owned allocation. Exhaustive backend allocation failures preserve the Core
 snapshot and release partial publication.
 
-Executed controls cover31 record/tuple widths in both optimized and development
-tiers (62 Array/List entry functions per tier),600 rows, a257-row slice crossing
-leaves, a saved original and individually rounded F32 operations. Cancellation,
-NaNs, infinities, subnormals and signed zero are included. Further laws cover
-U32 wrapping; composed producers; saved updates; early break/return; rows saved
-through calls, closures and demands; callback order; traps and recovery.
+Executed controls cover 31 record/tuple widths in both optimized and development
+tiers (62 Array/List entry functions per tier), 600 rows, a 257-row slice
+crossing leaves, a saved original and individually rounded F32 operations.
+Cancellation, NaNs, infinities, subnormals and signed zero are included. Further
+laws cover U32 wrapping; composed producers; saved updates; early break/return;
+rows saved through calls, closures and demands; callback order; traps and
+recovery.
 
 Source and compiled dependencies each change the producer and consumer body,
 reject an invalid edit, recover and restart from an owned checkpoint. Successful
@@ -52,9 +53,9 @@ retained/restarted bytes equal fresh bytes; failed diagnostics equal fresh
 diagnostics and failed publication leaves the last checkpoint exact. Existing
 row/cursor/width17/reference-bearing/suspension laws run alongside these checks.
 
-Focused qualification on the old002/034 base passes22 executed laws and the
-native consumer/OOM law. Porting onto the qualified039/055 release passes8
-additional LLVM guest laws and the analyzer:348 files, zero findings. All
+Focused qualification on the old 002/034 base passes 22 executed laws and the
+native consumer/OOM law. Porting onto the qualified 039/055 release passes 8
+additional LLVM guest laws and the analyzer: 348 files, zero findings. All
 original worktrees/logs remain; copied evidence lives in ignored
 `build/bench/row-fusion-040/`.
 
@@ -69,20 +70,20 @@ Those failed logs remain separate from accepted checks.
 ## Pinned release measurements
 
 The isolated source tree is `e191930790cbc616fbbcfc6fb1e7695aa4dac91f`, based on
-record`f80a1f7`. Standard Zig0.17.0 LLVM/Fast binary SHA256:
+record `f80a1f7`. Standard Zig 0.17.0 LLVM/Fast binary SHA256:
 `468aa4e851cb65c08e9991dd38bc245319d0a8b195f12855c1573264cda886af`. It is
 immutable at`build/bench/row-fusion-040/blotc-isolated`. The baseline is the
-accepted039/055 binary
+accepted 039/055 binary
 `47021c966f75fbb6063b9de52d476fe944a8aa16dc6bc47aeae66cfbf4dd9095`. Pins,
-sources, Wasm,31 raw paired samples and compiler phases are in
+sources, Wasm, 31 raw paired samples and compiler phases are in
 `row-fusion-040/{pins.json,isolated/report.json}`.
 
-The merged024/035/040 initial release is
+The merged 024/035/040 initial release is
 `9ea894d41e157824dd951e5f92827284da98c59af47c8b5831ebd04623688b21`,
 implementation tree`92e09418c4449fd772c0037ead43cd922e51fb6a`, compiler
 source`497069ed0c61181232520acdb249b35828334ae1`. Its rows report is
-`build/bench/joint-024-035-040/rows/report.json`. CPU7,12 warmups and31
-alternating pairs use unmodified production Wasm and100,000 retained rows:
+`build/bench/joint-024-035-040/rows/report.json`. CPU 7, 12 warmups and 31
+alternating pairs use unmodified production Wasm and 100,000 retained rows:
 
 | Fixture                          | Baseline guest CPU ms | Merged guest CPU ms |  Ratio |
 | -------------------------------- | --------------------: | ------------------: | -----: |
@@ -93,27 +94,27 @@ alternating pairs use unmodified production Wasm and100,000 retained rows:
 | Array direct field-read control  |                  .094 |                .098 | 1.0426 |
 | List direct field-read control   |                  .089 |                .073 |  .8202 |
 
-Array committed high-water is2,228,224 bytes and List1,441,792 bytes for both
+Array committed high-water is 2,228,224 bytes and List 1,441,792 bytes for both
 binaries. Removed allocation traffic is not a reduction in committed pages:
 baseline boxes are reclaimed/reused. The native zero-box control, rather than
 memory page equality, establishes elimination. The isolated consumer ratios are
-.0206–.0646, with direct controls1.0347/1.0000; the merged List direct gain also
-includes035's smaller ownership journal. Neither measurement attributes all
-combined behavior to040.
+.0206–.0646, with direct controls 1.0347/1.0000; the merged List direct gain
+also includes 035's smaller ownership journal. Neither measurement attributes
+all combined behavior to 040.
 
-Seven alternating compiler pairs compare fresh compilation and20 hot seed edits
-of the six combined fixtures. Fresh wall medians are4.492→4.271 ms; childCPU is
-below the10ms accounting tick.20-edit CPU medians are40→40 ms, wall87.413→77.746
-ms. Every shape's fresh/retained bytes are exact within its compiler;
-intentional optimization changes permit cross-compiler byte changes. These tiny
-phases do not establish a general compiler CPU improvement.
+Seven alternating compiler pairs compare fresh compilation and 20 hot seed edits
+of the six combined fixtures. Fresh wall medians are 4.492→4.271 ms; childCPU is
+below the 10 ms accounting tick. 20-edit CPU medians are 40→40 ms, wall
+87.413→77.746 ms. Every shape's fresh/retained bytes are exact within its
+compiler; intentional optimization changes permit cross-compiler byte changes.
+These tiny phases do not establish a general compiler CPU improvement.
 
 ## Integrated qualification
 
-Implementation `2689ad5` is complete for task040. The pinned tree above passes
-`deno task test:compiler`: full native suite and925 guest/client tests, all
+Implementation `2689ad5` is complete for task 040. The pinned tree above passes
+`deno task test:compiler`: full native suite and 925 guest/client tests, all
 eight unchanged allocation budgets. `deno task lint:zig` with the pinned local
-analyzer reports349 files and zero findings. Zig0.17.0 was checked before each
+analyzer reports 349 files and zero findings. Zig 0.17.0 was checked before each
 build batch. Exact commands, source/binary identity, raw logs and every
 comparison are in `build/bench/joint-024-035-040/qualification-pins.json`. No
 source correction or repeated full gate was needed after combining the
@@ -126,8 +127,8 @@ teardown zero. Twelve public Wasm modules change through the ownership/fusion
 optimizations; scalar bytes are identical. Seven synthetic fresh/retained/edit/
 restart pairs preserve all bytes even across compilers, with teardown zero.
 These costs qualify the combined batch; no general compile speedup is claimed.
-Task024's general forms/edit target and035's tracing-removal/CPU gates remain
-open independently of completed040.
+Task 024's general forms/edit target and 035's tracing-removal/CPU gates remain
+open independently of completed 040.
 
 The reproducible benchmark command is:
 
@@ -141,4 +142,4 @@ taskset -c 7 deno run -A build/bench/row-fusion-040/measure.ts \
 Fusion remains bounded and opportunistic. Large/deep functions, lazy or escaped
 row uses, unknown shapes/effects and rows beyond the admitted scalar width use
 ordinary owned values. Removing collection construction, all row boxes or all
-generic iterator state is not claimed; tasks041/047 cover separate later hills.
+generic iterator state is not claimed; tasks 041/047 cover separate later hills.

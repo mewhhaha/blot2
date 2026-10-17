@@ -2,9 +2,10 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — scope closed to fixed language-qualification rows by
-  owner decision on 15 October 2026; waiting for a passing full gate on current
-  source.
+- **Status:** Complete — closed on 17 October 2026 against the three
+  scoped-identity rows of
+  [language qualification](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
+  gate at `05401a9`.
 - **Dependencies:** [057](057-specify-scoped-effect-identities.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / effect
   identities and handlers. Sources:
@@ -28,11 +29,11 @@ instances and row subtraction.
 
 ## Implementation checklist
 
-- [ ] Implement instance creation and identity-preserving type/effect evidence
+- [x] Implement instance creation and identity-preserving type/effect evidence
       across generic calls and captures.
-- [ ] Subtract only the handled instance from effect requirements and preserve
+- [x] Subtract only the handled instance from effect requirements and preserve
       multiplicity/chronological row behavior.
-- [ ] Route runtime operations to the correct provider and encode transportable
+- [x] Route runtime operations to the correct provider and encode transportable
       identities in dependencies without serializing fresh authority improperly.
 
 ## Validation
@@ -52,10 +53,10 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Same-typed instances remain distinct through every compiler/runtime stage.
-- [ ] Handler subtraction removes exactly the handled capability and preserves
+- [x] Same-typed instances remain distinct through every compiler/runtime stage.
+- [x] Handler subtraction removes exactly the handled capability and preserves
       valid effects and diagnostics.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Closed acceptance — owner decision, 15 October 2026
@@ -76,25 +77,55 @@ read against these rows.
 The task completes when every native law and guest test mapped to these rows
 passes in the full compiler gate (`deno task test:compiler` and
 `deno task lint:zig`) on the committed source. The rows passed in the 15 October
-freeze `3548546c…`, but the current working tree failed 20 native laws on the
-evening of 15 October, so completion waits for a passing gate on current source.
-The original acceptance index
+freeze `3548546c…`. The 20 native-law failures seen on the evening of 15 October
+were fixed in `23a934f`, and the gate at `05401a9` passed on 17 October. The
+original acceptance index
 (`build/bench/finish-rest-20261015/language-acceptance/qualified-baseline.json`)
-was removed with `build/`; regenerate the row-to-law mapping from the passing
-gate's native test names and guest JUnit report and record it durably in
-[LANGUAGE_QUALIFICATION.md](../zig-native/LANGUAGE_QUALIFICATION.md).
+was removed with `build/`. The row-to-law mapping regenerated from that gate's
+native test names and guest JUnit report is recorded in
+[LANGUAGE_QUALIFICATION.md](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026).
 
 ## Completion evidence
 
-- Partial checkpoint: `0d77afc`; task 058 remains in progress.
-- Validation: full gate passes 1,701 native laws, 1,075 guests, 1,050 complete
-  OOM sweeps plus two expected-error harness laws and zero analyzer findings
-  across 375 files.
-- Pure product/record helpers and multi-input Unit callback invocation preserve
-  exact input owners, row multiplicity and decoded private-body validation.
-  General capture/result/store graphs and public generative schemes stay open.
-- Captured fresh/edit/revert CPU ratios are 1.0049/1.0074/1.0051 against the
-  preceding product-only checkpoint. Public outputs and allocations are exact;
-  see [merged qualification](../zig-native/CONTINUATION_QUALIFICATION.md).
+- Revision: committed source at `05401a9` (17 October 2026), the tree the gate
+  ran on; `23a934f` also passed the full gate. The closure itself is
+  documentation only. Earlier implementation checkpoints include `0d77afc` and
+  `10fab46`.
+- Validation (Zig 0.17.0): the full gate at `05401a9` passes 2,355 native laws
+  in two shards with zero failures and zero leaks, 1,501 guest tests with zero
+  failures, and the harness and smoke phases; `deno task lint:zig` reports zero
+  zig-analyzer findings over 486 files. The run's final native-input check
+  refused only because another session edited `../gdev` during the run; every
+  phase passed. The earlier gate at `23a934f` passed 2,354 native laws with zero
+  leaks, 1,486 guest, 28 harness, 21 preflight and 48 smoke tests and zero
+  analyzer findings.
+- Row-to-law mapping: the
+  [index](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026)
+  names 32 native laws and 24 guest tests for the twelve requirements of the
+  three scoped-identity rows; all passed in the `05401a9` gate.
+- Comparison: the design's required measurement against closed static controls
+  (seven alternating compiler pairs, 31 warmed guest pairs) is recorded in
+  [measured scope cost](../zig-native/LANGUAGE_QUALIFICATION.md#measured-scope-cost):
+  median fresh compiler CPU for two fresh scoped State owners is 1.0951× the
+  static control, and warmed guest calls cost 1.2605× in sync and 1.0807× in
+  JSPI mode. The earlier partial checkpoint `0d77afc` measured fresh/edit/revert
+  CPU ratios of 1.0049/1.0074/1.0051 against the preceding product-only
+  checkpoint
+  ([merged qualification](../zig-native/CONTINUATION_QUALIFICATION.md)). This
+  closure changes no code, so no new comparison applies.
+- Remaining limitations: forms outside the rows are excluded scope under the
+  owner decision of 15 October 2026 (closed acceptance above;
+  [README owner decisions](README.md#task-index)), not open work. General
+  capture/result/store graphs, general higher-order and anonymous invocation
+  binder transport, and public generative selection schemes beyond the admitted
+  invocation-version forms reject or decline conservatively with stable
+  diagnostics
+  ([conservative limits](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md#conservative-limits)).
+  Live scoped authority never enters portable artifacts: scoped receipts decline
+  import, and checkpoints keep validated symbolic binders that create fresh
+  owners when run. Scoped routing costs about 26% more per warmed sync guest
+  call than static families on the measured workload.
 - Durable record:
-  [scoped effects](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md).
+  [row-to-law index](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
+  [scoped effect qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md)
+  and the [scoped effects design](../zig-native/SCOPED_EFFECTS.md).

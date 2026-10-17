@@ -104,6 +104,18 @@ const Collector = struct {
                         try self.scope(arm.c, arm.b, depth + 1);
                     }
                 },
+                // A statement case carries rebinding out of its plain do: arms.
+                .case_expr => for (self.tree.list(.{ .start = value.b, .len = value.c })) |arm_id| {
+                    const arm = self.tree.node(arm_id);
+                    const arm_body = self.tree.extra.items[arm.c + 1];
+                    if (self.tree.node(arm_body).tag != .block or self.tree.node(arm_body).c != 0) continue;
+                    const mark = self.trail.items.len;
+                    defer self.restore(mark);
+                    for (self.tree.list(.{ .start = arm.a, .len = arm.b })) |row| {
+                        for (self.tree.children(row)) |pattern_id| try self.pattern(pattern_id, depth + 1);
+                    }
+                    try self.suite(arm_body, depth + 1);
+                },
                 .for_stmt => try self.scope(self.tree.extra.items[value.c + 1], value.a, depth + 1),
                 .range_stmt => try self.scope(value.c, 0, depth + 1),
                 .forever_stmt => try self.scope(value.a, 0, depth + 1),

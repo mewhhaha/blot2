@@ -416,7 +416,7 @@ the final CPU/memory gates.
 ## Integrated descriptors, forwarding and State at `850793f`
 
 All three frozen slices above are in `850793f`, jointly qualified with scoped
-SIMD and guarded body receipts. Full native suite,936 guest/client tests, eight
+SIMD and guarded body receipts. Full native suite, 936 guest/client tests, eight
 unchanged budgets and 350 analyzer files/zero pass. Standard Zig 0.17.0
 LLVM/Fast release `fa471c09…2387` produces the exact 11352-byte mixed Wasm
 `b973f621…9a94` from the isolated final State screen. The 32-byte header,
@@ -428,16 +428,16 @@ five, checks values and flat warm memory. Baseline is qualified 2689 ad 5
 (`9ea894d4`), so these merged costs include all three slices rather than only
 State.
 
-| Guest batch              | Baseline CPU ms | Joint CPU ms |  Ratio |
-| ------------------------ | --------------: | -----------: | -----: |
-| Sync scalar,10000 calls  |           3.215 |        3.102 |  .9649 |
-| Sync Arrays,2000 calls   |           4.043 |        4.044 | 1.0002 |
-| Sync requests,2000 calls |           7.054 |        6.898 |  .9780 |
-| Sync cycles,20000 cycles |          28.536 |       18.432 |  .6459 |
-| JSPI scalar,10000 calls  |          18.027 |       17.801 |  .9875 |
-| JSPI Arrays,2000 calls   |           7.316 |        7.441 | 1.0171 |
-| JSPI requests,2000 calls |          10.330 |       10.179 |  .9853 |
-| JSPI cycles,20000 cycles |          28.567 |       18.425 |  .6450 |
+| Guest batch               | Baseline CPU ms | Joint CPU ms |  Ratio |
+| ------------------------- | --------------: | -----------: | -----: |
+| Sync scalar, 10000 calls  |           3.215 |        3.102 |  .9649 |
+| Sync Arrays, 2000 calls   |           4.043 |        4.044 | 1.0002 |
+| Sync requests, 2000 calls |           7.054 |        6.898 |  .9780 |
+| Sync cycles, 20000 cycles |          28.536 |       18.432 |  .6459 |
+| JSPI scalar, 10000 calls  |          18.027 |       17.801 |  .9875 |
+| JSPI Arrays, 2000 calls   |           7.316 |        7.441 | 1.0171 |
+| JSPI requests, 2000 calls |          10.330 |       10.179 |  .9853 |
+| JSPI cycles, 20000 cycles |          28.567 |       18.425 |  .6450 |
 
 Cycles improve about 35.5%; the JSPI Array control regresses 1.7%. These costs
 do not close the historical tracing comparison. Task 035 remains active for
@@ -479,7 +479,7 @@ The separately frozen inputs under `build/bench/tracing/` are
 preserved in their original trees. These do not replace merged qualification.
 
 The Array publication fix changes the unchanged rolling cancellation fixture
-from fallback `[1,0,7]` and growing heap to strict `[2,2,0]` and flat 128KiB.
+from fallback `[1,0,7]` and growing heap to strict `[2,2,0]` and flat 128 KiB.
 Single-use private storage does the same for the original cyclic mapped-window
 and persistent-update fixture. No source annotation rewrites hide either
 failure. Both tiers retain results, zero roots/leases and bounded 4096→65536
@@ -492,7 +492,7 @@ The merged tree is `3688e1965213b06e36a1ad5118ab1c6f1c1de54b`, compiler source
 `48f7bf8cd3219535013dd8eb96b28e0c67702bcd`. Standard Zig 0.17.0 LLVM/Fast
 release SHA-256
 `44af80a95af5de58c521a7d520c5d8c6ea993e09aae1c06e9031f3d5dbd9ec2b` passes full
-native/OOM,961 guest/client tests, all eight unchanged budgets and 351 analyzer
+native/OOM, 961 guest/client tests, all eight unchanged budgets and 351 analyzer
 files/zero. Private arena helper roles derive through the existing
 `Arena.function_fields` catalog and remap through executable artifacts;
 optimizer v 12 retains the numeric-scope/row-product domain alongside ownership
@@ -502,16 +502,16 @@ Twenty-five CPU 7 alternating merged/qualified `850793f` pairs discard the first
 five and check results/flat warm storage in sync and JSPI modes. The mixed Wasm
 grows 11352→11650 bytes; both manifests remain `[2,2,0]`.
 
-| Guest batch              | Baseline CPU ms | Merged CPU ms |  Ratio |
-| ------------------------ | --------------: | ------------: | -----: |
-| Sync scalar,10000 calls  |           3.197 |         3.227 | 1.0094 |
-| Sync Arrays,2000 calls   |           4.074 |         4.106 | 1.0079 |
-| Sync requests,2000 calls |           6.989 |         7.055 | 1.0094 |
-| Sync cycles,20000 cycles |          18.870 |        16.406 |  .8694 |
-| JSPI scalar,10000 calls  |          18.122 |        17.284 |  .9538 |
-| JSPI Arrays,2000 calls   |           7.295 |         7.338 | 1.0060 |
-| JSPI requests,2000 calls |          10.141 |        10.153 | 1.0012 |
-| JSPI cycles,20000 cycles |          18.719 |        16.319 |  .8718 |
+| Guest batch               | Baseline CPU ms | Merged CPU ms |  Ratio |
+| ------------------------- | --------------: | ------------: | -----: |
+| Sync scalar, 10000 calls  |           3.197 |         3.227 | 1.0094 |
+| Sync Arrays, 2000 calls   |           4.074 |         4.106 | 1.0079 |
+| Sync requests, 2000 calls |           6.989 |         7.055 | 1.0094 |
+| Sync cycles, 20000 cycles |          18.870 |        16.406 |  .8694 |
+| JSPI scalar, 10000 calls  |          18.122 |        17.284 |  .9538 |
+| JSPI Arrays, 2000 calls   |           7.295 |         7.338 | 1.0060 |
+| JSPI requests, 2000 calls |          10.141 |        10.153 | 1.0012 |
+| JSPI cycles, 20000 cycles |          18.719 |        16.319 |  .8718 |
 
 Merged cycles improve about 13% versus `850793f`; the other control costs are
 recorded above. Public compiler CPU ratios 0.9945–1.0234 and zero peak deltas
@@ -776,7 +776,7 @@ Three native laws include full OOM cleanup. Ten direct Wasm protocol groups
 cover cycles, outgoing children, bad protocols, journal page growth, trap unwind
 and repeated bounded memory. The direct fixture's mutable ownership switch is
 not Source admission evidence. This checkpoint enables no production rewrite and
-claims no historical performance win. Task035 remains open; the runtime
+claims no historical performance win. Task 035 remains open; the runtime
 candidate and final qualification remain separate.
 
 ## Owned emission coordinates (15 October 2026)
@@ -789,9 +789,9 @@ not independently establish dispatch, lifetime, cohort membership or RC
 permission; a consumer must rederive those relationships from immutable Core.
 
 The root receipt law passes complete replay/import allocation failures and
-malformed-coordinate controls. Twenty-two selected executed groups and the
-full453-file zero-finding analyzer pass. Ordinary Cost remains byte-identical
-at11958B. Private25-pair controls measure wall geomean0.999058 over
+malformed-coordinate controls. Twenty-two selected executed groups and the full
+453-file zero-finding analyzer pass. Ordinary Cost remains byte-identical at
+11958B. Private 25-pair controls measure wall geomean 0.999058 over
 ordinary/Cost fresh/retained cases; CPU instrumentation was invalid and supplies
 no CPU gate. Exact source images, pins and root logs are in
 `build/bench/complete-program-20261015/semantic-emission/`. The production
@@ -801,11 +801,11 @@ intersection/consumer and historical ownership performance gates remain open.
 
 The private semantic/Core-to-runtime intersection and late assembly consumer
 pass focused lifecycle and retained/portable execution controls. They remain
-unpromoted. Thirty balanced CPU7 rounds preserve exact values and128KiB warmed
-memory but cycle CPU remains flat against the current compiler:median ratios
-0.99955sync and1.00105JSPI. Historical total median geomean1.28443 and cycle
-p951.64304/1.61003 fail the required gates. Removing measured cycle walks alone
-replaces their cost with per-member pins and group-list validation.
+unpromoted. Thirty balanced CPU 7 rounds preserve exact values and 128 KiB
+warmed memory but cycle CPU remains flat against the current compiler:median
+ratios 0.99955 sync and 1.00105 JSPI. Historical total median geomean 1.28443
+and cycle p95 1.64304/1.61003 fail the required gates. Removing measured cycle
+walks alone replaces their cost with per-member pins and group-list validation.
 
 Immutable source/patch/compiler pins, raw rounds, profiling samples and the
 rejection are preserved in
@@ -815,8 +815,8 @@ no ownership performance or full-program completion is claimed.
 
 The subsequent nested-callable reuse repair checks each callable-layout record
 against its own checked job rather than its enclosing caller. Semantic-site
-admission and immutable lifetime checks remain unchanged. Root complete-OOM,
-26executed groups and112affected analyzer files pass; ordinary Cost and captured
-project bytes remain exact. Captured retained reuse recovers489fragments. This
+admission and immutable lifetime checks remain unchanged. Root complete-OOM, 26
+executed groups and 112 affected analyzer files pass; ordinary Cost and captured
+project bytes remain exact. Captured retained reuse recovers 489 fragments. This
 compiler-work repair supplies no new ownership permission or tracing-removal
 evidence. See `build/bench/complete-program-20261015/nested-callable-reuse/`.

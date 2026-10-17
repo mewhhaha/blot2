@@ -56,17 +56,17 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: `850793f`, joint implementation tree`ee33b8b5…cf46`.
-- Validation: Zig0.17.0 full native/936 guest-client gate, eight unchanged
-  budgets and350 analyzer files/zero. Both-tier tails, row widths/slices,
+- Commit: `850793f`, joint implementation tree `ee33b8b5…cf46`.
+- Validation: Zig 0.17.0 full native/936 guest-client gate, eight unchanged
+  budgets and 350 analyzer files/zero. Both-tier tails, row widths/slices,
   snapshots, effects, F32 order/traps, retained/checkpoint edits and OOM pass.
   The initial helper-directory failure and corrected recovery are preserved.
-- Comparison: LLVM/Fast`fa471c09…2387` versus qualified040`9ea894d4…8b21`.
+- Comparison: LLVM/Fast `fa471c09…2387` versus qualified 040 `9ea894d4…8b21`.
   Scoped generator CPU ratios .5013/.5717; Array rows .8350–.9046, smaller List
   rows .8997–.9127. Guest memory is unchanged. Public compile CPU .9966–1.0173;
   no general compiler speedup or reliable widest-List gain is claimed.
 - Remaining limitations: conditional/carrying loops, trapping/effectful kernels
   and unproved row products retain ordinary scalar lowering. Reductions are
   never automatically regrouped. Development artifacts stay scalar and exact.
-- Durable record:[NUMERIC_SIMD](../zig-native/NUMERIC_SIMD.md), with exact pins,
-  three isolated screens and the merged release distributions.
+- Durable record: [NUMERIC_SIMD](../zig-native/NUMERIC_SIMD.md), with exact
+  pins, three isolated screens and the merged release distributions.

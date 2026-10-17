@@ -57,10 +57,10 @@ development and the scenarios below.
 ## Completion evidence
 
 - Commit: `4013b10`.
-- Validation: Zig 0.17.0; full native/OOM,961 guest/client tests, both tiers,
+- Validation: Zig 0.17.0; full native/OOM, 961 guest/client tests, both tiers,
   eight unchanged budgets and 351 analyzer files/zero. Shared 2^31-leaf bounds,
   references/cycles, saved versions and retained/restart failures pass.
-- Comparison:31 alternating warmed pairs show linear scalar build, logarithmic
+- Comparison: 31 alternating warmed pairs show linear scalar build, logarithmic
   callback paths, faster interval queries and measured costs versus exclusive
   Array edits. Memory charges current/original and 64 saved versions separately.
   LLVM/source/report pins are in

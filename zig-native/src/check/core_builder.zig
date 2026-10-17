@@ -153,6 +153,8 @@ const Scratch = struct {
     merge_heads: []u32 = &.{},
     merge_next: []u32 = &.{},
     loop_exit_indices: []u32 = &.{},
+    /// Nonzero for a statement case arm block that carries rebinding out.
+    statement_arms: []u32 = &.{},
     definition_epochs: []u32 = &.{},
     reference_epochs: []u32 = &.{},
     capture_epoch: u32 = 0,
@@ -178,6 +180,7 @@ const Scratch = struct {
         allocator.free(self.merge_heads);
         allocator.free(self.merge_next);
         allocator.free(self.loop_exit_indices);
+        allocator.free(self.statement_arms);
         allocator.free(self.definition_epochs);
         allocator.free(self.reference_epochs);
     }
@@ -251,6 +254,10 @@ const Builder = struct {
         if (self.source.checked.loop_exits.len != 0) {
             try self.allocateEmpty(&self.scratch.loop_exit_indices, self.source.tree.nodes.items.len);
             for (self.source.checked.loop_exits, 0..) |exit, index| self.scratch.loop_exit_indices[exit.node] = @intCast(index + 1);
+        }
+        if (self.source.checked.statement_arms.len != 0) {
+            try self.allocateEmpty(&self.scratch.statement_arms, self.source.tree.nodes.items.len);
+            for (self.source.checked.statement_arms) |arm| self.scratch.statement_arms[arm.node] = 1;
         }
         try self.tables.type_nodes.appendSlice(self.allocator, self.source.checked.types.nodes.items[0..6]);
         for (0..6) |i| self.scratch.type_map[i] = @intCast(i);
@@ -2538,6 +2545,10 @@ const Builder = struct {
                 try self.copyMerges(source, id);
                 return id;
             },
+            .case_expr => {
+                if (self.carryingCase(source)) return self.caseStatement(source, depth + 1);
+                return self.expression(source, depth + 1);
+            },
             .if_let_stmt => {
                 const input = try self.expression(syntax.b, depth + 1);
                 const input_range = try self.save(&.{input});
@@ -2561,6 +2572,105 @@ const Builder = struct {
             },
             else => return self.expression(source, depth + 1),
         }
+    }
+    fn statementArm(self: *const Builder, source: ast.Id) bool {
+        return self.scratch.statement_arms.len != 0 and self.scratch.statement_arms[source] != 0;
+    }
+    fn carryingCase(self: *const Builder, source: ast.Id) bool {
+        const syntax = self.source.tree.node(source);
+        for (self.source.tree.list(.{ .start = syntax.b, .len = syntax.c })) |arm| {
+            if (self.statementArm(self.source.tree.extra.items[self.source.tree.node(arm).c + 1])) return true;
+        }
+        return false;
+    }
+    /// A statement case whose do: arms carry rebinding outward lowers to nested
+    /// two-arm statement matches, so every level keeps an if let's binary
+    /// merges. Level k tests arm k; otherwise it binds the inputs once and
+    /// continues with level k + 1. The last level tests the last two arms, and
+    /// a lone arm falls back to its unreachable incoming versions.
+    fn caseStatement(self: *Builder, source: ast.Id, depth: usize) Error!core.Id {
+        const syntax = self.source.tree.node(source);
+        const source_inputs = self.source.tree.extra.items[syntax.a..][0..2];
+        var inputs: std.ArrayList(core.Id) = .empty;
+        defer inputs.deinit(self.allocator);
+        for (self.source.tree.list(.{ .start = source_inputs[0], .len = source_inputs[1] })) |input| try inputs.append(self.allocator, try self.expression(input, depth + 1));
+        const id = try self.caseLevel(source, self.source.tree.list(.{ .start = syntax.b, .len = syntax.c }), 0, inputs.items, depth + 1);
+        self.scratch.ast_map[source] = id;
+        return id;
+    }
+    fn caseLevel(self: *Builder, source: ast.Id, arms: []const ast.Id, level: usize, inputs: []const core.Id, depth: usize) Error!core.Id {
+        if (depth >= 1024) {
+            try self.diagnostic(.complexity, source);
+            return 0;
+        }
+        const input_range = try self.save(inputs);
+        const tested = try self.caseArm(arms[level], depth + 1);
+        const fallback: core.MatchArm = switch (arms.len - level) {
+            1 => blk: {
+                var wildcards: std.ArrayList(core.PatternId) = .empty;
+                defer wildcards.deinit(self.allocator);
+                for (inputs) |input| try wildcards.append(self.allocator, try self.addPattern(source, .{ .tag = .wildcard, .ty = self.tables.nodes.items[input].ty }));
+                const row = try self.addPatternRow(wildcards.items);
+                break :blk .{ .rows = .{ .start = row, .len = 1 }, .body = 0, .span = self.source.tree.span(source) };
+            },
+            2 => try self.caseArm(arms[level + 1], depth + 1),
+            else => blk: {
+                const next = arms[level + 1];
+                var binders: std.ArrayList(core.PatternId) = .empty;
+                defer binders.deinit(self.allocator);
+                var references: std.ArrayList(core.Id) = .empty;
+                defer references.deinit(self.allocator);
+                for (inputs) |input| {
+                    const ty = self.tables.nodes.items[input].ty;
+                    if (self.tables.bindings.items.len == std.math.maxInt(u32)) return error.CoreLimit;
+                    const binding: core.BindingId = @intCast(self.tables.bindings.items.len);
+                    try self.tables.bindings.append(self.allocator, .{ .kind = .local, .ty = ty, .scheme = .{ .root = ty }, .target = .{ .binding = 0 }, .span = self.source.tree.span(next) });
+                    try binders.append(self.allocator, try self.addPattern(next, .{ .tag = .bind, .ty = ty, .a = binding }));
+                    try references.append(self.allocator, try self.referenceNode(next, binding, ty));
+                }
+                const row = try self.addPatternRow(binders.items);
+                const rest = try self.caseLevel(source, arms, level + 1, references.items, depth + 1);
+                const children = try self.save(&.{rest});
+                break :blk .{ .rows = .{ .start = row, .len = 1 }, .body = try self.make(next, .{ .tag = .suite, .ty = T.unit, .a = children.start, .b = children.len }), .span = self.source.tree.span(next) };
+            },
+        };
+        const arm_start: u32 = @intCast(self.tables.match_arms.items.len);
+        try self.tables.match_arms.appendSlice(self.allocator, &.{ tested, fallback });
+        const index: u32 = @intCast(self.tables.matches.items.len);
+        try self.tables.matches.append(self.allocator, .{ .inputs = input_range, .arms = .{ .start = arm_start, .len = 2 }, .statement = true });
+        const id = try self.make(if (level == 0) source else arms[level], .{ .tag = .match, .ty = T.unit, .a = index });
+        try self.copyMerges(arms[level], id);
+        return id;
+    }
+    /// A carrying do: arm runs as its level's suite, like an if branch. A
+    /// return written directly in it ends the arm, so only its value remains.
+    /// Any other arm body is that suite's one discarded statement.
+    fn caseArm(self: *Builder, source: ast.Id, depth: usize) Error!core.MatchArm {
+        const syntax = self.source.tree.node(source);
+        const row_start: u32 = @intCast(self.tables.pattern_rows.items.len);
+        for (self.source.tree.list(.{ .start = syntax.a, .len = syntax.b })) |row_source| {
+            var patterns: std.ArrayList(core.Id) = .empty;
+            defer patterns.deinit(self.allocator);
+            for (self.source.tree.children(row_source)) |pattern_source| try patterns.append(self.allocator, try self.patternNode(pattern_source, depth + 1));
+            _ = try self.addPatternRow(patterns.items);
+        }
+        const rows: core.List = .{ .start = row_start, .len = @intCast(self.tables.pattern_rows.items.len - row_start) };
+        const details = self.source.tree.extra.items[syntax.c..][0..2];
+        const guard = try self.expression(details[0], depth + 1);
+        var children: std.ArrayList(core.Id) = .empty;
+        defer children.deinit(self.allocator);
+        if (self.statementArm(details[1])) {
+            for (self.source.tree.children(details[1])) |child| {
+                const statement_ = self.source.tree.node(child);
+                if (statement_.tag == .return_stmt) {
+                    if (statement_.a != 0) try children.append(self.allocator, try self.expression(statement_.a, depth + 1));
+                } else try children.append(self.allocator, try self.statement(child, depth + 1));
+            }
+        } else try children.append(self.allocator, try self.expression(details[1], depth + 1));
+        const range = try self.save(children.items);
+        const body = try self.make(details[1], .{ .tag = .suite, .ty = T.unit, .a = range.start, .b = range.len });
+        if (self.statementArm(details[1])) self.scratch.ast_map[details[1]] = body;
+        return .{ .rows = rows, .guard = guard, .body = body, .span = self.source.tree.span(source) };
     }
     fn copyMerges(self: *Builder, source: ast.Id, id: core.Id) Error!void {
         const start: u32 = @intCast(self.tables.merges.items.len);

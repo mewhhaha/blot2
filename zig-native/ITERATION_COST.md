@@ -37,11 +37,11 @@ measurements explain the dominant iteration cost and do not justify weakening
 OOM or ownership coverage. Use focused development checks, then one full gate
 per frozen batch.
 
-The repaired compiler first ran a full native phase in743.310 seconds, then
-972/973 guests in274.516 seconds. After the counter-schema test correction,
+The repaired compiler first ran a full native phase in 743.310 seconds, then
+972/973 guests in 274.516 seconds. After the counter-schema test correction,
 unchanged compiler source reused the build and successful native cache:
-0.056/0.025 seconds for those task spans,276.872 seconds for all973 guests. The
-complete final gate took276.964 seconds and passed. This is retained-cache
+0.056/0.025 seconds for those task spans, 276.872 seconds for all 973 guests.
+The complete final gate took 276.964 seconds and passed. This is retained-cache
 reuse, not a fresh native execution or faster changed-source build. Pins/logs
 are in `build/bench/joint-047-086-qualified/`.
 

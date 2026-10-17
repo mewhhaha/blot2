@@ -55,13 +55,13 @@ change.
 ## Completion evidence
 
 - Commit: `20ef28d`; reviewed against qualified compiler `2689ad5`.
-- Validation: Deno2.9.7 Markdown formatting/local links; independent U32
+- Validation: Deno 2.9.7 Markdown formatting/local links; independent U32
   wrapping, F32 order and noncommutative left-inverse trace assertions. No
   compiler source or executable fixtures changed; compiler builds were not
   needed for this documentation milestone.
 - Comparison: concrete callback/node/time/storage bounds are specified for
   ordered fold, monoid/group windows and persistent summary build/get/query/
-  update/concatenation. Measurements belong to045–046.
+  update/concatenation. Measurements belong to 045–046.
 - Remaining limits: arbitrary algebra laws and reducer agreement are explicit
   caller promises, not compiler-certified proofs or guessed function identity.
   No executable API/optimization is claimed by this design.

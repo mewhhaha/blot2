@@ -591,7 +591,7 @@ and producer ordinal relocation remain open; task 024 is active.
 
 The shared-principal, declared/portable qualification, seed-rebuild body offer
 and applied-annotation/constructor recipe slices above are jointly qualified at
-`2689ad5`. Full native suite,925 guest/client laws, eight unchanged budgets and
+`2689ad5`. Full native suite, 925 guest/client laws, eight unchanged budgets and
 349 analyzer files/zero pass. The exact LLVM/Fast release is `9ea894d4…8b21`;
 public CPU is mixed (.9946–1.0501), peak deltas zero and teardown zero. Earlier
 isolated costs are not substituted for merged costs. General scopes/cases,
@@ -662,7 +662,7 @@ claims no admission or performance gain.
 ## Integrated guarded scopes at `850793f`
 
 The independent guard and scope/local-principal slices are jointly qualified at
-`850793f` with the full native suite,936 guest/client tests, eight unchanged
+`850793f` with the full native suite, 936 guest/client tests, eight unchanged
 budgets and 350 analyzer files/zero. The exact LLVM/Fast compiler is
 `fa471c09…2387`; merged public CPU .9966–1.0173, peak deltas zero, requested
 bytes−227,737..0 and teardown zero. The guard fixes the confirmed main wrong
@@ -681,7 +681,7 @@ isolated safety/scopes/local pins remain under
 ## Integrated explicit fields at `4013b10`
 
 The frozen `concrete-fields-followup.patch` (`4ed0c57f…f5d8`) is now qualified
-with the full native suite,961 guest/client tests, eight unchanged budgets and
+with the full native suite, 961 guest/client tests, eight unchanged budgets and
 351 analyzer files/zero. Explicit field nodes own their spelling/tag and nominal
 receipts, remapping current slots and constructor variants. This does not admit
 dotted access paths; their complete side tables are still required.
@@ -726,20 +726,20 @@ bytes.
 
 Exact basis tree `344769cece12fdeb4484b63187cfab123a3abe85` and immutable
 Safe/noLLVM binaries are recorded in ignored `build/bench/task024-dotted/` in
-`/tmp/blot2-task024-completion`. Five alternating pairs on CPU5, with two
+`/tmp/blot2-task024-completion`. Five alternating pairs on CPU 5, with two
 warmups and 20 edited/reverted preparations per sample, measure dotted128/512
 edit child CPU 123.5→90 /477.5→350.5 ms (paired median ratios .7317/.7267), body
 elaborations 130.5/514.5→2.5 and exact Wasm hashes. Dotted population CPU rises
-about9–12%; 512 steady RSS rises about2 MiB. Plain controls measure79→77.5
-/294→293 ms and unchanged2.5 elaborations. Process clocks use Linux100Hz ticks;
-these development costs are not LLVM/Fast release acceptance or a
+about 9–12%; 512 steady RSS rises about 2 MiB. Plain controls measure 79→77.5
+/294→293 ms and unchanged 2.5 elaborations. Process clocks use Linux 100 Hz
+ticks; these development costs are not LLVM/Fast release acceptance or a
 captured-project speedup.
 
-Task024 remains active. General requirements, dotted methods/selector forms,
+Task 024 remains active. General requirements, dotted methods/selector forms,
 producer-unit ordinal relocation, richer scoped/control forms and the total
-under100ms edit target remain open. Root owns the combined full gate and release
-qualification; no milestone commit, overall completion or task053 qualification
-is claimed by this isolated checkpoint.
+under 100 ms edit target remain open. Root owns the combined full gate and
+release qualification; no milestone commit, overall completion or task 053
+qualification is claimed by this isolated checkpoint.
 
 ## Inferred local requirements (isolated checkpoint, 13 October 2026)
 
@@ -752,15 +752,15 @@ duplicate body obligations. The marker uses existing predicate padding; body and
 local-scheme headers stay unchanged. Complete positive/negative member catalogs
 remain reads, including requirements on otherwise unreferenced local bindings.
 
-Local requirement traversal shares a4,096-node proof budget, with at most4,096
+Local requirement traversal shares a 4,096-node proof budget, with at most 4,096
 owned predicates across the body. Unsupported or exhausted proofs retain
 ordinary checking. Written local qualification origins, shared local callee
 edges, field/receiver/update/effect requirements and other residual forms remain
 ordinary. No portable artifact schema changes.
 
-The preceding implementation passes53 focused native laws. Final bounded code
-passes18 owned-body/principal/OOM controls and16 large-receipt fallback
-controls; 21 executed-Wasm laws plus eight unchanged budgets and371 analyzer
+The preceding implementation passes 53 focused native laws. Final bounded code
+passes 18 owned-body/principal/OOM controls and 16 large-receipt fallback
+controls; 21 executed-Wasm laws plus eight unchanged budgets and 371 analyzer
 files/zero pass. Source/compiled imports revoke local reuse on selected Foreign
 interfaces with fresh-identical diagnostics, then recover. Laws cover
 result-directed selection, negative candidate insertion, new AST/type/spelling
@@ -769,17 +769,18 @@ failures and positive Foreign callback traces. Every successful retained output
 equals fresh bytes.
 
 Against the exact dotted checkpoint `dca23f405a42c208d0cbcccf66656f7a69a09739`,
-three alternating CPU5 pairs with two warmups and16 edits/reverts per sample
-measure Safe/noLLVM local64/128 CPU98.125→79.375 /188.125→152.5 ms; paired
-median ratios.8141/.8040, elaborations69.5/133.5→5.5. Plain controls are near
-parity. Local population CPU rises22–25%;128 steady RSS rises372KiB. Root's full
-gate was running during these development measurements. Immutable binaries,
+three alternating CPU 5 pairs with two warmups and 16 edits/reverts per sample
+measure Safe/noLLVM local64/128 CPU 98.125→79.375 /188.125→152.5 ms; paired
+median ratios .8141/.8040, elaborations 69.5/133.5→5.5. Plain controls are near
+parity. Local population CPU rises 22–25%; 128 steady RSS rises 372 KiB. Root's
+full gate was running during these development measurements. Immutable binaries,
 prior unbounded prototype, samples, exact pins and logs remain in ignored
 `build/bench/task024-local-requirements/` in `/tmp/blot2-task024-completion`.
 
-Task024 and dependent053 remain open. Root owns combined full-gate and LLVM/Fast
-acceptance. This does not complete general local requirements, producer-unit
-ordinal relocation, richer scoped/control forms or the total edit target.
+Task 024 and dependent 053 remain open. Root owns combined full-gate and
+LLVM/Fast acceptance. This does not complete general local requirements,
+producer-unit ordinal relocation, richer scoped/control forms or the total edit
+target.
 
 ## Merged checkpoint, 13 October 2026
 
@@ -789,7 +790,7 @@ executed guests, 977 exhaustive failure sweeps and zero analyzer findings across
 exact source/binary pins, measured costs and still-open scope. Isolated clocks
 above remain separate from the final combined release measurements.
 
-### Isolated declared local qualifications —13 October 2026
+### Isolated declared local qualifications — 13 October 2026
 
 Written associated/result-selection and `type_rep` local principals now keep
 exact clause authority through replay. Owned predicate origins store spans
@@ -808,31 +809,31 @@ header. The public-interface check still validates each predicate's kind, four
 type roots and member name, and complete candidate reads precede selection.
 Producer binding/unit ordinal changes still force ordinary checking.
 
-Focused Safe/noLLVM validation passes54 existing body-cache laws, including
+Focused Safe/noLLVM validation passes 54 existing body-cache laws, including
 fresh/population and retained allocation-failure sweeps, followed by the added
-exact-clause/budget law. All23 body guest laws and eight unchanged budgets pass;
-371 Zig files have zero analyzer findings. U32/F32/owning Array native controls,
-source and compiled exported local origins, earlier AST/type/spelling edits,
-selected body edits, wrong clauses, missing references, Foreign rejection and
-recovery retain fresh-identical bytes or diagnostics and executed results.
+exact-clause/budget law. All 23 body guest laws and eight unchanged budgets
+pass; 371 Zig files have zero analyzer findings. U32/F32/owning Array native
+controls, source and compiled exported local origins, earlier AST/type/spelling
+edits, selected body edits, wrong clauses, missing references, Foreign rejection
+and recovery retain fresh-identical bytes or diagnostics and executed results.
 
 Against exact local-requirement checkpoint
-`51a2f752db3ec27d98f45925c95fa155bd2b0d1e`, three alternating CPU5 pairs with
-two warmups and16 hot edits/reverts measure declared64/128 CPU94.375→81.875 /
-183.75→158.125ms; paired median ratios.8733/.8557. Elaborations69.5/133.5→5.5.
-Plain controls remain near parity. Declared population CPU rises37–44%; steady
-RSS rises roughly1.1/1.7MiB. Root's combined gate ran concurrently, so these
-Safe/noLLVM numbers are development measurements. Immutable binaries,48samples,
-exact pins and logs live in ignored `build/bench/task024-declared-local/` in
-`/tmp/blot2-task024-completion`.
+`51a2f752db3ec27d98f45925c95fa155bd2b0d1e`, three alternating CPU 5 pairs with
+two warmups and 16 hot edits/reverts measure declared64/128 CPU 94.375→81.875 /
+183.75→158.125 ms; paired median ratios .8733/.8557. Elaborations
+69.5/133.5→5.5. Plain controls remain near parity. Declared population CPU rises
+37–44%; steady RSS rises roughly 1.1/1.7 MiB. Root's combined gate ran
+concurrently, so these Safe/noLLVM numbers are development measurements.
+Immutable binaries, 48 samples, exact pins and logs live in ignored
+`build/bench/task024-declared-local/` in `/tmp/blot2-task024-completion`.
 
-Task024 and053 remain open for shared local callee edges, field/receiver/update/
-effect residuals, imported annotation heads, producer ordinal relocation,
-general scoped/control forms and the total edit target. Parent integration owns
-full-gate and LLVM/Fast acceptance; this checkpoint is reviewable, not an
-accepted overall milestone.
+Task 024 and 053 remain open for shared local callee edges,
+field/receiver/update/ effect residuals, imported annotation heads, producer
+ordinal relocation, general scoped/control forms and the total edit target.
+Parent integration owns full-gate and LLVM/Fast acceptance; this checkpoint is
+reviewable, not an accepted overall milestone.
 
-### Isolated producer ordinal relocation —13 October 2026
+### Isolated producer ordinal relocation — 13 October 2026
 
 Body offers now resolve the accepted revision's borrowed cache by canonical
 producer filename, independently of current loader order. A request-local map
@@ -840,7 +841,7 @@ owns only its directory; prior body leases stay with the accepted revision.
 Missing or ambiguous old filenames offer nothing. Current checking still
 precedes every replay and executable lowering/relinking remains fresh.
 
-Project checking supplies a32-byte digest of each original loaded module
+Project checking supplies a 32-byte digest of each original loaded module
 filename. Nominal recipes, applied annotation reads, associated candidate
 catalogs, imported principals and declared qualification authority bind that
 origin. Imported values also bind their original declaration name. Numerical
@@ -849,25 +850,25 @@ nominals by exact origin/name and current value bindings by the unchanged body
 spelling, then validates the complete interface and candidate reads. A different
 producer with an equal interface revokes reuse. Standalone callers without a
 project dictionary retain their exact ordinal authority. No artifact schema or
-dense body-fact header changes; each distinct owned nominal read grows32bytes.
+dense body-fact header changes; each distinct owned nominal read grows 32 bytes.
 
-All57 focused native body-cache laws pass. Native imported-target relocation/OOM
-controls verify rebuilt unit/binding references and original-module/name
-revocation. A real retained revision sweep adds a module and earlier producer
-declarations, compares fresh bytes, discards every failed/complete candidate,
-preserves the successful publication and retries/commits. All24 body guest laws
-plus eight unchanged budgets pass, with source and compiled module
-insertion/deletion, declaration renumbering, scalar aliases, explicit local
-origins, associated selection, dotted nominal payloads, owning Array results,
-selected executable edits, equal-interface producer retargets, failed edits and
-recovery.371 Zig files remain at zero findings.
+All 57 focused native body-cache laws pass. Native imported-target
+relocation/OOM controls verify rebuilt unit/binding references and
+original-module/name revocation. A real retained revision sweep adds a module
+and earlier producer declarations, compares fresh bytes, discards every
+failed/complete candidate, preserves the successful publication and
+retries/commits. All 24 body guest laws plus eight unchanged budgets pass, with
+source and compiled module insertion/deletion, declaration renumbering, scalar
+aliases, explicit local origins, associated selection, dotted nominal payloads,
+owning Array results, selected executable edits, equal-interface producer
+retargets, failed edits and recovery. 371 Zig files remain at zero findings.
 
 Against exact declared-local checkpoint
-`ade73b43129ffe9822d3a11a0e814d3cd2406ad4`, three alternating CPU5 Safe/noLLVM
-pairs with two warmups and16 hot edits/reverts measure producer64/128 CPU
-172.5→156.875 /341.875→312.5ms; paired median ratios.9161/.9139. Elaborations
-66/130→2. Plain controls stay near parity. Producer population CPU rises11%;
-steady RSS falls roughly1.0/1.4MiB in these samples.48samples, immutable
+`ade73b43129ffe9822d3a11a0e814d3cd2406ad4`, three alternating CPU 5 Safe/noLLVM
+pairs with two warmups and 16 hot edits/reverts measure producer64/128 CPU
+172.5→156.875 /341.875→312.5 ms; paired median ratios .9161/.9139. Elaborations
+66/130→2. Plain controls stay near parity. Producer population CPU rises 11%;
+steady RSS falls roughly 1.0/1.4 MiB in these samples. 48 samples, immutable
 binaries, exact source/binary pins and logs remain in ignored
 `build/bench/task024-ordinals/` in `/tmp/blot2-task024-completion`. These are
 development measurements with other qualification work concurrent, not
@@ -875,11 +876,11 @@ captured-project or release acceptance.
 
 Producer ordinal relocation is implemented for admitted receipts. Shared local
 callee edges, other residual predicates, imported annotation heads, broader
-scoped/control forms, full-gate/LLVM qualification and the total under100ms edit
-target keep024 and053 open. Canonical filenames identify the current retained
-project; these receipts do not provide cross-checkout identity.
+scoped/control forms, full-gate/LLVM qualification and the total under 100 ms
+edit target keep 024 and 053 open. Canonical filenames identify the current
+retained project; these receipts do not provide cross-checkout identity.
 
-### Isolated imported annotation heads and bounded recipe proofs —13 October 2026
+### Isolated imported annotation heads and bounded recipe proofs — 13 October 2026
 
 Body capture now finishes inside the checker, while its exact nominal-name
 lookup still exists. Capture and replay resolve direct imports, imported aliases
@@ -891,7 +892,7 @@ The redundant project-level capture is removed. Legacy explicit capture remains
 conservative without a resolver. Unsupported lookup or recipe proofs decline.
 
 Initial admission reduced elaborations but doubled retained CPU: complete
-generic nominal recipes were proved repeatedly. A fixed64-entry body-local memo
+generic nominal recipes were proved repeatedly. A fixed 64-entry body-local memo
 now reuses only complete recipe digests at the exact recursion depth, retaining
 the full original proof debit. Exhausted depth/budget declines; a full memo
 computes uncached. The memo allocates nothing, owns no solver values and never
@@ -900,11 +901,11 @@ mutations while resolving referenced globals. Capture uses completed immutable
 facts. The original regression, quick repair comparison and final samples are
 preserved separately.
 
-Focused validation covers59 native body-cache laws, including fresh/population
+Focused validation covers 59 native body-cache laws, including fresh/population
 and retained allocation failures, exact imported alias-name/recipe revocation,
-memo depth/budget/capacity controls and successful-publication retry. All25 body
-guest laws plus eight unchanged budgets pass;371 Zig files have zero analyzer
-findings. Source and compiled direct/alias/namespace heads retain
+memo depth/budget/capacity controls and successful-publication retry. All 25
+body guest laws plus eight unchanged budgets pass; 371 Zig files have zero
+analyzer findings. Source and compiled direct/alias/namespace heads retain
 fresh-identical bytes, owning Array results, missing-head diagnostics and
 recovery through module/producer renumbering. Native controls reject
 `Alias a = Wrapper U32` after `Alias a = Wrapper a` even when this use remains
@@ -912,21 +913,21 @@ recovery through module/producer renumbering. Native controls reject
 equal current result.
 
 Against exact ordinal checkpoint `8879a15b28ad6414b755f9b6bdea968025503fb8`,
-three alternating CPU5 Safe/noLLVM pairs with two warmups and16 hot
-edits/reverts measure imported-head64/128 CPU 115.625→108.125 /223.75→208.125ms;
-paired median ratios.9243/.9354. Elaborations 66/130→2. Plain controls stay near
-parity. Head population CPU rises15–17%; steady RSS rises540/1,748KiB. Immutable
-binaries, the un-memoized regression, quick comparison, final48samples, exact
-pins and logs remain in ignored `build/bench/task024-imported-heads/` in
-`/tmp/blot2-task024-completion`. These concurrent Safe/noLLVM measurements
-diagnose development costs; release, captured-project and combined full-gate
-acceptance belong to the parent.
+three alternating CPU 5 Safe/noLLVM pairs with two warmups and 16 hot
+edits/reverts measure imported-head64/128 CPU 115.625→108.125 /223.75→208.125
+ms; paired median ratios.9243/.9354. Elaborations 66/130→2. Plain controls stay
+near parity. Head population CPU rises 15–17%; steady RSS rises 540/1,748 KiB.
+Immutable binaries, the un-memoized regression, quick comparison, final 48
+samples, exact pins and logs remain in ignored
+`build/bench/task024-imported-heads/` in `/tmp/blot2-task024-completion`. These
+concurrent Safe/noLLVM measurements diagnose development costs; release,
+captured-project and combined full-gate acceptance belong to the parent.
 
 Imported annotation heads are covered for admitted recipes. Shared local callee
 requirements, other residual predicates, broader scoped/control forms and the
-total under100ms edit target keep024 and053 open.
+total under 100 ms edit target keep 024 and 053 open.
 
-### Isolated shared requirements in local principals —13 October 2026
+### Isolated shared requirements in local principals — 13 October 2026
 
 Local principals now own shared `callee_use` edges through the existing binding
 receipt. Capture replaces the source binding/unit with an owned binding slot;
@@ -937,27 +938,27 @@ reference's requirements into its local principal; replay preserves that
 boundary instead of adding them again to the enclosing pending graph. Ordinary
 locals keep their ordinary empty summary. No header or artifact schema grows.
 
-60 focused native body-cache laws,26 body guests, eight unchanged budgets and
+60 focused native body-cache laws, 26 body guests, eight unchanged budgets and
 371-file zero analyzer pass. Fresh/population and retained OOM, U32/F32/owning
 Array relays, negative candidate insertion and requirement removal, source and
 compiled helper body/signature/Foreign changes, producer renumbering, failed
 edits and recovery preserve fresh bytes, diagnostics and executed values.
 
-Against `cc6e5e4e25c7be1114e9c6547cd40804f7bb33c5`, three alternating CPU5
-Safe/noLLVM pairs with two warmups and16 edits/reverts measure local64/128 CPU
-120→89.375 /231.875→172.5ms; paired ratios.7448/.7439 and elaborations
-70.5/134.5→6.5. Population rises9–10%; steady RSS rises944/720KiB. An initial
-plain64+7% paired result does not repeat in five further plain pairs:64/128 CPU
-70.625/133.75ms is identical across variants. Both distributions remain in
+Against `cc6e5e4e25c7be1114e9c6547cd40804f7bb33c5`, three alternating CPU 5
+Safe/noLLVM pairs with two warmups and 16 edits/reverts measure local64/128 CPU
+120→89.375 /231.875→172.5 ms; paired ratios .7448/.7439 and elaborations
+70.5/134.5→6.5. Population rises 9–10%; steady RSS rises 944/720 KiB. An initial
+plain64+7% paired result does not repeat in five further plain pairs: 64/128 CPU
+70.625/133.75 ms is identical across variants. Both distributions remain in
 ignored `build/bench/task024-shared-locals/`, alongside immutable binaries,
-exact pins,88samples and logs in `/tmp/blot2-task024-completion`.
+exact pins, 88 samples and logs in `/tmp/blot2-task024-completion`.
 
 This covers local requirements forwarded through completed shared summaries.
 Other residual predicates, explicit effect/control syntax, broader forms and the
-total under100ms target keep024/053 open. Root owns combined release and
+total under 100 ms target keep 024/053 open. Root owns combined release and
 captured-project acceptance; these are concurrent development measurements.
 
-### Isolated written Foreign arrows —13 October 2026
+### Isolated written Foreign arrows — 13 October 2026
 
 The owned syntax walker now admits function-arrow effect rows whose labels are
 exactly the sealed built-in `Foreign`, including empty closed rows and written
@@ -973,25 +974,26 @@ relocation, fresh/retained byte equality and every capture/replay allocation
 failure. Executed source and compiled-import laws check callback traces after
 producer value edits, pure/Foreign transitions, a rejected closed-row
 annotation, a missing reference, recovery and revert. The body-only native
-family passes62 laws;27 body guests plus8 unchanged budgets pass;371 analyzed
-files have zero findings. Root owns the combined release gate; no duplicate full
-gate was run.
+family passes 62 laws; 27 body guests plus 8 unchanged budgets pass; 371
+analyzed files have zero findings. Root owns the combined release gate; no
+duplicate full gate was run.
 
-CPU5 Safe/noLLVM development comparisons use three alternating pairs at64/128,
-two warmups and16 retained edits/reverts, with exact Wasm hashes and executed
-callbacks. Final retained CPU70→63.125 /136.875→120ms (paired0.902/0.881), while
-elaborations66.5/130.5→2.5. Population CPU60→80 /120→150ms (paired1.333/1.25);
-retained RSS rises604/1792KiB. Plain retained controls61.875→61.875 /
-119.375→118.75ms have paired medians1.0. Two48-sample distributions, immutable
-binaries, logs and exact pins remain under`build/bench/task024-foreign-arrows/`.
-The final rebuild followed an intact mutable-cache relocation from full `/tmp`
-to `/var/tmp`; the interrupted build and unlogged native run are not counted.
+CPU 5 Safe/noLLVM development comparisons use three alternating pairs at 64/128,
+two warmups and 16 retained edits/reverts, with exact Wasm hashes and executed
+callbacks. Final retained CPU 70→63.125 /136.875→120 ms (paired 0.902/0.881),
+while elaborations 66.5/130.5→2.5. Population CPU 60→80 /120→150 ms (paired
+1.333/1.25); retained RSS rises 604/1792 KiB. Plain retained controls
+61.875→61.875 / 119.375→118.75 ms have paired medians 1.0. Two 48-sample
+distributions, immutable binaries, logs and exact pins remain
+under`build/bench/task024-foreign-arrows/`. The final rebuild followed an intact
+mutable-cache relocation from full `/tmp` to `/var/tmp`; the interrupted build
+and unlogged native run are not counted.
 
 Field/receiver/update and user-operation residuals, remaining control forms,
-LLVM/captured-project acceptance and the under100ms total target keep024 and its
-dependent053 open. Written Foreign rows close one exact exclusion.
+LLVM/captured-project acceptance and the under 100 ms total target keep 024 and
+its dependent 053 open. Written Foreign rows close one exact exclusion.
 
-### Isolated ordinary array selectors —13 October 2026
+### Isolated ordinary array selectors — 13 October 2026
 
 Array index expressions now use the existing two-child syntax receipt. The
 checker constrains an array owner and a U32 selector, and lowering reads only
@@ -1003,24 +1005,25 @@ The focused generic-selector law covers scalar, F32 and owning nested arrays,
 changed selector values, spelling/type relocation, fresh/retained bytes and all
 capture/replay allocation failures. Source and compiled-import executions cover
 selector and producer body edits, floating-selector rejection, recovery and
-revert.63 body native laws,28 body guests plus8 unchanged budgets and371-file
-zero analyzer pass in isolation. Root owns combined release acceptance.
+revert. 63 body native laws, 28 body guests plus 8 unchanged budgets and
+371-file zero analyzer pass in isolation. Root owns combined release acceptance.
 
-CPU5 Safe/noLLVM comparisons retain three alternating pairs for plain/indexed
-forms at64/128, two warmups and16 edits/reverts, exact Wasm hashes and executed
-results. Indexed retained CPU64.375→56.25 /122.5→106.875ms (paired0.874/0.868);
-elaborations66.5/130.5→2.5. Population60→70 /100→130ms (paired1.167/1.3);
-retained RSS+96/+1224KiB. Initial plain128 CPU101.875→109.375ms (paired1.074)
-did not repeat in five further pairs:101.25→101.25ms (paired1.0); plain64 repeat
-51.875→52.5ms (paired1.012). Both distributions remain;88 samples, immutable
-binaries and pins live under `build/bench/task024-array-index/`.
+CPU 5 Safe/noLLVM comparisons retain three alternating pairs for plain/indexed
+forms at 64/128, two warmups and 16 edits/reverts, exact Wasm hashes and
+executed results. Indexed retained CPU 64.375→56.25 /122.5→106.875 ms (paired
+0.874/0.868); elaborations 66.5/130.5→2.5. Population 60→70 /100→130 ms (paired
+1.167/1.3); retained RSS+96/+1224 KiB. Initial plain128 CPU 101.875→109.375 ms
+(paired 1.074) did not repeat in five further pairs: 101.25→101.25 ms (paired
+1.0); plain64 repeat 51.875→52.5 ms (paired 1.012). Both distributions remain;
+88 samples, immutable binaries and pins live under
+`build/bench/task024-array-index/`.
 
 General residual projection/receiver/update/effect ownership, other control
-forms, LLVM/captured-project acceptance and the under100ms total target remain
-open for024/053. Generic field templates still need exact current plans before
+forms, LLVM/captured-project acceptance and the under 100 ms total target remain
+open for 024/053. Generic field templates still need exact current plans before
 admission; an empty physical variant list cannot be treated as a concrete path.
 
-### Isolated generic explicit fields —13 October 2026
+### Isolated generic explicit fields — 13 October 2026
 
 Implicit field predicates with no secondary operand now participate in complete
 interface and member-catalog proofs. An explicit postfix field may own an empty
@@ -1037,24 +1040,24 @@ unselected candidate insertion. Executed source/compiled laws preserve current
 record and nominal slots, scalar/owning payload changes and local field scopes.
 Selected method body edits change results; a selected Foreign interface fails a
 pure consumer, and missing fields/rejected edits recover and revert. The full
-body-only native family passes65 laws;29 body guests plus8 unchanged budgets and
-371-file zero analyzer pass. Root owns combined release qualification.
+body-only native family passes 65 laws; 29 body guests plus 8 unchanged budgets
+and 371-file zero analyzer pass. Root owns combined release qualification.
 
-CPU5 Safe/noLLVM64/128 field retained CPU79.375→63.125 /151.875→119.375ms
-(paired0.795/0.783), elaborations66.5/130.5→2.5. Population70→80 /130→150ms
-(paired1.143/1.154), retained RSS+1096/+644KiB. Plain retained
-controls53.75→53.75 /103.75→103.75ms have paired1.0/1.006. Three alternating
-pairs, two warmups and 16 edits/reverts per workload verify exact hashes and
-executed results. Initial and final48-sample distributions, immutable binaries
-and pins remain under `build/bench/task024-generic-fields/`.
+CPU 5 Safe/noLLVM 64/128 field retained CPU 79.375→63.125 /151.875→119.375 ms
+(paired 0.795/0.783), elaborations 66.5/130.5→2.5. Population 70→80 /130→150 ms
+(paired 1.143/1.154), retained RSS+1096/+644 KiB. Plain retained controls
+53.75→53.75 /103.75→103.75 ms have paired 1.0/1.006. Three alternating pairs,
+two warmups and 16 edits/reverts per workload verify exact hashes and executed
+results. Initial and final 48-sample distributions, immutable binaries and pins
+remain under `build/bench/task024-generic-fields/`.
 
 Generic dotted templates, projected receivers, declared field requirements,
 receiver/update/user-operation residuals and other control forms remain
-conservative exclusions. LLVM/captured-project acceptance and the under100ms
-total target keep024/053 open. Empty templates are admitted as generic evidence,
-never as concrete physical paths.
+conservative exclusions. LLVM/captured-project acceptance and the under 100 ms
+total target keep 024/053 open. Empty templates are admitted as generic
+evidence, never as concrete physical paths.
 
-### Isolated generic dotted templates —13 October 2026
+### Isolated generic dotted templates — 13 October 2026
 
 Generic dotted paths now own their direct field predicates and zero-tag steps
 through the existing sparse path receipt. Every empty step requires a plain
@@ -1069,23 +1072,23 @@ exclusion, plus global/local two-step generic paths through every fresh/retained
 capture/replay allocation failure and unselected candidate insertion. The
 source/compiled field law now executes both postfix and dotted forms, including
 local principals, current slots, owning payloads, method body/effect changes,
-rejected fields, recovery and revert.29 body guests plus8 unchanged budgets and
-371-file zero analyzer pass. The inherited65-law family qualified the explicit
-field basis; this delta ran targeted dotted controls. Root owns the next
-combined full compiler gate.
+rejected fields, recovery and revert. 29 body guests plus 8 unchanged budgets
+and 371-file zero analyzer pass. The inherited 65-law family qualified the
+explicit field basis; this delta ran targeted dotted controls. Root owns the
+next combined full compiler gate.
 
-CPU5 Safe/noLLVM64/128 dotted retained CPU79.375→62.5 /153.75→120ms
-(paired0.781/0.780), elaborations66.5/130.5→2.5. Population70→80 /140→150ms
-(paired1.143/1.071), retained RSS+252/+88KiB. Plain retained50.625→50.625 /
-98.75→98.75ms has paired1.0. Three alternating pairs, two warmups and16 edits/
-reverts produce48 samples with exact hashes and executed results. Immutable
-binaries and pins remain under `build/bench/task024-generic-paths/`.
+CPU 5 Safe/noLLVM 64/128 dotted retained CPU 79.375→62.5 /153.75→120 ms (paired
+0.781/0.780), elaborations 66.5/130.5→2.5. Population 70→80 /140→150 ms (paired
+1.143/1.071), retained RSS+252/+88 KiB. Plain retained 50.625→50.625 /
+98.75→98.75 ms has paired 1.0. Three alternating pairs, two warmups and 16
+edits/ reverts produce 48 samples with exact hashes and executed results.
+Immutable binaries and pins remain under `build/bench/task024-generic-paths/`.
 
 Qualified generic roots, projected/declared fields, receiver/update/user-effect
 residuals, remaining control forms and LLVM/captured-project/total-edit
-acceptance keep024/053 open. This closes ordinary variable-root dotted fields.
+acceptance keep 024/053 open. This closes ordinary variable-root dotted fields.
 
-### Isolated compatible pure forms —13 October 2026
+### Isolated compatible pure forms — 13 October 2026
 
 One syntax bundle admits ordinary if-let scopes/joins, scalar negation, value
 patterns, product projection and the shared pure Array/List operation class. The
@@ -1099,25 +1102,26 @@ Native if-let and collection/value-pattern laws cover scalar/owning joins,
 fallthrough, captures, changed value patterns and every fresh/retained capture/
 replay allocation failure. Source/compiled executions cover active/fallback
 callback traces, variant-tag insertion, owning results, negation, collection
-operations, product/value patterns, rejected edits, correction and revert.
-The68-law body family passed65 laws initially; the three failures expected an
+operations, product/value patterns, rejected edits, correction and revert. The
+68-law body family passed 65 laws initially; the three failures expected an
 Array.concat body to remain ordinary. Updating those work counters for the new
 admission and rerunning all three laws (including their OOM and negative reads)
-passes. No semantic mismatch occurred.30 body guests plus8 unchanged budgets and
-371-file zero analyzer pass. Root owns the combined full compiler gate.
+passes. No semantic mismatch occurred. 30 body guests plus 8 unchanged budgets
+and 371-file zero analyzer pass. Root owns the combined full compiler gate.
 
-CPU5 Safe/noLLVM64/128 if-let retained70.625→63.75 /135→120ms
-(paired0.903/0.889), elaborations66.5/130.5→2.5. Population60→80 /110→150ms
-(paired1.333/1.364), retained RSS−52/+1100KiB. Collection retained67.5→59.375
-/131.25→114.375ms (paired0.872/0.871), the same elaboration reduction;
-population60→70 /110→140ms (paired1.167/1.364), retained RSS+644/+1088KiB. Plain
-controls are near parity. Initial if-let and two final48-sample distributions
-remain under `build/bench/task024-if-let/`, with immutable binaries/logs/pins.
+CPU 5 Safe/noLLVM 64/128 if-let retained 70.625→63.75 /135→120 ms (paired
+0.903/0.889), elaborations 66.5/130.5→2.5. Population 60→80 /110→150 ms (paired
+1.333/1.364), retained RSS−52/+1100 KiB. Collection retained 67.5→59.375
+/131.25→114.375 ms (paired 0.872/0.871), the same elaboration reduction;
+population 60→70 /110→140 ms (paired 1.167/1.364), retained RSS+644/+1088 KiB.
+Plain controls are near parity. Initial if-let and two final 48-sample
+distributions remain under `build/bench/task024-if-let/`, with immutable
+binaries/logs/pins.
 
 The remaining eligibility/acceptance inventory and architectural comparison are
 in `build/bench/task024-architecture/REMAINING.md`. Whole Checked/module copying
 is rejected. Qualified/projected/declared fields, receiver/update/demand/loop/
-user-effect/implementation proof owners and total edit acceptance keep024/053
+user-effect/implementation proof owners and total edit acceptance keep 024/053
 open; the proposed broader source-Core path remains a prototype.
 
 ### Combined replay qualification, 13 October 2026
@@ -1233,7 +1237,7 @@ source and qualification are in
 `build/bench/complete-program-20261015/body-loop-receipts/` and
 `body-use-values/`.
 
-Five alternating CPU7 development pairs over 128 loop declarations preserve
+Five alternating CPU 7 development pairs over 128 loop declarations preserve
 cross-compiler and fresh/replayed Wasm. Edit/revert CPU falls from 150/160 to
 120 ms, with elaborations 130 to 2. Population rises from 110 to 160 ms. Plain
 128 controls stay at 130 ms population, 90 ms edit and 100 ms revert. Linux CPU
@@ -1252,7 +1256,7 @@ and inferred generic replacement. Five root guest groups and 384-file zero lint
 pass; source and costs are pinned in
 `build/bench/complete-program-20261015/body-path-updates/`.
 
-Five alternating CPU7 development pairs over 128 update declarations reduce
+Five alternating CPU 7 development pairs over 128 update declarations reduce
 edit/revert CPU from 190/190 to 130/140 ms and elaborations from 130 to 2.
 Population rises from 130 to 180 ms. Plain wall controls stay within 0.3%; CPU
 sampling has 10 ms granularity. Broader residual/effect/control receipts,
@@ -1269,13 +1273,14 @@ ordinary; existing interface, identity and capture proofs are unchanged.
 Two native laws, two neighbors and complete allocation failures pass. Both new
 guest tiers preserve once-only/ignored Foreign effects, demanded owning arrays,
 lazy-to-eager signature changes, source/archive/checkpoint, failed revisions,
-recovery and sync/JSPI. Four loop/path neighbors and400affected zero-finding
-analyzer files pass. Five balanced development pairs reduce128demanded-body
-retained edit/revert160/150→120/120ms and elaborations130→2; population rises
-120→160ms. Plain retained controls stay100ms. All60phases preserve cross-binary
-bytes and executed values; process CPU has10ms resolution. This does not close
-the release/general under100ms gate. Source/binary pins, raw phases and failed
-controls are in `build/bench/complete-program-20261015/body-demand-receipts/`.
+recovery and sync/JSPI. Four loop/path neighbors and 400 affected zero-finding
+analyzer files pass. Five balanced development pairs reduce 128 demanded-body
+retained edit/revert 160/150→120/120 ms and elaborations 130→2; population rises
+120→160 ms. Plain retained controls stay 100 ms. All 60 phases preserve
+cross-binary bytes and executed values; process CPU has 10 ms resolution. This
+does not close the release/general under 100 ms gate. Source/binary pins, raw
+phases and failed controls are in
+`build/bench/complete-program-20261015/body-demand-receipts/`.
 
 ## Nested callable fragment owners, 15 October 2026
 
@@ -1286,13 +1291,13 @@ the outer caller's job and declined valid nested fragments. Missing/out-of-range
 owners and changed layouts still decline; no interface or import guard is
 relaxed.
 
-One native law with complete allocation failures,26executed groups and112
+One native law with complete allocation failures, 26 executed groups and 112
 affected zero-finding analyzer files pass. The unchanged captured project
-recovers489fragments, retaining1152named+369closures with240declines; every
-phase keeps its prior Wasm hash and70,330source steps. A single development wall
-screen changes edit/revert14.032/13.466→11.782/11.287s; fresh remains25.0s. This
-is compatibility and attribution evidence, not the release/CPU target. Exact
-sources, failed-before control and pins are in
+recovers 489 fragments, retaining 1152 named+369 closures with 240 declines;
+every phase keeps its prior Wasm hash and 70,330 source steps. A single
+development wall screen changes edit/revert 14.032/13.466→11.782/11.287s; fresh
+remains 25.0s. This is compatibility and attribution evidence, not the
+release/CPU target. Exact sources, failed-before control and pins are in
 `build/bench/complete-program-20261015/nested-callable-reuse/`.
 
 ## Chains with no clean dependency, 15 October 2026
@@ -1303,9 +1308,9 @@ the existing mixed checker. Previously it required at least one clean dependency
 and rebuilt every semantic caller. Each cutoff still compares the current
 checked interface and namespace; executable lowering reads the current producer.
 
-An opaque3-module law now reuses the intermediate and entry callers, with
-fallback elaborations5→3. One native law with complete candidate allocation
-failures, 10executed groups, TypeScript and19affected zero-finding analyzer
+An opaque 3-module law now reuses the intermediate and entry callers, with
+fallback elaborations 5→3. One native law with complete candidate allocation
+failures, 10 executed groups, TypeScript and 19 affected zero-finding analyzer
 files pass. Source/archive/checkpoint, invalid-signature rollback, recovery and
 both codegen tiers/sync/JSPI preserve fresh bytes and values. Scalar wrappers
 still export no guest memory. No CPU target or general module-abstraction
@@ -1322,13 +1327,14 @@ separate current validated map; function and Demand traversals retain operation
 arguments. No spelling, physical layout or raw ordinal supplies authority.
 Invocation, scoped/generative and incomplete recipes remain ordinary.
 
-Root8native laws,4complete allocation sweeps,6executed groups, TypeScript and400
-affected zero-finding analyzer files pass. Controls cover changed declarations,
-wrong origins/aliases, ordinal relocation, malformed/ambiguous catalogs, open
-rows, Foreign compatibility and Demand boundaries. Both tiers/sync/JSPI preserve
-source/archive/checkpoint bytes, effects, host failure and recovery. One source
-dependency edit uses4retained versus5fresh elaborations. Archive parity is
-qualified; archive work reduction is not. Exact source/binary pins and logs:
+Root 8 native laws, 4 complete allocation sweeps, 6 executed groups, TypeScript
+and 400 affected zero-finding analyzer files pass. Controls cover changed
+declarations, wrong origins/aliases, ordinal relocation, malformed/ambiguous
+catalogs, open rows, Foreign compatibility and Demand boundaries. Both
+tiers/sync/JSPI preserve source/archive/checkpoint bytes, effects, host failure
+and recovery. One source dependency edit uses 4 retained versus 5 fresh
+elaborations. Archive parity is qualified; archive work reduction is not. Exact
+source/binary pins and logs:
 `build/bench/complete-program-20261015/body-user-effect-rows/`.
 
 ## Inert principal suffixes, 15 October 2026
@@ -1342,21 +1348,21 @@ exact. This comparison neither changes the stored format nor relocates bindings.
 Edits that shift shared slots retain ordinary checking.
 
 An opaque dependency's last function can now add/remove a private local while
-its intermediate and entry callers retain semantic reuse. Root3native laws,
-complete candidate allocation failures,10executed groups, TypeScript and56
+its intermediate and entry callers retain semantic reuse. Root 3 native laws,
+complete candidate allocation failures, 10 executed groups, TypeScript and 56
 affected zero-finding analyzer files pass. Changed spellings/producers,
 malformed views, suffix payloads, changed prefixes and references into omitted
 slots reject. Source/archive/checkpoint, invalid signatures/recovery and both
-tiers/sync/JSPI preserve fresh bytes/results. Ordinary Cost stays exact11958B.
+tiers/sync/JSPI preserve fresh bytes/results. Ordinary Cost stays exact 11958B.
 No general edit CPU or final qualification is claimed. Source/compiler pins and
 logs: `build/bench/complete-program-20261015/inert-principal-slot-cutoff/`.
 
 The lightweight principal validator also checks proof-header binding bounds and
 self-unit external/implementation/selected-member/predicate targets before slots
 are omitted. A new forged-header control fails before this guard and rejects
-after it. Eight focused native laws,22executed groups and60affected zero-finding
-analyzer files pass; cache-disabled ordinary Cost is unchanged. Exact delta,
-Debug counterexample and pins:
+after it. Eight focused native laws, 22 executed groups and 60 affected
+zero-finding analyzer files pass; cache-disabled ordinary Cost is unchanged.
+Exact delta, Debug counterexample and pins:
 `build/bench/complete-program-20261015/principal-local-target-bounds/`.
 
 The comparison now omits each interface's maximal canonical inert local suffix,
@@ -1365,8 +1371,8 @@ function edits that shift only erased local/parameter markers. Validation bounds
 all local shared-callee and self/unit0 target references; foreign predicates
 must resolve to an exact retained external alias. An ordinary scheme's
 shared-callee slot remains owner-local. No graph, export target or stored
-binding is remapped. Root8native laws/3complete allocation sweeps,25executed
-groups and266affected zero-finding analyzer files pass; general CPU
+binding is remapped. Root 8 native laws/3complete allocation sweeps, 25 executed
+groups and 266 affected zero-finding analyzer files pass; general CPU
 qualification remains open. Exact counterexamples, source/binary pins and logs:
 `build/bench/complete-program-20261015/principal-local-suffix-normalization/`.
 

@@ -65,12 +65,12 @@ Invoking a once closure transfers its captures to the invocation; abandoning it
 drops them. Many closures cannot hide an affine owned capture. Capturing a
 capability preserves its exact identity and owner region. Demand creation moves
 its captured owners into the demand. Cancellation may retry a demand, so its
-body cannot consume an affine capture without a restart-safe checked protocol.
-A demand parameter moves its captured owners once only when the callee declares
-it affine before generic instantiation (`~(value: unique T)`); a generic demand
+body cannot consume an affine capture without a restart-safe checked protocol. A
+demand parameter moves its captured owners once only when the callee declares it
+affine before generic instantiation (`~(value: unique T)`); a generic demand
 parameter such as `keep = fn ~value` stays retryable, so a consuming capture is
-rejected there. This is fixed at the call as `demand_once`.
-Ready demands retain their strong results; usage contracts never weaken memos.
+rejected there. This is fixed at the call as `demand_once`. Ready demands retain
+their strong results; usage contracts never weaken memos.
 
 ## Resources and exits
 
@@ -148,6 +148,13 @@ fresh/retained/restart equality and separate population/edit costs; this design
 has no executable performance claim.
 
 ## Bounded implementation and qualification
+
+Tasks 061 and 062 closed on 17 October 2026 against the usage and resource rows
+of the
+[language qualification index](LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
+with the full gate at `05401a9`. The checkpoints below are historical; where
+they say 061/062 remain in progress or defer the combined gate, that was true
+when they were written.
 
 The isolated 061 continuation preserves qualifiers and checks binding moves,
 affine captures, branch and exit joins, exact one-iteration bounds and direct

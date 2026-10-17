@@ -1,7 +1,7 @@
 # Approved constant receipts
 
-The owner approved this design and requested implementation on12 October2026.
-Task086 is in progress. Primitive constant-slot receipts are qualified on main;
+The owner approved this design and requested implementation on 12 October 2026.
+Task 086 is in progress. Primitive constant-slot receipts are qualified on main;
 broader constant authority and whole-task qualification remain pending.
 
 ## Historical attribution before the current continuation
@@ -156,23 +156,23 @@ judgment/fuel tape remain ordinary.
 Release qualification admits scalar results with scalar ready reads, and
 computed Array/List payloads containing only primitive scalars with scalar ready
 reads. Compound payloads/anchors keep ordinary evaluation: the captured edit
-spent19.8MB on dense graph indexes without a CPU payoff. This type/shape
+spent 19.8 MB on dense graph indexes without a CPU payoff. This type/shape
 admission also rejects older compound receipts before importing semantic or
 graph state.
 
-The focused cost-gate followup raises primitive value-work admission from64 to
-128 source steps: the captured105-step scalar did not repay owner/lookup work,
-while the measured161-step primitive spines did. An old owner containing only
+The focused cost-gate followup raises primitive value-work admission from 64 to
+128 source steps: the captured 105-step scalar did not repay owner/lookup work,
+while the measured 161-step primitive spines did. An old owner containing only
 subfloor receipts installs no dedicated constant provider or fallback gate.
 Known non-primitive declared result heads skip recorder/provider observation
 before evaluation; open heads retain result-based admission. This followup is
-included in qualified compiler6a57437. The
+included in qualified compiler 6a57437. The
 [merged qualification](ITERATOR_CONSTANTS_QUALIFICATION.md) records the actual
-LLVM costs, full native/973-guest gate and355-file zero analyzer. Primitive
+LLVM costs, full native/973-guest gate and 355-file zero analyzer. Primitive
 scalar/collection and deep-member edits improve modestly. The captured project
-has zero dedicated receipt/index bookkeeping and no constant payoff; its
-roughly5% retained CPU regression comes from late ownership fallback assembly.
-Task086 remains open.
+has zero dedicated receipt/index bookkeeping and no constant payoff; its roughly
+5% retained CPU regression comes from late ownership fallback assembly. Task 086
+remains open.
 
 ## Merged checkpoint, 13 October 2026
 
@@ -253,7 +253,7 @@ A single matched Safe/noLLVM captured-project pair preserves exact Wasm and
 70,330 source steps. Retained edits replay 59,915 steps through six receipts and
 96 solver queries. The prior dev control has eleven receipts and 61,383 replayed
 steps; differences in receipt count alone do not establish a speedup. The pair
-is unscored and lacks release CPU qualification. Exact427 external pins and
+is unscored and lacks release CPU qualification. Exact 427 external pins and
 records are in `build/bench/finish-rest-20261015/captured-current/` and
 `captured-dev-control/`. Literal-edit and cumulative-allocation targets, final
 release costs and the combined full gate remain open.

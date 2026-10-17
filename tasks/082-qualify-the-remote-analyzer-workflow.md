@@ -58,56 +58,37 @@ changes; run code gates only when code or build inputs change.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: read-only Actions inspection on15October2026 found latest
-  successful
-  run[37935729382](https://github.com/mewhhaha/blot2/actions/runs/37935729382)
-  at65dccda29d56d4eaf6d23ff81ca05f1720824d23. Its workflow SHA-256 is
-  1e53d90913450bbb9b4bd46a502fcb8ecc972172cac10555588138b806b1803b; the current
-  local workflow
-  isdb109741eb6cd29e7505e8ee30c461c237d8fbaf0177d71cc06907f20f9d287c. The
-  workflow differs and the run does not contain the current uncommitted
-  compiler. It does not qualify this gate. Raw observation, jobs and workflow
-  response are in `build/bench/complete-program-20261015/remote-analyzer-*`.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
-
-### Local analyzer runs — 15 October 2026 (current uncommitted tree)
-
-- `../zig-analyzer` at `13b7e03` (0.17.0-2): `zig build backend` succeeded and
-  `zig-analyzer doctor` reports a compatible backend. `deno task lint:zig`
-  checks 486 files and reports 10 findings: eight `double-release` on guarded
-  `defer if (flag) x.deinit()` sites whose flag is cleared after an explicit
-  deinit, and two `invalidated-container-view` on by-value copies broken out of
-  a `for` loop in `reuse/dependency_interface_tests.zig`. All ten appear to be
-  false positives introduced by newer analyzer rules.
-- The CI-pinned analyzer `756bfd5` (0.17.0-1), built in an isolated clone,
-  reports zero findings across all 486 source files and the fixture module.
-- Remaining: rerun over the final committed tree, and decide whether the gate
-  uses the CI pin or the newer analyzer (which would need either analyzer fixes
-  or source changes for those ten sites).
-
-### Local analyzer run — 16 October 2026 (committed tree `2b2ffbb`)
-
+- Commit: pending; record the final committed tree and analyzer revisions.
 - Owner decision, 16 October 2026: the local `../zig-analyzer` build gates this
   task, and its known false positives are accepted for now.
-- `../zig-analyzer` at `13b7e03`, Zig 0.17.0: `zig build backend` succeeded
-  (8:02) and `zig-analyzer doctor` reports Zig 0.17.0 and a compatible backend.
-  `deno task lint:zig` checks 486 files and reports the same 10 findings as on
-  15 October, in `eval/region_arena.zig` (2), `reuse/artifact_import_tests.zig`,
-  `reuse/code_artifacts_tests.zig`, `reuse/source_value_template_tests.zig` (4)
-  and `reuse/dependency_interface_tests.zig` (2).
-- Cause of the eight `double-release` findings: the rule's deferred-release
-  check (`src/rules/lifecycle/container_release.zig`, `deferredReleaseAfter`)
-  treats `defer if (flag) x.deinit()` as unconditional, although its explicit-
-  release check already skips conditional defers. The two
-  `invalidated-container-view` findings flag a by-value node copy and a `usize`
-  index broken out of a `for` loop, neither of which views the reallocated
-  slice.
-- No source suppressions or restructuring were applied. No upstream issue has
-  been filed; that needs owner approval.
-- The CI-pinned analyzer `756bfd5` reported zero findings over `23a934f`; the
-  only source change since then is the `2b2ffbb` contract fix.
+- Latest local run (16 October 2026, committed tree `2b2ffbb`):
+  `../zig-analyzer` at `13b7e03` (0.17.0-2), Zig 0.17.0. `zig build backend`
+  succeeded (8:02) and `zig-analyzer doctor` reports Zig 0.17.0 and a compatible
+  backend. `deno task lint:zig` checks 486 files and reports 10 findings, the
+  same as on the 15 October uncommitted tree: `eval/region_arena.zig` (2),
+  `reuse/artifact_import_tests.zig`, `reuse/code_artifacts_tests.zig`,
+  `reuse/source_value_template_tests.zig` (4) and
+  `reuse/dependency_interface_tests.zig` (2).
+- Cause: the eight `double-release` findings come from the rule's
+  deferred-release check (`src/rules/lifecycle/container_release.zig`,
+  `deferredReleaseAfter`), which treats `defer if (flag) x.deinit()` as
+  unconditional although its explicit-release check already skips conditional
+  defers. The two `invalidated-container-view` findings flag a by-value node
+  copy and a `usize` index broken out of a `for` loop, neither of which views
+  the reallocated slice. No source suppressions or restructuring were applied;
+  no upstream issue has been filed (that needs owner approval).
+- CI-pinned analyzer `756bfd5` (0.17.0-1), built in an isolated clone, reports
+  zero findings across all 486 source files and the fixture module over
+  `23a934f`; the only source change since then is the `2b2ffbb` contract fix.
+- Remote observation (read-only, 15 October 2026): the latest successful
+  [run 37935729382](https://github.com/mewhhaha/blot2/actions/runs/37935729382)
+  at `65dccda29d56d4eaf6d23ff81ca05f1720824d23` used workflow SHA-256
+  `1e53d90913450bbb9b4bd46a502fcb8ecc972172cac10555588138b806b1803b`, which
+  differs from the local
+  `db109741eb6cd29e7505e8ee30c461c237d8fbaf0177d71cc06907f20f9d287c`, and
+  predates the current compiler. It does not qualify this gate.
+- Comparison: not applicable; this is a static-analysis gate.
+- Remaining work: rerun over the final committed tree that task 084 qualifies
+  and record both analyzer revisions and any finding only one reports.
+- Durable record: pending; record the final analyzer result outside `tasks/`
+  before cleanup.

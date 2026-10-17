@@ -26,13 +26,21 @@ edited module is rechecked, Core node and type IDs are module-global, and the
 symbol table is ordered by first use. Adding admitted forms one at a time does
 not remove those blockers.
 
+By owner decision on 17 October 2026, task 024 closes against fixed acceptance
+rows. The body forms it leaves on ordinary checking (listed in
+[024's closed acceptance](024-apply-general-body-interface-cutoff.md#closed-acceptance--owner-decision-17-october-2026))
+move here: admit one only when attribution on the 084 workload shows it among
+the costs blocking the target, otherwise record it as an attributed remaining
+cost.
+
 ## Implementation checklist
 
 - [ ] Recheck only changed bodies, or record why the module must be rechecked.
 - [ ] Make declaration-local IDs and symbol order stable across edits that add
       nodes, types or identifier spellings, or record why not.
 - [ ] Attribute and remove the remaining retained body-edit costs on the 084
-      workload, keeping byte equality and rollback.
+      workload, including body forms that 024 leaves on ordinary checking,
+      keeping byte equality and rollback.
 
 ## Validation
 

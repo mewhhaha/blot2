@@ -625,8 +625,8 @@ allocation sweeps** plus two expected-error harness laws. All 455 analyzer files
 have zero findings; the full gate takes 697.812 s. Exact frozen inputs and
 release qualification are in
 [the checkpoint](../zig-native/CONTINUATION_QUALIFICATION.md#qualified-continuation-15-october-2026).
-Tasks 070/071 now satisfy their finite acceptance criteria. Statuses are **74
-complete** (including four designs), **26 in progress** and **8 pending**: **34
+Tasks 070/071 now satisfy their finite acceptance criteria. Statuses are **80
+complete** (including four designs), **21 in progress** and **8 pending**: **29
 remain open**. The broader program and performance targets remain open.
 
 Owner decisions of 15 October 2026: language tasks 058/059/061/062/064/065,
@@ -636,8 +636,33 @@ each task; the five final performance targets move to follow-up tasks
 exhaustion, not on CPU parity with tracing; task [082] uses a local analyzer
 build instead of a remote run; and task [083] is complete after the approved
 cache deletion. The owner also removed `build/`, so `build/bench/...` evidence
-paths are historical. On the evening of 15 October the current working tree
-failed 20 of 2,354 native laws in `deno task test:compiler`.
+paths are historical. The 20 native-law failures seen on the evening of 15
+October were fixed in `23a934f`; the gate at `05401a9` (17 October) passed 2,355
+native laws with zero leaks and 1,501 guest tests.
+
+Owner decisions of 17 October 2026: tasks [024] and [053] close against fixed
+acceptance rows recorded in each task. 024 has eleven body-form rows; row 11
+(qualified, projected and declared field forms) is still to implement. 053 has
+thirteen private-edit and wrapper rows taken from the module-abstraction
+acceptance laws. Body forms that 024 leaves on ordinary checking move to [102],
+which admits one only when attribution on the 084 workload shows it blocking the
+body-edit target, so no task is added. At the owner's request, task [086] is
+gated on a release measurement of unaffected-constant work. It closes as not
+needed if that work is below 20% of retained literal-edit CPU and is not the
+largest phase.
+
+On 17 October 2026, tasks [058], [059], [061], [062], [064] and [065] closed
+against their fixed rows with the gate at `05401a9`; the regenerated row-to-law
+index is in
+[language qualification](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026).
+Trace-to-law indexes for [067]/[068] and [073]/[074] are recorded in
+[staging qualification](../zig-native/STAGING_QUALIFICATION.md#trace-to-law-index-17-october-2026)
+and
+[structured task qualification](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#trace-to-law-index-17-october-2026).
+Those four stay in progress: 067/068 need population and retained cost
+measurements on gated source, and 068 also waits for [024]; 073/074 wait for
+[035]. Two 067 traces and one 074 trace are only partly covered by named laws,
+as recorded in those tasks.
 
 | Task                                                    | Status          | Dependencies                           |
 | ------------------------------------------------------- | --------------- | -------------------------------------- |
@@ -665,9 +690,9 @@ failed 20 of 2,354 native laws in `deno task test:compiler`.
 | [022] — Retain constants and relocatable data           | Complete        | [020], [021]                           |
 | [023] — Narrow literal edit invalidation                | Complete        | [022]                                  |
 | [024] — Apply general body interface cutoff             | In progress     | [023]                                  |
-| [025] — Resolve calls before emission                   | Complete        | —                                      |
-| [026] — Resolve structured control flow                 | Complete        | —                                      |
-| [027] — Represent ownership in resolved ir              | Complete        | —                                      |
+| [025] — Resolve calls before emission                   | Complete        | [008], [020]                           |
+| [026] — Resolve structured control flow                 | Complete        | [025]                                  |
+| [027] — Represent ownership in resolved ir              | Complete        | [026]                                  |
 | [028] — Make emission consume resolved bodies           | Complete        | [027]                                  |
 | [029] — Remove function indices from reuse keys         | Complete        | [018], [028]                           |
 | [030] — Specify shared and cyclic ownership             | Complete        | [027]                                  |
@@ -688,7 +713,7 @@ failed 20 of 2,354 native laws in `deno task test:compiler`.
 | [045] — Implement rolling reductions                    | Complete        | [044]                                  |
 | [046] — Implement composable summary trees              | Complete        | [045]                                  |
 | [047] — Eliminate generic iterator state                | In progress     | [040], [027]                           |
-| [048] — Explain dispatch and evidence                   | Complete        | —                                      |
+| [048] — Explain dispatch and evidence                   | Complete        | [004], [005]                           |
 | [049] — Specify editor completion                       | Complete        | [048]                                  |
 | [050] — Implement editor completion                     | Complete        | [049]                                  |
 | [051] — Specify module abstraction                      | Complete        | [020]                                  |
@@ -698,14 +723,14 @@ failed 20 of 2,354 native laws in `deno task test:compiler`.
 | [055] — Implement associated type members               | Complete        | [054]                                  |
 | [056] — Implement declarations and evidence diagnostics | Complete        | [055]                                  |
 | [057] — Specify scoped effect identities                | Complete        | [052]                                  |
-| [058] — Implement effect instances and subtraction      | In progress     | [057]                                  |
-| [059] — Reject escaping capabilities                    | In progress     | [058]                                  |
+| [058] — Implement effect instances and subtraction      | Complete        | [057]                                  |
+| [059] — Reject escaping capabilities                    | Complete        | [058]                                  |
 | [060] — Specify usage and lifetime contracts            | Complete design | [059], [030]                           |
-| [061] — Check usage and call multiplicity               | In progress     | [060]                                  |
-| [062] — Implement resource cleanup contracts            | In progress     | [061], [033], [020]                    |
+| [061] — Check usage and call multiplicity               | Complete        | [060]                                  |
+| [062] — Implement resource cleanup contracts            | Complete        | [061], [033], [020]                    |
 | [063] — Specify polymorphic packages                    | Complete design | [056], [059]                           |
-| [064] — Check higher rank types and skolems             | In progress     | [063]                                  |
-| [065] — Implement existential packages                  | In progress     | [064], [020]                           |
+| [064] — Check higher rank types and skolems             | Complete        | [063]                                  |
+| [065] — Implement existential packages                  | Complete        | [064], [020]                           |
 | [066] — Specify typed staging                           | Complete design | [053], [065]                           |
 | [067] — Implement typed code and descriptors            | In progress     | [066]                                  |
 | [068] — Implement hygienic generation and reuse         | In progress     | [067], [024]                           |
@@ -728,7 +753,7 @@ failed 20 of 2,354 native laws in `deno task test:compiler`.
 | [085] — Gate principal-graph sharing on payoff          | Complete        | —                                      |
 | [086] — Retain constant evaluation across revisions     | In progress     | [023]                                  |
 | [087] — Skip rebuilds for trivia-only edits             | Complete        | —                                      |
-| [088] — Restore summary-job inference cost              | Complete        | —                                      |
+| [088] — Restore summary-job inference cost              | Complete        | [085]                                  |
 | [089] — Report inference budget exhaustion              | Complete        | —                                      |
 | [090] — Make pending-check solving incremental          | Complete        | —                                      |
 | [091] — Bound compile-time evaluation by call depth     | Complete        | —                                      |
@@ -748,7 +773,8 @@ failed 20 of 2,354 native laws in `deno task test:compiler`.
 | [105] — Admit agreeing generalized local instances      | In progress     | None                                   |
 | [106] — Fit small guest objects and journal pages       | In progress     | None                                   |
 | [107] — Reject dead rebinding in nested blocks          | In progress     | None                                   |
-| [999] — Remove tasks and plan                           | Pending         | All [001]–[107], plus every added task |
+| [108] — Widen stored callback rows in static captures   | In progress     | None                                   |
+| [999] — Remove tasks and plan                           | Pending         | All [001]–[108], plus every added task |
 
 ## Coverage matrix
 
@@ -821,7 +847,7 @@ obligations remain part of applicable tasks and final qualification.
 | Demand reuse: body changes with unchanged types, exact captures/effects, failed revisions and recovery        | [018], [024], [036], [039]                             |
 | Reported from gdev: positioned budget diagnostics, evaluation depth by calls, current-syntax formatting       | [089], [091], [092], [097], [099]                      |
 | Owner decision (pen migration): versioned public project protocol and native typed asset imports              | [095], [096]                                           |
-| Reported from Ink: generalized-local ownership (#10), small guest objects, dead nested rebinding (#11)        | [105], [106], [107]                                    |
+| Reported from Ink: generalized-local ownership (#10), small guest objects, dead nested rebinding (#11)        | [105]–[108]                                            |
 | Shared gates: no name recognition; chronological semantics, diagnostic order and immutable atomic publication | [084]                                                  |
 | Final performance: cold ~500 ms; literal <30 ms; body <100 ms; largest region <50 ms; allocation <100 MB      | [084] measures; [100]–[104] own the targets            |
 | Final qualification: every semantic/runtime/language/tooling and external gate, follow-ups before cleanup     | [082], [083], [084]                                    |
@@ -850,7 +876,7 @@ records their measurements on a re-pinned workload.
 
 ## Planning-directory validation
 
-For this documentation change, verify exactly 001–107 plus 999, unique numbered
+For this documentation change, verify exactly 001–108 plus 999, unique numbered
 filenames, all seven required sections, concrete unchecked acceptance criteria,
 existing relative links/anchors, and exact manifest dependencies forming an
 acyclic graph. Check that every task is indexed and every open source
@@ -971,4 +997,5 @@ external gate or durable-documentation obligation remains open.
 [105]: 105-admit-agreeing-generalized-local-instances.md
 [106]: 106-fit-small-guest-objects-and-journal-pages.md
 [107]: 107-reject-dead-rebinding-in-nested-blocks.md
+[108]: 108-widen-stored-callback-rows-in-static-captures.md
 [999]: 999-remove-tasks-and-plan.md

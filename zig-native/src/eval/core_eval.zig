@@ -8075,7 +8075,11 @@ const ClosureRegion = struct {
                 if (children.items.len != 1) return error.TypeMismatch;
                 const arrow = self.solver.node(scheme);
                 if (arrow.tag != .function) return error.TypeMismatch;
-                try self.unify(try self.importType(scope, constructor.payload, 0), children.items[0]);
+                // Stored callbacks have exact rows; a checked use may widen
+                // them, so their covariant rows reopen before the invariant
+                // nominal argument is fixed (as the checker does per use).
+                const payload = try self.solver.openCovariant(try self.solver.resolve(children.items[0], 0));
+                try self.unify(try self.importType(scope, constructor.payload, 0), payload);
                 break :blk arrow.b;
             },
             .effect_set, .effect_descriptor, .computation, .request_decision => try self.importEvidence(self.session.valueEvidence(value_), 0),

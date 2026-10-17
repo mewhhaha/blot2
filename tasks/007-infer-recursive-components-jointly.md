@@ -90,7 +90,7 @@ development and the scenarios below.
 - Remaining limitations: the frozen private gdev snapshot is unavailable. This
   public batch's maximum recorded region duration is 35.563 ms; it does not
   prove the under-50-ms target for all programs. The median workload CPU ratio
-  is 1.052, and recursive diamond32 rises from 10.872 to 19.634 ms. Component
+  is 1.052, and recursive diamond 32 rises from 10.872 to 19.634 ms. Component
   rebuilding, duplicate scoped checks and allocation costs remain optimization
   work; no general speedup is claimed.
 - Durable record:
