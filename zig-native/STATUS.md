@@ -48,10 +48,55 @@ validation from direct packed-row loops. Its three-field fold fixture uses about
 24% less CPU against the preceding packed compiler, with unchanged guest memory.
 Full traversal and cursor regression closure remain open.
 
+## Compile-time baseline
+
+The current measured workload is the gdev game as of 17 October 2026 (`3cf6de1`
+compiler; the CT1–CT8 measurement hills in
+[COMPILE_HILLS.md](../COMPILE_HILLS.md) add no compiler work). It is frozen in
+ignored `build/bench/gdev-snapshot`, verified against
+`scripts/bench/gdev-manifest.json`, and holds 130 source files and 1.09 MB of
+Blot including the Ink library, about 2.8 times the older workload below. Every
+build runs through `serve-project` with pen.json's imports and native assets.
+CPU is per-thread schedstat time of the release child over the build; cold
+figures are medians of 5–7 runs at low load.
+
+| Measurement                          |                 Value |
+| ------------------------------------ | --------------------: |
+| Game (`src/main.blot`) cold CPU      |              3,011 ms |
+| Devtools cold CPU                    |              1,051 ms |
+| All 55 test entries, CPU             |               167.5 s |
+| Largest test entry (`robot_pickup`)  |                19.5 s |
+| Game peak RSS                        |               312 MiB |
+| Game Wasm                            |               1.84 MB |
+| Retained trivia edit                 |                 11 ms |
+| Retained literal in a body           |                 1.6 s |
+| Retained first literal-constant edit |   2.4 s (reuses none) |
+| Retained body or type change         |             1.8–2.9 s |
+| Unused ink/math export               | 3.1 s, Wasm unchanged |
+
+Profiled phase clocks (`--profile`; exclusive, they cover 100–102% of child CPU)
+split a cold game build into about 1.0 s of checking, 0.28 s of lowering, 0.09 s
+of freezing, 0.21 s of validation, 2.0 s of backend and under 80 ms for assets,
+load, lex and parse together. The session allocator receives 1,388 MiB in 3.9 M
+requests: check 420 MiB, backend 611 MiB, freeze 142 MiB and lower 99 MiB. Check
+raises peak RSS by 121 MiB, freeze by 62 MiB and the backend by 60 MiB.
+
+`deno task bench:compile --baseline OLD --candidate NEW` measures fresh, restart
+(`--restart-cache`) and retained phases in alternating pairs, the seven-scenario
+edit suite with reuse counters, and the test suite with `--workload tests`. It
+fails on Wasm that differs between binaries, between retained and fresh builds,
+or from the per-entry hashes in `scripts/bench/gdev-wasm.json`, unless
+`--allow-wasm-diff` declares the change. `deno task profile:compile` samples
+stacks under gdb. Without the snapshot, the synthetic corpus and its miniature
+edit suite still run; `zig-native/tests/compile_budget.test.ts` pins that
+suite's reuse counts.
+
 ## Historical demand-forwarding measurements
 
 These are the earlier qualified demand-forwarding measurements on the frozen,
-private 394,294-byte gdev workload, from seven alternating pairs. CPU is child
+private 394,294-byte gdev workload, from seven alternating pairs. That workload
+is retired: its 647 ms cold and 150 ms first-edit figures were CLI builds
+without native assets and do not compare with the baseline above. CPU is child
 user plus system time; filesystem caches and machine load are uncontrolled.
 Fresh compilation has persistence disabled. Retained population is measured
 separately from edits. Earlier batches and different workloads are not
@@ -95,12 +140,15 @@ executed-Wasm, client, dependency, checkpoint and retained-revision tests.
 suite before applying the filter.
 
 `deno task bench:compile --baseline OLD_BLOTC --candidate NEW_BLOTC --runs 5`
-checks output equality and measures fresh, population, first edit, subsequent
-edit and no-op phases. Add `--restart-cache` to measure isolated cold cache
-population and process restart. The harness verifies the private gdev snapshot
-against `scripts/bench/gdev-manifest.json`; never commit that snapshot. Without
-it, the synthetic corpus still runs. `blotc build ... --profile` reports phase
-and region timings; deterministic work counters accompany compilation records.
+checks output equality against both binaries, retained phases and the recorded
+hashes, and measures fresh, population, no-op and the edit suite's edit and
+revert phases through `serve-project`. Add `--restart-cache` for isolated cache
+population and process restart, `--workload tests` for the test suite and
+`--profile` for phase clocks and allocation counts. The harness verifies the
+private gdev snapshot against `scripts/bench/gdev-manifest.json`; never commit
+that snapshot. Without it, the synthetic corpus still runs.
+`blotc build ... --profile` reports phase, allocation and region detail;
+deterministic work counters accompany compilation records.
 
 ## Remaining boundaries
 

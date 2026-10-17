@@ -45,6 +45,11 @@ uncontrolled. Against the previous variable-cache compiler, fresh CPU was
 speedup was claimed. Raw samples and binary hashes are in ignored
 `build/bench/demand-forwarding-qualified`.
 
+That 394 KB workload is retired. The current gdev baseline (3,011 ms cold game
+CPU through `serve-project` on a 1.09 MB snapshot) is in
+[STATUS.md](../zig-native/STATUS.md#compile-time-baseline) and
+[COMPILE_HILLS.md](../COMPILE_HILLS.md).
+
 The later compiler milestone `90bd532` qualifies U32 row reductions and bounded
 callee admission with the full native suite, 598 guest/client tests and zero
 analyzer findings across 288 Zig files. Tasks [002] and [004] remain in

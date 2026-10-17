@@ -238,6 +238,12 @@ The 55 test entries take 167.5 s CPU, and their frontend is 94–99% of that.
 - **Fix:** move this baseline into `zig-native/STATUS.md` and PLAN.md's
   measuring section. Retire the 647 ms and 150 ms figures, which describe the
   older workload.
+- **Result (18 October 2026):** CT8, "Record the gdev compile-time baseline in
+  STATUS.md and PLAN.md". `zig-native/STATUS.md` gains a compile-time baseline
+  section (cold, test-suite and retained figures, the phase clock and allocation
+  split, the bench workflow); PLAN.md's measuring section describes the new
+  harness and baseline. Both, and `tasks/README.md`, mark the 647 ms cold and
+  150 ms first-edit figures as the retired 394 KB workload.
 
 ## Phase 1: retained edits
 

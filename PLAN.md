@@ -42,41 +42,58 @@ remaining work. Each milestone lands as a local commit on `main` after
 
 ### Measuring
 
-- Frozen gdev workload: `build/bench/gdev-snapshot` (gitignored). gdev is a
-  private repository and blot2 is public, so never commit its sources. Verify
-  the snapshot against `scripts/bench/gdev-manifest.json`.
+- Frozen gdev workload: `build/bench/gdev-snapshot` (gitignored), the game,
+  devtools, tests, pen and Ink sources with pen.json. gdev is a private
+  repository and blot2 is public, so never commit its sources; only names,
+  hashes and numbers. Verify the snapshot against
+  `scripts/bench/gdev-manifest.json`.
 - Paired comparison:
-  `deno task bench:compile --baseline OLD_BLOTC --candidate NEW_BLOTC`. It
-  reports child CPU (not wall time) for fresh processes and retained phases. It
-  fails on any Wasm difference.
-- Attribution: `blotc build ... --profile` prints phase timings and the slowest
-  inference regions. Every build prints deterministic `work_counters`.
+  `deno task bench:compile --baseline OLD_BLOTC --candidate NEW_BLOTC`. Every
+  build goes through `serve-project` with pen.json's imports and native assets.
+  It reports child CPU (per-thread schedstat, not wall time) with median and
+  range for fresh processes, restarts and retained phases. The retained session
+  runs the seven-scenario edit suite (trivia, literal constant, literal in a
+  body, body, type, an ink/math body, an unused export) and prints reuse and
+  recheck counters. `--workload tests` builds every test entry as pen does and
+  prints the suite total and the ten slowest entries. It fails on any Wasm
+  difference between binaries or phases, or from the per-entry hashes in
+  `scripts/bench/gdev-wasm.json`; a hill that changes output passes
+  `--allow-wasm-diff` and re-records with `--write-hashes`.
+- Attribution: `--profile` (CLI) or `profileBackend` (project API, and
+  `bench:compile --profile`) adds exclusive phase clocks with requested bytes,
+  allocation counts and peak-RSS growth per phase, plus backend clocks and the
+  slowest inference regions. Every build prints deterministic work counters.
   `deno task profile:compile` samples a release blotc under gdb (cold, an edit
   scenario with `--edit`, or a test entry with `--test`) and prints self,
   inclusive, subsystem, file, line and caller tables; `--aggregate` re-reads
   saved samples.
 - Regression budgets: `zig-native/tests/compile_budget.test.ts` asserts counters
-  for the chain, generic chain, diamond and fan-out probes. Deep probes now
-  include annotated chains at 300 and 1,000, a generic chain at 300 and diamond
-  N=16. Executed laws also cover these shapes, deep diagnostics, dependencies,
-  checkpoints and retained recovery. Tighten the `today` tables whenever a hill
-  lowers counters.
-- On this machine ananicy demotes `deno` and its children to SCHED_IDLE. Compare
-  CPU, never wall time, and use alternating pairs.
+  for the chain, generic chain, diamond and fan-out probes, and the reuse of a
+  miniature edit suite (`retainedToday`). Deep probes include annotated chains
+  at 300 and 1,000, a generic chain at 300 and diamond N=16. Executed laws also
+  cover these shapes, deep diagnostics, dependencies, checkpoints and retained
+  recovery. Tighten the `today` tables whenever a hill lowers counters.
+- On this machine ananicy demotes `deno` and its children to SCHED_IDLE, and
+  other sessions share its 8 cores. Compare CPU, never wall time, use
+  alternating pairs and note the load average.
 
-Starting point (be33230, cold CLI on the gdev snapshot):
+Current baseline (17 October 2026, `3cf6de1`, release `blotc` through
+`serve-project` on the 1.09 MB snapshot; see
+[COMPILE_HILLS.md](COMPILE_HILLS.md#baseline-17-october-2026-3cf6de1) and
+[STATUS.md](zig-native/STATUS.md#compile-time-baseline)):
 
-- About 0.85–1.0 s CPU. Phases: check 137 ms, lower 31 ms, emit 672 ms.
-- Inference is about 720 ms of emit.
-- One principal region (`const sandbox = game …` in `src/main.blot`) has 13,863
-  scopes and takes about 420 ms.
-- Counters: 1,758 regions; 66,509 scopes; 5,673 closed and 10,897 unresolved
-  callee collections; 7,436 memo hits; 3,113 solver passes; 35,725 constraint
-  visits; 213,964 occurs steps; 555,661 type nodes; 426 MB requested in 1.4 M
-  allocations.
-- A literal edit (`floor_half_extent` 60.0 → 61.0 in `src/robots.blot`) takes
-  about 228 ms. It re-specializes 210 named functions and 72 closures, and every
-  edit reports `rebuilt_seed: true`.
+- Cold CPU: game 3,011 ms (312 MiB peak RSS, 1.84 MB Wasm), devtools 1,051 ms,
+  all 55 test entries 167.5 s, the largest test entry 19.5 s.
+- Phase clocks of a cold game build: check about 1.0 s, lower 0.28 s, freeze
+  0.09 s, validation 0.21 s, backend 2.0 s (inference 1.26 s of it). The session
+  allocator receives 1,388 MiB in 3.9 M requests.
+- Retained: trivia 11 ms; literal in a body 1.6 s; the first literal-constant
+  edit 2.4 s and reuses none of 1,794 instances; body, type, ink/math body and
+  unused-export edits 1.8–3.1 s with no reuse.
+
+The earlier figures (647 ms cold, 150 ms first literal edit, 740 ms population)
+describe the older 394 KB workload built by the CLI without native assets; they
+are not comparable with the current snapshot.
 
 ### Completed qualification
 
