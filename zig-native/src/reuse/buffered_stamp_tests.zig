@@ -48,6 +48,26 @@ test "buffered structural stamp preserves byte chunks and primitive writes at ev
     try same(@as([]const u64, &numbers));
 }
 test "buffered structural stamp counters preserve input stream and remove tiny Blake3 update calls without allocations" {
+    // Optional items keep a per-item stream, so only buffering removes calls.
+    var words: [8193]?u32 = undefined;
+    for (&words, 0..) |*word, index| word.* = if (index % 5 == 0) null else @intCast(index);
+    var original: artifacts.StampCounts = .{};
+    var counts: artifacts.StampCounts = .{};
+    const reference = (artifacts.Stamping{ .algorithm = .reference, .counts = &original }).stamp(@as([]const ?u32, &words));
+    const buffered = (artifacts.Stamping{ .counts = &counts }).stamp(@as([]const ?u32, &words));
+    try std.testing.expectEqualSlices(u8, &reference, &buffered);
+    try std.testing.expectEqual(original.bytes, counts.bytes);
+    try std.testing.expectEqual(original.input_updates, counts.input_updates);
+    try std.testing.expectEqual(@as(usize, 2 + 8193 + 6554), original.hash_updates);
+    try std.testing.expectEqual(@as(usize, 9), counts.hash_updates);
+    try std.testing.expectEqual(counts.hash_updates, counts.buffer_flushes);
+    try std.testing.expectEqual(@as(usize, 0), counts.direct_chunks);
+    const saved = counts;
+    try same(@as([]const ?u32, &words));
+    _ = artifacts.stamp(words);
+    try std.testing.expectEqual(saved, counts);
+}
+test "buffered structural stamp sends a byte-identical word slice as one direct chunk" {
     var words: [8193]u32 = undefined;
     for (&words, 0..) |*word, index| word.* = @intCast(index);
     var original: artifacts.StampCounts = .{};
@@ -56,13 +76,9 @@ test "buffered structural stamp counters preserve input stream and remove tiny B
     const buffered = (artifacts.Stamping{ .counts = &counts }).stamp(@as([]const u32, &words));
     try std.testing.expectEqualSlices(u8, &reference, &buffered);
     try std.testing.expectEqual(original.bytes, counts.bytes);
-    try std.testing.expectEqual(original.input_updates, counts.input_updates);
-    try std.testing.expectEqual(@as(usize, 8195), original.hash_updates);
-    try std.testing.expectEqual(@as(usize, 9), counts.hash_updates);
-    try std.testing.expectEqual(counts.hash_updates, counts.buffer_flushes);
-    try std.testing.expectEqual(@as(usize, 0), counts.direct_chunks);
-    const saved = counts;
-    try same(@as([]const u32, &words));
-    _ = artifacts.stamp(words);
-    try std.testing.expectEqual(saved, counts);
+    try std.testing.expectEqual(@as(usize, 3), original.hash_updates);
+    try std.testing.expectEqual(@as(usize, 3), counts.input_updates);
+    try std.testing.expectEqual(@as(usize, 1), counts.buffer_flushes);
+    try std.testing.expectEqual(@as(usize, 1), counts.direct_chunks);
+    try std.testing.expectEqual(@as(usize, 2), counts.hash_updates);
 }

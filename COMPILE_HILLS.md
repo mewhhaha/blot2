@@ -774,6 +774,13 @@ Blake3 keys in-process caches with 4-byte updates
 (`structural.zig:9-70`).
 
 - **Fix:** hash and compare unique-representation slices as bytes.
+- **Result (18 October 2026):**
+  `CT76: hash and compare fixed structural values as
+  bytes`. Fixed-size parts
+  reach the sink in one update: memory-identical slices directly, padded records
+  packed in 1 KiB chunks. The byte stream is unchanged, so stamps stay
+  identical. Plain records compare with `memcmp`. Instructions fall 0.2% on the
+  game, 0.4% on a literal edit and 4.8% on its revert; CPU moves within noise.
 
 ### CT77: reserve map capacity
 
