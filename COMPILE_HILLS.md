@@ -836,6 +836,10 @@ The release target is `.cpu_model = .baseline` (`zig-native/build.zig:8`).
 The CLI frees the whole heap before exit (`main.zig:318-478`).
 
 - **Fix:** skip teardown in release CLI builds. Keep it for leak-checked tests.
+- **Result (18 October 2026):** dropped. On a 0.7 s CLI build, skipping the
+  final release saves 2.6 ms of `teardown_us` (0.4%) and 0.05% of instructions,
+  with no measurable CPU change. The release `live_bytes == 0` checks in the
+  Deno tests are worth more.
 
 ## Phase 7: restart cache
 
