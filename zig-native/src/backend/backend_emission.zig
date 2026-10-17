@@ -328,8 +328,11 @@ pub const Owner = struct {
     /// alias or rebinding chain feeding it (issue #10). Uses that disagree
     /// may instead evaluate a pure producer once per use layout
     /// (`decideInstances`); a read inside such a producer occurs once per
-    /// instance. This never unifies the semantic producer scheme.
-    fn localStorageMappings(self: *Emitter, root: core.Id, mappings: *std.ArrayList(Mapping), instances: *InstanceDecisions) Error!void {
+    /// instance. A use whose only holes are ambiguous variables is closed
+    /// with storage this whole body gives them (`closeAmbiguousUse`), and
+    /// `rows` receives the row facts that choice adds. This never unifies the
+    /// semantic producer scheme.
+    fn localStorageMappings(self: *Emitter, root: core.Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), instances: *InstanceDecisions) Error!void {
         const g = self.generator;
         const source = g.unit(self.unit_id);
         if (source.nodes.len > 4096) return;
@@ -342,8 +345,16 @@ pub const Owner = struct {
         defer scratch.deinit(g.allocator);
         var scratch_rows: std.ArrayList(RowMapping) = .empty;
         defer scratch_rows.deinit(g.allocator);
+        var ambiguous: Ambiguous = .{};
+        defer ambiguous.deinit(g.allocator);
+        var with_ambiguous: std.ArrayList(Mapping) = .empty;
+        defer with_ambiguous.deinit(g.allocator);
+        var with_ambiguous_rows: std.ArrayList(RowMapping) = .empty;
+        defer with_ambiguous_rows.deinit(g.allocator);
+        var scratch_plain: std.ArrayList(Mapping) = .empty;
+        defer scratch_plain.deinit(g.allocator);
         var position = statements.len;
-        while (position > 0) {
+        statements: while (position > 0) {
             position -= 1;
             const statement = statements[position];
             const n = source.node(statement);
@@ -351,7 +362,7 @@ pub const Owner = struct {
             const producer = source.node(n.b);
             // Built data never takes the shared storage below; only distinct
             // instances may serve it.
-            const built = producer.tag == .construct or producer.tag == .product or producer.tag == .record;
+            const built = producer.tag == .construct or producer.tag == .product or producer.tag == .record or producer.tag == .array;
             if (!built and producer.tag != .call and producer.tag != .apply and producer.tag != .project and producer.tag != .reference) continue;
             const binding = source.binding(n.a);
             if (binding.kind != .local or binding.scheme.variables.len == 0) continue;
@@ -368,12 +379,20 @@ pub const Owner = struct {
                 if (aliased.unit != 0 and aliased.unit != self.unit_id) continue;
                 if (source.binding(aliased.binding).kind != .local) continue;
             }
-            const previous = if (mappings.items.len == 0) self.mappings else mappings.items;
+            const plain = if (mappings.items.len == 0) self.mappings else mappings.items;
+            with_ambiguous.clearRetainingCapacity();
+            try withFacts(Mapping, g.allocator, plain, ambiguous.types.items, &with_ambiguous);
+            const previous = with_ambiguous.items;
+            with_ambiguous_rows.clearRetainingCapacity();
+            try withFacts(RowMapping, g.allocator, self.row_mappings, ambiguous.rows.items, &with_ambiguous_rows);
+            const previous_rows = with_ambiguous_rows.items;
             var uses: [max_local_instances]layout.Id = undefined;
             var use_count: usize = 0;
             var open = false;
+            // Whether a use closes only through ambiguous storage.
+            var widened = false;
             scan: for (source.nodes, 0..) |node, index| {
-                if (budget == 0) return;
+                if (budget == 0) break :statements;
                 budget -= 1;
                 if (node.tag != .reference) continue;
                 const reference = source.reference(@intCast(index));
@@ -383,19 +402,32 @@ pub const Owner = struct {
                 const contexts = if (reader) |held| held.count else 1;
                 for (0..contexts) |context| {
                     var context_mappings = previous;
-                    var context_rows = self.row_mappings;
+                    var context_rows = previous_rows;
                     if (reader) |held| {
                         scratch.clearRetainingCapacity();
                         try withFacts(Mapping, g.allocator, previous, instances.factsAt(held, context), &scratch);
                         context_mappings = scratch.items;
                         scratch_rows.clearRetainingCapacity();
-                        try withFacts(RowMapping, g.allocator, self.row_mappings, instances.rowsAt(held, context), &scratch_rows);
+                        try withFacts(RowMapping, g.allocator, previous_rows, instances.rowsAt(held, context), &scratch_rows);
                         context_rows = scratch_rows.items;
                     }
-                    const instance = try g.codeLayoutWithRows(self.unit_id, source.typeOf(@intCast(index)), context_mappings, context_rows, source.span(@intCast(index)));
+                    const use_type = source.typeOf(@intCast(index));
+                    const span = source.span(@intCast(index));
+                    const instance = try g.codeLayoutWithRows(self.unit_id, use_type, context_mappings, context_rows, span);
                     if (self.hasErasedType(instance, 0)) {
+                        // Scan this local again once its ambiguous holes
+                        // have storage.
+                        if (try self.closeAmbiguousUse(use_type, context_mappings, context_rows, span, &ambiguous, &budget)) {
+                            position += 1;
+                            continue :statements;
+                        }
                         open = true;
                         break :scan;
+                    }
+                    if (ambiguous.types.items.len != 0 and !widened) {
+                        scratch_plain.clearRetainingCapacity();
+                        try withFacts(Mapping, g.allocator, plain, if (reader) |held| instances.factsAt(held, context) else &.{}, &scratch_plain);
+                        widened = self.hasErasedType(try g.codeLayoutWithRows(self.unit_id, use_type, scratch_plain.items, context_rows, span), 0);
                     }
                     if (std.mem.findScalar(layout.Id, uses[0..use_count], instance) != null) continue;
                     if (use_count == uses.len) {
@@ -416,23 +448,35 @@ pub const Owner = struct {
             }
             var indirect = false;
             for (source.closures) |metadata| for (source.extra[metadata.captures.start..][0..metadata.captures.len]) |held_binding| {
-                if (budget == 0) return;
+                if (budget == 0) break :statements;
                 budget -= 1;
                 if (held_binding == n.a) indirect = true;
             };
             for (source.merges) |merge| {
-                if (budget == 0) return;
+                if (budget == 0) break :statements;
                 budget -= 1;
                 if (merge.then_binding == n.a or merge.else_binding == n.a) indirect = true;
             }
             for (source.loop_carries) |carry| {
-                if (budget == 0) return;
+                if (budget == 0) break :statements;
                 budget -= 1;
                 if (carry.incoming == n.a or carry.iteration == n.a or carry.backedge == n.a or carry.outgoing == n.a) indirect = true;
             }
             if (indirect) continue;
-            if (use_count > 1) {
-                try self.decideInstances(statement, previous, uses[0..use_count], instances);
+            // The promoting attempt keeps a closed initializer's evaluator
+            // value and serializes each use at its own layout. A local that
+            // only ambiguous storage closes keeps that path, as it did while
+            // the hole was open, rather than evaluate its producer at runtime.
+            // That is speculation too: a runtime-dependent initializer is not
+            // promoted, so a failing attempt retries and decides it then.
+            const promotable = producer.tag == .call or producer.tag == .apply or producer.tag == .project or producer.tag == .construct or producer.tag == .product or producer.tag == .record;
+            if (widened and g.speculative_locals and promotable) {
+                g.speculated = true;
+                continue;
+            }
+            // Built data with one use is a single instance.
+            if (use_count > 1 or (built and use_count == 1)) {
+                try self.decideInstances(statement, previous, previous_rows, uses[0..use_count], instances);
                 continue;
             }
             if (built) continue;
@@ -451,7 +495,7 @@ pub const Owner = struct {
                         if (mapping.variable == variable) break;
                     } else try next.append(g.allocator, .{ .variable = variable, .layout = layout.word });
                 }
-                const closed = try g.codeLayoutWithRows(self.unit_id, binding.ty, next.items, self.row_mappings, source.span(statement));
+                const closed = try g.codeLayoutWithRows(self.unit_id, binding.ty, next.items, previous_rows, source.span(statement));
                 if (self.hasErasedType(closed, 0)) continue;
                 try g.mapTypeDepth(self.unit_id, &next, null, source.typeOf(n.b), closed, source.span(statement), 0);
             }
@@ -468,13 +512,176 @@ pub const Owner = struct {
             mappings.* = next;
             next = .empty;
         }
+        if (ambiguous.types.items.len == 0) return;
+        {
+            var merged: std.ArrayList(Mapping) = .empty;
+            errdefer merged.deinit(g.allocator);
+            try withFacts(Mapping, g.allocator, if (mappings.items.len == 0) self.mappings else mappings.items, ambiguous.types.items, &merged);
+            mappings.deinit(g.allocator);
+            mappings.* = merged;
+        }
+        if (ambiguous.rows.items.len == 0) return;
+        rows.clearRetainingCapacity();
+        try withFacts(RowMapping, g.allocator, self.row_mappings, ambiguous.rows.items, rows);
+    }
+    /// Ambiguous variables some use of one body left open, with the storage
+    /// the whole body gives them: a scalar word for a type variable and the
+    /// closed empty row for an effect row tail.
+    const Ambiguous = struct {
+        types: std.ArrayList(Mapping) = .empty,
+        rows: std.ArrayList(RowMapping) = .empty,
+        fn deinit(self: *Ambiguous, a: Allocator) void {
+            self.types.deinit(a);
+            self.rows.deinit(a);
+        }
+    };
+    /// Closes a use whose holes are all ambiguous: no scheme or declaration
+    /// of this unit quantifies them. Checking left such a type variable
+    /// unconstrained, so no value of its type is ever built and no code reads
+    /// one, and such a row tail adds no effect to the labels before it. Each
+    /// takes a scalar word, or the closed empty row, throughout the body. The
+    /// choice depends only on the variable, so bodies that make it agree, and
+    /// a value of such a type reaches another body only through a layout,
+    /// which carries the choice into nested closures and callee instances.
+    /// A quantified hole declines: it stands for each type its instances
+    /// choose, and a later use may read its shared storage at a concrete type.
+    /// A quantified row tail stays unknown, which leaves no hole. True when
+    /// the use is closed; otherwise `ambiguous` is unchanged.
+    fn closeAmbiguousUse(self: *Emitter, ty: types.Id, mappings: []const Mapping, rows: []const RowMapping, span: core.Span, ambiguous: *Ambiguous, budget: *usize) Error!bool {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        var variables: TypeVariables = .{ .source = source };
+        if (!variables.visit(ty, 0)) return false;
+        const known_types = ambiguous.types.items.len;
+        const known_rows = ambiguous.rows.items.len;
+        var closed = false;
+        defer if (!closed) {
+            ambiguous.types.shrinkRetainingCapacity(known_types);
+            ambiguous.rows.shrinkRetainingCapacity(known_rows);
+        };
+        for (variables.types[0..variables.type_count]) |variable| {
+            if (for (mappings) |mapping| {
+                if (mapping.variable == variable) break true;
+            } else false) continue;
+            if (quantifiedVariable(source, variable, false, budget)) return false;
+            try ambiguous.types.append(g.allocator, .{ .variable = variable, .layout = layout.word });
+        }
+        if (ambiguous.types.items.len == known_types) return false;
+        for (variables.rows[0..variables.row_count]) |variable| {
+            if (for (rows) |mapping| {
+                if (mapping.variable == variable) break true;
+            } else false) continue;
+            if (quantifiedVariable(source, variable, true, budget)) continue;
+            try ambiguous.rows.append(g.allocator, .{ .variable = variable, .row = 0 });
+        }
+        var closed_types: std.ArrayList(Mapping) = .empty;
+        defer closed_types.deinit(g.allocator);
+        var closed_rows: std.ArrayList(RowMapping) = .empty;
+        defer closed_rows.deinit(g.allocator);
+        try withFacts(Mapping, g.allocator, mappings, ambiguous.types.items[known_types..], &closed_types);
+        try withFacts(RowMapping, g.allocator, rows, ambiguous.rows.items[known_rows..], &closed_rows);
+        closed = !self.hasErasedType(try g.codeLayoutWithRows(self.unit_id, ty, closed_types.items, closed_rows.items, span), 0);
+        return closed;
+    }
+    /// The distinct type variables and row tail variables a type mentions.
+    /// `visit` is false when there are more than fit, the walk exceeds its
+    /// bound, or a node is not one these storage choices can describe.
+    const TypeVariables = struct {
+        source: *const core.Module,
+        types: [32]types.Id = undefined,
+        type_count: usize = 0,
+        rows: [16]u32 = undefined,
+        row_count: usize = 0,
+        remaining: usize = 1024,
+        fn visit(self: *TypeVariables, ty: types.Id, depth: usize) bool {
+            if (depth >= 64 or self.remaining == 0) return false;
+            self.remaining -= 1;
+            const source = self.source;
+            const n = source.types.node(ty);
+            switch (n.tag) {
+                .unit, .boolean, .u32, .f32, .never, .erased_proof, .type_constructor, .bound => return true,
+                .variable => {
+                    if (std.mem.findScalar(types.Id, self.types[0..self.type_count], ty) != null) return true;
+                    if (self.type_count == self.types.len) return false;
+                    self.types[self.type_count] = ty;
+                    self.type_count += 1;
+                    return true;
+                },
+                .function, .demand, .provider => {
+                    if (n.tag == .function and !self.visit(n.b, depth + 1)) return false;
+                    return self.row(n.c, depth + 1) and self.visit(n.a, depth + 1);
+                },
+                .array, .list, .cursor, .resolver, .usage, .scoped, .forall, .existential => return self.visit(n.a, depth + 1),
+                .state_provider => return self.visit(n.a, depth + 1) and self.visit(n.b, depth + 1) and self.visit(n.c, depth + 1),
+                .product, .nominal => {
+                    const children = if (n.tag == .nominal) source.types.nominalArguments(n) else source.types.list(.{ .start = n.a, .len = n.b });
+                    for (children) |child| if (!self.visit(child, depth + 1)) return false;
+                    return true;
+                },
+                .record => {
+                    for (0..n.b) |index| if (!self.visit(source.types.recordField(n, index).ty, depth + 1)) return false;
+                    return true;
+                },
+                else => return false,
+            }
+        }
+        fn row(self: *TypeVariables, id: types.Effects.Id, depth: usize) bool {
+            const source = self.source;
+            for (source.types.rowLabels(id)) |label| for (source.types.operationArguments(label)) |argument| {
+                if (!self.visit(argument, depth + 1)) return false;
+            };
+            switch (source.types.row(id).tail) {
+                .variable => |variable| {
+                    if (std.mem.findScalar(u32, self.rows[0..self.row_count], variable) != null) return true;
+                    if (self.row_count == self.rows.len) return false;
+                    self.rows[self.row_count] = variable;
+                    self.row_count += 1;
+                    return true;
+                },
+                else => return true,
+            }
+        }
+    };
+    /// Whether a scheme, type declaration, operation, closure, contract or
+    /// implementation of `source` quantifies or closes type variable or, for
+    /// `row`, row variable `variable`. An exhausted budget answers yes.
+    fn quantifiedVariable(source: *const core.Module, variable: u32, row: bool, budget: *usize) bool {
+        const Lists = struct {
+            types: *const core.Types,
+            variable: u32,
+            fn has(self: @This(), list: types.List) bool {
+                return std.mem.findScalar(u32, self.types.list(list), self.variable) != null;
+            }
+        };
+        const lists: Lists = .{ .types = &source.types, .variable = variable };
+        const total = source.bindings.len + source.bodies.len + source.constructors.len + source.nominals.len + source.operation_names.len + source.closures.len + source.contracts.len + source.implementations.len;
+        if (budget.* < total) return true;
+        budget.* -= total;
+        if (row) {
+            for (source.bindings) |binding| if (lists.has(binding.scheme.row_variables) or lists.has(binding.scheme.closed_rows) or lists.has(binding.public_rows)) return true;
+            for (source.bodies) |body| if (lists.has(body.scheme.row_variables) or lists.has(body.scheme.closed_rows) or lists.has(body.closed_rows)) return true;
+            for (source.constructors) |constructor| if (lists.has(constructor.scheme.row_variables)) return true;
+            for (source.closures) |metadata| if (lists.has(metadata.closed_rows)) return true;
+            for (source.contracts) |contract| if (lists.has(contract.row_variables) or lists.has(contract.row_parameters)) return true;
+            for (source.implementations) |implementation| if (lists.has(implementation.row_variables) or lists.has(implementation.row_parameters)) return true;
+            return false;
+        }
+        for (source.bindings) |binding| if (lists.has(binding.scheme.variables) or lists.has(binding.scheme.generative) or lists.has(binding.public_variables)) return true;
+        for (source.bodies) |body| if (lists.has(body.scheme.variables) or lists.has(body.scheme.generative)) return true;
+        for (source.constructors) |constructor| if (lists.has(constructor.scheme.variables) or lists.has(constructor.scheme.generative)) return true;
+        for (source.nominals) |nominal| if (lists.has(nominal.parameters) or lists.has(nominal.variables)) return true;
+        for (source.operation_names) |operation| if (lists.has(operation.variables) or lists.has(operation.parameters)) return true;
+        for (source.contracts) |contract| if (lists.has(contract.parameters) or lists.has(contract.variables)) return true;
+        for (source.implementations) |implementation| if (lists.has(implementation.variables) or lists.has(implementation.head)) return true;
+        return false;
     }
     /// Uses of one generalized local at different layouts share no physical
     /// value: closure ABI and field words depend on the layout. A pure
     /// producer with a representation-free value instead runs once per
     /// distinct use layout, each under facts closing only the local's
     /// quantified holes. Authority, usage contracts and effects decline.
-    fn decideInstances(self: *Emitter, statement: core.Id, previous: []const Mapping, uses: []const layout.Id, decisions: *InstanceDecisions) Error!void {
+    /// `previous` and `previous_rows` are the body's substitutions so far.
+    fn decideInstances(self: *Emitter, statement: core.Id, previous: []const Mapping, previous_rows: []const RowMapping, uses: []const layout.Id, decisions: *InstanceDecisions) Error!void {
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const n = source.node(statement);
@@ -505,7 +712,7 @@ pub const Owner = struct {
             next.clearRetainingCapacity();
             next_rows.clearRetainingCapacity();
             try next.appendSlice(g.allocator, previous);
-            try next_rows.appendSlice(g.allocator, self.row_mappings);
+            try next_rows.appendSlice(g.allocator, previous_rows);
             try g.mapTypeDepth(self.unit_id, &next, &next_rows, binding.ty, selected, span, 0);
             try g.mapTypeDepth(self.unit_id, &next, &next_rows, source.typeOf(n.b), selected, span, 0);
             // Only the local's own quantified holes may differ by instance.
@@ -522,7 +729,7 @@ pub const Owner = struct {
             // a known row still reconciles exactly.
             const rows_first = decisions.rows.items.len;
             for (next_rows.items) |mapping| {
-                const old = for (self.row_mappings) |prior| {
+                const old = for (previous_rows) |prior| {
                     if (prior.variable == mapping.variable) break prior.row;
                 } else layout.unknown_row;
                 if (mapping.row == old) continue;
@@ -535,7 +742,7 @@ pub const Owner = struct {
             closed.clearRetainingCapacity();
             closed_rows.clearRetainingCapacity();
             try withFacts(Mapping, g.allocator, previous, decisions.factsAt(&decision, index), &closed);
-            try withFacts(RowMapping, g.allocator, self.row_mappings, decisions.rowsAt(&decision, index), &closed_rows);
+            try withFacts(RowMapping, g.allocator, previous_rows, decisions.rowsAt(&decision, index), &closed_rows);
             if (try g.codeLayoutWithRows(self.unit_id, binding.ty, closed.items, closed_rows.items, span) != selected) break :admitted false;
         } else true;
         if (!admitted) {
@@ -618,9 +825,11 @@ pub const Owner = struct {
         if (self.preparation_depth >= 256) return g.fail(self.unit_id, root, .complexity);
         var storage: std.ArrayList(Mapping) = .empty;
         defer storage.deinit(g.allocator);
+        var storage_rows: std.ArrayList(RowMapping) = .empty;
+        defer storage_rows.deinit(g.allocator);
         var instances: InstanceDecisions = .{};
         defer instances.deinit(g.allocator);
-        try self.localStorageMappings(root, &storage, &instances);
+        try self.localStorageMappings(root, &storage, &storage_rows, &instances);
         const source = g.unit(self.unit_id);
         if (@import("bottom_result.zig").proves(g.units, self.unit_id, root) and try self.codeLayout(source.typeOf(root), source.span(root)) == layout.erased) {
             if (storage.items.len == 0) try storage.appendSlice(g.allocator, self.mappings);
@@ -628,7 +837,7 @@ pub const Owner = struct {
             defer rows.deinit(g.allocator);
             try g.mapTypeDepth(self.unit_id, &storage, &rows, source.typeOf(root), 5, source.span(root), 0);
         }
-        return self.prepareMapped(root, depth, template, if (storage.items.len == 0) self.mappings else storage.items, self.row_mappings, if (instances.decisions.items.len == 0) null else &instances);
+        return self.prepareMapped(root, depth, template, if (storage.items.len == 0) self.mappings else storage.items, if (storage_rows.items.len == 0) self.row_mappings else storage_rows.items, if (instances.decisions.items.len == 0) null else &instances);
     }
     /// Prepares `root` under exact physical substitutions. Instance bodies
     /// enter here directly with their facts and no storage decisions.
@@ -1952,6 +2161,11 @@ pub const Owner = struct {
         var prepared_body = try emitter.prepareBody(body.root, depth + 1, false);
         defer prepared_body.deinit(g.allocator);
         emitter.body = &prepared_body;
+        // Encoding reads the substitutions the plans were prepared under,
+        // including local storage and ambiguous-variable facts.
+        emitter.mappings = prepared_body.mappings;
+        emitter.row_mappings = prepared_body.rows;
+        emitter.layout_cache = @splat(.{});
         if (remaining.len != 0 and try emitter.saturatedAssociated(body.root, self, remaining, depth)) return true;
         try emitter.expression(body.root, depth + 1);
         var ty = key.result;

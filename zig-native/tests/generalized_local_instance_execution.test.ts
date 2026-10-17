@@ -350,3 +350,106 @@ entry const main = fn (x: U32) => do:
   return next + values.length - 2
 `);
 });
+
+// A use that leaves only ambiguous variables open (no scheme quantifies
+// them) observes nothing there, so the whole body stores them as a word and
+// closes an ambiguous row tail as pure (issue #10). `boxed.length` leaves the
+// scope's action result open; before this, `b` was serialized at an erased
+// result and reported `ownership_unproved`.
+const scoped = `
+type B [w, s] is data = #B { initial: w, s: w -> s }
+const empty = fn () => do:
+  let scope = fn world => fn action => do:
+    use result <- action ()
+    return (world, result)
+  return #B { initial: (), s: scope }
+const run = fn b => fn action => do:
+  let #B { initial, s } = b
+  return s initial action
+entry const memory = fn () -> Array U32 => #[]
+`;
+
+Deno.test("a generalized local read only for its length stores its ambiguous hole as a word", async () => {
+  await returnsArgumentWithMemory(`${scoped}
+entry const main = fn (x: U32) => do:
+  let b = empty ()
+  let (_, r) = run b (fn () => x)
+  let boxed = #[b, b]
+  return r + boxed.length - 2
+`);
+});
+
+// The hole `#[b, b]` leaves open is `boxed`'s own quantified variable, and
+// later uses read that storage at F32 and at an array. Word storage there
+// would drop the array's retains; only the `.length` use's fresh variable is
+// ambiguous, so `boxed` keeps one instance per layout.
+Deno.test("a quantified hole read later at a heap type keeps one instance per layout", async () => {
+  await returnsArgumentWithMemory(`${scoped}
+entry const main = fn (x: U32) => do:
+  let b = empty ()
+  let (_, r) = run b (fn () => x)
+  let boxed = #[b, b]
+  let (_, fraction) = run boxed[0] (fn () => 1.5)
+  let (_, values) = run boxed[1] (fn () => #[x, x + 1])
+  return r + values[1] - values[0] + boxed.length - 3
+`);
+});
+
+// `#[k, k]` reads the runtime-dependent `k` at an ambiguous hole. The
+// promoting attempt keeps such a local undecided for a promotion that cannot
+// happen, so it fails and the retry evaluates one instance per layout.
+Deno.test("a runtime producer read at an ambiguous hole retries with one instance per layout", async () => {
+  await returnsArgumentWithMemory(`
+${pair}
+entry const memory = fn () -> Array U32 => #[]
+entry const main = fn (x: U32) => do:
+  let k = pair x
+  let (a, _) = k 1.5
+  let n = #[k, k].length
+  return a + n - 2
+`);
+});
+
+// A closure captures `boxed`, so its quantified hole has no instance and
+// stays open where `#[b, b]` serializes `b`. That hole is not ambiguous, so
+// it still reports `ownership_unproved` instead of taking word storage.
+Deno.test("a captured local whose quantified hole stays open still declines", async () => {
+  await compileExpectedFailure(`${scoped}
+entry const main = fn (x: U32) => do:
+  let b = empty ()
+  let (_, r) = run b (fn () => x)
+  let boxed = #[b, b]
+  let later = fn (y: U32) => do:
+    let (_, values) = run boxed[1] (fn () => #[y, y])
+    return values.length
+  return r + boxed.length + later x - 4
+`, "ownership_unproved");
+});
+
+// Ink's effect repro c1, reduced: no use applies the route callback, so its
+// type variable and effect row stay ambiguous at `create`, which reads the
+// systems whole. The promoted builders serialize it as a pure `U32 -> U32`.
+Deno.test("promoted builders serialize a polymorphic callback no use applies", async () => {
+  await returnsArgumentWithMemory(`${scoped}
+type System [route, start] is data = #Route route | #Start start
+type App [engine, system] is data = #App { engine: engine, systems: Array system }
+const new_with = fn route => #App { engine: empty (), systems: #[#Route route, #Start (fn () => ())] }
+const finish = fn app => do:
+  let #App { engine, systems } = app
+  return #App { engine, systems }
+const run_start = fn systems => fn () => do:
+  for system in systems:
+    use case system of
+      #Start start => start ()
+      _ => ()
+const create = fn app => fn () => do:
+  let #App { engine, systems } = app
+  let (world, _) = run engine (run_start systems)
+  return world
+entry const main = fn (x: U32) => do:
+  let builder = new_with (fn (e: u) => e)
+  let application = finish builder
+  let world = create application ()
+  return x
+`);
+});

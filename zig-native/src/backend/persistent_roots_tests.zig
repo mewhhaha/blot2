@@ -692,6 +692,61 @@ test "promoted generalized builder chains serialize curried callbacks through re
     try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
 }
 
+// Issue #10 (Ink effect repro c1): `@array.length boxed` leaves the scope's
+// action result open, and `create` serializes the systems whole while no use
+// applies the route. Those variables and the route's row are ambiguous, so
+// the body stores them as a word and a pure row; `boxed`'s own quantified
+// hole still takes one instance per layout.
+test "ambiguous holes at generalized local uses take word storage through replay checkpoint and OOM" {
+    var fixture = try Fixture.initSource(
+        \\type B [w, s] is data = #B { initial: w, s: w -> s }
+        \\type System [route, start] is data = #Route route | #Start start
+        \\type App [engine, system] is data = #App { engine: engine, systems: Array system }
+        \\const empty = fn () => do:
+        \\  let scope = fn world => fn action => do:
+        \\    use result <- action ()
+        \\    return (world, result)
+        \\  return #B { initial: (), s: scope }
+        \\const enter = fn b => fn action => do:
+        \\  let #B { initial, s } = b
+        \\  return s initial action
+        \\const new_with = fn route => #App { engine: empty (), systems: #[#Route route, #Start (fn () => ())] }
+        \\const create = fn app => fn () => do:
+        \\  let #App { engine, systems } = app
+        \\  let (world, _) = enter engine (fn () => @array.length systems)
+        \\  return world
+        \\entry const run = fn (seed: U32) => do:
+        \\  let b = empty ()
+        \\  let (_, first) = enter b (fn () => seed)
+        \\  let boxed = #[b, b]
+        \\  let (_, values) = enter (@array.get boxed 1) (fn () => @array.fill 2 seed)
+        \\  let app = new_with (fn (e: u) => e)
+        \\  let world = create app ()
+        \\  return @u32.add (@u32.add first (@array.get values 0)) (@array.length boxed)
+    );
+    defer fixture.deinit();
+    const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
+    defer a.free(nodes);
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    try ownership(first.bytes);
+    var retained = try fixture.emit(a, &first.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
+    const compiler: [32]u8 = @splat(38);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    var portable = try fixture.emit(a, null, &checkpoint);
+    defer portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, portable.bytes);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, null, first.bytes });
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
+    try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
+}
+
 test "persistent source roots preserve fresh retained and portable checkpoint Wasm" {
     var fixture = try Fixture.init();
     defer fixture.deinit();

@@ -4,8 +4,8 @@
 
 - **Status:** In progress — agreeing instances and closed promotion recorded on
   16 October 2026; per-use-layout runtime instances and their checks recorded
-  on 17 October 2026; Ink's app-hooks builders recorded on 17 October 2026; the
-  commit remains.
+  on 17 October 2026; Ink's app-hooks builders recorded on 17 October 2026;
+  ambiguous holes recorded on 17 October 2026; the commit remains.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink by peer session on 16 October
   2026 as [issue #10](https://github.com/mewhhaha/blot2/issues/10); owner
@@ -102,6 +102,40 @@ which broke Ink's ECS builders.
     panic, on the first versions of the new law programs).
 - [x] Executed laws for both shapes with exported, stable guest memory and a
       native replay, checkpoint and OOM law combining them.
+- [x] Ambiguous holes. A promoted value serialized whole at a use that leaves
+      a type variable open (`let boxed = #[b, b]` read only for its length;
+      Ink's effect repro `c1`, whose route callback `fn (e: u) => e` reaches
+      `create_world` with `u` and its row unconstrained) failed both attempts.
+      A naive word stand-in at that serialization is unsound: the hole there
+      is `boxed`'s own quantified variable, and a later use may read its
+      shared storage at an array.
+  - A use whose remaining holes are all ambiguous type variables, which no
+    scheme, type declaration, operation, contract or implementation of the
+    unit quantifies, now closes with scalar word storage for them and the
+    closed empty row for its ambiguous row tails, throughout the body
+    (`closeAmbiguousUse` in `localStorageMappings`). Checking left such a
+    variable unconstrained, so no value of its type is ever built. The choice
+    depends only on the variable, so bodies that make it agree, and nested
+    closures and callee instances receive it through their layouts. Quantified
+    holes still decline, so `boxed`'s own variable then takes one instance per
+    use layout (F32, an array and the `.length` use's word), or stays open and
+    reports `ownership_unproved` when a closure captures `boxed`.
+  - Built data, arrays included, with one use takes a single instance
+    (`decideInstances`), which gives `boxed` storage when `.length` is its
+    only use.
+  - In the promoting attempt a promotable local that only ambiguous storage
+    closes stays undecided, so a closed initializer keeps its evaluator value.
+    Otherwise Ink's builder chains (and the concrete-route variant of `c1`,
+    which already built) would run their producers at runtime and reach
+    `new_with`'s first link, whose row layout `decideInstances` cannot
+    reconcile. Leaving it undecided is speculation: a runtime-dependent
+    initializer (`let k = pair x` read inside `#[k, k]`) is not promoted, so
+    that attempt fails and the retry instances it.
+  - An inlined named body (`inlineNamedValuesMode`) encodes under the
+    substitutions its plans were prepared under, local storage and ambiguous
+    facts included, instead of the inline call's own.
+  - The new native law's OOM pass caught a double free in the final merge of
+    ambiguous facts; the merged list's `errdefer` is scoped to its own block.
 
 ## Validation
 
@@ -162,21 +196,44 @@ before the local milestone commit. Re-run the Ink ownership repro folder.
   test:compiler --budget-seconds 5400 --phase-seconds 3600` passes in 21
   minutes: native 2 × 1181 tests with no leaks, guests 1516, harness 28 and
   smoke 48.
+- Validation (17 October, ambiguous holes): the issue's `boxed` program
+  returns 9 for `main 7`, and Ink's effect repro `c1` builds and returns its
+  argument, with guest memory steady at 131072 bytes over 4,096 calls (memory
+  exported for the check). All 23 laws in
+  `generalized_local_instance_execution.test.ts` pass with the release and dev
+  compilers; against an unpatched `48eda0a` build the four new executed laws
+  fail with `ownership_unproved` and the other 19 pass, the new captured-`boxed`
+  decline law among them. The new native law "ambiguous holes at generalized
+  local uses take word storage through replay checkpoint and OOM" passes, and
+  fails unpatched; its OOM pass found the double free fixed above. Against the
+  unpatched build, Ink's 50 test programs, 124 ownership repros and 30 effect
+  repros keep their build outcomes and every compared entry result (599 calls
+  over 47 Ink test modules, 478 over 118 ownership repros), except `c1`, which
+  now builds; `apprt` still reports `ownership_unproved`. Seventeen nearby
+  guest suites (128 tests) pass with both compilers, and `deno task lint:zig`
+  reports 0 findings. `deno task test:compiler --budget-seconds 5400
+  --phase-seconds 3600` passes in 20 minutes: native 1182 + 1181 tests over
+  two shards with no leaks, guests 1521, harness 28 and smoke 48.
 - Comparison: not applicable; emission admission change only.
-- Remaining limitations: a promoted value serialized whole at a use that leaves
-  a type hole open, for example `let boxed = #[b, b]` read only for its length,
-  or the effect repro `c1`, whose route callback `fn (e: u) => e` reaches
-  `create_world` with `u` unconstrained (`apprt` fails the same way, then its
-  retry reports `public_arena`). Word storage would be sound there only for an
-  instantiation variable free in the whole body (no interface, capture or
-  generalized-local scheme owns it) and only if nested closure bodies and
-  callee instances take the same choice. Rewriting the hole at one
-  serialization is unsound: it may be a generalized local's quantified
-  variable whose shared runtime storage a later use reads at a concrete type.
-  Also generalized locals in nested blocks (only a body's own statements are
+- Remaining limitations: ambiguous storage closes holes only at uses of a
+  body's own generalized locals. The effect repro `apprt` needs it at the call
+  instances of a named function: `app.run (application n) world ...` and
+  `app.create_world (application n) ()` read only the engine, so
+  `application`'s own type variables stay open there and its instance compiles
+  with erased holes. Inside that instance those holes are quantified, so the
+  builder chain stays undecided, `new_with` runs at an erased instance, and
+  `ecs.new`'s promoted builder is serialized at an erased scope result
+  (`unresolved_type` in the promoting attempt; the retry reports
+  `public_arena`). Fixing it would mean taking ambiguous storage for every node
+  of a body, call results and callee keys included, which changes callee
+  instances broadly. `decideInstances` also still declines `new_with`'s
+  single-use first link, whose binding row layout does not reconcile with its
+  use; Ink reaches it only when a builder chain runs at runtime. Also
+  generalized locals in nested blocks (only a body's own statements are
   decided); producers containing blocks, matches, effects or proven in-place
-  collection edits; locals captured by closures; more than four distinct use
-  layouts. Each of these keeps reporting `ownership_unproved` rather than
-  emitting a latent signature mismatch.
+  collection edits; locals captured by closures, whose quantified holes stay
+  open (the captured-`boxed` law); more than four distinct use layouts. Each of
+  these keeps reporting `ownership_unproved` rather than emitting a latent
+  signature mismatch or storing a quantified hole as a word.
 - Durable record: [CONTRACT.md](../zig-native/CONTRACT.md) generalized-local
   paragraph.

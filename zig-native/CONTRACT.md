@@ -86,16 +86,29 @@ owns a Body prepared under facts that close only the local's quantified type
 holes and its quantified or still unknown rows; each use reads the instance of
 its own layout. A read inside an instanced producer counts once per instance,
 so alias and rebinding chains instance every link. The producer's free locals
-are immutable, so every instance reads the same values. Captures, merges,
-carries, qualified or generative schemes, authority-bearing or usage-contract
-values, effects, blocks, matches, collection edits proven to run in place and
-any use that leaves a hole open decline. A declined runtime-dependent
-initializer whose uses disagree still reports `ownership_unproved`. That is not
-only an ownership limit: no single physical value serves both uses, because
-closure signatures and field words depend on the layout, and emitting one
-traps with a signature mismatch. The source scheme and semantic generalization
-remain unchanged. Substitutions belong to the owned resolved Body, including
-encoding; they never become solver evidence.
+are immutable, so every instance reads the same values. Built data, arrays
+included, with a single use takes a single instance. A use whose remaining
+holes are all ambiguous type variables, which no scheme, type declaration,
+operation, contract or implementation of the unit quantifies, observes nothing
+there: checking left them unconstrained, so no value of such a type is ever
+built. The whole body stores each as a scalar word and closes each such row
+tail at that use as the empty row. The choice depends only on the variable, so
+bodies that make it agree, and nested closures and callee instances receive it
+through their layouts. A quantified hole never takes this storage: it stands
+for each type its instances choose, and a later use may read its shared storage
+at a concrete type. In the promoting attempt a promotable local that only such
+storage closes stays undecided, so a closed initializer keeps its evaluator
+value; one that is not promoted fails that attempt, and the retry decides it
+under the same storage. Captures, merges, carries, qualified or generative
+schemes, authority-bearing or usage-contract values, effects, blocks, matches,
+collection edits proven to run in place and any use that leaves a quantified
+hole open decline. A declined runtime-dependent initializer whose uses disagree
+still reports `ownership_unproved`. That is not only an ownership limit: no
+single physical value serves both uses, because closure signatures and field
+words depend on the layout, and emitting one traps with a signature mismatch.
+The source scheme and semantic generalization remain unchanged. Substitutions
+belong to the owned resolved Body, including encoding, an inlined body's too;
+they never become solver evidence.
 
 Finite closed local data can instead retain its evaluator value, including
 independent generic uses and captures. The proof checks exact constructor
