@@ -827,6 +827,9 @@ The release target is `.cpu_model = .baseline` (`zig-native/build.zig:8`).
 
 - **Fix:** measure an x86-64-v3 build. If it pays, ship a variant or dispatch
   hashing at runtime.
+- **Result (18 October 2026):** dropped. An `x86_64_v3` build runs 1.1% fewer
+  instructions but 3.8–4.2% more CPU on the game over 16 pairs on this Zen 2
+  machine. Neither a variant binary nor runtime dispatch pays.
 
 ### CT81: exit without teardown
 
