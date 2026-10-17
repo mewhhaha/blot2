@@ -14,7 +14,12 @@ boundary and remains the baseline for its additional costs.
 The nonmoving Wasm32 header occupies 32 bytes. It contains physical/requested
 sizes, flags, one phase-exclusive free/mark/destruction link, a strong count, an
 exact reference bitmap and two reserved cycle fields. Bit 31 describes every
-word from 31 onward; heterogeneous tails decline admission. Checked type roles
+word from 31 onward; heterogeneous tails decline admission. Allocation classes
+include the header. Power-of-two classes start at 64 bytes; below 2 KiB each
+also has a 1.5x companion, giving 48, 64, 96, 128, 192, …, 1,536 and 2,048
+bytes. Companion free lists use the heads of the power classes below 64 bytes,
+which no block can use. Each class is a multiple of 16 bytes, so a heap
+starting at 64 KiB keeps 16-byte aligned payloads. Checked type roles
 resolve dynamic value fields before counting. Table-function and List
 owner-token words are scalars. Numeric arrays and List leaves have zero-child
 descriptors.
@@ -125,9 +130,12 @@ measures 17.114 ms for empty Wasm calls and 23.348 ms for checked operations,
 about 6.2 ns additional CPU per pair. This isolates operation checks from
 collection geometry and does not predict whole-program costs.
 
-Header growth affects fallback modules too. Public-Array allocation probes show
-4-, 8- and 16-byte payloads moving from 32- to 64-byte blocks; 24-, 32-, 64-,
-976-, 992-, 1,024- and 4,096-byte payloads keep their previous classes. The List
+Header growth affects fallback modules too. Public-Array allocation probes in
+this release showed 4-, 8- and 16-byte payloads moving from 32- to 64-byte
+blocks; 24-, 32-, 64-, 976-, 992-, 1,024- and 4,096-byte payloads kept their
+previous classes. The later companion classes put 4- to 16-byte payloads in
+48-byte blocks, 64-byte payloads in 96-byte blocks and 1,024-byte payloads in
+1,536-byte blocks; the other probed payloads keep the classes above. The List
 leaf boundary is now 244 words, with source laws across that boundary at all row
 widths; old 248-word evidence is historical. A 100,000-element numeric
 List-to-Array probe commits 1,048,576 bytes in both releases. Page equality does

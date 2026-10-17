@@ -7,13 +7,18 @@ const gen = @import("../backend/runtime_code.zig");
 const Code = gen.Code;
 const Local = gen.Local;
 const Error = std.mem.Allocator.Error;
-const page_bytes = 4096;
-const first_slot = 8;
-const slot_bytes = 8;
+const head_bytes = @sizeOf(h.ArenaHeader);
+// A page payload and its arena header fill the 4096-byte allocation class
+// exactly. The full page's top equals its payload size.
+pub const page_bytes = 4096 - head_bytes;
+pub const first_slot = 8;
+pub const slot_bytes = 8;
 pub const slots_per_page = (page_bytes - first_slot) / slot_bytes;
+comptime {
+    std.debug.assert((page_bytes - first_slot) % slot_bytes == 0);
+}
 pub const enabled: u32 = 1;
 pub const complete: u32 = 2;
-const head_bytes = @sizeOf(h.ArenaHeader);
 const owner_slot = h.offset(h.ArenaHeader, "candidate_prev");
 fn code(m: *w.Module, id: u32) Code {
     return .{ .module = m, .function = id };

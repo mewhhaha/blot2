@@ -208,9 +208,10 @@ A frame now reserves one 8-byte marker instead of a marker and a separate result
 slot. Before retiring the callee suffix, close transfers or retains the returned
 value into that marker. Its existing frame link names the caller. Close keeps an
 owning marker and pops an empty one; borrowed results retain exactly as before.
-This does not assume a borrowed result has another root. A 4096-byte journal
-payload holds 511 records, with the first record at byte 8. The 32-byte object
-header, typed masks and public ABI remain unchanged.
+This does not assume a borrowed result has another root. A journal page's
+4064-byte payload and header fill one 4096-byte block; it holds 507 records,
+with the first record at byte 8. The 32-byte object header, typed masks and
+public ABI remain unchanged.
 
 Journal pop and lease release also validate a live header once per ownership
 transaction, then detach, decrement and drain without repeating that validation.
@@ -356,7 +357,7 @@ material remaining cycle/host CPU gate keep task 035 open.
 
 A guest State installation now owns one 20-byte frame: read token, checked
 value, strong outer link, guest-only kind tag 4, and write token. It replaces a
-4-byte cell and two 16-byte frames: three 64-byte allocation classes become one.
+4-byte cell and two 16-byte frames: three allocations become one 64-byte block.
 The 32-byte header and collection geometry do not change. Lookup matches either
 nominal token before forwarding outer; callback dispatch still excludes the
 matched provider and every younger scope. Loads and typed stores address the

@@ -18,11 +18,11 @@ The reserved `candidate_prev` word points to the original owner's slot while its
 lease exists. Lease consumption clears both links before decrement/destruction.
 The cycle collector must reuse that word only after this phase ends.
 
-A journal page has a scalar 4096-byte payload, a previous-page link and 511
+A journal page has a scalar 4064-byte payload, a previous-page link and 507
 8-byte slots: value and frame identity. Only values are roots. Frame identities
-and page links are allocator bookkeeping. A page uses the existing 8192-byte
-allocation class. Empty suffix pages are recycled; the base page is reusable
-until instance teardown.
+and page links are allocator bookkeeping. With its 32-byte header, a page fills
+the 4096-byte allocation class exactly. Empty suffix pages are recycled; the
+base page is reusable until instance teardown.
 
 A call reserves one marker before opening its frame. Allocation reserves a slot
 before publishing storage. At close the marker becomes the caller result owner:
@@ -196,10 +196,10 @@ Memory stayed at its warmed size. The carry-loop route retired 5,555,202 objects
 and ended with zero roots and leases. The startup route retained exactly one
 module-table root/lease; teardown removed it and retired the remaining six
 objects. Wasm linear memory does not shrink on teardown. This measures reuse and
-retirement, not returned OS pages. Journal storage adds an 8192-byte base class;
-its payload is 4096 bytes. Header, Array layout and 244-word List geometry are
-unchanged from 031, so those earlier costs are separate from this root
-extension.
+retirement, not returned OS pages. Journal storage added an 8192-byte base
+class with a 4096-byte payload; pages now use one 4096-byte block. Header,
+Array layout and 244-word List geometry are unchanged from 031, so those
+earlier costs are separate from this root extension.
 
 Focused checks passed: eight source ownership/plateau laws (seven at both
 codegen tiers), 11 checked RC execution laws, 45 startup/demand/State/GC/Foreign

@@ -168,6 +168,8 @@ fn emitNode(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.set(left, .{ .call, r.chunk_new, split, owner });
     try c.ret(.{ .call, r.branch, left, .{ .call, r.chunk_new, .{ .i32_sub, count, split }, owner }, owner });
     try c.end();
+    // Buckets are exact power-of-two allocator classes. Leaves skip the 1.5x
+    // companion classes so that growth by one element keeps doubling capacity.
     try c.set(bucket, 64);
     try c.loop(.{ .i32_lt_u, bucket, .{ .i32_add, @sizeOf(heap.ArenaHeader) + header, .{ .i32_mul, count, 4 } } });
     try c.set(bucket, .{ .i32_mul, bucket, 2 });

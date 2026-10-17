@@ -26,7 +26,8 @@ verifies.
   guest regressions behind them were fixed on 16 October:
   - lazy demand types follow the callee parameter;
   - only a demand parameter declared affine before instantiation moves captured
-    owners (`demand_once`), so retry demands keep rejecting them;
+    owners (`demand_once`), so retry demands keep rejecting them (owner accepted
+    this rule on 17 October; recorded in `USAGE_CONTRACTS.md`);
   - public dependency freezes copy instance identities verbatim;
   - workspace goals also search active quantifier goals;
   - task call sites register pattern locals;

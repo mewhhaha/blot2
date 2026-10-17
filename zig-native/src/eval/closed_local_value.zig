@@ -159,3 +159,10 @@ pub fn analyze(units: []const core.Module, owner: u32, initializer: core.Id) ?Pr
     if (!scan.value(owner, initializer, &.{}, 0)) return null;
     return scan.proof;
 }
+/// Whether a type has a representation-free value graph: scalars, variables,
+/// functions and transparent data, never authority-bearing types.
+pub fn dataShape(units: []const core.Module, owner: u32, ty: T.Id) bool {
+    var scan: Scan = .{ .units = units };
+    const module = scan.unit(owner) orelse return false;
+    return scan.shape(module, ty, .{}, false, 0);
+}

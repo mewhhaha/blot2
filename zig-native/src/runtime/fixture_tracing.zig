@@ -388,19 +388,20 @@ fn rootMark(c: @import("../backend/runtime_code.zig").Code, a: wasm.Arena, traci
     const page = try c.temp();
     const top = try c.temp();
     const slot = try c.temp();
+    const journal = @import("root_runtime.zig");
     try c.set(page, .{ .global, a.root_page });
     try c.set(top, .{ .global, a.root_top });
     try c.loop(page);
     try c.value(.{ .call, tracing.mark, page, index, start });
     try c.op(.drop, 0);
-    try c.set(slot, 8);
+    try c.set(slot, journal.first_slot);
     try c.loop(.{ .i32_lt_u, slot, top });
     try c.value(.{ .call, tracing.mark, .{ .load, .{ .i32_add, page, slot }, 0 }, index, start });
     try c.op(.drop, 0);
-    try c.set(slot, .{ .i32_add, slot, 8 });
+    try c.set(slot, .{ .i32_add, slot, journal.slot_bytes });
     try c.again();
     try c.set(page, .{ .load, page, 0 });
-    try c.set(top, 4096);
+    try c.set(top, journal.page_bytes);
     try c.again();
 }
 

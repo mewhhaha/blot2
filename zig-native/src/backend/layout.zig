@@ -7,6 +7,7 @@ const evidence = @import("../eval/type_evidence.zig");
 const code_expectation = @import("../reuse/code_expectation.zig");
 const Allocator = std.mem.Allocator;
 pub const Id = u32;
+pub const word: Id = 3;
 pub const erased: Id = 6;
 /// Unknown effects are representation-only facts, distinct from closed empty.
 pub const capability_layout_decl: u32 = 7;

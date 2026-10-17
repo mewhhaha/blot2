@@ -3036,6 +3036,20 @@ pub const Session = struct {
         const values: std.AutoHashMapUnmanaged(core.BindingId, ValueId) = .empty;
         return self.closedNode(unit, id, &values, &.{}, &.{});
     }
+    /// Attempts a closed initializer without a totality proof. Any failure,
+    /// including a read of an enclosing local, declines without publishing a
+    /// diagnostic, so the caller keeps its ordinary runtime path.
+    pub fn attemptClosedNode(self: *Session, unit: u32, id: core.Id) Allocator.Error!?ValueId {
+        const saved = self.diagnostic;
+        const values: std.AutoHashMapUnmanaged(core.BindingId, ValueId) = .empty;
+        return self.closedNode(unit, id, &values, &.{}, &.{}) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => {
+                self.diagnostic = saved;
+                return null;
+            },
+        };
+    }
     pub fn stagedReplacement(self: *const Session, code_value: ValueId, id: core.Id) ?ValueId {
         if (self.valueInfo(code_value).kind != .code) return null;
         for (self.valueChildren(code_value)) |replacement| {

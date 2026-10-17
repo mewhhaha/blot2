@@ -515,6 +515,51 @@ Deno.test("private roots move fresh returns and retain borrowed children before 
   r.call("root_leave", 2);
 });
 
+Deno.test("companion classes split small powers of two and recycle only within their class", async () => {
+  const r = await runtime();
+  const classes = [48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 4096, 8192];
+  const values: number[] = [];
+  for (const [index, block] of classes.entries()) {
+    const smaller = index === 0 ? 32 : classes[index - 1];
+    // Classes include the 32-byte header: test both payload boundaries.
+    for (const payload of [smaller - 32 + 4, block - 32]) {
+      const value = r.call("allocate_typed", payload, 0);
+      assert.equal(r.word(value - 32), block, `payload ${payload}`);
+      assert.equal(r.word(value - 28), payload);
+      assert.equal(value % 16, 0);
+      values.push(value);
+    }
+  }
+  for (const value of values) r.call("release_lease", value);
+  assert.equal(r.count("destroyed"), values.length);
+  const heap = r.heap();
+  // Each free list is LIFO and returns only blocks retired from its class.
+  for (const [index, block] of classes.entries()) {
+    assert.equal(r.call("allocate_typed", block - 32, 0), values[2 * index + 1]);
+    const smaller = index === 0 ? 32 : classes[index - 1];
+    assert.equal(r.call("allocate_typed", smaller - 32 + 4, 0), values[2 * index]);
+  }
+  assert.equal(r.heap(), heap);
+});
+
+Deno.test("journal pages fill the 4096-byte class and link at their slot capacity", async () => {
+  const r = await runtime();
+  const capacity = Number(
+    (r.exports.root_capacity as WebAssembly.Global).value,
+  );
+  assert.equal(capacity, (4096 - 32 - 8) / 8);
+  const first = r.call("root_reserve") - 8;
+  assert.equal(r.word(first - 32), 4096);
+  assert.equal(r.word(first - 28), 4096 - 32);
+  let last = first + 8;
+  for (let index = 1; index < capacity; index++) last = r.call("root_reserve");
+  assert.equal(last, first + 4096 - 32 - 8);
+  const second = r.call("root_reserve") - 8;
+  assert.notEqual(second, first);
+  assert.equal(r.word(second), first);
+  assert.equal(r.word(second - 32), 4096);
+});
+
 Deno.test("frame markers transfer owning returns across journal page retirement", async () => {
   const r = await runtime();
   const capacity = Number(

@@ -66,6 +66,10 @@ drops them. Many closures cannot hide an affine owned capture. Capturing a
 capability preserves its exact identity and owner region. Demand creation moves
 its captured owners into the demand. Cancellation may retry a demand, so its
 body cannot consume an affine capture without a restart-safe checked protocol.
+A demand parameter moves its captured owners once only when the callee declares
+it affine before generic instantiation (`~(value: unique T)`); a generic demand
+parameter such as `keep = fn ~value` stays retryable, so a consuming capture is
+rejected there. This is fixed at the call as `demand_once`.
 Ready demands retain their strong results; usage contracts never weaken memos.
 
 ## Resources and exits

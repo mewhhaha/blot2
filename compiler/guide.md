@@ -140,11 +140,13 @@ An outer local rebound directly in the loop with `:=` carries its new value to
 the next iteration and after the loop. Its type must stay the same across
 iterations. New locals and the index remain inside the loop. Nested loops carry
 successors through their enclosing loop. Rebindings inside `if`/`if let`
-branches also carry outward. A separately nested `do:` keeps its own scope.
-`return` exits the enclosing `do`; a loop creates no new return boundary.
-`break` exits the nearest loop and carries its latest local values into the
-statements after it. In a request loop it also cancels the captured computation.
-There is no `continue` statement yet.
+branches also carry outward. A separately nested `do:`, including a `case` arm
+body, keeps its own scope: a `:=` of an outer local there that is never read
+inside that block is rejected with `dead_rebinding`. Rebind with `if`/`else`, or
+assign the value of a `case` expression. `return` exits the enclosing `do`; a
+loop creates no new return boundary. `break` exits the nearest loop and carries
+its latest local values into the statements after it. In a request loop it also
+cancels the captured computation. There is no `continue` statement yet.
 
 ```blot
 entry const sum_to = fn (end: U32) => do:

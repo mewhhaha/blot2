@@ -61,11 +61,22 @@ composed bodies use private functions. Runtime arguments evaluate once in their
 original order. Private functions have ordinary invocation-local cleanup and
 provider scopes.
 
-A generalized local result from a call or selected named member with one
-concrete checked use may prepare its private storage at that instance. Only
+A generalized local result from a call, application, selected named member or
+local alias whose concrete checked uses all agree on one layout may prepare its
+private storage at that instance. Bindings are visited last to first, so the
+facts of a later local close the uses feeding it through aliases and rebinding
+chains; a use read only by an unused local alias is ignored. A local with no
+use observes nothing, so its quantified holes take scalar word storage. Only
 quantified local holes gain physical facts; known layouts still reconcile
-exactly. Captures, merges, carries and multiple or unresolved instances decline
-this bounded proof. The source scheme and semantic generalization remain
+exactly. Captures, merges and carries decline this bounded proof. When uses
+disagree, a closed initializer built by a call, application, projection or
+constructor is evaluated instead; it keeps its evaluator value and each use
+serializes it at its own layout. That attempt reads no enclosing local,
+publishes no diagnostic when it declines and marks its code fresh. A
+compilation that fails after such a promotion runs once more without
+promotions, and that attempt owns the reported outcome. A
+runtime-dependent initializer whose uses disagree still reports
+`ownership_unproved`. The source scheme and semantic generalization remain
 unchanged. Substitutions belong to the owned resolved Body, including encoding;
 they never become solver evidence.
 
@@ -579,12 +590,12 @@ types and never treats an unknown word as scalar or reference.
 
 Word-element cursors own a leaf base and its logical start, separate from the
 collection's lookup cache. Forks only consult that shared cache on a leaf
-crossing. The four-word cursor uses a 64-byte allocation class with the 32-byte
-ownership header. Serialized cursors start without a cached leaf. Every stored
-pointer remains an allocation base and published cursors are initialized once,
-never mutated. Packed-row cursors keep logical positions with a private leaf
-cache whose base counts words. Direct loops retain their own leaf span and a
-bounded stack of pending right subtrees. The private stack roots the original
+crossing. The four-word cursor uses the 48-byte allocation class with the
+32-byte ownership header. Serialized cursors start without a cached leaf. Every
+stored pointer remains an allocation base and published cursors are initialized
+once, never mutated. Packed-row cursors keep logical positions with a private
+leaf cache whose base counts words. Direct loops retain their own leaf span and
+a bounded stack of pending right subtrees. The private stack roots the original
 collection and is cleared before use; its references are allocation bases. Each
 tree edge is visited at most once, independently of descriptor-cache changes.
 Each request consumes the immediately next leaf: direct loops read every word in

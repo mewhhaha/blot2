@@ -183,7 +183,7 @@ pub const SchemeSummary = struct {
     shareable: bool = false,
 };
 pub const CapabilityFlow = @import("capability_flow.zig").Contract;
-pub const Binding = struct { capability_flow: CapabilityFlow = .unknown, capability_parameters: @import("capability_flow.zig").Parameters = .{}, operation_ref: u32 = 0, private: bool = false, name: symbols.Symbol, declaration: ast.Id, owner: ast.Id, kind: Kind, named_function: bool = false, ty: T.Id, scheme: T.Scheme = .{}, external: ?ExternalTarget = null, predecessor: BindingId = 0, summary: SchemeSummary = .{} };
+pub const Binding = struct { read: bool = false, capability_flow: CapabilityFlow = .unknown, capability_parameters: @import("capability_flow.zig").Parameters = .{}, operation_ref: u32 = 0, private: bool = false, name: symbols.Symbol, declaration: ast.Id, owner: ast.Id, kind: Kind, named_function: bool = false, ty: T.Id, scheme: T.Scheme = .{}, external: ?ExternalTarget = null, predecessor: BindingId = 0, summary: SchemeSummary = .{} };
 /// An immutable interface borrows only semantic tables, never a source body.
 pub const SchemeInterface = struct {
     /// Binding ordinal in the owner of `callees`, before external relocation.
@@ -273,7 +273,7 @@ pub const LoopCarry = struct { node: ast.Id, incoming: BindingId, iteration: Bin
 pub const LoopExit = struct { node: ast.Id, loop: ast.Id, bindings: T.List };
 pub const ClosedRow = struct { owner: BindingId, variable: u32 };
 pub const Merge = struct { node: ast.Id, result: BindingId, then_binding: BindingId, else_binding: BindingId };
-pub const Code = enum { task_escape, task_handle_consumed, task_capture_transfer, task_capability_shared, task_demand_shared, task_regions_overlap, task_host_contract, task_budget, invalid_proof_operand, proof_scope_escape, proof_runtime_use, proof_mismatch, contradictory_proof, proof_analysis_limit, effect_identity_scope, capability_escape, capability_analysis_limit, undetermined_implementation, orphan_implementation, overlapping_implementation, incompatible_implementation, recursive_evidence, missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, unknown_rebinding, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget, skolem_escape, rank_mismatch, package_expected, package_witness_mismatch, package_escape, abstract_representation_access, use_after_move, duplicate_owner, borrow_conflict, borrow_escape, once_reused, multiplicity_unknown, cleanup_not_safe, usage_evidence_mismatch, usage_analysis_limit, code_shape_mismatch, stage_unavailable, cross_stage_authority, descriptor_private, generated_binding_escape, staging_budget };
+pub const Code = enum { task_escape, task_handle_consumed, task_capture_transfer, task_capability_shared, task_demand_shared, task_regions_overlap, task_host_contract, task_budget, invalid_proof_operand, proof_scope_escape, proof_runtime_use, proof_mismatch, contradictory_proof, proof_analysis_limit, effect_identity_scope, capability_escape, capability_analysis_limit, undetermined_implementation, orphan_implementation, overlapping_implementation, incompatible_implementation, recursive_evidence, missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, unknown_rebinding, dead_rebinding, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget, skolem_escape, rank_mismatch, package_expected, package_witness_mismatch, package_escape, abstract_representation_access, use_after_move, duplicate_owner, borrow_conflict, borrow_escape, once_reused, multiplicity_unknown, cleanup_not_safe, usage_evidence_mismatch, usage_analysis_limit, code_shape_mismatch, stage_unavailable, cross_stage_authority, descriptor_private, generated_binding_escape, staging_budget };
 pub const PurityWitness = @import("../reuse/purity_diagnostics.zig").Witness;
 pub const Diagnostic = struct {
     pub const TypeApplication = enum { missing_array, missing_nominal, extra };
@@ -441,6 +441,7 @@ pub const Diagnostic = struct {
             .invalid_operator => "This operator is not declared or supported",
             .return_outside_block => "Return requires an enclosing do block in this function",
             .unknown_rebinding => if (self.symbol != 0) ":= requires an existing local binding" else "Rebinding requires an existing lexical name",
+            .dead_rebinding => "This := inside a nested do: block is never read and leaves the enclosing binding unchanged; rebind it with if/else or assign a case expression",
             .nesting_limit => "Semantic nesting exceeds the compiler limit",
             .inference_budget => "Type inference exceeded this module's work budget",
             .constructor_marker => "Record constructors require # before the name",
@@ -864,6 +865,8 @@ const Engine = struct {
     global_states: std.AutoHashMapUnmanaged(BindingId, Global) = .empty,
     active: std.ArrayList(BindingId) = .empty,
     env: std.ArrayList(Entry) = .empty,
+    /// The block that is a lambda's own body, as opposed to a nested do:.
+    function_body: ast.Id = 0,
     current: BindingId = 0,
     pending_start: usize = 0,
     owner: ast.Id = 0,
@@ -9683,6 +9686,7 @@ const Engine = struct {
         return summary;
     }
     fn instantiate(self: *Engine, binding: BindingId, source: ast.Id) T.Error!T.Id {
+        self.bindings.items[binding].read = true;
         self.operation_refs[source] = self.bindings.items[binding].operation_ref;
         const principal = self.bindings.items[binding].scheme;
         if (principal.root == 0) {
@@ -11698,6 +11702,7 @@ const Engine = struct {
         const required = if (result_annotation != 0) try self.annotation(result_annotation) else 0;
         if (node.c != 0 and self.tree.node(node.c).tag == .type_effect) try self.constrainEffects(latent, try self.annotationEffects(self.tree.node(node.c).b), id);
         var result: T.Id = 0;
+        self.function_body = node.b;
         if (required != 0) result = try self.contextualLambda(node.b, required) else if (contextual) result = try self.contextualLambda(node.b, required_arrow.b) else result = try self.expression(node.b);
         if (required != 0) {
             try self.constrain(result, required, id);
@@ -11948,6 +11953,8 @@ const Engine = struct {
             if (resolver.tag == .provider or resolver.tag == .state_provider) return try self.providerBlock(id, resolver_type);
         }
         const scope = self.env.items.len;
+        const first_binding = self.bindings.items.len;
+        const nested = self.function_body != id;
         const old_target = self.return_target;
         const old_owner = self.owner;
         const old_resolver = self.resolver_scope;
@@ -11975,6 +11982,7 @@ const Engine = struct {
             self.resolver_scope = old_resolver;
         }
         const flow = try self.suite(id);
+        if (nested) try self.deadRebindings(scope, first_binding);
         if (!flow.exits) {
             if (block_index == 0) try self.constrain(result, T.unit, id) else {
                 const op = try self.resolverMethod(id, .pure, T.unit, self.resolver_scope.result, 0, false);
@@ -12603,6 +12611,34 @@ const Engine = struct {
         }
         self.expr_types[id] = if (exits) T.never else T.unit;
         return .{ .exits = exits, .breaks = exits };
+    }
+    /// A nested do: keeps its own scope (issue #11): only if/if let and loops
+    /// carry a rebinding outward. A := of an enclosing name none of whose
+    /// versions made in the block is ever read, including versions inside its
+    /// branches, therefore changes nothing, so it is rejected.
+    fn deadRebindings(self: *Engine, scope: usize, first_binding: usize) T.Error!void {
+        for (self.env.items[scope..], scope..) |entry, index| {
+            if (entry.name == self.self_name) continue;
+            const binding = self.bindings.items[entry.binding];
+            if (binding.predecessor == 0 or binding.read) continue;
+            const last = for (self.env.items[index + 1 ..]) |next| {
+                if (next.name == entry.name) break false;
+            } else true;
+            if (!last) continue;
+            var root = binding.predecessor;
+            const enclosing = for (0..64) |_| {
+                if (root == 0) break false;
+                if (for (self.env.items[0..scope]) |prior| {
+                    if (prior.binding == root) break true;
+                } else false) break true;
+                root = self.bindings.items[root].predecessor;
+            } else false;
+            if (!enclosing) continue;
+            const read = for (self.bindings.items[first_binding..]) |version| {
+                if (version.name == entry.name and version.read) break true;
+            } else false;
+            if (!read) try self.diagnostic(.dead_rebinding, binding.declaration);
+        }
     }
     fn rebindStatement(self: *Engine, id: ast.Id) T.Error!Flow {
         const node = self.tree.node(id);

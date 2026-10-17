@@ -1,10 +1,23 @@
 //! Address-preserving allocation and direct reclamation. Payload pointers never
-//! change; power-of-two free lists reuse retired blocks. Partial assembly owns
+//! change; per-class free lists reuse retired blocks. Partial assembly owns
 //! its separate legacy scanner and emits none of it into retained source bodies.
 const std = @import("std");
 const wasm = @import("../backend/wasm.zig");
 const heap = @import("runtime_layout.zig");
 const Error = std.mem.Allocator.Error;
+// Size classes include the arena header. Power-of-two class 2^k keeps its
+// free-list head k at address 32 + 4k; the first-fit list for blocks above
+// 2 GiB uses head 32. A header plus one payload byte needs more than 2^5
+// bytes, so heads 0..5 never hold a power class. They hold the 1.5x
+// companions 3 * 2^(k-2) of power classes 6..11: 48, 96, 192, 384, 768 and
+// 1536 bytes. Each class is a multiple of 16 bytes, so a heap starting at
+// 64 KiB keeps 16-byte aligned payloads.
+const first_class = 6;
+const companion_classes = 6;
+comptime {
+    std.debug.assert(@sizeOf(heap.ArenaHeader) + 1 > 1 << (first_class - 1));
+    std.debug.assert(companion_classes <= first_class);
+}
 // Reserved arena metadata follows the 33 free-list heads (bytes 32..164).
 // These pointer-free immutable descriptors are shared by every list helper,
 // including helpers reconstructed from a retained executable fragment.
@@ -77,6 +90,17 @@ fn recycle(module: *wasm.Module, arena: wasm.Arena) Error!void {
         .{ .op = .i32_const, .operand = 2 },
         .{ .op = .i32_shl },
         .{ .op = .i32_add },
+        // A companion 3 * 2^(k-2) has k - 2 trailing zeros and head k - 6.
+        .{ .op = .local_get, .operand = size },
+        .{ .op = .local_get, .operand = size },
+        .{ .op = .i32_const, .operand = 1 },
+        .{ .op = .i32_sub },
+        .{ .op = .i32_and },
+        .{ .op = .i32_const, .operand = 0 },
+        .{ .op = .i32_ne },
+        .{ .op = .i32_const, .operand = 4 * (first_class - 2) },
+        .{ .op = .i32_mul },
+        .{ .op = .i32_sub },
         .{ .op = .end },
         .{ .op = .local_set, .operand = bin },
         .{ .op = .local_get, .operand = head },
@@ -140,6 +164,33 @@ fn allocate(module: *wasm.Module, arena: wasm.Arena) Error!void {
         .{ .op = .local_get, .operand = class },
         .{ .op = .i32_shl },
         .{ .op = .local_set, .operand = size },
+        // Below 2 KiB, a block that fits three quarters of its power class
+        // uses that class's companion and free-list head.
+        .{ .op = .local_get, .operand = class },
+        .{ .op = .i32_const, .operand = first_class + companion_classes },
+        .{ .op = .i32_lt_u },
+        .{ .op = .local_get, .operand = bytes },
+        .{ .op = .i32_const, .operand = @sizeOf(heap.ArenaHeader) },
+        .{ .op = .i32_add },
+        .{ .op = .local_get, .operand = size },
+        .{ .op = .local_get, .operand = size },
+        .{ .op = .i32_const, .operand = 2 },
+        .{ .op = .i32_shr_u },
+        .{ .op = .i32_sub },
+        .{ .op = .i32_le_u },
+        .{ .op = .i32_and },
+        .{ .op = .if_ },
+        .{ .op = .local_get, .operand = class },
+        .{ .op = .i32_const, .operand = first_class },
+        .{ .op = .i32_sub },
+        .{ .op = .local_set, .operand = class },
+        .{ .op = .local_get, .operand = size },
+        .{ .op = .local_get, .operand = size },
+        .{ .op = .i32_const, .operand = 2 },
+        .{ .op = .i32_shr_u },
+        .{ .op = .i32_sub },
+        .{ .op = .local_set, .operand = size },
+        .{ .op = .end },
         .{ .op = .end },
         .{ .op = .i32_const, .operand = 32 },
         .{ .op = .local_get, .operand = class },

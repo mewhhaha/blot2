@@ -114,6 +114,10 @@ const EvidenceRoot = refinement_receipt.Root;
 pub const Generator = struct {
     pub const Emission = Emitter;
     inline_named: bool = true,
+    /// Closed generalized locals whose uses disagree may keep evaluator
+    /// values. A failed compilation that did so retries without them.
+    speculative_locals: bool = true,
+    speculated: bool = false,
     demand_lowering: @import("demand_lowering.zig").Store = .{},
     ragged_probe_limit: u32 = ragged_builder.probe_limit,
     work_timing: @import("backend_timing.zig").Work = .{},
@@ -2288,13 +2292,22 @@ pub fn compileWithEvidenceNoise(allocator: Allocator, units: []const core.Module
 }
 
 pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entry: u32, options: CompileOptions) Error!Result {
-    return compileAttempt(allocator, units, entry, options, false) catch |err| {
+    return compileLocals(allocator, units, entry, options, true) catch |err| {
+        if (err != error.SpeculativeLocalRetry) return @errorCast(err);
+        // A promoted generalized local could not serve one of its uses, or
+        // the program fails anyway. The fresh attempt keeps every such local
+        // on its ordinary runtime path and owns the reported outcome.
+        return @errorCast(compileLocals(allocator, units, entry, options, false));
+    };
+}
+fn compileLocals(allocator: Allocator, units: []const core.Module, entry: u32, options: CompileOptions, speculative: bool) (Error || error{SpeculativeLocalRetry})!Result {
+    return compileAttempt(allocator, units, entry, options, false, speculative) catch |err| {
         if (err != error.ConstantReceiptRetry) return @errorCast(err);
         std.debug.assert(options.constant_receipts);
         // compileAttempt has destroyed every mutable owner before retrying.
         // Ordinary recording remains enabled for the next revision; only
         // partial receipt reuse is disabled during this fresh attempt.
-        var result = compileAttempt(allocator, units, entry, options, true) catch |retry_error| {
+        var result = compileAttempt(allocator, units, entry, options, true, speculative) catch |retry_error| {
             std.debug.assert(retry_error != error.ConstantReceiptRetry);
             return @errorCast(retry_error);
         };
@@ -2313,6 +2326,7 @@ const CompileRun = struct {
     clock: @import("backend_timing.zig").Clock = undefined,
     timing: @import("backend_timing.zig").Stats = .{},
     recording: bool = false,
+    speculative_locals: bool = true,
     module_stamps: code_artifacts.ModuleStamps = undefined,
     stamps_alive: bool = false,
     stamps: ?*code_artifacts.ModuleStamps = null,
@@ -2371,6 +2385,7 @@ const CompileRun = struct {
         }
         self.generator = try Generator.init(self.allocator, self.units, if (self.recording) &self.journal else null);
         self.generator.inline_named = self.options.inline_named;
+        self.generator.speculative_locals = self.speculative_locals;
         if (self.options.constant_limits.steps) |limit| self.generator.evaluator.options.max_steps = limit;
         if (self.options.constant_limits.values) |limit| self.generator.evaluator.options.max_values = limit;
         if (self.options.constant_limits.children) |limit| self.generator.evaluator.options.max_children = limit;
@@ -2724,13 +2739,23 @@ const CompileRun = struct {
     }
 };
 
-fn compileAttempt(allocator: Allocator, units: []const core.Module, entry: u32, options: CompileOptions, skip_constant_replay: bool) (Error || error{ConstantReceiptRetry})!Result {
-    var run: CompileRun = .{ .allocator = allocator, .units = units, .entry = entry, .options = options };
+fn compileAttempt(allocator: Allocator, units: []const core.Module, entry: u32, options: CompileOptions, skip_constant_replay: bool, speculative_locals: bool) (Error || error{ ConstantReceiptRetry, SpeculativeLocalRetry })!Result {
+    var run: CompileRun = .{ .allocator = allocator, .units = units, .entry = entry, .options = options, .speculative_locals = speculative_locals };
     defer run.deinit();
     try run.prepare(skip_constant_replay);
-    if (try run.emit()) |failure| return failure;
+    if (try run.emit()) |failure| {
+        if (!run.generator.speculated) return failure;
+        var discarded = failure;
+        discarded.deinit(allocator);
+        return error.SpeculativeLocalRetry;
+    }
+    const speculated = run.generator.speculated;
     var result = try run.assemble();
-    if (result.diagnostic != null) return result;
+    if (result.diagnostic != null) {
+        if (!speculated) return result;
+        result.deinit(allocator);
+        return error.SpeculativeLocalRetry;
+    }
     errdefer result.deinit(allocator);
     try run.observe(&result);
     try run.recordArtifact(&result);

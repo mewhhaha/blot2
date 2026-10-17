@@ -54,7 +54,7 @@ A live cached descriptor cannot be reallocated at the same address. A later
 invocation therefore rejects the revoked closure instead of invoking its new
 callback. The memo stays ready and retains its original closure; no cache is
 weakened and no generation counter can wrap. The descriptor grows from 8 to 12
-bytes, still in the same 64-byte allocator class with the 32-byte header.
+bytes, still in the same 48-byte allocator class with the 32-byte header.
 
 Trace: first invocation supplies A, forces the memo and calls A(41) to
 obtain 42. Leave revokes A. A second invocation supplies B; the ready memo still

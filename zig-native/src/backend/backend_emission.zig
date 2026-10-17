@@ -260,19 +260,29 @@ pub const Owner = struct {
         }
         return prepared;
     }
-    /// A generalized local with one checked instance may use that instance's
-    /// private storage. Only its quantified holes acquire facts; captures and
-    /// flow aliases decline. This never unifies the semantic producer scheme.
+    /// A generalized local whose checked instances agree on one layout may
+    /// use that instance's private storage. Only its quantified holes acquire
+    /// facts; captures, merges and carries decline. Statements are visited
+    /// last to first, so a later local's facts close the instances of an
+    /// alias or rebinding chain feeding it (issue #10). This never unifies the
+    /// semantic producer scheme.
     fn localStorageMappings(self: *Emitter, root: core.Id, mappings: *std.ArrayList(Mapping)) Error!void {
         const g = self.generator;
         const source = g.unit(self.unit_id);
         if (source.nodes.len > 4096) return;
         var budget: usize = 65536;
-        for (source.children(root)) |statement| {
+        const statements = source.children(root);
+        // References read only by an unused local alias need no instance.
+        var dead_aliases: [16]core.Id = undefined;
+        var dead_count: usize = 0;
+        var position = statements.len;
+        while (position > 0) {
+            position -= 1;
+            const statement = statements[position];
             const n = source.node(statement);
             if (n.tag != .bind or n.a == 0) continue;
             const producer = source.node(n.b);
-            if (producer.tag != .call and producer.tag != .project) continue;
+            if (producer.tag != .call and producer.tag != .apply and producer.tag != .project and producer.tag != .reference) continue;
             const binding = source.binding(n.a);
             if (binding.kind != .local or binding.scheme.variables.len == 0) continue;
             const produced = try self.codeLayout(binding.ty, source.span(statement));
@@ -283,20 +293,36 @@ pub const Owner = struct {
                 const receiver = try self.codeLayout(projection.source_type, source.span(n.b));
                 if (try self.memberTarget(n.b, projection.field, receiver) == null) continue;
             }
-            var use: ?core.Id = null;
+            if (producer.tag == .reference) {
+                const aliased = source.reference(n.b);
+                if (aliased.unit != 0 and aliased.unit != self.unit_id) continue;
+                if (source.binding(aliased.binding).kind != .local) continue;
+            }
+            const previous = if (mappings.items.len == 0) self.mappings else mappings.items;
+            var actual: ?layout.Id = null;
+            var agreed = true;
             for (source.nodes, 0..) |node, index| {
                 if (budget == 0) return;
                 budget -= 1;
                 if (node.tag != .reference) continue;
                 const reference = source.reference(@intCast(index));
                 if (reference.binding != n.a or (reference.unit != 0 and reference.unit != self.unit_id)) continue;
-                if (use != null) {
-                    use = null;
+                if (std.mem.findScalar(core.Id, dead_aliases[0..dead_count], @intCast(index)) != null) continue;
+                const instance = try g.codeLayoutWithRows(self.unit_id, source.typeOf(@intCast(index)), previous, self.row_mappings, source.span(@intCast(index)));
+                if (self.hasErasedType(instance, 0) or (actual != null and actual.? != instance)) {
+                    agreed = false;
                     break;
                 }
-                use = @intCast(index);
+                actual = instance;
             }
-            const selected = use orelse continue;
+            if (!agreed) continue;
+            if (actual == null and producer.tag == .reference) {
+                if (dead_count < dead_aliases.len) {
+                    dead_aliases[dead_count] = n.b;
+                    dead_count += 1;
+                }
+                continue;
+            }
             var indirect = false;
             for (source.closures) |metadata| for (source.extra[metadata.captures.start..][0..metadata.captures.len]) |held_binding| {
                 if (budget == 0) return;
@@ -314,14 +340,24 @@ pub const Owner = struct {
                 if (carry.incoming == n.a or carry.iteration == n.a or carry.backedge == n.a or carry.outgoing == n.a) indirect = true;
             }
             if (indirect) continue;
-            const actual = try self.codeLayout(source.typeOf(selected), source.span(selected));
-            if (self.hasErasedType(actual, 0)) continue;
             var next: std.ArrayList(Mapping) = .empty;
             defer next.deinit(g.allocator);
-            const previous = if (mappings.items.len == 0) self.mappings else mappings.items;
             try next.appendSlice(g.allocator, previous);
-            try g.mapTypeDepth(self.unit_id, &next, null, binding.ty, actual, source.span(statement), 0);
-            try g.mapTypeDepth(self.unit_id, &next, null, source.typeOf(n.b), actual, source.span(statement), 0);
+            if (actual) |selected| {
+                try g.mapTypeDepth(self.unit_id, &next, null, binding.ty, selected, source.span(statement), 0);
+                try g.mapTypeDepth(self.unit_id, &next, null, source.typeOf(n.b), selected, source.span(statement), 0);
+            } else {
+                // No instance observes this pure local, so any physical
+                // choice for its quantified holes is sound; take a scalar word.
+                for (source.types.list(binding.scheme.variables)) |variable| {
+                    for (next.items) |mapping| {
+                        if (mapping.variable == variable) break;
+                    } else try next.append(g.allocator, .{ .variable = variable, .layout = layout.word });
+                }
+                const closed = try g.codeLayoutWithRows(self.unit_id, binding.ty, next.items, self.row_mappings, source.span(statement));
+                if (self.hasErasedType(closed, 0)) continue;
+                try g.mapTypeDepth(self.unit_id, &next, null, source.typeOf(n.b), closed, source.span(statement), 0);
+            }
             var private = true;
             for (next.items) |mapping| {
                 const old = for (previous) |prior| {
@@ -593,6 +629,19 @@ pub const Owner = struct {
         const ty = try self.codeLayout(g.unit(self.unit_id).typeOf(id), g.unit(self.unit_id).span(id));
         try g.emitValue(self.function_id, .{ .scalar = .pointer, .bits = try g.static_data.serialize(g, plan.value, ty, 0) });
     }
+    /// Each use serializes, and so checks, a promoted value. An unused value
+    /// would skip those checks, so it keeps its ordinary path.
+    fn useCount(self: *Emitter, binding: core.BindingId) usize {
+        const source = self.generator.unit(self.unit_id);
+        if (source.nodes.len > 4096) return 0;
+        var count: usize = 0;
+        for (source.nodes, 0..) |node, index| {
+            if (node.tag != .reference) continue;
+            const reference = source.reference(@intCast(index));
+            if (reference.binding == binding and (reference.unit == 0 or reference.unit == self.unit_id)) count += 1;
+        }
+        return count;
+    }
     fn hasMutableUse(self: *Emitter, binding: core.BindingId) bool {
         const source = self.generator.unit(self.unit_id);
         // These edges consume one physical local. An initializer's closed
@@ -631,8 +680,9 @@ pub const Owner = struct {
         if (n.tag == .bind) {
             const binding = source.binding(n.a);
             const shape = source.types.node(binding.ty);
-            if (binding.kind == .local and binding.scheme.variables.len != 0 and (shape.tag == .nominal or shape.tag == .product or shape.tag == .record) and !self.hasMutableUse(n.a)) {
-                if (@import("../eval/closed_local_value.zig").analyze(g.units, self.unit_id, n.b)) |proof| {
+            if (binding.kind == .local and binding.scheme.variables.len != 0 and !self.hasMutableUse(n.a)) {
+                const data = shape.tag == .nominal or shape.tag == .product or shape.tag == .record;
+                if (if (data) @import("../eval/closed_local_value.zig").analyze(g.units, self.unit_id, n.b) else null) |proof| {
                     if (g.artifacts) |artifacts| {
                         for (proof.dependencies[0..proof.len]) |target| try artifacts.readInlineBody(target);
                         // No completed local constant receipt yet owns this
@@ -643,6 +693,23 @@ pub const Owner = struct {
                     try self.static_values.put(g.allocator, n.a, value);
                     try body.put(g.allocator, id, .{ .static_binding = value });
                     return;
+                }
+                // Instances at different layouts share no private storage
+                // (issue #10). A closed initializer that evaluates instead
+                // keeps its value, and each use serializes it at its own
+                // layout. Local closures keep their callable templates. If
+                // any use cannot be served, compilation retries without this.
+                const producer = source.node(n.b).tag;
+                const built = producer == .call or producer == .apply or producer == .project or producer == .construct or producer == .product or producer == .record;
+                if (g.speculative_locals and built and self.useCount(n.a) != 0 and self.hasErasedType(try self.codeLayout(binding.ty, source.span(id)), 0) and @import("../eval/closed_local_value.zig").dataShape(g.units, self.unit_id, binding.ty)) {
+                    if (try g.evaluator.attemptClosedNode(self.unit_id, n.b)) |value| {
+                        // Body reads made by the evaluation are not recorded.
+                        if (g.artifacts) |artifacts| artifacts.requireFreshCode();
+                        g.speculated = true;
+                        try self.static_values.put(g.allocator, n.a, value);
+                        try body.put(g.allocator, id, .{ .static_binding = value });
+                        return;
+                    }
                 }
             }
         }

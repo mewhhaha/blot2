@@ -79,7 +79,8 @@ Deno.test("owned temporary lifetimes recycle at final borrow without running the
   const call = (name: string, value = 0) => Number((instance.exports[name] as CallableFunction)(value)) >>> 0;
   equal(call("temporary_fold", 100000), (100000 * 99999 / 2) >>> 0);
   const heap = call("temporary_heap");
-  equal(heap, 65536 + 256);
+  // A 128-byte payload and its 32-byte header use the 192-byte class.
+  equal(heap, 65536 + 192);
   for (let i = 0; i < 100; i++) {
     equal(call("temporary_early", 1000), 49 * 50 / 2);
     equal(call("temporary_fold", 100), 99 * 100 / 2);
@@ -112,7 +113,7 @@ Deno.test("closed shared and cyclic allocation groups release without a collecto
   const call = (name: string, value = 0) => Number((instance.exports[name] as CallableFunction)(value)) >>> 0;
   equal(call("graph_fold", 100000), (100000 * 100001) >>> 0);
   const heap = call("temporary_heap");
-  equal(heap, 65536 + 4 * 256);
+  equal(heap, 65536 + 4 * 192);
   call("temporary_collect");
   for (let i=0; i<10; i++) {
     equal(call("graph_fold", 10000), 10000 * 10001);

@@ -626,7 +626,7 @@ have zero findings; the full gate takes 697.812 s. Exact frozen inputs and
 release qualification are in
 [the checkpoint](../zig-native/CONTINUATION_QUALIFICATION.md#qualified-continuation-15-october-2026).
 Tasks 070/071 now satisfy their finite acceptance criteria. Statuses are **74
-complete** (including four designs), **23 in progress** and **8 pending**: **31
+complete** (including four designs), **26 in progress** and **8 pending**: **34
 remain open**. The broader program and performance targets remain open.
 
 Owner decisions of 15 October 2026: language tasks 058/059/061/062/064/065,
@@ -745,7 +745,10 @@ failed 20 of 2,354 native laws in `deno task test:compiler`.
 | [102] — Reach the general body-edit target              | Pending         | [084], [024]                           |
 | [103] — Bound the largest inference region              | Pending         | [084]                                  |
 | [104] — Reduce requested allocation below 100 MB        | Pending         | [084]                                  |
-| [999] — Remove tasks and plan                           | Pending         | All [001]–[104], plus every added task |
+| [105] — Admit agreeing generalized local instances      | In progress     | None                                   |
+| [106] — Fit small guest objects and journal pages       | In progress     | None                                   |
+| [107] — Reject dead rebinding in nested blocks          | In progress     | None                                   |
+| [999] — Remove tasks and plan                           | Pending         | All [001]–[107], plus every added task |
 
 ## Coverage matrix
 
@@ -818,6 +821,7 @@ obligations remain part of applicable tasks and final qualification.
 | Demand reuse: body changes with unchanged types, exact captures/effects, failed revisions and recovery        | [018], [024], [036], [039]                             |
 | Reported from gdev: positioned budget diagnostics, evaluation depth by calls, current-syntax formatting       | [089], [091], [092], [097], [099]                      |
 | Owner decision (pen migration): versioned public project protocol and native typed asset imports              | [095], [096]                                           |
+| Reported from Ink: generalized-local ownership (#10), small guest objects, dead nested rebinding (#11)        | [105], [106], [107]                                    |
 | Shared gates: no name recognition; chronological semantics, diagnostic order and immutable atomic publication | [084]                                                  |
 | Final performance: cold ~500 ms; literal <30 ms; body <100 ms; largest region <50 ms; allocation <100 MB      | [084] measures; [100]–[104] own the targets            |
 | Final qualification: every semantic/runtime/language/tooling and external gate, follow-ups before cleanup     | [082], [083], [084]                                    |
@@ -846,7 +850,7 @@ records their measurements on a re-pinned workload.
 
 ## Planning-directory validation
 
-For this documentation change, verify exactly 001–104 plus 999, unique numbered
+For this documentation change, verify exactly 001–107 plus 999, unique numbered
 filenames, all seven required sections, concrete unchecked acceptance criteria,
 existing relative links/anchors, and exact manifest dependencies forming an
 acyclic graph. Check that every task is indexed and every open source
@@ -964,4 +968,7 @@ external gate or durable-documentation obligation remains open.
 [102]: 102-reach-the-body-edit-target.md
 [103]: 103-bound-the-largest-inference-region.md
 [104]: 104-reduce-requested-allocation-below-100-mb.md
+[105]: 105-admit-agreeing-generalized-local-instances.md
+[106]: 106-fit-small-guest-objects-and-journal-pages.md
+[107]: 107-reject-dead-rebinding-in-nested-blocks.md
 [999]: 999-remove-tasks-and-plan.md
