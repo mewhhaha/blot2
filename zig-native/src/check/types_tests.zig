@@ -560,6 +560,33 @@ test "operation catalogs distinguish nominal phantom arguments and closed latent
     try std.testing.expectEqualDeep(point, store.mark());
 }
 
+/// Symbolic equality visits each pair once, also after more pairs than its
+/// inline list holds: a doubling DAG of depth 40 has 2^40 paths.
+fn sharedEqualityLaw(allocator: std.mem.Allocator) !void {
+    var store = try Store.init(allocator);
+    defer store.deinit();
+    const leaf = try store.fresh();
+    const other = try store.fresh();
+    var left = leaf;
+    var right = leaf;
+    var different = other;
+    for (0..40) |_| {
+        left = try store.product(&.{ left, left });
+        right = try store.product(&.{ right, right });
+        different = try store.product(&.{ different, different });
+    }
+    try std.testing.expect(try store.equalSymbolic(left, right));
+    try std.testing.expect(!try store.equalSymbolic(left, different));
+    // A few pairs, repeated within the inline list.
+    const small = try store.product(&.{ leaf, other, leaf, other });
+    try std.testing.expect(try store.equalSymbolic(small, try store.product(&.{ leaf, other, leaf, other })));
+    try std.testing.expect(!try store.equalSymbolic(small, try store.product(&.{ leaf, other, other, other })));
+}
+test "symbolic equality visits shared pairs once beyond its inline list and through allocation failure" {
+    try sharedEqualityLaw(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, sharedEqualityLaw, .{});
+}
+
 fn sharedSubstitutionLaw(allocator: std.mem.Allocator) !void {
     var store = try Store.init(allocator);
     defer store.deinit();

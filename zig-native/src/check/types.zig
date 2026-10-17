@@ -1335,6 +1335,10 @@ pub const Store = struct {
         try pending.append(scratch_allocator, .{ .a = left, .b = right });
         var seen: std.AutoHashMapUnmanaged(Pair, void) = .empty;
         defer seen.deinit(scratch_allocator);
+        // Most comparisons visit a handful of pairs; they stay in this list
+        // and the map takes over only once it is full.
+        var few: [16]Pair = undefined;
+        var few_count: usize = 0;
         var budget: usize = 1_000_000;
         while (pending.pop()) |pair| {
             if (self.has_projections) try @constCast(self).chargeProjection();
@@ -1345,8 +1349,18 @@ pub const Store = struct {
             // Associated selections can share exponentially many paths to that
             // leaf, so visit each pair once without treating identity as proof.
             if (symbolic or self.has_projections) {
-                const entry = try seen.getOrPut(scratch_allocator, pair);
-                if (entry.found_existing) continue;
+                if (few_count < few.len) {
+                    const repeated = for (few[0..few_count]) |prior| {
+                        if (prior.a == pair.a and prior.b == pair.b) break true;
+                    } else false;
+                    if (repeated) continue;
+                    few[few_count] = pair;
+                    few_count += 1;
+                } else {
+                    if (seen.count() == 0) for (few) |prior| try seen.put(scratch_allocator, prior, {});
+                    const entry = try seen.getOrPut(scratch_allocator, pair);
+                    if (entry.found_existing) continue;
+                }
             }
             if (budget == 0) return error.TypeLimit;
             budget -= 1;
