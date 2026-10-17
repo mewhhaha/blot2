@@ -372,11 +372,10 @@ pub const Store = struct {
             std.mem.sortUnstable(FieldWords, fields, {}, FieldWords.less);
             if (fields.len > 1) for (fields[1..], fields[0 .. fields.len - 1]) |field, prior| if (field.name == prior.name) return error.TypeMismatch;
         }
+        // One header update streams the same bytes as one update per word.
+        const header = std.mem.toBytes(tag) ++ std.mem.toBytes(a) ++ std.mem.toBytes(b) ++ std.mem.toBytes(row);
         var hash = std.hash.Wyhash.init(0);
-        hash.update(std.mem.asBytes(&tag));
-        hash.update(std.mem.asBytes(&a));
-        hash.update(std.mem.asBytes(&b));
-        hash.update(std.mem.asBytes(&row));
+        hash.update(&header);
         hash.update(std.mem.sliceAsBytes(owned));
         return self.internWithEffectsHashed(tag, a, b, row, owned, hash.final());
     }
@@ -1309,6 +1308,19 @@ test "candidate matching checks phantom substitutions and rolls back failed para
     try std.testing.expect(!try evidence.match(&source, pattern, rejected, &mappings));
     try std.testing.expectEqual(@as(usize, 1), mappings.items.len);
     try std.testing.expectEqual(types.u32_type, mappings.items[0].evidence);
+}
+test "interning fingerprints do not depend on how their stream is split into updates" {
+    var words: [70]u32 = undefined;
+    for (&words, 0..) |*word, index| word.* = @truncate(index *% 2654435761);
+    const tag: Tag = .record;
+    var split = std.hash.Wyhash.init(0);
+    split.update(std.mem.asBytes(&tag));
+    for (&words) |*word| split.update(std.mem.asBytes(word));
+    const header = std.mem.toBytes(tag) ++ std.mem.toBytes(words[0]) ++ std.mem.toBytes(words[1]);
+    var joined = std.hash.Wyhash.init(0);
+    joined.update(&header);
+    joined.update(std.mem.sliceAsBytes(words[2..]));
+    try std.testing.expectEqual(split.final(), joined.final());
 }
 test "semantic record equality is independent of field order and hash collisions are exact" {
     const a = std.testing.allocator;

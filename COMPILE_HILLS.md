@@ -799,6 +799,16 @@ memcpy and memset take 11.6% self cold and more in edits.
 
 - **Fix:** attribute their callers with CT4. Remove by-value copies of large
   structs and zeroing of fixed arrays that are written before they are read.
+- **Result (18 October 2026):**
+  `CT78: stop zeroing unused validation scratch and
+  copying hot inputs`. The
+  sampler attributed the copies on CT76 (1,350 samples).
+  `capability_contracts.View.validate` zeroed 136 KiB of fixed arrays per call
+  (2.0%), `frozen_core_validation.Graph.edge` copied its 160-byte receiver
+  (0.7%), and evidence interning sent one Wyhash update per word (1.2%).
+  Instructions fall 5.1% on the game, 5.0% on devtools, 2.8% on a literal edit
+  and 7.4% on its revert. Game CPU drops from 3,656 to 3,539 ms (-2.8% paired),
+  devtools by 3.4% and the edit by 2.2%.
 
 ### CT79: the hottest u64→u32 map
 

@@ -110,8 +110,11 @@ pub const View = struct {
         if (self.nodes.len == 0 or self.nodes.len > 4096 or self.words.len > 65_536 or root >= self.nodes.len or arity > 16) return error.InvalidCapabilityContract;
         if (!std.meta.eql(self.nodes[0], Term{ .tag = .empty })) return error.InvalidCapabilityContract;
         var visits: usize = 0;
-        var depths: [4096]u8 = @splat(0);
-        var roles: [65_536]u8 = @splat(0);
+        // Only the prefixes indexed by this view's nodes and words are read.
+        var depths: [4096]u8 = undefined;
+        @memset(depths[0..self.nodes.len], 0);
+        var roles: [65_536]u8 = undefined;
+        @memset(roles[0..self.words.len], 0);
         for (self.nodes, 0..) |node, index| {
             visits += 1;
             if (visits > 65_536) return error.CapabilityAnalysisLimit;
@@ -158,7 +161,8 @@ pub const View = struct {
             if (height >= 128) return error.CapabilityAnalysisLimit;
             depths[index] = @intCast(height);
         }
-        var reached: [17][4096]bool = @splat(@splat(false));
+        var reached: [17][4096]bool = undefined;
+        for (&reached) |*row| @memset(row[0..self.nodes.len], false);
         var remaining: usize = 65_536 - visits;
         try self.boundScopes(root, arity, 0, &reached, &remaining, 0);
     }

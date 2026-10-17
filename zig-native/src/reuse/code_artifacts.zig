@@ -612,6 +612,13 @@ fn BufferedHash(comptime counted: bool) type {
                 }
                 return;
             }
+            // Inlined scalar writes keep a constant length and fit in one copy.
+            if (source.len <= self.bytes.len - self.len) {
+                @memcpy(self.bytes[self.len..][0..source.len], source);
+                self.len += source.len;
+                if (self.len == self.bytes.len) self.flush();
+                return;
+            }
             var remaining = source;
             while (remaining.len != 0) {
                 const take = @min(remaining.len, self.bytes.len - self.len);

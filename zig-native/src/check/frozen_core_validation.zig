@@ -1431,12 +1431,12 @@ pub const Graph = struct {
     fn count(self: Graph) usize {
         return self.starts[kind_count];
     }
-    pub fn item(self: Graph, vertex_: usize) struct { kind: Kind, id: usize } {
+    pub fn item(self: *const Graph, vertex_: usize) struct { kind: Kind, id: usize } {
         var k: usize = 0;
         while (vertex_ >= self.starts[k + 1]) : (k += 1) {}
         return .{ .kind = @fromBackingInt(@intCast(k)), .id = vertex_ - self.starts[k] };
     }
-    pub fn edge(self: Graph, vertex_: usize, slot: usize) ?usize {
+    pub fn edge(self: *const Graph, vertex_: usize, slot: usize) ?usize {
         var k: usize = 0;
         while (vertex_ >= self.starts[k + 1]) : (k += 1) {}
         const id = vertex_ - self.starts[k];

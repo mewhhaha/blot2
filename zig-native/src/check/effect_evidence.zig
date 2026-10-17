@@ -95,10 +95,10 @@ pub const Store = struct {
         return self.internOperationInstance(identity, values, .{ .unit = 0, .decl = 0 });
     }
     pub fn internOperationInstance(self: *Store, identity: types.NominalIdentity, values: []const u32, instance: types.NominalIdentity) Error!Label {
+        // One header update streams the same bytes as one update per word.
+        const header = std.mem.toBytes(instance) ++ std.mem.toBytes(identity.unit) ++ std.mem.toBytes(identity.decl);
         var hash = std.hash.Wyhash.init(0);
-        if (instance.decl != 0) hash.update(std.mem.asBytes(&instance));
-        hash.update(std.mem.asBytes(&identity.unit));
-        hash.update(std.mem.asBytes(&identity.decl));
+        hash.update(if (instance.decl != 0) &header else header[@sizeOf(types.NominalIdentity)..]);
         hash.update(std.mem.sliceAsBytes(values));
         return self.internOperationInstanceHashed(identity, values, instance, hash.final());
     }
