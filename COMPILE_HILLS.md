@@ -135,6 +135,14 @@ from sampling.
 - **Fix:** add load, lex, parse, check, lower, freeze and validation clocks to
   `--profile` and to `serve-project` stats.
 - **Target:** clocks that sum to within 5% of process CPU.
+- **Result (18 October 2026):** CT2, "Clock every build phase under --profile
+  and in serve-project stats". Exclusive thread-local phase scopes (assets,
+  inputs, load, lex, parse, check, lower, freeze, validation, backend, other)
+  publish as `phase_profile` / `phaseProfile`; unprofiled builds read no clock.
+  Profiled game: check 975, lower 270, freeze 92, validation 215, backend 1,980
+  ms, assets/load/lex/parse 58 ms; the named clocks cover 100.2–101.6% of child
+  CPU (devtools 100.2–100.9%). Unprofiled, 5 pairs at load 7: game 3,818 / 3,832
+  ms, devtools 1,350 / 1,265 ms, within noise; Wasm identical.
 
 ### CT3: allocation counters per phase
 
