@@ -453,3 +453,21 @@ entry const main = fn (x: U32) => do:
   return x
 `);
 });
+
+// Which declarations quantify a variable is a property of the unit, so the
+// unit's size never turns an ambiguous hole into a declined one. Two hundred
+// padding declarations and twenty generalized locals each read only for
+// their length once exhausted a per-body search budget and reported
+// `ownership_unproved`; every hole still takes word storage.
+Deno.test("a large unit still stores the ambiguous holes of its generalized locals as words", async () => {
+  const padding = Array.from({ length: 200 }, (_, unit) => `type Pad${unit} is data = ${Array.from({ length: 8 }, (_, tag) => `#P${unit}x${tag}`).join(" | ")}`).join("\n");
+  const locals = Array.from({ length: 20 }, (_, index) => `  let boxed${index} = #[b, b]`).join("\n");
+  const lengths = Array.from({ length: 20 }, (_, index) => `boxed${index}.length`).join(" + ");
+  await returnsArgumentWithMemory(`${scoped}${padding}
+entry const main = fn (x: U32) => do:
+  let b = empty ()
+  let (_, r) = run b (fn () => x)
+${locals}
+  return r + ${lengths} - 40
+`);
+});

@@ -417,7 +417,7 @@ pub const Owner = struct {
                     if (self.hasErasedType(instance, 0)) {
                         // Scan this local again once its ambiguous holes
                         // have storage.
-                        if (try self.closeAmbiguousUse(use_type, context_mappings, context_rows, span, &ambiguous, &budget)) {
+                        if (try self.closeAmbiguousUse(use_type, context_mappings, context_rows, span, &ambiguous)) {
                             position += 1;
                             continue :statements;
                         }
@@ -547,7 +547,7 @@ pub const Owner = struct {
     /// choose, and a later use may read its shared storage at a concrete type.
     /// A quantified row tail stays unknown, which leaves no hole. True when
     /// the use is closed; otherwise `ambiguous` is unchanged.
-    fn closeAmbiguousUse(self: *Emitter, ty: types.Id, mappings: []const Mapping, rows: []const RowMapping, span: core.Span, ambiguous: *Ambiguous, budget: *usize) Error!bool {
+    fn closeAmbiguousUse(self: *Emitter, ty: types.Id, mappings: []const Mapping, rows: []const RowMapping, span: core.Span, ambiguous: *Ambiguous) Error!bool {
         const g = self.generator;
         const source = g.unit(self.unit_id);
         var variables: TypeVariables = .{ .source = source };
@@ -563,7 +563,7 @@ pub const Owner = struct {
             if (for (mappings) |mapping| {
                 if (mapping.variable == variable) break true;
             } else false) continue;
-            if (quantifiedVariable(source, variable, false, budget)) return false;
+            if (try g.quantifiedVariable(self.unit_id, variable, false)) return false;
             try ambiguous.types.append(g.allocator, .{ .variable = variable, .layout = layout.word });
         }
         if (ambiguous.types.items.len == known_types) return false;
@@ -571,7 +571,7 @@ pub const Owner = struct {
             if (for (rows) |mapping| {
                 if (mapping.variable == variable) break true;
             } else false) continue;
-            if (quantifiedVariable(source, variable, true, budget)) continue;
+            if (try g.quantifiedVariable(self.unit_id, variable, true)) continue;
             try ambiguous.rows.append(g.allocator, .{ .variable = variable, .row = 0 });
         }
         var closed_types: std.ArrayList(Mapping) = .empty;
@@ -642,39 +642,6 @@ pub const Owner = struct {
             }
         }
     };
-    /// Whether a scheme, type declaration, operation, closure, contract or
-    /// implementation of `source` quantifies or closes type variable or, for
-    /// `row`, row variable `variable`. An exhausted budget answers yes.
-    fn quantifiedVariable(source: *const core.Module, variable: u32, row: bool, budget: *usize) bool {
-        const Lists = struct {
-            types: *const core.Types,
-            variable: u32,
-            fn has(self: @This(), list: types.List) bool {
-                return std.mem.findScalar(u32, self.types.list(list), self.variable) != null;
-            }
-        };
-        const lists: Lists = .{ .types = &source.types, .variable = variable };
-        const total = source.bindings.len + source.bodies.len + source.constructors.len + source.nominals.len + source.operation_names.len + source.closures.len + source.contracts.len + source.implementations.len;
-        if (budget.* < total) return true;
-        budget.* -= total;
-        if (row) {
-            for (source.bindings) |binding| if (lists.has(binding.scheme.row_variables) or lists.has(binding.scheme.closed_rows) or lists.has(binding.public_rows)) return true;
-            for (source.bodies) |body| if (lists.has(body.scheme.row_variables) or lists.has(body.scheme.closed_rows) or lists.has(body.closed_rows)) return true;
-            for (source.constructors) |constructor| if (lists.has(constructor.scheme.row_variables)) return true;
-            for (source.closures) |metadata| if (lists.has(metadata.closed_rows)) return true;
-            for (source.contracts) |contract| if (lists.has(contract.row_variables) or lists.has(contract.row_parameters)) return true;
-            for (source.implementations) |implementation| if (lists.has(implementation.row_variables) or lists.has(implementation.row_parameters)) return true;
-            return false;
-        }
-        for (source.bindings) |binding| if (lists.has(binding.scheme.variables) or lists.has(binding.scheme.generative) or lists.has(binding.public_variables)) return true;
-        for (source.bodies) |body| if (lists.has(body.scheme.variables) or lists.has(body.scheme.generative)) return true;
-        for (source.constructors) |constructor| if (lists.has(constructor.scheme.variables) or lists.has(constructor.scheme.generative)) return true;
-        for (source.nominals) |nominal| if (lists.has(nominal.parameters) or lists.has(nominal.variables)) return true;
-        for (source.operation_names) |operation| if (lists.has(operation.variables) or lists.has(operation.parameters)) return true;
-        for (source.contracts) |contract| if (lists.has(contract.parameters) or lists.has(contract.variables)) return true;
-        for (source.implementations) |implementation| if (lists.has(implementation.variables) or lists.has(implementation.head)) return true;
-        return false;
-    }
     /// Uses of one generalized local at different layouts share no physical
     /// value: closure ABI and field words depend on the layout. A pure
     /// producer with a representation-free value instead runs once per

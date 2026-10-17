@@ -14,6 +14,7 @@ const runtime_operations = @import("runtime_operations.zig");
 const owned_arrays = @import("owned_arrays.zig");
 const code_artifacts = @import("../reuse/code_artifacts.zig");
 const discarded_bindings = @import("discarded_bindings.zig");
+const unit_index = @import("unit_index.zig");
 const startup_emission_facts = @import("startup_emission_facts.zig");
 const startup_occurrence_flow = @import("startup_occurrence_flow.zig");
 const startup_occurrence_plan = @import("startup_occurrence_plan.zig");
@@ -59,6 +60,7 @@ pub const State = struct {
     numeric_plans: std.AutoHashMapUnmanaged(u32, @import("../check/numeric_proof_core.zig").Plan) = .empty,
     facts: function_facts.Store = .{},
     discard_proofs: std.AutoHashMapUnmanaged(u32, discarded_bindings.Proof) = .empty,
+    quantified: std.AutoHashMapUnmanaged(u32, unit_index.Quantified) = .empty,
     task_movers: std.AutoHashMapUnmanaged(layout.Id, u32) = .empty,
     pub fn init(a: Allocator) State {
         return .{ .runtime_operations = runtime_operations.Store.init(a) };
@@ -90,6 +92,9 @@ pub const State = struct {
         var discarded = self.discard_proofs.valueIterator();
         while (discarded.next()) |proof| proof.deinit(a);
         self.discard_proofs.deinit(a);
+        var quantified = self.quantified.valueIterator();
+        while (quantified.next()) |set| set.deinit(a);
+        self.quantified.deinit(a);
         self.task_movers.deinit(a);
     }
     pub fn runtimeGlobal(self: *State, g: anytype, target: core.BindingRef) Error!u32 {

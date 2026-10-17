@@ -277,6 +277,15 @@ pub const Generator = struct {
         try self.planning.discard_proofs.put(self.allocator, unit_id, proof);
         return proof.admits(binding);
     }
+    /// Whether a declaration of unit `unit_id` quantifies or closes type
+    /// variable or, for `row`, row variable `variable`.
+    pub fn quantifiedVariable(self: *Generator, unit_id: u32, variable: u32, row: bool) Error!bool {
+        if (self.planning.quantified.getPtr(unit_id)) |set| return set.has(variable, row);
+        var set = try @import("unit_index.zig").Quantified.init(self.allocator, self.unit(unit_id));
+        errdefer set.deinit(self.allocator);
+        try self.planning.quantified.put(self.allocator, unit_id, set);
+        return set.has(variable, row);
+    }
     pub fn ownsArrayUpdate(self: *Generator, unit_id: u32, id: core.Id) Error!bool {
         if (self.planning.array_proofs.get(unit_id)) |proof| return proof.admits(id);
         var proof = try owned_arrays.Proof.init(self.allocator, self.units, unit_id);
