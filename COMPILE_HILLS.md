@@ -747,6 +747,13 @@ allocator on workers (`eval/parallel_allocator.zig`).
 - **Fix:** use per-thread or atomic counters, or compile them out, and give
   workers `smp_allocator`.
 - **Unblocks:** CT86–CT89.
+- **Result (18 October 2026):**
+  `CT74: share allocation meters with workers without a lock`.
+  `TrackedAllocator` gains a `.shared` mode with atomic counters (`.single`
+  keeps plain ones), and `LockedAllocator` hands any shareable allocator (smp,
+  page, or a shared meter over one) to jobs unwrapped. Serial builds are
+  instruction-identical. The game with `--semantic-workers 4` drops from 5,050
+  to 4,844 ms CPU and from 4,225 to 4,065 ms wall (5 pairs, load 6.5).
 
 ### CT75: a fast hash for in-memory keys
 

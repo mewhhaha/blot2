@@ -63,6 +63,7 @@ comptime {
     _ = @import("eval/semantic_evidence_import.zig");
     _ = @import("reuse/retained_revision.zig");
     _ = @import("eval/semantic_job_batch.zig");
+    _ = @import("eval/parallel_allocator.zig");
     _ = @import("reuse/principal_archive.zig");
     _ = @import("reuse/retained_catalog_tests.zig");
     _ = @import("backend/startup_emission_facts_tests.zig");

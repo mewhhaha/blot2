@@ -302,7 +302,9 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
     var profile: ?phase_profile.Profile = if (profile_requested) .init(io) else null;
     var counting: phase_profile.CountingAllocator = .{ .backing = backing };
     if (profile) |*owner| counting.attach(owner);
-    var tracked: memory.TrackedAllocator = .{ .backing = if (profile != null) counting.allocator() else backing };
+    // Worker jobs allocate through this meter directly when it is shared; a
+    // profiled build counts below it, so its workers keep their lock.
+    var tracked: memory.TrackedAllocator = .{ .backing = if (profile != null) counting.allocator() else backing, .sharing = if (policy.semantic_workers > 1 or policy.codegen_workers > 1) .shared else .single };
     const allocator = tracked.allocator();
     const start = now(io);
     const installation: ?phase_profile.Installation = if (profile) |*owner| phase_profile.install(owner) else null;
