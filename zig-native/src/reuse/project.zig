@@ -8,6 +8,7 @@ const syntax_diagnostics = @import("../parse/syntax_diagnostics.zig");
 const symbol = @import("../parse/symbols.zig");
 const D = @import("frozen_dependency.zig");
 const relink = @import("dependency_relink.zig");
+const phase_profile = @import("../phase_profile.zig");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 
@@ -254,7 +255,11 @@ const Loader = struct {
             try self.report(origin, .source_limit, canonical, null);
             return null;
         }
-        var tokens = lexer.lex(self.allocator, source) catch |err| switch (err) {
+        var tokens = lexed: {
+            const timing = phase_profile.enter(.lex);
+            defer timing.exit();
+            break :lexed lexer.lex(self.allocator, source);
+        } catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.SourceLimit => {
                 try self.report(origin, .source_limit, canonical, err);
@@ -262,9 +267,11 @@ const Loader = struct {
             },
         };
         defer tokens.deinit(self.allocator);
-        var tree = if (tokens.diagnostics.items.len == 0)
-            try parser.parseWithFixities(self.allocator, source, tokens.tokens.items, &self.project.symbols, self.inherited_fixities.items)
-        else
+        var tree = if (tokens.diagnostics.items.len == 0) parsed: {
+            const timing = phase_profile.enter(.parse);
+            defer timing.exit();
+            break :parsed try parser.parseWithFixities(self.allocator, source, tokens.tokens.items, &self.project.symbols, self.inherited_fixities.items);
+        } else
             try ast.Tree.init(self.allocator);
         defer if (!transferred) tree.deinit(self.allocator);
         const id: UnitId = reserved orelse @intCast(self.project.units.items.len + 1);
@@ -478,6 +485,8 @@ pub fn loadCompiledMixedReadOnly(allocator: Allocator, io: Io, entrypath: []cons
     return loadCompiledMode(allocator, io, entrypath, options, dependency, null, inputs, reuse);
 }
 fn loadCompiledMode(allocator: Allocator, io: Io, entrypath: []const u8, options: Options, dependency: *const D.FrozenDependency, mutable: ?*D.FrozenDependency, inputs: ?InputProvider, reuse: ?[]const bool) !Project {
+    const timing = phase_profile.enter(.load);
+    defer timing.exit();
     if (options.input_mode != .project) return error.InputModeUnsupported;
     if (dependency.modules.len >= options.max_files or dependency.modules.len >= std.math.maxInt(u32)) return error.FileLimit;
     var loader: Loader = .{ .allocator = allocator, .io = io, .options = options, .inputs = inputs, .project = .{ .input_mode = options.input_mode, .compiled_modules = dependency.modules, .compiled_reuse = reuse orelse &.{} } };
@@ -559,6 +568,8 @@ pub fn load(allocator: Allocator, io: Io, entrypath: []const u8, options: Option
 }
 
 pub fn loadWithInputs(allocator: Allocator, io: Io, entrypath: []const u8, options: Options, inputs: ?InputProvider) Allocator.Error!Project {
+    const timing = phase_profile.enter(.load);
+    defer timing.exit();
     var loader: Loader = .{ .allocator = allocator, .io = io, .options = options, .inputs = inputs, .project = .{ .input_mode = options.input_mode } };
     errdefer loader.project.deinit(allocator);
     defer loader.deinitScratch();

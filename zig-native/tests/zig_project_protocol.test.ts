@@ -15,6 +15,7 @@ const statObjects = [
   "optimization",
   "runtimeOptimization",
   "backendTiming",
+  "phaseProfile",
   "workCounters",
   "principals",
   "refinements",

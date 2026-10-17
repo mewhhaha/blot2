@@ -102,6 +102,7 @@ comptime {
     _ = @import("backend/resolved_body.zig");
     _ = @import("backend/runtime_flags_tests.zig");
     _ = @import("backend/backend_timing.zig");
+    _ = @import("phase_profile.zig");
     _ = @import("check/effect_evidence.zig");
     _ = @import("reuse/epoch_resolution_cache.zig");
     _ = @import("backend/persistent_roots_tests.zig");

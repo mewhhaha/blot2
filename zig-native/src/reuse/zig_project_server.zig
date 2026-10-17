@@ -14,6 +14,7 @@ const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const restart_cache = @import("restart_cache.zig");
 const native_assets = @import("../backend/native_assets.zig");
+const phase_profile = @import("../phase_profile.zig");
 
 const Request = struct {
     kind: enum { open, build, close, checkpoint, complete },
@@ -249,9 +250,15 @@ const AssetRange = struct { id: u32, path: []const u8, mediaType: []const u8, sh
 const AssetDependency = struct { path: []const u8, sha256: ?[]const u8 };
 
 fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32, sources: []const inputs.overlays.Source, asset_sources: []const inputs.overlays.Source) !void {
+    // Profiled sessions clock this build until its stats are published.
+    var profile: phase_profile.Profile = .init(io);
+    const installation: ?phase_profile.Installation = if (opened.session.profile_backend) phase_profile.install(&profile) else null;
+    defer if (installation) |installed| installed.restore();
     var assets: ?*native_assets.Candidate = null;
     defer if (assets) |candidate| candidate.deinit(a);
     if (opened.assets) |*owner| {
+        const timing = phase_profile.enter(.assets);
+        defer timing.exit();
         assets = owner.prepare(io, opened.entry, sources, asset_sources) catch |err| {
             return operationFailure(a, writer, opened, id, @errorName(err), "Unable to prepare native asset inputs", null);
         };
@@ -286,6 +293,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                 .optimization = result.result.compiled.optimization,
                 .runtimeOptimization = result.result.compiled.runtime_optimization,
                 .backendTiming = result.result.compiled.timing,
+                .phaseProfile = if (installation != null) profile.record() else phase_profile.Record{},
                 .workCounters = result.result.compiled.counters,
                 .demandLowering = result.result.compiled.demand_lowering,
                 .principals = result.result.compiled.principal,

@@ -652,6 +652,8 @@ pub fn checkProjectRetainingBodies(allocator: Allocator, source: *project.Projec
 }
 
 fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: check.PrivateExecution, previous: ?entry_cutoff.Previous, editor: ?EditorQuery, retain_bodies: bool) !CheckedProject {
+    const timing = @import("../phase_profile.zig").enter(.check);
+    defer timing.exit();
     var engine: Engine = .{ .allocator = allocator, .source = source, .result = .{}, .execution = execution, .editor = editor, .retain_bodies = retain_bodies };
     defer engine.previous_bodies.deinit(allocator);
     if (previous) |old| if (old.bodies.len == old.names.owners.len) {

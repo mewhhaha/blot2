@@ -15,6 +15,7 @@ const format = @import("dependency_format.zig");
 const relink = @import("dependency_relink.zig");
 const core_validation = @import("../check/frozen_core_validation.zig");
 const principal_validation = @import("dependency_interface_validation.zig");
+const phase_profile = @import("../phase_profile.zig");
 pub const Error = std.mem.Allocator.Error || error{ InvalidArtifact, DependencyLimit, CoreLimit };
 
 fn ordinal(source: *const project.Project, unit: u32) Error!u32 {
@@ -138,7 +139,11 @@ fn freezeOne(a: std.mem.Allocator, source: *const project.Project, checked: *con
     const src = source.unit(unit);
     const typed = checked.module(unit);
     try require(typed.valid and typed.checked.diagnostics.len == 0 and typed.checked.unit == unit);
-    var ir = if (retained_core) |saved| try copyCoreValue(a, saved.*) else try core_builder.lowerWithOrigins(a, &src.tree, &source.symbols, &typed.checked, .{ .context = source, .lookup = project_check.diagnosticModuleOrigin });
+    var ir = if (retained_core) |saved| try copyCoreValue(a, saved.*) else lowered: {
+        const timing = phase_profile.enter(.lower);
+        defer timing.exit();
+        break :lowered try core_builder.lowerWithOrigins(a, &src.tree, &source.symbols, &typed.checked, .{ .context = source, .lookup = project_check.diagnosticModuleOrigin });
+    };
     errdefer ir.deinit(a);
     ir.unit = unit;
     try require(ir.diagnostics.len == 0);
@@ -147,8 +152,12 @@ fn freezeOne(a: std.mem.Allocator, source: *const project.Project, checked: *con
     for (ir.types.nodes) |*node| node.* = .{ .tag = node.tag, .a = node.a, .b = node.b, .c = node.c };
     var interface = try snapshot.freezePrincipal(a, &src.tree, &typed.checked);
     errdefer snapshot.deinit(a, &interface);
-    try principal_validation.validate(&interface, source.symbols.entries.items.len + 1, source.units.items.len);
-    try principal_validation.validateGraph(a, &interface);
+    {
+        const timing = phase_profile.enter(.validation);
+        defer timing.exit();
+        try principal_validation.validate(&interface, source.symbols.entries.items.len + 1, source.units.items.len);
+        try principal_validation.validateGraph(a, &interface);
+    }
     try checkInterfaceUnits(&interface, units);
     const exports = try a.alloc(D.Export, typed.exports.len);
     errdefer a.free(exports);
@@ -202,6 +211,8 @@ pub fn freeze(a: std.mem.Allocator, source: *const project.Project, checked: *co
 /// Only executable Core is copied; principal interfaces are frozen afresh from
 /// the exact checked source. No solver or caller evidence is admitted here.
 pub fn freezeFromCheckedCore(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *const partial.Prepared) Error!D.FrozenDependency {
+    const timing = phase_profile.enter(.freeze);
+    defer timing.exit();
     try require(prepared.cached == 0 and !prepared.source_mode and prepared.entry == source.entry and prepared.prelude == source.prelude_unit);
     try require(prepared.units.len == source.units.items.len and prepared.paths.len == source.units.items.len);
     const identity = prepared.identity.view();
@@ -219,6 +230,8 @@ pub fn freezeFromCheckedCore(a: std.mem.Allocator, source: *const project.Projec
 }
 
 pub fn freezeFromMixedCheckedCore(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *const partial.Prepared) Error!D.FrozenDependency {
+    const timing = phase_profile.enter(.freeze);
+    defer timing.exit();
     try checkMixed(source, prepared);
     return freezeMode(a, source, checked, prepared.units);
 }
@@ -243,6 +256,8 @@ fn checkChecked(source: *const project.Project, checked: *const project_check.Ch
 /// the lifetime of its immutable module payloads. Sharing grants storage and
 /// structural validation reuse only; source/check admission already completed.
 pub fn freezeSharedFromMixed(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *const partial.Prepared, previous: *const retained.Snapshot, stats: *retained.Stats) Error!*retained.Snapshot {
+    const timing = phase_profile.enter(.freeze);
+    defer timing.exit();
     try checkMixed(source, prepared);
     try checkChecked(source, checked);
     try require(previous.initialized == previous.modules.len and source.compiled_modules.ptr == previous.value.modules.ptr and source.compiled_modules.len == previous.value.modules.len);
@@ -319,7 +334,11 @@ fn freezeMode(a: std.mem.Allocator, source: *const project.Project, checked: *co
         for (result.modules, views) |*m, *view| view.* = &m.core;
         // Source identities are checked against only retained siblings. An excluded
         // entry producer can never silently become the reserved unit-zero context.
-        for (result.modules) |*m| try core_validation.validate(a, &m.core, .{ .units = views, .symbol_count = result.symbols.len, .source_length = m.identity.source_bytes });
+        {
+            const timing = phase_profile.enter(.validation);
+            defer timing.exit();
+            for (result.modules) |*m| try core_validation.validate(a, &m.core, .{ .units = views, .symbol_count = result.symbols.len, .source_length = m.identity.source_bytes });
+        }
         const names = try a.alloc(u32, result.symbols.len);
         defer a.free(names);
         for (names, 0..) |*name, id| name.* = @intCast(id);
@@ -348,6 +367,8 @@ pub fn validate(a: std.mem.Allocator, value: *const D.FrozenDependency) Error!vo
     return validateMode(a, value, null, null, &stats);
 }
 fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current: ?*const retained.Snapshot, previous: ?*const retained.Snapshot, stats: *retained.Stats) Error!void {
+    const timing = phase_profile.enter(.validation);
+    defer timing.exit();
     try require(value.symbols.len != 0 and value.symbols[0].text.len == 0);
     var paths: std.StringHashMapUnmanaged(void) = .empty;
     defer paths.deinit(a);
@@ -515,6 +536,8 @@ fn validateImportGraph(a: std.mem.Allocator, value: *const D.FrozenDependency) E
 /// Compare decoded identities and import order against the current source
 /// closure. Call before relocation; artifact metadata is never its own key.
 pub fn validateSources(value: *const D.FrozenDependency, source: *const project.Project) Error!void {
+    const timing = phase_profile.enter(.validation);
+    defer timing.exit();
     try require(source.entry != 0 and source.entry <= source.units.items.len);
     try require(value.modules.len == source.units.items.len - 1);
     for (source.units.items, 1..) |src, source_id| {

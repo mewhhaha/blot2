@@ -158,7 +158,7 @@ It allows 30 s by default (1 to 300 s) for the hello and the open together.
 | `stdRoot`          | path or null                     | the root of the `std/` alias                                               |
 | `imports`          | array of `{prefix, root}`        | more directory aliases                                                     |
 | `dependencies`     | path or null                     | a `.blotdep` bundle from `blot dependencies`                               |
-| `profileBackend`   | boolean                          | detailed backend timings (default false)                                   |
+| `profileBackend`   | boolean                          | detailed backend and build phase timings (default false)                   |
 | `explainDemands`   | boolean                          | bounded demand-lowering report (default false)                             |
 | `codegenTier`      | `"optimized"` or `"development"` | default `"optimized"`; development skips optional scalar and vector passes |
 | `shareMachineCode` | boolean                          | prototype; default false                                                   |
@@ -273,6 +273,7 @@ the reference client rejects an empty or invalid module.
     "optimization": {},
     "runtimeOptimization": {},
     "backendTiming": {},
+    "phaseProfile": {},
     "workCounters": {},
     "principals": {},
     "refinements": {},
@@ -301,8 +302,8 @@ the revision.
 - integers: `nativeWorkSteps`, `sourceBytes`, `freshModules` and
   `cachedModules`;
 - objects: `frontend`, `backend`, `optimization`, `runtimeOptimization`,
-  `backendTiming`, `workCounters`, `principals`, `refinements`,
-  `selectedQueries`, `constantReceipts` and `attemptStats`;
+  `backendTiming`, `phaseProfile`, `workCounters`, `principals`,
+  `refinements`, `selectedQueries`, `constantReceipts` and `attemptStats`;
 - a boolean: `restartCacheLoaded`.
 
 `demandLowering` is null by default. With `explainDemands: true`, it is
@@ -310,6 +311,11 @@ the revision.
 recording attempts. Sites carry filename/truncation, unit, UTF8 byte span,
 lowering and reason. Reporting preserves executable bytes. See
 [DEMANDS.md](DEMANDS.md) for the decisions, bounds and retained span behavior.
+
+`phaseProfile` is empty unless the session opened with `profileBackend`. A
+profiled build reports `total_us` and exclusive `phases` (`other`, `assets`,
+`inputs`, `load`, `lex`, `parse`, `check`, `lower`, `freeze`, `validation`,
+`backend`), each `{us}`, which partition the build up to its stats.
 
 The objects are measurements for people, and their insides are not part of the
 contract. The reference client validates the four integers as nonnegative safe

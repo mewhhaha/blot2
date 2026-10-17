@@ -1,5 +1,6 @@
-// `--profile` opts in to detailed backend clocks; deterministic work counters
-// are always reported. Unprofiled stats carry no zero-filled placeholders.
+// `--profile` opts in to detailed backend clocks and whole-build phase clocks;
+// deterministic work counters are always reported. Unprofiled stats carry no
+// zero-filled placeholders.
 import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 
@@ -25,6 +26,25 @@ const counterNames = [
 interface Backend {
   prepare_us: number;
   work?: { regions: unknown[]; inference_us: number; lookup_us: number };
+}
+interface Phases {
+  total_us?: number;
+  phases?: Record<string, { us: number }>;
+}
+/** Frontend and backend phases a profiled project build always passes. */
+const phaseNames = ["load", "lex", "parse", "check", "lower", "backend"];
+function assertPhases(record: Phases) {
+  assert(Number.isSafeInteger(record.total_us), JSON.stringify(record));
+  let sum = 0;
+  for (const [name, phase] of Object.entries(record.phases ?? {})) {
+    assert(Number.isSafeInteger(phase.us) && phase.us >= 0, name);
+    sum += phase.us;
+  }
+  for (const name of phaseNames) assert(record.phases?.[name], name);
+  assert(record.phases!.check.us > 0 && record.phases!.backend.us > 0);
+  // Exclusive phases partition the clocked interval (each rounds down).
+  const count = Object.keys(record.phases!).length;
+  assert(sum <= record.total_us! && record.total_us! - sum <= count);
 }
 // Metadata counters include the canonical path, and temporary names vary in
 // length, so compared builds use equal-length sibling directories.
@@ -71,6 +91,7 @@ for (const command of ["build", "build-project"]) {
     }
     assert(plain.metrics.work_counters.inference_regions > 0);
     assert(plain.metrics.work_counters.solver_passes > 0);
+    assert.deepEqual(plain.metrics.phase_profile, {});
 
     const profiled = await build(command, `${command}-b`, "--profile");
     assert(profiled.success, profiled.text);
@@ -78,6 +99,7 @@ for (const command of ["build", "build-project"]) {
     assert(Array.isArray(detail.work?.regions));
     assert(Number.isSafeInteger(detail.work?.inference_us));
     assert(Number.isSafeInteger(detail.work?.lookup_us));
+    assertPhases(profiled.metrics.phase_profile);
     // Profiling observes; it neither changes code nor the deterministic work.
     assert.deepEqual(profiled.wasm, plain.wasm);
     assert.deepEqual(
@@ -129,6 +151,8 @@ Deno.test("project API reports counters always and clocks only when profiled", a
     assert(
       Array.isArray((right.stats.backendTiming as unknown as Backend).work?.regions),
     );
+    assert.deepEqual(left.stats.phaseProfile, {});
+    assertPhases(right.stats.phaseProfile as unknown as Phases);
     assert.deepEqual(left.bytes, right.bytes);
   } finally {
     await plain.dispose();

@@ -11,6 +11,7 @@ const backend = @import("backend/core_backend.zig");
 const memory = @import("runtime/memory.zig");
 const project = @import("reuse/project.zig");
 const project_check = @import("reuse/project_check.zig");
+const phase_profile = @import("phase_profile.zig");
 const Io = std.Io;
 const Policy = @import("execution_policy.zig").Policy;
 fn semanticPolicy(value: []const u8) ?Policy {
@@ -295,10 +296,14 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
     return ok;
 }
 
-fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, profile: bool, explain_demands: bool, output_path: ?[]const u8, cache_root: ?[]const u8, policy: Policy) !bool {
+fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, profile_requested: bool, explain_demands: bool, output_path: ?[]const u8, cache_root: ?[]const u8, policy: Policy) !bool {
     var tracked: memory.TrackedAllocator = .{ .backing = backing };
     const allocator = tracked.allocator();
     const start = now(io);
+    // --profile clocks every phase of this compilation until its record.
+    var profile: phase_profile.Profile = .init(io);
+    const installation: ?phase_profile.Installation = if (profile_requested) phase_profile.install(&profile) else null;
+    defer if (installation) |installed| installed.restore();
     var source_bytes: usize = 0;
     var files: usize = 0;
     var syntax_nodes: usize = 0;
@@ -409,6 +414,8 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         }
         for (loaded.units.items, 0..) |*unit_, index| {
             const id: u32 = @intCast(index + 1);
+            const lowering = phase_profile.enter(.lower);
+            defer lowering.exit();
             units[index] = try core_builder.lowerWithOrigins(allocator, &unit_.tree, &loaded.symbols, &checked.module(id).checked, .{ .context = &loaded, .lookup = project_check.diagnosticModuleOrigin });
             units[index].unit = id;
             initialized += 1;
@@ -440,7 +447,11 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         var checkpoint = if (cache_file) |*file| file.load(io) else null;
         defer if (checkpoint) |*candidate| candidate.deinit();
         cache_loaded = checkpoint != null;
-        var compiled = try backend.compileWithOptions(allocator, units, loaded.entry, .{ .io = io, .policy = policy, .profile_backend = profile, .explain_demands = explain_demands, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null });
+        var compiled = emitted: {
+            const timing = phase_profile.enter(.backend);
+            defer timing.exit();
+            break :emitted try backend.compileWithOptions(allocator, units, loaded.entry, .{ .io = io, .policy = policy, .profile_backend = profile_requested, .explain_demands = explain_demands, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null });
+        };
         defer {
             const result_release_start = now(io);
             compiled.deinit(allocator);
@@ -521,6 +532,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         .emit_us = emit_us,
         .write_us = write_us,
         .teardown_us = teardown_us,
+        .phase_profile = if (installation != null) profile.record() else phase_profile.Record{},
         .memory = tracked.counts,
         .memory_scope = "Requested bytes for project source, syntax, symbols, typed core and compiler scratch; excludes allocator overhead and process RSS. All owners released before this record.",
     }, .{}, writer);

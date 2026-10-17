@@ -15,6 +15,7 @@ const closure = @import("dependency_closure.zig");
 const retained_dependency = @import("retained_dependency.zig");
 const checker = @import("project_check.zig");
 const settings = @import("dependency_cli.zig").settings;
+const phase_profile = @import("../phase_profile.zig");
 const Allocator = std.mem.Allocator;
 
 const Policy = @import("../execution_policy.zig").Policy;
@@ -404,7 +405,11 @@ pub const Session = struct {
         var transferred = false;
         defer if (!transferred) frozen.deinit(a);
         if (kept) |*prepared| {
-            try prepared.rebindFrozenPrefix(a, &frozen.value);
+            {
+                const timing = phase_profile.enter(.freeze);
+                defer timing.exit();
+                try prepared.rebindFrozenPrefix(a, &frozen.value);
+            }
             work.reused_entry_bodies = prepared.units[prepared.entry - 1].body_lowerings;
             // FallbackStats already records all frontend work in this attempt.
             // No second consumer parse/check/lower was performed.
@@ -429,7 +434,12 @@ pub const Session = struct {
     fn fallback(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, snapshot: *inputs.Snapshot, candidate_seed: *?retained_dependency.Seed, counts: *FallbackStats) !partial.Preparation {
         const a = self.allocator;
         if (std.mem.eql(u8, &self.seed_settings, &settings(snapshot.options))) {
-            if (try snapshot.reusableModules(io, &self.seed)) |reuse| {
+            const reusable = reused: {
+                const timing = phase_profile.enter(.inputs);
+                defer timing.exit();
+                break :reused try snapshot.reusableModules(io, &self.seed);
+            };
+            if (reusable) |reuse| {
                 defer a.free(reuse);
                 const mixed = self.mixedFrontend(io, entry_path, output_identity, snapshot, candidate_seed, counts, reuse) catch |err| blk: {
                     if (err == error.OutOfMemory) return error.OutOfMemory;
@@ -504,6 +514,10 @@ pub const Session = struct {
         defer epoch.preparing = false;
         const a = self.allocator;
         try self.ensureSharedSeed();
+        // Input capture and comparison end before any frontend preparation.
+        const input_timing = phase_profile.enter(.inputs);
+        var capturing = true;
+        defer if (capturing) input_timing.exit();
         var snapshot = try inputs.Snapshot.initWithSources(a, io, options, sources);
         var snapshot_alive = true;
         defer if (snapshot_alive) snapshot.deinit();
@@ -531,6 +545,8 @@ pub const Session = struct {
                 return .{ .ready = candidate };
             }
         };
+        input_timing.exit();
+        capturing = false;
         var fallback_counts: FallbackStats = .{};
         var preparation: partial.Preparation = undefined;
         if (admitted) {
@@ -568,18 +584,22 @@ pub const Session = struct {
                 // graphs even when a dependency seed had to be rebuilt.
                 const prior_compatible = !rebuilt;
                 const compatible = prior_compatible or std.mem.eql(u8, &self.seed_settings, &settings_key);
-                var result = try prepared.emitWithOptions(a, .{
-                    .io = io,
-                    .profile_backend = self.profile_backend,
-                    .explain_demands = self.explain_demands,
-                    .checkpoint = if (self.checkpoint) |*checkpoint| checkpoint else null,
-                    .policy = self.policy,
-                    .retain_artifacts = true,
-                    .previous = if (compatible and self.current != null) &self.current.?.artifacts else null,
-                    .query_previous = if (compatible and self.current != null) &self.current.?.artifacts else null,
-                    .principal_previous = if (rebuilt and self.current != null) &self.current.?.artifacts else null,
-                    .cached_units = prepared.cached,
-                });
+                var result = emitted: {
+                    const timing = phase_profile.enter(.backend);
+                    defer timing.exit();
+                    break :emitted try prepared.emitWithOptions(a, .{
+                        .io = io,
+                        .profile_backend = self.profile_backend,
+                        .explain_demands = self.explain_demands,
+                        .checkpoint = if (self.checkpoint) |*checkpoint| checkpoint else null,
+                        .policy = self.policy,
+                        .retain_artifacts = true,
+                        .previous = if (compatible and self.current != null) &self.current.?.artifacts else null,
+                        .query_previous = if (compatible and self.current != null) &self.current.?.artifacts else null,
+                        .principal_previous = if (rebuilt and self.current != null) &self.current.?.artifacts else null,
+                        .cached_units = prepared.cached,
+                    });
+                };
                 errdefer result.deinit(a);
                 if (result.result.compiled.diagnostic != null) {
                     snapshot_alive = false;

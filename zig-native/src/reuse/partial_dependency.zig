@@ -325,6 +325,8 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
                 // previous Prepared and all of its immutable source pins.
                 ir.* = try @import("dependency_closure.zig").copyCore(a, &previous.?.prepared.units[id - 1]);
             } else {
+                const timing = @import("../phase_profile.zig").enter(.lower);
+                defer timing.exit();
                 ir.* = try core_builder.lowerWithOrigins(a, &unit.tree, &source.symbols, &checked.module(@intCast(id)).checked, .{ .context = source, .lookup = checker.diagnosticModuleOrigin });
                 ir.unit = @intCast(id);
                 stats.body_lowerings += ir.body_lowerings;

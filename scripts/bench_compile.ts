@@ -793,6 +793,7 @@ async function main(): Promise<number> {
     console.log("\ncandidate fresh-build work counters (deterministic)");
     printTable(counterRows);
   }
+  const phases = args.profile ? phaseTables(workloads, samples) : {};
 
   const loadEnd = loadAverage();
   // Intentional backend changes may differ between binaries. They must never
@@ -825,6 +826,7 @@ async function main(): Promise<number> {
         })),
         medians,
         counters,
+        phases,
         wasm,
         problems,
         unexpected_problems: unexpectedProblems,
@@ -854,6 +856,65 @@ async function main(): Promise<number> {
     }.`,
   );
   return 0;
+}
+
+interface PhaseProfile {
+  total_us?: number;
+  phases?: Record<string, { us: number }>;
+}
+/**
+ * Median exclusive phase clocks of each variant's fresh builds (profiled
+ * sessions only), and how much of the measured CPU the named phases cover.
+ */
+function phaseTables(workloads: Workload[], samples: Sample[]) {
+  const tables: Record<string, Record<string, Record<string, number>>> = {};
+  for (const workload of workloads) {
+    const byVariant: Record<string, Record<string, number>> = {};
+    for (const variant of ["baseline", "candidate"]) {
+      const profiled = samples.filter((s) =>
+        s.kind === "fresh" && s.workload === workload.name &&
+        s.variant === variant &&
+        (s.stats.phaseProfile as PhaseProfile | undefined)?.phases
+      );
+      if (!profiled.length) continue;
+      const profiles = profiled.map((s) =>
+        s.stats.phaseProfile as PhaseProfile
+      );
+      const row: Record<string, number> = {};
+      for (const name of Object.keys(profiles[0].phases!)) {
+        row[name] = median(profiles.map((p) => p.phases![name].us / 1000));
+      }
+      row.total = median(profiles.map((p) => p.total_us! / 1000));
+      row.named_over_cpu = median(
+        profiled.map((s) => {
+          const p = s.stats.phaseProfile as PhaseProfile;
+          return (p.total_us! - p.phases!.other.us) / 1000 / s.cpu_ms;
+        }),
+      );
+      byVariant[variant] = row;
+    }
+    if (!Object.keys(byVariant).length) continue;
+    tables[workload.name] = byVariant;
+    const names = Object.keys(byVariant.candidate ?? byVariant.baseline);
+    const rows = [[workload.name, "phase", "baseline ms", "candidate ms"]];
+    for (const name of names) {
+      const format = (value: number | undefined) =>
+        value === undefined
+          ? "-"
+          : name === "named_over_cpu"
+          ? value.toFixed(3)
+          : value.toFixed(1);
+      rows.push([
+        "",
+        name,
+        format(byVariant.baseline?.[name]),
+        format(byVariant.candidate?.[name]),
+      ]);
+    }
+    console.log(`\nfresh-build phase clocks (median, exclusive)`);
+    printTable(rows);
+  }
+  return tables;
 }
 
 function printTable(rows: string[][]) {
