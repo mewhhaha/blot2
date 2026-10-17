@@ -183,6 +183,16 @@ with PR_SET_PTRACER set for yama.
   unused export. Report CPU together with `reused_named`/`fresh_named` and the
   recheck counters.
 - **Target:** reuse counts asserted in `compile_budget.test.ts`, never times.
+- **Result (18 October 2026):** CT5, "Run the retained edit suite and budget its
+  reuse counts". The game session runs all seven scenarios with edit and revert
+  and prints reuse, seed, output, revalidation and recheck counters. A miniature
+  public suite (`editSuite` in `scripts/bench/corpus.ts`) is pinned as
+  `retainedToday` upper bounds in `compile_budget.test.ts`. Game, one session:
+  the first literal-constant edit reuses 0 of 1,794 and revalidates 14 modules
+  (its revert reuses 1,501 and revalidates 1); body, type, ink/math body and
+  unused-export edits reuse nothing (2.6–3.3 s); recheck counters stay 0. The
+  miniature suite reuses 8 of 10 on its first literal edit, so it does not
+  reproduce that first-edit loss.
 
 ### CT6: a test-suite metric
 
