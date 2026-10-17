@@ -7,6 +7,9 @@ preserved. No optimization may recognize prelude declaration names. The previous
 version of this file, with every earlier program's measurements, is
 `git show be33230:PLAN.md`.
 
+The next program, 94 compile-time hills measured on the current gdev, is in
+[COMPILE_HILLS.md](COMPILE_HILLS.md).
+
 ## Twenty-hill program
 
 Approved on 2026-10-08 after a review of checkpoint `be33230`. Resumed with the
