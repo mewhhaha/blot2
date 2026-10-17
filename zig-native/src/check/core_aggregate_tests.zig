@@ -113,6 +113,45 @@ test "ordered alternatives share their checked binding guard and body" {
     try std.testing.expectEqual(@as(core.Id, 0), arms[1].guard);
 }
 
+const nullary_nominal_source =
+    \\type Mode is data = #On | #Off
+    \\type Level is data = #Low | #High
+    \\const keep = fn (mode: Mode) -> Mode => mode
+    \\const level = fn (mode: Mode) -> Level => case mode of
+    \\  #On => #High
+    \\  #Off => #Low
+    \\const twice = fn (mode: Mode) -> Mode => keep (keep mode)
+    \\const both = fn (mode: Mode) -> (Mode, Level) => (twice mode, level mode)
+    \\entry const answer = both #On
+;
+fn nullaryNominalPublication(allocator: std.mem.Allocator, fixture: *const Fixture) !void {
+    var module = try fixture.lower(allocator);
+    defer module.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), module.diagnostics.len);
+    // Every use of an argument-free nominal shares the first published node.
+    var seen: [2]?T.Id = .{ null, null };
+    for (module.types.nodes, 0..) |node, index| {
+        if (node.tag != .nominal or module.types.nominalArguments(node).len != 0) continue;
+        const slot = &seen[if (seen[0] == null or module.types.nodes[seen[0].?].b == node.b) 0 else 1];
+        try std.testing.expect(slot.* == null);
+        slot.* = @intCast(index);
+    }
+    try std.testing.expect(seen[0] != null and seen[1] != null);
+    var pairs: usize = 0;
+    for (module.types.nodes) |node| {
+        if (node.tag != .product or node.b != 2) continue;
+        for (module.types.list(.{ .start = node.a, .len = node.b })) |field| try std.testing.expect(field == seen[0].? or field == seen[1].?);
+        pairs += 1;
+    }
+    try std.testing.expect(pairs != 0);
+}
+test "argument-free nominal types publish one node each" {
+    var fixture = try Fixture.init(nullary_nominal_source);
+    defer fixture.deinit();
+    try nullaryNominalPublication(a, &fixture);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, nullaryNominalPublication, .{&fixture});
+}
+
 test "variant field projections retain constructor-specific canonical indices" {
     var fixture = try Fixture.init(
         \\type Point is data = #Left { x: U32, y: F32 } | #Right { y: F32, x: U32 }

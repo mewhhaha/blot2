@@ -137,6 +137,8 @@ const Tables = struct {
 };
 const Scratch = struct {
     saved_fields: std.AutoHashMapUnmanaged(u32, void) = .empty,
+    /// First published node of each argument-free nominal.
+    nullary_nominals: std.AutoHashMapUnmanaged(T.NominalIdentity, T.Id) = .empty,
     request_callbacks: std.ArrayList(RequestCallbackFrame) = .empty,
     visit_epochs: std.ArrayList(u32) = .empty,
     resolver_loop_frames: std.ArrayList(ResolverLoopFrame) = .empty,
@@ -165,6 +167,7 @@ const Scratch = struct {
     proof_visits: usize = 0,
     fn deinit(self: *Scratch, allocator: Allocator) void {
         self.saved_fields.deinit(allocator);
+        self.nullary_nominals.deinit(allocator);
         self.request_callbacks.deinit(allocator);
         self.visit_epochs.deinit(allocator);
         self.resolver_loop_frames.deinit(allocator);
@@ -283,8 +286,14 @@ const Builder = struct {
         }
         if (self.tables.type_nodes.items.len == std.math.maxInt(u32)) return error.CoreLimit;
         const id: T.Id = @intCast(self.tables.type_nodes.items.len);
+        const nullary = value.tag == .nominal and self.tables.type_extra.items[value.c] == 0;
+        if (nullary) try self.scratch.nullary_nominals.ensureUnusedCapacity(self.allocator, 1);
         try self.tables.type_nodes.append(self.allocator, value);
         if (canonical) |slot| slot.* = id;
+        if (nullary) {
+            const entry = self.scratch.nullary_nominals.getOrPutAssumeCapacity(.{ .unit = value.a, .decl = value.b });
+            if (!entry.found_existing) entry.value_ptr.* = id;
+        }
         return id;
     }
     fn projectType(self: *Builder, source: T.Id, depth: usize) Error!T.Id {
@@ -382,12 +391,9 @@ const Builder = struct {
             },
             .nominal, .projection, .instance_selection => blk: {
                 if (original.tag == .nominal and self.source.checked.types.nominalArguments(original).len == 0) {
-                    for (self.tables.type_nodes.items, 0..) |existing, index| {
-                        if (existing.tag == .nominal and existing.a == original.a and existing.b == original.b and self.tables.type_extra.items[existing.c] == 0) {
-                            const id: T.Id = @intCast(index);
-                            self.scratch.type_map[source] = id;
-                            return id;
-                        }
+                    if (self.scratch.nullary_nominals.get(.{ .unit = original.a, .decl = original.b })) |id| {
+                        self.scratch.type_map[source] = id;
+                        return id;
                     }
                 }
                 var arguments: std.ArrayList(T.Id) = .empty;
