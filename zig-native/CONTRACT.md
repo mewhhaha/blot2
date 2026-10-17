@@ -71,9 +71,13 @@ quantified local holes gain physical facts; known layouts still reconcile
 exactly. Captures, merges and carries decline this bounded proof. When uses
 disagree, a closed initializer built by a call, application, projection or
 constructor is evaluated instead; it keeps its evaluator value and each use
-serializes it at its own layout. That attempt reads no enclosing local,
-publishes no diagnostic when it declines and marks its code fresh. A
-compilation that fails after such a promotion runs once more without
+serializes it at its own layout. A callback whose rows that use leaves open is
+serialized at the instance its own body infers: each arrow the closure owns,
+including every literal arrow of a curried anonymous closure, closes to its own
+effects. That attempt reads only enclosing locals that already hold evaluator
+values, so each link of a rebinding chain headed by a promoted value is
+promoted too; it publishes no diagnostic when it declines and marks its code
+fresh. A compilation that fails after such a promotion runs once more without
 promotions, and that attempt owns the reported outcome. Otherwise a producer
 built only from pure calls, applications, projections, construction and local
 reads, whose value has a representation-free shape, runs once per distinct

@@ -4,7 +4,8 @@
 
 - **Status:** In progress — agreeing instances and closed promotion recorded on
   16 October 2026; per-use-layout runtime instances and their checks recorded
-  on 17 October 2026; the commit remains.
+  on 17 October 2026; Ink's app-hooks builders recorded on 17 October 2026; the
+  commit remains.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink by peer session on 16 October
   2026 as [issue #10](https://github.com/mewhhaha/blot2/issues/10); owner
@@ -77,6 +78,30 @@ which broke Ink's ECS builders.
       uses, an alias chain and a `:=` builder chain), keep the in-place edit and
       closure-capture declines as failure laws, and add a native replay,
       checkpoint and OOM law in `persistent_roots_tests.zig`.
+- [x] Ink's app-hooks builders. The uses that leave the action result open
+      (`reset_scoped`, `advance_scoped`, `render_scoped`) were already served:
+      a static call keeps the promoted value in the compiler and serializes
+      only the fields it selects (`inlineStaticCall`). Two other gaps failed
+      the promoting attempt, and the retry then hit the captured local's
+      erased scope tuple:
+  - `app.run` reads only the engine, so the systems' rows stay open at that
+    use and each callback is serialized at the instance its own body infers
+    (`inferClosure`). `closeRetainedRows` (`core_eval.zig`) closed only the
+    outer arrow of an anonymous closure, so the curried render system
+    `fn presentation => fn frame => ...` stayed open and declined. A closure
+    literal that is an anonymous closure's whole body is now closed like a
+    named curried body's parameter arrow.
+  - In a `:=` builder chain only the head `app.new policy` was closed; each
+    later link read it, so `attemptClosedNode` declined and the head was
+    serialized at the next link's erased layout. The attempt now reads
+    enclosing locals that already hold evaluator values, so every link is
+    promoted.
+  - `closureWithStaticCaptures` kept a slice of the layout store across
+    `closureFunction`, which can grow the store; it now copies the capture
+    layouts first (it read freed storage, a safe-build index-out-of-bounds
+    panic, on the first versions of the new law programs).
+- [x] Executed laws for both shapes with exported, stable guest memory and a
+      native replay, checkpoint and OOM law combining them.
 
 ## Validation
 
@@ -119,14 +144,39 @@ before the local milestone commit. Re-run the Ink ownership repro folder.
   reports 0 findings. `deno task test:compiler --budget-seconds 5400
   --phase-seconds 3600` passes in 18 minutes: native 2 × 1178 tests with no
   leaks, guests 1508, harness 28 and smoke 48.
+- Validation (17 October, app-hooks): Ink's `app-hooks.blot` builds; with
+  release and dev compilers `paused_frame` returns
+  `[11, 0, 0, 0.5, 1, 2, 5, 6]` and `pause_events`
+  `[11, 2, 0, 0.5, 0, 1, 2, 1, 2, 1, 2, 3, 4, 4, 5, 6]`, as
+  `app-hooks_test.ts` expects, and `schedule_workload n` returns
+  `[n, n, n(n+1)/2]`; guest memory stays at 131072 bytes over 1,000 repeated
+  calls. All 18 laws in `generalized_local_instance_execution.test.ts` pass;
+  against an unpatched `f6a2942` build the two new laws fail with
+  `ownership_unproved` and the other 16 pass. The new native law passes and
+  fails unpatched. Against the unpatched build, Ink's 50 test programs, 124
+  ownership repros and 30 effect repros keep their build
+  outcomes and every compared entry result (599 calls over the Ink tests and
+  478 over the ownership repros), except `app-hooks` and the effect repro
+  `hooks`, which now build. Seventeen nearby guest suites (119
+  tests) pass and `deno task lint:zig` reports 0 findings. `deno task
+  test:compiler --budget-seconds 5400 --phase-seconds 3600` passes in 21
+  minutes: native 2 × 1181 tests with no leaks, guests 1516, harness 28 and
+  smoke 48.
 - Comparison: not applicable; emission admission change only.
-- Remaining limitations: promoted values whose uses leave holes open (Ink
-  `app-hooks`; the effect repros `apprt`, `c1` and `hooks` fail identically
-  before and after this change and were not diagnosed further); generalized
-  locals in nested blocks (only a
-  body's own statements are decided); producers containing blocks, matches,
-  effects or proven in-place collection edits; locals captured by closures;
-  more than four distinct use layouts. Each of these keeps reporting
-  `ownership_unproved` rather than emitting a latent signature mismatch.
+- Remaining limitations: a promoted value serialized whole at a use that leaves
+  a type hole open, for example `let boxed = #[b, b]` read only for its length,
+  or the effect repro `c1`, whose route callback `fn (e: u) => e` reaches
+  `create_world` with `u` unconstrained (`apprt` fails the same way, then its
+  retry reports `public_arena`). Word storage would be sound there only for an
+  instantiation variable free in the whole body (no interface, capture or
+  generalized-local scheme owns it) and only if nested closure bodies and
+  callee instances take the same choice. Rewriting the hole at one
+  serialization is unsound: it may be a generalized local's quantified
+  variable whose shared runtime storage a later use reads at a concrete type.
+  Also generalized locals in nested blocks (only a body's own statements are
+  decided); producers containing blocks, matches, effects or proven in-place
+  collection edits; locals captured by closures; more than four distinct use
+  layouts. Each of these keeps reporting `ownership_unproved` rather than
+  emitting a latent signature mismatch.
 - Durable record: [CONTRACT.md](../zig-native/CONTRACT.md) generalized-local
   paragraph.

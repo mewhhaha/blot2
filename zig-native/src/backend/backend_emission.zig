@@ -1011,12 +1011,14 @@ pub const Owner = struct {
                 // Instances at different layouts share no private storage
                 // (issue #10). A closed initializer that evaluates instead
                 // keeps its value, and each use serializes it at its own
-                // layout. Local closures keep their callable templates. If
+                // layout. Local closures keep their callable templates. It
+                // may read locals that already hold values, so each link of a
+                // := chain headed by a promoted value is promoted too. If
                 // any use cannot be served, compilation retries without this.
                 const producer = source.node(n.b).tag;
                 const built = producer == .call or producer == .apply or producer == .project or producer == .construct or producer == .product or producer == .record;
                 if (g.speculative_locals and built and self.useCount(n.a) != 0 and self.hasErasedType(try self.codeLayout(binding.ty, source.span(id)), 0) and @import("../eval/closed_local_value.zig").dataShape(g.units, self.unit_id, binding.ty)) {
-                    if (try g.evaluator.attemptClosedNode(self.unit_id, n.b)) |value| {
+                    if (try g.evaluator.attemptClosedNode(self.unit_id, n.b, &self.static_values)) |value| {
                         // Body reads made by the evaluation are not recorded.
                         if (g.artifacts) |artifacts| artifacts.requireFreshCode();
                         g.speculated = true;
@@ -5327,7 +5329,9 @@ pub const Owner = struct {
         const prepared = self.resolvedPlan(id).template;
         const key = prepared.static_key orelse return false;
         const captures = source.closureCaptures(id);
-        const capture_types = g.representations.store.children(key.captures);
+        // Emitting the closure may intern layouts and move the store's lists.
+        const capture_types = try g.allocator.dupe(layout.Id, g.representations.store.children(key.captures));
+        defer g.allocator.free(capture_types);
         const function_id = try g.closureFunction(key);
         const capture_roles = try self.layoutRoles(g.allocator, capture_types);
         defer g.allocator.free(capture_roles);

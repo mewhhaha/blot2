@@ -3036,13 +3036,13 @@ pub const Session = struct {
         const values: std.AutoHashMapUnmanaged(core.BindingId, ValueId) = .empty;
         return self.closedNode(unit, id, &values, &.{}, &.{});
     }
-    /// Attempts a closed initializer without a totality proof. Any failure,
-    /// including a read of an enclosing local, declines without publishing a
-    /// diagnostic, so the caller keeps its ordinary runtime path.
-    pub fn attemptClosedNode(self: *Session, unit: u32, id: core.Id) Allocator.Error!?ValueId {
+    /// Attempts a closed initializer without a totality proof. It may read
+    /// only enclosing locals that already hold evaluator `values`. Any
+    /// failure, including a read of another enclosing local, declines without
+    /// publishing a diagnostic, so the caller keeps its ordinary runtime path.
+    pub fn attemptClosedNode(self: *Session, unit: u32, id: core.Id, values: *const std.AutoHashMapUnmanaged(core.BindingId, ValueId)) Allocator.Error!?ValueId {
         const saved = self.diagnostic;
-        const values: std.AutoHashMapUnmanaged(core.BindingId, ValueId) = .empty;
-        return self.closedNode(unit, id, &values, &.{}, &.{}) catch |err| switch (err) {
+        return self.closedNode(unit, id, values, &.{}, &.{}) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             else => {
                 self.diagnostic = saved;
@@ -11823,6 +11823,15 @@ const ClosureRegion = struct {
                         const body = self.session.units[source.owner].body(metadata.identity) orelse return error.UnresolvedType;
                         if (metadata.applied > body.parameters.len) return error.UnresolvedType;
                         break :count body.parameters.len - metadata.applied;
+                    } else if (metadata.origin == .anonymous) count: {
+                        // `fn a => fn b => ...` is curried like a named body:
+                        // a closure literal that is the whole body is this
+                        // closure's own arrow, not a returned callback.
+                        const module = &self.session.units[source.owner];
+                        var count: usize = 1;
+                        var body = module.closures[metadata.identity].body;
+                        while (module.node(body).tag == .closure and count < self.session.options.max_type_depth) : (count += 1) body = module.closure(body).body;
+                        break :count count;
                     } else 1;
                     changed = try self.closeRetainedFunctionRows(source.root, parameters) or changed;
                     continue;

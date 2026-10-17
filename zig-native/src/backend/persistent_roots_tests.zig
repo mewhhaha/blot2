@@ -631,6 +631,67 @@ test "generalized runtime locals used at different layouts evaluate one checked 
     try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
 }
 
+// Issue #10 (Ink app-hooks): `play` leaves the curried callback's rows open,
+// so serializing it infers each of its own arrows; the rebound link reads the
+// promoted `empty ()` value and is promoted too.
+test "promoted generalized builder chains serialize curried callbacks through replay checkpoint and OOM" {
+    var fixture = try Fixture.initSource(
+        \\type State a is effect = { get: Unit -> a, set: a -> Unit }
+        \\type App [world, scope, render] is data = #App { initial: world, scope: world -> scope, render: render }
+        \\type Trace is data = #Trace (Array U32)
+        \\const empty = fn () => do:
+        \\  let scope = fn world => fn action => do:
+        \\    use outcome <- @effect.run State.get State.set world action
+        \\    return outcome
+        \\  return #App { initial: #Trace #[], scope, render: fn (frame: U32) => frame }
+        \\const note = fn (value: U32) => do:
+        \\  use current <- State.get ()
+        \\  let #Trace values = current
+        \\  return State.set (#Trace #[...values, value])
+        \\const with_render = fn render => fn app => do:
+        \\  let #App { initial, scope } = app
+        \\  return #App { initial, scope, render }
+        \\const initial = fn app => do:
+        \\  let #App { initial } = app
+        \\  return initial
+        \\const play = fn app => fn world => fn action => do:
+        \\  let #App { scope } = app
+        \\  return scope world action
+        \\const draw = fn app => fn frame => do:
+        \\  let #App { render } = app
+        \\  return render 2 frame
+        \\entry const run = fn (seed: U32) => do:
+        \\  let app = empty ()
+        \\  app := with_render (fn (scale: U32) => fn (frame: U32) => do:
+        \\    use note frame
+        \\    return @u32.mul frame scale) self
+        \\  let (trace, doubled) = play app (initial app) (fn () => draw app seed)
+        \\  let #Trace values = trace
+        \\  return @u32.add doubled (@array.length values)
+    );
+    defer fixture.deinit();
+    const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
+    defer a.free(nodes);
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    try ownership(first.bytes);
+    var retained = try fixture.emit(a, &first.capture.?, null);
+    defer retained.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
+    const compiler: [32]u8 = @splat(37);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    var portable = try fixture.emit(a, null, &checkpoint);
+    defer portable.deinit(a);
+    try std.testing.expectEqualSlices(u8, first.bytes, portable.bytes);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, null, first.bytes });
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
+    try std.testing.expectEqualDeep(nodes, fixture.units[0].nodes);
+}
+
 test "persistent source roots preserve fresh retained and portable checkpoint Wasm" {
     var fixture = try Fixture.init();
     defer fixture.deinit();

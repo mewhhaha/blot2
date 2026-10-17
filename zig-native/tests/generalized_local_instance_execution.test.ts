@@ -271,3 +271,82 @@ entry const main = fn (x: U32) => do:
   return first
 `);
 });
+
+// Ink's app builders (issue #10). Closed builders whose uses disagree keep
+// their evaluator value. `run` reads only the scope, so the render callback's
+// rows stay open there and the callback is serialized at the instance its own
+// body infers, every arrow of a curried literal included. `initial` and
+// `render` leave the scope's action result open; they read the fields they
+// select.
+const app = `
+type State a is effect = {
+  get: Unit -> a
+  set: a -> Unit
+}
+type App [world, scope, render] is data = #App { initial: world, scope: world -> scope, render: render }
+type Trace is data = #Trace (Array U32)
+const empty = fn () => do:
+  let scope = fn world => fn action => do:
+    use outcome <- @effect.run State.get State.set world action
+    return outcome
+  return #App { initial: #Trace #[], scope, render: fn (frame: U32) => frame }
+const note = fn (value: U32) => do:
+  use current <- State.get ()
+  let #Trace values = current
+  return State.set (#Trace #[...values, value])
+const with_render = fn render => fn app => do:
+  let #App { initial, scope } = app
+  return #App { initial, scope, render }
+const initial = fn app => do:
+  let #App { initial } = app
+  return initial
+const run = fn app => fn world => fn action => do:
+  let #App { scope } = app
+  return scope world action
+entry const memory = fn () -> Array U32 => #[]
+`;
+
+async function returnsArgumentWithMemory(source: string): Promise<void> {
+  await compileAndRun(source, (guest) => {
+    equal(guest.call("main", 7), 7);
+    for (let index = 0; index < 16; index++) guest.call("main", index);
+    const settled = guest.memoryBytes();
+    if (settled === 0) throw new Error("Expected exported guest memory");
+    for (let index = 0; index < 2048; index++) equal(guest.call("main", index), index);
+    equal(guest.memoryBytes(), settled);
+  });
+}
+
+Deno.test("promoted builders serialize curried callbacks whose rows a use leaves open", async () => {
+  await returnsArgumentWithMemory(`${app}
+const render = fn app => fn frame => do:
+  let #App { render } = app
+  return render 2 frame
+entry const main = fn (x: U32) => do:
+  let app = with_render (fn (scale: U32) => fn (frame: U32) => do:
+    use note frame
+    return frame * scale) (empty ())
+  let (trace, doubled) = run app (initial app) (fn () => render app x)
+  let #Trace values = trace
+  return doubled - x + values.length - 1
+`);
+});
+
+// A := link built only from a promoted builder and closed arguments is
+// closed too, so it keeps its evaluator value instead of serializing the
+// promoted builder at a layout its own open uses leave unresolved.
+Deno.test("rebinding links that read a promoted builder are promoted with it", async () => {
+  await returnsArgumentWithMemory(`${app}
+const render = fn app => fn frame => do:
+  let #App { render } = app
+  return render frame
+entry const main = fn (x: U32) => do:
+  let app = empty ()
+  app := with_render (fn (frame: U32) => do:
+    use note frame
+    return frame + 1) self
+  let (trace, next) = run app (initial app) (fn () => render app x)
+  let #Trace values = trace
+  return next + values.length - 2
+`);
+});
