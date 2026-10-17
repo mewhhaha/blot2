@@ -11,9 +11,13 @@
 //
 // Both binaries must emit the same Wasm for every workload and phase, a
 // retained session must match a fresh build, and restoring a source must
-// restore the bytes, or the run fails after writing its results. Intentional
-// cross-compiler differences require --allow-wasm-diff; output stability and
-// each compiler's retained/restart parity always remain gates.
+// restore the bytes, or the run fails after writing its results. Fresh gdev
+// outputs (and expected rejections) must also match the per-entry hashes
+// recorded in scripts/bench/gdev-wasm.json, so a hill cannot drift from the
+// recorded baseline even when both of its binaries agree. Intentional output
+// changes require --allow-wasm-diff (then --write-hashes re-records them);
+// output stability, retained/restart parity and successful builds always
+// remain gates.
 // Linux only (reads /proc). Run with --allow-all: Deno gates /proc behind it,
 // and the harness already executes arbitrary compilers.
 //
@@ -47,10 +51,11 @@ import {
 
 const repo = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const manifestPath = `${repo}/scripts/bench/gdev-manifest.json`;
+const hashesPath = `${repo}/scripts/bench/gdev-wasm.json`;
 const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   [--runs 5] [--workload all|gdev|game|devtools|tests|synthetic|NAME,...]
   [--test-runs 1] [--no-retained] [--profile] [--out DIR] [--snapshot DIR]
-  [--allow-wasm-diff] [--write-manifest] [--restart-cache]
+  [--allow-wasm-diff] [--write-hashes] [--write-manifest] [--restart-cache]
 
   --baseline/--candidate  blotc executables. Pass one binary twice to measure noise.
   --workload              comma-separated: gdev entries (game, devtools), every
@@ -63,7 +68,11 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   --profile               open every session with profileBackend (detailed
                           clocks cost a few percent of CPU).
   --snapshot              gdev snapshot (default build/bench/gdev-snapshot).
-  --allow-wasm-diff       report, but do not fail on, Wasm differing between binaries.
+  --allow-wasm-diff       report, but do not fail on, Wasm differing between
+                          binaries or from scripts/bench/gdev-wasm.json.
+  --write-hashes          record the candidate's fresh gdev Wasm hashes (and
+                          expected rejections) for the measured entries in
+                          scripts/bench/gdev-wasm.json.
   --restart-cache         measure isolated cold cache population and process restarts.
   --write-manifest        rewrite scripts/bench/gdev-manifest.json from the snapshot.
 Results: build/tmp/bench/<timestamp>/{results.json,samples.jsonl}.`;
@@ -81,6 +90,7 @@ const { values: args } = parseArgs({
     "no-retained": { type: "boolean", default: false },
     "allow-wasm-diff": { type: "boolean", default: false },
     "write-manifest": { type: "boolean", default: false },
+    "write-hashes": { type: "boolean", default: false },
     "restart-cache": { type: "boolean", default: false },
     help: { type: "boolean", default: false },
   },
@@ -655,6 +665,51 @@ async function main(): Promise<number> {
     wasm[workload.name] = digests;
   }
 
+  // Recorded fresh outputs per gdev entry, and per edited entry.
+  const manifestHash = await sha256(await Deno.readFile(manifestPath));
+  const recorded = snapshot.status === "verified"
+    ? await recordedHashes()
+    : null;
+  const expectedRejections = new Set<string>();
+  const measuredHashes: Record<string, Hash> = {};
+  const unrecorded = new Set<string>();
+  const recordProblems = new Set<string>();
+  if (recorded && recorded.manifest !== manifestHash) {
+    problems.push(
+      "scripts/bench/gdev-wasm.json was recorded for another snapshot manifest; re-record it with --write-hashes",
+    );
+  }
+  for (const workload of workloads) {
+    if (workload.group === "synthetic") continue;
+    const keys: [string, string][] = [
+      [workload.name, "fresh"],
+      ...workload.scenarios.map((scenario): [string, string] => [
+        `${workload.name} @ ${scenario.name}`,
+        `fresh_edit:${scenario.name}`,
+      ]),
+    ];
+    for (const [entry, phase] of keys) {
+      const expected = recorded?.entries[entry];
+      for (const variant of variants) {
+        const actual = wasm[workload.name][`${phase}/${variant.name}`];
+        if (!actual) continue;
+        if (variant.name === "candidate") measuredHashes[entry] = actual;
+        if (expected === undefined) {
+          unrecorded.add(entry);
+        } else if (actual !== expected) {
+          const problem = `${entry}: ${variant.name} emitted ${
+            outcome(actual)
+          }, recorded ${outcome(expected)}`;
+          problems.push(problem);
+          crossCompilerProblems.add(problem);
+          recordProblems.add(problem);
+        } else if (actual.startsWith("failure:")) {
+          expectedRejections.add(workload.name);
+        }
+      }
+    }
+  }
+
   // Medians and spreads of child CPU per workload and phase.
   const cell = (workload: string, variant: string, phase: string) => {
     const values = samples.filter((s) =>
@@ -759,10 +814,13 @@ async function main(): Promise<number> {
   }
   const tests = testTable(workloads, samples, medians);
   const failures = failureTable(samples);
-  // Until recorded outcomes pin them, only test entries may fail.
+  // A rejection never passes as an output change. Only rejections recorded
+  // in gdev-wasm.json, or of unrecorded test entries, are expected.
   for (const failure of failures) {
     const workload = workloads.find((w) => w.name === failure.workload)!;
-    if (workload.group !== "tests") {
+    const known = workload.group === "tests" &&
+      (expectedRejections.has(workload.name) || unrecorded.has(workload.name));
+    if (!known || failure.phase !== "fresh") {
       problems.push(
         `${failure.workload} ${failure.phase}: ${failure.variant} failed with ${failure.code}`,
       );
@@ -777,6 +835,46 @@ async function main(): Promise<number> {
   const unexpectedProblems = args["allow-wasm-diff"]
     ? problems.filter((problem) => !crossCompilerProblems.has(problem))
     : problems;
+  if (unrecorded.size && !args["write-hashes"]) {
+    console.log(
+      `\nno recorded hash for ${
+        [...unrecorded].join(", ")
+      }; --write-hashes records them.`,
+    );
+  }
+  if (args["write-hashes"]) {
+    // Never record an output that failed its own run's parity checks.
+    const blocking = unexpectedProblems.filter((problem) =>
+      !recordProblems.has(problem)
+    );
+    if (blocking.length) {
+      console.log(
+        `\nnot writing ${shown(hashesPath)}: the run has other problems.`,
+      );
+    } else {
+      const entries = {
+        ...(recorded?.manifest === manifestHash ? recorded.entries : {}),
+        ...measuredHashes,
+      };
+      await Deno.writeTextFile(
+        hashesPath,
+        JSON.stringify(
+          {
+            manifest: manifestHash,
+            recorded_by: variants[1].sha256,
+            entries: Object.fromEntries(Object.entries(entries).sort()),
+          },
+          null,
+          2,
+        ) + "\n",
+      );
+      console.log(
+        `\nwrote ${shown(hashesPath)} (${
+          Object.keys(measuredHashes).length
+        } measured entries)`,
+      );
+    }
+  }
   await Deno.writeTextFile(
     `${out}/results.json`,
     JSON.stringify(
@@ -807,6 +905,9 @@ async function main(): Promise<number> {
         reuse,
         phases,
         wasm,
+        recorded_hashes: recorded
+          ? { manifest_matches: recorded.manifest === manifestHash }
+          : null,
         problems,
         unexpected_problems: unexpectedProblems,
       },
@@ -824,7 +925,7 @@ async function main(): Promise<number> {
       `\nWasm verification ${
         unexpectedProblems.length
           ? "FAILED"
-          : "cross-compiler differences (allowed)"
+          : "declared output differences (allowed by --allow-wasm-diff)"
       }:\n  ${problems.join("\n  ")}`,
     );
     return unexpectedProblems.length ? 1 : 0;
@@ -832,10 +933,28 @@ async function main(): Promise<number> {
   console.log(
     `Wasm verified identical: baseline = candidate${
       samples.some((s) => s.kind === "retained") ? ", fresh = retained" : ""
-    }.`,
+    }${recorded ? ", gdev = recorded hashes" : ""}.`,
   );
   return 0;
 }
+
+/** Recorded per-entry outputs: sha256 of the Wasm, or `failure:CODE`. */
+interface RecordedHashes {
+  /** sha256 of scripts/bench/gdev-manifest.json when recorded. */
+  manifest: Hash;
+  recorded_by: Hash;
+  entries: Record<string, string>;
+}
+async function recordedHashes(): Promise<RecordedHashes | null> {
+  try {
+    return JSON.parse(await Deno.readTextFile(hashesPath));
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) return null;
+    throw error;
+  }
+}
+const outcome = (digest: string) =>
+  digest.startsWith("failure:") ? digest : `Wasm ${digest.slice(0, 12)}`;
 
 /**
  * The test suite: per-entry median CPU, the suite total (sum of medians, for

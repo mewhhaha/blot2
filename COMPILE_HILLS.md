@@ -216,6 +216,15 @@ The 55 test entries take 167.5 s CPU, and their frontend is 94–99% of that.
 
 - **Fix:** every hill's paired run fails on a Wasm difference unless the hill
   declares one. Record the baseline hashes per entry beside the manifest.
+- **Result (18 October 2026):** CT7, "Guard gdev Wasm with recorded per-entry
+  hashes". `scripts/bench/gdev-wasm.json` holds the snapshot manifest's hash and
+  65 entries (game, devtools, the game's seven edited sources and the 56 test
+  entries, `salt_hauling` as `failure:type_mismatch`), recorded from main's
+  release binary. A run fails when either binary differs from a recorded entry;
+  `--allow-wasm-diff` permits a declared change and `--write-hashes` re-records
+  it. Rejections and parity failures are never excused. A self-paired run passes
+  ("gdev = recorded hashes"); an altered devtools hash exits 1, and 0 with
+  `--allow-wasm-diff`.
 
 ### CT8: record the baseline
 
