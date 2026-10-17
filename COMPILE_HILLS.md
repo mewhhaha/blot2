@@ -150,6 +150,15 @@ Only the solver and scratch pools count allocations.
 
 - **Fix:** add requested bytes, allocation count and peak RSS per phase to the
   stats record. Reuse the counters that CT74 moves off the hot path.
+- **Result (18 October 2026):** CT3, "Count requested bytes, allocations and
+  peak RSS per phase". Profiled builds route the session allocator through a
+  CountingAllocator that charges the active phase with relaxed atomics; nothing
+  is inserted otherwise and `runtime/memory.zig` is untouched, so the counts
+  survive CT74. Peak RSS is VmHWM sampled at phase changes (getrusage keeps the
+  spawning process's RSS after exec). Game: 1,388 MiB in 3.91 M requests (check
+  420 MiB / 2.42 M, backend 611 MiB, freeze 142 MiB, lower 99 MiB); peak 306
+  MiB, raised by check 121, freeze 62, backend 60 and lower 38 MiB. Profiled CPU
+  +0.7% against CT2.
 
 ### CT4: a committed sampler
 
