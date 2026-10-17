@@ -41,19 +41,24 @@ import {
   editedSources,
   gdevWorkloads,
   sessionOptions,
+  testWorkloads,
   type Workload,
 } from "./bench/gdev.ts";
 
 const repo = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const manifestPath = `${repo}/scripts/bench/gdev-manifest.json`;
 const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
-  [--runs 5] [--workload all|gdev|game|devtools|synthetic|NAME] [--no-retained]
-  [--profile] [--out DIR] [--snapshot DIR] [--allow-wasm-diff]
-  [--write-manifest] [--restart-cache]
+  [--runs 5] [--workload all|gdev|game|devtools|tests|synthetic|NAME,...]
+  [--test-runs 1] [--no-retained] [--profile] [--out DIR] [--snapshot DIR]
+  [--allow-wasm-diff] [--write-manifest] [--restart-cache]
 
   --baseline/--candidate  blotc executables. Pass one binary twice to measure noise.
-  --workload              gdev entries (game, devtools), the synthetic corpus
-                          (with the edit_suite project), or one workload by name.
+  --workload              comma-separated: gdev entries (game, devtools), every
+                          gdev test entry (tests, about 170 s CPU per binary and
+                          run), the synthetic corpus (with the edit_suite
+                          project), or workloads by name (tests/NAME.blot).
+                          all = gdev and synthetic.
+  --test-runs             alternating pairs for test entries (default 1).
   --no-retained           skip the retained-session phases.
   --profile               open every session with profileBackend (detailed
                           clocks cost a few percent of CPU).
@@ -68,6 +73,7 @@ const { values: args } = parseArgs({
     baseline: { type: "string" },
     candidate: { type: "string" },
     runs: { type: "string", default: "5" },
+    "test-runs": { type: "string", default: "1" },
     workload: { type: "string", default: "all" },
     out: { type: "string" },
     snapshot: { type: "string" },
@@ -182,6 +188,8 @@ async function syntheticWorkload(
     group: "synthetic",
     root,
     entry: `${root}/main.blot`,
+    overlay: {},
+    retained: true,
     stdRoot: null,
     prelude: `${repo}/std/prelude.blot`,
     imports: {},
@@ -208,6 +216,8 @@ async function projectWorkload(
     group: "synthetic",
     root,
     entry: `${root}/${project.entry}`,
+    overlay: {},
+    retained: true,
     stdRoot: `${repo}/std`,
     prelude: `${repo}/std/prelude.blot`,
     imports: {},
@@ -236,8 +246,18 @@ interface Sample {
   wall_ms: number;
   peak_rss_kib: number;
   wasm_bytes: number;
+  /** A failed build records `failure:CODE` here and its diagnostic below. */
   wasm_sha256: Hash;
+  failure?: Failure;
   stats: Record<string, unknown>;
+}
+/** A rejected build's first diagnostic, with its file relative to the root. */
+interface Failure {
+  code: string;
+  stage: string;
+  file: string;
+  start: number;
+  end: number;
 }
 
 interface Usage {
@@ -294,28 +314,40 @@ type Measured = Omit<Sample, "kind" | "workload" | "variant" | "run" | "phase">;
 async function measuredBuild(
   session: Session,
   sources: Record<string, string>,
-  label: string,
 ): Promise<Measured> {
   const pid = session.compiler.pid;
   const before = await processUsage(pid);
   const started = performance.now();
   const result: ZigProjectBuildResult = await session.compiler.build({
-    sources,
+    sources: { ...session.workload.overlay, ...sources },
   });
   const wall_ms = performance.now() - started;
   const after = await processUsage(pid);
-  if (!result.success) {
-    throw new Error(
-      `${session.variant.name} failed ${label} of ${session.workload.name}:\n${
-        JSON.stringify(result.diagnostics.slice(0, 3), null, 2)
-      }`,
-    );
-  }
-  return {
+  const usage = {
     cpu_ms: (after.cpu_ns - before.cpu_ns) / 1e6,
     tick_cpu_ms: (after.ticks - before.ticks) * 1000 / ticksPerSecond,
     wall_ms,
     peak_rss_kib: after.peak_rss_kib,
+  };
+  if (!result.success) {
+    const [first] = result.diagnostics;
+    const failure: Failure = {
+      code: first?.code ?? "unknown",
+      stage: first?.stage ?? "",
+      file: first ? relative(session.workload.root, first.filename) : "",
+      start: first?.start ?? 0,
+      end: first?.end ?? 0,
+    };
+    return {
+      ...usage,
+      wasm_bytes: 0,
+      wasm_sha256: `failure:${failure.code}`,
+      failure,
+      stats: (result.attemptStats ?? {}) as Record<string, unknown>,
+    };
+  }
+  return {
+    ...usage,
     wasm_bytes: result.bytes.length,
     wasm_sha256: await sha256(result.bytes),
     stats: result.stats as Record<string, unknown>,
@@ -328,11 +360,10 @@ async function freshBuild(
   workload: Workload,
   sources: Record<string, string> = {},
   cacheDirectory: string | false = false,
-  label = "fresh build",
 ): Promise<Measured> {
   const session = await openSession(variant, workload, cacheDirectory);
   try {
-    return await measuredBuild(session, sources, label);
+    return await measuredBuild(session, sources);
   } finally {
     await session.compiler.dispose();
   }
@@ -352,7 +383,7 @@ async function retainedSession(
       variant: variant.name,
       run,
       phase: name,
-      ...await measuredBuild(session, sources, `retained ${name}`),
+      ...await measuredBuild(session, sources),
     });
   };
   try {
@@ -417,8 +448,12 @@ async function main(): Promise<number> {
     return args.help ? 0 : 2;
   }
   const runs = Number(args.runs);
-  if (!Number.isSafeInteger(runs) || runs < 1) {
-    throw new Error("--runs must be positive");
+  const testRuns = Number(args["test-runs"]);
+  if (
+    !Number.isSafeInteger(runs) || runs < 1 ||
+    !Number.isSafeInteger(testRuns) || testRuns < 1
+  ) {
+    throw new Error("--runs and --test-runs must be positive");
   }
   const timestamp = new Date().toISOString().replaceAll(":", "-").replace(
     /\..*/,
@@ -440,27 +475,36 @@ async function main(): Promise<number> {
 
   const snapshot = await verifySnapshot();
   if (snapshot.status === "missing") printMissingSnapshot();
-  const selected = args.workload!;
+  const selected = args.workload!.split(",");
+  const chosen = (...names: string[]) =>
+    names.some((name) => selected.includes(name));
   const workloads: Workload[] = [];
   if (snapshot.status === "verified") {
     for (const workload of await gdevWorkloads(repo, snapshotRoot)) {
-      if (["all", "gdev", workload.name].includes(selected)) {
-        workloads.push(workload);
-      }
+      if (chosen("all", "gdev", workload.name)) workloads.push(workload);
+    }
+    for (const workload of await testWorkloads(repo, snapshotRoot)) {
+      if (chosen("tests", workload.name)) workloads.push(workload);
     }
   }
   for (const program of syntheticCorpus) {
     if (
-      ["all", "synthetic", program.name, `${program.name}_${program.size}`]
-        .includes(selected)
+      chosen(
+        "all",
+        "synthetic",
+        program.name,
+        `${program.name}_${program.size}`,
+      )
     ) workloads.push(await syntheticWorkload(program, out));
   }
-  if (["all", "synthetic", editSuite.name].includes(selected)) {
+  if (chosen("all", "synthetic", editSuite.name)) {
     workloads.push(await projectWorkload(editSuite, out));
   }
   if (!workloads.length) {
-    throw new Error(`No workload matches --workload ${selected}`);
+    throw new Error(`No workload matches --workload ${args.workload}`);
   }
+  const runsOf = (workload: Workload) =>
+    workload.group === "tests" ? testRuns : runs;
 
   const samples: Sample[] = [];
   const record = async (sample: Sample) => {
@@ -474,7 +518,11 @@ async function main(): Promise<number> {
   const loadStart = loadAverage();
   const cpus = navigator.hardwareConcurrency;
   console.log(
-    `bench:compile ${runs} alternating pairs, out ${shown(out)}\n` +
+    `bench:compile ${runs} alternating pairs${
+      workloads.some((w) => w.group === "tests")
+        ? ` (${testRuns} for test entries)`
+        : ""
+    }, out ${shown(out)}\n` +
       variants.map((v) =>
         `  ${v.name.padEnd(9)} ${v.sha256.slice(0, 12)} ${v.executable}`
       ).join("\n"),
@@ -487,9 +535,10 @@ async function main(): Promise<number> {
     );
   }
 
-  for (let run = 0; run < runs; run++) {
+  for (let run = 0; run < Math.max(...workloads.map(runsOf)); run++) {
     const order = run % 2 ? [...variants].reverse() : variants;
     for (const workload of workloads) {
+      if (run >= runsOf(workload)) continue;
       for (const variant of order) {
         const cacheDirectory = args["restart-cache"]
           ? `${out}/cache/${variant.name}/${workload.name}/${run}`
@@ -509,17 +558,11 @@ async function main(): Promise<number> {
             kind: "restart",
             phase: "restart",
             ...base,
-            ...await freshBuild(
-              variant,
-              workload,
-              {},
-              cacheDirectory,
-              "restart build",
-            ),
+            ...await freshBuild(variant, workload, {}, cacheDirectory),
           });
         }
       }
-      if (!args["no-retained"]) {
+      if (!args["no-retained"] && workload.retained) {
         for (const variant of order) {
           for (const sample of await retainedSession(variant, workload, run)) {
             await record(sample);
@@ -547,17 +590,11 @@ async function main(): Promise<number> {
       }
       digests[key] = sample.wasm_sha256;
     }
-    if (!args["no-retained"]) {
+    if (!args["no-retained"] && workload.retained) {
       for (const scenario of workload.scenarios) {
         const sources = await editedSources(workload, scenario);
         for (const variant of variants) {
-          const built = await freshBuild(
-            variant,
-            workload,
-            sources,
-            false,
-            `fresh build of ${scenario.name}`,
-          );
+          const built = await freshBuild(variant, workload, sources);
           digests[`fresh_edit:${scenario.name}/${variant.name}`] =
             built.wasm_sha256;
         }
@@ -645,6 +682,21 @@ async function main(): Promise<number> {
   ]];
   for (const workload of workloads) {
     medians[workload.name] = {};
+    if (workload.group === "tests") {
+      for (const variant of ["baseline", "candidate"] as const) {
+        (medians[workload.name].fresh ??= {
+          baseline: null,
+          candidate: null,
+          ratio: null,
+        })[variant] = cell(workload.name, variant, "fresh");
+      }
+      const { baseline, candidate } = medians[workload.name].fresh;
+      medians[workload.name].fresh.ratio =
+        baseline && candidate && baseline.median > 0
+          ? candidate.median / baseline.median
+          : null;
+      continue;
+    }
     const phases = [
       ...new Set(
         samples.filter((s) => s.workload === workload.name).map((s) => s.phase),
@@ -688,7 +740,8 @@ async function main(): Promise<number> {
       | Record<string, number>
       | null;
     counters[workload.name] = c;
-    if (!c) continue;
+    // Test entries are summarized in the test-suite table.
+    if (!c || workload.group === "tests") continue;
     counterRows.push([
       workload.name,
       String(c.inference_regions),
@@ -703,6 +756,17 @@ async function main(): Promise<number> {
   if (counterRows.length > 1) {
     console.log("\ncandidate fresh-build work counters (deterministic)");
     printTable(counterRows);
+  }
+  const tests = testTable(workloads, samples, medians);
+  const failures = failureTable(samples);
+  // Until recorded outcomes pin them, only test entries may fail.
+  for (const failure of failures) {
+    const workload = workloads.find((w) => w.name === failure.workload)!;
+    if (workload.group !== "tests") {
+      problems.push(
+        `${failure.workload} ${failure.phase}: ${failure.variant} failed with ${failure.code}`,
+      );
+    }
   }
   const reuse = reuseTables(workloads, samples, medians);
   const phases = args.profile ? phaseTables(workloads, samples) : {};
@@ -738,6 +802,8 @@ async function main(): Promise<number> {
         })),
         medians,
         counters,
+        tests,
+        failures,
         reuse,
         phases,
         wasm,
@@ -765,10 +831,114 @@ async function main(): Promise<number> {
   }
   console.log(
     `Wasm verified identical: baseline = candidate${
-      args["no-retained"] ? "" : ", fresh = retained"
+      samples.some((s) => s.kind === "retained") ? ", fresh = retained" : ""
     }.`,
   );
   return 0;
+}
+
+/**
+ * The test suite: per-entry median CPU, the suite total (sum of medians, for
+ * entries both variants built) and the ten slowest entries.
+ */
+function testTable(
+  workloads: Workload[],
+  samples: Sample[],
+  medians: Record<
+    string,
+    Record<string, { baseline: Spread | null; candidate: Spread | null }>
+  >,
+) {
+  const entries = workloads.filter((w) => w.group === "tests");
+  if (!entries.length) return null;
+  const rss = (name: string) =>
+    Math.max(
+      0,
+      ...samples.filter((s) => s.workload === name && s.variant === "candidate")
+        .map((s) => s.peak_rss_kib),
+    );
+  const rows = entries.map((workload) => {
+    const cell = medians[workload.name].fresh;
+    const failed = samples.find((s) =>
+      s.workload === workload.name && s.failure
+    );
+    return {
+      name: workload.name,
+      baseline_ms: cell.baseline?.median ?? null,
+      candidate_ms: cell.candidate?.median ?? null,
+      peak_rss_kib: rss(workload.name),
+      outcome: failed ? failed.wasm_sha256 : "built",
+    };
+  });
+  const total = (field: "baseline_ms" | "candidate_ms") =>
+    rows.reduce((sum, row) => sum + (row[field] ?? 0), 0);
+  const result = {
+    entries: rows.length,
+    failed: rows.filter((row) => row.outcome !== "built").length,
+    total_baseline_ms: total("baseline_ms"),
+    total_candidate_ms: total("candidate_ms"),
+    per_entry: rows,
+  };
+  const slowest = [...rows].sort((a, b) =>
+    (b.candidate_ms ?? b.baseline_ms ?? 0) -
+    (a.candidate_ms ?? a.baseline_ms ?? 0)
+  ).slice(0, 10);
+  const fixed = (value: number | null) =>
+    value === null ? "-" : value.toFixed(1);
+  const ratio = (base: number | null, cand: number | null) =>
+    base && cand ? (cand / base).toFixed(3) : "-";
+  console.log(
+    `\ntest suite: ${result.entries} entries (${result.failed} failed), ` +
+      `total CPU ${fixed(result.total_baseline_ms)} / ${
+        fixed(result.total_candidate_ms)
+      } ms (baseline / candidate, ${
+        ratio(result.total_baseline_ms, result.total_candidate_ms)
+      })`,
+  );
+  printTable([
+    ["slowest entries", "baseline ms", "candidate ms", "cand/base", "RSS MiB"],
+    ...slowest.map((row) => [
+      row.name,
+      fixed(row.baseline_ms),
+      fixed(row.candidate_ms),
+      ratio(row.baseline_ms, row.candidate_ms),
+      (row.peak_rss_kib / 1024).toFixed(0),
+    ]),
+  ]);
+  return result;
+}
+
+/** One line per distinct rejected build (workload, phase, variant, code). */
+function failureTable(samples: Sample[]) {
+  const seen = new Map<
+    string,
+    { workload: string; phase: string; variant: string } & Failure
+  >();
+  for (const sample of samples) {
+    if (!sample.failure) continue;
+    const key = `${sample.workload}/${sample.phase}/${sample.variant}`;
+    seen.set(key, {
+      workload: sample.workload,
+      phase: sample.phase,
+      variant: sample.variant,
+      ...sample.failure,
+    });
+  }
+  const failures = [...seen.values()];
+  if (failures.length) {
+    console.log("\nrejected builds (first diagnostic)");
+    printTable([
+      ["workload", "phase", "variant", "code", "at"],
+      ...failures.map((f) => [
+        f.workload,
+        f.phase,
+        f.variant,
+        f.code,
+        `${f.file}:${f.start}-${f.end}`,
+      ]),
+    ]);
+  }
+  return failures;
 }
 
 /** What a retained revision reused and redid; deterministic per phase. */

@@ -17,10 +17,14 @@ export interface Scenario {
 }
 export interface Workload {
   readonly name: string;
-  readonly group: "gdev" | "synthetic";
+  readonly group: "gdev" | "tests" | "synthetic";
   /** Directory holding every source of the workload. */
   readonly root: string;
   readonly entry: string;
+  /** Sources every build overlays (absolute path to text), such as a test. */
+  readonly overlay: Readonly<Record<string, string>>;
+  /** Whether bench:compile also measures a retained session. */
+  readonly retained: boolean;
   readonly stdRoot: string | null;
   readonly prelude: string;
   /** Import alias prefix to absolute directory. */
@@ -209,6 +213,8 @@ export async function gdevWorkloads(
     group: "gdev",
     root: snapshotRoot,
     entry: `${snapshotRoot}/${entry}`,
+    overlay: {},
+    retained: true,
     stdRoot: `${repo}/std`,
     prelude: `${repo}/std/prelude.blot`,
     imports: settings.imports,
@@ -219,4 +225,36 @@ export async function gdevWorkloads(
     workload("game", "src/main.blot", gameScenarios),
     workload("devtools", "devtools/main.blot", []),
   ];
+}
+
+/**
+ * Every `tests/*.blot` entry, built as pen builds tests: the game's
+ * `src/test_fixture.blot` entry (which exists only as an overlay) holding the
+ * test's source, so its relative imports resolve inside `src/`.
+ */
+export async function testWorkloads(
+  repo: string,
+  snapshotRoot: string,
+): Promise<Workload[]> {
+  const [game] = await gdevWorkloads(repo, snapshotRoot);
+  const entry = `${snapshotRoot}/src/test_fixture.blot`;
+  const names: string[] = [];
+  for await (const item of Deno.readDir(`${snapshotRoot}/tests`)) {
+    if (item.isFile && item.name.endsWith(".blot")) names.push(item.name);
+  }
+  const workloads: Workload[] = [];
+  for (const name of names.sort()) {
+    workloads.push({
+      ...game,
+      name: `tests/${name}`,
+      group: "tests",
+      entry,
+      overlay: {
+        [entry]: await Deno.readTextFile(`${snapshotRoot}/tests/${name}`),
+      },
+      retained: false,
+      scenarios: [],
+    });
+  }
+  return workloads;
 }

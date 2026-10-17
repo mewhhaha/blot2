@@ -167,6 +167,15 @@ The 55 test entries take 167.5 s CPU, and their frontend is 94–99% of that.
   bench workload.
 - **Separate:** `tests/salt_hauling.blot` fails with `type_mismatch` in the
   snapshot; triage it separately.
+- **Result (18 October 2026):** `CT6: Measure the gdev test suite as a bench
+  workload`. `--workload tests` builds all 56 entries as pen does (the
+  `src/test_fixture.blot` overlay), records rejections instead of aborting, and
+  prints the suite total and the ten slowest entries. Base/candidate, one run at
+  load 5.5–8.8: 211.3 / 208.9 s; slowest `robot_pickup` 27.3 / 24.8 s, `edit`
+  15.2 / 13.9 s, `game` 13.3 / 13.2 s. Wasm identical on all 55 built entries.
+  `salt_hauling` is a stale test, not a compiler bug: it calls `station.layout`
+  with 3 of its 5 curried parameters (`index` and `seconds` were added), so the
+  `case` scrutinee is a function and the `#Some shape` arm is a type mismatch.
 
 ### CT7: a byte-identity guard
 

@@ -24,6 +24,7 @@ import {
   editedSources,
   gdevWorkloads,
   sessionOptions,
+  testWorkloads,
   type Workload,
 } from "./gdev.ts";
 
@@ -100,7 +101,6 @@ async function sampleRun(
   blotc: string,
   wrapper: string,
   workload: Workload,
-  overlay: Record<string, string>,
 ): Promise<void> {
   const control = `${out}/control-${run}`;
   await Deno.mkdir(control, { recursive: true });
@@ -134,7 +134,7 @@ async function sampleRun(
   try {
     const build = async (sources: Record<string, string>, label: string) => {
       const result = await compiler.build({
-        sources: { ...overlay, ...sources },
+        sources: { ...workload.overlay, ...sources },
       });
       if (!result.success) {
         throw new Error(
@@ -347,16 +347,13 @@ async function main(): Promise<number> {
   const snapshotRoot = resolve(
     args.snapshot ?? `${repo}/build/bench/gdev-snapshot`,
   );
-  const workloads = await gdevWorkloads(repo, snapshotRoot);
-  let workload = workloads.find((w) => w.name === args.workload);
-  if (!workload) throw new Error(`No gdev workload ${args.workload}`);
   // Tests build as pen builds them: the fixture entry with the test overlaid.
-  const overlay: Record<string, string> = {};
-  if (args.test) {
-    const entry = `${snapshotRoot}/src/test_fixture.blot`;
-    overlay[entry] = await Deno.readTextFile(`${snapshotRoot}/${args.test}`);
-    workload = { ...workload, name: args.test, entry };
-  }
+  const workloads = args.test
+    ? await testWorkloads(repo, snapshotRoot)
+    : await gdevWorkloads(repo, snapshotRoot);
+  const name = args.test ?? args.workload;
+  const workload = workloads.find((w) => w.name === name);
+  if (!workload) throw new Error(`No gdev workload ${name}`);
   const timestamp = new Date().toISOString().replaceAll(":", "-").replace(
     /\..*/,
     "",
@@ -365,7 +362,7 @@ async function main(): Promise<number> {
   await Deno.mkdir(out, { recursive: true });
   const wrapper = await ptracerWrapper(out, blotc);
   for (let run = 0; run < Number(args.runs); run++) {
-    await sampleRun(run, out, blotc, wrapper, workload, overlay);
+    await sampleRun(run, out, blotc, wrapper, workload);
   }
   const text = report(await loadStacks([`${out}/samples.jsonl`]), top);
   await Deno.writeTextFile(`${out}/report.txt`, text + "\n");
