@@ -816,6 +816,10 @@ memcpy and memset take 11.6% self cold and more in edits.
 
 - **Fix:** identify the map. Replace it with a dense array or a better key where
   ids are compact.
+- **Result (18 October 2026):** dropped. The hottest map is
+  `effect_evidence.operation_buckets` (1.1% of the 2.0%). It is keyed by a
+  Wyhash fingerprint, so no dense array applies. Using the fingerprint as its
+  own hash saved 0.1% of instructions but no CPU over 15 pairs (+0.2% median).
 
 ### CT80: a modern CPU build
 
