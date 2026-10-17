@@ -51,6 +51,10 @@ remaining work. Each milestone lands as a local commit on `main` after
   fails on any Wasm difference.
 - Attribution: `blotc build ... --profile` prints phase timings and the slowest
   inference regions. Every build prints deterministic `work_counters`.
+  `deno task profile:compile` samples a release blotc under gdb (cold, an edit
+  scenario with `--edit`, or a test entry with `--test`) and prints self,
+  inclusive, subsystem, file, line and caller tables; `--aggregate` re-reads
+  saved samples.
 - Regression budgets: `zig-native/tests/compile_budget.test.ts` asserts counters
   for the chain, generic chain, diamond and fan-out probes. Deep probes now
   include annotated chains at 300 and 1,000, a generic chain at 300 and diamond

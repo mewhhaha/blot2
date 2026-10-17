@@ -1,0 +1,101 @@
+# Poor man's sampling profiler for blotc, run inside gdb:
+#
+#   gdb -batch -q -x scripts/bench/gdb_sampler.py
+#
+# scripts/bench/profile_compile.ts drives it; run that instead. Environment:
+#   SAMPLE_CONTROL  directory for the handshake files below
+#   SAMPLE_BINARY   the blotc whose symbols gdb loads (must have DWARF)
+#   SAMPLE_OUT      JSON-lines output, one record per stop
+#   SAMPLE_MIN_MS / SAMPLE_MAX_MS  random interval between stops (default 3-10)
+#   SAMPLE_LIMIT    stop after this many samples (default unlimited)
+#
+# Handshake: the driver writes `pid`; this script attaches and writes
+# `attached`; the driver writes `start` before the measured builds and `stop`
+# after them. Each stop sends SIGUSR1 after a random delay (gdb keeps it from
+# the program), then records every thread's stack including inlined frames.
+# Threads blocked in the process's main function (joining the compile thread)
+# are skipped.
+import json
+import os
+import random
+import subprocess
+import time
+
+import gdb
+
+control = os.environ["SAMPLE_CONTROL"]
+low = float(os.environ.get("SAMPLE_MIN_MS", "3")) / 1000
+high = float(os.environ.get("SAMPLE_MAX_MS", "10")) / 1000
+limit = int(os.environ.get("SAMPLE_LIMIT", "0")) or None
+
+
+def flag(name):
+    return os.path.exists(os.path.join(control, name))
+
+
+def wait_for(name):
+    while not flag(name):
+        time.sleep(0.005)
+
+
+def stack(thread):
+    thread.switch()
+    frame = gdb.newest_frame()
+    frames = []
+    while frame is not None and len(frames) < 500:
+        try:
+            sal = frame.find_sal()
+            frames.append([
+                frame.name() or "??",
+                sal.symtab.filename if sal.symtab else "",
+                sal.line,
+                frame.type() == gdb.INLINE_FRAME,
+            ])
+        except gdb.error:
+            frames.append(["??", "", 0, False])
+        try:
+            frame = frame.older()
+        except gdb.error:
+            break
+    return frames
+
+
+wait_for("pid")
+pid = int(open(os.path.join(control, "pid")).read())
+for command in ("set pagination off", "set confirm off",
+                "set debuginfod enabled off"):
+    gdb.execute(command)
+gdb.execute("file " + os.environ["SAMPLE_BINARY"])
+gdb.execute("attach %d" % pid)
+# `noprint` would imply `nostop`; continue() captures the message.
+gdb.execute("handle SIGUSR1 nopass stop print")
+open(os.path.join(control, "attached"), "w").write("1")
+wait_for("start")
+started = time.time()
+taken = 0
+with open(os.environ["SAMPLE_OUT"], "a") as out:
+    while not flag("stop") and (limit is None or taken < limit):
+        delay = random.uniform(low, high)
+        subprocess.Popen([
+            "/bin/sh", "-c", "sleep %f; kill -USR1 %d 2>/dev/null" % (delay, pid)
+        ])
+        try:
+            gdb.execute("continue", to_string=True)
+        except gdb.error:
+            break  # The process exited.
+        if flag("stop"):
+            break  # The measured builds finished while this stop was pending.
+        try:
+            stacks = [s for s in map(stack, gdb.selected_inferior().threads())
+                      if not any(f[0] == "main.main" for f in s)]
+        except gdb.error:
+            break
+        out.write(json.dumps({"t": time.time() - started, "st": stacks}) + "\n")
+        out.flush()
+        taken += 1
+try:
+    gdb.execute("detach")
+except gdb.error:
+    pass
+open(os.path.join(control, "detached"), "w").write(str(taken))
+gdb.execute("quit")
