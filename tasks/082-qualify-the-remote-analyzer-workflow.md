@@ -2,9 +2,10 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — re-scoped by owner decision on 15 October 2026 to a
-  local run of the analyzer built from `../zig-analyzer`; no completion is
-  claimed.
+- **Status:** In progress — re-scoped by owner decision on 15 October 2026 to
+  a local run of the analyzer built from `../zig-analyzer`. The run passes on
+  committed tree `4599957`; completion waits for a rerun over the tree task
+  084 qualifies.
 - **Dependencies:** [081](081-finalize-durable-documentation.md)
 - **Originating requirements:** PLAN: Hill 17 follow-up / first remote analyzer
   run. Sources: [PLAN.md](../PLAN.md).
@@ -31,12 +32,12 @@ baseline.
 
 ## Implementation checklist
 
-- [ ] Build the analyzer and its compiler backend in `../zig-analyzer`
+- [x] Build the analyzer and its compiler backend in `../zig-analyzer`
       (`zig build`, `zig build backend`) and confirm `zig-analyzer doctor`
       passes with Zig 0.17.0.
-- [ ] Run `deno task lint:zig` over the final committed tree with that analyzer
+- [x] Run `deno task lint:zig` over the final committed tree with that analyzer
       and confirm zero findings and full source coverage.
-- [ ] Record the analyzer commit, doctor output, file count and result durably.
+- [x] Record the analyzer commit, doctor output, file count and result durably.
 
 ## Validation
 
@@ -61,7 +62,18 @@ changes; run code gates only when code or build inputs change.
 - Commit: pending; record the final committed tree and analyzer revisions.
 - Owner decision, 16 October 2026: the local `../zig-analyzer` build gates this
   task, and its known false positives are accepted for now.
-- Latest local run (16 October 2026, committed tree `2b2ffbb`):
+- Latest local run (17 October 2026, committed tree `4599957`, clean
+  `zig-native/`): `../zig-analyzer` at `9a78ce1` (0.17.0-2, pushed), which
+  merges the upstream fixes for the false positives below. `zig-analyzer
+  doctor` reports Zig 0.17.0 and a compatible compiler backend. `deno task
+  lint:zig` and an uncached `zig-analyzer check --no-cache` each report 0
+  findings over all 487 `zig-native/src` files and the fixture module. The
+  CI-pinned `756bfd5` (0.17.0-1) also reports 0 findings over the same tree,
+  so no finding is reported by only one revision. Outside the gated
+  directories, `check .` under the default profile warns about five deprecated
+  `std.fs.path` uses (such as `zig-native/compiler_fingerprint.zig`); they are
+  not part of this gate.
+- Earlier local run (16 October 2026, committed tree `2b2ffbb`):
   `../zig-analyzer` at `13b7e03` (0.17.0-2), Zig 0.17.0. `zig build backend`
   succeeded (8:02) and `zig-analyzer doctor` reports Zig 0.17.0 and a compatible
   backend. `deno task lint:zig` checks 486 files and reports 10 findings, the
@@ -88,7 +100,7 @@ changes; run code gates only when code or build inputs change.
   `db109741eb6cd29e7505e8ee30c461c237d8fbaf0177d71cc06907f20f9d287c`, and
   predates the current compiler. It does not qualify this gate.
 - Comparison: not applicable; this is a static-analysis gate.
-- Remaining work: rerun over the final committed tree that task 084 qualifies
-  and record both analyzer revisions and any finding only one reports.
+- Remaining work: rerun both analyzers over the final committed tree that task
+  084 qualifies (under a second each) and record the result.
 - Durable record: pending; record the final analyzer result outside `tasks/`
   before cleanup.

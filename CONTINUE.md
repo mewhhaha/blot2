@@ -2,8 +2,8 @@
 
 Finish the entire program in [tasks/README.md](tasks/README.md), continuing past
 individual milestones. Commit or push only with the owner's approval. As of 17
-October 2026 there are 80 complete tasks (including four designs), 21 in
-progress and 8 pending: **29 remain open**; see the counts in
+October 2026 there are 80 complete tasks (including four designs), 22 in
+progress and 7 pending: **29 remain open**; see the counts in
 [tasks/README.md](tasks/README.md). Keep this handoff until every required task
 verifies.
 

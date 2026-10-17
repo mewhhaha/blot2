@@ -626,7 +626,7 @@ have zero findings; the full gate takes 697.812 s. Exact frozen inputs and
 release qualification are in
 [the checkpoint](../zig-native/CONTINUATION_QUALIFICATION.md#qualified-continuation-15-october-2026).
 Tasks 070/071 now satisfy their finite acceptance criteria. Statuses are **80
-complete** (including four designs), **21 in progress** and **8 pending**: **29
+complete** (including four designs), **22 in progress** and **7 pending**: **29
 remain open**. The broader program and performance targets remain open.
 
 Owner decisions of 15 October 2026: language tasks 058/059/061/062/064/065,
@@ -747,7 +747,7 @@ as recorded in those tasks.
 | [079] — Relocate fixtures through a test module         | In progress     | [078]                                  |
 | [080] — Organize the source tree                        | In progress     | [079]                                  |
 | [081] — Finalize durable documentation                  | In progress     | [080]                                  |
-| [082] — Qualify the analyzer workflow locally           | Pending         | [081]                                  |
+| [082] — Qualify the analyzer workflow locally           | In progress     | [081]                                  |
 | [083] — Review and clean old build artifacts            | Complete        | [081]                                  |
 | [084] — Qualify the complete program                    | Pending         | [082], [083], [085]–[099]              |
 | [085] — Gate principal-graph sharing on payoff          | Complete        | —                                      |
