@@ -9803,24 +9803,27 @@ const Engine = struct {
         const fresh_rows = try temporary.alloc(T.Effects.Id, old_rows.len);
         defer temporary.free(fresh_rows);
         for (fresh_rows) |*row| row.* = try self.types.freshEffects();
-        const value = try self.types.substituteWithRows(principal.root, old, fresh_ids, old_rows, fresh_rows);
-        try self.appendInstance(principal.obligations, old, fresh_ids, old_rows, fresh_rows, source, 0);
+        var substitution = try self.types.prepareSubstitution(old, fresh_ids, old_rows, fresh_rows);
+        defer substitution.deinit(self.types.allocator);
+        const value = try self.types.substitutePrepared(&substitution, principal.root);
+        try self.appendInstance(principal.obligations, &substitution, source, 0);
         if (principal.generative.len > 32 or principal.generative.len % 2 != 0) return error.TypeLimit;
         const generators = try temporary.dupe(T.Id, self.types.list(principal.generative));
         defer temporary.free(generators);
         for (0..generators.len / 2) |index| try self.generative_bindings.append(self.allocator, .{
-            .arrow = try self.types.substituteWithRows(generators[index * 2], old, fresh_ids, old_rows, fresh_rows),
-            .selection = try self.types.substituteWithRows(generators[index * 2 + 1], old, fresh_ids, old_rows, fresh_rows),
+            .arrow = try self.types.substitutePrepared(&substitution, generators[index * 2]),
+            .selection = try self.types.substitutePrepared(&substitution, generators[index * 2 + 1]),
         });
         if (self.exact_argument_types) return value;
         return self.types.openCovariant(value);
     }
     /// Appends one instance of a scheme's obligations. A shared-scheme use
     /// inside the scheme is instantiated as another use, never flattened.
-    fn appendInstance(self: *Engine, span: T.List, old: []const T.Id, fresh_ids: []const T.Id, old_rows: []const u32, fresh_rows: []const T.Effects.Id, source: ast.Id, expansion: u32) T.Error!void {
+    /// The one prepared substitution serves every obligation of the instance.
+    fn appendInstance(self: *Engine, span: T.List, substitution: *T.Store.Substitution, source: ast.Id, expansion: u32) T.Error!void {
         for (self.obligations.items[span.start..][0..span.len]) |constraint| {
-            const ty = try self.types.substituteWithRows(constraint.ty, old, fresh_ids, old_rows, fresh_rows);
-            try self.appendPending(.{ .owner = self.current, .expansion = expansion, .origin = try self.memberUseOrigin(constraint, source), .suspended = constraint.explicit and constraint.kind != .record_merge, .method_member = constraint.kind == .receiver and !constraint.explicit, .value = .{ .ty = ty, .kind = constraint.kind, .source = source, .name = constraint.name, .result = if (constraint.result == 0) 0 else try self.types.substituteWithRows(constraint.result, old, fresh_ids, old_rows, fresh_rows), .other = if (constraint.other == 0) 0 else try self.types.substituteWithRows(constraint.other, old, fresh_ids, old_rows, fresh_rows), .signature = if (constraint.signature == 0) 0 else try self.types.substituteWithRows(constraint.signature, old, fresh_ids, old_rows, fresh_rows), .operator = constraint.operator, .identity = constraint.identity, .explicit = constraint.explicit, .qualification_span = constraint.qualification_span, .qualification_unit = constraint.qualification_unit } });
+            const ty = try self.types.substitutePrepared(substitution, constraint.ty);
+            try self.appendPending(.{ .owner = self.current, .expansion = expansion, .origin = try self.memberUseOrigin(constraint, source), .suspended = constraint.explicit and constraint.kind != .record_merge, .method_member = constraint.kind == .receiver and !constraint.explicit, .value = .{ .ty = ty, .kind = constraint.kind, .source = source, .name = constraint.name, .result = if (constraint.result == 0) 0 else try self.types.substitutePrepared(substitution, constraint.result), .other = if (constraint.other == 0) 0 else try self.types.substitutePrepared(substitution, constraint.other), .signature = if (constraint.signature == 0) 0 else try self.types.substitutePrepared(substitution, constraint.signature), .operator = constraint.operator, .identity = constraint.identity, .explicit = constraint.explicit, .qualification_span = constraint.qualification_span, .qualification_unit = constraint.qualification_unit } });
         }
     }
     /// Instantiates only what the caller can observe. The callee's private
@@ -9881,7 +9884,9 @@ const Engine = struct {
         for (old_rows, fresh_rows) |variable, *row| {
             row.* = if (std.mem.findScalar(u32, public_rows, variable)) |at| self.types.node(instance[public.len + at]).c else try self.types.freshEffects();
         }
-        try self.appendInstance(principal.obligations, old, fresh_ids, old_rows, fresh_rows, use.value.source, expansion);
+        var substitution = try self.types.prepareSubstitution(old, fresh_ids, old_rows, fresh_rows);
+        defer substitution.deinit(self.types.allocator);
+        try self.appendInstance(principal.obligations, &substitution, use.value.source, expansion);
     }
     fn purityIdentity(context: *anyopaque, allocator: Allocator, identity: Identity, kind: @import("../eval/purity_type_key.zig").Kind) @import("../eval/purity_type_key.zig").OriginError!@import("../eval/purity_type_key.zig").Identity {
         const self: *Engine = @ptrCast(@alignCast(context));

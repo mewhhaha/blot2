@@ -589,6 +589,109 @@ test "shared type substitution stays linear and releases scratch on allocation f
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, sharedSubstitutionLaw, .{});
 }
 
+/// One store state, then several roots substituted either through one
+/// prepared substitution or through a separate call per root. `binders`
+/// above the index threshold exercises the indexed lookups.
+fn preparedSubstitutionStore(allocator: std.mem.Allocator, binders: usize, prepared: bool) !Store {
+    var store = try Store.init(allocator);
+    errdefer store.deinit();
+    var old: std.ArrayList(Id) = .empty;
+    defer old.deinit(allocator);
+    var fresh: std.ArrayList(Id) = .empty;
+    defer fresh.deinit(allocator);
+    for (0..binders) |_| {
+        try old.append(allocator, try store.fresh());
+        try fresh.append(allocator, try store.fresh());
+    }
+    // A repeated binder keeps its first replacement.
+    try old.append(allocator, old.items[binders / 2]);
+    try fresh.append(allocator, u32_type);
+    // A formal tail names a row binder; its replacement is a row handle.
+    const formal = try store.boundType(0, 1);
+    try old.append(allocator, formal);
+    try fresh.append(allocator, try store.freshRowType());
+    // Row binders apply in order: the first replacement's tail is the
+    // second binder, which the same pass then replaces.
+    var old_rows: std.ArrayList(u32) = .empty;
+    defer old_rows.deinit(allocator);
+    var fresh_rows: std.ArrayList(Effects.Id) = .empty;
+    defer fresh_rows.deinit(allocator);
+    const latent = try store.freshEffects();
+    const chained = try store.freshEffects();
+    try old_rows.append(allocator, store.effects.node(latent).tail.variable);
+    try fresh_rows.append(allocator, try store.effects.row(&.{foreign_operation}, store.effects.node(chained).tail));
+    for (0..binders) |_| {
+        try old_rows.append(allocator, store.effects.node(try store.freshEffects()).tail.variable);
+        try fresh_rows.append(allocator, try store.freshEffects());
+    }
+    try old_rows.append(allocator, store.effects.node(chained).tail.variable);
+    try fresh_rows.append(allocator, try store.effects.row(&.{foreign_operation}, .closed));
+    const all = try store.product(old.items[0..binders]);
+    const shared = try store.product(&.{ all, all });
+    const formal_row = try store.effects.row(&.{}, .{ .formal = formal });
+    const roots = [_]Id{
+        shared,
+        try store.functionWithEffects(old.items[0], shared, latent),
+        try store.functionWithEffects(old.items[binders / 2], old.items[binders - 1], formal_row),
+        u32_type,
+        try store.demandWithEffects(all, try store.freshEffects()),
+    };
+    if (prepared) {
+        var substitution = try store.prepareSubstitution(old.items, fresh.items, old_rows.items, fresh_rows.items);
+        defer substitution.deinit(allocator);
+        for (roots) |root| _ = try store.substitutePrepared(&substitution, root);
+    } else {
+        for (roots) |root| _ = try store.substituteWithRows(root, old.items, fresh.items, old_rows.items, fresh_rows.items);
+    }
+    return store;
+}
+fn preparedSubstitutionLaw(allocator: std.mem.Allocator) !void {
+    for ([_]usize{ 3, 40 }) |binders| {
+        var each = try preparedSubstitutionStore(allocator, binders, false);
+        defer each.deinit();
+        var prepared = try preparedSubstitutionStore(allocator, binders, true);
+        defer prepared.deinit();
+        // The prepared path appends exactly the nodes, lists and rows that
+        // separate calls append, in the same order.
+        try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(each.nodes.items), std.mem.sliceAsBytes(prepared.nodes.items));
+        try std.testing.expectEqualSlices(Id, each.extra.items, prepared.extra.items);
+        try std.testing.expectEqualDeep(each.effects.rows.items, prepared.effects.rows.items);
+        try std.testing.expectEqualSlices(Effects.Label, each.effects.labels.items, prepared.effects.labels.items);
+    }
+}
+test "a prepared substitution builds the same instance as one call per root" {
+    try preparedSubstitutionLaw(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, preparedSubstitutionLaw, .{});
+}
+test "a prepared substitution checks replacement kinds again after a write" {
+    var store = try Store.init(std.testing.allocator);
+    defer store.deinit();
+    var old: [20]Id = undefined;
+    var fresh: [20]Id = undefined;
+    for (&old, &fresh) |*before, *after| {
+        before.* = try store.fresh();
+        after.* = try store.fresh();
+    }
+    var substitution = try store.prepareSubstitution(&old, &fresh, &.{}, &.{});
+    defer substitution.deinit(std.testing.allocator);
+    const root = try store.product(&old);
+    _ = try store.substitutePrepared(&substitution, root);
+    const checked = substitution.checked.?;
+    _ = try store.substitutePrepared(&substitution, root);
+    try std.testing.expectEqual(checked, substitution.checked.?);
+    try store.appendVersion(fresh[0], u32_type);
+    _ = try store.substitutePrepared(&substitution, root);
+    try std.testing.expect(substitution.checked.?.mutation_epoch != checked.mutation_epoch);
+    // A row handle is no data replacement, prepared or not, on every call.
+    var rows = old;
+    rows[3] = try store.freshRowType();
+    try std.testing.expectError(error.TypeMismatch, store.substituteWithRows(root, &old, &rows, &.{}, &.{}));
+    var rejected = try store.prepareSubstitution(&old, &rows, &.{}, &.{});
+    defer rejected.deinit(std.testing.allocator);
+    try std.testing.expectError(error.TypeMismatch, store.substitutePrepared(&rejected, root));
+    try std.testing.expectError(error.TypeMismatch, store.substitutePrepared(&rejected, u32_type));
+}
+
 test "type substitution preserves historical views and independent row replacements" {
     var store = try Store.init(std.testing.allocator);
     defer store.deinit();
