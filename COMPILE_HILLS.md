@@ -761,6 +761,12 @@ Blake3 keys in-process caches with 4-byte updates
 (`reuse/body_check_cache.zig:776` and about 25 other sites).
 
 - **Fix:** use a 128-bit non-cryptographic hash where keys are not persisted.
+- **Result (18 October 2026):** dropped after an audit. Every Blake3 key is
+  either persisted (restart-cache stamps, `.blotdep` digests, compiler identity)
+  or admits a body-cache hit by digest equality without the full key (body read
+  sets, capability contract and unit origin digests). A non-cryptographic hash
+  could turn a collision into a miscompile there. In-process tables that verify
+  their keys already use Wyhash. Blake3 is about 1.5% of cold self time.
 
 ### CT76: fast structural hash and equality
 
