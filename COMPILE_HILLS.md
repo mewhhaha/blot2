@@ -167,6 +167,14 @@ with PR_SET_PTRACER set for yama.
 
 - **Fix:** commit it with its aggregator under `scripts/bench/`, so any hill can
   attach self, inclusive and subsystem tables.
+- **Result (18 October 2026):** CT4, "Commit the gdb stack sampler as deno task
+  profile:compile". `scripts/bench/gdb_sampler.py` runs inside gdb;
+  `scripts/bench/profile_compile.ts` opens the workload behind a generated
+  PR_SET_PTRACER wrapper and samples cold builds, `--edit` scenarios or `--test`
+  entries, then prints self, inclusive, subsystem, owning directory, file, line
+  and memcpy/hash/allocator caller tables (`--aggregate` re-reads samples). One
+  cold game run: 476 samples, `projectType` 5.3% self, check 35% of leaf time,
+  hash maps 12%, memcpy/memset 11%, as in the baseline.
 
 ### CT5: an edit-scenario suite
 
