@@ -106,6 +106,8 @@ const OpenProject = struct {
     cache_file: ?restart_cache.File,
     cache_loaded: bool,
     saved_revision: usize = 0,
+    /// Present for profiled sessions: every session allocation passes it.
+    allocation_counter: ?*phase_profile.CountingAllocator = null,
 
     fn init(a: Allocator, io: Io, request: Request, compiler: [32]u8, checkpoint_bytes: []const u8, cache_root: ?[]const u8) !OpenProject {
         const raw = try validateOpen(request);
@@ -251,9 +253,11 @@ const AssetDependency = struct { path: []const u8, sha256: ?[]const u8 };
 
 fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32, sources: []const inputs.overlays.Source, asset_sources: []const inputs.overlays.Source) !void {
     // Profiled sessions clock this build until its stats are published.
-    var profile: phase_profile.Profile = .init(io);
-    const installation: ?phase_profile.Installation = if (opened.session.profile_backend) phase_profile.install(&profile) else null;
+    var profile: ?phase_profile.Profile = if (opened.session.profile_backend) .init(io) else null;
+    const installation: ?phase_profile.Installation = if (profile) |*owner| phase_profile.install(owner) else null;
     defer if (installation) |installed| installed.restore();
+    if (opened.allocation_counter) |counter| if (profile) |*owner| counter.attach(owner);
+    defer if (opened.allocation_counter) |counter| counter.detach();
     var assets: ?*native_assets.Candidate = null;
     defer if (assets) |candidate| candidate.deinit(a);
     if (opened.assets) |*owner| {
@@ -293,7 +297,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                 .optimization = result.result.compiled.optimization,
                 .runtimeOptimization = result.result.compiled.runtime_optimization,
                 .backendTiming = result.result.compiled.timing,
-                .phaseProfile = if (installation != null) profile.record() else phase_profile.Record{},
+                .phaseProfile = if (profile) |*owner| owner.record() else phase_profile.Record{},
                 .workCounters = result.result.compiled.counters,
                 .demandLowering = result.result.compiled.demand_lowering,
                 .principals = result.result.compiled.principal,
@@ -476,6 +480,9 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
         .capabilities = &[_][]const u8{ "project-build", "utf8_bytes", "abort-disposes-process", "source-overlays", "backend-checkpoints", "native-assets-v1", "editor-completion-v1" },
         .maxFrameBytes = frames.max_frame_bytes,
     }, &.{});
+    // Released after `opened`: a profiled session allocates through it.
+    var allocation_counter: ?*phase_profile.CountingAllocator = null;
+    defer if (allocation_counter) |counter| a.destroy(counter);
     var opened: ?OpenProject = null;
     defer if (opened) |*owner| owner.deinit();
     var last_id: u32 = 0;
@@ -492,9 +499,18 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
             .open => {
                 if (request.sources.len != 0 or request.assetSources.len != 0 or request.checkpoint != (frame.payload().len != 0)) return error.InvalidOpen;
                 if (opened != null) return error.AlreadyOpen;
+                const session_allocator = if (request.profileBackend) counted: {
+                    const counter = try a.create(phase_profile.CountingAllocator);
+                    counter.* = .{ .backing = a };
+                    // AlreadyOpen above proves no previous session or counter.
+                    // zig-analyzer: disable-next-line overwritten-owning-value
+                    allocation_counter = counter;
+                    break :counted counter.allocator();
+                } else a;
                 // AlreadyOpen above proves the optional owns no previous session.
                 // zig-analyzer: disable-next-line overwritten-owning-value
-                opened = try OpenProject.init(a, io, request, compiler, frame.payload(), cache_root);
+                opened = try OpenProject.init(session_allocator, io, request, compiler, frame.payload(), cache_root);
+                opened.?.allocation_counter = allocation_counter;
                 opened.?.session.policy.semantic_workers = policy.semantic_workers;
                 opened.?.session.policy.semantic_components = policy.semantic_components;
                 try reply(a, writer, .{ .kind = "open", .id = request.id, .epoch = epoch, .revision = 0 }, &.{});

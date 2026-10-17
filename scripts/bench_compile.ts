@@ -860,16 +860,42 @@ async function main(): Promise<number> {
 
 interface PhaseProfile {
   total_us?: number;
-  phases?: Record<string, { us: number }>;
+  peak_rss_kib?: number;
+  phases?: Record<
+    string,
+    {
+      us: number;
+      requested_bytes?: number;
+      allocations?: number;
+      rss_growth_kib?: number;
+    }
+  >;
+}
+interface PhaseCell {
+  ms: number;
+  requested_mib: number | null;
+  allocations: number | null;
+  rss_growth_mib: number | null;
 }
 /**
- * Median exclusive phase clocks of each variant's fresh builds (profiled
- * sessions only), and how much of the measured CPU the named phases cover.
+ * Median exclusive phase clocks and allocation counts of each variant's fresh
+ * builds (profiled sessions only), and how much of the measured CPU the named
+ * phases cover.
  */
 function phaseTables(workloads: Workload[], samples: Sample[]) {
-  const tables: Record<string, Record<string, Record<string, number>>> = {};
+  type Table = {
+    phases: Record<string, PhaseCell>;
+    total_ms: number;
+    named_over_cpu: number;
+    peak_rss_mib: number | null;
+  };
+  const tables: Record<string, Record<string, Table>> = {};
+  const optional = (values: (number | undefined)[], scale: number) =>
+    values.every((value) => value !== undefined)
+      ? median(values.map((value) => value! / scale))
+      : null;
   for (const workload of workloads) {
-    const byVariant: Record<string, Record<string, number>> = {};
+    const byVariant: Record<string, Table> = {};
     for (const variant of ["baseline", "candidate"]) {
       const profiled = samples.filter((s) =>
         s.kind === "fresh" && s.workload === workload.name &&
@@ -880,38 +906,88 @@ function phaseTables(workloads: Workload[], samples: Sample[]) {
       const profiles = profiled.map((s) =>
         s.stats.phaseProfile as PhaseProfile
       );
-      const row: Record<string, number> = {};
+      const phases: Record<string, PhaseCell> = {};
       for (const name of Object.keys(profiles[0].phases!)) {
-        row[name] = median(profiles.map((p) => p.phases![name].us / 1000));
+        const cells = profiles.map((p) => p.phases![name]);
+        phases[name] = {
+          ms: median(cells.map((cell) => cell.us / 1000)),
+          requested_mib: optional(
+            cells.map((cell) => cell.requested_bytes),
+            1048576,
+          ),
+          allocations: optional(cells.map((cell) => cell.allocations), 1),
+          rss_growth_mib: optional(
+            cells.map((cell) => cell.rss_growth_kib),
+            1024,
+          ),
+        };
       }
-      row.total = median(profiles.map((p) => p.total_us! / 1000));
-      row.named_over_cpu = median(
-        profiled.map((s) => {
-          const p = s.stats.phaseProfile as PhaseProfile;
-          return (p.total_us! - p.phases!.other.us) / 1000 / s.cpu_ms;
-        }),
-      );
-      byVariant[variant] = row;
+      byVariant[variant] = {
+        phases,
+        total_ms: median(profiles.map((p) => p.total_us! / 1000)),
+        named_over_cpu: median(
+          profiled.map((s) => {
+            const p = s.stats.phaseProfile as PhaseProfile;
+            return (p.total_us! - p.phases!.other.us) / 1000 / s.cpu_ms;
+          }),
+        ),
+        peak_rss_mib: optional(profiles.map((p) => p.peak_rss_kib), 1024),
+      };
     }
     if (!Object.keys(byVariant).length) continue;
     tables[workload.name] = byVariant;
-    const names = Object.keys(byVariant.candidate ?? byVariant.baseline);
-    const rows = [[workload.name, "phase", "baseline ms", "candidate ms"]];
-    for (const name of names) {
-      const format = (value: number | undefined) =>
-        value === undefined
-          ? "-"
-          : name === "named_over_cpu"
-          ? value.toFixed(3)
-          : value.toFixed(1);
+    const shown = byVariant.candidate ?? byVariant.baseline;
+    const label = byVariant.candidate ? "candidate" : "baseline";
+    const fixed = (value: number | null | undefined, digits = 1) =>
+      value === null || value === undefined ? "-" : value.toFixed(digits);
+    const rows = [[
+      workload.name,
+      "phase",
+      "baseline ms",
+      "candidate ms",
+      `${label} req MiB`,
+      `${label} allocs`,
+      `${label} RSS+ MiB`,
+    ]];
+    for (const [name, cell] of Object.entries(shown.phases)) {
       rows.push([
         "",
         name,
-        format(byVariant.baseline?.[name]),
-        format(byVariant.candidate?.[name]),
+        fixed(byVariant.baseline?.phases[name]?.ms),
+        fixed(byVariant.candidate?.phases[name]?.ms),
+        fixed(cell.requested_mib),
+        fixed(cell.allocations, 0),
+        fixed(cell.rss_growth_mib),
       ]);
     }
-    console.log(`\nfresh-build phase clocks (median, exclusive)`);
+    const sum = (field: "requested_mib" | "allocations") =>
+      Object.values(shown.phases).every((cell) => cell[field] !== null)
+        ? Object.values(shown.phases).reduce(
+          (total, cell) => total + cell[field]!,
+          0,
+        )
+        : null;
+    rows.push([
+      "",
+      "total",
+      fixed(byVariant.baseline?.total_ms),
+      fixed(byVariant.candidate?.total_ms),
+      fixed(sum("requested_mib")),
+      fixed(sum("allocations"), 0),
+      fixed(shown.peak_rss_mib),
+    ]);
+    rows.push([
+      "",
+      "named/cpu",
+      fixed(byVariant.baseline?.named_over_cpu, 3),
+      fixed(byVariant.candidate?.named_over_cpu, 3),
+      "",
+      "",
+      "",
+    ]);
+    console.log(
+      "\nfresh-build phase profile (median, exclusive; RSS+ is peak RSS growth)",
+    );
     printTable(rows);
   }
   return tables;

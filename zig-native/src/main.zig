@@ -297,12 +297,15 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
 }
 
 fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, profile_requested: bool, explain_demands: bool, output_path: ?[]const u8, cache_root: ?[]const u8, policy: Policy) !bool {
-    var tracked: memory.TrackedAllocator = .{ .backing = backing };
+    // --profile clocks every phase of this compilation until its record and
+    // counts its allocations per phase below the requested-bytes tracker.
+    var profile: ?phase_profile.Profile = if (profile_requested) .init(io) else null;
+    var counting: phase_profile.CountingAllocator = .{ .backing = backing };
+    if (profile) |*owner| counting.attach(owner);
+    var tracked: memory.TrackedAllocator = .{ .backing = if (profile != null) counting.allocator() else backing };
     const allocator = tracked.allocator();
     const start = now(io);
-    // --profile clocks every phase of this compilation until its record.
-    var profile: phase_profile.Profile = .init(io);
-    const installation: ?phase_profile.Installation = if (profile_requested) phase_profile.install(&profile) else null;
+    const installation: ?phase_profile.Installation = if (profile) |*owner| phase_profile.install(owner) else null;
     defer if (installation) |installed| installed.restore();
     var source_bytes: usize = 0;
     var files: usize = 0;
@@ -532,7 +535,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         .emit_us = emit_us,
         .write_us = write_us,
         .teardown_us = teardown_us,
-        .phase_profile = if (installation != null) profile.record() else phase_profile.Record{},
+        .phase_profile = if (profile) |*owner| owner.record() else phase_profile.Record{},
         .memory = tracked.counts,
         .memory_scope = "Requested bytes for project source, syntax, symbols, typed core and compiler scratch; excludes allocator overhead and process RSS. All owners released before this record.",
     }, .{}, writer);

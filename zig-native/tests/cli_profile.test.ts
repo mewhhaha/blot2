@@ -29,19 +29,39 @@ interface Backend {
 }
 interface Phases {
   total_us?: number;
-  phases?: Record<string, { us: number }>;
+  peak_rss_kib?: number;
+  phases?: Record<
+    string,
+    {
+      us: number;
+      requested_bytes: number;
+      allocations: number;
+      rss_growth_kib: number;
+    }
+  >;
 }
 /** Frontend and backend phases a profiled project build always passes. */
 const phaseNames = ["load", "lex", "parse", "check", "lower", "backend"];
 function assertPhases(record: Phases) {
   assert(Number.isSafeInteger(record.total_us), JSON.stringify(record));
   let sum = 0;
+  let growth = 0;
   for (const [name, phase] of Object.entries(record.phases ?? {})) {
-    assert(Number.isSafeInteger(phase.us) && phase.us >= 0, name);
+    for (const value of Object.values(phase)) {
+      assert(Number.isSafeInteger(value) && value >= 0, name);
+    }
     sum += phase.us;
+    growth += phase.rss_growth_kib;
   }
   for (const name of phaseNames) assert(record.phases?.[name], name);
-  assert(record.phases!.check.us > 0 && record.phases!.backend.us > 0);
+  const { check, backend } = record.phases!;
+  assert(check.us > 0 && backend.us > 0);
+  // Checking and emission allocate; requests are charged where they happen.
+  assert(check.allocations > 0 && check.requested_bytes > 0);
+  assert(backend.allocations > 0 && backend.requested_bytes > 0);
+  assert(Number.isSafeInteger(record.peak_rss_kib));
+  assert(growth <= record.peak_rss_kib!);
+  if (Deno.build.os === "linux") assert(record.peak_rss_kib! > 0);
   // Exclusive phases partition the clocked interval (each rounds down).
   const count = Object.keys(record.phases!).length;
   assert(sum <= record.total_us! && record.total_us! - sum <= count);

@@ -227,8 +227,10 @@ and below 100 ms incremental, without a hard real-time guarantee. The project
 API's `profileBackend: true` and the CLI's `build ... --profile` (also
 `build-project`) add nested phase timings and the eight slowest inference
 regions as `backend_timing.work`, and whole-build exclusive phase clocks (load,
-lex, parse, check, lower, freeze, validation, backend and the rest) as
-`phase_profile` (`phaseProfile`). Detailed clocks are disabled by default so
+lex, parse, check, lower, freeze, validation, backend and the rest) with each
+phase's requested bytes, allocation count and peak-RSS growth as
+`phase_profile` (`phaseProfile`). The counting allocator is inserted only for
+profiled builds. Detailed clocks are disabled by default so
 profiling does not tax ordinary hot paths: an unprofiled record omits `work`
 and publishes an empty phase profile. Deterministic work counters (`work_counters` in CLI stats,
 `workCounters` in the project API) are always on: inference regions, region

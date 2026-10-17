@@ -313,9 +313,12 @@ lowering and reason. Reporting preserves executable bytes. See
 [DEMANDS.md](DEMANDS.md) for the decisions, bounds and retained span behavior.
 
 `phaseProfile` is empty unless the session opened with `profileBackend`. A
-profiled build reports `total_us` and exclusive `phases` (`other`, `assets`,
-`inputs`, `load`, `lex`, `parse`, `check`, `lower`, `freeze`, `validation`,
-`backend`), each `{us}`, which partition the build up to its stats.
+profiled build reports `total_us`, the process's `peak_rss_kib` and exclusive
+`phases` (`other`, `assets`, `inputs`, `load`, `lex`, `parse`, `check`,
+`lower`, `freeze`, `validation`, `backend`), which partition the build up to
+its stats. Each phase is `{us, requested_bytes, allocations, rss_growth_kib}`:
+session allocator requests charged while it was active, and how far it raised
+peak RSS.
 
 The objects are measurements for people, and their insides are not part of the
 contract. The reference client validates the four integers as nonnegative safe
