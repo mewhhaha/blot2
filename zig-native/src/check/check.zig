@@ -75,7 +75,7 @@ fn inferenceBudget(options: ModuleOptions) usize {
     if (@hasDecl(@import("root"), "inferenceBudget")) return @import("root").inferenceBudget();
     return default_inference_budget;
 }
-pub const ModuleOptions = struct { editor: ?EditorMarker = null, purity_origins: ModuleOrigins = .{}, builtin_catalog: bool = false, prelude_unit: u32 = 0, inherited_fixities: []const ImportedFixity = &.{}, max_inference_transitions: ?usize = null, associated_remaining: ?*usize = null, body_source: []const u8 = &.{}, retained_bodies: ?*@import("../reuse/body_check_cache.zig").Cache = null, previous_bodies: ?*const @import("../reuse/body_check_cache.zig").Cache = null, body_external_names: ?@import("../reuse/body_check_cache.zig").ExternalNames = null };
+pub const ModuleOptions = struct { editor: ?EditorMarker = null, purity_origins: ModuleOrigins = .{}, builtin_catalog: bool = false, prelude_unit: u32 = 0, inherited_fixities: []const ImportedFixity = &.{}, max_inference_transitions: ?usize = null, associated_remaining: ?*usize = null, body_source: []const u8 = &.{}, retained_bodies: ?*@import("../reuse/body_check_cache.zig").Cache = null, previous_bodies: ?*const @import("../reuse/body_check_cache.zig").Cache = null, body_external_names: ?@import("../reuse/body_check_cache.zig").ExternalNames = null, producer_capabilities: ?ProducerCapabilities = null };
 /// Private differential control. This changes execution, never semantic module
 /// options or any retained-artifact key. Ordinary public entrypoints leave it off.
 pub const AliasGlobalStats = struct { attempts: usize = 0, admitted: usize = 0, declined: usize = 0, frames: usize = 0, peak_frames: usize = 0 };
@@ -197,6 +197,8 @@ pub const SchemeInterface = struct {
     obligations: []const T.Obligation,
     /// Where the schemes shared by this scheme's `callee_use` obligations live.
     callees: Callees = .none,
+    /// The producer's recipe, when it differs from `callees`/`producer_binding`.
+    capability_source: ?CapabilitySource = null,
 };
 /// The producer tables that resolve a scheme's shared callees by binding.
 pub const Callees = union(enum) {
@@ -243,6 +245,22 @@ pub const ImportedBinding = struct {
 /// Declaration facts admitted only by the owned source-validation API.
 pub const SourceHeader = struct { capability_flow: CapabilityFlow = .unknown, capability_parameters: @import("capability_flow.zig").Parameters = .{}, name: symbols.Symbol = 0, namespace: symbols.Symbol = 0, member: symbols.Symbol = 0, target: ExternalTarget, named_function: bool = false, origin: ast.Id, expose: bool = true };
 pub const SourceDeclaration = struct { capability_flow: CapabilityFlow = .unknown, capability_parameters: @import("capability_flow.zig").Parameters = .{}, private: bool = false, name: symbols.Symbol, declaration: ast.Id, kind: Kind, named_function: bool, external: ?ExternalTarget };
+/// The capability facts an imported binding's own producer published. A
+/// member imported through another module's catalog arrives as that module's
+/// alias, and a frozen interface keeps no capability facts for aliases; taking
+/// them from the producer gives a live and a frozen-interface check the same
+/// imports.
+pub const ProducerCapability = struct {
+    flow: CapabilityFlow = .unknown,
+    parameters: @import("capability_flow.zig").Parameters = .{},
+    /// Where the producer's published recipe lives, when it has one.
+    recipe: ?CapabilitySource = null,
+};
+pub const CapabilitySource = struct { callees: Callees, binding: BindingId };
+pub const ProducerCapabilities = struct {
+    context: *const anyopaque,
+    lookup: *const fn (context: *const anyopaque, target: ExternalTarget) ?ProducerCapability,
+};
 pub fn sourceDeclaration(binding: Binding) SourceDeclaration {
     return .{ .private = binding.private, .name = binding.name, .declaration = binding.declaration, .kind = binding.kind, .capability_flow = binding.capability_flow, .capability_parameters = binding.capability_parameters, .named_function = binding.named_function, .external = binding.external };
 }
@@ -903,6 +921,7 @@ const Engine = struct {
     unit: u32 = 1,
     builtin_catalog: bool = false,
     source_validation: bool = false,
+    producer_capabilities: ?ProducerCapabilities = null,
     source_annotation_failed: bool = false,
     source_header_diagnostics: []Diagnostic = &.{},
     prelude_unit: u32 = 0,
@@ -1475,6 +1494,10 @@ const Engine = struct {
         }
         self.source_annotation_failed = self.diagnostics.items.len != before;
     }
+    fn producerCapability(self: *const Engine, target: ExternalTarget) ?ProducerCapability {
+        const resolver = self.producer_capabilities orelse return null;
+        return resolver.lookup(resolver.context, target);
+    }
     fn importHeader(self: *Engine, imported: SourceHeader) T.Error!void {
         std.debug.assert(self.source_validation);
         const key: Qualified = .{ .namespace = imported.namespace, .member = imported.member };
@@ -1560,7 +1583,8 @@ const Engine = struct {
             errdefer header.deinit(self.allocator);
             try self.proof_contracts.append(self.allocator, .{ .binding = binding, .header = header, .parameters = &.{} });
         }
-        if (interface.callees.capabilityContract(interface.producer_binding, interface.capability_parameters.arity())) |header| contract: {
+        const recipe_source = interface.capability_source orelse CapabilitySource{ .callees = interface.callees, .binding = interface.producer_binding };
+        if (recipe_source.callees.capabilityContract(recipe_source.binding, interface.capability_parameters.arity())) |header| contract: {
             const checkpoint = self.capability_store.mark();
             var committed = false;
             defer if (!committed) self.capability_store.rollback(checkpoint);
@@ -2313,7 +2337,22 @@ const Engine = struct {
                 const definition = if (@TypeOf(imported) == SourceCatalog) imported.declarations[method.binding] else imported.declaration(method.binding);
                 if (definition.private) continue;
                 const target = definition.external orelse ExternalTarget{ .unit = producer.unit, .binding = method.binding };
-                if (@TypeOf(imported) == SourceCatalog) try self.importHeader(.{ .target = target, .capability_flow = definition.capability_flow, .capability_parameters = definition.capability_parameters, .named_function = definition.named_function, .origin = imported.origin, .expose = false }) else if (self.source_validation) try self.importHeader(.{ .target = target, .capability_flow = definition.capability_flow, .capability_parameters = definition.capability_parameters, .named_function = definition.named_function, .origin = imported.origin, .expose = false }) else try self.importBinding(.{ .target = target, .interface = imported.interface(method.binding), .origin = imported.origin, .expose = false });
+                // A member the catalog's module itself imported keeps its
+                // producer's capability facts, never the alias's copy.
+                const owned: ?ProducerCapability = if (definition.external != null) self.producerCapability(target) else null;
+                if (@TypeOf(imported) == SourceCatalog or self.source_validation) {
+                    const flow = if (owned) |facts| facts.flow else definition.capability_flow;
+                    const parameters = if (owned) |facts| facts.parameters else definition.capability_parameters;
+                    try self.importHeader(.{ .target = target, .capability_flow = flow, .capability_parameters = parameters, .named_function = definition.named_function, .origin = imported.origin, .expose = false });
+                } else {
+                    var interface = imported.interface(method.binding);
+                    if (owned) |facts| {
+                        interface.capability_flow = facts.flow;
+                        interface.capability_parameters = facts.parameters;
+                        interface.capability_source = facts.recipe orelse CapabilitySource{ .callees = .none, .binding = 0 };
+                    }
+                    try self.importBinding(.{ .target = target, .interface = interface, .origin = imported.origin, .expose = false });
+                }
                 const binding = self.catalogs.external_targets.get(target).?;
                 var present = false;
                 for (self.associated.items) |prior| if (prior.identity.unit == method.identity.unit and prior.identity.decl == method.identity.decl and prior.member == method.member and prior.binding == binding) {
@@ -15010,6 +15049,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
         .purity_origins = options.purity_origins,
         .source_validation = source_validation,
         .prelude_unit = options.prelude_unit,
+        .producer_capabilities = options.producer_capabilities,
     };
     engine.proof_body.values.account = &engine.proof_visits;
     defer engine.scratch_pool.deinit();

@@ -305,6 +305,22 @@ A body or literal edit in `ink/math` (71 importers) reuses nothing.
   `Quat.conjugate` carry recipes only at population. That difference in
   `check.zig` also makes retained interfaces differ from cold ones; it belongs
   to the checker hills.
+- **Result, capability facts (18 October 2026):** CT11, "Take a catalog
+  member's capability facts from its producer". The recipes did not come from
+  scoped types: `ink/math` imports the prelude's F32 members through
+  `std/vector`'s catalog, as aliases. A live alias carries its producer's flow
+  and recipe, but a frozen interface strips both from aliases, so a check
+  against frozen dependencies could not derive recipes for `Color.lerp` and
+  `Quat.conjugate`, and retained and cold builds published different
+  interfaces. A catalog member now takes its capability facts from its
+  producer, live or frozen; a law checks that the re-exporting consumer
+  publishes identical flows and recipes at population, after an edit and in a
+  cold build. The first `ink/math` edit still re-checks the 76 importers
+  (2,459 → 2,470 ms): its interface also differs in type-graph sharing, since
+  replayed body facts give `Mat4.view`'s inferred result its own `Mat4` node
+  where fresh elaboration shares the constructor's. Hash-consing projected
+  interface graphs, or comparing them modulo sharing, would remove that.
+  Wasm identical.
 
 ### CT12: instance-level dependencies
 

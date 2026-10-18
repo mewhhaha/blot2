@@ -327,6 +327,30 @@ const Engine = struct {
             .source => return null,
         }
     }
+    /// A catalog member imported through another module keeps its producer's
+    /// capability facts (check.ProducerCapability), whether that producer was
+    /// checked here or comes from its frozen interface.
+    fn producerCapability(context: *const anyopaque, target: check.ExternalTarget) ?check.ProducerCapability {
+        const self: *const Engine = @ptrCast(@alignCast(context));
+        const module = self.catalogModule(target.unit) orelse return null;
+        switch (module.owner) {
+            .typed => |owner| {
+                if (target.binding >= owner.bindings.len or owner.bindings[target.binding].external != null) return null;
+                const binding = owner.bindings[target.binding];
+                return .{ .flow = binding.capability_flow, .parameters = binding.capability_parameters, .recipe = .{ .callees = .{ .live = owner }, .binding = target.binding } };
+            },
+            .frozen => |owner| {
+                if (target.binding >= owner.bindings.len or owner.bindings[target.binding].external != null) return null;
+                const binding = owner.bindings[target.binding];
+                return .{ .flow = binding.capability_flow, .parameters = binding.capability_parameters, .recipe = .{ .callees = .{ .frozen = owner }, .binding = target.binding } };
+            },
+            .source => |owner| {
+                if (target.binding >= owner.declarations.len or owner.declarations[target.binding].external != null) return null;
+                const declaration = owner.declarations[target.binding];
+                return .{ .flow = declaration.capability_flow, .parameters = declaration.capability_parameters };
+            },
+        }
+    }
     fn originalBindingCapabilities(context: *const anyopaque, target: check.ExternalTarget) ?@import("body_check_cache.zig").Digest {
         const self: *const Engine = @ptrCast(@alignCast(context));
         const module = self.catalogModule(target.unit) orelse return null;
@@ -580,6 +604,7 @@ const Engine = struct {
         if (self.retain_bodies and self.editor == null) options.retained_bodies = &self.result.body_caches[unit - 1];
         options.body_source = self.source.unit(unit).source;
         options.body_external_names = .{ .context = self, .lookup = originalBindingName, .unit_origin = originalUnitOrigin, .closed_rows = originalBindingClosedRows, .qualification = originalQualification, .capabilities = originalBindingCapabilities };
+        options.producer_capabilities = .{ .context = self, .lookup = producerCapability };
         if (self.previous_bodies.get(self.source.filename(unit))) |cached| options.previous_bodies = cached;
         if (self.editor) |query| {
             options.max_inference_transitions = query.budget.remaining;
