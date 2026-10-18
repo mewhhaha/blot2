@@ -158,6 +158,14 @@ test "returned stored captured and later-read arguments keep the copy" {
         \\const keep = fn values => pass values
         \\const left = fn a => fn b => @u32.add a[0] b[0]
         \\const deep = fn count => fn values => if @u32.eq count 0 then @array.length values else deep (@u32.sub count 1) values
+        \\const merged = fn (flag: Bool) => fn (values: Array U32) => do:
+        \\  if flag:
+        \\    values := #[7]
+        \\  return values
+        \\const carried = fn (count: U32) => fn (values: Array U32) => do:
+        \\  for index in 0..count:
+        \\    values := #[index]
+        \\  return values
         \\
     ;
     const cases = [_][]const u8{
@@ -171,6 +179,8 @@ test "returned stored captured and later-read arguments keep the copy" {
         "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  return left values (@array.set values 0 9)\n",
         "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  return values[@u32.sub (@array.set values 0 5)[1] 1]\n",
         "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let size = deep 3 values\n  values[0] := size\n  return values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = merged (@u32.eq count 0) values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = carried 0 values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
     };
     const a = std.testing.allocator;
     for (cases) |case| {

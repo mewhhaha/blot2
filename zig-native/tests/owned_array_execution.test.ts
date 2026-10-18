@@ -208,6 +208,23 @@ const pair = fn values => (values, 1)
 const first = fn values => values[0]
 const reader = fn values => fn index => values[index]
 const left = fn a => fn b => a[0] + b[0]
+const merged = fn (flag: Bool) => fn (values: Array U32) => do:
+  if flag:
+    values := #[7]
+  return values
+const carried = fn (count: U32) => fn (values: Array U32) => do:
+  for index in 0..count:
+    values := #[index]
+  return values
+entry const reassigned = fn (n: U32) => do:
+  let values = @array.fill n 1
+  let sum = 0
+  for i in 0..n:
+    let before = merged (i == n) values
+    let after = carried 0 values
+    values[i] := 9
+    sum := sum + before[i] + after[i]
+  return sum
 entry const returned = fn (n: U32) => do:
   let values = @array.fill n 1
   let sum = 0
@@ -275,6 +292,7 @@ entry const indexed = fn (n: U32) => do:
           }
         }
         equal(run("kept", n).result, 2 * n);
+        equal(run("reassigned", n).result, 2 * n);
         equal(run("nested", n).result, 9 * (n - 1));
         equal(run("ordered", n).result, 10);
         equal(run("indexed", n).result, 1);

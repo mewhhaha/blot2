@@ -353,19 +353,13 @@ const Borrows = struct {
         const body = &callee.body;
         const binding = source.bodyParameters(body)[index].binding;
         var walk: Walk = .{ .borrows = self, .unit = target.unit, .binding = binding, .depth = depth };
-        const use: Use = if (binding == 0 or implicitAlias(source, binding) or !try walk.visit(body.root)) .escapes else if (walk.parts) .parts else .scalars;
+        const use: Use = if (binding == 0 or !try walk.visit(body.root)) .escapes else if (walk.parts) .parts else .scalars;
         self.cache.getPtr(key).?.* = use;
         return use;
     }
 };
 fn borrowed(use: Use) bool {
     return use == .scalars or use == .parts;
-}
-// Merges and carries are implicit uses, including edges outside the body.
-fn implicitAlias(module: *const core.Module, binding: core.BindingId) bool {
-    for (module.merges) |merge| if (merge.then_binding == binding or merge.else_binding == binding) return true;
-    for (module.loop_carries) |carry| if (carry.incoming == binding or carry.iteration == binding or carry.backedge == binding or carry.outgoing == binding) return true;
-    return false;
 }
 const Walk = struct {
     borrows: *Borrows,
@@ -403,7 +397,9 @@ const Walk = struct {
         self.budget -= 1;
         const m = self.module();
         const n = m.node(id);
-        // A merge or carry can make a later binding the same value.
+        // A merge or carry can make a later binding the same value. Core
+        // attaches merges to statement `if`/`match` nodes and carries to
+        // loops, so the walk meets each one that can name the binding.
         if (id < m.merge_ranges.len) for (m.branchMerges(id)) |merge| {
             if (merge.then_binding == self.binding or merge.else_binding == self.binding) return false;
         };
