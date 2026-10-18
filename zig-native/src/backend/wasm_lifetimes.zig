@@ -748,12 +748,34 @@ const Analysis = struct {
     }
 };
 
+/// One temporaries scan of a body, shared by the lifetime and reference-count
+/// passes while no pass between them replaces the body. Both read the same
+/// body, summaries and mode, so the second scan would repeat the first.
+pub const SharedScan = struct {
+    state: ?Analysis = null,
+    pub fn deinit(self: *SharedScan) void {
+        if (self.state) |*state| state.deinit();
+        self.* = .{};
+    }
+    /// The body changed; the next pass scans it again.
+    pub fn invalidate(self: *SharedScan) void {
+        self.deinit();
+    }
+    fn analysis(self: *SharedScan, a: A, module: *const w.Module, function: *const w.Function, summaries: *Summaries) A.Error!*Analysis {
+        if (self.state) |*state| return state;
+        self.state = try Analysis.init(a, summaries, function, .temporaries);
+        errdefer self.deinit();
+        try self.state.?.scan(module, function);
+        return &self.state.?;
+    }
+};
+
 pub fn analyze(a: A, module: *const w.Module, function: *const w.Function) !Plan {
     var summaries = try Summaries.init(a, module);
     defer summaries.deinit();
-    return analyzeWithSummaries(a, module, function, &summaries);
+    return analyzeWithSummaries(a, module, function, &summaries, null);
 }
-fn analyzeWithSummaries(a: A, module: *const w.Module, function: *const w.Function, summaries: *Summaries) !Plan {
+fn analyzeWithSummaries(a: A, module: *const w.Module, function: *const w.Function, summaries: *Summaries, shared: ?*SharedScan) !Plan {
     var plan: Plan = .{};
     errdefer plan.deinit(a);
     if (module.arena == null) return plan;
@@ -768,9 +790,9 @@ fn analyzeWithSummaries(a: A, module: *const w.Module, function: *const w.Functi
     var storage: [proof_scratch_bytes]u8 align(@alignOf(usize)) = undefined;
     var scratch: std.heap.BufferFirstAllocator = .init(&storage, a);
     const temporary = scratch.allocator();
-    var state = try Analysis.init(temporary, summaries, function, .temporaries);
-    defer state.deinit();
-    try state.scan(module, function);
+    var own: SharedScan = .{};
+    defer own.deinit();
+    const state = try (shared orelse &own).analysis(a, module, function, summaries);
     if (!state.valid or state.allocations.items.len == 0) return plan;
     const groups = try temporary.alloc(Group, state.allocations.items.len);
     defer temporary.free(groups);
@@ -859,10 +881,10 @@ fn analyzeWithSummaries(a: A, module: *const w.Module, function: *const w.Functi
 pub fn run(a: A, module: *const w.Module, function: *const w.Function) !?Output {
     var summaries = try Summaries.init(a, module);
     defer summaries.deinit();
-    return runWithSummaries(a, module, function, &summaries);
+    return runWithSummaries(a, module, function, &summaries, null);
 }
-pub fn runWithSummaries(a: A, module: *const w.Module, function: *const w.Function, summaries: *Summaries) !?Output {
-    var plan = try analyzeWithSummaries(a, module, function, summaries);
+pub fn runWithSummaries(a: A, module: *const w.Module, function: *const w.Function, summaries: *Summaries, shared: ?*SharedScan) !?Output {
+    var plan = try analyzeWithSummaries(a, module, function, summaries, shared);
     defer plan.deinit(a);
     if (plan.releases.items.len == 0) return null;
     var out: Output = .{};
@@ -1242,7 +1264,7 @@ fn returnedGraph(a: A) !void {
         defer summaries.deinit();
         const summary = try summaries.get(factory);
         if (scenario == 0) try std.testing.expectEqual(@as(?u32, 8), summary.owned_result_bytes) else try std.testing.expectEqual(@as(?u32, null), summary.owned_result_bytes);
-        var plan = try analyzeWithSummaries(a, &module, &module.functions.items[consumer], &summaries);
+        var plan = try analyzeWithSummaries(a, &module, &module.functions.items[consumer], &summaries, null);
         defer plan.deinit(a);
         // Scalar pointer-looking words still allow one-allocation ownership.
         // Owning child fields must not retire while their loaded borrow runs.
@@ -1414,7 +1436,7 @@ pub const RcPlan = struct {
         self.writes.deinit(a);
     }
 };
-pub fn rcPlan(a: A, module: *const w.Module, function: *const w.Function, summaries: *Summaries) A.Error!RcPlan {
+pub fn rcPlan(a: A, module: *const w.Module, function: *const w.Function, summaries: *Summaries, shared: ?*SharedScan) A.Error!RcPlan {
     var plan: RcPlan = .{};
     errdefer plan.deinit(a);
     if (module.arena == null) return plan;
@@ -1433,12 +1455,9 @@ pub fn rcPlan(a: A, module: *const w.Module, function: *const w.Function, summar
         else => {},
     };
     if (!publishes) return plan;
-    var storage: [proof_scratch_bytes]u8 align(@alignOf(usize)) = undefined;
-    var scratch: std.heap.BufferFirstAllocator = .init(&storage, a);
-    const temporary = scratch.allocator();
-    var state = try Analysis.init(temporary, summaries, function, .temporaries);
-    defer state.deinit();
-    try state.scan(module, function);
+    var own: SharedScan = .{};
+    defer own.deinit();
+    const state = try (shared orelse &own).analysis(a, module, function, summaries);
     plan.admitted = state.valid and state.rc_valid;
     for (state.allocations.items) |*owner| {
         const inst = function.instructions.items[owner.definition];
@@ -1491,8 +1510,8 @@ pub fn rcPlan(a: A, module: *const w.Module, function: *const w.Function, summar
     }
     return plan;
 }
-pub fn runRc(a: A, module: *const w.Module, function: *const w.Function, summaries: *Summaries) A.Error!?Output {
-    var plan = try rcPlan(a, module, function, summaries);
+pub fn runRc(a: A, module: *const w.Module, function: *const w.Function, summaries: *Summaries, shared: ?*SharedScan) A.Error!?Output {
+    var plan = try rcPlan(a, module, function, summaries, shared);
     defer plan.deinit(a);
     if (!plan.admitted or (plan.allocations.items.len == 0 and plan.writes.items.len == 0)) return null;
     var out: Output = .{};
@@ -1569,13 +1588,13 @@ test "checked scalar fields keep pointer-looking words outside reference publica
     });
     var summaries = try Summaries.init(a, &module);
     defer summaries.deinit();
-    var plan = try rcPlan(a, &module, &module.functions.items[function], &summaries);
+    var plan = try rcPlan(a, &module, &module.functions.items[function], &summaries, null);
     defer plan.deinit(a);
     try std.testing.expect(plan.admitted);
     try std.testing.expectEqual(@as(u32, 2), plan.allocations.items[0].mask);
     try std.testing.expectEqual(@as(usize, 1), plan.writes.items.len);
     try std.testing.expectEqual(@as(u32, 4), module.functions.items[function].instructions.items[plan.writes.items[0].at].operand);
-    var rewritten = (try runRc(a, &module, &module.functions.items[function], &summaries)).?;
+    var rewritten = (try runRc(a, &module, &module.functions.items[function], &summaries, null)).?;
     defer rewritten.deinit(a);
     var stores: usize = 0;
     var publications: usize = 0;
@@ -1615,13 +1634,13 @@ fn scalarSelfIdentity(a: A) !void {
         defer summaries.deinit();
         try summaries.prepare();
         const conflict = summaries.role_conflicts;
-        var plan = try analyzeWithSummaries(a, &module, &module.functions.items[f], &summaries);
+        var plan = try analyzeWithSummaries(a, &module, &module.functions.items[f], &summaries, null);
         defer plan.deinit(a);
         if (scenario == 0) {
             try std.testing.expectEqual(@as(usize, 0), conflict);
             try std.testing.expectEqual(@as(usize, 1), plan.releases.items.len);
             try std.testing.expect(plan.releases.items[0].after >= call_at);
-            var counted = try rcPlan(a, &module, &module.functions.items[f], &summaries);
+            var counted = try rcPlan(a, &module, &module.functions.items[f], &summaries, null);
             defer counted.deinit(a);
             try std.testing.expect(counted.admitted);
             try std.testing.expectEqual(@as(u32, 0), counted.allocations.items[0].mask);
@@ -1651,13 +1670,13 @@ fn dynamicTypedMask(a: A) !void {
         try module.emitSlice(f, &.{ .{ .op = .call, .operand = if (typed) arena.allocate_typed else arena.allocate }, .{ .op = .local_set, .operand = owner }, .{ .op = .local_get, .operand = owner }, .{ .op = .local_get, .operand = 1 }, .{ .op = .i32_store, .operand = 4 } });
         var summaries = try Summaries.init(a, &module);
         defer summaries.deinit();
-        var plan = try rcPlan(a, &module, &module.functions.items[f], &summaries);
+        var plan = try rcPlan(a, &module, &module.functions.items[f], &summaries, null);
         defer plan.deinit(a);
         try std.testing.expectEqual(typed, plan.admitted);
         if (typed) {
             try std.testing.expectEqual(@as(usize, 0), plan.allocations.items.len);
             try std.testing.expectEqual(@as(usize, 1), plan.writes.items.len);
-            var output = (try runRc(a, &module, &module.functions.items[f], &summaries)).?;
+            var output = (try runRc(a, &module, &module.functions.items[f], &summaries, null)).?;
             defer output.deinit(a);
             const last = output.instructions.items[output.instructions.items.len - 1];
             try std.testing.expectEqual(ir.Op.call, last.op);
@@ -1698,13 +1717,13 @@ fn checkedScalarStores(a: A) !void {
         try module.emit(f, .{ .op = op, .operand = offset });
         var summaries = try Summaries.init(a, &module);
         defer summaries.deinit();
-        var plan = try rcPlan(a, &module, &module.functions.items[f], &summaries);
+        var plan = try rcPlan(a, &module, &module.functions.items[f], &summaries, null);
         defer plan.deinit(a);
         const admitted = scenario == 0 or scenario == 7 or scenario == 9;
         try std.testing.expectEqual(admitted, plan.admitted);
         if (admitted) {
             try std.testing.expectEqual(@as(usize, 0), plan.writes.items.len);
-            var lifetime = try analyzeWithSummaries(a, &module, &module.functions.items[f], &summaries);
+            var lifetime = try analyzeWithSummaries(a, &module, &module.functions.items[f], &summaries, null);
             defer lifetime.deinit(a);
             try std.testing.expectEqual(@as(usize, 0), lifetime.releases.items.len);
         }
@@ -1713,4 +1732,50 @@ fn checkedScalarStores(a: A) !void {
 test "checked scalar stores qualify publication without owner lifetime authority and reject malformed fresh-reference and mixed vector facts through OOM" {
     try checkedScalarStores(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, checkedScalarStores, .{});
+}
+
+fn sharedScanScenario(a: A) !void {
+    var module = w.Module.init(a);
+    defer module.deinit();
+    const arena = try module.ensureArena();
+    var functions: [2]u32 = undefined;
+    for (&functions, 0..) |*f, scenario| {
+        f.* = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+        try module.setParameterRoles(f.*, ir.packParameterRoles(&.{.scalar}));
+        const descriptor = try module.addLocal(f.*, .i32);
+        var buffer: [ir.max_annotations]ir.Instruction = undefined;
+        try module.emitSlice(f.*, ir.annotations(&.{ .scalar, .scalar, .scalar }, .unknown, &buffer));
+        try module.emitSlice(f.*, &.{ .{ .op = .i32_const, .operand = 12 }, .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = descriptor }, .{ .op = .local_get, .operand = descriptor }, .{ .op = .local_get }, .{ .op = .i32_store, .operand = 4 } });
+        // The second body publishes a word it read back before returning it.
+        if (scenario == 1) try module.emitSlice(f.*, &.{ .{ .op = .local_get, .operand = descriptor }, .{ .op = .local_get, .operand = descriptor }, .{ .op = .i32_load, .operand = 4 }, .{ .op = .i32_store, .operand = 8 } });
+        try module.emitSlice(f.*, &.{ .{ .op = .local_get, .operand = descriptor }, .{ .op = .i32_load, .operand = 4 } });
+    }
+    var summaries = try Summaries.init(a, &module);
+    defer summaries.deinit();
+    try summaries.prepare();
+    for (functions) |f| {
+        const body = &module.functions.items[f];
+        var lifetime = try analyzeWithSummaries(a, &module, body, &summaries, null);
+        defer lifetime.deinit(a);
+        var counted = try rcPlan(a, &module, body, &summaries, null);
+        defer counted.deinit(a);
+        var shared: SharedScan = .{};
+        defer shared.deinit();
+        var shared_lifetime = try analyzeWithSummaries(a, &module, body, &summaries, &shared);
+        defer shared_lifetime.deinit(a);
+        try std.testing.expect(shared.state != null);
+        var shared_counted = try rcPlan(a, &module, body, &summaries, &shared);
+        defer shared_counted.deinit(a);
+        try std.testing.expectEqualSlices(Release, lifetime.releases.items, shared_lifetime.releases.items);
+        try std.testing.expectEqual(counted.admitted, shared_counted.admitted);
+        try std.testing.expectEqualDeep(counted.allocations.items, shared_counted.allocations.items);
+        try std.testing.expectEqualDeep(counted.writes.items, shared_counted.writes.items);
+        // An invalidated scan is taken again for the next body.
+        shared.invalidate();
+        try std.testing.expect(shared.state == null);
+    }
+}
+test "one shared scan answers the lifetime and reference-count plans of separate scans through allocation failure" {
+    try sharedScanScenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, sharedScanScenario, .{});
 }

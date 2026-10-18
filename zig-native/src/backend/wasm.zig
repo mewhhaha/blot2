@@ -1074,7 +1074,7 @@ pub const Module = struct {
                     view.locals = body.locals;
                     view.instructions = body.instructions;
                 }
-                var proof = try @import("wasm_lifetimes.zig").rcPlan(self.allocator, self, &view, &passes.summaries);
+                var proof = try @import("wasm_lifetimes.zig").rcPlan(self.allocator, self, &view, &passes.summaries, null);
                 defer proof.deinit(self.allocator);
 
                 if (!proof.admitted or proof.allocations.items.len != 0) {

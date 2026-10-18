@@ -145,6 +145,10 @@ pub const Session = struct {
             view.instructions = replacement.instructions;
             provider_borrow = true;
         };
+        // The lifetime and rc passes share one scan while the body between
+        // them stays the same.
+        var scan: lifetimes.SharedScan = .{};
+        defer scan.deinit();
         inline for (.{ "inline", "scalar", "vector", "row_products", "lifetime", "reduce", "rc" }) |pass| {
             const next: ?ir.Body = if (self.tier == .development and !std.mem.eql(u8, pass, "lifetime") and !std.mem.eql(u8, pass, "rc"))
                 null
@@ -157,12 +161,13 @@ pub const Session = struct {
             else if (comptime std.mem.eql(u8, pass, "row_products"))
                 try @import("wasm_row_products.zig").run(self.allocator, &view)
             else if (comptime std.mem.eql(u8, pass, "rc"))
-                if (self.runtimeHelper(source)) null else try lifetimes.runRc(self.allocator, self.module, &view, &self.summaries)
+                if (self.runtimeHelper(source)) null else try lifetimes.runRc(self.allocator, self.module, &view, &self.summaries, &scan)
             else if (comptime std.mem.eql(u8, pass, "reduce"))
                 try @import("wasm_row_reduce.zig").run(self.allocator, &view)
             else
-                try lifetimes.runWithSummaries(self.allocator, self.module, &view, &self.summaries);
+                try lifetimes.runWithSummaries(self.allocator, self.module, &view, &self.summaries, &scan);
             if (next) |replacement| {
+                scan.invalidate();
                 if (owned) |*body| body.deinit(self.allocator);
                 owned = replacement;
                 view.locals = replacement.locals;

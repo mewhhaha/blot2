@@ -27,10 +27,10 @@ fn scenario(allocator: std.mem.Allocator, erased: bool) !void {
     var summaries = try lifetimes.Summaries.init(allocator, &module);
     defer summaries.deinit();
     try summaries.prepare();
-    var proof = try lifetimes.rcPlan(allocator, &module, &module.functions.items[function], &summaries);
+    var proof = try lifetimes.rcPlan(allocator, &module, &module.functions.items[function], &summaries, null);
     defer proof.deinit(allocator);
     try std.testing.expectEqual(!erased, proof.admitted);
-    var output = try lifetimes.runRc(allocator, &module, &module.functions.items[function], &summaries);
+    var output = try lifetimes.runRc(allocator, &module, &module.functions.items[function], &summaries, null);
     defer if (output) |*body| body.deinit(allocator);
     try std.testing.expectEqual(!erased, output != null);
     if (output) |body| {
@@ -87,11 +87,11 @@ test "shared RC admits only a full zero fill before fresh payload access" {
         var summaries = try lifetimes.Summaries.init(a, &module);
         defer summaries.deinit();
         try summaries.prepare();
-        var plan = try lifetimes.rcPlan(a, &module, &module.functions.items[function], &summaries);
+        var plan = try lifetimes.rcPlan(a, &module, &module.functions.items[function], &summaries, null);
         defer plan.deinit(a);
         try std.testing.expectEqual(variant == 0, plan.admitted);
         if (variant == 0) {
-            var output = (try lifetimes.runRc(a, &module, &module.functions.items[function], &summaries)).?;
+            var output = (try lifetimes.runRc(a, &module, &module.functions.items[function], &summaries, null)).?;
             defer output.deinit(a);
             var typed = false;
             var zero = false;
@@ -132,10 +132,10 @@ fn shapedScenario(allocator: std.mem.Allocator) !void {
     var summaries = try lifetimes.Summaries.init(allocator, &module);
     defer summaries.deinit();
     try summaries.prepare();
-    var plan = try lifetimes.rcPlan(allocator, &module, &module.functions.items[function], &summaries);
+    var plan = try lifetimes.rcPlan(allocator, &module, &module.functions.items[function], &summaries, null);
     defer plan.deinit(allocator);
     try std.testing.expect(plan.admitted);
-    var output = (try lifetimes.runRc(allocator, &module, &module.functions.items[function], &summaries)).?;
+    var output = (try lifetimes.runRc(allocator, &module, &module.functions.items[function], &summaries, null)).?;
     defer output.deinit(allocator);
     var checked: usize = 0;
     for (output.instructions.items) |inst| if (inst.op == .call and inst.operand == arena.store_word) {
