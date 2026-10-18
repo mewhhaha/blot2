@@ -1081,6 +1081,12 @@ in big modules.
 (`backend/backend_plan.zig:232-262`).
 
 - **Fix:** extend reach incrementally.
+- **Result (18 October 2026):** dropped. The loop runs only for runtime cells
+  (top-level `let`), and none of gdev's sources, its tests or `std` declare
+  one, so `planRuntime` returns after its body scan on every gdev entry: 0 of
+  959 cold game samples and 2 of 7,689 on a literal edit. Incremental reach
+  would also have to reproduce the first `const_only` origin and follow
+  suspensions cached between iterations, for nothing gdev can measure.
 
 ### CT67: an arena per emitter
 
