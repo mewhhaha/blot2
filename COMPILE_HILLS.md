@@ -767,7 +767,10 @@ in big modules.
   `pick_along` pass with both compilers. Instructions: game 28.364 → 28.314 G,
   devtools 9.233 → 9.215 G, literal edit 14.617 → 14.589 G. CPU (5 pairs, load
   1.3): game 2,970 → 2,976 ms, devtools 1,039 → 1,043 ms, literal edit 1,436 →
-  1,427 ms.
+  1,427 ms. Building the index in groups on first use (references and flags,
+  statement parents, flow facts) keeps `compile_budget`'s chain_generic at
+  main's requested bytes (8,533,910 → 8,492,366 B) for +0.004% game
+  instructions.
 
 ### CT65: memoize layouts across emitters
 
