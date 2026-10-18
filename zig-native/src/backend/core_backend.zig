@@ -2379,9 +2379,13 @@ const CompileRun = struct {
     query_state: ?completed_specialization_query.State = null,
     constant_state: ?@import("../reuse/constant_receipt_reuse.zig").State = null,
     candidate: ?@import("region_candidate.zig").Extension = null,
+    /// Four-lane worker view over the assembled module; it borrows bodies
+    /// from `candidate` or the generator's module.
+    vectors: ?@import("simd_abi.zig").View = null,
     optimized: ?@import("optimized_bodies.zig").Capture = null,
     fn deinit(self: *CompileRun) void {
         if (self.optimized) |*owner| owner.deinit();
+        if (self.vectors) |*owner| owner.deinit();
         if (self.candidate) |*owner| owner.deinit();
         if (self.constant_state) |*state| state.deinit();
         if (self.query_state) |*state| state.deinit();
@@ -2562,6 +2566,10 @@ const CompileRun = struct {
         }
         var assembled_module: *const wasm.Module = &self.generator.module;
         if (self.candidate) |*owned| assembled_module = &owned.view.module;
+        // Scalar replacement removes the boxes the worker view introduces;
+        // the development tier keeps the boxed ABI.
+        if (self.options.policy.codegen_tier == .optimized) self.vectors = try @import("simd_abi.zig").prepare(self.allocator, assembled_module);
+        if (self.vectors) |*owned| assembled_module = &owned.module;
         self.optimized = if (self.options.retain_artifacts) .{ .allocator = self.allocator } else null;
         var runtime_optimization: @import("optimized_bodies.zig").Stats = .{};
         const retained_optimized = if (self.options.previous) |previous| if (previous.optimized) |*owned| owned else null else null;
@@ -2746,6 +2754,9 @@ const CompileRun = struct {
         defer if (replay_candidate) |*owned| owned.deinit();
         var replay_module: *const wasm.Module = &replayed;
         if (replay_candidate) |*owned| replay_module = &owned.view.module;
+        var replay_vectors = if (self.options.policy.codegen_tier == .optimized) try @import("simd_abi.zig").prepare(self.allocator, replay_module) else null;
+        defer if (replay_vectors) |*owned| owned.deinit();
+        if (replay_vectors) |*owned| replay_module = &owned.module;
         const actual_bytes = replay_module.assembleCheckedWithOptions(.{ .tier = self.options.policy.codegen_tier, .share_machine_code = self.options.policy.share_machine_code }) catch |err| switch (err) {
             error.IncompleteOwnership => return error.InvalidFunctionReference,
             error.OutOfMemory => return error.OutOfMemory,

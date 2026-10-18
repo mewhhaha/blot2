@@ -1105,6 +1105,24 @@ the box runs outside every loop or in a loop activation that allocates the
 group. Any other escape keeps the group's storage. Ordinary lifetime and root
 passes then own every remaining allocation.
 
+A private function whose parameter or result holds a proved four-lane product
+gets a v128 worker in a detached assembly view, and every direct call in that
+view enters the worker. The proof is a checked type fact, not a name: locals,
+block results, direct arguments and parameters, and returns and direct results
+connected by copies share one type, and a class read or written whole by a v128
+access at offset zero is a four-lane product. An arithmetic address, plain
+constant, host or helper result, erased or provider parameter, access outside
+sixteen bytes, or allocation other than a sixteen-byte scalar-only box makes
+the class ineligible. The worker stores each v128 parameter in a fresh
+scalar-only box on entry and loads its returned box at every exit; callers load
+argument lanes and box a v128 result the same way, and scalar replacement then
+removes the boxes that do not escape. Entries, start, adapters, region or
+cohort owners, callees the inline pass expands and bodies branching to their
+own label keep their ABI. The original keeps its boxed body for tables, exports
+and helper callers, and otherwise becomes a trapping body. The view is rebuilt
+for every optimized assembly and artifact replay; the development tier
+assembles without it.
+
 An exact table target in a selected private closure may expose a bounded checked
 scalar consumer with internal blocks. Copied locals start at typed zero on every
 call, and branches remain inside that body. Calls, loops, writes, unknown roles,

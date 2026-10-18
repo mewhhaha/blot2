@@ -752,8 +752,11 @@ construction, destructuring, operations, loop carries and copies of parameters,
 call results and fields need no heap object. A value boxes once where it leaves
 the function (a non-inlined call, a stored record or closure field, a return)
 when that point runs no more often than the value was produced; otherwise it
-keeps ordinary refcounted storage. Values still cross non-inlined calls,
-including closure adapters such as partial applications in a pipeline, as boxes.
+keeps ordinary refcounted storage. A private function whose parameter or
+result such operations prove to be four lanes takes and returns it as a v128
+value at direct calls, so a non-inlined helper, recursion or a pipeline into a
+named function allocates nothing. Closure calls, including partial applications
+and pipelines into them, keep the boxed ABI and box the value once per call.
 
 Eligible independent numeric array-construction kernels automatically use
 four-lane Wasm SIMD and a scalar tail. Admission follows bounded ordinary

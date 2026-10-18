@@ -222,6 +222,11 @@ test "representation adapters erase only exact argument return paths and preserv
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, adapterScenario, .{});
 }
 
+/// The inline pass expands or erases every direct call to this callee.
+pub fn expands(module: *const wasm.Module, id: u32) bool {
+    return returnedParameter(module, id) != null or admitted(module, &module.functions.items[id]) or framed(module, id);
+}
+
 fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
     const arena = module.arena orelse return false;
     if (body.result != .i32 or body.codeLength() > 96 or body.codeLength() == 0) return false;

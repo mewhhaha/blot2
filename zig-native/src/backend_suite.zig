@@ -4,6 +4,7 @@ comptime {
     _ = @import("backend/callable_origins.zig");
     _ = @import("backend/wasm_inline.zig");
     _ = @import("backend/wasm_sroa.zig");
+    _ = @import("backend/simd_abi.zig");
     _ = @import("backend/wasm_row_reduce.zig");
     _ = @import("backend/runtime_operation_backend_tests.zig");
     _ = @import("backend/provider_origins.zig");

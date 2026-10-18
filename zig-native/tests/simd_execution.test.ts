@@ -213,6 +213,165 @@ entry const run = fn (n: U32) -> F32 => do:
   }, { stdRoot });
 });
 
+Deno.test("four-lane values cross non-inlined direct calls as v128 without boxes", async () => {
+  await compileAndRun(`
+import * as simd from "std/simd"
+const k = fn (x: F32) -> F32 => simd.f32_sum (simd.f32_add (simd.f32_splat x) (2.0, 2.0, 2.0, 2.0))
+entry const repro = fn (n: U32) -> F32 => do:
+  let total = 0.0
+  for i in 0..n:
+    total := total + k 0.25
+  return total
+// Large enough to stay out of line inside loops as well.
+const step = fn (v: simd.F32x4) -> simd.F32x4 => do:
+  let a = simd.f32_add (simd.f32_mul v (0.5, 0.5, 0.5, 0.5)) (1.0, 2.0, 3.0, 4.0)
+  let b = simd.f32_min (simd.f32_max a (simd.f32_splat 0.0)) (simd.f32_splat 100.0)
+  let c = simd.f32_add (simd.f32_mul b (0.75, 0.75, 0.75, 0.75)) b
+  let d = simd.f32_sub c (simd.f32_mul b (0.125, 0.125, 0.125, 0.125))
+  let e = simd.f32_mul (simd.f32_add d (simd.f32_splat 0.5)) (simd.f32_splat 0.5)
+  let f = simd.f32_add e (simd.f32_swizzle (3, 2, 1, 0) d)
+  let g = simd.f32_max (simd.f32_min f (simd.f32_splat 1000.0)) (simd.f32_splat (0.0 - 1000.0))
+  let h = simd.f32_add g (simd.f32_mul g (0.01, 0.02, 0.03, 0.04))
+  return simd.f32_sub h (simd.f32_mul h (0.001, 0.002, 0.003, 0.004))
+entry const looped = fn (n: U32) -> F32 => do:
+  let acc = simd.f32_splat 1.0
+  for i in 0..n:
+    acc := step acc
+  return simd.f32_sum acc
+entry const once = fn (x: F32) -> F32 => simd.f32_sum (step (step (simd.f32_splat x)))
+entry const piped = fn (n: U32) -> F32 => do:
+  let acc = simd.f32_splat 1.0
+  for i in 0..n:
+    acc := acc |> step
+  return simd.f32_sum acc
+const halve = fn (v: simd.F32x4) -> simd.F32x4 => if simd.f32_sum v < 1.0 then v else halve (simd.f32_mul v (0.5, 0.5, 0.5, 0.5))
+entry const recursive = fn (n: U32) -> F32 => simd.f32_sum (halve (simd.f32_splat (@u32.to_f32 n)))
+const ping = fn (a: simd.F32x4) => fn (b: simd.F32x4) => fn (n: U32) -> simd.F32x4 => if n == 0 then simd.f32_add a b else pong (step b) a (n - 1)
+const pong = fn (a: simd.F32x4) => fn (b: simd.F32x4) => fn (n: U32) -> simd.F32x4 => if n == 0 then simd.f32_sub a b else ping a (step b) (n - 1)
+entry const mutual = fn (n: U32) -> F32 => simd.f32_sum (ping (simd.f32_splat 1.0) (1.0, 2.0, 3.0, 4.0) n)
+const hash = fn (s: simd.U32x4) -> simd.U32x4 => do:
+  let a = simd.u32_xor s (simd.u32_shl 13 s)
+  let b = simd.u32_xor a (simd.u32_shr 17 a)
+  let c = simd.u32_add (simd.u32_xor b (simd.u32_shl 5 b)) (0x9E3779B9, 0x9E3779B9, 0x9E3779B9, 0x9E3779B9)
+  let d = simd.u32_mul (simd.u32_xor c (simd.u32_shr 16 c)) (0x85EBCA6B, 0x85EBCA6B, 0x85EBCA6B, 0x85EBCA6B)
+  return simd.u32_select (simd.u32_lt d (simd.u32_splat 0x80000000)) d (simd.u32_not d)
+entry const hashed = fn (n: U32) -> U32 => do:
+  let s = (1, 2, 3, 4)
+  for i in 0..n:
+    s := hash s
+  let (a, b, c, d) = s
+  return a ^ b ^ c ^ d
+// Closures keep the boxed ABI and box once per call.
+const blend = fn (w: F32) => fn (v: simd.F32x4) -> simd.F32x4 => step (simd.f32_mul v (simd.f32_splat w))
+const apply = fn (f: simd.F32x4 -> simd.F32x4) => fn (n: U32) -> F32 => do:
+  let acc = simd.f32_splat 1.0
+  for i in 0..n:
+    acc := f acc
+  return simd.f32_sum acc
+entry const direct = fn (n: U32) -> F32 => do:
+  let acc = simd.f32_splat 1.0
+  for i in 0..n:
+    acc := blend 0.5 acc
+  return simd.f32_sum acc
+entry const partial = fn (n: U32) -> F32 => do:
+  let half = blend 0.5
+  let acc = simd.f32_splat 1.0
+  for i in 0..n:
+    acc := half acc
+  return simd.f32_sum acc
+entry const passed = fn (n: U32) -> F32 => apply (blend 0.5) n
+entry const lanes = fn (x: F32) -> Array F32 => do:
+  let (a, b, c, d) = step (step (simd.f32_splat x))
+  return #[a, b, c, d]
+`, (guest, bytes) => {
+    // Results match the boxed compiler's bits.
+    const expected: Record<string, [number, number]> = {
+      repro: [100, 900], looped: [100, 997.8867797851562], once: [2, 70.62612915039062], piped: [100, 997.8867797851562],
+      recursive: [100, 0.78125], mutual: [5, 53.35212707519531], hashed: [100, 1213464523], direct: [100, 68.74153900146484],
+      partial: [100, 68.74153900146484], passed: [100, 68.74153900146484],
+    };
+    const raw = counters(bytes);
+    for (const [name, [argument, result]] of Object.entries(expected)) equal(raw.run(name, argument).result, result);
+    for (const name of ["repro", "looped", "once", "piped", "recursive", "mutual", "hashed", "direct"]) {
+      deepStrictEqual(raw.run(name, 2).traffic, [0, 0, 0], name);
+      deepStrictEqual(raw.run(name, 100).traffic, [0, 0, 0], name);
+    }
+    // Each extra closure call retires exactly one boxed result.
+    for (const name of ["partial", "passed"]) equal(raw.run(name, 100).traffic[2] - raw.run(name, 2).traffic[2], 98);
+    // The public Array ABI is unchanged; its lanes sum like f32_sum.
+    const lanes = Array.from(guest.call("lanes", 2) as Float32Array);
+    equal(lanes.reduce((sum, lane) => Math.fround(sum + lane)), 70.62612915039062);
+    for (const name of ["looped", "recursive", "mutual", "partial"]) raw.steady(name, 3);
+  }, { stdRoot });
+});
+
+Deno.test("four-lane workers match fresh builds across retained edits and checkpoints", async () => {
+  const { createZigProjectCompiler } = await import("../../compiler/zig_project_client.ts");
+  const { instantiateGuest } = await import("../../compiler/guest.ts");
+  const directory = await Deno.makeTempDir({ prefix: "blot-simd-workers-" });
+  const entry = `${directory}/main.blot`;
+  const helper = `${directory}/helper.blot`;
+  const program = `import * as simd from "std/simd"
+import * as helper from "./helper"
+entry const run = fn (n: U32) -> F32 => do:
+  let acc = simd.f32_splat 1.0
+  for i in 0..n:
+    acc := helper.step acc
+  return simd.f32_sum acc + helper.extra n
+`;
+  // An extra helper instance in some revisions moves every worker's index.
+  const sources = (bias: number) => ({
+    [entry]: program,
+    [helper]: `import * as simd from "std/simd"
+const step = fn (v: simd.F32x4) -> simd.F32x4 => do:
+  let a = simd.f32_add (simd.f32_mul v (0.5, 0.5, 0.5, 0.5)) (${bias}.0, 2.0, 3.0, 4.0)
+  let b = simd.f32_min (simd.f32_max a (simd.f32_splat 0.0)) (simd.f32_splat 100.0)
+  let c = simd.f32_add (simd.f32_mul b (0.75, 0.75, 0.75, 0.75)) b
+  let d = simd.f32_sub c (simd.f32_mul b (0.125, 0.125, 0.125, 0.125))
+  let e = simd.f32_mul (simd.f32_add d (simd.f32_splat 0.5)) (simd.f32_splat 0.5)
+  let f = simd.f32_add e (simd.f32_swizzle (3, 2, 1, 0) d)
+  let g = simd.f32_max (simd.f32_min f (simd.f32_splat 1000.0)) (simd.f32_splat (0.0 - 1000.0))
+  return simd.f32_sub g (simd.f32_mul g (0.001, 0.002, 0.003, 0.004))
+const twice = fn (v: simd.F32x4) -> simd.F32x4 => step (step v)
+const extra = fn (n: U32) -> F32 => simd.f32_sum (${bias === 5 ? "twice" : "step"} (simd.f32_splat (@u32.to_f32 n)))
+`,
+  });
+  try {
+    const options = {
+      executable: Deno.args[0] ?? new URL("../zig-out/bin/blotc", import.meta.url).pathname, entry, codegenTier: "optimized" as const,
+      prelude: new URL("../../std/prelude.blot", import.meta.url).pathname, stdRoot, cacheDirectory: false as const,
+    };
+    const retained = await createZigProjectCompiler(options);
+    let checkpoint;
+    try {
+      for (const bias of [3, 5, 3, 3]) {
+        const built = await retained.build({ sources: sources(bias) });
+        const fresh = await createZigProjectCompiler(options);
+        try {
+          const ordinary = await fresh.build({ sources: sources(bias) });
+          if (!built.success || !ordinary.success) throw new Error(JSON.stringify({ built, ordinary }));
+          deepStrictEqual(built.bytes, ordinary.bytes);
+          const raw = counters(built.bytes as Uint8Array<ArrayBuffer>);
+          const short = raw.run("run", 2);
+          deepStrictEqual(short.traffic, [0, 0, 0]);
+          deepStrictEqual(raw.run("run", 50).traffic, [0, 0, 0]);
+          const guest = await instantiateGuest(built.bytes);
+          try { equal(guest.call("run", 2), short.result); } finally { guest.dispose(); }
+        } finally { await fresh.dispose(); }
+        if (checkpoint === undefined) checkpoint = await retained.exportCheckpoint();
+      }
+    } finally { await retained.dispose(); }
+    const resumed = await createZigProjectCompiler({ ...options, checkpoint });
+    const fresh = await createZigProjectCompiler(options);
+    try {
+      const built = await resumed.build({ sources: sources(5) });
+      const ordinary = await fresh.build({ sources: sources(5) });
+      if (!built.success || !ordinary.success) throw new Error(JSON.stringify({ built, ordinary }));
+      deepStrictEqual(built.bytes, ordinary.bytes);
+    } finally { await resumed.dispose(); await fresh.dispose(); }
+  } finally { await Deno.remove(directory, { recursive: true }); }
+});
+
 // Every lane of a four-lane operation must have the bits of the scalar kernel
 // it replaces, including NaN, signed zero, subnormals and shift counts >= 32.
 const kernels = `
