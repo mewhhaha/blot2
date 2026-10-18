@@ -254,6 +254,21 @@ The first edit after population reuses nothing (`rebuilt_seed=true`,
 
 - **Fix:** record the populated revision as a reuse seed.
 - **Target:** the first literal edit matches the steady-state reuse.
+- **Result (18 October 2026):** CT9, "Seed the first edit from population and
+  check the entry once". Population checked `robots.blot` against live
+  dependencies and every edit against frozen interfaces; published capability
+  collections copied shared recipe nodes in the producer's order, so the two
+  differed and the first edit re-checked 14 modules and lost the reuse gate.
+  Collections are now built children-first. Population also checked the entry
+  twice (within the project, then as the seed's consumer); it now defers it from
+  the first check. Game, 5 pairs at load 1.1–1.5: first literal_constant edit
+  1,877 → 1,359 ms (0.724), reused 0 → 1,498 of 1,794, revalidated 14 → 1; fresh
+  2,567 → 2,519 ms (0.981); other phases unchanged. Test entries, 5 pairs:
+  robot_pickup 7,600 → 5,439 ms (0.716), edit 6,857 → 5,291 ms (0.772);
+  robot_pickup 71.71 → 51.37 G instructions. All 56 entries, one run with CT12:
+  116.3 → 101.4 s (0.872). A rejected population now checks the entry against
+  both the frozen and the live dependencies (stale `salt_hauling` 2.0 → 3.6 s).
+  Wasm identical.
 
 ### CT10: cut off unchanged output
 

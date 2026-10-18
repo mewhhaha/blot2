@@ -75,6 +75,10 @@ pub const CheckedProject = struct {
     module_cutoff: entry_cutoff.Stats = .{},
     reused_modules: []bool = &.{},
     interface_colors: []entry_cutoff.Color = &.{},
+    /// Set by checkProjectDeferringEntry: every module except the entry is
+    /// checked, and these budgets resume its check in checkDeferredEntry.
+    deferred_entry: ?Deferred = null,
+    pub const Deferred = struct { resolution_remaining: usize, associated_remaining: usize };
     pub fn compiledModule(self: *const CheckedProject, source: *const project.Project, id: usize) ?*const @import("frozen_dependency.zig").Module {
         if (source.compiledModule(id)) |value| return value;
         if (id == 0 or id > self.reused_modules.len or !self.reused_modules[id - 1]) return null;
@@ -219,6 +223,53 @@ const Engine = struct {
         self.compiled_catalogs[unit - 1].exports = exports;
         self.result.reused_modules[unit - 1] = true;
         self.result.module_cutoff.reused += 1;
+    }
+
+    /// Body offers stay borrowed from the accepted revision. Filename offers
+    /// relocate modules independently of loader discovery order.
+    fn offerBodies(self: *Engine, previous: ?entry_cutoff.Previous) Allocator.Error!void {
+        const old = previous orelse return;
+        if (old.bodies.len != old.names.owners.len) return;
+        for (old.bodies, 1..) |*body, unit| {
+            const filename = old.names.owner(@intCast(unit)) orelse continue;
+            const entry = try self.previous_bodies.getOrPut(self.allocator, filename);
+            if (entry.found_existing) {
+                entry.value_ptr.* = null;
+            } else entry.value_ptr.* = body;
+        }
+    }
+    fn deinitDiagnostics(self: *Engine) void {
+        for (self.diagnostics.items) |diagnostic_| {
+            if (diagnostic_.purity) |witness| witness.deinit(self.allocator);
+            if (diagnostic_.detail) |detail| self.allocator.free(detail);
+            if (diagnostic_.hole) |hole| hole.deinit(self.allocator);
+            if (diagnostic_.explanation) |explanation| explanation.deinit(self.allocator);
+        }
+        self.diagnostics.deinit(self.allocator);
+    }
+    /// One dependency-first step of a project check. False stops checking the
+    /// remaining modules.
+    fn checkOrdered(self: *Engine, unit: project.UnitId, previous: ?entry_cutoff.Previous) !bool {
+        const source = self.source;
+        if (source.input_mode == .source and unit == source.entry) {
+            if (check.sourceImportDiagnostic(&source.unit(unit).tree)) |item| {
+                // Prelude semantics precede the source import boundary;
+                // entry syntax already succeeded in project.load.
+                if (self.diagnostics.items.len == 0) try self.diagnostics.append(self.allocator, .{ .unit = unit, .span = item.span, .code = .semantic, .semantic = item.code });
+                return false;
+            }
+        }
+        if (unit == source.entry and !self.source_validation and self.diagnostics.items.len == 0) if (previous) |old| {
+            if (old.reuse_entry and try entry_cutoff.confirm(self.allocator, source, &self.result, old, &self.result.entry_cutoff)) return true;
+        };
+        if (unit != source.entry and self.result.reused_modules.len != 0 and self.diagnostics.items.len == 0) if (previous) |old| {
+            if (try @import("module_frontend_cutoff.zig").confirm(self.allocator, source, &self.result, old, unit, &self.result.module_cutoff)) {
+                try self.recoverModule(unit);
+                return true;
+            }
+        };
+        try self.checkModule(unit);
+        return true;
     }
 
     fn diagnostic(self: *Engine, unit: project.UnitId, span: ast.Span, code: Code) Allocator.Error!void {
@@ -651,32 +702,49 @@ pub fn checkProjectRetainingBodies(allocator: Allocator, source: *project.Projec
     return checkProjectMode(allocator, source, .{}, previous, null, true);
 }
 
+/// PRIVATE population lane: checks every module except the entry, which is
+/// last in dependency order, and records the budgets left for it. The entry
+/// stays unchecked until checkDeferredEntry. Source-validation projects check
+/// every module at once and leave `deferred_entry` null.
+pub fn checkProjectDeferringEntry(allocator: Allocator, source: *project.Project, previous: ?entry_cutoff.Previous) !CheckedProject {
+    return checkProjectModeDeferring(allocator, source, .{}, previous, null, true, true);
+}
+
+/// Checks the entry of a checkProjectDeferringEntry result exactly as one
+/// undivided pass would have checked it last: with the same remaining
+/// budgets, body offers and diagnostic order. `previous` must be the same
+/// offer. On failure `checked` is left empty.
+pub fn checkDeferredEntry(allocator: Allocator, source: *project.Project, checked: *CheckedProject, previous: ?entry_cutoff.Previous) !void {
+    const deferred = checked.deferred_entry orelse return;
+    const timing = @import("../phase_profile.zig").enter(.check);
+    defer timing.exit();
+    var engine: Engine = .{ .allocator = allocator, .source = source, .result = checked.*, .retain_bodies = checked.body_caches.len != 0, .resolution_remaining = deferred.resolution_remaining, .associated_remaining = deferred.associated_remaining };
+    checked.* = .{};
+    engine.result.deferred_entry = null;
+    engine.diagnostics = .fromOwnedSlice(engine.result.diagnostics);
+    engine.result.diagnostics = &.{};
+    errdefer engine.result.deinit(allocator);
+    defer engine.deinitDiagnostics();
+    defer engine.previous_bodies.deinit(allocator);
+    defer engine.deinitSourceModules();
+    try engine.offerBodies(previous);
+    try engine.initCompiledCatalogs();
+    _ = try engine.checkOrdered(source.entry, previous);
+    engine.result.diagnostics = try engine.diagnostics.toOwnedSlice(allocator);
+    checked.* = engine.result;
+}
+
 fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: check.PrivateExecution, previous: ?entry_cutoff.Previous, editor: ?EditorQuery, retain_bodies: bool) !CheckedProject {
+    return checkProjectModeDeferring(allocator, source, execution, previous, editor, retain_bodies, false);
+}
+fn checkProjectModeDeferring(allocator: Allocator, source: *project.Project, execution: check.PrivateExecution, previous: ?entry_cutoff.Previous, editor: ?EditorQuery, retain_bodies: bool, defer_entry: bool) !CheckedProject {
     const timing = @import("../phase_profile.zig").enter(.check);
     defer timing.exit();
     var engine: Engine = .{ .allocator = allocator, .source = source, .result = .{}, .execution = execution, .editor = editor, .retain_bodies = retain_bodies };
     defer engine.previous_bodies.deinit(allocator);
-    if (previous) |old| if (old.bodies.len == old.names.owners.len) {
-        // Bodies remain borrowed from the accepted revision. Filename offers
-        // relocate modules independently of loader discovery order.
-        for (old.bodies, 1..) |*body, unit| {
-            const filename = old.names.owner(@intCast(unit)) orelse continue;
-            const entry = try engine.previous_bodies.getOrPut(allocator, filename);
-            if (entry.found_existing) {
-                entry.value_ptr.* = null;
-            } else entry.value_ptr.* = body;
-        }
-    };
+    try engine.offerBodies(previous);
     errdefer engine.result.deinit(allocator);
-    defer {
-        for (engine.diagnostics.items) |diagnostic| {
-            if (diagnostic.purity) |witness| witness.deinit(allocator);
-            if (diagnostic.detail) |detail| allocator.free(detail);
-            if (diagnostic.hole) |hole| hole.deinit(allocator);
-            if (diagnostic.explanation) |explanation| explanation.deinit(allocator);
-        }
-        engine.diagnostics.deinit(allocator);
-    }
+    defer engine.deinitDiagnostics();
     defer engine.deinitSourceModules();
     if (source.diagnostics.items.len != 0) {
         for (source.diagnostics.items) |diagnostic_| try engine.diagnostics.append(allocator, .{
@@ -708,25 +776,13 @@ fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: c
             @memset(engine.result.interface_colors, .unknown);
         }
         try engine.initCompiledCatalogs();
+        const deferrable = defer_entry and source.input_mode == .project and !engine.source_validation and source.order.items.len != 0 and source.order.items[source.order.items.len - 1] == source.entry;
         for (source.order.items) |unit| {
-            if (source.input_mode == .source and unit == source.entry) {
-                if (check.sourceImportDiagnostic(&source.unit(unit).tree)) |item| {
-                    // Prelude semantics precede the source import boundary;
-                    // entry syntax already succeeded in project.load.
-                    if (engine.diagnostics.items.len == 0) try engine.diagnostics.append(allocator, .{ .unit = unit, .span = item.span, .code = .semantic, .semantic = item.code });
-                    break;
-                }
+            if (deferrable and unit == source.entry) {
+                engine.result.deferred_entry = .{ .resolution_remaining = engine.resolution_remaining, .associated_remaining = engine.associated_remaining };
+                break;
             }
-            if (unit == source.entry and !engine.source_validation and engine.diagnostics.items.len == 0) if (previous) |old| {
-                if (old.reuse_entry and try entry_cutoff.confirm(allocator, source, &engine.result, old, &engine.result.entry_cutoff)) continue;
-            };
-            if (unit != source.entry and engine.result.reused_modules.len != 0 and engine.diagnostics.items.len == 0) if (previous) |old| {
-                if (try @import("module_frontend_cutoff.zig").confirm(allocator, source, &engine.result, old, unit, &engine.result.module_cutoff)) {
-                    try engine.recoverModule(unit);
-                    continue;
-                }
-            };
-            try engine.checkModule(unit);
+            if (!try engine.checkOrdered(unit, previous)) break;
         }
     }
     engine.result.diagnostics = try engine.diagnostics.toOwnedSlice(allocator);

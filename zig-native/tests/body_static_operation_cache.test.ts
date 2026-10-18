@@ -115,31 +115,30 @@ for (const codegenTier of ["development", "optimized"] as const) {
             }
             assert.deepEqual(actual.bytes, result.bytes);
             if (compiler === retained && seed === "3" && prefix) {
-              assert(
+              // Source elaboration work of the whole attempt: the project
+              // check of a rebuilt seed plus the entry's consumer check.
+              const work = (stats: typeof actual.stats) =>
                 Number(
-                  (actual.stats.attemptStats.fallback as {
+                  (stats.attemptStats.fallback as {
                     body_elaborations: number;
                   }).body_elaborations,
-                ) <
-                  Number(
-                    (result.stats.attemptStats.fallback as {
-                      body_elaborations: number;
-                    }).body_elaborations,
-                  ),
+                ) +
+                Number(
+                  (stats.frontend as { body_elaborations: number })
+                    .body_elaborations,
+                );
+              const actualWork = work(actual.stats);
+              const freshWork = work(result.stats);
+              assert(
+                actualWork < freshWork,
                 JSON.stringify({
                   actual: actual.stats.frontend,
                   expected: result.stats.frontend,
+                  actualWork,
+                  freshWork,
                   archive: compiler === compiled,
                 }),
               );
-            }
-            if (compiler === retained && seed === "3" && prefix) {
-              const actualWork = (actual.stats.attemptStats.fallback as {
-                body_elaborations: number;
-              }).body_elaborations;
-              const freshWork = (result.stats.attemptStats.fallback as {
-                body_elaborations: number;
-              }).body_elaborations;
               console.log(
                 `BODY_STATIC_OPERATION tier=${codegenTier} source_elaborations=${actualWork}/${freshWork}`,
               );

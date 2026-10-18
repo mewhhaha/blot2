@@ -358,32 +358,103 @@ pub const Store = struct {
         for (header.nodes[1..], 1..) |term, index| {
             if (!needed[index]) continue;
             try self.visit(0);
-            map[index] = switch (term.tag) {
-                .empty => 0,
-                .unknown => try self.append(allocator, term),
-                .parameter => arguments[term.a],
-                .argument => try self.append(allocator, term),
-                .callable => try self.append(allocator, .{ .tag = .callable, .a = term.a, .b = map[term.b], .c = map[term.c] }),
-                .authority => return error.InvalidCapabilityContract,
-                .wrapped => try self.append(allocator, .{ .tag = .wrapped, .a = map[term.a] }),
-                .elements => try self.elements(allocator, map[term.a]),
-                .project => try self.project(allocator, map[term.a], term.b, @fromBackingInt(@intCast(term.c))),
-                .captures, .product, .record, .join => blk: {
-                    const children_ = header.view().children(term);
-                    var mapped: [4096]u32 = undefined;
-                    if (children_.len > mapped.len) return error.CapabilityAnalysisLimit;
-                    for (children_, 0..) |child, child_index| {
-                        if (term.tag == .record and child_index % 2 == 0) {
-                            mapped[child_index] = child;
-                            continue;
-                        }
-                        mapped[child_index] = map[child];
-                    }
-                    break :blk try self.aggregate(allocator, term.tag, mapped[0..children_.len]);
-                },
-            };
+            map[index] = try self.copy(allocator, header.view(), term, &map, arguments);
         }
         return map[header.root];
+    }
+    /// instantiate, copying the reachable graph children first in depth-first
+    /// order. The result then depends only on the recipe's terms, not on how
+    /// its producer numbered shared nodes: a live checked module and its frozen
+    /// interface number them differently, so published collections built this
+    /// way are equal whichever one an importer was checked against.
+    pub fn instantiateCanonical(self: *Store, allocator: A, header: anytype, arguments: []const Id) Error!Id {
+        const before = self.mark();
+        errdefer self.rollback(before);
+        const source = header.view();
+        try source.validate(header.root, header.arity, true);
+        if (arguments.len != header.arity) return error.InvalidCapabilityContract;
+        if (self.nodes.items.len == 0) _ = try self.append(allocator, .{ .tag = .empty });
+        for (arguments) |argument| if (argument >= self.nodes.items.len) return error.InvalidCapabilityContract;
+        const unmapped = std.math.maxInt(Id);
+        var map: [4096]Id = undefined;
+        @memset(map[0..source.nodes.len], unmapped);
+        map[0] = 0;
+        // validate bounds every path below 128 nodes, so the stack never
+        // exceeds the root plus 128 descendants. Children precede parents.
+        const Frame = struct { node: Id, next: u32 = 0 };
+        var stack: [130]Frame = undefined;
+        var depth: usize = 1;
+        stack[0] = .{ .node = header.root };
+        while (depth != 0) {
+            const top = &stack[depth - 1];
+            if (map[top.node] != unmapped) {
+                depth -= 1;
+                continue;
+            }
+            const term = source.nodes[top.node];
+            const pending: ?Id = switch (term.tag) {
+                .callable => edge: {
+                    while (top.next < 2) {
+                        const child = if (top.next == 0) term.b else term.c;
+                        top.next += 1;
+                        if (map[child] == unmapped) break :edge child;
+                    }
+                    break :edge null;
+                },
+                .wrapped, .project, .elements => edge: {
+                    if (top.next != 0) break :edge null;
+                    top.next = 1;
+                    break :edge if (map[term.a] == unmapped) term.a else null;
+                },
+                .captures, .product, .record, .join => edge: {
+                    const children_ = source.children(term);
+                    while (top.next < children_.len) {
+                        const position = top.next;
+                        top.next += 1;
+                        if (term.tag == .record and position % 2 == 0) continue;
+                        if (map[children_[position]] == unmapped) break :edge children_[position];
+                    }
+                    break :edge null;
+                },
+                else => null,
+            };
+            if (pending) |child| {
+                if (depth == stack.len) return error.CapabilityAnalysisLimit;
+                stack[depth] = .{ .node = child };
+                depth += 1;
+                continue;
+            }
+            try self.visit(0);
+            map[top.node] = try self.copy(allocator, source, term, &map, arguments);
+            depth -= 1;
+        }
+        return map[header.root];
+    }
+    fn copy(self: *Store, allocator: A, source: View, term: Term, map: *const [4096]Id, arguments: []const Id) Error!Id {
+        return switch (term.tag) {
+            .empty => 0,
+            .unknown => try self.append(allocator, term),
+            .parameter => arguments[term.a],
+            .argument => try self.append(allocator, term),
+            .callable => try self.append(allocator, .{ .tag = .callable, .a = term.a, .b = map[term.b], .c = map[term.c] }),
+            .authority => return error.InvalidCapabilityContract,
+            .wrapped => try self.append(allocator, .{ .tag = .wrapped, .a = map[term.a] }),
+            .elements => try self.elements(allocator, map[term.a]),
+            .project => try self.project(allocator, map[term.a], term.b, @fromBackingInt(@intCast(term.c))),
+            .captures, .product, .record, .join => blk: {
+                const children_ = source.children(term);
+                var mapped: [4096]u32 = undefined;
+                if (children_.len > mapped.len) return error.CapabilityAnalysisLimit;
+                for (children_, 0..) |child, child_index| {
+                    if (term.tag == .record and child_index % 2 == 0) {
+                        mapped[child_index] = child;
+                        continue;
+                    }
+                    mapped[child_index] = map[child];
+                }
+                break :blk try self.aggregate(allocator, term.tag, mapped[0..children_.len]);
+            },
+        };
     }
     pub fn callable(self: *Store, allocator: A, header: Recipe, captures: Id) Error!Id {
         const before = self.mark();
@@ -517,7 +588,7 @@ pub const Collection = struct {
             const recipe = self.header(entry.binding, binding.capability_parameters.arity()).?;
             var arguments: [16]u32 = undefined;
             for (0..recipe.arity) |index| arguments[index] = try store.append(allocator, .{ .tag = .parameter, .a = @intCast(index) });
-            const root = try store.instantiate(allocator, recipe, arguments[0..recipe.arity]);
+            const root = try store.instantiateCanonical(allocator, recipe, arguments[0..recipe.arity]);
             try roots.append(allocator, .{ .binding = entry.binding, .root = root });
         }
         if (roots.items.len == 0) return .{};
@@ -770,4 +841,38 @@ fn callableLaw(allocator: A) !void {
 test "owned callable recipes seal input binders and preserve exact projected results through all allocation failures" {
     try callableLaw(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, callableLaw, .{});
+}
+
+fn canonicalSelectLaw(allocator: A) !void {
+    const Declared = struct { kind: enum { global, local }, capability_parameters: @import("capability_flow.zig").Parameters };
+    const declared = [_]Declared{ .{ .kind = .local, .capability_parameters = .{} }, .{ .kind = .global, .capability_parameters = .init(1, 1) }, .{ .kind = .global, .capability_parameters = .init(1, 1) } };
+    // One pair of recipes, join(wrapped(captures []), wrapped(p0)) and
+    // record{9: callable(p0 -> argument)}, numbered once as a live check and
+    // once as its frozen interface numbered the shared nodes.
+    var live_nodes = [_]Term{ .{ .tag = .empty }, .{ .tag = .parameter }, .{ .tag = .wrapped, .a = 1 }, .{ .tag = .argument }, .{ .tag = .captures }, .{ .tag = .wrapped, .a = 4 }, .{ .tag = .join, .a = 0, .b = 2 }, .{ .tag = .callable, .a = 1, .b = 1, .c = 3 }, .{ .tag = .record, .a = 2, .b = 2 } };
+    var live_words = [_]u32{ 5, 2, 9, 7 };
+    var live_roots = [_]Binding{ .{ .binding = 1, .root = 6 }, .{ .binding = 2, .root = 8 } };
+    var frozen_nodes = [_]Term{ .{ .tag = .empty }, .{ .tag = .parameter }, .{ .tag = .captures }, .{ .tag = .argument }, .{ .tag = .callable, .a = 1, .b = 1, .c = 3 }, .{ .tag = .record, .a = 0, .b = 2 }, .{ .tag = .wrapped, .a = 2 }, .{ .tag = .wrapped, .a = 1 }, .{ .tag = .join, .a = 2, .b = 2 } };
+    var frozen_words = [_]u32{ 9, 4, 6, 7 };
+    var frozen_roots = [_]Binding{ .{ .binding = 1, .root = 8 }, .{ .binding = 2, .root = 5 } };
+    const live: Collection = .{ .nodes = &live_nodes, .words = &live_words, .bindings = &live_roots };
+    const frozen: Collection = .{ .nodes = &frozen_nodes, .words = &frozen_words, .bindings = &frozen_roots };
+    var left = try live.select(allocator, &declared, null);
+    defer left.deinit(allocator);
+    var right = try frozen.select(allocator, &declared, null);
+    defer right.deinit(allocator);
+    try std.testing.expectEqualDeep(left, right);
+    try left.validate(declared.len, 10);
+    const published: View = .{ .nodes = left.nodes, .words = left.words };
+    for (left.bindings, live_roots) |entry, original| {
+        try std.testing.expect(try equivalent(published, entry.root, .{ .nodes = live.nodes, .words = live.words }, original.root));
+    }
+    // Selecting a published collection again is the identity.
+    var again = try left.select(allocator, &declared, null);
+    defer again.deinit(allocator);
+    try std.testing.expectEqualDeep(left, again);
+}
+test "published capability collections do not depend on their producer's node numbering" {
+    try canonicalSelectLaw(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, canonicalSelectLaw, .{});
 }

@@ -450,13 +450,30 @@ pub const Session = struct {
         }
         var source = try project.loadWithInputs(a, io, entry_path, snapshot.options, snapshot.provider());
         defer source.deinit(a);
+        const body_offer = self.bodyOffer(snapshot.options);
+        const check_offer: ?@import("entry_frontend_cutoff.zig").Previous = if (body_offer) |offer| partial.checkPrevious(offer) else null;
+        // The ordinary lane checks the entry twice: within the whole project,
+        // then as the consumer of the frozen dependencies, whose result is
+        // published. Defer it from the first check; finish that check only
+        // when the consumer lane declines, so the ordinary lane below still
+        // owns every rejection and failure.
+        var deferred: ?checker.CheckedProject = null;
+        defer if (deferred) |*checked| checked.deinit(a);
+        if (source.diagnostics.items.len == 0 and !outputIsSource(&source, output_identity)) {
+            deferred = try checker.checkProjectDeferringEntry(a, &source, check_offer);
+            if (try self.consumeDeferred(io, entry_path, output_identity, snapshot, &source, &deferred.?, candidate_seed, counts, body_offer)) |consumer| return consumer;
+            try checker.checkDeferredEntry(a, &source, &deferred.?, check_offer);
+        }
         // Both lanes retain the ordinary source/check/lower validation order.
         // The private sharing lane keeps only that successful check, for this
         // exact captured Project, until closure freeze. No failure is cached.
         var kept_check: ?checker.CheckedProject = null;
         defer if (kept_check) |*checked| checked.deinit(a);
         const empty: dependency.FrozenDependency = .{ .symbols = &.{}, .modules = &.{} };
-        var fresh = try partial.prepareProjectKeepingEntry(a, &source, entry_path, output_identity, &empty, &kept_check, self.bodyOffer(snapshot.options));
+        var fresh = if (deferred) |checked| precomputed: {
+            deferred = null;
+            break :precomputed try partial.prepareProjectWithCheck(a, &source, entry_path, output_identity, &empty, checked, &kept_check, body_offer);
+        } else try partial.prepareProjectKeepingEntry(a, &source, entry_path, output_identity, &empty, &kept_check, body_offer);
         var fresh_alive = false;
         defer if (fresh_alive) fresh.deinit(a);
         switch (fresh) {
@@ -497,9 +514,55 @@ pub const Session = struct {
         counts.dependency_storage = .{ .fresh_modules = frozen.modules.len, .core_checked = frozen.modules.len, .interface_checked = frozen.modules.len };
         counts.frozen_modules = frozen.modules.len;
         for (frozen.modules) |module| counts.reused_core_bodies += module.core.body_lowerings;
-        var consumer = try partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &candidate_seed.*.?.value, snapshot.provider(), self.bodyOffer(snapshot.options));
+        var consumer = try partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &candidate_seed.*.?.value, snapshot.provider(), body_offer);
         errdefer consumer.deinit(a);
         if (consumer == .ready) try consumer.ready.inheritBodyCaches(a, body_caches, body_paths);
+        return consumer;
+    }
+    fn outputIsSource(source: *const project.Project, output_identity: ?[]const u8) bool {
+        const output = output_identity orelse return false;
+        for (source.units.items) |unit| if (std.mem.eql(u8, output, source.symbols.get(unit.filename))) return true;
+        return false;
+    }
+    /// The consumer lane of a deferred population check: freeze the checked
+    /// dependencies and prepare the entry once, against that seed, exactly as
+    /// the ordinary lane's published consumer. It publishes only success; null
+    /// leaves the candidate seed and counts untouched.
+    fn consumeDeferred(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, snapshot: *inputs.Snapshot, source: *project.Project, checked: *const checker.CheckedProject, candidate_seed: *?retained_dependency.Seed, counts: *FallbackStats, body_offer: ?partial.EntryPrevious) !?partial.Preparation {
+        const a = self.allocator;
+        if (checked.deferred_entry == null or checked.diagnostics.len != 0) return null;
+        // A lowering diagnostic or limit is reported by the ordinary lane.
+        const frozen = closure.freezeDeferringEntry(a, source, checked) catch |err| {
+            if (err == error.OutOfMemory) return error.OutOfMemory;
+            return null;
+        };
+        var seed: retained_dependency.Seed = .{ .value = frozen };
+        var seed_alive = true;
+        defer if (seed_alive) seed.deinit(a);
+        const owner = try retained_dependency.Snapshot.adopt(a, frozen);
+        owner.validated = true;
+        seed.snapshot = owner;
+        var consumer = try partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &seed.value, snapshot.provider(), body_offer);
+        if (consumer == .rejected) {
+            consumer.deinit(a);
+            return null;
+        }
+        errdefer consumer.deinit(a);
+        // Dependency body offers come from this check; the deferred entry has
+        // none, so the consumer keeps its own.
+        const paths = try a.alloc([]const u8, source.units.items.len);
+        defer a.free(paths);
+        for (paths, 1..) |*path, unit| path.* = source.filename(@intCast(unit));
+        try consumer.ready.inheritBodyCaches(a, checked.body_caches, paths);
+        var work: FallbackStats = .{ .validated_modules = source.units.items.len, .body_elaborations = checked.body_elaborations, .reused_check_body_elaborations = checked.body_elaborations, .frozen_modules = frozen.modules.len };
+        for (source.units.items) |unit| work.syntax_nodes += unit.tree.nodes.items.len - 1;
+        // Each dependency body was lowered once, straight into the seed.
+        for (frozen.modules) |module| work.body_lowerings += module.core.body_lowerings;
+        work.reused_core_bodies = work.body_lowerings;
+        work.dependency_storage = .{ .fresh_modules = frozen.modules.len, .core_checked = frozen.modules.len, .interface_checked = frozen.modules.len };
+        counts.* = work;
+        candidate_seed.* = seed;
+        seed_alive = false;
         return consumer;
     }
     pub fn prepareRevision(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, options: project.Options) !Preparation {

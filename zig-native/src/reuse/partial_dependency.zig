@@ -232,13 +232,13 @@ fn prepareReadOnlyMode(a: Allocator, io: std.Io, entry_path: []const u8, output_
     // Additional source producers change the catalog and must be checked in
     // the full fresh closure before any cached interfaces are consumed.
     if (source.units.items.len != dependency.modules.len + 1) return error.DependencySetChanged;
-    return prepareProjectMode(a, &source, entry_path, output_identity, dependency, null, previous, retain_bodies);
+    return prepareProjectMode(a, &source, entry_path, output_identity, dependency, null, previous, retain_bodies, null);
 }
 
 /// Consumes no Project storage. Cached Core is borrowed from the dense prefix;
 /// passing an empty dependency prepares an entirely fresh checked Project.
 pub fn prepareProject(a: Allocator, source: *project.Project, entry_path: []const u8, output_identity: ?[]const u8, dependency: *const D.FrozenDependency) !Preparation {
-    return prepareProjectMode(a, source, entry_path, output_identity, dependency, null, null, false);
+    return prepareProjectMode(a, source, entry_path, output_identity, dependency, null, null, false, null);
 }
 
 /// Retain the exact successful checker owner for this already captured Project.
@@ -246,15 +246,28 @@ pub fn prepareProject(a: Allocator, source: *project.Project, entry_path: []cons
 /// the check before the source and must not use it with a different Project.
 pub fn prepareProjectKeepingCheck(a: Allocator, source: *project.Project, entry_path: []const u8, output_identity: ?[]const u8, dependency: *const D.FrozenDependency, kept: *?checker.CheckedProject) !Preparation {
     std.debug.assert(kept.* == null);
-    return prepareProjectMode(a, source, entry_path, output_identity, dependency, kept, null, true);
+    return prepareProjectMode(a, source, entry_path, output_identity, dependency, kept, null, true, null);
 }
 
 pub const EntryPrevious = struct { prepared: *const Prepared, source: []const u8, reuse_modules: bool = false, body_only: bool = false };
 pub fn prepareProjectKeepingEntry(a: Allocator, source: *project.Project, entry_path: []const u8, output_identity: ?[]const u8, dependency: *const D.FrozenDependency, kept: *?checker.CheckedProject, previous: ?EntryPrevious) !Preparation {
     std.debug.assert(kept.* == null);
-    return prepareProjectMode(a, source, entry_path, output_identity, dependency, kept, previous, true);
+    return prepareProjectMode(a, source, entry_path, output_identity, dependency, kept, previous, true, null);
 }
-fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []const u8, output_identity: ?[]const u8, dependency: *const D.FrozenDependency, kept: ?*?checker.CheckedProject, previous: ?EntryPrevious, retain_bodies: bool) !Preparation {
+/// prepareProjectKeepingEntry with the check already made for this exact
+/// Project and `previous`, by checkProjectDeferringEntry and
+/// checkDeferredEntry. `checked` is consumed on every path.
+pub fn prepareProjectWithCheck(a: Allocator, source: *project.Project, entry_path: []const u8, output_identity: ?[]const u8, dependency: *const D.FrozenDependency, checked: checker.CheckedProject, kept: *?checker.CheckedProject, previous: ?EntryPrevious) !Preparation {
+    std.debug.assert(kept.* == null and checked.deferred_entry == null);
+    return prepareProjectMode(a, source, entry_path, output_identity, dependency, kept, previous, true, checked);
+}
+/// The checker's view of an entry offer; prepareProjectMode checks with it.
+pub fn checkPrevious(old: EntryPrevious) entry_cutoff.Previous {
+    return .{ .entry = old.prepared.entry, .prelude = old.prepared.prelude, .implicit_prelude = old.prepared.entry_implicit_prelude, .names = old.prepared.identity.view(), .source = old.source, .imports = old.prepared.entry_imports, .reuse_modules = old.reuse_modules, .reuse_entry = !old.body_only, .bodies = old.prepared.body_caches };
+}
+fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []const u8, output_identity: ?[]const u8, dependency: *const D.FrozenDependency, kept: ?*?checker.CheckedProject, previous: ?EntryPrevious, retain_bodies: bool, precomputed: ?checker.CheckedProject) !Preparation {
+    var owned_check = precomputed;
+    defer if (owned_check) |*checked| checked.deinit(a);
     if (source.compiled_modules.len != dependency.modules.len) return error.InvalidArtifact;
     if (source.diagnostics.items.len != 0) {
         const issue = source.diagnostics.items[0];
@@ -271,8 +284,11 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
     if (output_identity) |output| for (source.units.items) |unit| {
         if (std.mem.eql(u8, output, source.symbols.get(unit.filename))) return error.OutputIsSource;
     };
-    var checked = if (previous) |old|
-        try checker.checkProjectWithEntryCutoff(a, source, .{ .entry = old.prepared.entry, .prelude = old.prepared.prelude, .implicit_prelude = old.prepared.entry_implicit_prelude, .names = old.prepared.identity.view(), .source = old.source, .imports = old.prepared.entry_imports, .reuse_modules = old.reuse_modules, .reuse_entry = !old.body_only, .bodies = old.prepared.body_caches })
+    var checked = if (owned_check) |value| taken: {
+        owned_check = null;
+        break :taken value;
+    } else if (previous) |old|
+        try checker.checkProjectWithEntryCutoff(a, source, checkPrevious(old))
     else if (retain_bodies)
         try checker.checkProjectRetainingBodies(a, source, null)
     else

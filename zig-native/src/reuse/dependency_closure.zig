@@ -229,6 +229,16 @@ pub fn freezeFromCheckedCore(a: std.mem.Allocator, source: *const project.Projec
     return freezeMode(a, source, checked, prepared.units);
 }
 
+/// Private population path: the entry of this exact captured Project is still
+/// deferred (project_check.checkProjectDeferringEntry), so nothing about it is
+/// read. Every dependency is lowered and frozen exactly as freeze does.
+pub fn freezeDeferringEntry(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject) Error!D.FrozenDependency {
+    const timing = phase_profile.enter(.freeze);
+    defer timing.exit();
+    try require(checked.deferred_entry != null and source.compiled_modules.len == 0);
+    return freezeMode(a, source, checked, null);
+}
+
 pub fn freezeFromMixedCheckedCore(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *const partial.Prepared) Error!D.FrozenDependency {
     const timing = phase_profile.enter(.freeze);
     defer timing.exit();
@@ -247,7 +257,7 @@ fn checkChecked(source: *const project.Project, checked: *const project_check.Ch
     try require(source.diagnostics.items.len == 0 and checked.diagnostics.len == 0);
     try require(source.entry != 0 and source.entry <= source.units.items.len and checked.modules.len == source.units.items.len);
     try require(source.units.items.len <= std.math.maxInt(u32));
-    for (checked.modules, 1..) |m, id| if (checked.compiledModule(source, id) == null and !(id == source.entry and checked.entry_cutoff.reused != 0)) {
+    for (checked.modules, 1..) |m, id| if (checked.compiledModule(source, id) == null and !(id == source.entry and (checked.entry_cutoff.reused != 0 or checked.deferred_entry != null))) {
         try require(m != null and m.?.valid);
     };
 }

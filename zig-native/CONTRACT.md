@@ -1009,6 +1009,15 @@ set, so executable callers of a changed body always regenerate. Hygienic loop
 names are numbered within their top-level declaration. See
 [body interface cutoff](BODY_CUTOFF.md).
 
+Population checks every dependency within the whole project and the entry once,
+as the consumer of the frozen dependencies. A rejection, lowering diagnostic or
+freeze failure finishes the deferred entry check with the same budgets and body
+offers and takes the undivided lane, which reports it. Published capability
+collections are built children-first from each binding's recipe, so a module
+checked against live dependencies publishes the same Core and interface as one
+checked against their frozen interfaces, and the first edit after population
+cuts off like any later one.
+
 A retained revision whose inputs equal the last compiled revision's except for
 trivia (each changed source lexes cleanly to the same tokens and adjacency, and
 size limits hold) publishes the last successful output and keeps the retained
