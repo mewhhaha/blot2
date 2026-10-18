@@ -102,3 +102,102 @@ test "pattern-conditional append transfers ownership only without surviving alia
         try std.testing.expectEqual(@as(usize, if (aliased) 0 else 1), admitted);
     }
 }
+
+fn admittedUpdates(allocator: std.mem.Allocator, source: []const u8) !usize {
+    var module = try lower(allocator, source);
+    defer module.deinit(allocator);
+    var proof = try ownership.Proof.init(allocator, &.{module}, 1);
+    defer proof.deinit(allocator);
+    var count: usize = 0;
+    for (proof.updates) |yes| count += @intFromBool(yes);
+    return count;
+}
+
+test "read-only callees and dropped generator closures borrow an exclusive array" {
+    const prefix =
+        \\const get1 = fn index => fn values => values[index]
+        \\const size = fn values => @array.length values
+        \\const nested = fn index => fn values => @u32.add (get1 index values) (size values)
+        \\const total = fn (values: Array U32) => do:
+        \\  let sum = 0
+        \\  for value in values:
+        \\    sum := @u32.add sum value
+        \\  return sum
+        \\const generate = fn count => fn generator => @array.generate count generator
+        \\const map = fn transform => fn (values: Array U32) => generate (size values) (fn index => transform values[index])
+        \\
+    ;
+    const cases = [_][]const u8{
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  for index in 0..count:\n    values[index] := @u32.add (get1 index values) 1\n  return values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  for index in 0..count:\n    values[index] := nested index values\n  return values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  values[0] := total values\n  return values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let doubled = map (fn value => @u32.mul value 2) values\n  values[0] := doubled[0]\n  return values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let doubled = @array.generate count (fn index => @u32.mul values[index] 2)\n  values[0] := doubled[0]\n  return values\n",
+    };
+    const a = std.testing.allocator;
+    for (cases) |case| {
+        const source = try std.mem.concat(a, u8, &.{ prefix, case });
+        defer a.free(source);
+        try std.testing.expectEqual(@as(usize, 1), try admittedUpdates(a, source));
+    }
+    // Summaries, closure decisions and widened reads release every failure.
+    const source = try std.mem.concat(a, u8, &.{ prefix, cases[3] });
+    defer a.free(source);
+    var module = try lower(a, source);
+    defer module.deinit(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, proofScenario, .{&module});
+}
+
+test "returned stored captured and later-read arguments keep the copy" {
+    const prefix =
+        \\data Cell value = #Cell value
+        \\const pass = fn values => values
+        \\const wrap = fn values => #Cell values
+        \\const pair = fn values => (values, 1)
+        \\const reader = fn values => fn index => values[index]
+        \\const keep = fn values => pass values
+        \\const left = fn a => fn b => @u32.add a[0] b[0]
+        \\const deep = fn count => fn values => if @u32.eq count 0 then @array.length values else deep (@u32.sub count 1) values
+        \\
+    ;
+    const cases = [_][]const u8{
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = pass values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let #Cell before = wrap values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let (before, _) = pair values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let read = reader values\n  values[0] := 9\n  return @u32.add (read 0) values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let read = fn index => values[index]\n  let doubled = @array.generate count read\n  values[0] := 9\n  return @u32.add (read 0) doubled[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = keep values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let readers = @array.generate count (fn index => fn (unit: Unit) => values[index])\n  values[0] := 9\n  return @u32.add (readers[0] ()) values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  return left values (@array.set values 0 9)\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  return values[@u32.sub (@array.set values 0 5)[1] 1]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let size = deep 3 values\n  values[0] := size\n  return values\n",
+    };
+    const a = std.testing.allocator;
+    for (cases) |case| {
+        const source = try std.mem.concat(a, u8, &.{ prefix, case });
+        defer a.free(source);
+        try std.testing.expectEqual(@as(usize, 0), try admittedUpdates(a, source));
+    }
+}
+
+test "a borrowed element read keeps nested containers shared" {
+    const a = std.testing.allocator;
+    try std.testing.expectEqual(@as(usize, 0), try admittedUpdates(a,
+        \\const first = fn values => values[0]
+        \\entry const run = fn (count: U32) => do:
+        \\  let values = @array.generate count (fn index => @array.fill 2 index)
+        \\  let inner = first values
+        \\  values[0][0] := 9
+        \\  return @u32.add inner[0] values[0][0]
+        \\
+    ));
+    try std.testing.expectEqual(@as(usize, 1), try admittedUpdates(a,
+        \\const first = fn values => values[0]
+        \\entry const run = fn (count: U32) => do:
+        \\  let values = @array.generate count (fn index => @array.fill 2 index)
+        \\  let inner = first values
+        \\  values[1] := inner
+        \\  return values
+        \\
+    ));
+}

@@ -2,6 +2,7 @@
 const std = @import("std");
 const core = @import("../check/core.zig");
 const edit_call = @import("collection_edit_call.zig");
+const known_call = @import("known_call.zig");
 const State = struct {
     first: core.BindingId = 0,
     second: core.BindingId = 0,
@@ -41,9 +42,15 @@ pub const Proof = struct {
         const states = try allocator.alloc(State, module.bindings.len);
         defer allocator.free(states);
         @memset(states, .{});
-        const read_refs = try allocator.alloc(bool, module.nodes.len);
+        // The node after which a borrowed reference is no longer read; zero
+        // marks an escaping use.
+        const read_refs = try allocator.alloc(core.Id, module.nodes.len);
         defer allocator.free(read_refs);
-        @memset(read_refs, false);
+        @memset(read_refs, 0);
+        var borrows: Borrows = .{ .allocator = allocator, .units = units };
+        defer borrows.deinit();
+        var closures: std.ArrayList(core.Id) = .empty;
+        defer closures.deinit(allocator);
         const consumed_refs = try allocator.alloc(bool, module.nodes.len);
         defer allocator.free(consumed_refs);
         @memset(consumed_refs, false);
@@ -72,7 +79,9 @@ pub const Proof = struct {
                 } else if (module.arrayOperation(id) == .length or module.arrayOperation(id) == .get or module.arrayOperation(id) == .simd_load) {
                     const operands = module.children(id);
                     if (operands.len != 0 and module.node(operands[0]).tag == .reference) {
-                        read_refs[operands[0]] = true;
+                        // The element is read after the index evaluates, so
+                        // an edit inside the index cannot reuse this array.
+                        read_refs[operands[0]] = id;
                         // Reading an element can expose an inner allocation.
                         // The outer array may still be consumed, but nested
                         // mutation must preserve the extracted value.
@@ -84,6 +93,10 @@ pub const Proof = struct {
                         };
                         if (ref.unit == 0 and ref.binding != 0 and extracted) states[ref.binding].deep = false;
                     }
+                } else if (module.arrayOperation(id) == .generate) {
+                    // The generator runs only inside this operation.
+                    const operands = module.children(id);
+                    if (operands.len == 2 and module.node(operands[1]).tag == .closure) try borrows.until.put(allocator, operands[1], id);
                 },
                 .call, .apply => if (receiver(units, unit_id, id)) |binding| {
                     const edit = edit_call.analyze(units, unit_id, id).?;
@@ -91,8 +104,9 @@ pub const Proof = struct {
                     consumed_refs[edit.receiver] = true;
                 } else if (edit_call.readReceiver(units, unit_id, id)) |array| {
                     // A four-lane load copies scalar words out of the Array.
-                    if (module.node(array).tag == .reference) read_refs[array] = true;
-                },
+                    if (module.node(array).tag == .reference) read_refs[array] = id;
+                } else try borrows.markArguments(unit_id, id, states, read_refs),
+                .project => try borrows.markArguments(unit_id, id, states, read_refs),
                 .pattern_bind => {
                     const plan = edit_call.analyze(units, unit_id, node.b) orelse continue;
                     const success = plan.success orelse continue;
@@ -114,7 +128,9 @@ pub const Proof = struct {
                         states[node.a].second = ref.binding;
                     }
                 },
-                .closure, .suspend_ => for (module.extra[module.closures[node.a].captures.start..][0..module.closures[node.a].captures.len]) |binding| {
+                // A closure's consumer follows it; decide its captures below.
+                .closure => try closures.append(allocator, id),
+                .suspend_ => for (module.suspensionCaptures(id)) |binding| {
                     states[binding].escaped = true;
                 },
                 .loop => {
@@ -195,6 +211,21 @@ pub const Proof = struct {
                 if (module.reference(j).unit == 0 and consumedInside(module, node.c, j, 0)) consumed_refs[j] = true;
             }
         }
+        // A closure that a generator or borrowing parameter runs and then
+        // drops only borrows the captures its body reads. Every other
+        // closure keeps its captures alive.
+        for (closures.items) |closure| {
+            const until = borrows.until.get(closure) orelse 0;
+            for (module.closureCaptures(closure)) |binding| {
+                if (until != 0 and module.binding(binding).kind == .local) {
+                    if (try borrows.captured(unit_id, closure, binding, until, read_refs)) |use| {
+                        if (use == .parts) states[binding].deep = false;
+                        continue;
+                    }
+                }
+                states[binding].escaped = true;
+            }
+        }
         // Core emits a consuming update after its indices and replacement.
         // A loop reserves its ID before bounds/body, and its final suite ID
         // follows the backedge. These ordering bounds exclude later reads;
@@ -204,7 +235,7 @@ pub const Proof = struct {
             const ref = module.reference(@intCast(i));
             if (ref.unit != 0 or ref.binding == 0 or module.binding(ref.binding).kind != .local) continue;
             if (consumed_refs[i]) continue;
-            if (read_refs[i]) states[ref.binding].last_read = @max(states[ref.binding].last_read, @as(core.Id, @intCast(i))) else states[ref.binding].escaped = true;
+            if (read_refs[i] != 0) states[ref.binding].last_read = @max(states[ref.binding].last_read, read_refs[i]) else states[ref.binding].escaped = true;
         }
         for (states) |*state| {
             state.owned = (state.origin or state.transfer) and !state.escaped and state.consumers == 1 and state.last_read < state.consume;
@@ -258,6 +289,198 @@ fn consume(state: *State, id: core.Id) void {
     state.consumers += 1;
     state.consume = id;
 }
+/// How a source function uses one parameter. `scalars` and `parts` borrow it:
+/// lengths, element reads, finite traversal, calls of a callable parameter,
+/// arguments of other borrowing parameters and closures that such a use runs
+/// and drops observe it. It cannot reach the result, a surviving closure, a
+/// merge, a carry, an effect or a store. `parts` means a read element that is
+/// not scalar can reach those places, so nested containers stay shared.
+const Use = enum { pending, escapes, scalars, parts };
+// Bounds on summary work, not language limits: deeper or larger callees
+// simply keep their arguments escaping.
+const max_borrow_depth = 8;
+const max_borrow_nodes = 1024;
+const Borrows = struct {
+    allocator: std.mem.Allocator,
+    units: []const core.Module,
+    cache: std.AutoHashMapUnmanaged(Key, Use) = .empty,
+    // Closures a generator or borrowing parameter runs before this node,
+    // which drops them.
+    until: std.AutoHashMapUnmanaged(core.Id, core.Id) = .empty,
+    const Key = struct { unit: u32, binding: core.BindingId, index: u32 };
+    fn deinit(self: *Borrows) void {
+        self.cache.deinit(self.allocator);
+        self.until.deinit(self.allocator);
+    }
+    /// A saturated direct call borrows each local argument whose parameter
+    /// only reads it, and runs a closure argument only before it returns.
+    /// Those uses last until the call, after every argument has evaluated.
+    fn markArguments(self: *Borrows, unit_id: u32, id: core.Id, states: []State, reads: []core.Id) !void {
+        const module = &self.units[unit_id - 1];
+        const call = known_call.resolve(self.units, unit_id, id) orelse return;
+        const callee = known_call.wrapper(self.units, unit_id, call) orelse return;
+        for (call.arguments[0..call.count], 0..) |argument, index| {
+            const tag = module.node(argument).tag;
+            if (tag == .closure) {
+                if (borrowed(try self.parameter(callee, index, 0))) try self.until.put(self.allocator, argument, id);
+                continue;
+            }
+            if (tag != .reference) continue;
+            const ref = module.reference(argument);
+            if (ref.unit != 0 or ref.binding == 0 or module.binding(ref.binding).kind != .local) continue;
+            const use = try self.parameter(callee, index, 0);
+            if (!borrowed(use)) continue;
+            if (use == .parts) states[ref.binding].deep = false;
+            reads[argument] = id;
+        }
+    }
+    /// How a closure that runs before `until` uses one local capture. Each
+    /// read in its body then lasts until `until`.
+    fn captured(self: *Borrows, unit_id: u32, closure: core.Id, binding: core.BindingId, until: core.Id, reads: []core.Id) !?Use {
+        const module = &self.units[unit_id - 1];
+        var seen: std.ArrayList(core.Id) = .empty;
+        defer seen.deinit(self.allocator);
+        var walk: Walk = .{ .borrows = self, .unit = unit_id, .binding = binding, .depth = 0, .seen = &seen };
+        if (!try walk.visit(module.closure(closure).body)) return null;
+        for (seen.items) |ref| reads[ref] = @max(reads[ref], until);
+        return if (walk.parts) .parts else .scalars;
+    }
+    fn parameter(self: *Borrows, callee: known_call.Wrapper, index: usize, depth: u32) error{OutOfMemory}!Use {
+        if (depth >= max_borrow_depth) return .escapes;
+        const target = callee.target;
+        const key: Key = .{ .unit = target.unit, .binding = target.binding, .index = @intCast(index) };
+        // A recursive cycle has no summary yet; it keeps its argument.
+        if (self.cache.get(key)) |use| return if (use == .pending) .escapes else use;
+        try self.cache.put(self.allocator, key, .pending);
+        const source = &self.units[target.unit - 1];
+        const body = &callee.body;
+        const binding = source.bodyParameters(body)[index].binding;
+        var walk: Walk = .{ .borrows = self, .unit = target.unit, .binding = binding, .depth = depth };
+        const use: Use = if (binding == 0 or implicitAlias(source, binding) or !try walk.visit(body.root)) .escapes else if (walk.parts) .parts else .scalars;
+        self.cache.getPtr(key).?.* = use;
+        return use;
+    }
+};
+fn borrowed(use: Use) bool {
+    return use == .scalars or use == .parts;
+}
+// Merges and carries are implicit uses, including edges outside the body.
+fn implicitAlias(module: *const core.Module, binding: core.BindingId) bool {
+    for (module.merges) |merge| if (merge.then_binding == binding or merge.else_binding == binding) return true;
+    for (module.loop_carries) |carry| if (carry.incoming == binding or carry.iteration == binding or carry.backedge == binding or carry.outgoing == binding) return true;
+    return false;
+}
+const Walk = struct {
+    borrows: *Borrows,
+    unit: u32,
+    binding: core.BindingId,
+    depth: u32,
+    budget: usize = max_borrow_nodes,
+    parts: bool = false,
+    // Admitted direct references, when the caller extends their reads.
+    seen: ?*std.ArrayList(core.Id) = null,
+    fn module(self: *const Walk) *const core.Module {
+        return &self.borrows.units[self.unit - 1];
+    }
+    fn direct(self: *const Walk, id: core.Id) bool {
+        const m = self.module();
+        if (id == 0 or m.node(id).tag != .reference) return false;
+        const ref = m.reference(id);
+        return (ref.unit == 0 or ref.unit == self.unit) and ref.binding == self.binding;
+    }
+    fn see(self: *Walk, id: core.Id) !void {
+        if (self.seen) |list| try list.append(self.borrows.allocator, id);
+    }
+    fn captures(self: *const Walk, id: core.Id) bool {
+        const m = self.module();
+        return m.node(id).tag == .closure and std.mem.findScalar(core.BindingId, m.closureCaptures(id), self.binding) != null;
+    }
+    fn visitAll(self: *Walk, ids: []const core.Id) error{OutOfMemory}!bool {
+        for (ids) |id| if (!try self.visit(id)) return false;
+        return true;
+    }
+    /// Whether `id` evaluates without exposing the parameter itself.
+    fn visit(self: *Walk, id: core.Id) error{OutOfMemory}!bool {
+        if (id == 0) return true;
+        if (self.budget == 0) return false;
+        self.budget -= 1;
+        const m = self.module();
+        const n = m.node(id);
+        // A merge or carry can make a later binding the same value.
+        if (id < m.merge_ranges.len) for (m.branchMerges(id)) |merge| {
+            if (merge.then_binding == self.binding or merge.else_binding == self.binding) return false;
+        };
+        switch (n.tag) {
+            .reference => return !self.direct(id),
+            .constant, .panic, .primitive_function, .constructor_function => return true,
+            .scalar, .logical, .associated => return try self.visit(n.a) and try self.visit(n.b),
+            .return_ => return try self.visit(n.a),
+            .bind, .construct => return try self.visit(n.b),
+            .pattern_bind => return try self.visit(n.b) and try self.visit(n.c),
+            .if_value, .if_stmt => return try self.visit(n.a) and try self.visit(n.b) and try self.visit(n.c),
+            .block, .suite, .array, .product, .record, .break_ => return try self.visitAll(m.children(id)),
+            .loop => {
+                for (m.loopCarries(id)) |carry| if (carry.incoming == self.binding or carry.iteration == self.binding or carry.backedge == self.binding or carry.outgoing == self.binding) return false;
+                const loop = m.loopInfo(id);
+                if (loop.kind == .array and self.direct(loop.first)) {
+                    const ty = m.types.node(m.typeOf(loop.first));
+                    if ((ty.tag != .array and ty.tag != .list) or !scalarType(m, ty.a)) self.parts = true;
+                    try self.see(loop.first);
+                } else if (!try self.visit(loop.first)) return false;
+                return try self.visit(loop.end) and try self.visit(loop.body);
+            },
+            .array_op => {
+                const op = m.arrayOperation(id);
+                for (m.children(id), 0..) |child, index| {
+                    // Lengths and element or lane reads observe the array. A
+                    // generator runs only inside its operation.
+                    const generator = index == 1 and op == .generate;
+                    if (self.direct(child) and (generator or (index == 0 and (op == .length or op == .get or op == .simd_load)))) {
+                        if ((op == .get and !scalarType(m, n.ty)) or (op == .simd_load and !scalarElements(m, m.typeOf(child)))) self.parts = true;
+                        try self.see(child);
+                        continue;
+                    }
+                    if (!try (if (generator and self.captures(child)) self.visit(m.closure(child).body) else self.visit(child))) return false;
+                }
+                return true;
+            },
+            // A closure body can name the parameter only through its captures.
+            .closure => return !self.captures(id),
+            .suspend_ => return std.mem.findScalar(core.BindingId, m.suspensionCaptures(id), self.binding) == null,
+            .call, .apply, .project => {
+                if (known_call.resolve(self.borrows.units, self.unit, id)) |call| if (known_call.wrapper(self.borrows.units, self.unit, call)) |callee| {
+                    for (call.arguments[0..call.count], 0..) |argument, index| {
+                        const closure = self.captures(argument);
+                        if (!closure and !self.direct(argument)) {
+                            if (!try self.visit(argument)) return false;
+                            continue;
+                        }
+                        switch (try self.borrows.parameter(callee, index, self.depth + 1)) {
+                            .scalars => {},
+                            .parts => self.parts = true,
+                            .pending, .escapes => return false,
+                        }
+                        if (closure) {
+                            if (!try self.visit(m.closure(argument).body)) return false;
+                        } else try self.see(argument);
+                    }
+                    return true;
+                };
+                // Unknown callees and partial applications keep their
+                // operands. Calling a callable parameter only runs it.
+                return switch (n.tag) {
+                    .call => try self.visitAll(m.call(id).arguments),
+                    .apply => if (self.direct(n.a)) blk: {
+                        try self.see(n.a);
+                        break :blk try self.visit(n.b);
+                    } else try self.visit(n.a) and try self.visit(n.b),
+                    else => try self.visit(n.a),
+                };
+            },
+            else => return false,
+        }
+    }
+};
 const BranchBodies = struct { then: core.Id, otherwise: core.Id };
 fn branchBodies(module: *const core.Module, id: core.Id) ?BranchBodies {
     const node = module.node(id);

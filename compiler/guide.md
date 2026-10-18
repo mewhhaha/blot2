@@ -589,6 +589,18 @@ parameters, module values, or arrays reached through another collection. Reuse
 is an optimization, not a change to immutable semantics. Record updates
 reconstruct the record; they do not mutate it.
 
+Passing an array to a saturated direct call is not an alias once the call
+returns if the callee only reads that parameter: lengths, element or
+`@simd.load` lane reads, finite traversal, or passing it on to another such
+parameter. A closure literal that
+`@array.generate` or such a call runs and then drops borrows the captures its
+body only reads in the same way. The proof follows each callee's body, whether
+or not it is inlined, so a later `values[i] := x` updates in place. Returning
+the argument, storing it in a value, capturing it in a closure that survives,
+generic dispatch the proof cannot resolve, or an edit of the same array in a
+later argument of that call keeps the copy. A non-scalar element the callee
+reads still blocks nested in-place edits, as a direct read does.
+
 For proven local temporaries, the compiler releases storage after the final
 borrowed read or write. This also covers objects larger than the scalar
 replacement limit, branches, early returns and loop exits. Direct calls can
