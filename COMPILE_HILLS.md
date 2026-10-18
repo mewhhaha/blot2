@@ -562,6 +562,13 @@ even reused ones (`backend/optimized_bodies.zig:99-117`, `wasm.zig:1067`).
   9,168 on the first edit, where population's bodies differ from retained
   ones), so a memo of proved callee pairs was tried and dropped. Wasm
   identical.
+- **Follow-up (19 October 2026):** not attempted. On the game (one
+  serial-codegen pair) the first edit after population still optimizes 2,737 of
+  3,541 functions again (804 reused, matcher budget exhausted), and its assembly
+  costs 188 ms against 59 ms on the revert, which reuses 3,538: about 130 ms of
+  the first edit. The revert matches because both revisions emit retained
+  bodies; finding why population's freshly emitted bodies differ needs their
+  pre-optimization bodies compared, which is generator work.
 
 ### CT23: persist lifetime summaries
 
