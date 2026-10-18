@@ -567,7 +567,9 @@ fn checkLongInvalidation(a: std.mem.Allocator, old: *const retained.Capture, cur
     defer matcher.deinit();
     for (0..192) |id| try std.testing.expect(!matcher.matches(id));
     for (192..199) |id| try std.testing.expect(matcher.matches(id));
-    try std.testing.expect(matcher.work <= 1_000_000);
+    // Relocation walks spend at most their 1 M budget; the positional pass
+    // adds one linear look at each body (about 26 k steps here).
+    try std.testing.expect(matcher.work <= 1_000_000 + 64_000);
     try std.testing.expect(matcher.candidates >= 199);
     try std.testing.expectEqual(@as(u32, 1), old.entries.items[191].source.instructions.items[1].operand);
     try std.testing.expectEqual(@as(u32, 2), current.entries.items[191].source.instructions.items[1].operand);
@@ -611,7 +613,7 @@ test "bounded optimizer invalidation retains unrelated bodies across long revers
     try std.testing.expectEqualSlices(u8, fresh, changed);
     try std.testing.expectEqual(@as(usize, 7), stats.reused);
     try std.testing.expectEqual(@as(usize, 192), stats.optimized);
-    try std.testing.expect(stats.match_work <= 1_000_000);
+    try std.testing.expect(stats.match_work <= 1_000_000 + 64_000);
     module.functions.items[191].instructions.items[1].operand = 1;
     var reverted: retained.Capture = .{ .allocator = a };
     defer reverted.deinit();
@@ -620,6 +622,46 @@ test "bounded optimizer invalidation retains unrelated bodies across long revers
     defer a.free(restored);
     try std.testing.expectEqualSlices(u8, before, restored);
     try std.testing.expectEqual(@as(usize, 7), stats.reused);
+}
+
+test "positional optimizer reuse covers a program larger than the relocation budget" {
+    const a = std.testing.allocator;
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    // About 1.08 M source instructions: checking every position once costs
+    // more than the 1 M relocation walk budget.
+    const count = 120;
+    for (0..count) |index| {
+        const id = try module.addFunction(&.{.i32}, .i32);
+        try module.functions.items[id].instructions.appendNTimes(a, .{ .op = .nop }, 9_000);
+        try module.emitSlice(id, &.{ .{ .op = .local_get }, .{ .op = .i32_const, .operand = @intCast(index) }, .{ .op = .i32_add } });
+    }
+    var old: retained.Capture = .{ .allocator = a };
+    defer old.deinit();
+    const before = try module.assembleWithOptions(.{ .current = &old });
+    defer a.free(before);
+    var current: retained.Capture = .{ .allocator = a };
+    defer current.deinit();
+    var stats: retained.Stats = .{};
+    const unchanged = try assemble(a, &module, &old, &current, &stats);
+    defer a.free(unchanged);
+    try std.testing.expectEqualSlices(u8, before, unchanged);
+    try std.testing.expectEqual(@as(usize, count), stats.reused);
+    try std.testing.expectEqual(@as(usize, 0), stats.optimized);
+    try std.testing.expectEqual(@as(usize, 0), stats.match_budget_exhausted);
+    try std.testing.expect(stats.match_work > 1_000_000);
+    // A changed function still loses only its own reuse.
+    module.functions.items[7].instructions.items[9_001].operand = 1_000;
+    var edited: retained.Capture = .{ .allocator = a };
+    defer edited.deinit();
+    stats = .{};
+    const changed = try assemble(a, &module, &current, &edited, &stats);
+    defer a.free(changed);
+    const fresh = try module.assemble();
+    defer a.free(fresh);
+    try std.testing.expectEqualSlices(u8, fresh, changed);
+    try std.testing.expectEqual(@as(usize, count - 1), stats.reused);
+    try std.testing.expectEqual(@as(usize, 1), stats.optimized);
 }
 
 fn fallbackReuse(a: std.mem.Allocator) !void {

@@ -444,6 +444,20 @@ even reused ones (`backend/optimized_bodies.zig:99-117`, `wasm.zig:1067`).
 
 - **Fix:** keep encoded bytes and refcounted captures for matcher-reused
   functions.
+- **Result (18 October 2026):** CT22, "Count positional optimizer matching
+  apart from the relocation budget". Encoding is about 1% of a literal edit
+  and capture cloning 0.07%; the cost was functions the optimizer redid. The
+  matcher's 1 M walk budget was spent by the positional checks alone (622 k to
+  prepare positions on gdev's 3,541 functions), so even an unchanged position
+  stopped matching part way. Positional checks are linear and now keep their
+  own count. Game, 5 pairs at load 1.2–1.7: positional reuse on a
+  literal_constant revert 2,602 → 3,538 of 3,541; revert 1,097 → 1,037 ms
+  (10.43 → 9.93 G instructions), literal_in_body revert 1,102 → 1,047 ms,
+  body_change revert 1,717 → 1,663 ms. Edits that move positions are
+  unchanged: relocation walks fail on genuinely different bodies (9,164 of
+  9,168 on the first edit, where population's bodies differ from retained
+  ones), so a memo of proved callee pairs was tried and dropped. Wasm
+  identical.
 
 ### CT23: persist lifetime summaries
 

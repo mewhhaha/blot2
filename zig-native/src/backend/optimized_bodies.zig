@@ -474,16 +474,21 @@ pub const Matcher = struct {
         const relocation = @import("runtime_body_relocation.zig");
         var walk: relocation.Walk = .{};
         const budget = walk.remaining;
+        // Positional checks examine each input, call edge and old output a
+        // bounded number of times, so their work is linear in the program.
+        // They keep a separate count: charged to the relocation budget, a
+        // program larger than that budget lost positional reuse part way.
+        var positions: relocation.Walk = .{ .remaining = std.math.maxInt(usize) };
         defer {
-            self.work = budget - walk.remaining;
+            self.work = (budget - walk.remaining) +| (std.math.maxInt(usize) - positions.remaining);
             self.budget_exhausted = @intFromBool(walk.remaining == 0);
             walk.deinit(self.allocator);
         }
-        try self.preparePositions(&walk);
+        try self.preparePositions(&positions);
         var missing = false;
         for (self.prior_ids, 0..) |*prior, id| {
             self.candidates += 1;
-            if (self.matchesPosition(&walk, id)) prior.* = id else missing = true;
+            if (self.matchesPosition(&positions, id)) prior.* = id else missing = true;
         }
         if (!missing) return;
         for (self.current.entries.items, self.prior_ids, 0..) |entry, *prior, id| {
