@@ -232,6 +232,8 @@ interface Reuse {
   /** Modules whose frontend was validated again (`attemptStats.fallback`). */
   validated_modules: number;
   recheck_body_elaborations: number;
+  /** Bodies elaborated within the whole-project check of a rebuilt seed. */
+  check_body_elaborations?: number;
   /** The dependency seed was rebuilt; true permits either outcome. */
   rebuilt_seed: boolean;
   /** The previous output was published unchanged; true requires it. */
@@ -247,6 +249,7 @@ function reuse(result: ZigProjectBuildResult): Reuse {
     fresh_closures: backend.fresh_closures,
     validated_modules: fallback.validated_modules,
     recheck_body_elaborations: fallback.recheck_body_elaborations,
+    check_body_elaborations: fallback.body_elaborations,
     rebuilt_seed: attempt.rebuilt_seed as boolean,
     reused_output: attempt.reused_output as boolean,
   };
@@ -262,6 +265,7 @@ const retainedToday: Record<string, Reuse> = {
     fresh_closures: 0,
     validated_modules: 5,
     recheck_body_elaborations: 0,
+    check_body_elaborations: 150,
     rebuilt_seed: true,
     reused_output: false,
   },
