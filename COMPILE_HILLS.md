@@ -858,6 +858,10 @@ scan every variable per scope (`eval/core_eval.zig:6572-6640, 11743-11750`).
 That is quadratic in region scopes.
 
 - **Fix:** use compressed sparse rows and per-scope variable lists.
+- **Result (18 October 2026):** dropped. On 2,475 cold game samples
+  `freeze` is 0.2–0.3% inclusive and `exportSolved` 1.4%, almost all of it
+  projection and row resolution rather than scanning; per-scope lists would
+  save under 0.3%.
 
 ### CT54: memoize `lexicalScope` and index instance selection
 
