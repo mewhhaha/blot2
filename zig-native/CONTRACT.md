@@ -1014,13 +1014,27 @@ names are numbered within their top-level declaration. See
 [body interface cutoff](BODY_CUTOFF.md).
 
 Population checks every dependency within the whole project and the entry once,
-as the consumer of the frozen dependencies. A rejection, lowering diagnostic or
-freeze failure finishes the deferred entry check with the same budgets and body
-offers and takes the undivided lane, which reports it. Published capability
-collections are built children-first from each binding's recipe, so a module
-checked against live dependencies publishes the same Core and interface as one
-checked against their frozen interfaces, and the first edit after population
-cuts off like any later one.
+as the consumer of the frozen dependencies. Published capability collections
+are built children-first from each binding's recipe, so a module checked
+against live dependencies publishes the same Core and interface as one checked
+against their frozen interfaces, and the first edit after population cuts off
+like any later one.
+
+A build publishes only its first diagnostic, so a project check that reports
+one stops after that module. A portable check rejection is published by the
+lane that found it: the entry checked against the frozen dependencies, or the
+changed modules checked against the seed. Portable means the diagnostic belongs
+to a module that lane parsed, its text is the code's fixed message with at most
+a name (no hole, explanation, purity witness, numeric fault or detail), it is no
+budget, analysis-limit or dependency-failure rejection, and every loaded module
+is reachable from the entry or the prelude. The modules taken from the seed are
+closed under imports and checked successfully on the same inputs, and a frozen
+producer publishes what a live one does, so a fresh check meets the same first
+failing module and diagnostic: the premise successful retained revisions
+already rely on. The published fields are identical; the unit ordinal, which is
+not published, numbers the lane's own modules. Any other rejection, lowering
+diagnostic or freeze failure finishes the deferred entry check with the same
+budgets and body offers and takes the undivided lane, which reports it.
 
 Receiver syntax, operators and `from` select an associated function by type,
 through no named reference. A dirty associated candidate therefore dirties

@@ -29,7 +29,7 @@ const Fixture = struct {
     }
 };
 fn same(expected: *const partial.Result, actual: *const partial.Result) !void {
-    try std.testing.expectEqualDeep(expected.result.diagnostic, actual.result.diagnostic);
+    try @import("dependency_consumer.zig").expectSamePublished(expected.result.diagnostic, actual.result.diagnostic);
     try std.testing.expectEqualDeep(expected.result.compiled.diagnostic, actual.result.compiled.diagnostic);
     try std.testing.expectEqualDeep(expected.diagnostic_filename, actual.diagnostic_filename);
     try std.testing.expectEqual(expected.result.compiled.constant_steps, actual.result.compiled.constant_steps);
@@ -37,7 +37,7 @@ fn same(expected: *const partial.Result, actual: *const partial.Result) !void {
     try std.testing.expectEqualSlices(u8, expected.result.compiled.bytes, actual.result.compiled.bytes);
 }
 fn sameOutput(expected: *const partial.Result, actual: *const partial.Result, reused_output: bool) !void {
-    try std.testing.expectEqualDeep(expected.result.diagnostic, actual.result.diagnostic);
+    try @import("dependency_consumer.zig").expectSamePublished(expected.result.diagnostic, actual.result.diagnostic);
     try std.testing.expectEqualDeep(expected.result.compiled.diagnostic, actual.result.compiled.diagnostic);
     try std.testing.expectEqualDeep(expected.diagnostic_filename, actual.diagnostic_filename);
     try std.testing.expectEqual(if (reused_output) 0 else expected.result.compiled.constant_steps, actual.result.compiled.constant_steps);

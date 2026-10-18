@@ -727,12 +727,28 @@ pub fn checkProjectRetainingBodies(allocator: Allocator, source: *project.Projec
     return checkProjectMode(allocator, source, .{}, previous, null, true);
 }
 
+/// PRIVATE: checks like checkProjectWithEntryCutoff (with `previous`),
+/// checkProjectRetainingBodies or checkProject, for callers that publish only
+/// the first diagnostic. Checking stops after the first module that reports
+/// one, so `diagnostics` is a non-empty prefix of the complete check's list
+/// exactly when that list is non-empty, and later modules stay unchecked.
+pub fn checkProjectToFirstDiagnostic(allocator: Allocator, source: *project.Project, previous: ?entry_cutoff.Previous, retain_bodies: bool) !CheckedProject {
+    return checkProjectModeDeferring(allocator, source, .{}, previous, null, retain_bodies, false, true);
+}
+
 /// PRIVATE population lane: checks every module except the entry, which is
 /// last in dependency order, and records the budgets left for it. The entry
 /// stays unchecked until checkDeferredEntry. Source-validation projects check
 /// every module at once and leave `deferred_entry` null.
 pub fn checkProjectDeferringEntry(allocator: Allocator, source: *project.Project, previous: ?entry_cutoff.Previous) !CheckedProject {
-    return checkProjectModeDeferring(allocator, source, .{}, previous, null, true, true);
+    return checkProjectModeDeferring(allocator, source, .{}, previous, null, true, true, false);
+}
+
+/// checkProjectDeferringEntry for a caller that publishes only the first
+/// diagnostic: a dependency's diagnostic stops checking there, leaving
+/// `deferred_entry` null, so checkDeferredEntry checks nothing more.
+pub fn checkProjectDeferringEntryToFirstDiagnostic(allocator: Allocator, source: *project.Project, previous: ?entry_cutoff.Previous) !CheckedProject {
+    return checkProjectModeDeferring(allocator, source, .{}, previous, null, true, true, true);
 }
 
 /// Checks the entry of a checkProjectDeferringEntry result exactly as one
@@ -760,9 +776,9 @@ pub fn checkDeferredEntry(allocator: Allocator, source: *project.Project, checke
 }
 
 fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: check.PrivateExecution, previous: ?entry_cutoff.Previous, editor: ?EditorQuery, retain_bodies: bool) !CheckedProject {
-    return checkProjectModeDeferring(allocator, source, execution, previous, editor, retain_bodies, false);
+    return checkProjectModeDeferring(allocator, source, execution, previous, editor, retain_bodies, false, false);
 }
-fn checkProjectModeDeferring(allocator: Allocator, source: *project.Project, execution: check.PrivateExecution, previous: ?entry_cutoff.Previous, editor: ?EditorQuery, retain_bodies: bool, defer_entry: bool) !CheckedProject {
+fn checkProjectModeDeferring(allocator: Allocator, source: *project.Project, execution: check.PrivateExecution, previous: ?entry_cutoff.Previous, editor: ?EditorQuery, retain_bodies: bool, defer_entry: bool, first_diagnostic: bool) !CheckedProject {
     const timing = @import("../phase_profile.zig").enter(.check);
     defer timing.exit();
     var engine: Engine = .{ .allocator = allocator, .source = source, .result = .{}, .execution = execution, .editor = editor, .retain_bodies = retain_bodies };
@@ -808,6 +824,10 @@ fn checkProjectModeDeferring(allocator: Allocator, source: *project.Project, exe
                 break;
             }
             if (!try engine.checkOrdered(unit, previous)) break;
+            // Diagnostics are appended in dependency order and never
+            // reordered, so the first is final once it exists. Source
+            // validation still collects every module's numeric diagnostics.
+            if (first_diagnostic and !engine.source_validation and engine.diagnostics.items.len != 0) break;
         }
     }
     engine.result.diagnostics = try engine.diagnostics.toOwnedSlice(allocator);

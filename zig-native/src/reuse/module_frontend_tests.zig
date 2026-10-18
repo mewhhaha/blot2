@@ -44,7 +44,7 @@ fn fresh(fixture: *Fixture) !partial.Result {
     }
 }
 fn equal(actual: *const partial.Result, expected: *const partial.Result) !void {
-    try std.testing.expectEqualDeep(expected.result.diagnostic, actual.result.diagnostic);
+    try @import("dependency_consumer.zig").expectSamePublished(expected.result.diagnostic, actual.result.diagnostic);
     try std.testing.expectEqualDeep(expected.result.compiled.diagnostic, actual.result.compiled.diagnostic);
     try std.testing.expectEqualSlices(u8, expected.result.compiled.bytes, actual.result.compiled.bytes);
     try std.testing.expectEqual(expected.result.compiled.constant_steps, actual.result.compiled.constant_steps);

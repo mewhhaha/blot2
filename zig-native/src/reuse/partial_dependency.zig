@@ -26,6 +26,10 @@ pub const Result = struct {
     source_bytes: usize = 0,
     fresh_modules: usize = 0,
     cached_modules: usize = 0,
+    /// A check rejection that any lane loading the same modules reports
+    /// identically: see `portableRejection`. Retained revisions publish it
+    /// without first rebuilding the whole project in the ordinary lane.
+    portable: bool = false,
     pub fn deinit(self: *Result, a: Allocator) void {
         self.result.deinit(a);
         if (self.diagnostic_filename) |path| a.free(path);
@@ -294,35 +298,19 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
     if (output_identity) |output| for (source.units.items) |unit| {
         if (std.mem.eql(u8, output, source.symbols.get(unit.filename))) return error.OutputIsSource;
     };
+    // A rejection publishes only the first diagnostic, so checking stops at
+    // the first module that reports one.
     var checked = if (owned_check) |value| taken: {
         owned_check = null;
         break :taken value;
-    } else if (previous) |old|
-        try checker.checkProjectWithEntryCutoff(a, source, checkPrevious(old))
-    else if (retain_bodies)
-        try checker.checkProjectRetainingBodies(a, source, null)
-    else
-        try checker.checkProject(a, source);
+    } else try checker.checkProjectToFirstDiagnostic(a, source, if (previous) |old| checkPrevious(old) else null, previous != null or retain_bodies);
     var check_transferred = false;
     defer if (!check_transferred) checked.deinit(a);
     if (checked.diagnostics.len != 0) {
-        const issue = checked.diagnostics[0];
-        const unit = source.unit(issue.unit);
-        if (issue.hole) |hole| return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .hole = hole }));
-        if (issue.explanation) |explanation| return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .explanation = explanation }));
-        if (issue.numeric_literal) |detail| return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message(), .actual_token = detail.actual_token }, @as([]const ast.NumericFault, &.{detail})));
-        if (issue.purity) |witness| {
-            if (witness.operation_name == null and !witness.foreign) return error.OperationPurityOriginRequired;
-            const message = try purity.format(a, &source.symbols, "", witness);
-            defer a.free(message);
-            return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = message }, @as([]const @import("../check/check.zig").PurityWitness, &.{witness})));
-        }
-        const message = if (issue.symbol != 0)
-            try a.print("{s}{s}{s}", .{ issue.message(), if (std.mem.eql(u8, issue.codeName(), "unknown_intrinsic") or std.mem.eql(u8, issue.codeName(), "unknown_record_field")) " " else ": ", source.symbols.get(issue.symbol) })
-        else
-            try a.dupe(u8, issue.message());
-        defer a.free(message);
-        return reject(a, source, entry_path, try consumer.Diagnostic.init(a, issue.unit, "check-project", issue.codeName(), issue.span, message));
+        const portable = try portableRejection(a, source, checked.diagnostics[0]);
+        var rejection = try rejectChecked(a, source, entry_path, checked.diagnostics[0]);
+        rejection.rejected.portable = portable;
+        return rejection;
     }
     const units = try a.alloc(core.Module, source.units.items.len);
     var initialized: usize = 0;
@@ -404,6 +392,69 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
     }
     transferred = true;
     return .{ .ready = .{ .body_caches = body_caches, .units = units, .identity = identity, .unit_order = unit_order, .paths = paths, .cached = dependency.modules.len, .borrowed = borrowed, .entry_imports = entry_imports, .entry_implicit_prelude = source.unit(source.entry).implicit_prelude, .entry = source.entry, .prelude = source.prelude_unit, .source_mode = source.input_mode == .source, .source_bytes = source.source_bytes, .stats = stats } };
+}
+
+/// Whether every lane that loads the same modules publishes this first check
+/// diagnostic identically. The modules a retained lane takes from its seed
+/// are closed under imports, so it checks its source-parsed modules in the
+/// relative order of a fresh dependency-first check, against equal interfaces
+/// (a frozen producer publishes what a live one does), and each module it
+/// takes from the seed checked successfully on the same inputs. It therefore
+/// meets the same first failing module and the same first diagnostic as a
+/// fresh check, under the premise its successful revisions already rely on,
+/// provided that:
+/// - the diagnostic belongs to a module parsed in this lane;
+/// - its text is its code's fixed message with at most a name, never printed
+///   types (a hole, explanation, purity witness, numeric fault or detail);
+/// - it is not a budget or analysis-limit rejection, whose allowance depends
+///   on what else was checked first, or a dependency failure; and
+/// - every loaded module is reachable from the entry or the prelude, so a
+///   fresh load reads exactly these modules and their implementations.
+fn portableRejection(a: Allocator, source: *const project.Project, issue: checker.Diagnostic) Allocator.Error!bool {
+    if (source.input_mode != .project or issue.unit == 0 or issue.unit > source.units.items.len or source.compiledModule(issue.unit) != null) return false;
+    if (issue.hole != null or issue.explanation != null or issue.numeric_literal != null or issue.purity != null or issue.detail != null or issue.source != null) return false;
+    switch (issue.code) {
+        .semantic => switch (issue.semantic orelse return false) {
+            .task_budget, .proof_analysis_limit, .capability_analysis_limit, .associated_limit, .nesting_limit, .inference_budget, .usage_analysis_limit, .staging_budget => return false,
+            else => {},
+        },
+        .duplicate_name, .unknown_export, .entry_module, .declaration_modifier => {},
+        .resolution_budget, .source_validation, .dependency_failed => return false,
+    }
+    const seen = try a.alloc(bool, source.units.items.len);
+    defer a.free(seen);
+    @memset(seen, false);
+    var stack: std.ArrayList(u32) = .empty;
+    defer stack.deinit(a);
+    for ([_]u32{ source.entry, source.prelude_unit }) |root| if (root != 0) try stack.append(a, root);
+    while (stack.pop()) |unit| {
+        if (unit == 0 or unit > seen.len) return false;
+        if (seen[unit - 1]) continue;
+        seen[unit - 1] = true;
+        if (source.unit(unit).implicit_prelude and source.prelude_unit != 0) try stack.append(a, source.prelude_unit);
+        for (source.unitImports(unit)) |edge| try stack.append(a, edge.target);
+    }
+    for (seen) |reached| if (!reached) return false;
+    return true;
+}
+
+fn rejectChecked(a: Allocator, source: *const project.Project, entry_path: []const u8, issue: checker.Diagnostic) !Preparation {
+    const unit = source.unit(issue.unit);
+    if (issue.hole) |hole| return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .hole = hole }));
+    if (issue.explanation) |explanation| return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .explanation = explanation }));
+    if (issue.numeric_literal) |detail| return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message(), .actual_token = detail.actual_token }, @as([]const ast.NumericFault, &.{detail})));
+    if (issue.purity) |witness| {
+        if (witness.operation_name == null and !witness.foreign) return error.OperationPurityOriginRequired;
+        const message = try purity.format(a, &source.symbols, "", witness);
+        defer a.free(message);
+        return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = message }, @as([]const @import("../check/check.zig").PurityWitness, &.{witness})));
+    }
+    const message = if (issue.symbol != 0)
+        try a.print("{s}{s}{s}", .{ issue.message(), if (std.mem.eql(u8, issue.codeName(), "unknown_intrinsic") or std.mem.eql(u8, issue.codeName(), "unknown_record_field")) " " else ": ", source.symbols.get(issue.symbol) })
+    else
+        try a.dupe(u8, issue.message());
+    defer a.free(message);
+    return reject(a, source, entry_path, try consumer.Diagnostic.init(a, issue.unit, "check-project", issue.codeName(), issue.span, message));
 }
 
 /// Lowers on workers, when the project allows it, exactly the units the

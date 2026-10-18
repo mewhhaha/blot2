@@ -121,6 +121,10 @@ pub const FallbackStats = struct {
     entry_cutoff: @import("entry_frontend_cutoff.zig").Stats = .{},
     module_cutoff: @import("entry_frontend_cutoff.zig").Stats = .{},
     dependency_storage: retained_dependency.Stats = .{},
+    /// The published check rejection came from the lane that checked only the
+    /// changed modules, or the entry against frozen dependencies, without
+    /// checking the whole project again (partial.portableRejection).
+    portable_rejection: bool = false,
 };
 pub const Stats = struct { rebuilt_seed: bool = false, reused_output: bool = false, trivia_only: bool = false, inputs: inputs.Counts = .{}, fallback: FallbackStats = .{} };
 
@@ -382,7 +386,14 @@ pub const Session = struct {
             var fresh = try partial.prepareProjectKeepingEntry(a, &source, entry_path, output_identity, &self.seed, &checked, self.frontendOffer(snapshot.options));
             var fresh_alive = true;
             defer if (fresh_alive) fresh.deinit(a);
-            if (fresh == .rejected) return null;
+            if (fresh == .rejected) {
+                // The ordinary lane would meet this same first diagnostic
+                // (partial.portableRejection); only other rejections take it.
+                if (!fresh.rejected.portable) return null;
+                fresh_alive = false;
+                counts.portable_rejection = true;
+                return fresh;
+            }
             const saved: retained_dependency.Seed = shared: {
                 const owner = try closure.freezeSharedFromMixed(a, &source, &checked.?, &fresh.ready, self.seed_snapshot.?, &work.dependency_storage);
                 break :shared .{ .value = owner.value, .snapshot = owner };
@@ -457,12 +468,14 @@ pub const Session = struct {
         // The ordinary lane checks the entry twice: within the whole project,
         // then as the consumer of the frozen dependencies, whose result is
         // published. Defer it from the first check; finish that check only
-        // when the consumer lane declines, so the ordinary lane below still
-        // owns every rejection and failure.
+        // when the consumer lane declines with a failure it cannot publish
+        // (see consumeDeferred), so the ordinary lane below owns the rest.
+        // Only the first diagnostic is published, so a dependency's stops the
+        // check there.
         var deferred: ?checker.CheckedProject = null;
         defer if (deferred) |*checked| checked.deinit(a);
         if (source.diagnostics.items.len == 0 and !outputIsSource(&source, output_identity)) {
-            deferred = try checker.checkProjectDeferringEntry(a, &source, check_offer);
+            deferred = try checker.checkProjectDeferringEntryToFirstDiagnostic(a, &source, check_offer);
             if (try self.consumeDeferred(io, entry_path, output_identity, snapshot, &source, &deferred.?, candidate_seed, counts, body_offer)) |consumer| return consumer;
             try checker.checkDeferredEntry(a, &source, &deferred.?, check_offer);
         }
@@ -528,8 +541,11 @@ pub const Session = struct {
     }
     /// The consumer lane of a deferred population check: freeze the checked
     /// dependencies and prepare the entry once, against that seed, exactly as
-    /// the ordinary lane's published consumer. It publishes only success; null
-    /// leaves the candidate seed and counts untouched.
+    /// the ordinary lane's published consumer. It publishes success, and a
+    /// portable rejection (partial.portableRejection), which the entry's check
+    /// against the live dependencies would report identically; nothing is
+    /// seeded from a rejection. Null leaves the candidate seed and counts
+    /// untouched.
     fn consumeDeferred(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, snapshot: *inputs.Snapshot, source: *project.Project, checked: *const checker.CheckedProject, candidate_seed: *?retained_dependency.Seed, counts: *FallbackStats, body_offer: ?partial.EntryPrevious) !?partial.Preparation {
         const a = self.allocator;
         if (checked.deferred_entry == null or checked.diagnostics.len != 0) return null;
@@ -546,6 +562,10 @@ pub const Session = struct {
         seed.snapshot = owner;
         var consumer = try partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &seed.value, snapshot.provider(), body_offer);
         if (consumer == .rejected) {
+            if (consumer.rejected.portable) {
+                counts.portable_rejection = true;
+                return consumer;
+            }
             consumer.deinit(a);
             return null;
         }
@@ -624,7 +644,10 @@ pub const Session = struct {
                 else => return err,
             };
             if (fast_result) switch (preparation) {
-                .rejected => |*result| {
+                .rejected => |*result| if (result.portable) {
+                    // A portable check rejection already is the fresh result.
+                    fallback_counts.portable_rejection = true;
+                } else {
                     // An entry may remove old producers before a load/parse
                     // error. Fresh graph limits and diagnostic ordering then
                     // differ from a compiled prefix; establish the fresh result.

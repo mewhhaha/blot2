@@ -617,6 +617,25 @@ constant-receipt retry compiles again
 
 - **Fix:** roll back only the speculated local.
 - **Target:** an edit with an error costs no more than one compile.
+- **Result (18 October 2026):** CT29, "Publish portable check rejections from
+  the lane that found them". On gdev the backend retries never ran: an
+  instrumented build saw no speculative or receipt retry over four emit-stage
+  errors (type mismatch, missing implementation, const panic, division by zero),
+  which cost one compile already. The cost was the frontend: a check error found
+  by the mixed lane, the fast entry lane or the population consumer fell back to
+  loading and checking the whole project again, which kept checking past the
+  error. A build publishes only its first diagnostic, so a project check now
+  stops after the module that reports one, and a portable rejection (a plain
+  message in a module the lane parsed, no budget or dependency failure, every
+  module reachable) is published by the lane that found it. Game, 5 pairs at
+  load 1.6–2.2, identical diagnostics: unknown value in `robots` 619 → 20 ms
+  (4.99 → 0.14 G instructions), type mismatch 648 → 48 ms, unknown value in the
+  entry 1,015 → 12 ms, in `ink/math` 241 → 46 ms; emit-stage errors and
+  successful edits unchanged. Rejected `salt_hauling` population 3,787 → 2,404
+  ms (33.3 → 20.5 G); the remaining 0.2 s over checking the entry against live
+  dependencies is the dependency freeze the consumer check reads (the checker
+  reads frozen Core), which the successful population needs anyway. Wasm
+  identical.
 
 ## Phase 2: checker
 

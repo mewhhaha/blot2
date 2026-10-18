@@ -121,7 +121,7 @@ fn ordinary(fixture: *const Fixture) !partial.Result {
 }
 
 fn sameResult(expected: *const partial.Result, actual: *const partial.Result) !void {
-    try std.testing.expectEqualDeep(expected.result.diagnostic, actual.result.diagnostic);
+    try @import("dependency_consumer.zig").expectSamePublished(expected.result.diagnostic, actual.result.diagnostic);
     try std.testing.expectEqualDeep(expected.result.compiled.diagnostic, actual.result.compiled.diagnostic);
     try std.testing.expectEqualDeep(expected.diagnostic_filename, actual.diagnostic_filename);
     try std.testing.expectEqualSlices(u8, expected.result.compiled.bytes, actual.result.compiled.bytes);

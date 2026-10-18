@@ -511,3 +511,79 @@ Deno.test("budget: retained edit suite reuses at least today's work", async () =
     }`,
   );
 });
+
+// An edit with a check error costs one partial check: the lane that checks the
+// changed modules (or the entry against the frozen dependencies) publishes a
+// portable rejection without checking the whole project again, and its
+// diagnostic equals a fresh build's.
+const rejectedEdits: readonly {
+  name: string;
+  file: string;
+  search: string;
+  replace: string;
+}[] = [
+  {
+    name: "dependency_unknown_value",
+    file: "robots.blot",
+    search: "floor phase + 1.0",
+    replace: "floor phase + missing_value",
+  },
+  {
+    name: "dependency_type_mismatch",
+    file: "robots.blot",
+    search: "width: carry.width }",
+    replace: "width: carry }",
+  },
+  {
+    name: "entry_unknown_value",
+    file: "main.blot",
+    search: "robots.walk x",
+    replace: "robots.walk missing_value",
+  },
+];
+Deno.test("budget: retained edits with check errors publish one partial check", async () => {
+  await Deno.mkdir(scratchRoot, { recursive: true });
+  const directory = await Deno.makeTempDir({
+    dir: scratchRoot,
+    prefix: "budget-rejected-edits-",
+  });
+  const options = {
+    executable: compiler,
+    entry: `${directory}/${editSuite.entry}`,
+    prelude,
+    stdRoot,
+    cacheDirectory: false as const,
+  };
+  const retained = await createZigProjectCompiler(options);
+  try {
+    for (const [file, source] of Object.entries(editSuite.files)) {
+      await Deno.writeTextFile(`${directory}/${file}`, source);
+    }
+    assert((await retained.build()).success);
+    for (const edit of rejectedEdits) {
+      const original = editSuite.files[edit.file];
+      assert.equal(original.split(edit.search).length, 2, edit.name);
+      const sources = {
+        [`${directory}/${edit.file}`]: original.replace(edit.search, edit.replace),
+      };
+      const rejected = await retained.build({ sources });
+      assert(!rejected.success, edit.name);
+      const attempt = rejected.attemptStats as Record<string, unknown>;
+      const fallback = attempt.fallback as Record<string, unknown>;
+      assert.equal(fallback.portable_rejection, true, edit.name);
+      assert.equal(attempt.rebuilt_seed, false, edit.name);
+      const fresh = await createZigProjectCompiler(options);
+      try {
+        const expected = await fresh.build({ sources });
+        assert(!expected.success, edit.name);
+        assert.deepEqual(rejected.diagnostics, expected.diagnostics, edit.name);
+      } finally {
+        await fresh.dispose();
+      }
+      assert((await retained.build()).success, `${edit.name} revert`);
+    }
+  } finally {
+    await retained.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

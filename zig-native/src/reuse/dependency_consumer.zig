@@ -63,6 +63,20 @@ pub const Diagnostic = struct {
         try writer.writeByte('\n');
     }
 };
+/// Test helper: every field a project build publishes for a frontend
+/// rejection agrees. The unit ordinal is not published (the file name is): it
+/// numbers the modules of the lane that found the diagnostic.
+pub fn expectSamePublished(expected: ?Diagnostic, actual: ?Diagnostic) !void {
+    try std.testing.expectEqual(expected == null, actual == null);
+    const left = expected orelse return;
+    const right = actual.?;
+    try std.testing.expectEqualStrings(left.stage, right.stage);
+    try std.testing.expectEqualStrings(left.code, right.code);
+    try std.testing.expectEqual(left.start, right.start);
+    try std.testing.expectEqual(left.end, right.end);
+    try std.testing.expectEqualStrings(left.message, right.message);
+    try std.testing.expectEqualDeep(left.publication, right.publication);
+}
 pub fn publishedDiagnostic(allocator: Allocator, unit: u32, stage: []const u8, source: []const u8, publication: syntax.Publication, details: anytype) !Diagnostic {
     var result = try Diagnostic.init(allocator, unit, stage, publication.code, publication.span, publication.message);
     errdefer result.deinit(allocator);
