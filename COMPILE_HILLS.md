@@ -1169,6 +1169,12 @@ path (`main.zig:438-475`).
 
 - **Fix:** encode functions on workers into per-function buffers. Concatenate
   them in index order.
+- **Result (18 October 2026):** dropped. Encoding is 0.3% of cold game samples
+  and about 1% of an edit. Per-worker buffers joined in index order kept the
+  Wasm identical for every worker count, but with `codegenWorkers` 4 (5 pairs,
+  load 1.6) `assemble_us` fell only from 89.6 to 89.1 ms on the game, 95.1 to
+  92.3 ms on a literal edit and 64.2 to 60.0 ms on its revert. Wall time did
+  not move (2,256 → 2,258, 1,038 → 1,036 and 936 → 931 ms), and CPU rose 2%.
 
 ## Phase 6: hashing, copying, memory
 
