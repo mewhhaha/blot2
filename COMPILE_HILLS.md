@@ -482,6 +482,13 @@ The principal gate re-scans all bindings until nothing changes
 same fixpoint (`reuse/revision_inputs.zig:459-475`).
 
 - **Fix:** use reverse-dependency worklists seeded by the changed modules.
+- **Result (18 October 2026):** dropped; the fixpoints are not the cost. Sampled
+  at `685ae93`, `propagateReferences` is 0.04% of a literal edit and 0.04% of a
+  body edit, `dirtySelections` (which repeats it) 0.12% of a body edit, about 3
+  ms together, under what one build can attribute. The importer fixpoint in
+  `reusableModules` iterates 130 modules and does not show in samples; its
+  function's 0.21% is realpath, reads and digests (CT19). Worklists would add
+  reverse-edge construction to every gate for no measurable gain.
 
 ### CT21: append-only pools
 
