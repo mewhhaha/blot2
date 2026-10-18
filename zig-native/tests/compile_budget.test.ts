@@ -416,11 +416,11 @@ const revalidationToday: Record<string, Revalidation> = {
   "revert:literal_in_body": { core_checked: 1, interface_checked: 1 },
   "edit:body_change": { core_checked: 1, interface_checked: 1 },
   "revert:body_change": { core_checked: 1, interface_checked: 1 },
-  "edit:type_change": { core_checked: 1, interface_checked: 4 },
+  "edit:type_change": { core_checked: 1, interface_checked: 1 },
   "revert:type_change": { core_checked: 1, interface_checked: 1 },
   "edit:imported_body": { core_checked: 1, interface_checked: 1 },
   "revert:imported_body": { core_checked: 1, interface_checked: 1 },
-  "edit:unused_export": { core_checked: 3, interface_checked: 4 },
+  "edit:unused_export": { core_checked: 3, interface_checked: 3 },
   "revert:unused_export": { core_checked: 3, interface_checked: 3 },
 };
 

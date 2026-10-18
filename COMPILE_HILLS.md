@@ -691,6 +691,21 @@ whole program on every build.
 `dependency_interface_validation.validateGraphWithBudget` is 0.6% self.
 
 - **Fix:** skip it for interfaces whose hash is already validated.
+- **Result (18 October 2026):** two commits. "CT48: validate each fresh
+  principal interface once, after renumbering": `freezeOne` validated every new
+  interface (bounds and graph) before the closure pass validated it again; the
+  checked relink now covers interface units, so only the closure pass remains:
+  game instructions -0.67% (23,068 → 22,913 M), devtools -0.67%. "CT48: keep
+  shared interface receipts when only the dictionary grows": shared interfaces
+  were already reused (no hash needed: a shared owner is immutable), but any new
+  symbol revalidated all of them. Interface validation reads only its own
+  module and bounds symbol IDs from above, so a grown dictionary keeps the
+  receipts: a game type-change edit checks 13 instead of 129 interfaces, an
+  unused export 75 instead of 129 (miniature suite 1 and 3 instead of 4,
+  budgeted). With CT46, versus main `67f1068` (5 pairs, load 0.8): cold game
+  validation clock 128 → 58 ms, instructions -2.2% (23,185 → 22,675 M),
+  devtools -2.4%; type-change edit validation 72.7 → 24.8 ms (CPU 1,987 →
+  1,941 ms). Wasm identical.
 
 ### CT49: attribute `validateModuleBodies`
 

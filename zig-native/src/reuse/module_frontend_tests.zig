@@ -150,12 +150,14 @@ test "shared dependency validation rechecks exactly the importers of changed for
     try std.testing.expectEqual(@as(usize, 1), stats.core_reused);
     try std.testing.expectEqual(@as(usize, 2), stats.core_checked);
     try std.testing.expectEqual(stats.shared_modules, stats.interface_reused);
-    // A new symbol only raises the dictionary bound; ownership still decides.
+    // A new symbol only raises the dictionary bound; ownership still decides,
+    // and every shared interface keeps its receipt.
     stats = try ownerScopedRevision(&session, &fixture, "const new_private_name: U32 = 2\nconst value: U32 = 43\n", &left_shared);
     try std.testing.expect(session.seed.symbols.len > symbols);
     try std.testing.expectEqual(@as(usize, 1), stats.core_reused);
     try std.testing.expectEqual(stats.fresh_modules + @intFromBool(left_shared), stats.core_checked);
-    try std.testing.expectEqual(@as(usize, 0), stats.interface_reused);
+    try std.testing.expectEqual(stats.shared_modules, stats.interface_reused);
+    try std.testing.expectEqual(stats.fresh_modules, stats.interface_checked);
     stats = try ownerScopedRevision(&session, &fixture, original, &left_shared);
     try std.testing.expectEqual(@as(usize, 1), stats.core_reused);
     try std.testing.expectEqual(stats.fresh_modules + @intFromBool(left_shared), stats.core_checked);

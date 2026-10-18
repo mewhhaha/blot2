@@ -404,6 +404,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
     // shared module whose transitive owners are all shared validates exactly
     // as before when the module count is unchanged: symbol IDs are only ever
     // bounded above by the dictionary, which is append-only across revisions.
+    // A shared interface reads nothing foreign and keeps its receipt likewise.
     const owner_bounds = if (saved) |old| value.modules.len == old.value.modules.len and value.symbols.len >= old.value.symbols.len else false;
     var exact_owners: ?@import("dependency_core_inputs.zig").Owners = null;
     var owners_examined = false;
@@ -412,13 +413,12 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
     var associated_remaining: usize = 1_000_000;
     for (value.modules, 0..) |*m, id| {
         const shared = if (saved) |old| if (current) |owner| owner.shares(old, id) else false else false;
-        const same_interface_bounds = if (saved) |old| value.symbols.len == old.value.symbols.len and value.modules.len == old.value.modules.len else false;
         try require(std.Io.Dir.path.isAbsolute(m.identity.normalized_path));
         const path = try paths.getOrPut(a, m.identity.normalized_path);
         try require(!path.found_existing);
         prelude_count += @intFromBool(m.identity.prelude);
         try require(prelude_count <= 1);
-        if (shared and same_interface_bounds) {
+        if (shared and owner_bounds) {
             stats.interface_reused += 1;
         } else {
             try principal_validation.validate(&m.interface, value.symbols.len, value.modules.len);
