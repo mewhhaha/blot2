@@ -528,3 +528,72 @@ fn triviaScenario(allocator: std.mem.Allocator, base: []const u8) !void {
     defer allocator.free(changed);
     try std.testing.expect(try same(allocator, base, changed));
 }
+
+/// Every observation, looked up through the snapshot, equals a scan of its
+/// list; a repeated lookup reads, resolves and digests nothing again.
+fn indexScenario(allocator: std.mem.Allocator, root: []const u8, overlay: []const u8) !void {
+    const aliases = [_]project.Alias{.{ .prefix = "pkg/", .root = root }};
+    const sources = [_]inputs.overlays.Source{.{ .path = overlay, .contents = "const answer:U32=7\n" }};
+    var snapshot = try inputs.Snapshot.initWithSources(allocator, io, .{ .aliases = &aliases }, &sources);
+    var alive = true;
+    defer if (alive) snapshot.deinit();
+    const main_path = try std.Io.Dir.path.join(allocator, &.{ root, "main.blot" });
+    defer allocator.free(main_path);
+    const requests = [_][]const u8{ "./dep", "pkg/dep", "./overlay", "unknown/dep", "./missing" };
+    for (0..2) |round| {
+        const before = snapshot.counts;
+        for (requests) |request| {
+            const resolved = snapshot.resolve(main_path, request) catch |err| {
+                if (err == error.OutOfMemory) return error.OutOfMemory;
+                continue;
+            };
+            const canonical = snapshot.canonical(io, resolved) catch |err| {
+                if (err == error.OutOfMemory) return error.OutOfMemory;
+                continue;
+            };
+            const bytes = snapshot.read(io, canonical) catch |err| {
+                if (err == error.OutOfMemory) return error.OutOfMemory;
+                continue;
+            };
+            const digest = try snapshot.sourceDigest(canonical, bytes);
+            try std.testing.expectEqual(format.digest(bytes), digest);
+            try std.testing.expectEqualStrings(bytes, snapshot.capturedSource(canonical).?);
+        }
+        if (round == 1) try std.testing.expectEqualDeep(before, snapshot.counts);
+    }
+    try std.testing.expectEqual(@as(usize, 5), snapshot.counts.resolutions);
+    // Each list position is the one its index names, and keys are distinct.
+    for (snapshot.paths.items, 0..) |entry, position| {
+        try std.testing.expectEqual(@as(u32, @intCast(position)), snapshot.path_index.get(entry.key).?);
+        for (snapshot.paths.items[0..position]) |earlier| try std.testing.expect(!std.mem.eql(u8, earlier.key, entry.key));
+    }
+    for (snapshot.files.items, 0..) |entry, position| try std.testing.expectEqual(@as(u32, @intCast(position)), snapshot.file_index.get(entry.key).?);
+    for (snapshot.imports.items, 0..) |entry, position| try std.testing.expectEqual(@as(u32, @intCast(position)), snapshot.import_index.get(.{ .source = entry.source, .request = entry.request }).?);
+    try std.testing.expectEqual(snapshot.paths.items.len, snapshot.path_index.count());
+    try std.testing.expectEqual(snapshot.files.items.len, snapshot.file_index.count());
+    try std.testing.expectEqual(snapshot.imports.items.len, snapshot.import_index.count());
+    var frozen = snapshot.freeze();
+    alive = false;
+    defer frozen.deinit();
+    // The frozen record answers by scan; its failed observations decline reuse.
+    var next = try inputs.Snapshot.initWithSources(allocator, io, .{ .aliases = &aliases }, &sources);
+    defer next.deinit();
+    try std.testing.expect(!try next.equalsPrevious(io, frozen.view()));
+    for (frozen.view().files) |entry| switch (entry.result) {
+        .bytes => |bytes| try std.testing.expectEqualStrings(bytes, frozen.capturedSource(entry.key).?),
+        .failure => try std.testing.expect(frozen.capturedSource(entry.key) == null),
+    };
+}
+
+test "revision input indexes answer exactly as list scans and survive every allocation failure" {
+    var dir = std.testing.tmpDir(.{});
+    defer dir.cleanup();
+    try dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = main });
+    try dir.dir.writeFile(io, .{ .sub_path = "dep.blot", .data = original });
+    const root = try dir.dir.realPathFileAlloc(io, ".", a);
+    defer a.free(root);
+    const overlay = try std.Io.Dir.path.join(a, &.{ root, "overlay.blot" });
+    defer a.free(overlay);
+    try indexScenario(a, root, overlay);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, indexScenario, .{ root, overlay });
+}

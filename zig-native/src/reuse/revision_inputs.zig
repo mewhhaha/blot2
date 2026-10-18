@@ -121,6 +121,24 @@ fn freeOptions(a: Allocator, options: project.Options) void {
     a.free(options.aliases);
 }
 
+/// An import observation's key: the importing file and its request text.
+const ImportKey = struct {
+    source: []const u8,
+    request: []const u8,
+    const Context = struct {
+        pub fn hash(_: Context, key: ImportKey) u64 {
+            var hasher = std.hash.Wyhash.init(0);
+            hasher.update(std.mem.asBytes(&key.source.len));
+            hasher.update(key.source);
+            hasher.update(key.request);
+            return hasher.final();
+        }
+        pub fn eql(_: Context, left: ImportKey, right: ImportKey) bool {
+            return std.mem.eql(u8, left.source, right.source) and std.mem.eql(u8, left.request, right.request);
+        }
+    };
+};
+
 pub const Snapshot = struct {
     allocator: Allocator,
     options: project.Options,
@@ -129,6 +147,13 @@ pub const Snapshot = struct {
     imports: std.ArrayList(Resolution) = .empty,
     counts: Counts = .{},
     sources: ?overlays.Set = null,
+    /// Positions in `paths`, `files` and `imports`, keyed by the entries' own
+    /// key bytes. They answer exactly what a scan of the lists would.
+    path_index: std.StringHashMapUnmanaged(u32) = .empty,
+    file_index: std.StringHashMapUnmanaged(u32) = .empty,
+    import_index: std.HashMapUnmanaged(ImportKey, u32, ImportKey.Context, std.hash_map.default_max_load_percentage) = .empty,
+    /// Digests of successful reads by `files` position, each computed once.
+    digests: std.AutoHashMapUnmanaged(u32, [32]u8) = .empty,
 
     pub fn view(self: *const Snapshot) View {
         return .{ .options = self.options, .paths = self.paths.items, .files = self.files.items, .imports = self.imports.items, .counts = self.counts };
@@ -136,6 +161,7 @@ pub const Snapshot = struct {
     /// Call only after successful compilation. The provider is invalid after
     /// this ownership transfer; rejected attempts retain their Snapshot.
     pub fn freeze(self: *Snapshot) Frozen {
+        self.deinitIndexes();
         const frozen: Frozen = .{ .allocator = self.allocator, .record = .{ .key = .{ .options = self.options }, .dependencies = .{ .paths = self.paths, .files = self.files, .imports = self.imports }, .value = .{ .counts = self.counts } }, .sources = self.sources };
         self.* = undefined;
         return frozen;
@@ -187,25 +213,48 @@ pub const Snapshot = struct {
         self.files.deinit(a);
         for (self.imports.items) |entry| entry.deinit(a);
         self.imports.deinit(a);
+        self.deinitIndexes();
         self.* = undefined;
+    }
+    fn deinitIndexes(self: *Snapshot) void {
+        const a = self.allocator;
+        self.path_index.deinit(a);
+        self.file_index.deinit(a);
+        self.import_index.deinit(a);
+        self.digests.deinit(a);
     }
     fn get(entries: []const Entry, key: []const u8) ?Outcome {
         for (entries) |entry| if (std.mem.eql(u8, entry.key, key)) return entry.result;
         return null;
     }
+    fn lookup(entries: []const Entry, index: *const std.StringHashMapUnmanaged(u32), key: []const u8) ?Outcome {
+        const position = index.get(key) orelse return null;
+        return entries[position].result;
+    }
     fn value(result: Outcome) anyerror![]const u8 {
         if (result == .failure) return result.failure;
         return result.bytes;
     }
-    fn publish(self: *Snapshot, entries: *std.ArrayList(Entry), key: []const u8, result: Outcome) Allocator.Error!Outcome {
+    fn publish(self: *Snapshot, entries: *std.ArrayList(Entry), index: *std.StringHashMapUnmanaged(u32), key: []const u8, result: Outcome) Allocator.Error!Outcome {
         errdefer result.deinit(self.allocator);
+        if (entries.items.len >= std.math.maxInt(u32)) return error.OutOfMemory;
+        try entries.ensureUnusedCapacity(self.allocator, 1);
+        try index.ensureUnusedCapacity(self.allocator, 1);
         const owned = try self.allocator.dupe(u8, key);
-        errdefer self.allocator.free(owned);
-        try entries.append(self.allocator, .{ .key = owned, .result = result });
+        entries.appendAssumeCapacity(.{ .key = owned, .result = result });
+        index.putAssumeCapacityNoClobber(owned, @intCast(entries.items.len - 1));
         return result;
     }
+    /// The digest of a source this snapshot read successfully, computed once.
+    pub fn sourceDigest(self: *Snapshot, canonical_path: []const u8, bytes: []const u8) Allocator.Error![32]u8 {
+        const position = self.file_index.get(canonical_path) orelse return @import("dependency_format.zig").digest(bytes);
+        std.debug.assert(self.files.items[position].result == .bytes and self.files.items[position].result.bytes.ptr == bytes.ptr);
+        const entry = try self.digests.getOrPut(self.allocator, position);
+        if (!entry.found_existing) entry.value_ptr.* = @import("dependency_format.zig").digest(bytes);
+        return entry.value_ptr.*;
+    }
     pub fn canonical(self: *Snapshot, io: std.Io, path: []const u8) anyerror![]const u8 {
-        if (get(self.paths.items, path)) |old| return value(old);
+        if (lookup(self.paths.items, &self.path_index, path)) |old| return value(old);
         self.counts.canonical_reads += 1;
         const result: Outcome = blk: {
             if (self.sources) |*sources| {
@@ -223,10 +272,10 @@ pub const Snapshot = struct {
             defer self.allocator.free(raw);
             break :blk .{ .bytes = try self.allocator.dupe(u8, raw) };
         };
-        return value(try self.publish(&self.paths, path, result));
+        return value(try self.publish(&self.paths, &self.path_index, path, result));
     }
     pub fn read(self: *Snapshot, io: std.Io, canonical_path: []const u8) anyerror![]const u8 {
-        if (get(self.files.items, canonical_path)) |old| return value(old);
+        if (lookup(self.files.items, &self.file_index, canonical_path)) |old| return value(old);
         self.counts.source_reads += 1;
         const cap = @min(self.options.max_source_bytes, std.math.maxInt(u32)) +| 1;
         const result: Outcome = blk: {
@@ -239,15 +288,15 @@ pub const Snapshot = struct {
             };
             break :blk .{ .bytes = bytes };
         };
-        return value(try self.publish(&self.files, canonical_path, result));
+        return value(try self.publish(&self.files, &self.file_index, canonical_path, result));
     }
     pub fn resolve(self: *Snapshot, source: []const u8, request: []const u8) (Allocator.Error || error{InvalidPath})![]const u8 {
-        for (self.imports.items) |entry| if (std.mem.eql(u8, entry.source, source) and std.mem.eql(u8, entry.request, request)) {
-            return switch (entry.result) {
+        if (self.import_index.get(.{ .source = source, .request = request })) |position| {
+            return switch (self.imports.items[position].result) {
                 .bytes => |bytes| bytes,
                 .failure => error.InvalidPath,
             };
-        };
+        }
         self.counts.resolutions += 1;
         const result: Outcome = blk: {
             const bytes = project.resolveImportPath(self.allocator, source, request, self.options) catch |err| switch (err) {
@@ -258,11 +307,14 @@ pub const Snapshot = struct {
         };
         var published = false;
         errdefer if (!published) result.deinit(self.allocator);
+        if (self.imports.items.len >= std.math.maxInt(u32)) return error.OutOfMemory;
+        try self.imports.ensureUnusedCapacity(self.allocator, 1);
+        try self.import_index.ensureUnusedCapacity(self.allocator, 1);
         const owned_source = try self.allocator.dupe(u8, source);
         errdefer if (!published) self.allocator.free(owned_source);
         const owned_request = try self.allocator.dupe(u8, request);
-        errdefer if (!published) self.allocator.free(owned_request);
-        try self.imports.append(self.allocator, .{ .source = owned_source, .request = owned_request, .result = result });
+        self.imports.appendAssumeCapacity(.{ .source = owned_source, .request = owned_request, .result = result });
+        self.import_index.putAssumeCapacityNoClobber(.{ .source = owned_source, .request = owned_request }, @intCast(self.imports.items.len - 1));
         published = true;
         return switch (result) {
             .bytes => |bytes| bytes,
@@ -294,7 +346,7 @@ pub const Snapshot = struct {
 
     /// Borrow a successful source read already owned by this immutable snapshot.
     pub fn capturedSource(self: *const Snapshot, canonical_path: []const u8) ?[]const u8 {
-        return switch (get(self.files.items, canonical_path) orelse return null) {
+        return switch (lookup(self.files.items, &self.file_index, canonical_path) orelse return null) {
             .bytes => |bytes| bytes,
             .failure => null,
         };
@@ -423,7 +475,7 @@ pub const Snapshot = struct {
             };
             if (bytes.len > self.options.max_source_bytes or bytes.len > self.options.max_total_source_bytes -| total) return null;
             total += bytes.len;
-            same.* = bytes.len == module.identity.source_bytes and std.mem.eql(u8, &@import("dependency_format.zig").digest(bytes), &module.identity.source_digest);
+            same.* = bytes.len == module.identity.source_bytes and std.mem.eql(u8, &try self.sourceDigest(canonical_path, bytes), &module.identity.source_digest);
             if (module.identity.prelude) {
                 if (prelude != null) return null;
                 const raw = self.options.prelude_path orelse return null;
@@ -498,7 +550,7 @@ pub const Snapshot = struct {
                 if (err == error.OutOfMemory) return error.OutOfMemory;
                 return false;
             };
-            closure.validateProducer(module, canonical_path, bytes) catch return false;
+            closure.validateProducerDigest(module, canonical_path, bytes.len, try self.sourceDigest(canonical_path, bytes)) catch return false;
             if (bytes.len > self.options.max_source_bytes or bytes.len > self.options.max_total_source_bytes -| total) return false;
             total += bytes.len;
             if (module.identity.prelude) {

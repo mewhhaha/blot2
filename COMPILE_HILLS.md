@@ -461,6 +461,19 @@ and double-hashes every input.
 
 - **Fix:** add hash maps and a stat cache, and accept the client's changed set
   through the existing overlays.
+- **Result (18 October 2026):** CT19, "Index revision input observations and
+  digest each source once". Sampled after CT18, revision inputs were 0.6% of a
+  literal edit: the import-resolution scan 0.2%, realpath 0.16%, the trivia
+  re-lex 0.12% and the double source digest 0.09%. A snapshot now indexes its
+  path, file and import observations (positions in the same lists, so frozen
+  records and their scans are unchanged) and memoizes each source's digest for
+  admission and module reuse. Law: every observation's index equals its list
+  position, repeats read and resolve nothing, under an allocation-failure sweep.
+  Game, 5 pairs at load 1.2: −20 M instructions per edit (literal_constant
+  revert 9.205 → 9.185 G, 971 → 962 ms), trivia revert 62 → 43 M instructions
+  (10 → 9 ms). Input counters and Wasm identical. No stat cache: skipping reads
+  by mtime is unsound for same-size edits within a timestamp tick, reads cost
+  0.05%, and the protocol does not promise that overlays list every change.
 
 ### CT20: worklists for dirty propagation
 

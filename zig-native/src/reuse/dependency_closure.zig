@@ -659,8 +659,12 @@ pub fn sourceKey(compiler: [32]u8, settings: [32]u8, source: *const project.Proj
 /// A loader verifies every canonical producer path and current raw file before
 /// using its stored import edges. This requires no parsing or checking.
 pub fn validateProducer(owner: *const D.Module, canonical_path: []const u8, source: []const u8) Error!void {
+    try validateProducerDigest(owner, canonical_path, source.len, format.digest(source));
+}
+/// `validateProducer` given the source's length and an already computed digest.
+pub fn validateProducerDigest(owner: *const D.Module, canonical_path: []const u8, source_bytes: usize, digest: format.Digest) Error!void {
     try require(std.mem.eql(u8, owner.identity.normalized_path, canonical_path));
-    try require(owner.identity.source_bytes == source.len and std.mem.eql(u8, &owner.identity.source_digest, &format.digest(source)));
+    try require(owner.identity.source_bytes == source_bytes and std.mem.eql(u8, &owner.identity.source_digest, &digest));
 }
 
 /// Equivalent to sourceKey after complete validate and validateProducer for
