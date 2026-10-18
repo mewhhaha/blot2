@@ -526,20 +526,69 @@ test "principal gate rejects missing erased source metadata even when dependency
     try std.testing.expect(gate.structural_units[0]);
 }
 
-test "principal gate globally rejects dirty associated candidates and their transitive closure" {
-    var before = try Fixture.init(a, &.{direct_transitive});
-    defer before.deinit(a);
-    var after = try Fixture.init(a, &.{direct_transitive});
-    defer after.deinit(a);
-    for ([_]*core.Module{ &before.units[0], &after.units[0] }) |module| module.associated = try a.dupe(core.Associated, &.{.{ .identity = .{ .unit = 1, .decl = 1 }, .member = 0, .operator = .add, .target = target(module, "transitive") }});
+const selecting =
+    \\type Pair is data = #Pair { left: U32, right: U32 }
+    \\entry const schema: U32 = 7
+    \\entry const direct: U32 = schema
+    \\entry const transitive: U32 = direct
+    \\entry const builder = fn (value: U32) -> U32 => value
+    \\entry const doubled: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
+    \\entry const user = fn (value: U32) -> U32 => doubled value
+    \\entry const projected = fn (pair: Pair) -> U32 => pair.left
+    \\entry const reader = fn (pair: Pair) -> U32 => projected pair
+;
+fn symbolId(names: identity.View, spelling: []const u8) u32 {
+    for (1..names.symbols.len) |id| if (std.mem.eql(u8, names.symbol(@intCast(id)).?, spelling)) return @intCast(id);
+    unreachable;
+}
+fn selectionScenario(allocator: std.mem.Allocator, member: []const u8, operator: T.Operator) !void {
+    var before = try Fixture.init(allocator, &.{selecting});
+    defer before.deinit(allocator);
+    var after = try Fixture.init(allocator, &.{selecting});
+    defer after.deinit(allocator);
+    const name = if (member.len == 0) 0 else symbolId(before.names.view(), member);
+    for ([_]*core.Module{ &before.units[0], &after.units[0] }) |module| module.associated = try allocator.dupe(core.Associated, &.{.{ .identity = .{ .unit = 1, .decl = 1 }, .member = name, .operator = operator, .target = target(module, "transitive") }});
     after.units[0].nodes[root(&after.units[0], "schema")].a = 8;
-    var pinned = try Pinned.init(a, &before);
-    defer pinned.deinit(a);
-    var gate = try Gate.init(a, &pinned.pools, after.units, after.names.view());
+    var pinned = try Pinned.init(allocator, &before);
+    defer pinned.deinit(allocator);
+    var gate = try Gate.init(allocator, &pinned.pools, after.units, after.names.view());
     defer gate.deinit();
-    try std.testing.expect(!gate.enabled);
-    try std.testing.expect(!gate.admits(target(&after.units[0], "builder")));
-    try std.testing.expect(gate.structural_units[0]);
+    // The dirty candidate dirties only the bodies resolving its key and
+    // their readers; their own sources stay admitted for receipts.
+    try std.testing.expect(gate.enabled and gate.structural_units[0]);
+    try std.testing.expect(!gate.admits(target(&after.units[0], "transitive")));
+    try std.testing.expect(gate.admits(target(&after.units[0], "builder")));
+    const add = std.mem.eql(u8, member, "add");
+    const left = std.mem.eql(u8, member, "left");
+    try std.testing.expectEqual(!add, gate.admits(target(&after.units[0], "doubled")));
+    try std.testing.expectEqual(!add, gate.admits(target(&after.units[0], "user")));
+    try std.testing.expectEqual(!left, gate.admits(target(&after.units[0], "projected")));
+    try std.testing.expectEqual(!left, gate.admits(target(&after.units[0], "reader")));
+    try std.testing.expect(gate.admitsLocalSource(target(&after.units[0], "doubled")));
+    try std.testing.expect(gate.admitsLocalSource(target(&after.units[0], "projected")));
+}
+test "principal gate dirties the declarations that may select a dirty associated candidate" {
+    // A named member resolved by @type.call, a field-syntax member that the
+    // published recipe does not list, and an operator nothing here resolves.
+    try selectionScenario(a, "add", .none);
+    try selectionScenario(a, "left", .none);
+    try selectionScenario(a, "", .add);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, selectionScenario, .{ @as([]const u8, "left"), T.Operator.none });
+}
+test "published recipes omit field-syntax members that selection scans include" {
+    var fixture = try Fixture.init(a, &.{selecting});
+    defer fixture.deinit(a);
+    const module = &fixture.units[0];
+    const left = symbolId(fixture.names.view(), "left");
+    const binding = target(module, "projected").binding;
+    const body = module.body(binding).?.*;
+    const recipe = module.declaration_dependencies[module.bindings[binding].body_id];
+    for (module.dependency_members[recipe.members.start..][0..recipe.members.len]) |published| try std.testing.expect(published.name != left);
+    const scanned = try dependencies.selectionMembers(a, module, body);
+    defer a.free(scanned);
+    for (scanned) |use| {
+        if (use.name == left) break;
+    } else return error.TestUnexpectedResult;
 }
 
 test "principal gate rejects changed catalogs and the affected provider or runtime declaration" {

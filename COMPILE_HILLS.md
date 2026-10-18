@@ -293,6 +293,19 @@ Body edits reuse nothing, even in a module with one changed body.
 - **Fix:** record, per emitted instance, the bodies, constants and layouts it
   read. Rebuild only the instances whose inputs changed.
 - **Target:** a body edit under 100 ms with output identical to a fresh build.
+- **Result (18 October 2026):** CT12, "Invalidate only the declarations that may
+  select an edited member". Per-instance body and value admission already
+  existed; what discarded everything was the gate's rule that any dirty
+  associated candidate disables reuse for the program, since receiver syntax,
+  operators and `from` select by type through no named reference. The gate now
+  dirties the declarations whose bodies may resolve the candidate's member name
+  or operator (recipe members plus projected and updated fields, which recipes
+  omit, and every obligation) and their readers. Game, 5 pairs at load 1.0–1.5:
+  body_change edit 2,114 → 1,901 ms (0.899), revert 2,060 → 1,911 ms, reused 0 →
+  1,434 of 1,794; steady-state ink/math body edit 1,695 → 1,524 ms, reused 0 →
+  1,429; session instructions 101.9 → 97.1 G. Backend generate stays about 1.16
+  s with 80% of instances reused, so the 100 ms target needs CT13 onward. Wasm
+  identical.
 
 ### CT13: incremental constant serialization
 

@@ -19,6 +19,10 @@ const Capture = struct {
     runtime_metadata: core.Id = 0,
     watched_binding: core.BindingId = 0,
     watched_used: bool = false,
+    /// Also record every member name a body may resolve by type: projected
+    /// and updated fields and every obligation's name or operator. Published
+    /// recipes leave this off; they feed startup ordering unchanged.
+    selection: bool = false,
     fn deinit(self: *Capture) void {
         self.work.deinit(self.allocator);
         self.references.deinit(self.allocator);
@@ -82,6 +86,10 @@ const Capture = struct {
                 if (binding == 0 or binding >= self.module.bindings.len) return error.CoreLimit;
                 const entry = try self.schemes_seen.getOrPut(self.allocator, binding);
                 if (!entry.found_existing) try pending.append(allocator, .{ .scheme = self.module.binding(binding).scheme });
+                continue;
+            }
+            if (self.selection) {
+                try self.member(obligation.name, obligation.operator);
                 continue;
             }
             if (!obligation.explicit) continue;
@@ -152,7 +160,13 @@ const Capture = struct {
                             try self.scheme(self.module.binding(n.a).scheme);
                             try self.node(n.b);
                         },
-                        .return_, .force, .project, .computation, .effect_scope => try self.node(n.a),
+                        .return_, .force, .project, .computation, .effect_scope => {
+                            if (self.selection and n.tag == .project) {
+                                if (n.b >= self.module.projections.len) return error.CoreLimit;
+                                try self.member(self.module.projection(n.b).field, .none);
+                            }
+                            try self.node(n.a);
+                        },
                         .result_associated => {
                             try self.member(n.b, .none);
                             try self.node(n.a);
@@ -234,6 +248,13 @@ const Capture = struct {
                             const metadata = self.module.updateInfo(id);
                             try self.node(metadata.value);
                             const selectors = self.module.updateSelectors(id);
+                            if (self.selection) {
+                                for (self.module.updatePath(id)) |name| try self.member(name, .none);
+                                for (selectors) |step| if (step.kind == .field) {
+                                    if (step.projection >= self.module.projections.len) return error.CoreLimit;
+                                    try self.member(self.module.projection(step.projection).field, .none);
+                                };
+                            }
                             var i = selectors.len;
                             while (i != 0) {
                                 i -= 1;
@@ -317,6 +338,16 @@ pub fn capture(allocator: Allocator, module: *core.Module) Error!void {
     module.declaration_dependencies = bodies;
     module.dependency_references = references;
     module.dependency_members = members;
+}
+
+/// Every member name and operator `body` may resolve by type against an
+/// associated catalog: its recipe members plus projected and updated fields
+/// and all obligations. The caller owns the returned slice.
+pub fn selectionMembers(allocator: Allocator, module: *const core.Module, body: core.Body) Error![]core.DependencyMember {
+    var scan: Capture = .{ .allocator = allocator, .module = module, .selection = true };
+    defer scan.deinit();
+    _ = try scan.scan(body);
+    return scan.members.toOwnedSlice(allocator);
 }
 
 /// Retained anonymous closures and waiting memo cells own a source body rather

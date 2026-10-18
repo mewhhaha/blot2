@@ -1018,6 +1018,13 @@ checked against live dependencies publishes the same Core and interface as one
 checked against their frozen interfaces, and the first edit after population
 cuts off like any later one.
 
+Receiver syntax, operators and `from` select an associated function by type,
+through no named reference. A dirty associated candidate therefore dirties
+every declaration whose body may resolve its member name or operator (recipe
+members plus projected and updated fields and every obligation,
+`declaration_dependencies.selectionMembers`) and their transitive readers; the
+rest of the program keeps the gate.
+
 A retained revision whose inputs equal the last compiled revision's except for
 trivia (each changed source lexes cleanly to the same tokens and adjacency, and
 size limits hold) publishes the last successful output and keeps the retained

@@ -52,6 +52,7 @@ comptime {
     _ = @import("reuse/fallback_check_sharing_tests.zig");
     _ = @import("reuse/fallback_core_reuse_tests.zig");
     _ = @import("reuse/population_seed_tests.zig");
+    _ = @import("reuse/selection_cutoff_tests.zig");
     _ = @import("check/checked_core_freeze_tests.zig");
     _ = @import("reuse/alias_project_tests.zig");
     _ = @import("reuse/projection_cache_tests.zig");

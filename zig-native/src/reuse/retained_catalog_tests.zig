@@ -261,12 +261,20 @@ test "retained catalog identical target IDs cannot admit a changed cached produc
     };
     try std.testing.expect(changed);
     try std.testing.expect(!std.mem.eql(u8, &before, &artifacts.stamp(current.prepared.units)));
-    // Catalog projections stay equal. The exact immutable producer check must
-    // still turn off replay before any request matching or refinement occurs.
+    // Catalog projections stay equal. The exact immutable producer check marks
+    // the producer unstable, and the changed method loses admission together
+    // with every reader and selector of it; its unchanged sibling is kept.
     try std.testing.expect(previous.selectionStable(current.prepared.units, current.prepared.identity.view(), current.prepared.cached));
     var state = try fragment.State.init(a, previous, current.prepared.units, current.prepared.identity.view(), current.prepared.cached);
     defer state.deinit();
     try std.testing.expect(!state.importer.stable[producer_id - 1]);
-    try std.testing.expect(!state.enabled);
+    const gate = &state.importer.code_gate.?;
+    try std.testing.expect(gate.semantic.enabled);
+    var admitted: usize = 0;
+    for (entry.associated) |method| admitted += @intFromBool(gate.body(method.target));
+    try std.testing.expectEqual(@as(usize, 1), admitted);
+    const helper_id: u32 = if (producer_id == 1) 2 else 1;
+    const helper = &current.prepared.units[helper_id - 1];
+    try std.testing.expect(!gate.body(.{ .unit = helper_id, .binding = helper.bodies[1].binding }));
     try std.testing.expectEqualSlices(u8, &old_core, &artifacts.stamp(old.prepared.units));
 }

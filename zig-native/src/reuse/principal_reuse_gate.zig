@@ -2,8 +2,10 @@
 //! gate never grants validity to executable values, slots or generated code.
 //! Ordered namespaces and semantic catalogs must agree. Admitted modules
 //! preserve their entire structure except isolated scalar constant payloads;
-//! optional changed-module admission invalidates changed declarations and their
-//! readers. Exact unchanged declaration projections may supply principal proofs.
+//! optional changed-module admission invalidates changed declarations, the
+//! declarations that may select a changed associated function by type, and
+//! their readers. Exact unchanged declaration projections may supply principal
+//! proofs.
 const std = @import("std");
 const core = @import("../check/core.zig");
 const T = @import("../check/types.zig");
@@ -230,40 +232,13 @@ pub const Gate = struct {
         }
 
         @memcpy(local_dirty, dirty);
-        // A fixed point also handles recursive source declarations. External
-        // aliases are vertices: a read of either the alias or its producer is
-        // invalidated by the same transitive source change.
-        var changed = true;
-        while (changed) {
-            changed = false;
-            for (units, 0..) |module, unit| {
-                for (module.bindings[1..], 1..) |binding, id| {
-                    const index = offsets[unit] + id;
-                    if (dirty[index]) continue;
-                    if (binding.kind == .external) {
-                        if (result.targetDirty(unit, binding.target)) {
-                            dirty[index] = true;
-                            changed = true;
-                        }
-                    } else if (binding.kind == .global) {
-                        const recipe = module.declaration_dependencies[binding.body_id];
-                        for (module.dependency_references[recipe.references.start..][0..recipe.references.len]) |target| {
-                            if (result.targetDirty(unit, target)) {
-                                dirty[index] = true;
-                                changed = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        // Principal selection can inspect a candidate that leaves no named
-        // executable reference. Until selected-member edges are independently
-        // complete, any dirty catalog candidate disables the entire gate.
-        for (units, 0..) |module, unit| for (module.associated) |candidate| {
-            if (result.targetDirty(unit, candidate.target)) return result;
-        };
+        propagateReferences(&result, dirty);
+        // Selection by type can reach an associated candidate through no
+        // named reference: a body resolves a member name or operator against
+        // the catalog of its operand's type. A dirty candidate therefore
+        // dirties every declaration that resolves its key, and those
+        // declarations' readers in turn.
+        try dirtySelections(&result, allocator, dirty);
         result.enabled = true;
         return result;
     }
@@ -414,6 +389,95 @@ pub const Gate = struct {
         return null;
     }
 };
+
+/// A fixed point also handles recursive source declarations. External
+/// aliases are vertices: a read of either the alias or its producer is
+/// invalidated by the same transitive source change.
+fn propagateReferences(gate: *const Gate, dirty: []bool) void {
+    var changed = true;
+    while (changed) {
+        changed = false;
+        for (gate.units, 0..) |module, unit| {
+            for (module.bindings[1..], 1..) |binding, id| {
+                const index = gate.offsets[unit] + id;
+                if (dirty[index]) continue;
+                if (binding.kind == .external) {
+                    if (gate.targetDirty(unit, binding.target)) {
+                        dirty[index] = true;
+                        changed = true;
+                    }
+                } else if (binding.kind == .global) {
+                    const recipe = module.declaration_dependencies[binding.body_id];
+                    for (module.dependency_references[recipe.references.start..][0..recipe.references.len]) |target| {
+                        if (gate.targetDirty(unit, target)) {
+                            dirty[index] = true;
+                            changed = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// The catalog lookup rule of every type-directed selection: a member name
+/// when the use has one, otherwise its operator.
+fn selects(use: core.DependencyMember, candidate: core.Associated) bool {
+    return if (use.name != 0) use.name == candidate.member else use.operator != .none and use.operator == candidate.operator;
+}
+
+/// Dirties every declaration whose body may select a dirty associated
+/// candidate (declaration_dependencies.selectionMembers), then their readers,
+/// until no further candidate becomes dirty. A body whose scan exceeds its
+/// limit counts as selecting everything.
+fn dirtySelections(gate: *const Gate, allocator: Allocator, dirty: []bool) Allocator.Error!void {
+    var candidates: std.ArrayList(core.Associated) = .empty;
+    defer candidates.deinit(allocator);
+    var scanned: std.AutoHashMapUnmanaged(usize, []const core.DependencyMember) = .empty;
+    defer {
+        var uses = scanned.valueIterator();
+        while (uses.next()) |value| allocator.free(value.*);
+        scanned.deinit(allocator);
+    }
+    while (true) {
+        const known = candidates.items.len;
+        for (gate.units, 0..) |module, unit| for (module.associated) |candidate| {
+            if (!gate.targetDirty(unit, candidate.target)) continue;
+            for (candidates.items) |prior| {
+                if (prior.member == candidate.member and prior.operator == candidate.operator) break;
+            } else try candidates.append(allocator, candidate);
+        };
+        if (candidates.items.len == known) return;
+        var changed = false;
+        for (gate.units, 0..) |*module, unit| for (module.bindings[1..], 1..) |binding, id| {
+            const index = gate.offsets[unit] + id;
+            if (dirty[index] or binding.kind != .global) continue;
+            const entry = try scanned.getOrPut(allocator, index);
+            if (!entry.found_existing) {
+                entry.value_ptr.* = dependencies.selectionMembers(allocator, module, module.bodies[binding.body_id]) catch |err| switch (err) {
+                    error.OutOfMemory => {
+                        scanned.removeByPtr(entry.key_ptr);
+                        return error.OutOfMemory;
+                    },
+                    error.CoreLimit => {
+                        scanned.removeByPtr(entry.key_ptr);
+                        dirty[index] = true;
+                        changed = true;
+                        continue;
+                    },
+                };
+            }
+            const uses = entry.value_ptr.*;
+            selected: for (uses) |use| for (candidates.items[0..]) |candidate| if (selects(use, candidate)) {
+                dirty[index] = true;
+                changed = true;
+                break :selected;
+            };
+        };
+        if (changed) propagateReferences(gate, dirty);
+    }
+}
 
 /// A changed executable module cannot change global selection or semantic
 /// identity. This initial projection keeps its complete type/obligation graph
