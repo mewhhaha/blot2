@@ -375,6 +375,7 @@ pub const Session = struct {
         var frozen = snapshot_block: {
             var source = try project.loadCompiledMixedReadOnly(a, io, entry_path, snapshot.options, &self.seed, snapshot.provider(), reuse);
             defer source.deinit(a);
+            source.lowering = .{ .io = io, .workers = self.policy.semantic_workers };
             if (source.diagnostics.items.len != 0) return null;
             var checked: ?checker.CheckedProject = null;
             defer if (checked) |*owner| owner.deinit(a);
@@ -450,6 +451,7 @@ pub const Session = struct {
         }
         var source = try project.loadWithInputs(a, io, entry_path, snapshot.options, snapshot.provider());
         defer source.deinit(a);
+        source.lowering = .{ .io = io, .workers = self.policy.semantic_workers };
         const body_offer = self.bodyOffer(snapshot.options);
         const check_offer: ?@import("entry_frontend_cutoff.zig").Previous = if (body_offer) |offer| partial.checkPrevious(offer) else null;
         // The ordinary lane checks the entry twice: within the whole project,

@@ -7,6 +7,7 @@ const symbols = @import("parse/symbols.zig");
 const checker = @import("check/check.zig");
 const core = @import("check/core.zig");
 const core_builder = @import("check/core_builder.zig");
+const parallel_lowering = @import("check/parallel_lowering.zig");
 const backend = @import("backend/core_backend.zig");
 const memory = @import("runtime/memory.zig");
 const project = @import("reuse/project.zig");
@@ -417,11 +418,26 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
             allocator.free(units);
             teardown_us += elapsed(release_start, io);
         }
+        // Workers may lower every unit up front; the loop below still takes
+        // them, and reports their diagnostics, in unit order.
+        var lowered = workers: {
+            if (policy.semantic_workers <= 1) break :workers null;
+            const inputs = try allocator.alloc(?parallel_lowering.Input, loaded.units.items.len);
+            defer allocator.free(inputs);
+            for (inputs, loaded.units.items, 1..) |*input, *unit_, id| input.* = .{ .tree = &unit_.tree, .checked = &checked.module(@intCast(id)).checked };
+            const lowering = phase_profile.enter(.lower);
+            defer lowering.exit();
+            break :workers try parallel_lowering.Batch.run(allocator, io, policy.semantic_workers, &loaded.symbols, .{ .context = &loaded, .lookup = project_check.diagnosticModuleOrigin }, inputs);
+        };
+        defer if (lowered) |*batch| batch.deinit();
         for (loaded.units.items, 0..) |*unit_, index| {
             const id: u32 = @intCast(index + 1);
             const lowering = phase_profile.enter(.lower);
             defer lowering.exit();
-            units[index] = try core_builder.lowerWithOrigins(allocator, &unit_.tree, &loaded.symbols, &checked.module(id).checked, .{ .context = &loaded, .lookup = project_check.diagnosticModuleOrigin });
+            units[index] = if (lowered) |*batch|
+                try batch.take(index)
+            else
+                try core_builder.lowerWithOrigins(allocator, &unit_.tree, &loaded.symbols, &checked.module(id).checked, .{ .context = &loaded, .lookup = project_check.diagnosticModuleOrigin });
             units[index].unit = id;
             initialized += 1;
             core_nodes += units[index].nodes.len - 1;

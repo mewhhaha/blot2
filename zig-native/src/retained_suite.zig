@@ -20,6 +20,7 @@ comptime {
     _ = @import("backend/machine_code_sharing_tests.zig");
     _ = @import("reuse/zig_project_frames_tests.zig");
     _ = @import("reuse/partial_dependency_tests.zig");
+    _ = @import("reuse/parallel_lowering_tests.zig");
     _ = @import("reuse/partial_runtime_tests.zig");
     _ = @import("reuse/dependency_project_consumer_tests.zig");
     _ = @import("reuse/dependency_import_resolution_tests.zig");

@@ -112,6 +112,11 @@ pub const Project = struct {
     entry: UnitId = 0,
     prelude_unit: UnitId = 0,
     source_bytes: usize = 0,
+    /// How this project's fresh units are lowered. An execution choice only:
+    /// Core, diagnostics and every cache key are the same for any value.
+    lowering: Lowering = .{},
+
+    pub const Lowering = struct { io: ?Io = null, workers: u8 = 1 };
 
     pub fn deinit(self: *Project, allocator: Allocator) void {
         for (self.units.items) |*unit_| unit_.deinit(allocator);

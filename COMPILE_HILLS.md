@@ -704,6 +704,17 @@ Lowering is serial (`main.zig:403-413`), but `lowerWithOrigins` takes only const
 inputs.
 
 - **Fix:** lower units on workers and merge diagnostics in source order.
+- **Result (18 October 2026):** "CT42: Lower fresh units on semantic workers".
+  With `--semantic-workers` above 1, `check/parallel_lowering.zig` lowers the
+  fresh units of dependency freezing, project preparation and the CLI on
+  workers, largest first; the serial loops take them in unit order, so
+  diagnostics, errors and ownership do not change. Wasm identical on the game,
+  devtools and the 10 slowest tests. Game with 4 workers (5 pairs, load 1.3):
+  the `lower` phase 84.7 → 44.5 ms, wall 2,486 → 2,444 ms (-1.7%) and an
+  `imported_body` edit 2,347 → 2,308 ms; CPU +1.9% with identical
+  instructions, peak RSS 300 → 298 MiB. Devtools wall 905 → 896 ms; the 10
+  slowest tests 44.5 → 44.1 s. The largest unit bounds the speedup. Serial
+  builds take the old path.
 
 ### CT43: prefetch loading
 

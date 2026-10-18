@@ -16,6 +16,7 @@ const ast = @import("../parse/ast.zig");
 const Allocator = std.mem.Allocator;
 const RuntimeIdentity = @import("../backend/runtime_identity.zig");
 const entry_cutoff = @import("entry_frontend_cutoff.zig");
+const parallel_lowering = @import("../check/parallel_lowering.zig");
 
 pub const Result = struct {
     result: consumer.Result,
@@ -339,6 +340,8 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
         a.free(paths);
     };
     var stats: consumer.Stats = .{ .syntax_nodes = 0, .body_elaborations = checked.body_elaborations, .body_lowerings = 0, .imported_schemes = checked.imported_schemes };
+    var lowered = try lowerFresh(a, source, &checked);
+    defer if (lowered) |*batch| batch.deinit();
     for (source.units.items, units, paths, 1..) |*unit, *ir, *path, id| {
         path.* = try a.dupe(u8, source.filename(@intCast(id)));
         paths_initialized += 1;
@@ -352,7 +355,10 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
             } else {
                 const timing = @import("../phase_profile.zig").enter(.lower);
                 defer timing.exit();
-                ir.* = try core_builder.lowerWithOrigins(a, &unit.tree, &source.symbols, &checked.module(@intCast(id)).checked, .{ .context = source, .lookup = checker.diagnosticModuleOrigin });
+                ir.* = if (lowered) |*batch|
+                    try batch.take(id - 1)
+                else
+                    try core_builder.lowerWithOrigins(a, &unit.tree, &source.symbols, &checked.module(@intCast(id)).checked, .{ .context = source, .lookup = checker.diagnosticModuleOrigin });
                 ir.unit = @intCast(id);
                 stats.body_lowerings += ir.body_lowerings;
             }
@@ -398,6 +404,21 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
     }
     transferred = true;
     return .{ .ready = .{ .body_caches = body_caches, .units = units, .identity = identity, .unit_order = unit_order, .paths = paths, .cached = dependency.modules.len, .borrowed = borrowed, .entry_imports = entry_imports, .entry_implicit_prelude = source.unit(source.entry).implicit_prelude, .entry = source.entry, .prelude = source.prelude_unit, .source_mode = source.input_mode == .source, .source_bytes = source.source_bytes, .stats = stats } };
+}
+
+/// Lowers on workers, when the project allows it, exactly the units the
+/// preparation loop lowers itself; that loop then takes them in unit order.
+fn lowerFresh(a: Allocator, source: *const project.Project, checked: *const checker.CheckedProject) !?parallel_lowering.Batch {
+    if (source.lowering.workers <= 1) return null;
+    const inputs = try a.alloc(?parallel_lowering.Input, source.units.items.len);
+    defer a.free(inputs);
+    for (inputs, source.units.items, 1..) |*input, *unit, id| {
+        const fresh = checked.compiledModule(source, id) == null and !(id == source.entry and checked.entry_cutoff.reused != 0);
+        input.* = if (fresh) .{ .tree = &unit.tree, .checked = &checked.module(@intCast(id)).checked } else null;
+    }
+    const timing = @import("../phase_profile.zig").enter(.lower);
+    defer timing.exit();
+    return parallel_lowering.Batch.run(a, source.lowering.io, source.lowering.workers, &source.symbols, .{ .context = source, .lookup = checker.diagnosticModuleOrigin }, inputs);
 }
 
 fn copyBodyCacheOffers(a: Allocator, destination: []@import("body_check_cache.zig").Cache, paths: []const []const u8, checked: ?[]const ?checker.Module, prior_caches: []const @import("body_check_cache.zig").Cache, prior_paths: []const []const u8) !void {

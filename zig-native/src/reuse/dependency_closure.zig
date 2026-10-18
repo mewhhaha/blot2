@@ -16,6 +16,7 @@ const relink = @import("dependency_relink.zig");
 const core_validation = @import("../check/frozen_core_validation.zig");
 const principal_validation = @import("dependency_interface_validation.zig");
 const phase_profile = @import("../phase_profile.zig");
+const parallel_lowering = @import("../check/parallel_lowering.zig");
 pub const Error = std.mem.Allocator.Error || error{ InvalidArtifact, DependencyLimit, CoreLimit };
 
 fn ordinal(source: *const project.Project, unit: u32) Error!u32 {
@@ -143,7 +144,28 @@ const Cores = union(enum) {
     copy: []const core.Module,
     /// Move fresh Core out of its preparation instead of copying it.
     take: *partial.Prepared,
+    /// Take Core that workers lowered afresh from the checked source.
+    lowered: *parallel_lowering.Batch,
 };
+
+/// Lowers every fresh unit on workers when the project allows it; null keeps
+/// lowering serial in freezeOne. Units freezeOne would refuse stay unlowered,
+/// so it refuses them exactly as before.
+fn lowerFresh(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, units: []const u32) Error!?parallel_lowering.Batch {
+    if (source.lowering.workers <= 1) return null;
+    const inputs = try a.alloc(?parallel_lowering.Input, units.len);
+    defer a.free(inputs);
+    for (inputs, units, 1..) |*input, id, source_id| {
+        input.* = null;
+        if (id == 0 or checked.compiledModule(source, source_id) != null) continue;
+        const typed = if (checked.modules[source_id - 1]) |*module| module else continue;
+        if (!typed.valid or typed.checked.diagnostics.len != 0 or typed.checked.unit != source_id) continue;
+        input.* = .{ .tree = &source.unit(@intCast(source_id)).tree, .checked = &typed.checked };
+    }
+    const timing = phase_profile.enter(.lower);
+    defer timing.exit();
+    return parallel_lowering.Batch.run(a, source.lowering.io, source.lowering.workers, &source.symbols, .{ .context = source, .lookup = project_check.diagnosticModuleOrigin }, inputs);
+}
 
 fn freezeOne(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, unit: u32, units: []const u32, cores: Cores) Error!D.Module {
     const src = source.unit(unit);
@@ -157,6 +179,7 @@ fn freezeOne(a: std.mem.Allocator, source: *const project.Project, checked: *con
         },
         .copy => |prepared| try copyCoreValue(a, prepared[unit - 1]),
         .take => |prepared| try prepared.takeCore(unit - 1),
+        .lowered => |batch| try batch.take(unit - 1),
     };
     errdefer ir.deinit(a);
     ir.unit = unit;
@@ -339,11 +362,13 @@ fn freezeMode(a: std.mem.Allocator, source: *const project.Project, checked: *co
         for (result.modules[0..initialized]) |*m| format.deinit(a, m);
         a.free(result.modules);
     }
+    var lowered = if (cores == .lower) try lowerFresh(a, source, checked, units) else null;
+    defer if (lowered) |*batch| batch.deinit();
     for (units, 1..) |id, source_id| if (id != 0) {
         result.modules[initialized] = if (checked.compiledModule(source, source_id)) |previous|
             try copyCoreValue(a, previous.*)
         else
-            try freezeOne(a, source, checked, @intCast(source_id), units, cores);
+            try freezeOne(a, source, checked, @intCast(source_id), units, if (lowered) |*batch| .{ .lowered = batch } else cores);
         initialized += 1;
     };
     // When the entry is last, retained units and symbols already have their

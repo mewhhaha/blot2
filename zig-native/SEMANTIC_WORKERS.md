@@ -234,3 +234,8 @@ target or private-application allocation target is claimed. The historical boxed
 compiler and private gdev application remain unavailable, so their external
 gates remain open. These observations qualify policy for the represented public
 domain, not all hosts or application graphs.
+
+The same opt-in count also lowers fresh source units in parallel
+(`check/parallel_lowering.zig`, CT42). Callers take the lowered units in unit
+order, so Core, diagnostics and Wasm do not depend on the count. Four workers
+cut the gdev game's lowering from 85 to 45 ms.
