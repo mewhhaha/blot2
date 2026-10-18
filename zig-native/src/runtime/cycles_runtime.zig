@@ -13,6 +13,17 @@ pub const gray: u32 = 64;
 pub const black: u32 = 128;
 pub const deferred: u32 = 256;
 pub const no_cycle: u32 = 512;
+/// Flags that make enqueue and visit return early. Cohort extensions widen
+/// these exact constants.
+pub const enqueue_guard: u32 = rc.lease | rc.dead | no_cycle;
+pub const visit_guard: u32 = rc.lease | gray | no_cycle;
+/// Traffic that triggers a pass grows with the vertices the previous pass
+/// discovered and kept, so rescanning live temporaries stays proportional to
+/// allocation traffic. Reclaimed vertices do not raise it, so uncollected
+/// cyclic garbage stays bounded by live scan size plus the minimum.
+pub const minimum_traffic: u32 = 65536;
+const traffic_per_vertex_shift = 6;
+const traffic_vertex_cap: u32 = 1 << 18;
 const header = @sizeOf(h.ArenaHeader);
 const f = struct {
     const flags = h.offset(h.ArenaHeader, "flags");
@@ -67,20 +78,21 @@ fn unlink(c: Code, a: w.Arena) Error!void {
 fn enqueue(c: Code, a: w.Arena) Error!void {
     const p: Local = .{ .id = 0 };
     const b = try head(c, p);
-    try c.when(.{ .i32_or, .{ .i32_eqz, .{ .load, b, f.layout } }, .{ .i32_and, .{ .load, b, f.flags }, rc.lease | rc.dead | no_cycle } });
+    try c.when(.{ .i32_or, .{ .i32_eqz, .{ .load, b, f.layout } }, .{ .i32_and, .{ .load, b, f.flags }, enqueue_guard } });
+    try c.op(.return_, 0);
+    try c.end();
+    // A queued candidate's later releases add no removal traffic.
+    try c.when(.{ .i32_and, .{ .load, b, f.flags }, queued });
     try c.op(.return_, 0);
     try c.end();
     // Saturate removal traffic so a large destruction batch cannot wrap and
     // suppress the next safe point. Membership remains independent of traffic.
-    try c.when(.{ .i32_lt_u, .{ .global, a.cycle_removed }, 65536 });
-    try c.when(.{ .i32_ge_u, .{ .load, b, f.requested }, .{ .i32_sub, 65536, .{ .global, a.cycle_removed } } });
-    try set(c, a.cycle_removed, 65536);
+    try c.when(.{ .i32_lt_u, .{ .global, a.cycle_removed }, .{ .global, a.cycle_threshold } });
+    try c.when(.{ .i32_ge_u, .{ .load, b, f.requested }, .{ .i32_sub, .{ .global, a.cycle_threshold }, .{ .global, a.cycle_removed } } });
+    try set(c, a.cycle_removed, .{ .global, a.cycle_threshold });
     try c.op(.else_, 0);
     try add(c, a.cycle_removed, .{ .load, b, f.requested });
     try c.end();
-    try c.end();
-    try c.when(.{ .i32_and, .{ .load, b, f.flags }, queued });
-    try c.op(.return_, 0);
     try c.end();
     try c.when(.{ .i32_and, .{ .load, b, f.flags }, gray });
     try c.store(b, f.flags, .{ .i32_or, .{ .load, b, f.flags }, deferred });
@@ -100,8 +112,10 @@ fn visit(c: Code, a: w.Arena) Error!void {
     try c.op(.return_, 0);
     try c.end();
     const b = try head(c, p);
-    // Leased boundaries and their outgoing edges stay outside subtraction.
-    try c.when(.{ .i32_and, .{ .load, b, f.flags }, rc.lease | gray });
+    // Leased boundaries and their outgoing edges stay outside subtraction. An
+    // exact no_cycle proof covers the object's whole reachable structure, so no
+    // cycle passes through it; leaving it outside only keeps its children live.
+    try c.when(.{ .i32_and, .{ .load, b, f.flags }, visit_guard });
     try c.op(.return_, 0);
     try c.end();
     try c.trap(.{ .i32_eqz, .{ .load, b, f.requested } });
@@ -166,6 +180,7 @@ fn collect(c: Code, a: w.Arena) Error!void {
     const b = try c.temp();
     const next = try c.temp();
     const pending = try c.temp();
+    const scanned = try c.temp();
     try c.when(.{ .i32_or, .{ .global, a.cycle_phase }, .{ .i32_eqz, .{ .global, a.cycle_head } } });
     try c.op(.return_, 0);
     try c.end();
@@ -173,10 +188,12 @@ fn collect(c: Code, a: w.Arena) Error!void {
     try set(c, a.cycle_removed, 0);
     try set(c, a.cycle_cadence, .{ .global, a.allocated });
     try add(c, a.cycle_passes, 1);
+    try c.set(scanned, .{ .global, a.cycle_vertices });
     try c.loop(.{ .global, a.cycle_head });
     try c.value(.{ .call, a.cycle_visit, .{ .global, a.cycle_head } });
     try work(c, a, p, .discover);
     try c.again();
+    try c.set(scanned, .{ .i32_sub, .{ .global, a.cycle_vertices }, scanned });
     try c.set(p, .{ .global, a.cycle_members });
     try c.loop(p);
     try c.set(b, .{ .i32_sub, p, header });
@@ -223,8 +240,13 @@ fn collect(c: Code, a: w.Arena) Error!void {
     try c.set(b, .{ .i32_sub, p, header });
     try set(c, a.cycle_members, .{ .load, b, f.member });
     try add(c, a.cycle_bytes, .{ .load, b, f.requested });
+    try c.set(scanned, .{ .i32_sub, scanned, 1 });
     try c.value(.{ .call, a.retire, p });
     try c.again();
+    try c.when(.{ .i32_gt_u, scanned, traffic_vertex_cap });
+    try c.set(scanned, traffic_vertex_cap);
+    try c.end();
+    try set(c, a.cycle_threshold, .{ .i32_add, minimum_traffic, .{ .i32_shl, scanned, traffic_per_vertex_shift } });
     try set(c, a.cycle_phase, 0);
     try rc.drain(c, a);
 }
@@ -232,7 +254,7 @@ fn safe(c: Code, a: w.Arena) Error!void {
     try c.when(.{ .i32_eqz, .{ .global, a.cycle_head } });
     try c.op(.return_, 0);
     try c.end();
-    try c.when(.{ .i32_or, Local{ .id = 0 }, .{ .i32_or, .{ .i32_ge_u, .{ .global, a.cycle_removed }, 65536 }, .{ .i32_ge_u, .{ .i32_sub, .{ .global, a.allocated }, .{ .global, a.cycle_cadence } }, 65536 } } });
+    try c.when(.{ .i32_or, Local{ .id = 0 }, .{ .i32_or, .{ .i32_ge_u, .{ .global, a.cycle_removed }, .{ .global, a.cycle_threshold } }, .{ .i32_ge_u, .{ .i32_sub, .{ .global, a.allocated }, .{ .global, a.cycle_cadence } }, .{ .global, a.cycle_threshold } } } });
     try c.value(.{ .call, a.cycle_collect });
     try c.end();
 }

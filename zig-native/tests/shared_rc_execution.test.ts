@@ -236,32 +236,40 @@ Deno.test("candidate discovery remains local and deduplicates repeated nonzero d
   assert.equal(r.count("destroyed"), 8193);
 });
 
-Deno.test("removal traffic triggers a complete pass without allocation or queue duplication", async () => {
+Deno.test("removal traffic charges each queued candidate once and triggers a complete pass without allocation", async () => {
   const r = await runtime();
   const metric = (name: string) =>
     Number((r.exports[name] as WebAssembly.Global).value);
-  const value = r.call("allocate_typed", 1024, 1);
-  r.call("store_word", value, value, value);
-  r.call("retain", value);
-  r.call("release_lease", value);
+  const cyclic = (bytes: number) => {
+    const value = r.call("allocate_typed", bytes, 1);
+    r.call("store_word", value, value, value);
+    r.call("retain", value);
+    r.call("release_lease", value);
+    return value;
+  };
+  const small = cyclic(1024);
+  const large = cyclic(65536 + 64 * 2);
   r.call("cycle_collect");
   const heap = r.heap(), passes = metric("cycle_passes");
-  for (let i = 0; i < 63; i++) {
-    r.call("retain", value);
-    r.call("release", value);
+  // Both survivors raise the next pass's traffic threshold by 64 bytes each.
+  // Releasing an already queued candidate adds no traffic.
+  for (let i = 0; i < 256; i++) {
+    r.call("retain", small);
+    r.call("release", small);
     r.call("cycle_safe", 0);
   }
   assert.equal(metric("cycle_passes"), passes);
-  r.call("retain", value);
-  r.call("release", value);
+  r.call("retain", large);
+  r.call("release", large);
   r.call("cycle_safe", 0);
   assert.equal(metric("cycle_passes"), passes + 1);
   assert.equal(metric("cycle_head"), 0);
-  assert.equal(metric("cycle_vertices"), 2);
+  assert.equal(metric("cycle_vertices"), 4);
   assert.equal(r.heap(), heap);
-  r.call("release", value);
+  r.call("release", small);
+  r.call("release", large);
   r.call("cycle_safe", 1);
-  assert.equal(r.count("destroyed"), 1);
+  assert.equal(r.count("destroyed"), 2);
 });
 
 Deno.test("checked RC preserves aliases and self stores and retires duplicate children once", async () => {

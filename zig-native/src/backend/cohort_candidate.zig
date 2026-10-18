@@ -184,8 +184,8 @@ fn extend(a: A, source: *const wasm.Module, proof: *const graph.Cohort) !Extensi
     const retire = try view.own(arena.retire);
     try retire.instructions.insertSlice(a, 0, &.{ .{ .op = .local_get }, .{ .op = .call, .operand = helpers.retire_members } });
     for ([_]struct { id: u32, mask: u32 }{
-        .{ .id = arena.cycle_enqueue, .mask = @import("../runtime/shared_rc.zig").lease | @import("../runtime/shared_rc.zig").dead | @import("../runtime/cycles_runtime.zig").no_cycle },
-        .{ .id = arena.cycle_visit, .mask = @import("../runtime/shared_rc.zig").lease | @import("../runtime/cycles_runtime.zig").gray },
+        .{ .id = arena.cycle_enqueue, .mask = @import("../runtime/cycles_runtime.zig").enqueue_guard },
+        .{ .id = arena.cycle_visit, .mask = @import("../runtime/cycles_runtime.zig").visit_guard },
     }) |guard| {
         const body = try view.own(guard.id);
         var matched: usize = 0;

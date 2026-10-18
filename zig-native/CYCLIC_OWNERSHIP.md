@@ -47,10 +47,15 @@ excluded. Finite masks cap scans at their highest owning bit; bit 31 keeps the
 repeating reference tail through physical allocation capacity. The same bound
 drives ordinary destruction, so scalar tails do not hide linear work.
 
-The collector runs at existing closed-root loop/call points after 64 KiB of
-allocation traffic or 64 KiB of removed candidate payload, and drains at
-invocation completion and idle disposal. Removal traffic saturates, while weak
-membership stays deduplicated. Candidate-free points check a global in constant
+The collector runs at existing closed-root loop/call points once allocation
+traffic or removed candidate payload reaches the pass threshold, and drains at
+invocation completion and idle disposal. The threshold is 64 KiB plus 64 bytes
+per vertex the previous pass discovered and kept (capped at 2^18 vertices), so
+rescanning live temporaries costs at most one vertex per 64 bytes of traffic.
+Reclaimed vertices don't raise it, so uncollected cyclic garbage stays bounded.
+Only a candidate's first enqueue charges removal traffic; releases of an already
+queued candidate add none. Removal traffic saturates, while weak membership
+stays deduplicated. Candidate-free points check a global in constant
 time. A triggered pass finishes its closure without a work-budget escape. Active
 JSPI and force journals remain strong boundaries. Cancellation, terminal force
 handling and host capability identity retain task 033 semantics.
@@ -124,8 +129,11 @@ The header and 244-word geometry add no task 034 cost. Candidate membership and
 three edge walks add work to cycle-capable graphs. The collector is synchronous
 and nonincremental: pause length scales with the candidate closure's vertices
 and physically retained owning slots, not with the whole heap. Large still-live
-reference graphs can be scanned repeatedly after sufficient removal traffic.
-Scalar proofs avoid that cost; other exact descriptor proofs are future hills.
+reference graphs can be rescanned, at a rate bounded by the threshold above.
+Discovery stops at `no_cycle` objects: their exact proof covers their whole
+reachable structure, so no cycle passes through them, and leaving them outside
+subtraction only keeps their children live. Scalar proofs avoid candidacy
+itself; other exact descriptor proofs are future hills.
 
 The counted-lease boundary preserves live or conservatively retained journal
 objects. It cannot reclaim a graph while an owner still holds it. Physical

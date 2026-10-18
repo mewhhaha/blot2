@@ -96,3 +96,34 @@ Deno.test("foreign constructor definitions retain conservative cycle work", asyn
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+Deno.test("trial passes skip proven elements of temporary containers", async () => {
+  const count = 4000, frames = 100;
+  await compileAndRun(
+    `import * as array from "std/array"
+type Scalar is data = #Scalar { a: U32, b: F32 }
+entry const run = fn (frames: U32) -> U32 => do:
+  let total = 0
+  for frame in 0..frames:
+    let items = #[#Scalar { a: index, b: 1.0 } | index <- array.generate ${count} identity]
+    total := self + items[3].a
+  return total
+entry const memory = fn () -> Array U32 => #[]
+`,
+    (_, bytes) => {
+      const raw = new WebAssembly.Instance(new WebAssembly.Module(bytes))
+        .exports;
+      const metric = (name: string) =>
+        Number((raw[`blot:${name}`] as WebAssembly.Global).value);
+      assert.equal((raw.run as CallableFunction)(frames), 3 * frames);
+      assert(metric("cycle_passes") > 0, "the temporary List stays a candidate");
+      // Each pass previously visited every element of the live List.
+      assert(
+        metric("cycle_vertices") < frames * count / 16,
+        `no_cycle elements stay outside trial deletion: ${metric("cycle_vertices")}`,
+      );
+      assert.equal(metric("cycle_bytes"), 0);
+    },
+    { stdRoot: new URL("../../std", import.meta.url).pathname },
+  );
+});

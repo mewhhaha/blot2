@@ -108,7 +108,7 @@ measured rounds; wall time covers the complete synchronous pass.
 The sparse-tail comparison measures the finite-mask bound directly. Bit 31 still
 covers every physically retained tail slot. An independent law proves a
 candidate closure does not scan an unrelated 8192-object heap. Another reaches
-the 64 KiB removal trigger without allocating, while the source large-retained
+the removal threshold without allocating and charges a queued candidate once, while the source large-retained
 heap law verifies that the tracer's larger budget does not postpone local
 passes. Large still-live reference closures can be rescanned; this synchronous
 complete-pass strategy has no latency guarantee independent of closure size.

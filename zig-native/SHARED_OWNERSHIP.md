@@ -224,8 +224,9 @@ token.
 
 Skip candidate enqueue only for a proven `no_cycle` object; ordinary zero-count
 destruction still releases its children. A cycle pass reached from another
-candidate still walks all of that object's strong edges and accounts for every
-internal reference. Every actual cycle therefore retains candidate discovery.
+candidate stops at that object: no cycle passes through it, and its unsubtracted
+edges only keep children live. Every actual cycle therefore retains candidate
+discovery.
 The stop-the-mutator pass is:
 
 1. Drain the candidate list and build the union of their outgoing strong

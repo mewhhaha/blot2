@@ -1077,7 +1077,8 @@ callables, demands, providers, erased fields and exhausted proofs decline.
 Repeated nominal layouts close an immutable recursive type proof; they do not
 assert runtime pointer uniqueness. The checked canonical allocation receives the
 existing no-cycle flag. Its typed edges, counts and iterative destructor remain
-unchanged, and genuine trial closures still visit those edges. Copy/edit/static
+unchanged. Trial discovery stops at the flag, because the proof excludes every
+cycle through the object. Copy/edit/static
 routes either preserve their own exact proof or leave the allocation eligible
 for candidates.
 

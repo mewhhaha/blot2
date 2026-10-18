@@ -21,7 +21,7 @@ pub const OwnerBoundary = struct { schema: u32, kind: enum(u8) { unique = 1, sha
 const Export = struct { name: []u8, index: u32, parameter: Scalar, result: Scalar, global: bool, callback: ?Callback = null, once: bool = false, parameter_owner: ?OwnerBoundary = null, result_owner: ?OwnerBoundary = null, owner_adapter: bool = false, task_adapter: bool = false, task_runtime: bool = false };
 pub const Arena = struct {
     pub const function_fields = .{ "allocate", "allocate_scalar", "recycle", "reset", "allocate_typed", "retain", "release", "release_lease", "retire", "free", "store_word", "copy_words", "decrement", "root_allocate", "root_reserve", "root_pop", "root_open", "root_close", "root_enter", "root_leave", "root_store", "root_public_allocate", "root_public_reset", "root_force", "root_authority", "cycle_enqueue", "cycle_unlink", "cycle_visit", "cycle_collect", "cycle_safe", "mark_acyclic", "allocate_shaped", "root_allocate_shaped" };
-    pub const global_fields = .{ "heap", "base", "static_end", "allocated", "rc_enabled", "rc_leases", "rc_retains", "rc_releases", "rc_destroyed", "root_enabled", "root_page", "root_top", "root_frame", "root_active", "root_external", "root_count", "root_globals", "root_started", "root_host_cursor", "root_host_active", "root_static_map", "root_static_count", "root_global_count", "cycle_head", "cycle_members", "cycle_work", "cycle_phase", "cycle_removed", "cycle_cadence", "cycle_passes", "cycle_vertices", "cycle_edges", "cycle_bytes" };
+    pub const global_fields = .{ "heap", "base", "static_end", "allocated", "rc_enabled", "rc_leases", "rc_retains", "rc_releases", "rc_destroyed", "root_enabled", "root_page", "root_top", "root_frame", "root_active", "root_external", "root_count", "root_globals", "root_started", "root_host_cursor", "root_host_active", "root_static_map", "root_static_count", "root_global_count", "cycle_head", "cycle_members", "cycle_work", "cycle_phase", "cycle_removed", "cycle_cadence", "cycle_passes", "cycle_vertices", "cycle_edges", "cycle_bytes", "cycle_threshold" };
     mark_acyclic: u32,
     allocate_shaped: u32,
     root_allocate_shaped: u32,
@@ -89,6 +89,7 @@ pub const Arena = struct {
     cycle_vertices: u32,
     cycle_edges: u32,
     cycle_bytes: u32,
+    cycle_threshold: u32,
 
     pub fn isAllocation(self: Arena, function: u32) bool {
         return function == self.allocate or function == self.allocate_scalar;
@@ -530,6 +531,7 @@ pub const Module = struct {
         const cycle_vertices = try self.addGlobal(.u32, 0, true);
         const cycle_edges = try self.addGlobal(.u32, 0, true);
         const cycle_bytes = try self.addGlobal(.u32, 0, true);
+        const cycle_threshold = try self.addGlobal(.u32, @import("../runtime/cycles_runtime.zig").minimum_traffic, true);
         const allocate = try self.addFunction(&.{.i32}, .i32);
         const allocate_scalar = try self.addFunction(&.{.i32}, .i32);
         const recycle = try self.addFunction(&.{.i32}, .none);
@@ -582,6 +584,7 @@ pub const Module = struct {
             .cycle_vertices = cycle_vertices,
             .cycle_edges = cycle_edges,
             .cycle_bytes = cycle_bytes,
+            .cycle_threshold = cycle_threshold,
             .root_force = root_force,
             .root_authority = root_authority,
             .root_public_allocate = root_public_allocate,

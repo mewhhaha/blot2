@@ -2,7 +2,6 @@
 const std = @import("std");
 const wasm = @import("../backend/wasm.zig");
 const cohort = @import("cohort_runtime.zig");
-const rc = @import("shared_rc.zig");
 const cycles = @import("cycles_runtime.zig");
 
 pub fn build(allocator: std.mem.Allocator) !wasm.Module {
@@ -16,8 +15,8 @@ pub fn build(allocator: std.mem.Allocator) !wasm.Module {
     // Source admission and prepared-body intersection are tested separately.
     try m.functions.items[a.retire].instructions.insertSlice(allocator, 0, &.{ .{ .op = .local_get }, .{ .op = .call, .operand = runtime.retire_members } });
     for ([_]struct { id: u32, mask: u32 }{
-        .{ .id = a.cycle_enqueue, .mask = rc.lease | rc.dead | cycles.no_cycle },
-        .{ .id = a.cycle_visit, .mask = rc.lease | cycles.gray },
+        .{ .id = a.cycle_enqueue, .mask = cycles.enqueue_guard },
+        .{ .id = a.cycle_visit, .mask = cycles.visit_guard },
     }) |guard| {
         var found: usize = 0;
         for (m.functions.items[guard.id].instructions.items) |*inst| {
