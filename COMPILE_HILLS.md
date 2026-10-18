@@ -424,16 +424,40 @@ reached from `Engine.appendInstance` (`check/check.zig:9822`) through
 - **Fix:** memoize the instantiation of each scheme obligation per use.
 - **Target:** that entry under 3.5 s, in line with entries of the same backend
   size.
+- **Result (18 October 2026):** commit "CT30: prepare one substitution per
+  scheme instance". Expanding a shared use substituted each obligation with a
+  kind check per binder per call and a binder scan per node. One prepared
+  substitution per instance now checks the kinds once and indexes long binder
+  lists; every root is copied exactly as before. Five round-robin runs at load
+  4–6, Wasm identical: robot_pickup 24.0 → 13.0 s, edit 13.2 → 10.9 s,
+  tests/game 11.7 → 10.9 s, interface_station 10.2 → 9.7 s, salt_clicks 9.9 →
+  7.9 s; the game entry is unchanged within noise. Substitution falls from 60%
+  to 8% of robot_pickup samples. The 3.5 s target is not reached, for two
+  structural reasons. Each of seven tests expands `carried` (48,500 obligations,
+  1,058 binders) in full: 46,447 of those obligations are residual
+  `effect_operation`s that stay unsolved, so the callee memo never records, and
+  they are copies of only 107 distinct closed operations that snowball through
+  `step` and `sized`. Deduplicating them would change scheme obligations and
+  needs a design decision. Population also checks the entry module twice (full
+  project, then the frozen-seed consumer).
 
 ### CT31: memoize substitution
 
 - **Fix:** cache `substituteWithRows` results by (type, substitution id) inside
   one check, and skip closed subtrees using a closed-height bit.
+- **Result (18 October 2026):** dropped. Sharing a memo across the roots of one
+  substitution, or returning closed subtrees uncopied, changes which type nodes
+  the checker creates and therefore the published Core (comparable through
+  `.blotdep` files), which phase 2 keeps identical. After CT30 the remaining
+  copying is 8% of robot_pickup samples and absent from the game profile.
 
 ### CT32: cache `dataKind`
 
 - **Fix:** store the data kind on interned type nodes instead of recomputing it
   per query.
+- **Result (18 October 2026):** dropped. `dataKind` was hot only through the
+  substitution checks that CT30 removed; it is 2 of 2,410 cold game samples and
+  absent from robot_pickup's profile after CT30.
 
 ### CT33: index nominal projections
 
@@ -442,6 +466,11 @@ nullary nominal (`check/core_builder.zig:385-391`). It is 5.2% self cold (about
 160 ms) and 29% self in some test entries.
 
 - **Fix:** keep a map from nominal to type node.
+- **Result (18 October 2026):** commit "CT33: index argument-free nominal type
+  nodes in lowering". Five round-robin runs after CT30, load 4–6: game entry
+  3,910 → 3,667 ms (3,782 before CT30), robot_pickup 13.0 → 10.1 s, edit 10.9 →
+  8.9 s, tests/game 10.9 → 8.9 s, interface_station 9.7 → 8.1 s, salt_clicks 7.9
+  → 7.2 s.
 
 ### CT34: `epoch_resolution_cache.Cache.get`
 
@@ -449,6 +478,13 @@ It is 9–12% self in test entries (`reuse/epoch_resolution_cache.zig:36-45`).
 
 - **Fix:** measure probe lengths, then fix the key distribution or the table
   layout.
+- **Result (18 October 2026):** dropped. Probe lengths are short: 25M lookups on
+  robot_pickup averaged 1.83 probes, but tables kept the length of their busiest
+  epoch (277k entries on average) and missed 88% of lookups. Shrinking tables
+  after quiet epochs (above 1,024 entries) measured no gain in eight game and
+  four test rounds at load 1: game 2,879 → 2,859 ms, robot_pickup 8,161 → 8,257
+  ms, edit 7,498 → 7,513 ms, interface_station 7,001 → 7,073 ms. It also added
+  5.6 MB of requested solver memory.
 
 ### CT35: the resolve family
 
@@ -457,6 +493,12 @@ and `closedRowHeight` together take about 11% self.
 
 - **Fix:** add path compression for resolved variables, cache heights on nodes,
   and resolve operation rows once per interned row.
+- **Result (18 October 2026):** dropped. Recording rows whose labels resolve
+  closed, keyed by the closed generation with the tallest argument for the depth
+  bound, measured 2,875 → 2,860 ms on the game and 8,349 → 8,391 ms on
+  robot_pickup at load 1. A per-store record added 15 MB of requested solver
+  memory; an inline 128-slot variant measured the same. Path compression was not
+  tried: resolution must keep its chronological views.
 
 ### CT36: cheaper structural type equality
 
@@ -464,6 +506,14 @@ and `closedRowHeight` together take about 11% self.
 
 - **Fix:** hash-cons closed types so their equality is an id compare, and use a
   small inline pair buffer before falling back to the map.
+- **Result (18 October 2026):** commit "CT36: keep small equality visits in an
+  inline list". Symbolic equality recorded every visited pair in a hash map; the
+  first sixteen pairs now stay in an inline list. Eight game and four test
+  rounds after CT33, load 1.1, Wasm identical: game 2,848 → 2,715 ms,
+  robot_pickup 8,118 → 7,779 ms, edit 7,461 → 7,073 ms, tests/game 7,400 → 7,194
+  ms, interface_station 6,965 → 6,654 ms, salt_clicks 5,913 → 5,593 ms;
+  requested memory is unchanged. Hash-consing closed types was not done: it
+  would change which type nodes exist and therefore the published Core.
 
 ### CT37: cheaper operation interning
 
@@ -472,6 +522,11 @@ about 2.5% self.
 
 - **Fix:** precompute operation hashes and avoid the memcpy that
   `effect_evidence.internOperationInstance` performs.
+- **Result (18 October 2026):** dropped. Grouping interned operations by
+  identity and instance, in stores above 32 operations, removed the scan but
+  measured 2,859 → 2,875 ms on the game and 8,257 → 8,349 ms on robot_pickup at
+  load 1, and added 84k allocations and 28 MB of requested solver memory. The
+  `effect_evidence` interning is reached from inference projection (CT60).
 
 ### CT38: checker linear scans
 
@@ -479,12 +534,16 @@ about 2.5% self.
 (:2856) and the duplicate-implementation check (:2599) scan linearly.
 
 - **Fix:** index them.
+- **Result (18 October 2026):** dropped. The three listed sites draw no samples
+  in 2,410 cold game samples or 1,500 test-entry samples.
 
 ### CT39: index named imports
 
 Named imports cost bindings times exports (`reuse/project_check.zig:447-470`).
 
 - **Fix:** index exports by name.
+- **Result (18 October 2026):** dropped. The bindings-by-exports loop draws 5 of
+  2,410 cold game samples (0.2%).
 
 ### CT40: lowering linear scans
 
@@ -492,6 +551,8 @@ The `dictionary_uses` (`check/core_builder.zig:1120, 1194`) and
 `member_templates` (:2859, :2906) lookups scan linearly.
 
 - **Fix:** use maps.
+- **Result (18 October 2026):** dropped. The `dictionary_uses` and
+  `member_templates` scans draw 1 of 2,410 cold game samples.
 
 ### CT41: a single-pass lexer
 
@@ -499,6 +560,12 @@ The lexer makes four passes and reserves no token capacity
 (`parse/lexer.zig:517-529`).
 
 - **Fix:** fuse the passes and reserve from the source length.
+- **Result (18 October 2026):** dropped. Lexing is 0.8% of a cold game build. A
+  microbenchmark over all 226 gdev and std files (2.07 MB) takes 40.0 ms per
+  round: validate 3.3, scan 21.0, layout 13.4 and contextual 2.6 ms. Reserving
+  token and line capacity plus an ASCII fast path measured 38.9 ms, within run
+  noise, and fusing passes cannot remove the scan and layout work that
+  dominates.
 
 ### CT42: parallel lowering per unit
 
