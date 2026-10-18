@@ -878,6 +878,11 @@ Each region sets up about 14 maps and 12 lists (`eval/core_eval.zig:6291-6338`)
 for a mean of 17 constraint visits.
 
 - **Fix:** initialize them lazily and pool the region shell.
+- **Result (18 October 2026):** dropped after measurement. Region setup and
+  teardown are 0.5% of cold samples (arena reset 0.4% self), and 4,233 of
+  5,886 regions request under 16 KB of solver memory. Resetting only the bump
+  blocks in use and keeping already-binned large blocks measured 20.451 →
+  20.442 G instructions (-0.04%), 2,345 → 2,339 ms over 5 pairs.
 
 ### CT56: solver allocation under 100 MB
 
