@@ -578,6 +578,9 @@ Retained RSS doubles over an edit series (312 to 630 MiB).
   population 259 → 232 MiB. Game, 5 pairs at load 1.3: instructions −0.07% to
   −0.26%, CPU population 2,508 → 2,489 ms, literal_constant revert 1,014 → 1,029
   ms, body_change revert 1,622 → 1,641 ms (within layout noise). Wasm identical.
+  The heap is not `shareable`, so parallel jobs take their usual lock; with 4
+  semantic workers (after CT42), 3 pairs: population wall 2,418 → 2,384 ms,
+  imported_body revert 1,429 → 1,402 ms, CPU equal or lower.
 
 ### CT26: per-body recheck cutoff
 
