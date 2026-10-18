@@ -84,8 +84,11 @@ fn implementations(owner: anytype, map: anytype) void {
         value.predicate.qualification_unit = map.unit(value.predicate.qualification_unit);
     }
 }
-pub fn interface(owner: *PI.Interface, names: []const u32, units: []const u32) void {
-    interfaceWith(owner, Dictionary{ .names = names, .units = units });
+/// Renumber a freshly frozen principal interface like moduleUnits.
+pub fn interfaceUnits(owner: *PI.Interface, units: []const u32) error{InvalidArtifact}!void {
+    var rejected = false;
+    interfaceWith(owner, Retained{ .units = units, .rejected = &rejected });
+    if (rejected) return error.InvalidArtifact;
 }
 fn interfaceWith(owner: *PI.Interface, map: anytype) void {
     capabilityNodes(owner.capability_contracts.nodes, map);

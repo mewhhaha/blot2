@@ -140,6 +140,37 @@ test "whole closure decode and numeric relocation publication are atomic through
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, relocationFail, .{wire});
 }
 
+test "checked unit renumbering keeps dense owners and rejects excluded or unknown producers" {
+    var f = try Fixture.init();
+    defer f.deinit();
+    var value = try closure.freeze(a, &f.source, &f.checked);
+    defer format.deinit(a, &value);
+    const before = try bytes(value);
+    defer a.free(before);
+    const dense = [_]u32{ 1, 2, 3 };
+    for (value.modules) |*m| {
+        try relink.moduleUnits(&m.core, &dense);
+        try relink.interfaceUnits(&m.interface, &dense);
+    }
+    const after = try bytes(value);
+    defer a.free(after);
+    try std.testing.expectEqualSlices(u8, before, after);
+    // Module 1 imports module 2. Excluding that producer (the role of the
+    // entry in a fresh freeze) or omitting it from the map must reject both
+    // its Core and its principal interface instead of mapping to unit zero.
+    try std.testing.expectEqualSlices(u32, &.{2}, value.modules[0].imports);
+    const excluded = [_]u32{ 1, 0, 3 };
+    const unknown = [_]u32{1};
+    for ([_][]const u32{ &excluded, &unknown }) |units| {
+        var core_owner = try closure.freeze(a, &f.source, &f.checked);
+        defer format.deinit(a, &core_owner);
+        try std.testing.expectError(error.InvalidArtifact, relink.moduleUnits(&core_owner.modules[0].core, units));
+        var interface_owner = try closure.freeze(a, &f.source, &f.checked);
+        defer format.deinit(a, &interface_owner);
+        try std.testing.expectError(error.InvalidArtifact, relink.interfaceUnits(&interface_owner.modules[0].interface, units));
+    }
+}
+
 test "closure keys exclude new entry bytes and reject changed dependencies paths settings and topology" {
     var f = try Fixture.init();
     defer f.deinit();

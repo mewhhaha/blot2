@@ -152,12 +152,8 @@ fn freezeOne(a: std.mem.Allocator, source: *const project.Project, checked: *con
     for (ir.types.nodes) |*node| node.* = .{ .tag = node.tag, .a = node.a, .b = node.b, .c = node.c };
     var interface = try snapshot.freezePrincipal(a, &src.tree, &typed.checked);
     errdefer snapshot.deinit(a, &interface);
-    {
-        const timing = phase_profile.enter(.validation);
-        defer timing.exit();
-        try principal_validation.validate(&interface, source.symbols.entries.items.len + 1, source.units.items.len);
-        try principal_validation.validateGraph(a, &interface);
-    }
+    // Complete closure validation checks the frozen interface once it has
+    // final ordinals; nothing here indexes through an unchecked ID.
     try checkInterfaceUnits(&interface, units);
     const exports = try a.alloc(D.Export, typed.exports.len);
     errdefer a.free(exports);
@@ -336,17 +332,14 @@ fn freezeMode(a: std.mem.Allocator, source: *const project.Project, checked: *co
     // When the entry is last, retained units and symbols already have their
     // final ordinals. Leave the owned copies untouched; complete validation
     // below still rejects references to the excluded entry and malformed IDs.
-    // Other entry positions renumber units only. Core renumbering is checked:
-    // an excluded entry producer can never silently become the reserved
+    // Other entry positions renumber units only. Renumbering is checked: an
+    // excluded entry producer can never silently become the reserved
     // unit-zero context, and complete validation of the dense result decides
-    // everything else, so Core is traversed once.
+    // everything else, so Core and interfaces are each validated once.
     if (source.entry != source.units.items.len) {
-        const names = try a.alloc(u32, result.symbols.len);
-        defer a.free(names);
-        for (names, 0..) |*name, id| name.* = @intCast(id);
         for (result.modules) |*m| {
             try relink.moduleUnits(&m.core, units);
-            relink.interface(&m.interface, names, units);
+            try relink.interfaceUnits(&m.interface, units);
             for (m.exports) |*exported| exported.target.unit = try mapped(units, exported.target.unit);
             for (m.fixities) |*f| f.producer.unit = try mapped(units, f.producer.unit);
         }
