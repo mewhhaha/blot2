@@ -778,6 +778,13 @@ Each function allocates a fresh emitter with about 90 lists and maps
 (`backend/core_backend.zig:1062-1078`).
 
 - **Fix:** reuse one emitter shell with a per-function arena.
+- **Result (18 October 2026):** dropped. Emitter teardown (`Owner.deinit`) is
+  0.04% of cold game samples, and the allocations under emitter frames are the
+  checker and evaluator stores (`equalGraph`, effect rows) and module emission,
+  not the emitter's own lists and maps. Those are filled through the shared
+  `g.allocator` at hundreds of sites in `backend_emission.zig`, so an arena
+  would mean splitting allocators throughout the emitter for a gain under the
+  noise.
 
 ### CT68: memoize inlining analyses
 
