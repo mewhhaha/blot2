@@ -810,6 +810,11 @@ Each function allocates a fresh emitter with about 90 lists and maps
 instruction (`backend/wasm_inline.zig:95, 105, 334-360`).
 
 - **Fix:** memoize them per callee.
+- **Result (18 October 2026):** "CT68: Compute each inlining callee fact once
+  per pipeline session". Atomic per-function slots shared by workers. Wasm
+  identical. Instructions: game 28.056 → 28.045 G (−0.04%), devtools 8.910 →
+  8.906 G. CPU: game 2,961 → 3,017 ms, devtools 1,006 → 1,026 ms (layout
+  jitter).
 
 ### CT69: one lifetime analysis per function
 
