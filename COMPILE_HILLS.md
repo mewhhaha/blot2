@@ -278,6 +278,14 @@ Adding an unused export to `ink/math` leaves the Wasm unchanged but costs 3.1 s.
   the previous revision's. When neither changes for any consumer, stop before
   the backend.
 - **Target:** an interface-neutral edit under 30 ms.
+- **Result (18 October 2026):** deferred; larger than described. The unused
+  export is inserted mid-module, so every later declaration of `ink/math`
+  changes its binding ID (its interface's capability roots move from binding 41
+  to 42), the new spelling grows the namespace, and all 76 importers re-check
+  and lower new Core. No module's interface or Core is unchanged, so stopping
+  before the backend needs comparison of the reachable program modulo binding
+  IDs and unreferenced spellings, which the reuse gate deliberately declines
+  today ("ID movement conservatively rebuilds code").
 
 ### CT11: interface early cutoff for importers
 
