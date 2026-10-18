@@ -1451,6 +1451,22 @@ The `rcPlan` loop is serial (`backend/wasm.zig:1063-1083`), and
 `codegen_workers` defaults to 1 (`execution_policy.zig:8`).
 
 - **Fix:** parallelize after CT74 and CT69.
+- **Result (18 October 2026):** "CT89: Plan reference counts in the codegen
+  worker jobs" and "CT89: Default serve-project codegen workers to four". A
+  serial game assembly is 201 ms: 13 ms of lifetime summaries, 142 ms of
+  optimization, 12 ms of `rcPlan` and 25 ms of sharing and encoding. Each
+  worker job now also plans reference counts over its final body, optimized or
+  reused, and assembly reads the verdicts in function order, so rejections name
+  the serial first unproven function (a law compares 1, 2 and 4 workers).
+  Serve-project sessions now default to 4 codegen workers; the CLI and
+  `Policy` stay serial, which keeps compile budgets and the unshared CLI meter.
+  Against 1 worker (5 pairs, load 1.7): game wall 2,424 → 2,330 ms (−3.9%),
+  CPU 2,390 → 2,420 ms, assembly 201 → 91 ms; literal edit 1,111 → 1,009 ms
+  (−9.2%); body edit 1,641 → 1,568 ms; imported-body edit 2,354 → 2,262 ms
+  and its revert 1,350 → 1,248 ms; CPU at most +1.3%, peak RSS unchanged
+  (274 MiB). The rc part alone takes 7–9 ms off every assembly at 4 workers.
+  All 56 test entries (one run each): wall 101.1 → 96.8 s, CPU 99.7 → 100.5
+  s. Wasm identical on the game, devtools and every test entry.
 
 ### CT90: share the checked game across test entries
 

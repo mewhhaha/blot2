@@ -56,15 +56,15 @@ improvement has been established. The `runtimeOptimization.shared` counter
 counts removed duplicate bodies. Artifact statistics describe the logical
 functions retained for replay.
 
-`codegenWorkers` requests 1–16 concurrent optimizer workers (default 1). Jobs
-read immutable function bodies and completed lifetime summaries; each worker
-owns its scratch arena. Small builds and edits with fewer than four uncached
-bodies or 4,096 instructions stay serial. `runtimeOptimization.workers` and
-`parallel_jobs` report the actual work scheduled. Output is byte-identical to
-serial assembly. This prototype parallelizes runtime optimization, not semantic
-checking or evaluation. Four workers reduced the measured cold assembly phase
-from about 30 ms to 18 ms on gdev, but total latency was too noisy to establish
-a speedup. It remains opt-in.
+`codegenWorkers` requests 1–16 concurrent optimizer workers (default 4). Jobs
+read immutable function bodies and completed lifetime summaries, optimize them
+and plan their reference counts; each worker owns its scratch arena. Small
+builds and edits with fewer than four uncached bodies or 4,096 instructions
+stay serial. `runtimeOptimization.workers` and `parallel_jobs` report the actual
+work scheduled. Output and rejections are byte-identical to serial assembly.
+This parallelizes runtime optimization, not semantic checking or evaluation. On
+the gdev game, four workers cut assembly from 201 to 91 ms and build wall time
+by 3.9% (a literal edit by 9.2%) with CPU within 1.3% (CT89).
 
 The direct native client accepts `semanticWorkers: 1..16` to opt into private
 semantic component jobs. Explicit `1` runs the same component path with one

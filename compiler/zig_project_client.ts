@@ -109,7 +109,7 @@ export interface ZigProjectCompilerOptions {
   codegenTier?: "optimized" | "development";
   /** Prototype: share identical internal machine bodies while keeping table slots. */
   shareMachineCode?: boolean;
-  /** Prototype: upper bound for coarse optimizer workers (1..16; default 1). */
+  /** Upper bound for coarse optimizer workers (1..16; default 4). */
   codegenWorkers?: number;
   /** Opt-in private semantic components with 1..16 workers; default stays serial. */
   semanticWorkers?: number;

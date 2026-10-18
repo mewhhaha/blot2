@@ -162,7 +162,7 @@ It allows 30 s by default (1 to 300 s) for the hello and the open together.
 | `explainDemands`   | boolean                          | bounded demand-lowering report (default false)                             |
 | `codegenTier`      | `"optimized"` or `"development"` | default `"optimized"`; development skips optional scalar and vector passes |
 | `shareMachineCode` | boolean                          | prototype; default false                                                   |
-| `codegenWorkers`   | integer 1..16                    | default 1                                                                  |
+| `codegenWorkers`   | integer 1..16                    | default 4                                                                  |
 | `checkpoint`       | boolean                          | true exactly when the payload holds checkpoint bytes                       |
 | `nativeAssets`     | object or null                   | optional native input configuration; absent/null disables it               |
 
@@ -209,7 +209,7 @@ UTF-8. These overrides use the same per-build disk/deletion rules as sources.
 Their full schema is in [NATIVE_ASSETS.md](NATIVE_ASSETS.md#build-payload).
 
 A build, checkpoint or close may carry the open's fields only at their defaults
-(absent, `null`, `false`, `[]`, `"optimized"`, `codegenWorkers` 1, `checkpoint`
+(absent, `null`, `false`, `[]`, `"optimized"`, `codegenWorkers` 4, `checkpoint`
 false); any other value stops the process with `InvalidRequest`. `version` must
 be absent or `null` after open. `nativeAssets` must also be absent or `null`; an
 empty object is still an open-only configuration.

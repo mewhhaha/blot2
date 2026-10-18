@@ -16,6 +16,10 @@ const restart_cache = @import("restart_cache.zig");
 const native_assets = @import("../backend/native_assets.zig");
 const phase_profile = @import("../phase_profile.zig");
 
+/// Optimizer workers for a session whose open names none. Four beat one on
+/// every gdev build and edit measured (CT89: game wall -3.9%, a literal edit
+/// -9.2%) with CPU within 1.3% and byte-identical output.
+pub const default_codegen_workers: u8 = 4;
 const Request = struct {
     kind: enum { open, build, close, checkpoint, complete },
     id: u32,
@@ -34,7 +38,7 @@ const Request = struct {
     explainDemands: bool = false,
     codegenTier: @import("../compilation_tier.zig").Tier = .optimized,
     shareMachineCode: bool = false,
-    codegenWorkers: u8 = 1,
+    codegenWorkers: u8 = default_codegen_workers,
     checkpoint: bool = false,
     sources: []const SourceRange = &.{},
     nativeAssets: ?native_assets.Options = null,
@@ -517,7 +521,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
             },
             .build, .close, .checkpoint, .complete => {
                 const owner = if (opened) |*value| value else return error.NotOpen;
-                if (request.nativeAssets != null or request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.explainDemands or request.codegenTier != .optimized or request.shareMachineCode or request.codegenWorkers != 1 or request.checkpoint) return error.InvalidRequest;
+                if (request.nativeAssets != null or request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.explainDemands or request.codegenTier != .optimized or request.shareMachineCode or request.codegenWorkers != default_codegen_workers or request.checkpoint) return error.InvalidRequest;
                 if (request.epoch == null or !std.mem.eql(u8, request.epoch.?, epoch) or request.revision == null or request.revision.? != owner.session.revisions) return error.RevisionMismatch;
                 if (request.kind == .complete) {
                     if (request.snapshot == null or request.filename == null or request.position == null or request.filename.?.len > 4096 or !validPath(request.filename.?)) return error.InvalidCompletionRequest;
