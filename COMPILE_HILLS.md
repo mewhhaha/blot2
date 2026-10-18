@@ -558,6 +558,10 @@ The project server persists its checkpoint before replying on revision 1
   Replying first would lose the cache to a kill in that window. The options are
   to weaken the promise (saved after the first reply; `close` still saves) or
   to persist from a detached process that later opens wait for.
+- **Decision (18 October 2026):** the owner chose the detached process. The
+  reply comes first, a detached writer persists the cache, and a later open
+  waits for that write to finish, so the warm-restart promise still holds.
+  Scheduled with CT82–CT85.
 
 ### CT25: bound retained memory
 
