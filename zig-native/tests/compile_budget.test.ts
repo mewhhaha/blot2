@@ -385,6 +385,45 @@ const retainedToday: Record<string, Reuse> = {
   },
 };
 
+/**
+ * Frozen dependency modules whose Core or principal interface a retained
+ * revision validated again instead of reusing the previous receipt
+ * (`attemptStats.fallback.dependency_storage`). Lower is better; a budget is
+ * the count when it was set.
+ */
+interface Revalidation {
+  core_checked: number;
+  interface_checked: number;
+}
+function revalidation(result: ZigProjectBuildResult): Revalidation {
+  assert(result.success, JSON.stringify(result));
+  const attempt = result.stats.attemptStats as Record<string, unknown>;
+  const fallback = attempt.fallback as Record<string, unknown>;
+  const storage = fallback.dependency_storage as Record<string, number>;
+  return {
+    core_checked: storage.core_checked,
+    interface_checked: storage.interface_checked,
+  };
+}
+// Only modules that are new or read a changed producer revalidate.
+const revalidationToday: Record<string, Revalidation> = {
+  "population": { core_checked: 4, interface_checked: 4 },
+  "edit:trivia": { core_checked: 0, interface_checked: 0 },
+  "revert:trivia": { core_checked: 0, interface_checked: 0 },
+  "edit:literal_constant": { core_checked: 1, interface_checked: 1 },
+  "revert:literal_constant": { core_checked: 1, interface_checked: 1 },
+  "edit:literal_in_body": { core_checked: 1, interface_checked: 1 },
+  "revert:literal_in_body": { core_checked: 1, interface_checked: 1 },
+  "edit:body_change": { core_checked: 1, interface_checked: 1 },
+  "revert:body_change": { core_checked: 1, interface_checked: 1 },
+  "edit:type_change": { core_checked: 1, interface_checked: 4 },
+  "revert:type_change": { core_checked: 1, interface_checked: 1 },
+  "edit:imported_body": { core_checked: 1, interface_checked: 1 },
+  "revert:imported_body": { core_checked: 1, interface_checked: 1 },
+  "edit:unused_export": { core_checked: 3, interface_checked: 4 },
+  "revert:unused_export": { core_checked: 3, interface_checked: 3 },
+};
+
 Deno.test("budget: retained edit suite reuses at least today's work", async () => {
   await Deno.mkdir(scratchRoot, { recursive: true });
   const directory = await Deno.makeTempDir({
@@ -400,11 +439,17 @@ Deno.test("budget: retained edit suite reuses at least today's work", async () =
   };
   const retained = await createZigProjectCompiler(options);
   const observed: Record<string, Reuse> = {};
+  const revalidated: Record<string, Revalidation> = {};
+  const record = (phase: string, result: ZigProjectBuildResult) => {
+    observed[phase] = reuse(result);
+    revalidated[phase] = revalidation(result);
+    return result;
+  };
   try {
     for (const [file, source] of Object.entries(editSuite.files)) {
       await Deno.writeTextFile(`${directory}/${file}`, source);
     }
-    observed.population = reuse(await retained.build());
+    record("population", await retained.build());
     for (const scenario of editSuite.scenarios) {
       const sources: Record<string, string> = {};
       for (const { file, search, replace } of scenario.replacements) {
@@ -413,8 +458,10 @@ Deno.test("budget: retained edit suite reuses at least today's work", async () =
         assert.equal(original.split(search).length, 2, `${scenario.name}`);
         sources[path] = original.replace(search, replace);
       }
-      const edited = await retained.build({ sources });
-      observed[`edit:${scenario.name}`] = reuse(edited);
+      const edited = record(
+        `edit:${scenario.name}`,
+        await retained.build({ sources }),
+      );
       const fresh = await createZigProjectCompiler(options);
       try {
         const expected = await fresh.build({ sources });
@@ -423,15 +470,24 @@ Deno.test("budget: retained edit suite reuses at least today's work", async () =
       } finally {
         await fresh.dispose();
       }
-      observed[`revert:${scenario.name}`] = reuse(await retained.build());
+      record(`revert:${scenario.name}`, await retained.build());
     }
   } finally {
     await retained.dispose();
     await Deno.remove(directory, { recursive: true });
   }
   assert.deepEqual(Object.keys(observed), Object.keys(retainedToday));
+  assert.deepEqual(Object.keys(revalidated), Object.keys(revalidationToday));
   const failures: string[] = [];
   const improved: string[] = [];
+  for (const [phase, budget] of Object.entries(revalidationToday)) {
+    for (const [name, limit] of Object.entries(budget)) {
+      const value = revalidated[phase][name as keyof Revalidation];
+      if (value > limit) {
+        failures.push(`${phase} ${name}: ${value} exceeds ${limit}`);
+      } else if (value < limit) improved.push(`${phase} ${name}`);
+    }
+  }
   for (const [phase, budget] of Object.entries(retainedToday)) {
     const actual = observed[phase];
     for (const [name, limit] of Object.entries(budget)) {

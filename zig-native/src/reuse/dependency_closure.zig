@@ -400,6 +400,11 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
     if (saved) |old| {
         for (old.value.modules, previous_views) |*module, *view| view.* = &module.core;
     }
+    // Validation reads foreign modules only through unit references, so a
+    // shared module whose transitive owners are all shared validates exactly
+    // as before when the module count is unchanged: symbol IDs are only ever
+    // bounded above by the dictionary, which is append-only across revisions.
+    const owner_bounds = if (saved) |old| value.modules.len == old.value.modules.len and value.symbols.len >= old.value.symbols.len else false;
     var exact_owners: ?@import("dependency_core_inputs.zig").Owners = null;
     var owners_examined = false;
     defer if (exact_owners) |*owners| owners.deinit(a);
@@ -426,9 +431,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
         if (shared and !same_core_context) {
             if (!owners_examined) {
                 owners_examined = true;
-                if (core_validation.equivalentContextFacts(.{ .units = previous_views, .symbol_count = saved.?.value.symbols.len }, .{ .units = views, .symbol_count = value.symbols.len })) {
-                    exact_owners = try @import("dependency_core_inputs.zig").Owners.init(a, current.?, saved.?);
-                }
+                if (owner_bounds) exact_owners = try @import("dependency_core_inputs.zig").Owners.init(a, current.?, saved.?);
             }
             if (exact_owners) |owners| same_owned_context = owners.stable[id];
         }

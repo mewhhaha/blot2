@@ -656,6 +656,24 @@ The loader reads, lexes and parses one file at a time (`reuse/project.zig`).
 whole program on every build.
 
 - **Fix:** validate only new or changed modules, and build the graph edges once.
+- **Result (18 October 2026):** two commits. "CT46: renumber fresh Core with a
+  checked relink and validate it once": a fresh freeze whose entry precedes its
+  dependencies (every cold build) validated each module's Core in source
+  numbering, to guard an unchecked relink, and again in the closure pass. The
+  relink now rejects units naming the excluded entry or no module, and only the
+  dense pass runs: game instructions -1.51% (23,423 → 23,068 M), devtools -1.62%,
+  measured on `fa4d4d5`. "CT46: reuse shared Core validation by owner inputs,
+  not global facts": validation reads foreign modules only through unit
+  references, so a shared module whose transitive owners are all shared keeps
+  its receipt when the module count is unchanged and the dictionary only grew,
+  instead of requiring every module's bounds and the symbol count to match.
+  Game, 3 runs at load 1.1: a type-change revert revalidates 13 instead of 129
+  modules' Core (validation 61.9 → 24.6 ms, edit 1,937 → 1,896 ms), an
+  unused-export revert 75 instead of 129 (81.8 → 53.7 ms); the miniature
+  suite's type change revalidates 1 instead of 4 (budgeted). Building the edges
+  once was not needed: each pass visits an edge once. A linear acyclicity proof
+  for lowered type graphs saved 0.17% of instructions and was dropped. Wasm
+  identical.
 
 ### CT47: copy-free capability views
 

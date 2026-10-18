@@ -108,36 +108,92 @@ test "shared dependency modules survive discard commit and pending session teard
     alive = false;
 }
 
-test "shared dependency validation observes changed foreign bounds and new symbols" {
+/// Prepares and commits a revision of `changed.blot`, whose only importer is
+/// `left`, and returns its dependency storage counters. `changed` is frozen
+/// afresh, `right` keeps its immutable owner, and `left` is reported.
+fn ownerScopedRevision(session: *retained.Session, fixture: *Fixture, text: []const u8, left_shared: *bool) !@import("retained_dependency.zig").Stats {
+    try fixture.write("changed.blot", text);
+    var expected = try fresh(fixture);
+    defer expected.deinit(a);
+    var candidate = try session.prepareRevision(io, fixture.path, null, .{});
+    defer candidate.deinit();
+    try std.testing.expect(candidate == .ready);
+    try equal(candidate.ready.result().?, &expected);
+    const old = session.seed_snapshot.?;
+    const next = candidate.ready.seed.?.snapshot.?;
+    for (next.value.modules, 0..) |module, index| {
+        const name = std.Io.Dir.path.basename(module.identity.normalized_path);
+        if (std.mem.eql(u8, name, "changed.blot")) try std.testing.expect(!next.shares(old, index));
+        if (std.mem.eql(u8, name, "right.blot")) try std.testing.expect(next.shares(old, index));
+        if (std.mem.eql(u8, name, "left.blot")) left_shared.* = next.shares(old, index);
+    }
+    const stats = candidate.ready.stats.fallback.dependency_storage;
+    try std.testing.expect(session.commit(candidate.ready));
+    return stats;
+}
+test "shared dependency validation rechecks exactly the importers of changed foreign bounds and new symbols" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     try initialize(&session, &fixture);
     const symbols = session.seed.symbols.len;
+    var left_shared = false;
     // All names already occur in the published namespace, but the local lambda
     // introduces another binding that foreign Core validation can observe.
+    // `left` keeps its owner but reads `changed`, so it alone revalidates;
+    // `right` keeps its validated Core.
+    var stats = try ownerScopedRevision(&session, &fixture, "const value: U32 = (fn (fixed: U32) -> U32 => fixed) 42\n", &left_shared);
+    try std.testing.expect(left_shared);
+    try std.testing.expectEqual(symbols, session.seed.symbols.len);
+    try std.testing.expectEqual(@as(usize, 2), stats.shared_modules);
+    try std.testing.expectEqual(@as(usize, 1), stats.core_reused);
+    try std.testing.expectEqual(@as(usize, 2), stats.core_checked);
+    try std.testing.expectEqual(stats.shared_modules, stats.interface_reused);
+    // A new symbol only raises the dictionary bound; ownership still decides.
+    stats = try ownerScopedRevision(&session, &fixture, "const new_private_name: U32 = 2\nconst value: U32 = 43\n", &left_shared);
+    try std.testing.expect(session.seed.symbols.len > symbols);
+    try std.testing.expectEqual(@as(usize, 1), stats.core_reused);
+    try std.testing.expectEqual(stats.fresh_modules + @intFromBool(left_shared), stats.core_checked);
+    try std.testing.expectEqual(@as(usize, 0), stats.interface_reused);
+    stats = try ownerScopedRevision(&session, &fixture, original, &left_shared);
+    try std.testing.expectEqual(@as(usize, 1), stats.core_reused);
+    try std.testing.expectEqual(stats.fresh_modules + @intFromBool(left_shared), stats.core_checked);
+}
+
+test "owner-scoped validation reuse revalidates a shared importer once its producer changes" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    try initialize(&session, &fixture);
+    // Corrupt only diagnostic metadata of the validated `left` owner, which
+    // validation rejects and emission never reads.
+    for (session.seed_snapshot.?.value.modules) |*module| {
+        if (!std.mem.eql(u8, std.Io.Dir.path.basename(module.identity.normalized_path), "left.blot")) continue;
+        module.core.spans[module.core.spans.len - 1].end = module.identity.source_bytes + 1;
+    }
+    // An unrelated edit leaves every input of `left` unchanged: its receipt stands.
+    try fixture.write("right.blot", "const fixed: U32 = 2\n");
+    var unrelated = try fresh(&fixture);
+    defer unrelated.deinit(a);
+    var kept = try session.revise(io, fixture.path, null, .{});
+    defer kept.deinit(a);
+    try equal(&kept, &unrelated);
+    var stats = session.last.fallback.dependency_storage;
+    try std.testing.expectEqual(@as(usize, 2), stats.shared_modules);
+    try std.testing.expectEqual(@as(usize, 2), stats.core_reused);
+    // Changing the bounds `left` reads revalidates it. The stale owner is
+    // rejected and the revision falls back to freezing every module afresh.
     try fixture.write("changed.blot", "const value: U32 = (fn (fixed: U32) -> U32 => fixed) 42\n");
     var expected = try fresh(&fixture);
     defer expected.deinit(a);
     var result = try session.revise(io, fixture.path, null, .{});
     defer result.deinit(a);
     try equal(&result, &expected);
-    try std.testing.expectEqual(symbols, session.seed.symbols.len);
-    var stats = session.last.fallback.dependency_storage;
-    try std.testing.expect(stats.shared_modules > 0);
-    try std.testing.expectEqual(@as(usize, 0), stats.core_reused);
-    try std.testing.expectEqual(stats.shared_modules, stats.interface_reused);
-    try fixture.write("changed.blot", "const new_private_name: U32 = 2\nconst value: U32 = 43\n");
-    var next_expected = try fresh(&fixture);
-    defer next_expected.deinit(a);
-    var next = try session.revise(io, fixture.path, null, .{});
-    defer next.deinit(a);
-    try equal(&next, &next_expected);
     stats = session.last.fallback.dependency_storage;
-    try std.testing.expect(stats.shared_modules > 0 and session.seed.symbols.len > symbols);
-    try std.testing.expectEqual(@as(usize, 0), stats.core_reused);
-    try std.testing.expectEqual(@as(usize, 0), stats.interface_reused);
+    try std.testing.expectEqual(@as(usize, 0), stats.shared_modules);
+    try std.testing.expectEqual(@as(usize, 3), stats.fresh_modules);
 }
 
 test "shared dependency revisions bound storage across repeated errors and reversions" {
@@ -636,6 +692,19 @@ test "module frontend reuse releases every failing candidate allocation and leav
     defer session.deinit();
     try initialize(&session, &fixture);
     try fixture.write("changed.blot", edited);
+    var expected = try fresh(&fixture);
+    defer expected.deinit(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, allocationFailure, .{ &fixture, &session, &expected });
+}
+
+test "owner-scoped validation reuse releases every failing candidate allocation" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    try initialize(&session, &fixture);
+    // Changed producer bounds route shared Core admission through owner inputs.
+    try fixture.write("changed.blot", "const value: U32 = (fn (fixed: U32) -> U32 => fixed) 42\n");
     var expected = try fresh(&fixture);
     defer expected.deinit(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, allocationFailure, .{ &fixture, &session, &expected });
