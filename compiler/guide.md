@@ -25,6 +25,11 @@ Blot compiles to Wasm; a host loads the module and calls its entrypoints, the
 sibling gdev checkout, `just run` starts Deno Desktop/WebGPU with source hot
 reload.
 
+An edit loop compiles with the development tier (`codegenTier: "development"` in
+a project session), which skips the optional scalar and vector passes and
+behaves the same; release builds use the default optimized tier. See
+`zig-native/PROJECT_CLIENT.md`.
+
 ## Layout, names, values, functions
 
 Indent suites after `do:`, `if ...:`, and `case ... of`. No suite braces,

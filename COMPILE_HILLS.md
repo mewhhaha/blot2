@@ -608,6 +608,19 @@ the seven optimization passes, but it is not the default.
 
 - **Decision:** whether the edit loop uses it. The output differs, so this is a
   product decision for the owner.
+- **Result (18 October 2026):** CT28, "Document the development tier for the
+  edit loop". Approved by the owner. The compiler and client switch already
+  existed (`codegenTier` on `open`), and pen lives in `../pen`: its Blot plugin
+  forwards a program's `codegenTier` setting, which applies to every build, so
+  `pen dev` must select the tier for its own session (a pen change; this repo
+  documents it in `PROJECT_CLIENT.md` and the guide). A law checks that default
+  builds equal the optimized tier byte for byte and that development builds run
+  the same programs, retained and fresh. The tier halves assembly (197 → 99 ms);
+  inference and constants, which dominate edits, are unchanged. Game, 5 pairs at
+  load 0.9–1.8: population 2,367 → 2,268 ms (19.74 → 19.14 G), literal_constant
+  edit 1,087 → 996 ms, literal_in_body 962 → 915 ms, body_change 1,621 → 1,565
+  ms, imported_body 2,333 → 2,229 ms, type_change 1,792 → 1,702 ms; reverts 0–6%
+  faster. Release output unchanged.
 
 ### CT29: cheaper edits with errors
 

@@ -47,6 +47,17 @@ keeps its selected tier; start a separate session to compare outputs. Optimized
 body captures are valid only for the tier that produced them. This option does
 not change the optimization mode used to build the native compiler itself.
 
+An edit loop such as `pen dev` opens its session with `"development"`; every
+release build (`pen build`, test runs, `bench:compile` hashes) opens with the
+default, whose output the development tier never changes
+(`tests/development_tier.test.ts`). pen's Blot plugin forwards its program
+setting `codegenTier` on `open`, but that setting applies to every build of the
+program, so `pen dev` must select the tier for its own session rather than
+through `pen.json`. On gdev the tier halves assembly (197 → 99 ms); inference
+and constant evaluation, which dominate an edit, are the same in both tiers.
+Game, 5 pairs: population 2,367 → 2,268 ms, a literal edit 1,087 → 996 ms, a
+body change 1,621 → 1,565 ms, an `ink/math` body edit 2,333 → 2,229 ms.
+
 `shareMachineCode: true` enables the internal body-sharing prototype. Identical
 resolved functions share one Wasm body while their source/evidence identities
 and indirect table slots remain distinct. Exported functions keep distinct
