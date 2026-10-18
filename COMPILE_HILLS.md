@@ -907,6 +907,10 @@ The solver requests 262 MB in 477k allocations, and scratch requests 122 MB in
 sessions repeat it (`reuse/independent_call_proof.zig:90`).
 
 - **Fix:** share immutable tables between sessions.
+- **Result (18 October 2026):** covered by CT15, whose `Session.initShared`
+  gives private sessions (independent call proofs and semantic component
+  jobs) the parent's unit facts. A cold build's one `Session.init` is 0.1% of
+  samples.
 
 ### CT58: stop copying wide values
 
