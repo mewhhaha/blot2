@@ -735,15 +735,15 @@ declines.
 
 - **Fix:** build the quantified set once per unit.
 - **Target:** no budget-driven declines, and the scan disappears from profiles.
-- **Result (18 October 2026):** "CT63: Build each unit's quantified-variable
-  set once". `backend/unit_index.zig` builds the set lazily per compile attempt;
+- **Result (18 October 2026):** "CT63: Build each unit's quantified-variable set
+  once". `backend/unit_index.zig` builds the set lazily per compile attempt;
   `closeAmbiguousUse` no longer charges the body budget. The scan never showed
   on gdev, whose large units skip `localStorageMappings` at the 4,096-node cliff
-  (CT64), so game and devtools are unchanged: 28.364 G and 9.233 G
-  instructions, 3,635 → 3,780 ms and 1,247 → 1,273 ms CPU (5 pairs, load 5.4,
-  noise), Wasm identical on game, devtools and the 10 slowest tests. A padded
-  unit (200 declarations, 20 generalized locals) that used to exhaust the
-  budget and report `ownership_unproved` now compiles and runs.
+  (CT64), so game and devtools are unchanged: 28.364 G and 9.233 G instructions,
+  3,635 → 3,780 ms and 1,247 → 1,273 ms CPU (5 pairs, load 5.4, noise), Wasm
+  identical on game, devtools and the 10 slowest tests. A padded unit (200
+  declarations, 20 generalized locals) that used to exhaust the budget and
+  report `ownership_unproved` now compiles and runs.
 
 ### CT64: a def-use index for Core
 
