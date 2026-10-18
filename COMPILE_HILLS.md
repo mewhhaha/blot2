@@ -721,6 +721,13 @@ inputs.
 The loader reads, lexes and parses one file at a time (`reuse/project.zig`).
 
 - **Fix:** read and lex discovered imports on workers.
+- **Result (18 October 2026):** dropped. On a 2.5 s game build the phase clocks
+  give lexing 19 ms, parsing 12 ms and loading 6 ms (1.5% of cold samples in
+  all). Parsing interns into the shared symbol pool under inherited fixities,
+  so only reads and lexing could move: at most about 15 ms of wall time with
+  four workers. `serve-project` reads through the revision snapshot, which
+  records every read and is not thread-safe, so prefetching would also need a
+  concurrent snapshot and speculative import resolution.
 
 ### CT44: level-wise parallel checking
 
