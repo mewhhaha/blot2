@@ -680,6 +680,11 @@ whole program on every build.
 `capability_contracts.View.validate` spends 1.5% in memcpy.
 
 - **Fix:** validate through borrowed slices.
+- **Result (18 October 2026):** dropped. CT78 already stopped zeroing the 136
+  KiB of fixed scratch per call. On a cold game build (1,347 samples)
+  `View.validate` is 0.4% inclusive (5 samples, from capability digests,
+  interface validation and scheme import) and its memset one sample; no copy
+  remains to borrow.
 
 ### CT48: cache dependency interface validation
 
