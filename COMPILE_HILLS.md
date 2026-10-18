@@ -929,6 +929,10 @@ sessions repeat it (`reuse/independent_call_proof.zig:90`).
 
 - **Fix:** finish Hill 5's open worklist so solver passes revisit only the
   constraints that changed.
+- **Result (18 October 2026):** dropped. Regions with more than eight
+  constraints already use the watched worklist. Of 52,075 constraint visits
+  on a cold game build, 42,500 solve, 8,542 wait on summaries and 830 stay
+  open, so there is no rescanning left to remove.
 
 ### CT60: memoize type-evidence projection
 
