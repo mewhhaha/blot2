@@ -973,6 +973,26 @@ It is 0.7% self.
   20.45 G instructions (-0.9%); devtools -0.4%; `robot_pickup` 5,311 → 5,257
   ms (-1.6% instructions). Wasm identical.
 
+### Issue #15: reference overlap validation
+
+`wasm_lifetimes.Analysis.validateReferences` scans a parent's access list per
+reference field, capped at 256 × 1024 comparisons per call; exhausting the cap
+marks the parent escaped.
+
+- **Result (18 October 2026):** measured; neither CPU nor rejections are
+  material, so no implementation. The pass has no samples in 2,475 cold game
+  samples (the whole lifetime pass is 1.7–2.1%). Counted with a temporary
+  probe that also ran the uncapped scan: cold game 7,111 calls (2,070 with
+  references; 5,602 references, 37,401 accesses, at most 271 and 2,981 in one
+  function) make 8,516 comparisons; devtools 5,183; `robot_pickup` 8,972; a
+  retained session with five edit/revert pairs 60,309 over 65,052 calls. No
+  call exhausts the budget, so no proof is rejected by it. Stress shapes on
+  one self-referencing record: W disjoint fields cost W² comparisons (the cap
+  first binds at W = 513), K reads per field multiply that by K + 1 (W = 256,
+  K = 4 exhausts it), and an overlapping write ends the scan early (W = 256:
+  32,897) but still exhausts it at W = 1,024. Only budget exhaustion on such
+  records rejects a proof the uncapped scan would accept.
+
 ## Phase 5: backend
 
 ### CT62: faster static-data serialization
