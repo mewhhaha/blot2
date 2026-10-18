@@ -135,14 +135,28 @@ fn copyCoreValue(a: std.mem.Allocator, value: anytype) std.mem.Allocator.Error!@
     }
 }
 
-fn freezeOne(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, unit: u32, units: []const u32, retained_core: ?*const core.Module) Error!D.Module {
+/// Where freezing obtains each fresh module's executable Core.
+const Cores = union(enum) {
+    /// Lower afresh from the checked source.
+    lower,
+    /// Copy prepared Core that its preparation keeps owning.
+    copy: []const core.Module,
+    /// Move fresh Core out of its preparation instead of copying it.
+    take: *partial.Prepared,
+};
+
+fn freezeOne(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, unit: u32, units: []const u32, cores: Cores) Error!D.Module {
     const src = source.unit(unit);
     const typed = checked.module(unit);
     try require(typed.valid and typed.checked.diagnostics.len == 0 and typed.checked.unit == unit);
-    var ir = if (retained_core) |saved| try copyCoreValue(a, saved.*) else lowered: {
-        const timing = phase_profile.enter(.lower);
-        defer timing.exit();
-        break :lowered try core_builder.lowerWithOrigins(a, &src.tree, &source.symbols, &typed.checked, .{ .context = source, .lookup = project_check.diagnosticModuleOrigin });
+    var ir = switch (cores) {
+        .lower => lowered: {
+            const timing = phase_profile.enter(.lower);
+            defer timing.exit();
+            break :lowered try core_builder.lowerWithOrigins(a, &src.tree, &source.symbols, &typed.checked, .{ .context = source, .lookup = project_check.diagnosticModuleOrigin });
+        },
+        .copy => |prepared| try copyCoreValue(a, prepared[unit - 1]),
+        .take => |prepared| try prepared.takeCore(unit - 1),
     };
     errdefer ir.deinit(a);
     ir.unit = unit;
@@ -199,14 +213,16 @@ fn freezeOne(a: std.mem.Allocator, source: *const project.Project, checked: *con
 /// Returned slices exclusively own their storage and use artifact unit IDs.
 /// Release with dependency_format.deinit(allocator, &result).
 pub fn freeze(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject) Error!D.FrozenDependency {
-    return freezeMode(a, source, checked, null);
+    return freezeMode(a, source, checked, .lower);
 }
 
 /// Private same-captured-project path. The caller must retain the successful
 /// fresh Prepared and the CheckedProject transferred from that same prepare.
-/// Only executable Core is copied; principal interfaces are frozen afresh from
-/// the exact checked source. No solver or caller evidence is admitted here.
-pub fn freezeFromCheckedCore(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *const partial.Prepared) Error!D.FrozenDependency {
+/// Executable Core moves out of `prepared` without a copy: once the guards
+/// pass, its nonentry units are left empty, safe only to release, whether or
+/// not freezing succeeds. Principal interfaces are frozen afresh from the
+/// exact checked source. No solver or caller evidence is admitted here.
+pub fn freezeFromCheckedCore(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *partial.Prepared) Error!D.FrozenDependency {
     const timing = phase_profile.enter(.freeze);
     defer timing.exit();
     try require(prepared.cached == 0 and !prepared.source_mode and prepared.entry == source.entry and prepared.prelude == source.prelude_unit);
@@ -222,7 +238,7 @@ pub fn freezeFromCheckedCore(a: std.mem.Allocator, source: *const project.Projec
         try require(ir.unit == id and ir.diagnostics.len == 0);
         try require(std.mem.eql(u8, path, source.filename(@intCast(id))) and std.mem.eql(u8, owner, path));
     }
-    return freezeMode(a, source, checked, prepared.units);
+    return freezeMode(a, source, checked, .{ .take = prepared });
 }
 
 /// Private population path: the entry of this exact captured Project is still
@@ -232,14 +248,14 @@ pub fn freezeDeferringEntry(a: std.mem.Allocator, source: *const project.Project
     const timing = phase_profile.enter(.freeze);
     defer timing.exit();
     try require(checked.deferred_entry != null and source.compiled_modules.len == 0);
-    return freezeMode(a, source, checked, null);
+    return freezeMode(a, source, checked, .lower);
 }
 
 pub fn freezeFromMixedCheckedCore(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *const partial.Prepared) Error!D.FrozenDependency {
     const timing = phase_profile.enter(.freeze);
     defer timing.exit();
     try checkMixed(source, prepared);
-    return freezeMode(a, source, checked, prepared.units);
+    return freezeMode(a, source, checked, .{ .copy = prepared.units });
 }
 fn checkMixed(source: *const project.Project, prepared: *const partial.Prepared) Error!void {
     try require(source.compiled_reuse.len == source.compiled_modules.len and source.entry == source.units.items.len);
@@ -261,7 +277,8 @@ fn checkChecked(source: *const project.Project, checked: *const project_check.Ch
 /// Retained entry-last preparation. The supplied snapshot exclusively controls
 /// the lifetime of its immutable module payloads. Sharing grants storage and
 /// structural validation reuse only; source/check admission already completed.
-pub fn freezeSharedFromMixed(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *const partial.Prepared, previous: *const retained.Snapshot, stats: *retained.Stats) Error!*retained.Snapshot {
+/// Fresh modules' Core moves out of `prepared` as in freezeFromCheckedCore.
+pub fn freezeSharedFromMixed(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *partial.Prepared, previous: *const retained.Snapshot, stats: *retained.Stats) Error!*retained.Snapshot {
     const timing = phase_profile.enter(.freeze);
     defer timing.exit();
     try checkMixed(source, prepared);
@@ -288,7 +305,7 @@ pub fn freezeSharedFromMixed(a: std.mem.Allocator, source: *const project.Projec
             try result.appendShared(previous, index);
             stats.shared_modules += 1;
         } else {
-            try result.appendOwned(try freezeOne(a, source, checked, id, units, &prepared.units[index]));
+            try result.appendOwned(try freezeOne(a, source, checked, id, units, .{ .take = prepared }));
             stats.fresh_modules += 1;
         }
     }
@@ -297,7 +314,7 @@ pub fn freezeSharedFromMixed(a: std.mem.Allocator, source: *const project.Projec
     result.validated = true;
     return result;
 }
-fn freezeMode(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, retained_cores: ?[]const core.Module) Error!D.FrozenDependency {
+fn freezeMode(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, cores: Cores) Error!D.FrozenDependency {
     try checkChecked(source, checked);
     var result: D.FrozenDependency = .{ .symbols = &.{}, .modules = &.{} };
     const units = try a.alloc(u32, source.units.items.len);
@@ -326,7 +343,7 @@ fn freezeMode(a: std.mem.Allocator, source: *const project.Project, checked: *co
         result.modules[initialized] = if (checked.compiledModule(source, source_id)) |previous|
             try copyCoreValue(a, previous.*)
         else
-            try freezeOne(a, source, checked, @intCast(source_id), units, if (retained_cores) |cores| &cores[source_id - 1] else null);
+            try freezeOne(a, source, checked, @intCast(source_id), units, cores);
         initialized += 1;
     };
     // When the entry is last, retained units and symbols already have their

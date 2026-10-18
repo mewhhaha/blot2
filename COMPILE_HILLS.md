@@ -640,6 +640,15 @@ The loader reads, lexes and parses one file at a time (`reuse/project.zig`).
 `freezeFromCheckedCore` is 7.8% of cold.
 
 - **Fix:** freeze checked Core in place or by moving buffers instead of copying.
+- **Result (18 October 2026):** CT45, "Move prepared Core into the frozen
+  closure instead of copying it". The 7.8% was mostly validation and principal
+  projection (CT46, CT48); the Core copy was 0.4% of cold samples. Fresh freezes
+  now take each new module's prepared Core (`Prepared.takeCore` leaves an empty
+  owner; borrowed seed Core never moves). Since CT9 a cold build lowers straight
+  into the seed, so cold is unchanged; retained freezes of fresh modules shrink.
+  Game, 3 runs at load 1.1: freeze requests 59.2 → 46.4 MiB and 29.6 → 23.5 ms
+  on a body edit, 131.8 → 101.0 MiB and 67.5 → 52.7 ms on an imported-body edit.
+  Wasm identical.
 
 ### CT46: incremental frozen-Core validation
 

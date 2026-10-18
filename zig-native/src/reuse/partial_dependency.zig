@@ -77,6 +77,15 @@ pub const Prepared = struct {
     fn isBorrowed(self: *const Prepared, index: usize) bool {
         return if (self.borrowed.len != 0) self.borrowed[index] else index < self.cached;
     }
+    /// PRIVATE ownership transfer to a closure freeze. Moves one fresh unit's
+    /// Core out and leaves an empty owner with the same unit, which is only
+    /// safe to release or rebind. Borrowed seed Core is never moved.
+    pub fn takeCore(self: *Prepared, index: usize) error{InvalidArtifact}!core.Module {
+        if (index >= self.units.len or self.isBorrowed(index)) return error.InvalidArtifact;
+        const value = self.units[index];
+        self.units[index] = .{ .unit = value.unit, .types = .{ .nodes = &.{}, .extra = &.{} }, .nodes = &.{}, .spans = &.{}, .extra = &.{}, .bindings = &.{}, .bodies = &.{}, .parameters = &.{}, .references = &.{}, .calls = &.{}, .merges = &.{}, .merge_ranges = &.{}, .names = &.{}, .obligations = &.{}, .diagnostics = &.{}, .body_lowerings = 0 };
+        return value;
+    }
     fn cachedCount(self: *const Prepared) usize {
         if (self.borrowed.len == 0) return self.cached;
         var count: usize = 0;
@@ -84,8 +93,8 @@ pub const Prepared = struct {
         return count;
     }
 
-    /// PRIVATE ownership transfer after freezeFromMixedCheckedCore copied this
-    /// exact preparation. Entry-last ordinals and the complete dictionary must
+    /// PRIVATE ownership transfer after a mixed freeze copied or took this
+    /// exact preparation's Core. Entry-last ordinals and the complete dictionary must
     /// be unchanged: no entry relinking or new source admission happens here.
     /// All guards precede mutation. The new seed must outlive this Prepared.
     pub fn rebindFrozenPrefix(self: *Prepared, a: Allocator, seed: *const D.FrozenDependency) error{InvalidArtifact}!void {
