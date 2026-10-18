@@ -169,6 +169,9 @@ pub const Proof = struct {
                 if (excludesLater(module, exit_id, state.consume)) consumed_refs[value] = true;
             }
         }
+        // References by binding, built once a guarded edit needs them.
+        var references: ?@import("unit_index.zig").Table(core.Id) = null;
+        defer if (references) |*table| table.deinit(allocator);
         for (module.nodes) |node| {
             if (node.tag != .pattern_bind or node.c == 0) continue;
             const plan = edit_call.analyze(units, unit_id, node.b) orelse continue;
@@ -179,10 +182,9 @@ pub const Proof = struct {
             if (states[binding].consume != node.b or states[binding].consumers != 1) continue;
             // In this arm the guarded edit never executed. Observing the input
             // here does not alias the successful successor.
-            for (module.nodes, 0..) |use, j| {
-                if (use.tag != .reference) continue;
-                const ref = module.reference(@intCast(j));
-                if (ref.unit == 0 and ref.binding == binding and consumedInside(module, node.c, @intCast(j), 0)) consumed_refs[j] = true;
+            if (references == null) references = try @import("unit_index.zig").references(allocator, module, unit_id);
+            for (references.?.get(binding)) |j| {
+                if (module.reference(j).unit == 0 and consumedInside(module, node.c, j, 0)) consumed_refs[j] = true;
             }
         }
         // Core emits a consuming update after its indices and replacement.

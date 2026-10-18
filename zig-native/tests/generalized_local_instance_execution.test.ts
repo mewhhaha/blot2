@@ -471,3 +471,28 @@ ${locals}
   return r + ${lengths} - 40
 `);
 });
+
+// Local storage decisions read a per-unit def-use index, so they no longer
+// stop at 4,096 Core nodes. A thousand padding functions put each program
+// above that size; both used to report `ownership_unproved`.
+const padding = Array.from({ length: 1000 }, (_, index) => `const pad${index} = fn (x: U32) => @u32.add (@u32.mul x ${index + 1}) ${index}`).join("\n");
+
+Deno.test("generalized local aliases in a unit above 4,096 nodes take the instance of their use", async () => {
+  await returnsArgument(`${builder}${padding}
+entry const main = fn (x: U32) => do:
+  let b = empty ()
+  let c = b
+  let (_, result) = run c (fn () => x)
+  return result
+`);
+});
+
+Deno.test("ambiguous holes in a unit above 4,096 nodes take word storage", async () => {
+  await returnsArgumentWithMemory(`${scoped}${padding}
+entry const main = fn (x: U32) => do:
+  let b = empty ()
+  let (_, r) = run b (fn () => x)
+  let boxed = #[b, b]
+  return r + boxed.length - 2
+`);
+});

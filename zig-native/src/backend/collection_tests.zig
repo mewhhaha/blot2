@@ -585,12 +585,12 @@ test "immediate collection step requires exact producer constructor and a single
     var module = try lowerWithCatalog(a, immediateStepSource, true);
     defer module.deinit(a);
     var step: core.Id = 0;
-    for (module.nodes, 0..) |node, id| if (node.tag == .bind and proof.stepSink(&module, @intCast(id)) != null) {
+    for (module.nodes, 0..) |node, id| if (node.tag == .bind and (try stepSinkOf(&module, @intCast(id))) != null) {
         try std.testing.expectEqual(@as(core.Id, 0), step);
         step = @intCast(id);
     };
     try std.testing.expect(step != 0);
-    const sink = proof.stepSink(&module, step).?;
+    const sink = (try stepSinkOf(&module, step)).?;
     const producer = &module.bodies[1];
     try std.testing.expect(proof.cursorNext(&module, producer.binding, &module, sink.constructor));
     const root = module.node(producer.root);
@@ -606,7 +606,7 @@ test "immediate collection step requires exact producer constructor and a single
     try std.testing.expect(proof.cursorNext(&module, producer.binding, &module, sink.constructor));
     const pattern = module.nodes[sink.pattern];
     module.nodes[sink.pattern].tag = .bind;
-    try std.testing.expect(proof.stepSink(&module, step) == null);
+    try std.testing.expect((try stepSinkOf(&module, step)) == null);
     module.nodes[sink.pattern] = pattern;
     for ([_][]const u8{
         "  let #Some (again, _) = step else:\n    return 0\n  return again\n",
@@ -617,7 +617,7 @@ test "immediate collection step requires exact producer constructor and a single
         var retained = try lowerWithCatalog(a, text, true);
         defer retained.deinit(a);
         for (retained.nodes, 0..) |node, id| if (node.tag == .bind) {
-            try std.testing.expect(proof.stepSink(&retained, @intCast(id)) == null);
+            try std.testing.expect((try stepSinkOf(&retained, @intCast(id))) == null);
         };
     }
 }
@@ -681,11 +681,16 @@ const localCursorSource =
     \\  return cursor
     \\entry const run = fn (values: Array U32) => @cursor.has (progress values)
 ;
+/// The step sink of a statement, over a fresh def-use index of `module`.
+fn stepSinkOf(module: *const core.Module, id: core.Id) !?@import("collection_iteration.zig").StepSink {
+    var uses = try @import("unit_index.zig").Uses.init(std.testing.allocator, module, module.unit);
+    defer uses.deinit(std.testing.allocator);
+    return @import("collection_iteration.zig").stepSink(module, &uses, id);
+}
 fn localCursorStep(module: *const core.Module) !@import("private_cursor.zig").Step {
-    const proof = @import("collection_iteration.zig");
     for (module.nodes, 0..) |node, id| {
         if (node.tag != .bind) continue;
-        const sink = proof.stepSink(module, @intCast(id)) orelse continue;
+        const sink = (try stepSinkOf(module, @intCast(id))) orelse continue;
         const initializer = module.node(node.b);
         try std.testing.expectEqual(core.Tag.project, initializer.tag);
         const input = module.reference(initializer.a);
@@ -702,8 +707,10 @@ test "private cursor successors require a closed lexical family and reject calls
     defer module.deinit(a);
     const step = try localCursorStep(&module);
     const root = module.bodies[2].root;
-    try std.testing.expect(!proof.check(&module, root, step.input));
-    const family = proof.checkSteps(&module, root, step.input, &.{step}).?;
+    var uses = try @import("unit_index.zig").Uses.init(a, &module, module.unit);
+    defer uses.deinit(a);
+    try std.testing.expect(!proof.check(&module, &uses, root, step.input));
+    const family = proof.checkSteps(&module, &uses, root, step.input, &.{step}).?;
     try std.testing.expect(std.mem.findScalar(core.BindingId, family.bindings[0..family.len], step.rest) != null);
     const position = std.mem.find(u8, localCursorSource, "  return cursor").?;
     for ([_][]const u8{
@@ -716,7 +723,9 @@ test "private cursor successors require a closed lexical family and reject calls
         var changed = try lowerWithCatalog(a, text, true);
         defer changed.deinit(a);
         const selected = try localCursorStep(&changed);
-        try std.testing.expect(proof.checkSteps(&changed, changed.bodies[2].root, selected.input, &.{selected}) == null);
+        var changed_uses = try @import("unit_index.zig").Uses.init(a, &changed, changed.unit);
+        defer changed_uses.deinit(a);
+        try std.testing.expect(proof.checkSteps(&changed, &changed_uses, changed.bodies[2].root, selected.input, &.{selected}) == null);
     }
 }
 test "private cursor successors publish only the returned immutable header and preserve replay" {
@@ -831,7 +840,7 @@ test "direct collection patterns eliminate transient cells with immutable Core r
     const before = @import("../check/core_snapshot_tests.zig").stamp(module);
     var direct: usize = 0;
     for (module.nodes, 0..) |node, id| if (node.tag == .pattern_bind) {
-        if (@import("collection_iteration.zig").stepSink(&module, @intCast(id))) |_| direct += 1;
+        if (try stepSinkOf(&module, @intCast(id))) |_| direct += 1;
     };
     try std.testing.expectEqual(@as(usize, 1), direct);
     const units = [_]core.Module{module};
@@ -849,4 +858,95 @@ test "direct collection patterns eliminate transient cells with immutable Core r
     try collectionIterationEmission(a, &units, &result.capture.?, result.bytes);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, collectionIterationEmission, .{ &units, null, result.bytes });
     try std.testing.expectEqual(before, @import("../check/core_snapshot_tests.zig").stamp(module));
+}
+
+/// `text` followed by a thousand unused functions, which put the unit above
+/// 4,096 Core nodes.
+fn padded(a: std.mem.Allocator, text: []const u8) ![]u8 {
+    var result: std.ArrayList(u8) = .empty;
+    errdefer result.deinit(a);
+    try result.appendSlice(a, text);
+    for (0..1000) |index| try result.print(a, "\nconst pad{d} = fn (x: U32) => @u32.add (@u32.mul x {d}) {d}", .{ index, index + 1, index });
+    return result.toOwnedSlice(a);
+}
+
+test "collection steps, loops and private cursors keep their physical forms above 4,096 Core nodes" {
+    const a = std.testing.allocator;
+    {
+        const text = try padded(a, immediateStepSource);
+        defer a.free(text);
+        var module = try lowerWithCatalog(a, text, true);
+        defer module.deinit(a);
+        try std.testing.expect(module.nodes.len > 4096);
+        const units = [_]core.Module{module};
+        var result = try @import("core_backend.zig").compileWithOptions(a, &units, 1, .{ .retain_artifacts = true, .artifact_replay = true });
+        defer result.deinit(a);
+        try std.testing.expect(result.diagnostic == null);
+        var advances: usize = 0;
+        for (result.capture.?.emission.records.items) |record| if (record.event == .semantic_site and record.event.semantic_site.kind == .allocation) {
+            const site = record.event.semantic_site;
+            const node = module.node(site.node);
+            try std.testing.expect(node.tag != .product and node.tag != .construct);
+            if (node.tag == .array_op and module.arrayOperation(site.node) == .cursor_advance) advances += 1;
+        };
+        try std.testing.expectEqual(@as(usize, 1), advances);
+        try collectionIterationEmission(a, &units, &result.capture.?, result.bytes);
+    }
+    {
+        const text = try padded(a, localCursorSource);
+        defer a.free(text);
+        var module = try lowerWithCatalog(a, text, true);
+        defer module.deinit(a);
+        try std.testing.expect(module.nodes.len > 4096);
+        const step = try localCursorStep(&module);
+        var uses = try @import("unit_index.zig").Uses.init(a, &module, module.unit);
+        defer uses.deinit(a);
+        try std.testing.expect(@import("private_cursor.zig").checkSteps(&module, &uses, module.bodies[2].root, step.input, &.{step}) != null);
+        const units = [_]core.Module{module};
+        var result = try @import("core_backend.zig").compileWithOptions(a, &units, 1, .{ .retain_artifacts = true, .artifact_replay = true });
+        defer result.deinit(a);
+        try std.testing.expect(result.diagnostic == null);
+        var headers: usize = 0;
+        for (result.capture.?.emission.records.items) |record| if (record.event == .semantic_site and record.event.semantic_site.kind == .allocation) {
+            const node = module.node(record.event.semantic_site.node);
+            try std.testing.expect(node.tag != .product and node.tag != .construct);
+            if (node.tag == .array_op) try std.testing.expect(module.arrayOperation(record.event.semantic_site.node) != .cursor and module.arrayOperation(record.event.semantic_site.node) != .cursor_advance);
+            if (node.tag == .reference) headers += 1;
+        };
+        try std.testing.expectEqual(@as(usize, 1), headers);
+        try collectionIterationEmission(a, &units, &result.capture.?, result.bytes);
+    }
+    {
+        const text = try padded(a,
+            \\data Maybe a = #Some a | #Nothing
+            \\const List.iter = fn (values: List a) => @list.cursor values
+            \\const Cursor.next = fn (cursor: Cursor collection) =>
+            \\  if @cursor.has cursor
+            \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
+            \\  else #Nothing
+            \\const fold = fn reduce => fn initial => fn values => do:
+            \\  let state = initial
+            \\  for value in values:
+            \\    use next <- reduce state value
+            \\    state := next
+            \\  return state
+            \\entry const run = fn (count: U32) => fold (fn left => fn right => @u32.add left right) 0 (@list.generate count (fn index => index))
+        );
+        defer a.free(text);
+        var module = try lowerWithCatalog(a, text, true);
+        defer module.deinit(a);
+        try std.testing.expect(module.nodes.len > 4096);
+        var uses = try @import("unit_index.zig").Uses.init(a, &module, module.unit);
+        defer uses.deinit(a);
+        var loops: usize = 0;
+        for (module.nodes, 0..) |node, id| if (node.tag == .loop and @import("collection_iteration.zig").candidate(&module, &uses, @intCast(id)) != null) {
+            loops += 1;
+        };
+        try std.testing.expectEqual(@as(usize, 1), loops);
+        const units = [_]core.Module{module};
+        var first = try @import("core_backend.zig").compileWithOptions(a, &units, 1, .{ .retain_artifacts = true });
+        defer first.deinit(a);
+        try std.testing.expect(first.diagnostic == null);
+        try collectionIterationEmission(a, &units, &first.capture.?, first.bytes);
+    }
 }

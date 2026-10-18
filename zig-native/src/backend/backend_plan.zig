@@ -61,6 +61,8 @@ pub const State = struct {
     facts: function_facts.Store = .{},
     discard_proofs: std.AutoHashMapUnmanaged(u32, discarded_bindings.Proof) = .empty,
     quantified: std.AutoHashMapUnmanaged(u32, unit_index.Quantified) = .empty,
+    /// Heap-owned so a held index outlives later insertions.
+    uses: std.AutoHashMapUnmanaged(u32, *unit_index.Uses) = .empty,
     task_movers: std.AutoHashMapUnmanaged(layout.Id, u32) = .empty,
     pub fn init(a: Allocator) State {
         return .{ .runtime_operations = runtime_operations.Store.init(a) };
@@ -95,6 +97,12 @@ pub const State = struct {
         var quantified = self.quantified.valueIterator();
         while (quantified.next()) |set| set.deinit(a);
         self.quantified.deinit(a);
+        var uses = self.uses.valueIterator();
+        while (uses.next()) |index| {
+            index.*.deinit(a);
+            a.destroy(index.*);
+        }
+        self.uses.deinit(a);
         self.task_movers.deinit(a);
     }
     pub fn runtimeGlobal(self: *State, g: anytype, target: core.BindingRef) Error!u32 {

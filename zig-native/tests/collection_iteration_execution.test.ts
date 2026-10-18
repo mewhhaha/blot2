@@ -228,3 +228,32 @@ entry const early = fn () => measured (@computation (fn () => first [3, 4, 5]))
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+// The iteration proof reads a per-unit def-use index, so it no longer stops
+// at 4,096 Core nodes: a thousand padding functions put this program above
+// that size, and its loops, including one that matches optional entries as
+// src/robots.blot's `pick_along` does, still take the physical form.
+Deno.test("resolved collection iteration applies in units above 4,096 Core nodes", async () => {
+  const padding = Array.from({ length: 1000 }, (_, index) => `const pad${index} = fn (x: U32) => @u32.add (@u32.mul x ${index + 1}) ${index}`).join("\n");
+  await session(`${program}${padding}
+const smallest = fn entries => do:
+  let closest = 1000000
+  for entry in entries:
+    if let #Some value = entry:
+      if value < closest:
+        closest := value
+  return closest
+entry const optional = fn (count: U32) => smallest (@array.generate count (fn index => if index % 3 == 0 then #Nothing else #Some (count - index)))
+`, (guest) => {
+    for (const count of [0, 1, 2, 3, 4, 245, 4096]) {
+      const sum = (count * (count - 1) / 2) >>> 0;
+      assert.equal(guest.call("run", count), sum);
+      assert.equal(guest.call("arrays", count), sum);
+      assert.equal(guest.call("nested", count), 3 * sum + 3 * count);
+      let closest = 1000000;
+      for (let index = 0; index < count; index++) if (index % 3 !== 0) closest = Math.min(closest, count - index);
+      assert.equal(guest.call("optional", count), closest);
+    }
+    assert.equal(guest.call("forks", null), 3);
+  });
+});

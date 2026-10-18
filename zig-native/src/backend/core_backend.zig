@@ -286,6 +286,21 @@ pub const Generator = struct {
         try self.planning.quantified.put(self.allocator, unit_id, set);
         return set.has(variable, row);
     }
+    /// The def-use index of unit `unit_id` with at least the groups `need`
+    /// names, each built on first use. The pointer stays valid for the whole
+    /// compile attempt.
+    pub fn unitUses(self: *Generator, unit_id: u32, need: @import("unit_index.zig").Uses.Need) Error!*const @import("unit_index.zig").Uses {
+        const index = self.planning.uses.get(unit_id) orelse created: {
+            try self.planning.uses.ensureUnusedCapacity(self.allocator, 1);
+            const fresh = try self.allocator.create(@import("unit_index.zig").Uses);
+            errdefer self.allocator.destroy(fresh);
+            fresh.* = try @import("unit_index.zig").Uses.initBase(self.allocator, self.unit(unit_id), unit_id);
+            self.planning.uses.putAssumeCapacityNoClobber(unit_id, fresh);
+            break :created fresh;
+        };
+        try index.ensure(self.allocator, self.unit(unit_id), unit_id, need);
+        return index;
+    }
     pub fn ownsArrayUpdate(self: *Generator, unit_id: u32, id: core.Id) Error!bool {
         if (self.planning.array_proofs.get(unit_id)) |proof| return proof.admits(id);
         var proof = try owned_arrays.Proof.init(self.allocator, self.units, unit_id);

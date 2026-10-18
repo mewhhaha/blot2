@@ -2,14 +2,14 @@
 //! Unknown methods and observable cursor progress keep their original protocol.
 const std = @import("std");
 const core = @import("../check/core.zig");
+const Uses = @import("unit_index.zig").Uses;
 pub const Candidate = struct { iter: core.Id, next: core.Id, receiver: core.Id, incoming: core.BindingId, iteration: core.BindingId, rest: core.BindingId, pattern: core.PatternId, constructor: u32 };
 fn local(source: *const core.Module, id: core.Id, binding: core.BindingId) bool {
     if (id == 0 or source.node(id).tag != .reference) return false;
     const reference = source.reference(id);
     return (reference.unit == 0 or reference.unit == source.unit) and reference.binding == binding;
 }
-pub fn candidate(source: *const core.Module, id: core.Id) ?Candidate {
-    if (source.nodes.len > 4096) return null;
+pub fn candidate(source: *const core.Module, uses: *const Uses, id: core.Id) ?Candidate {
     const loop = source.loopInfo(id);
     if (loop.kind != .forever) return null;
     const children = source.children(loop.body);
@@ -36,29 +36,22 @@ pub fn candidate(source: *const core.Module, id: core.Id) ?Candidate {
         if (iter == 0 or source.node(iter).tag != .project) return null;
         // The generated cursor is private. A manual loop that observes its
         // progress, retains its step/rest, or consumes its final cursor declines.
-        var budget: usize = 65536;
-        for (source.nodes, 0..) |node, index| {
-            if (budget == 0) return null;
-            budget -= 1;
-            if (node.tag != .reference) continue;
-            const reference = source.reference(@intCast(index));
-            if (reference.unit != 0 and reference.unit != source.unit) continue;
-            if (reference.binding == carry.outgoing) return null;
-            if (reference.binding == step.a and index != pattern.b) return null;
-            if (reference.binding == rest and index != update.b) return null;
-            if (reference.binding != carry.iteration and reference.binding != carry.backedge) continue;
-            if (index == next.a) continue;
-            var broken = false;
-            for (source.nodes, 0..) |exit, exit_id| {
-                if (budget == 0) return null;
-                budget -= 1;
-                if (exit.tag != .break_ or exit.a != id) continue;
-                for (source.breakValues(@intCast(exit_id))) |value| if (value == index) {
-                    broken = true;
-                    break;
-                };
+        const named = [_]core.BindingId{ carry.outgoing, step.a, rest, carry.iteration, carry.backedge };
+        for (named, 0..) |held, position| {
+            if (std.mem.findScalar(core.BindingId, named[0..position], held) != null) continue;
+            for (uses.references.get(held)) |index| {
+                const reference = source.reference(index);
+                if (reference.unit != 0 and reference.unit != source.unit) continue;
+                if (reference.binding == carry.outgoing) return null;
+                if (reference.binding == step.a and index != pattern.b) return null;
+                if (reference.binding == rest and index != update.b) return null;
+                if (reference.binding != carry.iteration and reference.binding != carry.backedge) continue;
+                if (index == next.a) continue;
+                const broken = for (uses.values.get(index)) |exit| {
+                    if (source.node(exit.exit).a == id) break true;
+                } else false;
+                if (!broken) return null;
             }
-            if (!broken) return null;
         }
         return .{ .iter = iter, .next = step.b, .receiver = next.a, .incoming = carry.incoming, .iteration = carry.iteration, .rest = rest, .pattern = items[0], .constructor = matched.a };
     }
@@ -100,40 +93,23 @@ pub fn cursorNext(source: *const core.Module, target: core.BindingId, consumer: 
 pub const StepSink = struct { pattern: core.Id, constructor: u32 };
 /// The successful payload is observable only through this immediately adjacent
 /// constructor pattern. Retained steps and closure/call escapes keep the ABI.
-pub fn stepSink(source: *const core.Module, binding: core.Id) ?StepSink {
-    if (source.nodes.len > 4096) return null;
+pub fn stepSink(source: *const core.Module, uses: *const Uses, binding: core.Id) ?StepSink {
     const node = source.node(binding);
     if (node.tag == .pattern_bind) return patternSink(source, binding);
     if (node.tag != .bind or node.a == 0) return null;
-    var found: ?core.Id = null;
-    var remaining: usize = 65_536;
-    for (source.nodes, 0..) |parent, parent_id| {
-        if (remaining == 0) return null;
-        remaining -= 1;
-        if (parent.tag != .block and parent.tag != .suite) continue;
-        const children = source.children(@intCast(parent_id));
-        for (children, 0..) |child, index| {
-            if (remaining == 0) return null;
-            remaining -= 1;
-            if (child != binding) continue;
-            if (found != null or index + 1 == children.len) return null;
-            found = children[index + 1];
-        }
-    }
-    const pattern_id = found orelse return null;
+    // The statement must appear in exactly one block or suite, not last.
+    const parent = uses.parentOf(binding);
+    if (parent.count != 1) return null;
+    const siblings = source.children(parent.node);
+    if (parent.position + 1 == siblings.len) return null;
+    const pattern_id = siblings[parent.position + 1];
     const pattern = source.node(pattern_id);
     if (pattern.tag != .pattern_bind or !local(source, pattern.b, node.a)) return null;
     const sink = patternSink(source, pattern_id) orelse return null;
-    for (source.nodes, 0..) |use, id| {
-        if (remaining == 0) return null;
-        remaining -= 1;
-        if (use.tag == .reference and local(source, @intCast(id), node.a) and id != pattern.b) return null;
+    for (uses.references.get(node.a)) |id| {
+        if (local(source, id, node.a) and id != pattern.b) return null;
     }
-    for (source.closures) |closure| for (source.extra[closure.captures.start..][0..closure.captures.len]) |capture| {
-        if (remaining == 0) return null;
-        remaining -= 1;
-        if (capture == node.a) return null;
-    };
+    if (uses.flagsOf(node.a).captured) return null;
     return sink;
 }
 fn patternSink(source: *const core.Module, id: core.Id) ?StepSink {

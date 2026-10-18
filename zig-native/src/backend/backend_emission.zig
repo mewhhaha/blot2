@@ -335,8 +335,8 @@ pub const Owner = struct {
     fn localStorageMappings(self: *Emitter, root: core.Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), instances: *InstanceDecisions) Error!void {
         const g = self.generator;
         const source = g.unit(self.unit_id);
-        if (source.nodes.len > 4096) return;
-        var budget: usize = 65536;
+        // Built only once some statement reaches the scan.
+        var unit_uses: ?*const @import("unit_index.zig").Uses = null;
         const statements = source.children(root);
         // References read only by an unused local alias need no instance.
         var dead_aliases: [16]core.Id = undefined;
@@ -391,14 +391,13 @@ pub const Owner = struct {
             var open = false;
             // Whether a use closes only through ambiguous storage.
             var widened = false;
-            scan: for (source.nodes, 0..) |node, index| {
-                if (budget == 0) break :statements;
-                budget -= 1;
-                if (node.tag != .reference) continue;
-                const reference = source.reference(@intCast(index));
-                if (reference.binding != n.a or (reference.unit != 0 and reference.unit != self.unit_id)) continue;
-                if (std.mem.findScalar(core.Id, dead_aliases[0..dead_count], @intCast(index)) != null) continue;
-                const reader = instances.reader(@intCast(index));
+            const index = unit_uses orelse try g.unitUses(self.unit_id, .{});
+            unit_uses = index;
+            scan: for (index.references.get(n.a)) |use| {
+                const reference = source.reference(use);
+                if (reference.unit != 0 and reference.unit != self.unit_id) continue;
+                if (std.mem.findScalar(core.Id, dead_aliases[0..dead_count], use) != null) continue;
+                const reader = instances.reader(use);
                 const contexts = if (reader) |held| held.count else 1;
                 for (0..contexts) |context| {
                     var context_mappings = previous;
@@ -411,8 +410,8 @@ pub const Owner = struct {
                         try withFacts(RowMapping, g.allocator, previous_rows, instances.rowsAt(held, context), &scratch_rows);
                         context_rows = scratch_rows.items;
                     }
-                    const use_type = source.typeOf(@intCast(index));
-                    const span = source.span(@intCast(index));
+                    const use_type = source.typeOf(use);
+                    const span = source.span(use);
                     const instance = try g.codeLayoutWithRows(self.unit_id, use_type, context_mappings, context_rows, span);
                     if (self.hasErasedType(instance, 0)) {
                         // Scan this local again once its ambiguous holes
@@ -446,23 +445,8 @@ pub const Owner = struct {
                 }
                 continue;
             }
-            var indirect = false;
-            for (source.closures) |metadata| for (source.extra[metadata.captures.start..][0..metadata.captures.len]) |held_binding| {
-                if (budget == 0) break :statements;
-                budget -= 1;
-                if (held_binding == n.a) indirect = true;
-            };
-            for (source.merges) |merge| {
-                if (budget == 0) break :statements;
-                budget -= 1;
-                if (merge.then_binding == n.a or merge.else_binding == n.a) indirect = true;
-            }
-            for (source.loop_carries) |carry| {
-                if (budget == 0) break :statements;
-                budget -= 1;
-                if (carry.incoming == n.a or carry.iteration == n.a or carry.backedge == n.a or carry.outgoing == n.a) indirect = true;
-            }
-            if (indirect) continue;
+            const flags = index.flagsOf(n.a);
+            if (flags.captured or flags.merge_branch or flags.carried) continue;
             // The promoting attempt keeps a closed initializer's evaluator
             // value and serializes each use at its own layout. A local that
             // only ambiguous storage closes keeps that path, as it did while
@@ -837,6 +821,7 @@ pub const Owner = struct {
         const proof = @import("private_cursor.zig");
         const g = self.generator;
         const source = g.unit(self.unit_id);
+        const uses = try g.unitUses(self.unit_id, .{ .flow = true });
         var steps: [64]proof.Step = undefined;
         var count: usize = 0;
         var entries = plans.entries.keyIterator();
@@ -855,15 +840,17 @@ pub const Owner = struct {
         var handled: [64]bool = @splat(false);
         for (steps[0..count], 0..) |step, index| {
             if (handled[index]) continue;
-            const family = proof.checkSteps(source, plans.root, step.input, steps[0..count]) orelse continue;
+            const family = proof.checkSteps(source, uses, plans.root, step.input, steps[0..count]) orelse continue;
             var admissible = true;
             // The existing whole-loop conversion already owns its progress
             // locals and skips these protocol nodes entirely.
-            for (source.nodes, 0..) |node, id| {
-                if (node.tag != .loop or !plans.entries.contains(@intCast(id))) continue;
-                const loop = plans.get(@intCast(id));
+            var planned = plans.entries.keyIterator();
+            while (planned.next()) |planned_id| {
+                const id = planned_id.*;
+                if (source.node(id).tag != .loop) continue;
+                const loop = plans.get(id);
                 if (loop != .loop or loop.loop.collection == null) continue;
-                for (source.loopCarries(@intCast(id))) |carry| {
+                for (source.loopCarries(id)) |carry| {
                     if (std.mem.findScalar(core.BindingId, family.bindings[0..family.len], carry.iteration) != null) {
                         admissible = false;
                         break;
@@ -893,10 +880,16 @@ pub const Owner = struct {
             for (steps[0..count], 0..) |other, other_index| if (std.mem.findScalar(core.BindingId, family.bindings[0..family.len], other.input) != null) {
                 handled[other_index] = true;
             };
-            for (source.nodes, 0..) |node, id| {
-                if (node.tag != .bind or std.mem.findScalar(core.BindingId, family.bindings[0..family.len], node.a) == null or plans.entries.contains(@intCast(id))) continue;
-                const input = try self.privateCursorConstructor(plans, node.b);
-                try plans.put(g.allocator, @intCast(id), .{ .private_cursor = input orelse 0 });
+            // Plan each member's definitions in node order.
+            var definitions: std.ArrayList(core.Id) = .empty;
+            defer definitions.deinit(g.allocator);
+            for (family.bindings[0..family.len]) |binding| try definitions.appendSlice(g.allocator, uses.definitions.get(binding));
+            std.mem.sort(core.Id, definitions.items, {}, std.sort.asc(core.Id));
+            for (definitions.items, 0..) |id, position| {
+                if (position != 0 and definitions.items[position - 1] == id) continue;
+                if (plans.entries.contains(id)) continue;
+                const input = try self.privateCursorConstructor(plans, source.node(id).b);
+                try plans.put(g.allocator, id, .{ .private_cursor = input orelse 0 });
             }
         }
     }
@@ -1121,28 +1114,20 @@ pub const Owner = struct {
     }
     /// Each use serializes, and so checks, a promoted value. An unused value
     /// would skip those checks, so it keeps its ordinary path.
-    fn useCount(self: *Emitter, binding: core.BindingId) usize {
+    fn useCount(self: *Emitter, binding: core.BindingId) Error!usize {
         const source = self.generator.unit(self.unit_id);
-        if (source.nodes.len > 4096) return 0;
         var count: usize = 0;
-        for (source.nodes, 0..) |node, index| {
-            if (node.tag != .reference) continue;
-            const reference = source.reference(@intCast(index));
-            if (reference.binding == binding and (reference.unit == 0 or reference.unit == self.unit_id)) count += 1;
+        for ((try self.generator.unitUses(self.unit_id, .{})).references.get(binding)) |index| {
+            const reference = source.reference(index);
+            if (reference.unit == 0 or reference.unit == self.unit_id) count += 1;
         }
         return count;
     }
-    fn hasMutableUse(self: *Emitter, binding: core.BindingId) bool {
-        const source = self.generator.unit(self.unit_id);
+    fn hasMutableUse(self: *Emitter, binding: core.BindingId) Error!bool {
         // These edges consume one physical local. An initializer's closed
         // value cannot replace the storage shared by later state versions.
-        for (source.loop_carries) |carry| {
-            if (carry.incoming == binding or carry.iteration == binding or carry.backedge == binding or carry.outgoing == binding) return true;
-        }
-        for (source.merges) |merge| {
-            if (merge.then_binding == binding or merge.else_binding == binding or merge.result == binding) return true;
-        }
-        return false;
+        const flags = (try self.generator.unitUses(self.unit_id, .{})).flagsOf(binding);
+        return flags.carried or flags.merge_branch or flags.merge_result;
     }
     fn prepareNode(self: *Emitter, body: *Body, id: core.Id, depth: usize, template: bool) Error!void {
         std.debug.assert(self.preparing);
@@ -1170,7 +1155,7 @@ pub const Owner = struct {
         if (n.tag == .bind) {
             const binding = source.binding(n.a);
             const shape = source.types.node(binding.ty);
-            if (binding.kind == .local and binding.scheme.variables.len != 0 and !self.hasMutableUse(n.a)) {
+            if (binding.kind == .local and binding.scheme.variables.len != 0 and !try self.hasMutableUse(n.a)) {
                 const data = shape.tag == .nominal or shape.tag == .product or shape.tag == .record;
                 if (if (data) @import("../eval/closed_local_value.zig").analyze(g.units, self.unit_id, n.b) else null) |proof| {
                     if (g.artifacts) |artifacts| {
@@ -1193,7 +1178,7 @@ pub const Owner = struct {
                 // any use cannot be served, compilation retries without this.
                 const producer = source.node(n.b).tag;
                 const built = producer == .call or producer == .apply or producer == .project or producer == .construct or producer == .product or producer == .record;
-                if (g.speculative_locals and built and self.useCount(n.a) != 0 and self.hasErasedType(try self.codeLayout(binding.ty, source.span(id)), 0) and @import("../eval/closed_local_value.zig").dataShape(g.units, self.unit_id, binding.ty)) {
+                if (g.speculative_locals and built and (try self.useCount(n.a)) != 0 and self.hasErasedType(try self.codeLayout(binding.ty, source.span(id)), 0) and @import("../eval/closed_local_value.zig").dataShape(g.units, self.unit_id, binding.ty)) {
                     if (try g.evaluator.attemptClosedNode(self.unit_id, n.b, &self.static_values)) |value| {
                         // Body reads made by the evaluation are not recorded.
                         if (g.artifacts) |artifacts| artifacts.requireFreshCode();
@@ -1229,7 +1214,7 @@ pub const Owner = struct {
                     if (source.node(operand).tag == .reference) {
                         const ref = source.reference(operand);
                         const cursor = g.representations.store.node(try self.codeLayout(source.typeOf(operand), source.span(id)));
-                        if ((ref.unit == 0 or ref.unit == self.unit_id) and cursor.tag == .cursor and packed_layout.collectionRowWords(&g.representations.store, cursor.a) != 0 and @import("private_cursor.zig").check(source, body.root, ref.binding)) {
+                        if ((ref.unit == 0 or ref.unit == self.unit_id) and cursor.tag == .cursor and packed_layout.collectionRowWords(&g.representations.store, cursor.a) != 0 and @import("private_cursor.zig").check(source, try g.unitUses(self.unit_id, .{ .flow = true }), body.root, ref.binding)) {
                             const row = g.representations.store.node(cursor.a).a;
                             if (row_projection_uses.checkBinding(source, body.root, id, n.a, &g.representations.store, row)) break :private .{ .private_row = row };
                         }
@@ -1238,7 +1223,7 @@ pub const Owner = struct {
                 if (source.types.node(source.binding(n.a).ty).tag != .cursor) break :private null;
                 const cursor = g.representations.store.node(try self.codeLayout(source.binding(n.a).ty, source.span(id)));
                 if (cursor.tag != .cursor or g.representations.store.node(cursor.a).tag != .list or packed_layout.collectionRowWords(&g.representations.store, cursor.a) == 0) break :private null;
-                if (!@import("private_cursor.zig").check(source, body.root, n.a)) break :private null;
+                if (!@import("private_cursor.zig").check(source, try g.unitUses(self.unit_id, .{ .flow = true }), body.root, n.a)) break :private null;
                 try self.prepareNode(body, n.b, depth + 1, false);
                 const input = try self.privateCursorConstructor(body, n.b);
                 if (input == null and source.node(n.b).tag != .reference and !(source.node(n.b).tag == .array_op and source.arrayOperation(n.b) == .cursor_advance)) break :private null;
@@ -3360,7 +3345,7 @@ pub const Owner = struct {
         const tag = source.node(initializer).tag;
         if (tag != .project and tag != .call) return null;
         const proof = @import("collection_iteration.zig");
-        const sink = proof.stepSink(source, id) orelse return null;
+        const sink = proof.stepSink(source, try g.unitUses(self.unit_id, .{ .parents = true }), id) orelse return null;
         try self.prepareNode(plans, initializer, depth + 1, false);
         if (!plans.entries.contains(initializer)) return null;
         const initializer_plan = plans.get(initializer);
@@ -3457,7 +3442,7 @@ pub const Owner = struct {
         if ((ref.unit != 0 and ref.unit != self.unit_id) or cursor.tag != .cursor or g.representations.store.node(cursor.a).tag != .list) return .{ .pattern = null };
         const words = packed_layout.collectionRowWords(&g.representations.store, cursor.a);
         const row = g.representations.store.node(cursor.a).a;
-        if (words == 0 or g.representations.store.node(row).tag != .product or source.patternChildren(node.a).len != words or !@import("private_cursor.zig").check(source, body.root, ref.binding)) return .{ .pattern = null };
+        if (words == 0 or g.representations.store.node(row).tag != .product or source.patternChildren(node.a).len != words or !@import("private_cursor.zig").check(source, try g.unitUses(self.unit_id, .{ .flow = true }), body.root, ref.binding)) return .{ .pattern = null };
         const fields = g.representations.store.children(row);
         for (source.patternChildren(node.a), 0..) |child, index| {
             const pattern = source.pattern(child);
@@ -9517,7 +9502,7 @@ pub const Owner = struct {
         var plan: resolved_flow.Loop = .{ .node = id, .kind = metadata.kind, .carries = carries, .carry_roles = roles, .roots = roots, .refutable = metadata.pattern != 0 and !plainBindingPattern(source, metadata.pattern, 0), .diverges = metadata.kind == .forever and !metadata.can_exit };
         if (!roots) return plan;
         const proof = @import("collection_iteration.zig");
-        const candidate = proof.candidate(source, id) orelse return plan;
+        const candidate = proof.candidate(source, try g.unitUses(self.unit_id, .{ .flow = true }), id) orelse return plan;
         if (!body.entries.contains(candidate.iter)) return plan;
         const creation = body.get(candidate.iter);
         if (creation != .projection or creation.projection == null or creation.projection.? != .member) return plan;

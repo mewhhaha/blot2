@@ -113,3 +113,167 @@ test "unit quantified variable sets agree with a scan of every declaration and s
     try std.testing.expect(!set.has(std.math.maxInt(u32), true));
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, buildQuantified, .{&module});
 }
+
+const flows =
+    \\data Maybe a = #Some a | #Nothing
+    \\const Cursor.next = fn (cursor: Cursor collection) =>
+    \\  if @cursor.has cursor
+    \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
+    \\  else #Nothing
+    \\const progress = fn (values: Array U32) => do:
+    \\  let original = @array.cursor values
+    \\  let cursor = original
+    \\  let total = 0
+    \\  for ever:
+    \\    if @u32.lt 10000 total:
+    \\      break
+    \\    use step <- cursor.next
+    \\    let #Some (value, rest) = step else:
+    \\      break
+    \\    total := @u32.add self value
+    \\    cursor := rest
+    \\  return cursor
+    \\const sum = fn (count: U32) => do:
+    \\  let total = 0
+    \\  let last = 0
+    \\  for index in 0..count:
+    \\    if @u32.lt index 3:
+    \\      last := index
+    \\    total := @u32.add self index
+    \\  let read = fn (bias: U32) => @u32.add (@u32.add total last) bias
+    \\  return read 1
+    \\entry const run = fn (values: Array U32) => @u32.add (sum (@array.length values)) (if @cursor.has (progress values) then 1 else 0)
+;
+
+fn local(source: *const core.Module, id: core.Id, binding: core.BindingId) bool {
+    if (source.node(id).tag != .reference) return false;
+    const reference = source.reference(id);
+    return (reference.unit == 0 or reference.unit == source.unit) and reference.binding == binding;
+}
+
+fn buildUses(allocator: std.mem.Allocator, source: *const core.Module) !void {
+    var uses = try unit_index.Uses.init(allocator, source, source.unit);
+    defer uses.deinit(allocator);
+}
+
+test "unit def-use index answers the whole-unit scans it replaces and survives allocation failure" {
+    for ([_][]const u8{ declarations, flows }) |text| {
+        var module = try lower(a, text);
+        defer module.deinit(a);
+        var uses = try unit_index.Uses.init(a, &module, module.unit);
+        defer uses.deinit(a);
+        var expected: std.ArrayList(u32) = .empty;
+        defer expected.deinit(a);
+        var exits: std.ArrayList(unit_index.Uses.Exit) = .empty;
+        defer exits.deinit(a);
+        var seen_carries = false;
+        for (0..module.bindings.len) |index| {
+            const binding: core.BindingId = @intCast(index);
+            expected.clearRetainingCapacity();
+            for (module.nodes, 0..) |node, id| if (node.tag == .reference and local(&module, @intCast(id), binding)) try expected.append(a, @intCast(id));
+            try std.testing.expectEqualSlices(u32, expected.items, uses.references.get(binding));
+            expected.clearRetainingCapacity();
+            for (module.nodes, 0..) |node, id| if (node.tag == .bind and node.a == binding) try expected.append(a, @intCast(id));
+            try std.testing.expectEqualSlices(u32, expected.items, uses.definitions.get(binding));
+            expected.clearRetainingCapacity();
+            for (module.nodes, 0..) |node, id| if (node.tag == .bind) {
+                var input = node.b;
+                if (module.node(input).tag == .array_op and module.arrayOperation(input) == .cursor_advance) input = module.children(input)[0];
+                if (local(&module, input, binding)) try expected.append(a, @intCast(id));
+            };
+            try std.testing.expectEqualSlices(u32, expected.items, uses.inputs.get(binding));
+            expected.clearRetainingCapacity();
+            var carried = false;
+            for (module.loop_carries, 0..) |carry, position| if (carry.incoming == binding or carry.iteration == binding or carry.backedge == binding or carry.outgoing == binding) {
+                carried = true;
+                try expected.append(a, @intCast(position));
+            };
+            try std.testing.expectEqualSlices(u32, expected.items, uses.carries.get(binding));
+            seen_carries = seen_carries or carried;
+            var captured = false;
+            for (module.closures) |metadata| for (module.extra[metadata.captures.start..][0..metadata.captures.len]) |held| {
+                captured = captured or held == binding;
+            };
+            var branch = false;
+            var result = false;
+            for (module.merges) |merge| {
+                branch = branch or merge.then_binding == binding or merge.else_binding == binding;
+                result = result or merge.result == binding;
+            }
+            const flags = uses.flagsOf(binding);
+            try std.testing.expectEqual(captured, flags.captured);
+            try std.testing.expectEqual(branch, flags.merge_branch);
+            try std.testing.expectEqual(result, flags.merge_result);
+            try std.testing.expectEqual(carried, flags.carried);
+        }
+        for (0..module.nodes.len) |index| {
+            const id: core.Id = @intCast(index);
+            var count: usize = 0;
+            var first: unit_index.Uses.Parent = .{};
+            for (module.nodes, 0..) |node, parent| if (node.tag == .block or node.tag == .suite) for (module.children(@intCast(parent)), 0..) |child, position| if (child == id) {
+                if (count == 0) first = .{ .node = @intCast(parent), .position = @intCast(position) };
+                count += 1;
+            };
+            const parent = uses.parentOf(id);
+            try std.testing.expectEqual(@min(count, 3), parent.count);
+            if (count != 0) {
+                try std.testing.expectEqual(first.node, parent.node);
+                try std.testing.expectEqual(first.position, parent.position);
+            }
+            expected.clearRetainingCapacity();
+            exits.clearRetainingCapacity();
+            for (module.nodes, 0..) |node, exit| if (node.tag == .break_) {
+                if (node.a == id) try expected.append(a, @intCast(exit));
+                for (module.breakValues(@intCast(exit)), 0..) |value, position| if (value == id) try exits.append(a, .{ .exit = @intCast(exit), .position = @intCast(position) });
+            };
+            try std.testing.expectEqualSlices(u32, expected.items, uses.exits.get(id));
+            try std.testing.expectEqualSlices(unit_index.Uses.Exit, exits.items, uses.values.get(id));
+            if (module.node(id).tag == .loop) {
+                const range = module.loopInfo(id).carries;
+                for (0..range.len) |position| {
+                    const owner = uses.carry_loops[range.start + position];
+                    try std.testing.expectEqual(id, owner.loop);
+                    try std.testing.expectEqual(@as(u32, @intCast(position)), owner.position);
+                }
+            }
+        }
+        if (text.ptr == flows.ptr) try std.testing.expect(seen_carries and module.merges.len != 0 and module.closures.len != 0);
+        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, buildUses, .{&module});
+    }
+}
+
+fn buildLazily(allocator: std.mem.Allocator, source: *const core.Module) !void {
+    var uses = try unit_index.Uses.initBase(allocator, source, source.unit);
+    defer uses.deinit(allocator);
+    try uses.ensure(allocator, source, source.unit, .{ .parents = true });
+    try uses.ensure(allocator, source, source.unit, .{ .flow = true });
+    try uses.ensure(allocator, source, source.unit, .{ .parents = true, .flow = true });
+}
+
+fn expectSameTable(comptime T: type, expected: unit_index.Table(T), actual: unit_index.Table(T)) !void {
+    try std.testing.expectEqualSlices(u32, expected.offsets, actual.offsets);
+    try std.testing.expectEqualSlices(T, expected.items, actual.items);
+}
+
+test "unit def-use groups built on demand equal the complete index and survive allocation failure" {
+    var module = try lower(a, flows);
+    defer module.deinit(a);
+    var full = try unit_index.Uses.init(a, &module, module.unit);
+    defer full.deinit(a);
+    var lazy = try unit_index.Uses.initBase(a, &module, module.unit);
+    defer lazy.deinit(a);
+    try std.testing.expect(!lazy.has_parents and !lazy.has_flow);
+    try expectSameTable(core.Id, full.references, lazy.references);
+    try std.testing.expectEqualSlices(unit_index.Uses.Flags, full.flags, lazy.flags);
+    try lazy.ensure(a, &module, module.unit, .{ .flow = true });
+    try std.testing.expect(lazy.has_flow and !lazy.has_parents);
+    try expectSameTable(core.Id, full.definitions, lazy.definitions);
+    try expectSameTable(core.Id, full.inputs, lazy.inputs);
+    try expectSameTable(u32, full.carries, lazy.carries);
+    try expectSameTable(core.Id, full.exits, lazy.exits);
+    try expectSameTable(unit_index.Uses.Exit, full.values, lazy.values);
+    try std.testing.expectEqualSlices(unit_index.Uses.Carry, full.carry_loops, lazy.carry_loops);
+    try lazy.ensure(a, &module, module.unit, .{ .parents = true });
+    for (0..module.nodes.len) |id| try std.testing.expectEqualDeep(full.parentOf(@intCast(id)), lazy.parentOf(@intCast(id)));
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, buildLazily, .{&module});
+}
