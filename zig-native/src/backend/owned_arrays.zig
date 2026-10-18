@@ -102,9 +102,6 @@ pub const Proof = struct {
                     const edit = edit_call.analyze(units, unit_id, id).?;
                     consume(&states[binding], id);
                     consumed_refs[edit.receiver] = true;
-                } else if (edit_call.readReceiver(units, unit_id, id)) |array| {
-                    // A four-lane load copies scalar words out of the Array.
-                    if (module.node(array).tag == .reference) read_refs[array] = id;
                 } else try borrows.markArguments(unit_id, id, states, read_refs),
                 .project => try borrows.markArguments(unit_id, id, states, read_refs),
                 .pattern_bind => {
