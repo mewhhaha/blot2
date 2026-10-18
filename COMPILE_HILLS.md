@@ -293,6 +293,18 @@ A body or literal edit in `ink/math` (71 importers) reuses nothing.
 
 - **Fix:** invalidate importers by interface hash, not by module identity.
   Re-emit only the instances that inline or evaluate the edited body.
+- **Result (18 October 2026):** no separate change. Importers are already cut
+  off by interface comparison (`module_frontend_cutoff`): a steady-state
+  `Quat.dot` body edit re-checks only `ink/math`. Its instances were then lost
+  to the gate's associated-candidate rule, which CT12 replaces: the revert
+  reuses 1,429 of 1,794 (1,695 → 1,524 ms). The first `ink/math` edit after
+  population still re-checks 76 modules: the checker publishes input-function
+  capability recipes for every eligible declaration when the module's type store
+  holds a scoped type, and a live-checked `ink/math` copies such nodes from its
+  imports while a check against frozen interfaces does not, so `Color.lerp` and
+  `Quat.conjugate` carry recipes only at population. That difference in
+  `check.zig` also makes retained interfaces differ from cold ones; it belongs
+  to the checker hills.
 
 ### CT12: instance-level dependencies
 
