@@ -843,6 +843,13 @@ Region `game.blot:9829` has 5,137 scopes and takes 262 ms.
 
 - **Fix:** record certified pairs as scopes are added, and return early when
   nothing changed.
+- **Result (18 October 2026):** dropped after measurement. After CT60
+  `closeCertificates` is 2.6% of cold game samples, but it runs about once
+  per region, at solve end: 6,495 calls over 5,886 regions, 3,549 of which
+  close rows; 1,154 find no certificate and only 363 see an unchanged solver.
+  A settled-row set with lazy protection (rollback-safe, reference path under
+  projections) passed a parity law but measured 20.633 → 20.611 G
+  instructions (-0.1%) and 2,340 → 2,330 ms over 5 pairs.
 
 ### CT53: per-scope edge lists
 
