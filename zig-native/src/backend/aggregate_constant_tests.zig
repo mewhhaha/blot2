@@ -111,3 +111,39 @@ test "aggregate constants with changed values aliases or nominal payloads rebuil
         try retainedScenario(a, &after, &initial, fresh.bytes, case.reused);
     }
 }
+
+// `three` is the first reader of all three aggregates, so its admission skips
+// three disjoint child ranges between its own records.
+const interleaved =
+    \\const table: Array U32 = #[10, 20, 30]
+    \\const second: Array U32 = #[1, 2, 3]
+    \\type Pair is data = #Pair { left: U32, right: U32 }
+    \\const pair = #Pair { left: 20, right: 22 }
+    \\const other = 0
+    \\entry const three = fn (i: U32) => do:
+    \\  let #Pair { left, right } = pair
+    \\  let low = @u32.add table[i] left
+    \\  return @u32.add low (@u32.add second[i] right)
+    \\entry const unrelated = fn () => other
+;
+test "admission skips every aggregate child range of one caller and keeps the records between them" {
+    var before = try Fixture.init(interleaved);
+    defer before.deinit();
+    var initial = try before.compile(a, null);
+    defer initial.deinit(a);
+    const cases = [_]struct { from: []const u8, to: []const u8, reused: usize }{
+        .{ .from = "const other = 0", .to = "const other = 1", .reused = 3 },
+        .{ .from = "#[1, 2, 3]", .to = "#[1, 2, 4]", .reused = 0 },
+        .{ .from = "@u32.add second[i] right", .to = "@u32.sub second[i] right", .reused = 0 },
+    };
+    for (cases, 0..) |case, index| {
+        const text = try std.mem.replaceOwned(u8, a, interleaved, case.from, case.to);
+        defer a.free(text);
+        var after = try Fixture.init(text);
+        defer after.deinit();
+        var fresh = try after.compile(a, null);
+        defer fresh.deinit(a);
+        try retainedScenario(a, &after, &initial, fresh.bytes, case.reused);
+        if (index == 0) try @import("../allocation_failures.zig").checkAllAllocationFailures(a, retainedScenario, .{ &after, &initial, fresh.bytes, case.reused });
+    }
+}

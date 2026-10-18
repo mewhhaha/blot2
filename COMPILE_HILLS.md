@@ -378,6 +378,14 @@ It is 2.7% self in a literal edit and recomputed per revision.
 (`reuse/artifact_fragment.zig:288-300`).
 
 - **Fix:** use an interval index.
+- **Result (18 October 2026):** CT17, "Follow skipped aggregate ranges with
+  one cursor during admission". The per-address scan (`localAddress`) is
+  negligible now; the self time was `admit` testing every emission record
+  against every skipped aggregate child. Those ranges are disjoint and
+  ascending, so one cursor follows them and a binary search passes over each
+  child's records. Game, 5 pairs: literal_constant edit 11.26 → 11.18 G
+  instructions (1,218 → 1,214 ms, within CPU noise), body_change 16.40 →
+  16.33 G. Wasm identical.
 
 ### CT18: generation tokens instead of module stamps
 

@@ -426,14 +426,19 @@ pub const State = struct {
                 else => {},
             }
         }
+        // Skipped children's sequence ranges are disjoint and ascending (the
+        // walk above resumes after each one), so one cursor follows them and
+        // their records are passed over by binary search.
+        var skip: usize = 0;
         var e = self.emissionAt(first);
         while (e < self.old.emission.records.items.len) : (e += 1) {
             const record = self.old.emission.records.items[e];
             if (record.sequence > last) break;
-            const inside = for (skipped.items) |child| {
-                if (record.sequence >= self.starts[child - 1] and record.sequence <= self.ends[child - 1]) break true;
-            } else false;
-            if (inside) continue;
+            while (skip < skipped.items.len and self.ends[skipped.items[skip] - 1] < record.sequence) skip += 1;
+            if (skip < skipped.items.len and record.sequence >= self.starts[skipped.items[skip] - 1]) {
+                e = self.emissionAt(self.ends[skipped.items[skip] - 1] + 1) - 1;
+                continue;
+            }
             switch (record.event) {
                 .function => |item| if (self.old.emission.functions[item.id].role == .static_closure and !self.staticHelper(self.old.emission.functions[item.id], record.owner)) return false,
                 .callable_layout => |item| {
