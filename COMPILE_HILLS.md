@@ -1157,6 +1157,13 @@ path (`main.zig:438-475`).
 
 - **Fix:** capture only for retained sessions. Write the cache after output is
   flushed.
+- **Result (18 October 2026):** dropped. Every `serve-project` build has a
+  retained consumer: the next revision is admitted against this capture, and
+  checkpoints and the restart cache encode it. The CLI already captures only
+  when the restart cache is enabled (`retain_artifacts = cache_file != null`)
+  and writes the cache after the Wasm file. Capture is now 3.5% of cold game
+  samples (`recordArtifact` and journal recording), all of it read by the next
+  build. Replying before persisting is CT24 and background population CT85.
 
 ### CT73: parallel final encoding
 
