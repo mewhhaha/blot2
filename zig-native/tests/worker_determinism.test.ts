@@ -1,6 +1,6 @@
 // Worker counts are execution choices: every count must emit the same Wasm
 // and diagnostics, fresh and after a retained edit, on a project large enough
-// that lowering actually runs on workers.
+// that lowering and assembly actually run on workers.
 import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
@@ -56,7 +56,7 @@ async function project(directory: string, bumps: number[]) {
   return sources;
 }
 
-Deno.test("lowering workers emit identical Wasm and diagnostics for every semantic worker count", async () => {
+Deno.test("lowering and codegen workers emit identical Wasm and diagnostics for every worker count", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-workers-" });
   const base = {
     executable,
@@ -76,10 +76,12 @@ Deno.test("lowering workers emit identical Wasm and diagnostics for every semant
     broken[`${directory}/m5.blot`] += "const other: U32 = fn value => value\n";
     const results: Uint8Array[][] = [];
     const rejections: unknown[] = [];
-    for (const semanticWorkers of [1, 2, 4]) {
+    const counts = [[1, 1], [2, 1], [4, 1], [1, 4], [4, 4]];
+    for (const [semanticWorkers, codegenWorkers] of counts) {
       const compiler = await createZigProjectCompiler({
         ...base,
         semanticWorkers,
+        codegenWorkers,
       });
       try {
         const bytes = [];

@@ -60,3 +60,41 @@ test "coarse optimizer jobs join and release outputs across allocation failures"
     try failureScenario(a, &module);
     try @import("../allocation_failures.zig").checkObservedConcurrentFailures(a, failureScenario, .{&module});
 }
+
+/// The first twenty functions publish nothing; the rest return an
+/// allocation the reference-count plan leaves uncounted.
+fn rcWorkload(a: std.mem.Allocator, first_unproven: *u32) !wasm.Module {
+    var module = wasm.Module.init(a);
+    errdefer module.deinit();
+    const arena = try module.ensureArena();
+    for (0..32) |index| {
+        const id = try module.addFunction(&.{.i32}, .i32);
+        if (index < 20) {
+            try module.emit(id, .{ .op = .local_get });
+        } else {
+            if (index == 20) first_unproven.* = id;
+            const local = try module.addLocal(id, .i32);
+            try module.emitSlice(id, &.{ .{ .op = .i32_const, .operand = 128 }, .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = local }, .{ .op = .local_get, .operand = local }, .{ .op = .local_get }, .{ .op = .i32_store }, .{ .op = .local_get, .operand = local } });
+        }
+        for (0..64) |_| try module.emitSlice(id, &.{ .{ .op = .i32_const, .operand = @intCast(index) }, .{ .op = .i32_add } });
+    }
+    return module;
+}
+
+test "parallel reference-count plans reject at the serial first unproven function" {
+    const a = std.testing.allocator;
+    var first: u32 = 0;
+    var module = try rcWorkload(a, &first);
+    defer module.deinit();
+    var serial: wasm.OwnershipFailure = .{};
+    try std.testing.expectError(error.IncompleteOwnership, module.assembleCheckedWithOptions(.{ .rejection = &serial }));
+    try std.testing.expectEqual(wasm.OwnershipFallback.unproven_body, serial.fallback);
+    try std.testing.expectEqual(@as(?u32, first), serial.function);
+    for ([_]u8{ 2, 4 }) |workers| {
+        var parallel: wasm.OwnershipFailure = .{};
+        var stats: retained.Stats = .{};
+        try std.testing.expectError(error.IncompleteOwnership, module.assembleCheckedWithOptions(.{ .rejection = &parallel, .io = std.testing.io, .workers = workers, .stats = &stats }));
+        try std.testing.expect(stats.workers > 1);
+        try std.testing.expectEqual(serial, parallel);
+    }
+}

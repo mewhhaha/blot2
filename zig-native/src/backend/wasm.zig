@@ -1016,6 +1016,17 @@ pub const Module = struct {
         };
         return false;
     }
+    /// Whether `function`'s final body leaves an allocation uncounted.
+    fn rcUnproven(self: *const Module, function: *const Function, body: ?ir.Body, passes: *@import("runtime_pipeline.zig").Session) !bool {
+        var view = function.*;
+        if (body) |final| {
+            view.locals = final.locals;
+            view.instructions = final.instructions;
+        }
+        var proof = try @import("wasm_lifetimes.zig").rcPlan(self.allocator, self, &view, &passes.summaries, null);
+        defer proof.deinit(self.allocator);
+        return !proof.admitted or proof.allocations.items.len != 0;
+    }
     fn assemblePrepared(self: *const Module, options: AssemblyOptions, journals: bool, comptime checked: bool) ![]u8 {
         if (options.import_function_table != null and self.host_references != null) return error.InvalidFunctionReference;
         for (self.functions.items) |function| if (!function.validProviderParameter()) return error.InvalidFunctionReference;
@@ -1046,7 +1057,11 @@ pub const Module = struct {
             stats.match_work = matches.work;
             stats.match_budget_exhausted = matches.budget_exhausted;
         };
-        var parallel = try @import("runtime_parallel.zig").Batch.run(self.allocator, options.io, &passes, if (matcher) |*matches| matches else null, options.workers);
+        var ownership_fallback: OwnershipFallback = .none;
+        var unproven_function: ?u32 = null;
+        if (self.arena == null) ownership_fallback = .no_arena else if (self.public_arena and !passes.roots) ownership_fallback = .public_arena else if (self.host_references != null and !passes.roots) ownership_fallback = .host_references else if (self.imports.items.len != 0 and !passes.roots) ownership_fallback = .imports else if (self.start != null and !passes.roots) ownership_fallback = .initializer;
+        if (ownership_fallback == .none and (self.mutable_static or (self.static_fields.items.len != 0 and !passes.roots))) ownership_fallback = .static_sequence_cache;
+        var parallel = try @import("runtime_parallel.zig").Batch.run(self.allocator, options.io, &passes, if (matcher) |*matches| matches else null, options.workers, ownership_fallback == .none);
         defer if (parallel) |*batch| batch.deinit();
         if (options.stats) |stats| if (parallel) |batch| {
             stats.workers = batch.workers;
@@ -1059,10 +1074,6 @@ pub const Module = struct {
         defer for (bodies) |*prepared| if (!prepared.borrowed) {
             if (prepared.body) |*body| body.deinit(self.allocator);
         };
-        var ownership_fallback: OwnershipFallback = .none;
-        var unproven_function: ?u32 = null;
-        if (self.arena == null) ownership_fallback = .no_arena else if (self.public_arena and !passes.roots) ownership_fallback = .public_arena else if (self.host_references != null and !passes.roots) ownership_fallback = .host_references else if (self.imports.items.len != 0 and !passes.roots) ownership_fallback = .imports else if (self.start != null and !passes.roots) ownership_fallback = .initializer;
-        if (ownership_fallback == .none and (self.mutable_static or (self.static_fields.items.len != 0 and !passes.roots))) ownership_fallback = .static_sequence_cache;
         for (self.functions.items, 0..) |*function, id| {
             if (options.stats) |stats| stats.functions += 1;
             const reused = if (matcher) |*matches| matches.matches(id) else false;
@@ -1072,15 +1083,8 @@ pub const Module = struct {
                 if (reused) stats.reused += 1 else stats.optimized += 1;
             }
             if (ownership_fallback == .none and !passes.runtimeHelper(function)) {
-                var view = function.*;
-                if (bodies[id].body) |body| {
-                    view.locals = body.locals;
-                    view.instructions = body.instructions;
-                }
-                var proof = try @import("wasm_lifetimes.zig").rcPlan(self.allocator, self, &view, &passes.summaries, null);
-                defer proof.deinit(self.allocator);
-
-                if (!proof.admitted or proof.allocations.items.len != 0) {
+                const unproven = if (parallel) |*batch| batch.unproven(id) else null;
+                if (unproven orelse try self.rcUnproven(function, bodies[id].body, &passes)) {
                     ownership_fallback = .unproven_body;
                     unproven_function = @intCast(id);
                 }
