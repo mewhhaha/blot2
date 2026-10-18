@@ -1401,6 +1401,10 @@ test "independent call proof retained dependencies survive semantic owner remapp
     try std.testing.expectEqual(fresh.constant_steps, checked.constant_steps);
     var third = try Fixture.init(independent_query_source);
     defer third.deinit();
+    // The edit below replaces the producer's nodes with new buffers, as a
+    // revision does; the pinned originals stay alive until the end.
+    var original_nodes: ?[]core.Node = null;
+    defer if (original_nodes) |nodes| a.free(nodes);
     var reused = try third.emit(a, .{ .retain_artifacts = true, .policy = .{ .semantic_workers = 2 }, .previous = &checked.capture.? });
     defer reused.deinit(a);
     try successful(&reused);
@@ -1410,7 +1414,10 @@ test "independent call proof retained dependencies survive semantic owner remapp
     try std.testing.expectEqualSlices(u8, third_fresh.bytes, reused.bytes);
     try std.testing.expectEqual(third_fresh.constant_steps, reused.constant_steps);
     const body = third.units[0].body(third.target("factor").binding).?;
-    third.units[0].nodes[body.root].a = 6;
+    const edited_nodes = try a.dupe(core.Node, third.units[0].nodes);
+    edited_nodes[body.root].a = 6;
+    original_nodes = third.units[0].nodes;
+    third.units[0].nodes = edited_nodes;
     var changed = try third.emit(a, .{ .retain_artifacts = true, .policy = .{ .semantic_workers = 2 }, .previous = &reused.capture.? });
     defer changed.deinit(a);
     try successful(&changed);
