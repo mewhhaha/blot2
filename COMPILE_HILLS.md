@@ -779,11 +779,11 @@ in big modules.
 - **Result (18 October 2026):** "CT65: Memoize closed type layouts per unit".
   Closed types (65% of the game's 159k top-level derivations, 8,266 distinct)
   are memoized in the layout store by unit position; the (type, mapping) memo
-  was not needed. Wasm identical. Instructions: game 28.314 → 28.123 G
-  (−0.7%), devtools 9.215 → 8.940 G (−3.0%), literal-constant edit 21.486 →
-  21.295 G. CPU: game 2,981 → 3,033 ms, devtools 1,035 → 1,044 ms (load 1.1),
-  inside the ±3% build-to-build layout jitter of this series: CT71, an
-  instruction no-op, measured −2.0%.
+  was not needed. Wasm identical. Instructions: game 28.314 → 28.123 G (−0.7%),
+  devtools 9.215 → 8.940 G (−3.0%), literal-constant edit 21.486 → 21.295 G.
+  CPU: game 2,981 → 3,033 ms, devtools 1,035 → 1,044 ms (load 1.1), inside the
+  ±3% build-to-build layout jitter of this series: CT71, an instruction no-op,
+  measured −2.0%.
 
 ### CT66: incremental runtime planning
 
