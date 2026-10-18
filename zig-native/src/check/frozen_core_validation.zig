@@ -161,7 +161,7 @@ fn scalarArity(op: core.Op) BoundsError!u8 {
     try enumValue(core.Op, op);
     return switch (op) {
         .none => error.InvalidArtifact,
-        .neg, .abs, .ceil, .floor, .trunc, .sqrt, .convert_u32_f32, .convert_f32_u32 => 1,
+        .neg, .abs, .ceil, .floor, .trunc, .sqrt, .convert_u32_f32, .convert_f32_u32, .bit_not, .any_true, .all_true, .bits, .from_bits => 1,
         else => 2,
     };
 }

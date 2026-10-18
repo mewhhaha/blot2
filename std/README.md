@@ -418,10 +418,14 @@ updates and concatenation follow logarithmic paths. The
 [full contracts](../zig-native/ROLLING_SUMMARIES.md) specify ordering and bounds.
 
 [simd.blot](simd.blot) supplies explicit four-lane U32/F32 operations on
-ordinary tuple aliases, checked array load/store, and ordered or explicitly
-pairwise reductions. Eligible independent numeric construction also vectorizes
-automatically. [SIMD semantics](../compiler/guide.md#simd) specify the exact
-arithmetic and admission limits.
+ordinary tuple aliases: arithmetic, shifts, min/max, comparison masks and
+bitwise selection, literal shuffles, dot products, bit reinterpretation, an
+opt-in relaxed multiply-add, checked array load/store, and ordered or
+explicitly pairwise reductions. Each lane matches its scalar kernel bit for
+bit, and private values stay in v128 locals. Eligible independent numeric
+construction also vectorizes automatically.
+[SIMD semantics](../compiler/guide.md#simd) specify the exact arithmetic and
+admission limits.
 
 Ownership analysis removes eligible local allocations and permits safe storage
 reuse. Runtime reclamation additionally uses a tracing collector in Wasm linear

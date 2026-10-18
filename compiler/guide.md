@@ -687,16 +687,53 @@ const translated = fn lanes => simd.u32_add lanes (1, 2, 3, 4)
 const scaled = fn lanes => simd.f32_mul lanes (2.0, 2.0, 2.0, 2.0)
 ```
 
-The module provides U32 add/subtract/multiply and bitwise operations; F32
-arithmetic, abs/negate, sqrt and rounding; and saturating F32-to-U32 and
-U32-to-F32 conversion. `load index values` and `store index lanes values` read
-or replace four consecutive U32, F32 or Bool elements after one range check,
-which precedes the index arithmetic. A store keeps the Array snapshot contract
-and edits in place when the Array is exclusive; a direct `load` wrapper call
-only reads its Array, so it does not force a later update to copy. Explicit
-compiler operations use `@simd.u32x4.*` and `@simd.f32x4.*` with their full
-argument lists, like the scalar compiler operations; `@simd.load values index`
-and `@simd.store values index lanes` take the Array first.
+Every operation with a scalar counterpart gives the bits of that scalar kernel
+in each lane, including NaN, signed zero and wrapping. Collection arguments and
+lane operands come last, so `lanes |> simd.u32_shl 13` pipelines.
+
+- Arithmetic: U32 add/subtract/multiply and bitwise and/or/xor; F32 arithmetic,
+  abs/negate, sqrt and rounding; saturating F32-to-U32 and U32-to-F32
+  conversion.
+- Shifts: `u32_shl count lanes`, `u32_shr count lanes` (logical) and
+  `u32_sar count lanes` (arithmetic) take a scalar U32 count that wraps modulo
+  32, like `<<` and `>>`.
+- Min/max: `f32_min a b` is the prelude's `min a b`, `if a < b then a else b`,
+  in each lane, so NaN and equal zeros choose `b`; `f32_max a b` is
+  `if a > b then a else b`. They lower to `f32x4.pmin b a` and `f32x4.pmax b a`,
+  whose definitions are exactly those selections. `u32_min`/`u32_max` compare
+  unsigned.
+- Comparisons: `f32_eq`/`ne`/`lt`/`le`/`gt`/`ge` and the unsigned `u32_*`
+  versions return a `U32x4` mask, all ones where the comparison holds and zero
+  elsewhere. `f32_select mask yes no` and `u32_select mask yes no` select
+  bitwise: a mask bit of one takes `yes`. `u32_not`, `u32_andnot a b`
+  (`a & ~b`), `any_true` and `all_true` (every lane nonzero) complete the mask
+  helpers.
+- Lane movement: `f32_shuffle (i0, i1, i2, i3) a b` takes lanes 0–3 from `a` and
+  4–7 from `b`; `f32_swizzle (i0, i1, i2, i3) a` and `f32_broadcast i a` select
+  from `a`. U32 versions exist for all three. Lane selectors must be in-range
+  U32 literals at a direct, fully applied call; anything else is the
+  `simd_lane_literal` compile error.
+- Horizontal: `f32_sum` adds left to right; `f32_sum_pairwise` explicitly
+  chooses `(a + b) + (c + d)`. `f32_dot a b` and `f32_dot3 a b` (lanes 0–2)
+  multiply lanes and add them left to right, the grouping of `std/vector`'s
+  `Vec3.dot`, so they match the scalar dot bit for bit.
+- Reinterpretation: `f32_bits lanes` gives the U32 bits of each lane and
+  `f32_from_bits lanes` rebuilds F32 lanes, payloads included.
+- `f32_relaxed_madd a b c` computes `a * b + c` fused or separately rounded, as
+  the host chooses, so its results can differ between machines and from
+  compile-time evaluation, which fuses. It uses the relaxed-SIMD instruction set
+  and is never chosen implicitly.
+- `load index values` and `store index lanes values` read or replace four
+  consecutive U32, F32 or Bool elements after one range check, which precedes
+  the index arithmetic. A store keeps the Array snapshot contract and edits in
+  place when the Array is exclusive; a direct `load` wrapper call only reads its
+  Array, so it does not force a later update to copy.
+
+Explicit compiler operations use `@simd.u32x4.*` and `@simd.f32x4.*` with their
+full argument lists, like the scalar compiler operations;
+`@simd.load values
+index` and `@simd.store values index lanes` take the Array
+first.
 
 In the optimized tier a private four-lane value lives in a v128 local: tuple
 construction, destructuring, operations, loop carries and copies of parameters,

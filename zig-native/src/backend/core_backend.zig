@@ -1614,7 +1614,20 @@ pub const Generator = struct {
             }
             switch (metadata.kind) {
                 .scalar => if (self.representations.store.node(parameters[0]).tag == .product) {
-                    try emitter.simdLocals(metadata.op, locals[0..metadata.arity], parameters[0]);
+                    // A callable value cannot carry literal lane selectors.
+                    const simd = @import("simd_intrinsics.zig");
+                    if (simd.literalLanes(metadata.op)) return self.fail(key.unit, 0, .simd_lane_literal);
+                    var operands: [3]u32 = undefined;
+                    operands[0] = locals[0];
+                    var count: usize = 1;
+                    if (metadata.arity == 2 and simd.pairs(metadata.op)) {
+                        try emitter.simdPairLocals(locals[1], operands[1..3]);
+                        count = 3;
+                    } else if (metadata.arity == 2) {
+                        operands[1] = locals[1];
+                        count = 2;
+                    }
+                    try emitter.simdLocals(metadata.op, operands[0..count], null, parameters[0], ty);
                 } else {
                     const scalar_type = self.representations.store.scalar(parameters[0]) orelse return self.fail(key.unit, 0, .unsupported);
                     const opcode = scalar_ops.opcode(metadata.op, scalar_type) orelse return self.fail(key.unit, 0, .unsupported);

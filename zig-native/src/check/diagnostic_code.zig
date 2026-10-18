@@ -47,6 +47,7 @@ pub const Code = enum {
     complexity,
     invalid_numeric_proof,
     ownership_unproved,
+    simd_lane_literal,
     stage_unavailable,
     code_shape_mismatch,
     cross_stage_authority,
@@ -98,6 +99,7 @@ pub const Code = enum {
                 if (detail.len != 0) return detail;
                 return "Native emission requires checked ownership for every allocation, field and exit";
             },
+            .simd_lane_literal => "SIMD lane indices must be in-range U32 literals at a direct, fully applied shuffle, swizzle or broadcast",
             .stage_unavailable => "The code or descriptor is unavailable at this stage",
             .code_shape_mismatch => "The generated code does not have its checked shape",
             .cross_stage_authority => "The value cannot cross this stage boundary",

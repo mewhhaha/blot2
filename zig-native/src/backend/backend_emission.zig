@@ -6,6 +6,7 @@ const core = @import("../check/core.zig");
 const types = @import("../check/types.zig");
 const wasm = @import("wasm.zig");
 const scalar_ops = @import("scalar_ops.zig");
+const simd_intrinsics = @import("simd_intrinsics.zig");
 const core_eval = @import("../eval/core_eval.zig");
 const type_evidence = @import("../eval/type_evidence.zig");
 const substitution_keys = @import("../reuse/substitution_keys.zig");
@@ -54,7 +55,7 @@ pub const Owner = struct {
     const ResolverPlan = union(enum) { monad, forward, run: resolved_call.Arrow, call: resolved_call.Applied };
     const DispatchPlan = union(enum) {
         scalar: wasm.Op,
-        simd: layout.Id,
+        simd: struct { input: layout.Id, result: layout.Id },
         selected: struct { key: Key, call: resolved_call.Applied },
     };
     const TemplatePreparation = struct {
@@ -2001,6 +2002,32 @@ pub const Owner = struct {
             machines[i] = g.representations.store.machine(key.parameters[position]);
         }
         try self.arrayLocals(id, plan.op, operands[0..plan.count], machines[0..plan.count], result, key.parameters[order[0]]);
+        return true;
+    }
+
+    /// A direct wrapper of a shuffle, swizzle or broadcast takes its lane
+    /// selectors from this call's literal argument.
+    fn inlineSimdCall(self: *Emitter, id: core.Id, key: Key, depth: usize) Error!bool {
+        const g = self.generator;
+        const plan = @import("simd_call.zig").analyze(g.units, self.unit_id, id) orelse return false;
+        if (key.count != plan.count or !std.meta.eql(plan.target, key.target)) return false;
+        if (g.artifacts) |artifacts| try artifacts.readInlineBody(plan.target);
+        const lanes = self.simdLaneLiterals(plan.arguments[plan.lanes], plan.op) orelse return g.fail(self.unit_id, plan.arguments[plan.lanes], .simd_lane_literal);
+        var values: [3]u32 = undefined;
+        for (plan.arguments[0..plan.count], 0..) |argument, i| {
+            if (i != plan.lanes) values[i] = try self.capture(argument, depth);
+        }
+        var operands: [2]u32 = undefined;
+        var count: usize = plan.vector_count;
+        if (plan.pair_parameter) {
+            try self.simdPairLocals(values[plan.vectors[0]], &operands);
+            count = 2;
+        } else for (plan.vectors[0..plan.vector_count], 0..) |position, i| {
+            operands[i] = values[position];
+        }
+        const source = g.unit(self.unit_id);
+        const result = try self.codeLayout(source.typeOf(id), source.span(id));
+        try self.simdLocals(plan.op, operands[0..count], lanes, result, result);
         return true;
     }
 
@@ -4984,26 +5011,173 @@ pub const Owner = struct {
         try self.storeElement(machine, if (front) 4 else 0, row_words, scalar_elements);
         try self.emit(.local_get, result);
     }
-    pub fn simdLocals(self: *Emitter, op: core.Op, operands: []const u32, input: layout.Id) Error!void {
-        const fields = self.generator.representations.store.children(input);
-        if (fields.len != 4) return self.generator.fail(self.unit_id, 0, .unsupported);
-        const scalar_type = self.generator.representations.store.scalar(fields[0]) orelse return self.generator.fail(self.unit_id, 0, .unsupported);
-        for (fields) |field| if (field != fields[0]) return self.generator.fail(self.unit_id, 0, .unsupported);
-        const scalar_op = scalar_ops.opcode(op, scalar_type) orelse return self.generator.fail(self.unit_id, 0, .unsupported);
-        const vector_op = @import("runtime_ir.zig").lift(scalar_op) orelse return self.generator.fail(self.unit_id, 0, .unsupported);
+    /// Applies one four-lane operation to captured operand locals. Vector
+    /// operands are product addresses, a shift count is a scalar word, and a
+    /// pair operand arrives as its two vector addresses. The result is a fresh
+    /// scalar-only product (or a Bool for a reduction); scalar replacement
+    /// keeps private products in v128 locals.
+    pub fn simdLocals(self: *Emitter, op: core.Op, operands: []const u32, lanes: ?[4]u8, input: layout.Id, result: layout.Id) Error!void {
+        const g = self.generator;
+        const vector_layout = if (simd_intrinsics.pairs(op) or op == .swizzle) result else input;
+        const fields = g.representations.store.children(vector_layout);
+        if (fields.len != 4) return g.fail(self.unit_id, 0, .unsupported);
+        const scalar_type = g.representations.store.scalar(fields[0]) orelse return g.fail(self.unit_id, 0, .unsupported);
+        for (fields) |field| if (field != fields[0]) return g.fail(self.unit_id, 0, .unsupported);
+        const floating = scalar_type == .f32;
+        const expected: usize = switch (op) {
+            .select, .relaxed_madd => 3,
+            .shuffle, .shift_left, .shift_right, .shift_right_signed, .min, .max, .bit_andnot => 2,
+            .swizzle, .broadcast, .bits, .from_bits, .bit_not, .any_true, .all_true => 1,
+            else => operands.len,
+        };
+        if (operands.len != expected or operands.len == 0) return g.fail(self.unit_id, 0, .unsupported);
+        if (simd_intrinsics.literalLanes(op) and lanes == null) return g.fail(self.unit_id, 0, .simd_lane_literal);
+        if (op == .any_true or op == .all_true) {
+            try self.simdLoad(operands[0]);
+            return self.emit(if (op == .any_true) .v128_any_true else .i32x4_all_true, 0);
+        }
         const address = try self.allocateStorage(16, true, .scalar);
         try self.emit(.local_get, address);
-        for (operands) |operand| {
-            try self.emit(.local_get, operand);
-            try self.emit(.v128_load, 0);
+        switch (op) {
+            .shift_left, .shift_right, .shift_right_signed => {
+                if (floating) return g.fail(self.unit_id, 0, .unsupported);
+                try self.simdLoad(operands[0]);
+                try self.emit(.local_get, operands[1]);
+                try self.emit(switch (op) {
+                    .shift_left => .i32x4_shl,
+                    .shift_right => .i32x4_shr_u,
+                    else => .i32x4_shr_s,
+                }, 0);
+            },
+            .shuffle, .swizzle, .broadcast => {
+                // Swizzles and broadcasts select only from the first operand.
+                try self.simdLoad(operands[0]);
+                try self.simdLoad(operands[operands.len - 1]);
+                var packed_lanes: u32 = 0;
+                for (lanes.?, 0..) |lane, index| packed_lanes |= @as(u32, lane) << @intCast(index * 3);
+                try self.emit(.i8x16_shuffle, packed_lanes);
+            },
+            .select => {
+                // v128.bitselect takes yes, no, then the mask.
+                try self.simdLoad(operands[1]);
+                try self.simdLoad(operands[2]);
+                try self.simdLoad(operands[0]);
+                try self.emit(.v128_bitselect, 0);
+            },
+            .relaxed_madd => {
+                if (!floating) return g.fail(self.unit_id, 0, .unsupported);
+                for (operands) |operand| try self.simdLoad(operand);
+                try self.emit(.f32x4_relaxed_madd, 0);
+            },
+            .min, .max => if (floating) {
+                // pmin b a is `a < b ? a : b`, the prelude's `min a b`;
+                // pmax b a is `b < a ? a : b`, the prelude's `max a b`.
+                try self.simdLoad(operands[1]);
+                try self.simdLoad(operands[0]);
+                try self.emit(if (op == .min) .f32x4_pmin else .f32x4_pmax, 0);
+            } else {
+                try self.simdLoad(operands[0]);
+                try self.simdLoad(operands[1]);
+                try self.emit(if (op == .min) .i32x4_min_u else .i32x4_max_u, 0);
+            },
+            // Reinterpretation keeps every bit; only the result type changes.
+            .bits, .from_bits => try self.simdLoad(operands[0]),
+            .bit_not => {
+                try self.simdLoad(operands[0]);
+                try self.emit(.v128_not, 0);
+            },
+            .bit_andnot => {
+                try self.simdLoad(operands[0]);
+                try self.simdLoad(operands[1]);
+                try self.emit(.v128_andnot, 0);
+            },
+            .equal, .not_equal, .less, .less_equal, .greater, .greater_equal => {
+                try self.simdLoad(operands[0]);
+                try self.simdLoad(operands[1]);
+                try self.emit(switch (op) {
+                    .equal => if (floating) .f32x4_eq else .i32x4_eq,
+                    .not_equal => if (floating) .f32x4_ne else .i32x4_ne,
+                    .less => if (floating) .f32x4_lt else .i32x4_lt_u,
+                    .less_equal => if (floating) .f32x4_le else .i32x4_le_u,
+                    .greater => if (floating) .f32x4_gt else .i32x4_gt_u,
+                    else => if (floating) .f32x4_ge else .i32x4_ge_u,
+                }, 0);
+            },
+            else => {
+                const scalar_op = scalar_ops.opcode(op, scalar_type) orelse return g.fail(self.unit_id, 0, .unsupported);
+                const vector_op = @import("runtime_ir.zig").lift(scalar_op) orelse return g.fail(self.unit_id, 0, .unsupported);
+                for (operands) |operand| try self.simdLoad(operand);
+                try self.emit(vector_op, 0);
+            },
         }
-        try self.emit(vector_op, 0);
         try self.emit(.v128_store, 0);
         try self.emit(.local_get, address);
     }
     fn simdLoad(self: *Emitter, operand: u32) Error!void {
         try self.emit(.local_get, operand);
         try self.emit(.v128_load, 0);
+    }
+    /// A pair operand that is not a literal product is a product of two
+    /// vector addresses.
+    pub fn simdPairLocals(self: *Emitter, pair: u32, into: *[2]u32) Error!void {
+        for (into, 0..) |*local, index| {
+            local.* = try self.temporary(.i32);
+            try self.emit(.local_get, pair);
+            try self.emit(.i32_load, @intCast(index * 4));
+            try self.emit(.local_set, local.*);
+        }
+    }
+    /// Literal lane selectors: a U32 constant, or a product of four.
+    fn simdLaneLiterals(self: *Emitter, id: core.Id, op: core.Op) ?[4]u8 {
+        const source = self.generator.unit(self.unit_id);
+        const limit = simd_intrinsics.laneLimit(op);
+        if (op == .broadcast) {
+            const lane = laneLiteral(source, id, limit) orelse return null;
+            return @splat(lane);
+        }
+        if (source.node(id).tag != .product) return null;
+        const children = source.children(id);
+        if (children.len != 4) return null;
+        var lanes: [4]u8 = undefined;
+        for (&lanes, children) |*lane, child| lane.* = laneLiteral(source, child, limit) orelse return null;
+        return lanes;
+    }
+    fn laneLiteral(source: *const core.Module, id: core.Id, limit: u32) ?u8 {
+        const node = source.node(id);
+        if (node.tag != .constant or source.types.node(source.typeOf(id)).tag != .u32 or node.a >= limit) return null;
+        return @intCast(node.a);
+    }
+    /// Evaluates a SIMD primitive's operands in written order. Literal lane
+    /// selectors emit no code; a literal pair contributes its two vectors.
+    fn simdExpression(self: *Emitter, id: core.Id, input: layout.Id, result: layout.Id, depth: usize) Error!void {
+        const g = self.generator;
+        const value = g.unit(self.unit_id).node(id);
+        var lanes: ?[4]u8 = null;
+        var operands: [3]u32 = undefined;
+        var count: usize = 0;
+        if (value.op == .shuffle or value.op == .swizzle) {
+            lanes = self.simdLaneLiterals(value.a, value.op) orelse return g.fail(self.unit_id, value.a, .simd_lane_literal);
+        } else {
+            operands[0] = try self.capture(value.a, depth);
+            count = 1;
+        }
+        if (value.op == .broadcast) {
+            lanes = self.simdLaneLiterals(value.b, value.op) orelse return g.fail(self.unit_id, value.b, .simd_lane_literal);
+        } else if (value.b != 0) {
+            count += try self.simdOperand(value.op, value.b, operands[count..][0..2], depth);
+        }
+        try self.simdLocals(value.op, operands[0..count], lanes, input, result);
+    }
+    fn simdOperand(self: *Emitter, op: core.Op, id: core.Id, into: *[2]u32, depth: usize) Error!usize {
+        const source = self.generator.unit(self.unit_id);
+        if (!simd_intrinsics.pairs(op)) {
+            into[0] = try self.capture(id, depth);
+            return 1;
+        }
+        if (source.node(id).tag == .product and source.children(id).len == 2) {
+            for (into, source.children(id)) |*local, child| local.* = try self.capture(child, depth);
+        } else try self.simdPairLocals(try self.capture(id, depth), into);
+        return 2;
     }
     fn arrayStructural(self: *Emitter, op: core.ArrayOp, locals: []const u32, scalar_elements: bool, stride: u32) Error!void {
         const count = try self.temporary(.i32);
@@ -6238,6 +6412,7 @@ pub const Owner = struct {
         if (prepared.partial) |partial| if (try self.inlineStaticCall(partial.key, partial.arguments[0..partial.count], depth)) return;
         if (prepared.known) |known| {
             if (try self.inlineCollectionEdit(id, known.key, depth)) return;
+            if (try self.inlineSimdCall(id, known.key, depth)) return;
             if (try self.inlineNamedCall(known.key, known.arguments[0..known.count], depth)) return;
         }
         if (self.static_values.count() == 0 and self.isCallableTemplate(n.a)) {
@@ -7855,6 +8030,7 @@ pub const Owner = struct {
         }
         if (!key.dictionaries) {
             if (try self.inlineCollectionEdit(id, key, depth)) return;
+            if (try self.inlineSimdCall(id, key, depth)) return;
             if (try self.inlineDemandCall(key, call.arguments, prepared.demand, depth)) return;
             if (try self.inlineStaticCall(key, call.arguments, depth)) return;
             if (try self.inlineNamedCall(key, call.arguments, depth)) return;
@@ -9762,7 +9938,7 @@ pub const Owner = struct {
         if (value.tag == .scalar and (value.c == 0 or value.b == 0)) {
             const input = try self.codeLayout(unit_.typeOf(value.a), unit_.span(id));
             if (g.representations.store.node(input).tag == .product) {
-                return .{ .simd = input };
+                return .{ .simd = .{ .input = input, .result = try self.codeLayout(value.ty, unit_.span(id)) } };
             }
             const opcode = scalar_ops.opcode(value.op, try self.scalar(value.a)) orelse return g.fail(self.unit_id, id, .unsupported);
             return .{ .scalar = opcode };
@@ -9818,16 +9994,7 @@ pub const Owner = struct {
                 if (value.b != 0) try self.expression(value.b, depth + 1);
                 try self.emit(opcode, 0);
             },
-            .simd => |input| {
-                var operands: [2]u32 = undefined;
-                operands[0] = try self.capture(value.a, depth);
-                var count: usize = 1;
-                if (value.b != 0) {
-                    operands[1] = try self.capture(value.b, depth);
-                    count = 2;
-                }
-                try self.simdLocals(value.op, operands[0..count], input);
-            },
+            .simd => |plan| try self.simdExpression(id, plan.input, plan.result, depth),
             .selected => |selected| try self.dispatchCall(id, selected.key, selected.call, depth),
         }
     }

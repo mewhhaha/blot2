@@ -4648,15 +4648,85 @@ pub const Session = struct {
         try self.chargeCells(owner, id, array.len);
         return self.copyAggregate(owner, id, values[0], index.bits, values[2]);
     }
+    fn simdLanes(self: *Session, owner: usize, id: core.Id, vector: ValueId) Error![4]Value {
+        if (vector == 0 or self.valueInfo(vector).kind != .product or self.valueInfo(vector).len != 4) return self.failNode(owner, id, .unsupported);
+        var lanes: [4]Value = undefined;
+        for (&lanes, self.valueChildren(vector)[0..4]) |*lane, child| lane.* = try self.requireScalar(owner, id, child);
+        return lanes;
+    }
+    fn simdPair(self: *Session, owner: usize, id: core.Id, pair: ValueId) Error![2][4]Value {
+        if (pair == 0 or self.valueInfo(pair).kind != .product or self.valueInfo(pair).len != 2) return self.failNode(owner, id, .unsupported);
+        const children = self.valueChildren(pair);
+        return .{ try self.simdLanes(owner, id, children[0]), try self.simdLanes(owner, id, children[1]) };
+    }
+    /// Each lane follows its scalar kernel exactly. Min/max use the prelude's
+    /// ordered selection; relaxed multiply-add is evaluated fused here.
     fn simdValue(self: *Session, owner: usize, id: core.Id, op: core.Op, left: ValueId, right: ValueId) Error!ValueId {
-        if (self.valueInfo(left).len != 4 or (right != 0 and (self.valueInfo(right).kind != .product or self.valueInfo(right).len != 4))) return self.failNode(owner, id, .unsupported);
-        const a: [4]ValueId = self.valueChildren(left)[0..4].*;
-        const b: [4]ValueId = if (right == 0) @splat(0) else self.valueChildren(right)[0..4].*;
-        var values: [4]ValueId = undefined;
-        for (&values, a, b) |*result, first, second| {
-            const lane = scalar_ops.evaluate(op, try self.requireScalar(owner, id, first), try self.requireScalar(owner, id, second)) catch return self.failNode(owner, id, .unsupported);
-            result.* = try self.makeScalar(owner, id, lane);
+        const simd = @import("../backend/simd_intrinsics.zig");
+        const a = try self.simdLanes(owner, id, left);
+        var lanes: [4]Value = undefined;
+        switch (op) {
+            .any_true, .all_true => {
+                var count: u32 = 0;
+                for (a) |lane| count += @intFromBool(lane.bits != 0);
+                const truth = if (op == .any_true) count != 0 else count == 4;
+                return self.makeScalar(owner, id, .{ .scalar = .bool, .bits = @intFromBool(truth) });
+            },
+            .bit_not, .bits, .from_bits => for (&lanes, a) |*lane, item| {
+                lane.* = .{ .scalar = if (op == .from_bits) .f32 else .u32, .bits = if (op == .bit_not) ~item.bits else item.bits };
+            },
+            .shift_left, .shift_right, .shift_right_signed, .broadcast => {
+                const count = try self.requireScalar(owner, id, right);
+                if (count.scalar != .u32) return self.failNode(owner, id, .unsupported);
+                if (op == .broadcast and count.bits >= simd.laneLimit(op)) return self.failNode(owner, id, .simd_lane_literal);
+                for (&lanes, a) |*lane, item| {
+                    const shift: u5 = @truncate(count.bits);
+                    lane.* = .{ .scalar = item.scalar, .bits = switch (op) {
+                        .shift_left => item.bits << shift,
+                        .shift_right => item.bits >> shift,
+                        .shift_right_signed => @bitCast(@as(i32, @bitCast(item.bits)) >> shift),
+                        else => a[count.bits].bits,
+                    } };
+                }
+            },
+            .select, .relaxed_madd, .shuffle => {
+                const pair = try self.simdPair(owner, id, right);
+                for (&lanes, a, 0..) |*lane, item, index| lane.* = switch (op) {
+                    .select => .{ .scalar = pair[0][index].scalar, .bits = (pair[0][index].bits & item.bits) | (pair[1][index].bits & ~item.bits) },
+                    .relaxed_madd => .{ .scalar = .f32, .bits = @bitCast(@mulAdd(f32, @bitCast(item.bits), @bitCast(pair[0][index].bits), @bitCast(pair[1][index].bits))) },
+                    else => blk: {
+                        if (item.bits >= simd.laneLimit(op)) return self.failNode(owner, id, .simd_lane_literal);
+                        break :blk pair[item.bits / 4][item.bits % 4];
+                    },
+                };
+            },
+            .swizzle => {
+                const vector = try self.simdLanes(owner, id, right);
+                for (&lanes, a) |*lane, item| {
+                    if (item.bits >= simd.laneLimit(op)) return self.failNode(owner, id, .simd_lane_literal);
+                    lane.* = vector[item.bits];
+                }
+            },
+            else => {
+                const b = if (right == 0) a else try self.simdLanes(owner, id, right);
+                for (&lanes, a, b) |*lane, first, second| {
+                    lane.* = switch (op) {
+                        .min, .max => blk: {
+                            // min chooses the left lane when left < right and
+                            // max when right < left, otherwise the right lane.
+                            const ordered = scalar_ops.evaluate(.less, if (op == .min) first else second, if (op == .min) second else first) catch return self.failNode(owner, id, .unsupported);
+                            break :blk if (ordered.bits != 0) first else second;
+                        },
+                        .bit_andnot => .{ .scalar = first.scalar, .bits = first.bits & ~second.bits },
+                        else => scalar_ops.evaluate(op, first, if (right == 0) .{ .scalar = .unit, .bits = 0 } else second) catch return self.failNode(owner, id, .unsupported),
+                    };
+                    // Lane comparisons produce all-ones or all-zero U32 masks.
+                    if (lane.scalar == .bool) lane.* = .{ .scalar = .u32, .bits = if (lane.bits != 0) std.math.maxInt(u32) else 0 };
+                }
+            },
         }
+        var values: [4]ValueId = undefined;
+        for (&values, lanes) |*result, lane| result.* = try self.makeScalar(owner, id, lane);
         return self.makeAggregate(owner, id, .product, 0, 0, &values);
     }
     fn arrayLengthFailure(self: *Session, owner: usize) Error {

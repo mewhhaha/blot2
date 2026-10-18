@@ -11290,12 +11290,21 @@ const Engine = struct {
         if (self.editorAt(id)) return self.captureEditor(id, 0, 0);
         if (@import("../backend/simd_intrinsics.zig").lookup(text)) |op| {
             const element = if (op.floating) T.f32_type else T.u32_type;
-            const input = try self.types.product(&.{ element, element, element, element });
-            const output = if (op.conversion) blk: {
-                const result = if (op.floating) T.u32_type else T.f32_type;
-                break :blk try self.types.product(&.{ result, result, result, result });
-            } else input;
-            return self.types.function(input, if (op.arity == 1) output else try self.types.function(input, output));
+            const vector = try self.types.product(&.{ element, element, element, element });
+            const lanes = try self.types.product(&.{ T.u32_type, T.u32_type, T.u32_type, T.u32_type });
+            const result_element = if (op.resultLane() == .f32) T.f32_type else T.u32_type;
+            const output = try self.types.product(&.{ result_element, result_element, result_element, result_element });
+            const pair = try self.types.product(&.{ vector, vector });
+            return switch (op.shape) {
+                .unary, .convert => self.types.function(vector, output),
+                .binary, .compare => self.types.function(vector, try self.types.function(vector, output)),
+                .shift, .broadcast => self.types.function(vector, try self.types.function(T.u32_type, vector)),
+                .reduce => self.types.function(vector, T.boolean),
+                .select => self.types.function(lanes, try self.types.function(pair, vector)),
+                .madd => self.types.function(vector, try self.types.function(pair, vector)),
+                .shuffle => self.types.function(lanes, try self.types.function(pair, vector)),
+                .swizzle => self.types.function(lanes, try self.types.function(vector, vector)),
+            };
         }
         if (std.mem.eql(u8, text, "@hole")) {
             if (self.editorAt(id)) return self.captureEditor(id, 0, 0);
