@@ -1077,6 +1077,18 @@ demand-force markers decline. Source arithmetic, eager operands and F32 bits
 remain exact; this grants no semantic or value-cache validity. See
 [iterator state qualification](ITERATOR_STATE.md).
 
+A version/copy group of 16-byte scalar-only objects accessed through whole
+v128 loads or stores keeps one v128 local per version instead; lane loads and
+stores become lane extracts and replacements, every lane written before any
+read. Only in such a body, an address from outside the function (parameter,
+call result, field or static constant) copied into the group loads its lanes
+there, and an escaping read straight from a local (a non-helper call argument,
+a stored field, a return) or a returned block result boxes a fresh scalar-only
+copy, annotated like an emitted allocation, when the group is read in lanes and
+the box runs outside every loop or in a loop activation that allocates the
+group. Any other escape keeps the group's storage. Ordinary lifetime and root
+passes then own every remaining allocation.
+
 An exact table target in a selected private closure may expose a bounded checked
 scalar consumer with internal blocks. Copied locals start at typed zero on every
 call, and branches remain inside that body. Calls, loops, writes, unknown roles,
