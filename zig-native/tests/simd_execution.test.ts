@@ -182,6 +182,37 @@ entry const held = fn (n: U32) -> F32 => do:
   }, { stdRoot });
 });
 
+Deno.test("three-operand SIMD wrappers stay in v128 locals outside loops", async () => {
+  await compileAndRun(`
+import * as simd from "std/simd"
+const pick = fn (h: U32) => fn (x: F32) -> F32 => do:
+  let r = simd.f32_select (simd.u32_lt (simd.u32_splat h) (simd.u32_splat 8)) (simd.f32_splat x) (1.0, 2.0, 3.0, 4.0)
+  let (a, b, c, d) = r
+  return ((a + b) + c) + d
+const bits = fn (h: U32) -> U32 => do:
+  let r = simd.u32_select (simd.u32_splat h) (5, 6, 7, 8) (9, 10, 11, 12)
+  let (a, b, c, d) = r
+  return a + b + c + d
+const fused = fn (x: F32) -> F32 => do:
+  let r = simd.f32_relaxed_madd (simd.f32_splat x) (2.0, 2.0, 2.0, 2.0) (1.0, 1.0, 1.0, 1.0)
+  let (a, b, c, d) = r
+  return ((a + b) + c) + d
+entry const run = fn (n: U32) -> F32 => do:
+  let total = 0.0
+  for i in 0..n:
+    total := total + pick (i % 16) 0.5 + @u32.to_f32 (bits (if i % 2 == 0 then 0 else 0xFFFFFFFF)) + fused 0.25
+  return total
+`, (_, bytes) => {
+    const guest = counters(bytes);
+    const short = guest.run("run", 2);
+    const long = guest.run("run", 1000);
+    deepStrictEqual(short.traffic, [0, 0, 0]);
+    deepStrictEqual(long.traffic, [0, 0, 0]);
+    // h < 8 takes x in every lane; mask 0 picks 9..12, all ones 5..8.
+    equal(short.result, 2 * 2 + (42 + 26) + 2 * 6);
+  }, { stdRoot });
+});
+
 // Every lane of a four-lane operation must have the bits of the scalar kernel
 // it replaces, including NaN, signed zero, subnormals and shift counts >= 32.
 const kernels = `

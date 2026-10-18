@@ -2006,24 +2006,31 @@ pub const Owner = struct {
     }
 
     /// A direct wrapper of a shuffle, swizzle or broadcast takes its lane
-    /// selectors from this call's literal argument.
+    /// selectors from this call's literal argument. A wrapper of select or
+    /// relaxed madd lowers here too, so its operand pair never boxes.
     fn inlineSimdCall(self: *Emitter, id: core.Id, key: Key, depth: usize) Error!bool {
         const g = self.generator;
         const plan = @import("simd_call.zig").analyze(g.units, self.unit_id, id) orelse return false;
         if (key.count != plan.count or !std.meta.eql(plan.target, key.target)) return false;
         if (g.artifacts) |artifacts| try artifacts.readInlineBody(plan.target);
-        const lanes = self.simdLaneLiterals(plan.arguments[plan.lanes], plan.op) orelse return g.fail(self.unit_id, plan.arguments[plan.lanes], .simd_lane_literal);
+        var lanes: ?[4]u8 = null;
+        if (plan.lanes) |position| lanes = self.simdLaneLiterals(plan.arguments[position], plan.op) orelse return g.fail(self.unit_id, plan.arguments[position], .simd_lane_literal);
         var values: [3]u32 = undefined;
         for (plan.arguments[0..plan.count], 0..) |argument, i| {
-            if (i != plan.lanes) values[i] = try self.capture(argument, depth);
+            if (plan.lanes != i) values[i] = try self.capture(argument, depth);
         }
-        var operands: [2]u32 = undefined;
-        var count: usize = plan.vector_count;
-        if (plan.pair_parameter) {
-            try self.simdPairLocals(values[plan.vectors[0]], &operands);
-            count = 2;
-        } else for (plan.vectors[0..plan.vector_count], 0..) |position, i| {
-            operands[i] = values[position];
+        var operands: [3]u32 = undefined;
+        var count: usize = 0;
+        for (plan.vectors[0..plan.vector_count], 0..) |position, i| {
+            if (plan.pair_parameter and i + 1 == plan.vector_count) {
+                var pair: [2]u32 = undefined;
+                try self.simdPairLocals(values[position], &pair);
+                operands[count..][0..2].* = pair;
+                count += 2;
+            } else {
+                operands[count] = values[position];
+                count += 1;
+            }
         }
         const source = g.unit(self.unit_id);
         const result = try self.codeLayout(source.typeOf(id), source.span(id));
