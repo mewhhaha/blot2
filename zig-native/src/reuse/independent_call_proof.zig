@@ -87,7 +87,7 @@ fn recheck(state: anytype, g: anytype, read: receipt.CallRead, actual: u32) Allo
     const a = state.allocator;
     const target: core.BindingRef = .{ .unit = read.unit, .binding = read.binding };
     const Probe = struct { evaluator: eval.Session, representations: struct { store: layout.Store } };
-    var probe: Probe = .{ .evaluator = try eval.Session.init(a, g.evaluator.units), .representations = .{ .store = undefined } };
+    var probe: Probe = .{ .evaluator = try eval.Session.initShared(a, &g.evaluator), .representations = .{ .store = undefined } };
     defer probe.evaluator.deinit();
     probe.representations.store = layout.Store.init(a) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else null;
     defer probe.representations.store.deinit();

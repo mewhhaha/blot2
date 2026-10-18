@@ -737,7 +737,7 @@ const CallSummaries = struct {
         return result;
     }
     fn executeComponentOwned(scratch: Allocator, output: Allocator, input: *const Session, component_: Component) Allocator.Error!?ComponentResult {
-        var private = try Session.init(scratch, input.units);
+        var private = try Session.initShared(scratch, input);
         defer private.deinit();
         private.options = input.options;
         private.semantic_job_budget = component_.budget;
@@ -1505,6 +1505,27 @@ pub const Session = struct {
             }
         }
         return .{ .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .visited_nodes = visited_nodes, .field_locations = field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = has_implementations, .has_generative_sources = has_generative_sources };
+    }
+    /// A private session over exactly `parent.units`. The facts Session.init
+    /// derives from those immutable units (the implementation and generative
+    /// source probes, offsets and nominal field locations) are copied from the
+    /// parent instead of rescanning every module; all evaluation state starts
+    /// empty, as from Session.init.
+    pub fn initShared(allocator: Allocator, parent: *const Session) Allocator.Error!Session {
+        const binding_offsets = try allocator.dupe(usize, parent.binding_offsets);
+        errdefer allocator.free(binding_offsets);
+        const node_offsets = try allocator.dupe(usize, parent.node_offsets);
+        errdefer allocator.free(node_offsets);
+        const slots = try allocator.alloc(Slot, parent.slots.len);
+        errdefer allocator.free(slots);
+        @memset(slots, .{});
+        const visited_nodes = try allocator.alloc(bool, parent.visited_nodes.len);
+        errdefer allocator.free(visited_nodes);
+        @memset(visited_nodes, false);
+        var storage = try value_storage.Store.init(allocator);
+        errdefer storage.deinit(allocator);
+        const field_locations = try parent.field_locations.clone(allocator);
+        return .{ .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = parent.units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .visited_nodes = visited_nodes, .field_locations = field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = parent.has_implementations, .has_generative_sources = parent.has_generative_sources };
     }
     pub fn deinit(self: *Session) void {
         self.retained.deinit(self.allocator);
@@ -12267,6 +12288,40 @@ test "private semantic lexical components remap capture interfaces without expor
     defer module.deinit(std.testing.allocator);
     for ([_]u8{ 1, 4 }) |workers| try privateLexicalScenario(std.testing.allocator, &module, workers);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, privateLexicalScenario, .{ &module, @as(u8, 1) });
+}
+fn sharedSessionScenario(a: Allocator, units: []const core.Module) !void {
+    var parent = try Session.init(a, units);
+    defer parent.deinit();
+    var shared = try Session.initShared(a, &parent);
+    defer shared.deinit();
+    try std.testing.expectEqual(parent.units.ptr, shared.units.ptr);
+    try std.testing.expectEqual(parent.units.len, shared.units.len);
+    try std.testing.expectEqualSlices(usize, parent.binding_offsets, shared.binding_offsets);
+    try std.testing.expectEqualSlices(usize, parent.node_offsets, shared.node_offsets);
+    try std.testing.expectEqual(parent.slots.len, shared.slots.len);
+    try std.testing.expectEqual(parent.visited_nodes.len, shared.visited_nodes.len);
+    for (shared.slots) |slot| try std.testing.expectEqual(Slot{}, slot);
+    for (shared.visited_nodes) |visited| try std.testing.expect(!visited);
+    try std.testing.expectEqual(parent.has_implementations, shared.has_implementations);
+    try std.testing.expectEqual(parent.has_generative_sources, shared.has_generative_sources);
+    try std.testing.expectEqual(parent.field_locations.count(), shared.field_locations.count());
+    try std.testing.expect(parent.field_locations.count() != 0);
+    var entries = parent.field_locations.iterator();
+    while (entries.next()) |entry| try std.testing.expectEqual(entry.value_ptr.*, shared.field_locations.get(entry.key_ptr.*).?);
+}
+test "a shared private session derives every unit fact Session.init derives through allocation failures" {
+    var module = try bodyRecipeLower(
+        \\type Pair is data = #Pair { left: U32, right: U32 }
+        \\type Shape is data = #Square { side: U32 } | #Rect { width: U32, height: U32 }
+        \\entry const area = fn (shape: Shape) => case shape of
+        \\  #Square { side } => @u32.mul side side
+        \\  #Rect { width, height } => @u32.mul width height
+        \\entry const total = fn (pair: Pair) => @u32.add pair.left pair.right
+    );
+    defer module.deinit(std.testing.allocator);
+    const units = [_]core.Module{module};
+    try sharedSessionScenario(std.testing.allocator, &units);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, sharedSessionScenario, .{@as([]const core.Module, &units)});
 }
 fn privateRecursiveScenario(a: Allocator, module: *const core.Module, workers: u8) !void {
     var session = try Session.init(a, &.{module.*});

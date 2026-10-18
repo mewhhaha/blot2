@@ -347,6 +347,15 @@ Constant serialization is 31% of a literal edit.
 It is 2.7% self in a literal edit and recomputed per revision.
 
 - **Fix:** cache it per module stamp.
+- **Result (18 October 2026):** CT15, "Share unit facts with private
+  evaluator sessions". The scans came from `Session.init` in the 64
+  independent call-proof rechecks of each edit, each rescanning every module
+  (3.5% of a literal edit, plus offsets and field-location hashing). Private
+  sessions (`initShared`: those rechecks and semantic component jobs) now copy
+  the parent session's unit facts over the same units. Game, 5 pairs at load
+  1.7: literal_constant edit 1,389 → 1,316 ms (12.83 → 12.49 G instructions),
+  literal_in_body 1,319 → 1,253 ms, body_change 1,947 → 1,899 ms; population
+  unchanged. Wasm identical.
 
 ### CT16: index `artifact_import` lookups
 

@@ -2653,6 +2653,10 @@ fn generativeSourceGuardScenario(allocator: Allocator, fixture: *const Fixture) 
     var session = try eval.Session.init(allocator, fixture.units);
     defer session.deinit();
     try std.testing.expect(session.has_generative_sources);
+    // Private probes share the parent's probe instead of rescanning units.
+    var private = try eval.Session.initShared(allocator, &session);
+    defer private.deinit();
+    try std.testing.expect(private.has_generative_sources);
     const choose = fixture.target("choose").binding;
     try std.testing.expect(module.binding(choose).scheme.generative.len != 0);
     try std.testing.expect(try graph.generativeNamed(allocator, module, choose));
@@ -2715,6 +2719,9 @@ test "source callable graph declines unsolved generative named captures" {
     var session = try eval.Session.init(a, after.units);
     defer session.deinit();
     try std.testing.expect(!session.has_generative_sources);
+    var private = try eval.Session.initShared(a, &session);
+    defer private.deinit();
+    try std.testing.expect(!private.has_generative_sources);
     var gate = try gate_api.Gate.init(a, pools, after.units, after.names.view());
     defer gate.deinit();
     var ordinary = try inspect(a, &initial.capture.?, &gate, after.target("bundle"));
