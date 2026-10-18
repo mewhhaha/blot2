@@ -547,6 +547,15 @@ The project server persists its checkpoint before replying on revision 1
 (`reuse/zig_project_server.zig:367`).
 
 - **Fix:** reply first, then persist.
+- **Result (18 October 2026):** deferred; it needs an owner decision. Saving
+  the 54.6 MB restart cache adds 175 ms CPU and 205 ms wall to the first game
+  build (2,445 → 2,650 ms wall, 4 runs after CT19). But the reply currently
+  implies the cache is on disk: the protocol tells hosts to kill a busy server
+  and restart warm from it, and `restart_cache.test.ts` disposes (SIGKILL)
+  right after the first reply and expects the next process to load it.
+  Replying first would lose the cache to a kill in that window. The options are
+  to weaken the promise (saved after the first reply; `close` still saves) or
+  to persist from a detached process that later opens wait for.
 
 ### CT25: bound retained memory
 
