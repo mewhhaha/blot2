@@ -890,6 +890,7 @@ pub fn runWithSummaries(a: A, module: *const w.Module, function: *const w.Functi
     var out: Output = .{};
     errdefer out.deinit(a);
     try out.locals.appendSlice(a, function.locals.items);
+    try out.instructions.ensureTotalCapacity(a, function.instructions.items.len + plan.releases.items.len);
     var condition: u32 = absent;
     var next: usize = 0;
     for (function.instructions.items, 0..) |inst, at| {
@@ -1517,6 +1518,7 @@ pub fn runRc(a: A, module: *const w.Module, function: *const w.Function, summari
     var out: Output = .{};
     errdefer out.deinit(a);
     try out.locals.appendSlice(a, function.locals.items);
+    try out.instructions.ensureTotalCapacity(a, function.instructions.items.len + plan.allocations.items.len + 7 * plan.writes.items.len);
     const scratch: u32 = @intCast(function.parameters.len + out.locals.items.len);
     try out.locals.appendNTimes(a, .i32, 3);
     var allocation: usize = 0;

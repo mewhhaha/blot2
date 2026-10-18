@@ -154,6 +154,7 @@ fn eraseAdapters(a: A, module: *const wasm.Module, source: *const ir.Function, f
     var result: ir.Body = .{};
     errdefer result.deinit(a);
     try result.locals.appendSlice(a, source.locals.items);
+    try result.instructions.ensureTotalCapacity(a, source.instructions.items.len);
     for (source.instructions.items) |inst| {
         var parameter: ?u32 = null;
         if (inst.op == .call) parameter = facts.returned(module, inst.operand);
@@ -473,6 +474,7 @@ fn inlineAllocations(a: A, module: *const wasm.Module, source: *const ir.Functio
     var result: ir.Body = .{};
     errdefer result.deinit(a);
     try result.locals.appendSlice(a, source.locals.items);
+    try result.instructions.ensureTotalCapacity(a, source.instructions.items.len);
     // Ownership annotations are copied but are not code for this budget.
     var code: usize = 0;
     for (source.instructions.items) |inst| {

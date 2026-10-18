@@ -552,6 +552,7 @@ pub fn run(a: A, module: *const wasm.Module, source: *const ir.Function) A.Error
     var out: ir.Body = .{};
     errdefer out.deinit(a);
     try out.locals.appendSlice(a, source.locals.items);
+    try out.instructions.ensureTotalCapacity(a, code.len);
     for (code, analysis.remove) |inst, omitted| if (!omitted) {
         try out.instructions.append(a, inst);
     };

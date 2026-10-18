@@ -196,6 +196,7 @@ pub fn runScoped(a: A, module: *const w.Module, source: *const ir.Function, fram
     var out: ir.Body = .{};
     errdefer out.deinit(a);
     try out.locals.appendSlice(a, source.locals.items);
+    try out.instructions.ensureTotalCapacity(a, source.instructions.items.len);
     const result: u32 = @intCast(source.parameters.len + out.locals.items.len);
     const automatic = result + @intFromBool(source.result != .none);
     const array_parameter = entry and source.parameters.len != 0 and source.parameterRole(0) == .reference;

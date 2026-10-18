@@ -17,6 +17,7 @@ pub fn run(a: std.mem.Allocator, module: *const wasm.Module, source: *const ir.F
     var out: ir.Body = .{};
     errdefer out.deinit(a);
     try out.locals.appendSlice(a, source.locals.items);
+    try out.instructions.ensureTotalCapacity(a, source.instructions.items.len);
     const context: u32 = @intCast(source.parameters.len + out.locals.items.len);
     try out.locals.append(a, .i32);
     for (source.instructions.items, 0..) |inst, index| {

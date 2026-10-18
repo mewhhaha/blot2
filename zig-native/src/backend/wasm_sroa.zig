@@ -907,6 +907,7 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
     var out: Output = .{};
     errdefer out.deinit(a);
     try out.locals.appendSlice(a, locals);
+    try out.instructions.ensureTotalCapacity(a, instructions.len);
     for (0..analysis.nodes.items.len) |id| {
         if (!analysis.selected(@intCast(id))) continue;
         const count = @popCount(analysis.nodes.items[id].used_fields);

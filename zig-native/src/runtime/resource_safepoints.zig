@@ -18,6 +18,7 @@ pub fn run(a: A, module: *const wasm.Module, function: *const ir.Function) A.Err
     var result: ir.Body = .{};
     errdefer result.deinit(a);
     try result.locals.appendSlice(a, function.locals.items);
+    try result.instructions.ensureTotalCapacity(a, function.instructions.items.len);
     for (function.instructions.items) |inst| {
         if (before(module, inst)) try result.instructions.append(a, .{ .op = .call_import, .operand = drain });
         try result.instructions.append(a, inst);
