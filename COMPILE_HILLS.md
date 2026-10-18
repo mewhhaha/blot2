@@ -761,9 +761,10 @@ in big modules.
   the private-cursor family uses a worklist, then replays the rules in scan
   order. Intended output change: only `src/robots.blot` (4,918 nodes) gains an
   optimization, the physical iteration and step sinks of `pick_along`'s loop.
-  Game Wasm 1,844,385 → 1,843,273 B, each of the 10 slowest tests −1,668 B,
-  devtools identical; the 39 gdev tests reaching `pick_along` pass with both
-  compilers. Instructions: game 28.364 → 28.314 G, devtools 9.233 → 9.215 G,
+  Game Wasm 1,844,385 → 1,843,273 B; 34 of the 65 entries in
+  `scripts/bench/gdev-wasm.json` change, each by a multiple of the 556-byte loop
+  rewrite, and devtools and 30 others are identical; the 39 gdev tests reaching
+  `pick_along` pass with both compilers. Instructions: game 28.364 → 28.314 G, devtools 9.233 → 9.215 G,
   literal edit 14.617 → 14.589 G. CPU (5 pairs, load 1.3): game 2,970 →
   2,976 ms, devtools 1,039 → 1,043 ms, literal edit 1,436 → 1,427 ms.
 
