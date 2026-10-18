@@ -869,6 +869,8 @@ That is quadratic in region scopes.
 the `instance_selection` import scans every binding (around :7396).
 
 - **Fix:** memoize the first and index the second.
+- **Result (18 October 2026):** dropped. Neither `lexicalScope` nor the
+  `instance_selection` binding scan appears in 2,475 cold game samples.
 
 ### CT55: lazy region scratch
 
