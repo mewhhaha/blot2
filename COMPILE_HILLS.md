@@ -489,6 +489,12 @@ even reused ones (`backend/optimized_bodies.zig:99-117`, `wasm.zig:1067`).
 (`backend/runtime_pipeline.zig:96`), including reused ones.
 
 - **Fix:** carry summaries across revisions in a deterministic order.
+- **Result (18 October 2026):** dropped. `Summaries.prepare` is 0.74% of a
+  literal edit and 0.54% of a body edit (about 10 ms), under what one build
+  can attribute. Summaries are inputs to the optimizer matcher, so reusing
+  them would need a proof of their own, and a recursive or depth-limited
+  summary depends on the order functions are visited, which an insertion
+  changes.
 
 ### CT24: reply before persisting
 
