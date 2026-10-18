@@ -362,6 +362,15 @@ It is 2.7% self in a literal edit and recomputed per revision.
 `knownRow` and `knownLayout` are 1.7% and 1.3% self in a literal edit.
 
 - **Fix:** replace their scans with hash indexes built once per artifact.
+- **Result (18 October 2026):** CT16, "Memoize known layout ceilings per
+  layout store". The two were an unmemoized recursive walk over shared layout
+  DAGs (7.5% of a literal edit with callers). `artifact_import.Knowledge` keeps
+  each node's and row's ceiling, the deepest level at which it is still known,
+  computed once per append-only store without recursion; known(id, 0) is then a
+  lookup. Game, 5 pairs at load 1.1–2.2: literal_constant edit 1,306 → 1,218
+  ms (12.49 → 11.26 G instructions), literal_in_body 1,247 → 1,159 ms,
+  body_change 1,871 → 1,790 ms (17.62 → 16.40 G); population unchanged. Wasm
+  identical.
 
 ### CT17: interval index for fragment admission
 

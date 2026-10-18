@@ -681,3 +681,113 @@ test "artifact import rejects forged scalar environment modes on owning capture 
     defer altered.deinit();
     try std.testing.expectEqual(@as(?u32, null), try altered.importResultTemplate(&generator, inputs.result_template));
 }
+
+/// The recursive rule that `importer.Knowledge` memoizes, as the oracle.
+fn referenceLayout(store: *const layout.Store, id: u32, depth: usize) bool {
+    if (id == 0 or id >= store.nodes.items.len or depth >= 128) return false;
+    const n = store.node(id);
+    return switch (n.tag) {
+        .invalid, .erased => false,
+        .function => referenceRow(store, n.c, depth + 1) and referenceLayout(store, n.a, depth + 1) and referenceLayout(store, n.b, depth + 1),
+        .demand, .provider => referenceRow(store, n.c, depth + 1) and referenceLayout(store, n.a, depth + 1),
+        .array, .list, .cursor, .resolver => referenceLayout(store, n.a, depth + 1),
+        .state_provider => referenceLayout(store, n.a, depth + 1) and referenceLayout(store, n.b, depth + 1) and referenceLayout(store, n.c, depth + 1),
+        .product, .record, .nominal => blk: {
+            for (store.children(id), 0..) |child, i| if (n.tag != .record or i % 2 != 0) {
+                if (!referenceLayout(store, child, depth + 1)) break :blk false;
+            };
+            break :blk true;
+        },
+        else => true,
+    };
+}
+fn referenceRow(store: *const layout.Store, id: u32, depth: usize) bool {
+    if (depth >= 128 or id == layout.unknown_row or id >= store.effects.rows.items.len) return false;
+    const view = store.effects.view();
+    for (view.rowLabels(id)) |label| for (view.operationArguments(label)) |argument| {
+        if (!referenceLayout(store, argument, depth + 1)) return false;
+    };
+    return true;
+}
+/// Every node and row of `store`, plus absent IDs, agrees with the oracle.
+fn expectKnowledge(allocator: Allocator, knowledge: *importer.Knowledge, store: *const layout.Store) !void {
+    for (0..store.nodes.items.len + 2) |id| try std.testing.expectEqual(referenceLayout(store, @intCast(id), 0), try knowledge.knownLayout(allocator, store, @intCast(id)));
+    for (0..store.effects.rows.items.len + 2) |id| try std.testing.expectEqual(referenceRow(store, @intCast(id), 0), try knowledge.knownRow(allocator, store, @intCast(id)));
+    try std.testing.expect(!try knowledge.knownRow(allocator, store, layout.unknown_row));
+}
+const KnowledgeLayouts = struct { deep: u32, wide: u32, bad_row: u32 };
+/// Shared DAGs, ignored record names, erased and unknown parts, rows, and
+/// array chains on both sides of the depth limit.
+fn knowledgeLayouts(store: *layout.Store) !KnowledgeLayouts {
+    const unit: u32 = 1;
+    const u32_: u32 = 3;
+    const f32_: u32 = 4;
+    const erased: u32 = 6;
+    const good_label = try store.effects.internOperation(.{ .unit = 1, .decl = 1 }, &.{ u32_, f32_ });
+    const bad_label = try store.effects.internOperation(.{ .unit = 1, .decl = 2 }, &.{ f32_, erased });
+    const good_row = try store.effects.internRow(&.{good_label});
+    const bad_row = try store.effects.internRow(&.{ good_label, bad_label });
+    // Field names sit at even positions and are never layouts.
+    const record = try store.intern(.record, 0, 0, &.{ erased, u32_, 9, f32_ });
+    const broken = try store.intern(.record, 0, 0, &.{ 7, u32_, 8, erased });
+    _ = try store.internWithEffects(.function, record, u32_, good_row, &.{});
+    _ = try store.internWithEffects(.function, record, u32_, bad_row, &.{});
+    _ = try store.internWithEffects(.function, broken, unit, 0, &.{});
+    _ = try store.internWithEffects(.function, record, unit, layout.unknown_row, &.{});
+    _ = try store.intern(.product, 0, 0, &.{ record, broken });
+    _ = try store.intern(.list, record, 0, &.{});
+    var wide = record;
+    for (0..10) |_| wide = try store.intern(.product, 0, 0, &.{ wide, wide });
+    var deep = u32_;
+    for (0..130) |_| deep = try store.intern(.array, deep, 0, &.{});
+    return .{ .deep = deep, .wide = wide, .bad_row = bad_row };
+}
+fn knowledgeScenario(allocator: Allocator) !void {
+    var store = try layout.Store.init(allocator);
+    defer store.deinit();
+    var knowledge: importer.Knowledge = .{};
+    defer knowledge.deinit(allocator);
+    const built = try knowledgeLayouts(&store);
+    // First queries reach the bottom of the chain and the DAG at once.
+    try std.testing.expect(!try knowledge.knownLayout(allocator, &store, built.deep));
+    try std.testing.expect(try knowledge.knownLayout(allocator, &store, built.wide));
+    try std.testing.expect(!try knowledge.knownRow(allocator, &store, built.bad_row));
+    try expectKnowledge(allocator, &knowledge, &store);
+    // Growth: nodes interned after earlier queries are answered exactly.
+    const before = store.nodes.items.len;
+    const over = try store.intern(.product, 0, 0, &.{ built.wide, built.deep });
+    _ = try store.intern(.array, built.wide, 0, &.{});
+    try std.testing.expect(store.nodes.items.len > before);
+    try std.testing.expect(!try knowledge.knownLayout(allocator, &store, over));
+    try expectKnowledge(allocator, &knowledge, &store);
+    // Another store with different content at the same IDs resets the memo.
+    var other = try layout.Store.init(allocator);
+    defer other.deinit();
+    var chain: u32 = 6;
+    for (0..8) |_| chain = try other.intern(.array, chain, 0, &.{});
+    try expectKnowledge(allocator, &knowledge, &other);
+    try expectKnowledge(allocator, &knowledge, &store);
+}
+test "known layout ceilings match the recursive rule across growth, store changes and allocation failures" {
+    try knowledgeScenario(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, knowledgeScenario, .{});
+}
+test "a failed known layout walk leaves no partial ceiling behind" {
+    var store = try layout.Store.init(a);
+    defer store.deinit();
+    const built = try knowledgeLayouts(&store);
+    var index: usize = 0;
+    while (true) : (index += 1) {
+        var knowledge: importer.Knowledge = .{};
+        defer knowledge.deinit(a);
+        var failing: std.testing.FailingAllocator = .init(a, .{ .fail_index = index });
+        const result = knowledge.knownLayout(failing.allocator(), &store, built.deep);
+        // Retrying after the failure, with the same memo, is still exact.
+        try expectKnowledge(a, &knowledge, &store);
+        if (result) |known| {
+            try std.testing.expect(!known);
+            break;
+        } else |err| try std.testing.expectEqual(error.OutOfMemory, err);
+    }
+    try std.testing.expect(index > 0);
+}

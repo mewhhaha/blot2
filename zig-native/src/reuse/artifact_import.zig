@@ -62,6 +62,8 @@ pub const Importer = struct {
     value_anchors: std.AutoHashMapUnmanaged(u32, u32) = .empty,
     operation_labels: ?[]u32 = null,
     operation_scopes: ?[]OperationScope = null,
+    /// Known-layout ceilings of the current generator's layout store.
+    knowledge: Knowledge = .{},
 
     /// The caller retains old Pools and immutable current Core through use.
     /// Canonical spellings are copied; temporary frontend owners may disappear.
@@ -181,6 +183,7 @@ pub const Importer = struct {
         self.row_keys.deinit(self.allocator);
         self.captures.deinit(self.allocator);
         self.value_anchors.deinit(self.allocator);
+        self.knowledge.deinit(self.allocator);
         if (self.operation_labels) |labels| self.allocator.free(labels);
         if (self.operation_scopes) |scopes| self.allocator.free(scopes);
         if (self.names) |*names| names.deinit(self.allocator);
@@ -389,13 +392,13 @@ pub const Importer = struct {
                         continue;
                     }
                     key.parameters[i] = try self.shape(g, key.parameters[i], 0);
-                    if (!knownLayout(&g.representations.store, key.parameters[i], 0)) return error.Declined;
+                    if (!try self.knowledge.knownLayout(self.allocator, &g.representations.store, key.parameters[i])) return error.Declined;
                     if (key.effects[i] == layout.unknown_row) return error.Declined;
                     key.effects[i] = try self.row(g, .layout, key.effects[i], 0);
-                    if (!knownRow(&g.representations.store, key.effects[i], 0)) return error.Declined;
+                    if (!try self.knowledge.knownRow(self.allocator, &g.representations.store, key.effects[i])) return error.Declined;
                 }
                 key.result = try self.shape(g, key.result, 0);
-                if (!knownLayout(&g.representations.store, key.result, 0)) return error.Declined;
+                if (!try self.knowledge.knownLayout(self.allocator, &g.representations.store, key.result)) return error.Declined;
                 key.templates = try self.templateKey(g, old_key.target.unit, key.templates, 0);
                 break :blk .{ .named = key };
             },
@@ -408,9 +411,9 @@ pub const Importer = struct {
                 key.ty = try self.shape(g, key.ty, 0);
                 key.captures = try self.shape(g, key.captures, 0);
                 if (g.representations.store.node(key.ty).tag != .function or g.representations.store.node(key.captures).tag != .product) return error.Declined;
-                if (!knownLayout(&g.representations.store, key.ty, 0)) return error.Declined;
+                if (!try self.knowledge.knownLayout(self.allocator, &g.representations.store, key.ty)) return error.Declined;
                 if (old_key.static_values == 0) {
-                    if (!knownLayout(&g.representations.store, key.captures, 0)) return error.Declined;
+                    if (!try self.knowledge.knownLayout(self.allocator, &g.representations.store, key.captures)) return error.Declined;
                 } else {
                     const module = self.old.modules[old_key.unit - 1].module;
                     const capture_span = module.closures[old_key.catalog].captures;
@@ -422,7 +425,7 @@ pub const Importer = struct {
                         const is_static = for (statics) |item| {
                             if (item.variable == binding) break true;
                         } else false;
-                        if (!is_static and !knownLayout(&g.representations.store, actual, 0)) return error.Declined;
+                        if (!is_static and !try self.knowledge.knownLayout(self.allocator, &g.representations.store, actual)) return error.Declined;
                     }
                 }
                 key.templates = try self.templateKey(g, old_key.unit, key.templates, 0);
@@ -475,7 +478,7 @@ pub const Importer = struct {
     }
     fn closedShape(self: *Importer, g: anytype, old_id: u32) Error!u32 {
         const id = try self.shape(g, old_id, 0);
-        if (!knownLayout(&g.representations.store, id, 0)) return error.Declined;
+        if (!try self.knowledge.knownLayout(self.allocator, &g.representations.store, id)) return error.Declined;
         return id;
     }
     /// Qualifies symbolic references, including unused symbol demands, without
@@ -562,7 +565,7 @@ pub const Importer = struct {
     pub fn importCallableLayout(self: *Importer, generator: anytype, old_id: u32, expected: ?u32) Allocator.Error!?u32 {
         if (old_id == 0 or old_id >= self.old.layouts.nodes.len or self.old.layouts.nodes[old_id].tag != .function or (expected != null and old_id != expected.?)) return null;
         const actual = (try self.importLayout(generator, old_id)) orelse return null;
-        if (!knownLayout(&generator.representations.store, actual, 0)) return null;
+        if (!try self.knowledge.knownLayout(self.allocator, &generator.representations.store, actual)) return null;
         return actual;
     }
     pub fn importSemanticSite(self: *Importer, g: anytype, site: @import("../backend/wasm.zig").Module.SemanticSite) Allocator.Error!?@import("../backend/wasm.zig").Module.SemanticSite {
@@ -983,7 +986,7 @@ pub const Importer = struct {
             .evidence = try self.mappingEvidence(g, old_capture.unit, old_capture.evidence, depth + 1),
             .rows = try self.rowKey(g, old_capture.unit, old_capture.rows, depth + 1),
         };
-        if (!knownLayout(&g.representations.store, imported.captures, 0)) return error.Declined;
+        if (!try self.knowledge.knownLayout(self.allocator, &g.representations.store, imported.captures)) return error.Declined;
         if (imported.scalar_environment and (!imported.has_environment or imported.demand_cell or imported.templates != 0 or !g.representations.store.scalarEnvironment(imported.captures) or self.units[owner - 1].node(imported.node).tag != .closure)) return error.Declined;
         const mapped = if (g.planning.template_instances.get(imported)) |existing| existing else blk: {
             if (g.planning.template_catalog.items.len >= std.math.maxInt(u32)) return error.Declined;
@@ -1027,7 +1030,7 @@ pub const Importer = struct {
             if (from.variable >= module.types.effects.variable_count or from.row == layout.unknown_row) return error.Declined;
             for (job.rows[0..i]) |prior| if (prior.variable == from.variable) return error.Declined;
             to.* = .{ .variable = from.variable, .row = try self.row(g, .layout, from.row, 0) };
-            if (!knownRow(&g.representations.store, to.row, 0)) return error.Declined;
+            if (!try self.knowledge.knownRow(self.allocator, &g.representations.store, to.row)) return error.Declined;
         }
         const templates = try self.allocator.alloc(substitutions.Entry, job.templates.len);
         errdefer self.allocator.free(templates);
@@ -1214,32 +1217,153 @@ fn uniqueFields(words: []const u32) Error!void {
         while (j < i) : (j += 2) if (words[j] == words[i]) return error.Declined;
     }
 }
-fn knownLayout(store: *const layout.Store, id: u32, depth: usize) bool {
-    if (id == 0 or id >= store.nodes.items.len or depth >= depth_limit) return false;
-    const n = store.node(id);
-    return switch (n.tag) {
-        .invalid, .erased => false,
-        .function => knownRow(store, n.c, depth + 1) and knownLayout(store, n.a, depth + 1) and knownLayout(store, n.b, depth + 1),
-        .demand, .provider => knownRow(store, n.c, depth + 1) and knownLayout(store, n.a, depth + 1),
-        .array, .list, .cursor, .resolver => knownLayout(store, n.a, depth + 1),
-        .state_provider => knownLayout(store, n.a, depth + 1) and knownLayout(store, n.b, depth + 1) and knownLayout(store, n.c, depth + 1),
-        .product, .record, .nominal => blk: {
-            for (store.children(id), 0..) |child, i| if (n.tag != .record or i % 2 != 0) {
-                if (!knownLayout(store, child, depth + 1)) break :blk false;
+/// Whether a current layout (or effect row) is fully known: no invalid or
+/// erased node and no unknown row within `depth_limit` levels. Equivalent to
+/// the recursive rule
+///   known(id, d) = d < limit and every child c is known(c, d + 1),
+/// where invalid/erased nodes and unknown or absent rows are never known and
+/// other leaves always are. known(id, d) holds exactly when d <= ceiling(id):
+/// a leaf's ceiling is limit - 1, a composite's is the minimum child ceiling
+/// minus one, and a node that reaches a cycle has ceiling -1. Interned layout
+/// nodes and rows are immutable and the store only grows, so each ceiling is
+/// computed once per store, children first, without recursion.
+pub const Knowledge = struct {
+    store: ?*const layout.Store = null,
+    /// Per node and per row: 0 unknown, 1 being computed, else ceiling + 3.
+    layouts: std.ArrayList(u8) = .empty,
+    rows: std.ArrayList(u8) = .empty,
+    frames: std.ArrayList(Frame) = .empty,
+    const Kind = enum { layout, row };
+    const Frame = struct { kind: Kind, id: u32, next: u32 = 0, argument: u32 = 0, ceiling: i16 = depth_limit - 1 };
+    const pending: u8 = 1;
+    const never: i16 = -1;
+
+    pub fn deinit(self: *Knowledge, allocator: Allocator) void {
+        self.layouts.deinit(allocator);
+        self.rows.deinit(allocator);
+        self.frames.deinit(allocator);
+        self.* = undefined;
+    }
+    pub fn knownLayout(self: *Knowledge, allocator: Allocator, store: *const layout.Store, id: u32) Allocator.Error!bool {
+        return try self.ceiling(allocator, store, .layout, id) >= 0;
+    }
+    pub fn knownRow(self: *Knowledge, allocator: Allocator, store: *const layout.Store, id: u32) Allocator.Error!bool {
+        return try self.ceiling(allocator, store, .row, id) >= 0;
+    }
+    fn table(self: *Knowledge, kind: Kind) *std.ArrayList(u8) {
+        return if (kind == .layout) &self.layouts else &self.rows;
+    }
+    /// The ceiling of an absent ID, or null when it has interned content.
+    fn absent(store: *const layout.Store, kind: Kind, id: u32) ?i16 {
+        return switch (kind) {
+            .layout => if (id == 0 or id >= store.nodes.items.len) never else null,
+            .row => if (id == layout.unknown_row or id >= store.effects.rows.items.len) never else null,
+        };
+    }
+    fn ceiling(self: *Knowledge, allocator: Allocator, store: *const layout.Store, kind: Kind, id: u32) Allocator.Error!i16 {
+        if (self.store != store) {
+            self.layouts.clearRetainingCapacity();
+            self.rows.clearRetainingCapacity();
+            self.store = store;
+        }
+        if (absent(store, kind, id)) |value| return value;
+        if (self.layouts.items.len < store.nodes.items.len) try self.layouts.appendNTimes(allocator, 0, store.nodes.items.len - self.layouts.items.len);
+        if (self.rows.items.len < store.effects.rows.items.len) try self.rows.appendNTimes(allocator, 0, store.effects.rows.items.len - self.rows.items.len);
+        if (self.table(kind).items[id] >= 2) return @as(i16, self.table(kind).items[id]) - 3;
+        std.debug.assert(self.frames.items.len == 0);
+        // A failed append leaves the marks of every unfinished frame behind;
+        // clear them so a retry recomputes those nodes from scratch.
+        errdefer {
+            for (self.frames.items) |frame| self.table(frame.kind).items[frame.id] = 0;
+            self.frames.clearRetainingCapacity();
+        }
+        try self.frames.append(allocator, .{ .kind = kind, .id = id });
+        self.table(kind).items[id] = pending;
+        while (self.frames.items.len != 0) {
+            const frame = &self.frames.items[self.frames.items.len - 1];
+            const child = nextChild(store, frame) orelse {
+                const value = @max(frame.ceiling, never);
+                const done = frame.*;
+                self.frames.items.len -= 1;
+                self.table(done.kind).items[done.id] = @intCast(value + 3);
+                if (self.frames.items.len != 0) {
+                    const parent = &self.frames.items[self.frames.items.len - 1];
+                    parent.ceiling = @min(parent.ceiling, value - 1);
+                }
+                continue;
             };
-            break :blk true;
-        },
-        else => true,
-    };
-}
-fn knownRow(store: *const layout.Store, id: u32, depth: usize) bool {
-    if (depth >= depth_limit or id == layout.unknown_row or id >= store.effects.rows.items.len) return false;
-    const view = store.effects.view();
-    for (view.rowLabels(id)) |label| for (view.operationArguments(label)) |argument| {
-        if (!knownLayout(store, argument, depth + 1)) return false;
-    };
-    return true;
-}
+            const known: ?i16 = absent(store, child.kind, child.id) orelse switch (self.table(child.kind).items[child.id]) {
+                0 => null,
+                // An unfinished ancestor: this child reaches a cycle.
+                pending => never,
+                else => |stored| @as(i16, stored) - 3,
+            };
+            if (known) |value| {
+                frame.ceiling = @min(frame.ceiling, value - 1);
+                continue;
+            }
+            try self.frames.append(allocator, .{ .kind = child.kind, .id = child.id });
+            self.table(child.kind).items[child.id] = pending;
+        }
+        return @as(i16, self.table(kind).items[id]) - 3;
+    }
+    /// Advances `frame` to its next child, or returns null after the last one
+    /// (after fixing a leaf's own ceiling).
+    fn nextChild(store: *const layout.Store, frame: *Frame) ?struct { kind: Kind, id: u32 } {
+        if (frame.kind == .row) {
+            const view = store.effects.view();
+            const labels = view.rowLabels(frame.id);
+            while (frame.next < labels.len) {
+                const arguments = view.operationArguments(labels[frame.next]);
+                if (frame.argument < arguments.len) {
+                    frame.argument += 1;
+                    return .{ .kind = .layout, .id = arguments[frame.argument - 1] };
+                }
+                frame.next += 1;
+                frame.argument = 0;
+            }
+            return null;
+        }
+        const n = store.node(frame.id);
+        const index = frame.next;
+        frame.next += 1;
+        switch (n.tag) {
+            .invalid, .erased => {
+                frame.ceiling = never;
+                return null;
+            },
+            .function => return switch (index) {
+                0 => .{ .kind = .row, .id = n.c },
+                1 => .{ .kind = .layout, .id = n.a },
+                2 => .{ .kind = .layout, .id = n.b },
+                else => null,
+            },
+            .demand, .provider => return switch (index) {
+                0 => .{ .kind = .row, .id = n.c },
+                1 => .{ .kind = .layout, .id = n.a },
+                else => null,
+            },
+            .array, .list, .cursor, .resolver => return if (index == 0) .{ .kind = .layout, .id = n.a } else null,
+            .state_provider => return switch (index) {
+                0 => .{ .kind = .layout, .id = n.a },
+                1 => .{ .kind = .layout, .id = n.b },
+                2 => .{ .kind = .layout, .id = n.c },
+                else => null,
+            },
+            .product, .nominal => {
+                const items = store.children(frame.id);
+                return if (index < items.len) .{ .kind = .layout, .id = items[index] } else null;
+            },
+            // Record children alternate field names and layouts.
+            .record => {
+                const items = store.children(frame.id);
+                const at = @as(usize, index) * 2 + 1;
+                return if (at < items.len) .{ .kind = .layout, .id = items[at] } else null;
+            },
+            else => return null,
+        }
+    }
+};
 fn copyIdentity(allocator: Allocator, view: identity.View) Allocator.Error!identity.Metadata {
     const bytes = try allocator.dupe(u8, view.bytes);
     errdefer allocator.free(bytes);
