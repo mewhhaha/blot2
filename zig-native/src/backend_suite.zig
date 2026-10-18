@@ -35,4 +35,5 @@ comptime {
     _ = @import("backend/wasm_control_flow.zig");
     _ = @import("backend/wasm_vectorize.zig");
     _ = @import("backend/unit_index_tests.zig");
+    _ = @import("backend/layout_memo_tests.zig");
 }

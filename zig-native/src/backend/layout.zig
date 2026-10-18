@@ -23,7 +23,83 @@ pub fn mappedInstance(original: types.NominalIdentity, mappings: []const Mapping
 pub const UniversalDictionaries = struct { owner: Id, start: u32, len: u32 };
 pub const RowMapping = struct { variable: u32, row: evidence.Effects.Id };
 pub const Error = Allocator.Error || error{ UnresolvedType, LayoutLimit, TypeMismatch };
+/// Layouts of closed source types: types that name no variable, binder,
+/// projection, scoped capability or open row, so no substitution, row fact or
+/// enclosing quantifier changes their layout. Only the units it was given are
+/// memoized, by their position, for as long as they live.
+pub const ClosedLayouts = struct {
+    units: []const core.Module = &.{},
+    /// Per unit, per type: 0 unknown, 1 closed, 2 open.
+    kinds: std.ArrayList([]u8) = .empty,
+    layouts: std.AutoHashMapUnmanaged(u64, Id) = .empty,
+    const closed_kind: u8 = 1;
+    const open_kind: u8 = 2;
+    pub fn deinit(self: *ClosedLayouts, a: Allocator) void {
+        for (self.kinds.items) |kinds| a.free(kinds);
+        self.kinds.deinit(a);
+        self.layouts.deinit(a);
+        self.* = .{};
+    }
+    /// The memo key of `ty` when `module` is one of the memoized units and
+    /// the type is closed.
+    fn key(self: *ClosedLayouts, a: Allocator, module: *const core.Module, ty: types.Id) Allocator.Error!?u64 {
+        if (self.units.len == 0) return null;
+        const first = @intFromPtr(self.units.ptr);
+        const address = @intFromPtr(module);
+        if (address < first or address >= first + self.units.len * @sizeOf(core.Module)) return null;
+        const offset = address - first;
+        if (offset % @sizeOf(core.Module) != 0) return null;
+        const unit = offset / @sizeOf(core.Module);
+        if (ty >= module.types.nodes.len) return null;
+        if (self.kinds.items.len == 0) {
+            try self.kinds.ensureTotalCapacityPrecise(a, self.units.len);
+            self.kinds.appendNTimesAssumeCapacity(&.{}, self.units.len);
+        }
+        if (self.kinds.items[unit].len != module.types.nodes.len) {
+            const kinds = try a.alloc(u8, module.types.nodes.len);
+            @memset(kinds, 0);
+            a.free(self.kinds.items[unit]);
+            self.kinds.items[unit] = kinds;
+        }
+        if (!closedType(module, self.kinds.items[unit], ty, 0)) return null;
+        return (@as(u64, unit) << 32) | ty;
+    }
+    /// Substitutions only name variables, binders and projections, never a
+    /// closed type, so a memoized layout never skips one. Checked in safe
+    /// builds.
+    fn checkSubstitutions(self: *ClosedLayouts, module: *const core.Module, mappings: []const Mapping) void {
+        const unit = (@intFromPtr(module) - @intFromPtr(self.units.ptr)) / @sizeOf(core.Module);
+        for (mappings) |mapping| {
+            if (mapping.variable >= module.types.nodes.len) continue;
+            std.debug.assert(!closedType(module, self.kinds.items[unit], mapping.variable, 0));
+        }
+    }
+    fn closedType(module: *const core.Module, kinds: []u8, ty: types.Id, depth: usize) bool {
+        if (kinds[ty] != 0) return kinds[ty] == closed_kind;
+        if (depth >= 1024) return false;
+        const n = module.types.node(ty);
+        const closed = switch (n.tag) {
+            .unit, .boolean, .u32, .f32, .never, .erased_proof, .type_constructor => true,
+            .array, .list, .cursor, .resolver, .usage => closedType(module, kinds, n.a, depth + 1),
+            .function => closedType(module, kinds, n.a, depth + 1) and closedType(module, kinds, n.b, depth + 1) and module.types.row(n.c).tail == .closed and module.types.rowLabels(n.c).len == 0,
+            .product, .nominal => blk: {
+                const children_ = if (n.tag == .nominal) module.types.nominalArguments(n) else module.types.list(.{ .start = n.a, .len = n.b });
+                for (children_) |child| if (!closedType(module, kinds, child, depth + 1)) break :blk false;
+                break :blk true;
+            },
+            .record => blk: {
+                for (0..n.b) |index| if (!closedType(module, kinds, module.types.recordField(n, index).ty, depth + 1)) break :blk false;
+                break :blk true;
+            },
+            else => false,
+        };
+        kinds[ty] = if (closed) closed_kind else open_kind;
+        return closed;
+    }
+};
 pub const Store = struct {
+    /// Memoizes closed type layouts of these units (see ClosedLayouts).
+    closed: ClosedLayouts = .{},
     opaque_sources: []const core.Module = &.{},
     record_names: @import("../check/record_order.zig").Names = .{},
     allocator: Allocator,
@@ -44,6 +120,7 @@ pub const Store = struct {
         return self;
     }
     pub fn deinit(self: *Store) void {
+        self.closed.deinit(self.allocator);
         self.record_names.deinit(self.allocator);
         self.effects.deinit();
         self.nodes.deinit(self.allocator);
@@ -732,6 +809,16 @@ pub const Store = struct {
     fn fromTypeDepth(self: *Store, module: *const core.Module, ty: types.Id, mappings: []const Mapping, rows: []const RowMapping, depth: usize, allow_erased: bool) Error!Id {
         if (depth >= 1024) return error.LayoutLimit;
         for (mappings) |mapping| if (mapping.variable == ty) return mapping.layout;
+        // A closed type's layout ignores the substitutions and the erasure
+        // policy; only the first derivation of each one walks it.
+        const key = try self.closed.key(self.allocator, module, ty) orelse return self.fromTypeNode(module, ty, mappings, rows, depth, allow_erased);
+        if (comptime @import("builtin").mode.runtimeSafety()) self.closed.checkSubstitutions(module, mappings);
+        if (self.closed.layouts.get(key)) |cached| return cached;
+        const result = try self.fromTypeNode(module, ty, mappings, rows, depth, allow_erased);
+        try self.closed.layouts.put(self.allocator, key, result);
+        return result;
+    }
+    fn fromTypeNode(self: *Store, module: *const core.Module, ty: types.Id, mappings: []const Mapping, rows: []const RowMapping, depth: usize, allow_erased: bool) Error!Id {
         const n = module.types.node(ty);
         switch (n.tag) {
             .unit, .boolean, .u32, .f32, .never => return ty,

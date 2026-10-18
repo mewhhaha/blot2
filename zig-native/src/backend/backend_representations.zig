@@ -22,6 +22,7 @@ pub const State = struct {
         };
         errdefer store.deinit();
         store.opaque_sources = units;
+        store.closed.units = units;
         for (units) |*unit| store.record_names.add(a, unit) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.TypeMismatch => return error.Declined,
