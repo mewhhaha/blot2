@@ -698,6 +698,14 @@ It is 13.1% inclusive cold.
 
 - **Fix:** break it down with CT2 and CT4, then cache per module stamp or fold
   it into checking.
+- **Result (18 October 2026):** dropped after attribution. It is the checker's
+  body inference, inside the `check` clock, not a separate validation: 14.6% of
+  cold game samples, of which `inferGlobal` is 81% (`inferDeclarationBody`
+  9.2%, `finishGlobal` 2.4% of the build), `finish` resolving final types 16%
+  (2.2%) and source-operator validation 0.4%. Each module is checked once cold;
+  retained edits already skip unchanged modules (module cutoff and body
+  caches), and a cross-process cache per stamp is the restart cache (CT82).
+  Its cost belongs to the checker and inference hills.
 
 ## Phase 4: inference
 
