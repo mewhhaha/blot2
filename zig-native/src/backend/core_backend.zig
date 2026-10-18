@@ -2694,7 +2694,9 @@ const CompileRun = struct {
             };
             result.query_tables.selected = self.metadata.specialization_queries.storage();
             result.query_tables.principal = self.metadata.principal_queries.storage();
-            try self.metadata.capturePoolsWithStamps(&self.generator, self.options.identity, &self.module_stamps);
+            // Without a previous revision every pin takes a fresh token; the
+            // memo is needed only to share retained tokens or to validate.
+            try self.metadata.capturePoolsWithStamps(&self.generator, self.options.identity, if (self.stamps != null or self.options.validate_pins) &self.module_stamps else null);
             result.counters = self.generator.evaluator.counters;
             // Publish validation only with this candidate's owned artifact pools.
             // A failed edit leaves the previous certificate and source pins intact.

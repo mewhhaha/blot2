@@ -437,10 +437,12 @@ are linear (`reuse/code_artifacts.zig:665-730`).
 - **Result (18 October 2026):** CT18, "Pin retained Core by generation token".
   Approved by the owner. Sampled before, stamps were 5.3% of a literal edit
   (the importer re-hashed every retained module). A pin now carries a token,
-  issued once when its Core image is first pinned, and the header it pinned; it
-  holds while its module names those buffers. A view inherits a token only from
-  the same buffers or from complete content equality (the existing `proveSame`
-  comparison), so a changed module never keeps one. Certificates compare tokens.
+  issued once when its Core image is first pinned, and a 64-bit print of the
+  header it pinned; it holds while its module names those buffers. A view
+  inherits a token only from the same buffers or from complete content equality
+  (the existing `proveSame` comparison), so a changed module never keeps one.
+  Certificates compare tokens. One law edited pinned Core in place; it now
+  edits a copy, as revisions do.
   `validate_pins` keeps the digest check opt-in; checkpoints store digests,
   never tokens, and restored pins validate them once. `owns()` is a range check.
   Laws: token memo (copies, every change kind, storage, unowned views, threads,

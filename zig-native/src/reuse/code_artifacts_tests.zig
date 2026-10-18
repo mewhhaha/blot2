@@ -148,6 +148,32 @@ test "compilation scoped tokens reuse identical immutable storage but distinguis
     try std.testing.expectEqual(@as(usize, 1), memo.reused);
 }
 
+test "header prints follow pinned buffers and boundaries, not contents" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    const copied_nodes = try a.dupe(core.Node, fixture.units[0].nodes);
+    defer a.free(copied_nodes);
+    var views: [6]core.Module = @splat(fixture.units[0]);
+    views[2].nodes = copied_nodes;
+    views[3].unit += 1;
+    views[4].nodes = views[4].nodes[0 .. views[4].nodes.len - 1];
+    // Empty slices name no buffer, whatever their pointer.
+    const other_bytes = try a.alloc(u8, 4);
+    defer a.free(other_bytes);
+    views[0].names = views[0].names[0..0];
+    views[1].names = other_bytes[0..0];
+    views[5] = views[0];
+    views[5].has_rank_contracts = !views[5].has_rank_contracts;
+    const first = artifacts.headerPrint(views[0]);
+    try std.testing.expectEqual(first, artifacts.headerPrint(views[1]));
+    for (views[2..]) |view| try std.testing.expect(artifacts.headerPrint(view) != first);
+    // Contents never enter the print.
+    const saved = fixture.units[0].nodes[0];
+    fixture.units[0].nodes[0].a ^= 1;
+    defer fixture.units[0].nodes[0] = saved;
+    try std.testing.expectEqual(first, artifacts.headerPrint(views[0]));
+}
+
 /// A previous revision's pins, as a capture leaves them; only `modules` is read.
 fn pinnedPools(pins: []artifacts.ModulePin) artifacts.Pools {
     var pools: artifacts.Pools = undefined;

@@ -218,16 +218,17 @@ pub const ModulePin = struct {
     module: *const core.Module,
     canonical_path: []u8,
     token: Token,
-    /// The header `module` held when pinned. The pin stays intact while
-    /// `module` names these same buffers; Core is immutable once pinned.
-    view: core.Module,
+    /// `headerPrint` of the header `module` held when pinned. The pin stays
+    /// intact while `module` names these same buffers; Core is immutable once
+    /// pinned.
+    header: u64,
     /// Opt-in integrity validation: the digest of the pinned Core, which every
     /// later admission recomputes before trusting the pin.
     stamp: ?[32]u8 = null,
 
     /// A pin with a fresh token and no digest.
     pub fn init(unit: u32, module: *const core.Module, canonical_path: []u8) ModulePin {
-        return .{ .unit = unit, .module = module, .canonical_path = canonical_path, .token = freshToken(), .view = module.* };
+        return .{ .unit = unit, .module = module, .canonical_path = canonical_path, .token = freshToken(), .header = headerPrint(module.*) };
     }
     /// A pin whose admissions also recompute and compare its Core digest.
     pub fn validated(unit: u32, module: *const core.Module, canonical_path: []u8) ModulePin {
@@ -767,7 +768,7 @@ pub const ModuleStamps = struct {
     /// same buffers and, for a validated pin, the same recomputed digest. The
     /// pin then lends its token to every later view of those buffers.
     pub fn intact(self: *ModuleStamps, pin: *const ModulePin) Allocator.Error!bool {
-        if (!sameStorage(pin.view, pin.module.*)) return false;
+        if (headerPrint(pin.module.*) != pin.header) return false;
         const known = try self.tokenEntry(pin.module) orelse return pinIntact(pin, null);
         if (known.token != pin.token) return false;
         const expected = pin.stamp orelse return true;
@@ -788,7 +789,7 @@ pub const ModuleStamps = struct {
             return known;
         }
         if (self.previous) |old| for (old.modules) |*pin| {
-            if (pin.view.unit != module.unit or !sameStorage(pin.view, module.*)) continue;
+            if (pin.module.unit != module.unit or !sameStorage(pin.module.*, module.*) or headerPrint(pin.module.*) != pin.header) continue;
             self.reused += 1;
             return try self.record(module.*, pin.token, null);
         };
@@ -819,7 +820,7 @@ pub const ModuleStamps = struct {
 /// and, for a validated pin, recomputes its digest.
 pub fn pinIntact(pin: *const ModulePin, memo: ?*ModuleStamps) Allocator.Error!bool {
     if (memo) |tokens| if (tokens.owns(pin.module)) return tokens.intact(pin);
-    if (!sameStorage(pin.view, pin.module.*)) return false;
+    if (headerPrint(pin.module.*) != pin.header) return false;
     const expected = pin.stamp orelse return true;
     return std.mem.eql(u8, &expected, &stamp(pin.module.*));
 }
@@ -901,6 +902,50 @@ test "exact stamp input equality excludes padding and preserves float bits and n
     try std.testing.expect(!sameStampValue(first, Choice{ .absent = {} }));
     right[2].number ^= 1;
     try std.testing.expect(!sameStampValue(first, second));
+}
+
+/// A 64-bit print of what `sameStorage` compares: every header field and
+/// slice boundary, never padding or contents. A pin keeps it instead of a
+/// copy of the whole header.
+pub fn headerPrint(module: core.Module) u64 {
+    var hasher = std.hash.Wyhash.init(0x626c6f742d70696e);
+    storageHash(&hasher, module);
+    return hasher.final();
+}
+fn storageHash(hasher: *std.hash.Wyhash, value: anytype) void {
+    switch (@typeInfo(@TypeOf(value))) {
+        .pointer => |p| {
+            if (p.size != .slice) @compileError("Core stamp views require slices");
+            const len: u64 = value.len;
+            hasher.update(std.mem.asBytes(&len));
+            // Equal lengths of zero match whatever their pointers.
+            if (len != 0) hasher.update(std.mem.asBytes(&@as(u64, @intFromPtr(value.ptr))));
+        },
+        .@"struct" => |s| inline for (s.field_names) |name| storageHash(hasher, @field(value, name)),
+        .array => for (value) |item| storageHash(hasher, item),
+        .optional => if (value) |item| {
+            hasher.update(&.{1});
+            storageHash(hasher, item);
+        } else hasher.update(&.{0}),
+        .@"union" => |u| {
+            const Tag = u.tag_type orelse @compileError("Core stamp views require tagged unions");
+            hasher.update(std.mem.asBytes(&scalarBits(@backingInt(@as(Tag, value)))));
+            switch (value) {
+                inline else => |item| storageHash(hasher, item),
+            }
+        },
+        .float => hasher.update(std.mem.asBytes(&value)),
+        .int => hasher.update(std.mem.asBytes(&scalarBits(value))),
+        .@"enum" => hasher.update(std.mem.asBytes(&scalarBits(@backingInt(value)))),
+        .bool => hasher.update(&.{@intFromBool(value)}),
+        .void => {},
+        else => @compileError("Unsupported Core stamp view"),
+    }
+}
+fn scalarBits(value: anytype) u64 {
+    const T = @TypeOf(value);
+    if (@bitSizeOf(T) > 64) @compileError("Core stamp view scalars fit 64 bits");
+    return @as(@Int(.unsigned, @bitSizeOf(T)), @bitCast(value));
 }
 
 /// Compare every header field and slice boundary, never padding or contents.
