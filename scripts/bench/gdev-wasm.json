@@ -1,6 +1,6 @@
 {
   "manifest": "6bafc8811c5cb8ae9001a69b7b20c28518304ac8228d499612adf751c5274548",
-  "recorded_by": "d5b91f122d869556a1f1df6a574c2e43744fb2fdbad1589cd88c972726e0fd02",
+  "recorded_by": "fb2881858bbd955f7b4086f875eeef4a83e7081095b509461c2f62c1f5edde96",
   "entries": {
     "devtools": "064955262c007d4168a6320cf1d3a0980ca7478a58cc1cdd8f6c1e3423425120",
     "game @ body_change": "73bbd997c91ec61a52efbd496c62a498f474bc3179e4ce7ef16fa01764f5e131",
@@ -51,7 +51,7 @@
     "tests/restore.blot": "64b5dbbf7a54c4cfe911318aa3b78d04b4ab4c4e327f16293c14b7b0ce8f4cca",
     "tests/restore_game.blot": "981f45080ca038e5326e576180e733395e95ae79ad4b7a400dde8e2509fe636a",
     "tests/robot_flight.blot": "ad139f10546ca1896464918966ac14cf12182c6e7d02f9640f1cd9907e3d2f02",
-    "tests/robot_flocking.blot": "6469b8ca47b954f43da3c43db409bb12b179a111028cdb2e0b611dbbea30da0a",
+    "tests/robot_flocking.blot": "07f165b94db6bac1a665be4c8b24d6a709d45766c59a4a15c96faec26279a071",
     "tests/robot_pickup.blot": "f033cc6b8485d3f88253252ad7539ec8627cf117de11d814121e80313d346845",
     "tests/rock.blot": "a5292e65ae133063f8cd5cee0fb03756228f0cbb5bb1db0a98ca6a8e622bca8f",
     "tests/salt_clicks.blot": "481e8070e50cb319f33911efbf054ebce70f1e7e3a4331121285bac8d2e49f95",
