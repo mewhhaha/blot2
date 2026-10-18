@@ -904,6 +904,19 @@ sessions repeat it (`reuse/independent_call_proof.zig:90`).
 It is 0.7% self.
 
 - **Fix:** cache imports per region by source type id.
+- **Result (18 October 2026):** CT61, "Chain solver operations by identity,
+  instance and arity". `importType` already memoizes per (scope, type) and
+  shares closed source types per region (0.4% self after CT60). The import
+  cost left was interning imported evidence labels: `internResolvedOperation`
+  scanned every solver operation per new label (2.6% of cold game samples,
+  all from `importEvidenceLabel`, quadratic in a seed row's labels). The
+  solver now chains operations by identity, instance and arity in index order,
+  linked lazily and unlinked by rollback, so interning compares only same-key
+  candidates and still returns the oldest equal one. A law checks every intern
+  against the old scan through rollback, argument writes, seeded tables and
+  allocation failures. 5 pairs at load 1.4: game 2,340 → 2,321 ms, 20.63 →
+  20.45 G instructions (-0.9%); devtools -0.4%; `robot_pickup` 5,311 → 5,257
+  ms (-1.6% instructions). Wasm identical.
 
 ## Phase 5: backend
 

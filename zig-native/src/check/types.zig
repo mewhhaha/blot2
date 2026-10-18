@@ -100,6 +100,9 @@ pub fn effectError(err: Effects.Error) Error {
 }
 
 const ProjectionResolution = struct { root: Id, at: Cursor, depth: u32 };
+const OperationKey = struct { identity: NominalIdentity, instance: NominalIdentity, arity: u32 };
+const OperationChain = struct { first: Effects.Label, last: Effects.Label };
+const OperationLink = struct { next: Effects.Label = none, previous: Effects.Label = none };
 pub const Store = struct {
     has_usage_types: bool = false,
     has_rank_types: bool = false,
@@ -142,6 +145,11 @@ pub const Store = struct {
     /// history clock. A type write advances child row visibility too.
     effects: Effects.Store,
     operations: std.ArrayList(Operation) = .empty,
+    /// Interned operations chained by identity, instance and arity, oldest
+    /// first; `operation_links` covers the leading operations linked so far.
+    /// Interning appends and rollback truncates; other writers only append.
+    operation_chains: std.AutoHashMapUnmanaged(OperationKey, OperationChain) = .empty,
+    operation_links: std.ArrayList(OperationLink) = .empty,
     quantifier_goals: std.ArrayList(QuantifierGoals) = .empty,
     quantifier_obligations: std.ArrayList(Obligation) = .empty,
 
@@ -173,6 +181,8 @@ pub const Store = struct {
         self.occurs_seen.deinit(self.allocator);
         self.effects.deinit();
         self.operations.deinit(self.allocator);
+        self.operation_chains.deinit(self.allocator);
+        self.operation_links.deinit(self.allocator);
         self.quantifier_goals.deinit(self.allocator);
         self.quantifier_obligations.deinit(self.allocator);
         self.* = undefined;
@@ -698,6 +708,7 @@ pub const Store = struct {
         self.nodes.shrinkRetainingCapacity(point.nodes);
         self.extra.shrinkRetainingCapacity(point.extra);
         self.variables.shrinkRetainingCapacity(point.variables);
+        self.unlinkOperations(point.operations);
         self.operations.shrinkRetainingCapacity(point.operations);
         self.quantifier_goals.shrinkRetainingCapacity(point.quantifier_goals);
         self.quantifier_obligations.shrinkRetainingCapacity(point.quantifier_obligations);
@@ -1303,19 +1314,67 @@ pub const Store = struct {
     fn internResolvedOperation(self: *Store, identity: NominalIdentity, instance: NominalIdentity, resolved: []const Id, symbolic: bool) Error!Effects.Label {
         const point = self.mark();
         errdefer self.rollback(point);
-        for (self.operations.items[1..], 1..) |candidate, index| {
-            if (!std.meta.eql(identity, candidate.identity) or !std.meta.eql(instance, candidate.instance)) continue;
-            const old = self.list(candidate.arguments);
-            if (old.len != resolved.len) continue;
-            var same = true;
-            for (old, resolved) |a, b| same = same and try self.equalGraph(a, b, symbolic);
-            if (same) return @intCast(index);
-        }
+        try self.linkOperations();
+        // Only candidates sharing identity, instance and arity can match; the
+        // chain visits them in index order, so the oldest equal one wins.
+        if (resolved.len <= std.math.maxInt(u32)) if (self.operation_chains.get(.{ .identity = identity, .instance = instance, .arity = @intCast(resolved.len) })) |chain| {
+            var index = chain.first;
+            while (index != none) : (index = self.operation_links.items[index].next) {
+                const old = self.list(self.operations.items[index].arguments);
+                var same = true;
+                for (old, resolved) |a, b| same = same and try self.equalGraph(a, b, symbolic);
+                if (same) return index;
+            }
+        };
         if (self.operations.items.len == none) return error.TypeLimit;
         const span = try self.saveList(resolved);
         const id: Effects.Label = @intCast(self.operations.items.len);
         try self.operations.append(self.allocator, .{ .identity = identity, .arguments = span, .instance = instance });
         return id;
+    }
+    /// Links every operation appended since the last call into its chain.
+    fn linkOperations(self: *Store) Error!void {
+        // Slot 0 is never interned; a shrink outside rollback relinks.
+        if (self.operation_links.items.len > self.operations.items.len) {
+            self.operation_chains.clearRetainingCapacity();
+            self.operation_links.clearRetainingCapacity();
+        }
+        if (self.operation_links.items.len == 0) try self.operation_links.append(self.allocator, .{});
+        while (self.operation_links.items.len < self.operations.items.len) {
+            const index: Effects.Label = @intCast(self.operation_links.items.len);
+            const operation_ = self.operations.items[index];
+            try self.operation_links.ensureUnusedCapacity(self.allocator, 1);
+            const entry = try self.operation_chains.getOrPut(self.allocator, .{ .identity = operation_.identity, .instance = operation_.instance, .arity = operation_.arguments.len });
+            if (entry.found_existing) {
+                self.operation_links.items[entry.value_ptr.last].next = index;
+                self.operation_links.appendAssumeCapacity(.{ .previous = entry.value_ptr.last });
+                entry.value_ptr.last = index;
+            } else {
+                self.operation_links.appendAssumeCapacity(.{});
+                entry.value_ptr.* = .{ .first = index, .last = index };
+            }
+        }
+    }
+    /// Removes linked operations at or after `length`, newest first.
+    fn unlinkOperations(self: *Store, length: usize) void {
+        if (self.operation_links.items.len > self.operations.items.len) {
+            self.operation_chains.clearRetainingCapacity();
+            self.operation_links.clearRetainingCapacity();
+        }
+        while (self.operation_links.items.len > @max(length, 1)) {
+            const index: Effects.Label = @intCast(self.operation_links.items.len - 1);
+            const operation_ = self.operations.items[index];
+            const key: OperationKey = .{ .identity = operation_.identity, .instance = operation_.instance, .arity = operation_.arguments.len };
+            const chain = self.operation_chains.getPtr(key).?;
+            std.debug.assert(chain.last == index);
+            const previous = self.operation_links.pop().?.previous;
+            if (previous == none) {
+                _ = self.operation_chains.remove(key);
+            } else {
+                self.operation_links.items[previous].next = none;
+                chain.last = previous;
+            }
+        }
     }
     /// Read-only exact comparison. A variable or open latent row is not closed,
     /// even when the two source IDs happen to be identical.
@@ -2406,4 +2465,68 @@ pub fn selectionAtom(source: anytype, original: NominalIdentity) NominalIdentity
         return .{ .unit = version.a, .decl = 0x40000000 | (version.b << 4) | version.c };
     }
     return .{ .unit = value.a, .decl = value.b };
+}
+
+const OperationIndexTests = struct {
+    /// The interning scan the chains replace: the oldest equal candidate.
+    fn scan(store: *const Store, identity: NominalIdentity, instance: NominalIdentity, resolved: []const Id, symbolic: bool) Error!?Effects.Label {
+        for (store.operations.items[1..], 1..) |candidate, index| {
+            if (!std.meta.eql(identity, candidate.identity) or !std.meta.eql(instance, candidate.instance)) continue;
+            const old = store.list(candidate.arguments);
+            if (old.len != resolved.len) continue;
+            var same = true;
+            for (old, resolved) |a, b| same = same and try store.equalGraph(a, b, symbolic);
+            if (same) return @intCast(index);
+        }
+        return null;
+    }
+    fn intern(store: *Store, identity: NominalIdentity, instance: NominalIdentity, resolved: []const Id, symbolic: bool) !Effects.Label {
+        const expected = try scan(store, identity, instance, resolved, symbolic);
+        const before = store.operations.items.len;
+        const actual = try store.internResolvedOperation(identity, instance, resolved, symbolic);
+        if (expected) |label| try std.testing.expectEqual(label, actual) else try std.testing.expectEqual(before, actual);
+        return actual;
+    }
+    fn histories(allocator: std.mem.Allocator) !void {
+        var store = try Store.init(allocator);
+        defer store.deinit();
+        // A direct append before any interning, as a table seeded from a
+        // module's operations is.
+        const seeded = try store.saveList(&.{u32_type});
+        try store.operations.append(allocator, .{ .identity = .{ .unit = 3, .decl = 1 }, .arguments = seeded });
+        const variable = try store.fresh();
+        // Distinct IDs with equal closed graphs, and a symbolic-only pair.
+        const pool = [_]Id{ u32_type, f32_type, try store.array(u32_type), try store.array(u32_type), try store.sequence(.list, f32_type), variable, try store.array(variable), try store.array(variable) };
+        var arguments: [3]Id = undefined;
+        var state: u32 = 0x9e3779b9;
+        for (0..240) |step| {
+            state = state *% 1664525 +% 1013904223;
+            const arity = (state >> 8) % 4;
+            for (arguments[0..arity], 0..) |*argument, index| argument.* = pool[(state >> @intCast(12 + index * 3)) % pool.len];
+            const identity: NominalIdentity = .{ .unit = 3, .decl = 1 + (state >> 20) % 3 };
+            const instance: NominalIdentity = if ((state >> 24) % 3 == 0) .{ .unit = 5, .decl = 1 + (state >> 26) % 2 } else .{ .unit = 0, .decl = 0 };
+            const symbolic = (state >> 28) % 2 == 0;
+            if (step % 40 == 17) {
+                // Speculative interning rolls back; the chains forget it.
+                const point = store.mark();
+                _ = try intern(&store, .{ .unit = 3, .decl = 9 }, instance, arguments[0..arity], symbolic);
+                _ = try intern(&store, identity, instance, arguments[0..arity], symbolic);
+                store.rollback(point);
+                // Rollback unlinks exactly what it removed.
+                try std.testing.expect(store.operation_links.items.len <= store.operations.items.len);
+                if (store.operation_links.items.len > 1) try std.testing.expectEqual(store.operations.items.len, store.operation_links.items.len);
+            } else if (step == 120) {
+                // A physical write to an interned argument list stays visible.
+                const label = try intern(&store, identity, instance, &.{ u32_type, f32_type }, false);
+                store.replaceListItem(store.operations.items[label].arguments, 1, u32_type);
+                _ = try intern(&store, identity, instance, &.{ u32_type, u32_type }, false);
+                _ = try intern(&store, identity, instance, &.{ u32_type, f32_type }, false);
+            } else _ = try intern(&store, identity, instance, arguments[0..arity], symbolic);
+        }
+    }
+};
+
+test "operation chains intern exactly the oldest equal operation through rollback writes and allocation failures" {
+    try OperationIndexTests.histories(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, OperationIndexTests.histories, .{});
 }
