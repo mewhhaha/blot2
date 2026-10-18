@@ -286,6 +286,28 @@ Adding an unused export to `ink/math` leaves the Wasm unchanged but costs 3.1 s.
   before the backend needs comparison of the reachable program modulo binding
   IDs and unreferenced spellings, which the reuse gate deliberately declines
   today ("ID movement conservatively rebuilds code").
+- **Design (19 October 2026):** not attempted; a sound cutoff needs three
+  pieces, none of which exists. (1) Interface equality modulo a binding map: map
+  each named global of the edited module to the declaration with the same
+  spelling and kind; the interfaces are equal when every principal fact agrees
+  through the map and every binding an importer references is mapped
+  (unreferenced additions and removals are ignored; locals and parameters are
+  interface stubs and map within their declaration). (2) Relocation of every
+  retained artifact that names the module's bindings through that map: the
+  importers' frozen interfaces and Core (`external` targets, dependency
+  references, associated and selected-member targets, fixity producers) and the
+  backend's retained records keyed by binding (fragments, refinement and
+  constant receipts, call proofs). `dependency_relink` already rewrites units
+  and symbols in one validated transaction; it needs the binding map. (3) The
+  reuse gate's exact `namespaceEqual` and `moduleEqual` must accept relocated
+  Core when the map is a bijection on referenced bindings. Then a relocated
+  importer equals a re-checked one, since its check reads the producer only
+  through mapped bindings; a law must compare a relocating session with fresh
+  builds over insertions, removals, reorders and renames, under allocation
+  failure. Stable declaration IDs (a per-module dictionary that only appends)
+  are the alternative but make numbering depend on edit history, so fresh and
+  retained builds would number bindings differently and Wasm identity would rest
+  on emission being independent of binding order.
 
 ### CT11: interface early cutoff for importers
 
