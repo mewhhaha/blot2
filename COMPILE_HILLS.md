@@ -721,8 +721,8 @@ journals three events plus a copy (`backend/wasm.zig:447-477`).
   `specializeClosure` inference. Excluding nested function compiles,
   serialization is 2.7% of cold game samples and 11% of a literal edit's, almost
   all of it `specializeClosure` (inference, CT50–CT61) and
-  `source_value_template.moduleGenerative` (CT15). The code this hill names,
-  the nominal scan, aggregate lists, field search and `dataWords` journaling, is
+  `source_value_template.moduleGenerative` (CT15). The code this hill names, the
+  nominal scan, aggregate lists, field search and `dataWords` journaling, is
   under 0.3% everywhere (0.2% cold game, 0.2% edit, 0.8% devtools), too little
   to justify touching the artifact journal.
 
