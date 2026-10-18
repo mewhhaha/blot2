@@ -836,6 +836,11 @@ About ten passes each build a new body and copy every instruction
 (`backend/runtime_pipeline.zig:148-229`).
 
 - **Fix:** edit in place or ping-pong between two buffers.
+- **Result (18 October 2026):** "CT70: Size each rewriting pass's output body
+  once". Each rewriting pass reserves its output; editing in place or passing
+  buffers through every pass would rewrite ten passes for the same copies.
+  Wasm identical. Instructions: game 28.045 → 28.036 G (−0.03%), devtools
+  8.906 → 8.904 G. CPU: game 3,025 → 3,017 ms, devtools 1,025 → 1,029 ms.
 
 ### CT71: a cycle-preparation worklist
 
