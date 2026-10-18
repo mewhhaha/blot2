@@ -10,185 +10,222 @@ const Allocator = std.mem.Allocator;
 const slots = @import("dependency_symbol_slots.zig");
 pub const Error = Allocator.Error || error{ InvalidArtifact, NoncanonicalSymbols, SymbolLimit };
 
-fn symbol(map: []const u32, id: u32) u32 {
-    return map[id];
+/// Decoded-artifact relocation. Callers validate every ID before rewriting.
+const Dictionary = struct {
+    names: []const u32,
+    units: []const u32,
+    fn symbol(self: Dictionary, id: u32) u32 {
+        return self.names[id];
+    }
+    fn unit(self: Dictionary, id: u32) u32 {
+        return if (id == 0 or id == std.math.maxInt(u32)) id else self.units[id - 1];
+    }
+};
+/// Fresh-freeze renumbering. Symbol IDs are unchanged; each unit must name a
+/// retained producer, so the excluded entry (mapped to zero) and out-of-range
+/// IDs record a rejection instead of becoming the current-unit context.
+const Retained = struct {
+    units: []const u32,
+    rejected: *bool,
+    fn symbol(_: Retained, id: u32) u32 {
+        return id;
+    }
+    fn unit(self: Retained, id: u32) u32 {
+        if (id == 0 or id == std.math.maxInt(u32)) return id;
+        if (id <= self.units.len and self.units[id - 1] != 0) return self.units[id - 1];
+        self.rejected.* = true;
+        return id;
+    }
+};
+fn identity(map: anytype, value: *T.NominalIdentity) void {
+    value.unit = map.unit(value.unit);
+    if (value.unit != 0 and value.unit != std.math.maxInt(u32) and value.decl & T.opaque_name_bit != 0) value.decl = T.opaque_name_bit | map.symbol(value.decl & ~T.opaque_name_bit);
 }
-fn unit(map: []const u32, id: u32) u32 {
-    return if (id == 0 or id == std.math.maxInt(u32)) id else map[id - 1];
+fn target(map: anytype, value: anytype) void {
+    value.unit = map.unit(value.unit);
 }
-fn identity(map: []const u32, names: []const u32, value: *T.NominalIdentity) void {
-    value.unit = unit(map, value.unit);
-    if (value.unit != 0 and value.unit != std.math.maxInt(u32) and value.decl & T.opaque_name_bit != 0) value.decl = T.opaque_name_bit | symbol(names, value.decl & ~T.opaque_name_bit);
-}
-fn target(map: []const u32, value: anytype) void {
-    value.unit = unit(map, value.unit);
-}
-fn typeUnits(nodes: []T.Node, names: []const u32, units: []const u32) void {
+fn typeUnits(nodes: []T.Node, map: anytype) void {
     for (nodes) |*node| switch (node.tag) {
-        .scoped => node.b = unit(units, node.b),
-        .instance_selection, .instance_version => node.a = unit(units, node.a),
+        .scoped => node.b = map.unit(node.b),
+        .instance_selection, .instance_version => node.a = map.unit(node.a),
         .nominal, .projection, .type_constructor => {
-            node.a = unit(units, node.a);
-            if (node.a != 0 and node.a != std.math.maxInt(u32) and node.b & T.opaque_name_bit != 0) node.b = T.opaque_name_bit | symbol(names, node.b & ~T.opaque_name_bit);
+            node.a = map.unit(node.a);
+            if (node.a != 0 and node.a != std.math.maxInt(u32) and node.b & T.opaque_name_bit != 0) node.b = T.opaque_name_bit | map.symbol(node.b & ~T.opaque_name_bit);
         },
         else => {},
     };
 }
 
-fn implementations(owner: anytype, names: []const u32, units: []const u32) void {
+fn implementations(owner: anytype, map: anytype) void {
     for (owner.implementations) |*value| {
-        identity(units, names, &value.identity);
-        identity(units, names, &value.contract);
-        value.name = symbol(names, value.name);
+        identity(map, &value.identity);
+        identity(map, &value.contract);
+        value.name = map.symbol(value.name);
     }
     for (owner.implementation_members) |*value| {
-        value.name = symbol(names, value.name);
-        target(units, &value.target);
+        value.name = map.symbol(value.name);
+        target(map, &value.target);
     }
     for (owner.member_templates) |*value| {
-        identity(units, names, &value.contract);
-        value.name = symbol(names, value.name);
+        identity(map, &value.contract);
+        value.name = map.symbol(value.name);
     }
     for (owner.selected_members) |*value| {
-        value.name = symbol(names, value.name);
-        target(units, &value.target);
+        value.name = map.symbol(value.name);
+        target(map, &value.target);
     }
     for (owner.selected_proofs) |*value| {
-        target(units, &value.predicate_target);
-        value.context = unit(units, value.context);
-        identity(units, names, &value.implementation);
-        identity(units, names, &value.contract);
-        identity(units, names, &value.predicate.identity);
-        value.predicate.name = symbol(names, value.predicate.name);
-        value.predicate.qualification_unit = unit(units, value.predicate.qualification_unit);
+        target(map, &value.predicate_target);
+        value.context = map.unit(value.context);
+        identity(map, &value.implementation);
+        identity(map, &value.contract);
+        identity(map, &value.predicate.identity);
+        value.predicate.name = map.symbol(value.predicate.name);
+        value.predicate.qualification_unit = map.unit(value.predicate.qualification_unit);
     }
 }
 pub fn interface(owner: *PI.Interface, names: []const u32, units: []const u32) void {
-    capabilityNodes(owner.capability_contracts.nodes, names);
-    implementations(owner, names, units);
-    owner.unit = unit(units, owner.unit);
-    typeUnits(owner.graph.nodes, names, units);
+    interfaceWith(owner, Dictionary{ .names = names, .units = units });
+}
+fn interfaceWith(owner: *PI.Interface, map: anytype) void {
+    capabilityNodes(owner.capability_contracts.nodes, map);
+    implementations(owner, map);
+    owner.unit = map.unit(owner.unit);
+    typeUnits(owner.graph.nodes, map);
     for (owner.graph.quantifier_obligations) |*goal| {
-        goal.name = symbol(names, goal.name);
-        identity(units, names, &goal.identity);
-        goal.qualification_unit = unit(units, goal.qualification_unit);
+        goal.name = map.symbol(goal.name);
+        identity(map, &goal.identity);
+        goal.qualification_unit = map.unit(goal.qualification_unit);
     }
     for (owner.graph.operations) |*operation| {
-        identity(units, names, &operation.identity);
-        operation.instance.unit = unit(units, operation.instance.unit);
+        identity(map, &operation.identity);
+        operation.instance.unit = map.unit(operation.instance.unit);
     }
     for (owner.bindings) |*binding| {
-        binding.name = symbol(names, binding.name);
-        if (binding.external) |*external| target(units, external);
+        binding.name = map.symbol(binding.name);
+        if (binding.external) |*external| target(map, external);
     }
     for (owner.obligations) |*obligation| {
-        obligation.name = symbol(names, obligation.name);
-        identity(units, names, &obligation.identity);
-        obligation.qualification_unit = unit(units, obligation.qualification_unit);
+        obligation.name = map.symbol(obligation.name);
+        identity(map, &obligation.identity);
+        obligation.qualification_unit = map.unit(obligation.qualification_unit);
     }
     for (owner.nominals) |*nominal| {
-        identity(units, names, &nominal.identity);
-        nominal.name = symbol(names, nominal.name);
+        identity(map, &nominal.identity);
+        nominal.name = map.symbol(nominal.name);
     }
     for (owner.contracts) |*contract| {
-        identity(units, names, &contract.identity);
-        contract.name = symbol(names, contract.name);
+        identity(map, &contract.identity);
+        contract.name = map.symbol(contract.name);
     }
     for (owner.contract_members) |*member| {
-        identity(units, names, &member.contract);
-        member.name = symbol(names, member.name);
+        identity(map, &member.contract);
+        member.name = map.symbol(member.name);
     }
     for (owner.contract_predicates) |*predicate| {
-        predicate.name = symbol(names, predicate.name);
-        identity(units, names, &predicate.identity);
-        predicate.qualification_unit = unit(units, predicate.qualification_unit);
+        predicate.name = map.symbol(predicate.name);
+        identity(map, &predicate.identity);
+        predicate.qualification_unit = map.unit(predicate.qualification_unit);
     }
     for (owner.implementation_predicates) |*predicate| {
-        predicate.name = symbol(names, predicate.name);
-        identity(units, names, &predicate.identity);
-        predicate.qualification_unit = unit(units, predicate.qualification_unit);
+        predicate.name = map.symbol(predicate.name);
+        identity(map, &predicate.identity);
+        predicate.qualification_unit = map.unit(predicate.qualification_unit);
     }
     for (owner.constructors) |*constructor| {
-        identity(units, names, &constructor.identity);
-        constructor.name = symbol(names, constructor.name);
+        identity(map, &constructor.identity);
+        constructor.name = map.symbol(constructor.name);
     }
     for (owner.effect_families) |*family| {
-        identity(units, names, &family.identity);
-        family.name = symbol(names, family.name);
+        identity(map, &family.identity);
+        family.name = map.symbol(family.name);
     }
     for (owner.effect_templates) |*operation| {
-        identity(units, names, &operation.identity);
-        operation.name = symbol(names, operation.name);
+        identity(map, &operation.identity);
+        operation.name = map.symbol(operation.name);
     }
     for (owner.associated) |*method| {
-        identity(units, names, &method.identity);
-        method.member = symbol(names, method.member);
+        identity(map, &method.identity);
+        method.member = map.symbol(method.member);
     }
 }
 
-pub fn module(owner: *core.Module, names: []const u32, units: []const u32) void {
-    for (owner.field_names) |*field| field.symbol = symbol(names, field.symbol);
+fn module(owner: *core.Module, names: []const u32, units: []const u32) void {
+    for (owner.field_names) |*field| field.symbol = names[field.symbol];
     std.mem.sortUnstable(core.FieldName, owner.field_names, {}, struct {
         fn less(_: void, left: core.FieldName, right: core.FieldName) bool {
             return left.symbol < right.symbol;
         }
     }.less);
-    capabilityNodes(owner.capability_contracts.nodes, names);
-    implementations(owner, names, units);
-    owner.unit = unit(units, owner.unit);
-    typeUnits(owner.types.nodes, names, units);
+    moduleWith(owner, Dictionary{ .names = names, .units = units });
+}
+/// Renumber a freshly frozen source module to dense artifact units in place.
+/// Symbols, field order and every non-unit word stay untouched, so complete
+/// Core validation of the result decides exactly what validating the source
+/// numbering would. A unit naming the excluded entry or no source module
+/// rejects; the owner is then partially renumbered and must be discarded.
+pub fn moduleUnits(owner: *core.Module, units: []const u32) error{InvalidArtifact}!void {
+    var rejected = false;
+    moduleWith(owner, Retained{ .units = units, .rejected = &rejected });
+    if (rejected) return error.InvalidArtifact;
+}
+fn moduleWith(owner: *core.Module, map: anytype) void {
+    capabilityNodes(owner.capability_contracts.nodes, map);
+    implementations(owner, map);
+    owner.unit = map.unit(owner.unit);
+    typeUnits(owner.types.nodes, map);
     for (owner.types.quantifier_obligations) |*goal| {
-        goal.name = symbol(names, goal.name);
-        identity(units, names, &goal.identity);
-        goal.qualification_unit = unit(units, goal.qualification_unit);
+        goal.name = map.symbol(goal.name);
+        identity(map, &goal.identity);
+        goal.qualification_unit = map.unit(goal.qualification_unit);
     }
     for (owner.types.operations) |*operation| {
-        identity(units, names, &operation.identity);
-        operation.instance.unit = unit(units, operation.instance.unit);
+        identity(map, &operation.identity);
+        operation.instance.unit = map.unit(operation.instance.unit);
     }
     for (owner.nodes) |*node| switch (node.tag) {
-        .associated => node.c = symbol(names, node.c),
-        .result_associated => node.b = symbol(names, node.b),
+        .associated => node.c = map.symbol(node.c),
+        .result_associated => node.b = map.symbol(node.b),
         else => {},
     };
-    for (owner.bindings) |*binding| target(units, &binding.target);
-    for (owner.references) |*reference| target(units, reference);
-    for (owner.dependency_references) |*reference| target(units, reference);
-    for (owner.erased_declaration_references) |*reference| target(units, &reference.target);
-    for (owner.dependency_members) |*member| member.name = symbol(names, member.name);
-    for (owner.calls) |*call| target(units, &call.target);
+    for (owner.bindings) |*binding| target(map, &binding.target);
+    for (owner.references) |*reference| target(map, reference);
+    for (owner.dependency_references) |*reference| target(map, reference);
+    for (owner.erased_declaration_references) |*reference| target(map, &reference.target);
+    for (owner.dependency_members) |*member| member.name = map.symbol(member.name);
+    for (owner.calls) |*call| target(map, &call.target);
     for (owner.obligations) |*obligation| {
-        obligation.name = symbol(names, obligation.name);
-        identity(units, names, &obligation.identity);
-        obligation.qualification_unit = unit(units, obligation.qualification_unit);
+        obligation.name = map.symbol(obligation.name);
+        identity(map, &obligation.identity);
+        obligation.qualification_unit = map.unit(obligation.qualification_unit);
     }
     for (owner.contracts) |*contract| {
-        identity(units, names, &contract.identity);
-        contract.name = symbol(names, contract.name);
+        identity(map, &contract.identity);
+        contract.name = map.symbol(contract.name);
     }
     for (owner.contract_members) |*member| {
-        identity(units, names, &member.contract);
-        member.name = symbol(names, member.name);
+        identity(map, &member.contract);
+        member.name = map.symbol(member.name);
     }
-    for (owner.nominals) |*nominal| identity(units, names, &nominal.identity);
-    for (owner.operation_names) |*operation| identity(units, names, &operation.identity);
-    for (owner.constructors) |*constructor| identity(units, names, &constructor.identity);
+    for (owner.nominals) |*nominal| identity(map, &nominal.identity);
+    for (owner.operation_names) |*operation| identity(map, &operation.identity);
+    for (owner.constructors) |*constructor| identity(map, &constructor.identity);
     for (owner.projections) |*projection| {
-        identity(units, names, &projection.nominal);
-        projection.field = symbol(names, projection.field);
+        identity(map, &projection.nominal);
+        projection.field = map.symbol(projection.field);
     }
     for (owner.associated) |*method| {
-        identity(units, names, &method.identity);
-        method.member = symbol(names, method.member);
-        target(units, &method.target);
+        identity(map, &method.identity);
+        method.member = map.symbol(method.member);
+        target(map, &method.target);
     }
     for (owner.resolver_ops) |*operation| {
-        operation.member = symbol(names, operation.member);
-        target(units, &operation.method);
+        operation.member = map.symbol(operation.member);
+        target(map, &operation.method);
     }
     for (owner.operation_values) |*operation| {
-        identity(units, names, &operation.identity);
-        operation.instance.unit = unit(units, operation.instance.unit);
+        identity(map, &operation.identity);
+        operation.instance.unit = map.unit(operation.instance.unit);
     }
 }
 
@@ -249,30 +286,31 @@ pub fn relink(allocator: Allocator, value: *D.FrozenDependency, pool: *symbols.P
     }
     // Everything below is infallible on the previously validated owner.
     std.mem.swap(symbols.Pool, pool, &candidate);
+    const map: Dictionary = .{ .names = names, .units = units };
     for (value.modules, word_slots) |*owner, roles| {
         slots.rewrite(owner.interface.graph.extra, roles.interface_types, names);
         slots.rewrite(owner.interface.patterns.extra, roles.patterns, names);
         slots.rewrite(owner.core.types.extra, roles.core_types, names);
         slots.rewrite(owner.interface.capability_contracts.words, roles.interface_capabilities, names);
         slots.rewrite(owner.core.capability_contracts.words, roles.core_capabilities, names);
-        interface(&owner.interface, names, units);
+        interfaceWith(&owner.interface, map);
         module(&owner.core, names, units);
-        for (owner.imports) |*dependency| dependency.* = unit(units, dependency.*);
-        for (owner.source_imports) |*request| request.target = unit(units, request.target);
+        for (owner.imports) |*dependency| dependency.* = map.unit(dependency.*);
+        for (owner.source_imports) |*request| request.target = map.unit(request.target);
         for (owner.exports) |*exported| {
-            exported.name = symbol(names, exported.name);
-            target(units, &exported.target);
+            exported.name = map.symbol(exported.name);
+            target(map, &exported.target);
         }
         for (owner.fixities) |*fixity| {
-            fixity.operator = symbol(names, fixity.operator);
-            fixity.target = symbol(names, fixity.target);
-            target(units, &fixity.producer);
+            fixity.operator = map.symbol(fixity.operator);
+            fixity.target = map.symbol(fixity.target);
+            target(map, &fixity.producer);
         }
     }
 }
 
-fn capabilityNodes(nodes: []@import("../check/capability_contracts.zig").Term, names: []const u32) void {
+fn capabilityNodes(nodes: []@import("../check/capability_contracts.zig").Term, map: anytype) void {
     for (nodes) |*node| if (node.tag == .project and node.c == @backingInt(@import("../check/capability_contracts.zig").Projection.field)) {
-        node.b = symbol(names, node.b);
+        node.b = map.symbol(node.b);
     };
 }

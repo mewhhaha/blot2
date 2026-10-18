@@ -135,6 +135,77 @@ test "checked Core clone principal freezing and closure validation release every
     defer format.deinit(a, &value);
 }
 
+/// Owned copy of the fixture's prepared Core sharing its read-only metadata.
+const Scratch = struct {
+    prepared: partial.Prepared,
+    fn init(f: *const Fixture) !Scratch {
+        const units = try a.alloc(@import("core.zig").Module, f.prepared.units.len);
+        var initialized: usize = 0;
+        errdefer {
+            for (units[0..initialized]) |*unit| unit.deinit(a);
+            a.free(units);
+        }
+        for (f.prepared.units, units) |*source, *copy| {
+            copy.* = try closure.copyCore(a, source);
+            initialized += 1;
+        }
+        var prepared = f.prepared;
+        prepared.units = units;
+        return .{ .prepared = prepared };
+    }
+    fn deinit(self: *Scratch) void {
+        for (self.prepared.units) |*unit| unit.deinit(a);
+        a.free(self.prepared.units);
+    }
+};
+const Corruption = enum { reference_entry, reference_unknown, nominal_entry, type_cycle };
+fn corruptedFreeze(f: *Fixture, corruption: Corruption) !void {
+    var scratch = try Scratch.init(f);
+    defer scratch.deinit();
+    const entry = f.source.entry;
+    var applied = false;
+    for (scratch.prepared.units, 1..) |*module, id| {
+        if (id == entry or applied) continue;
+        switch (corruption) {
+            .reference_entry, .reference_unknown => for (module.references) |*reference| if (reference.unit != 0 and reference.unit != id) {
+                reference.unit = if (corruption == .reference_entry) entry else @intCast(f.source.units.items.len + 1);
+                applied = true;
+                break;
+            },
+            .nominal_entry => for (module.types.nodes) |*node| if (node.tag == .nominal and node.a != 0 and node.a != id and node.a != std.math.maxInt(u32)) {
+                node.a = entry;
+                applied = true;
+                break;
+            },
+            .type_cycle => for (module.types.nodes, 0..) |*node, type_id| if (node.tag == .function) {
+                node.a = @intCast(type_id);
+                applied = true;
+                break;
+            },
+        }
+    }
+    try std.testing.expect(applied);
+    try std.testing.expectError(error.InvalidArtifact, closure.freezeFromCheckedCore(a, &f.source, &f.checked, &scratch.prepared));
+}
+test "checked Core freeze renumbers source units once and still rejects entry unknown and cyclic Core" {
+    var f = try Fixture.init(false);
+    defer f.deinit();
+    // The entry precedes its dependencies, so every module is renumbered.
+    try std.testing.expect(f.source.entry < f.source.units.items.len);
+    for (std.meta.tags(Corruption)) |corruption| try corruptedFreeze(&f, corruption);
+    var scratch = try Scratch.init(&f);
+    defer scratch.deinit();
+    var value = try closure.freezeFromCheckedCore(a, &f.source, &f.checked, &scratch.prepared);
+    defer format.deinit(a, &value);
+    var expected = try parity(&f);
+    defer format.deinit(a, &expected);
+    const left = try encode(value);
+    defer a.free(left);
+    const right = try encode(expected);
+    defer a.free(right);
+    try std.testing.expectEqualSlices(u8, right, left);
+}
+
 test "checked Core freeze rejects cached prefixes wrong order identity and failed checker before publishing" {
     var f = try Fixture.init(false);
     defer f.deinit();
