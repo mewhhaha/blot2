@@ -1437,6 +1437,21 @@ One worker adds 27% CPU, and no worker count beats serial wall time.
 
 Hill 9. It needs CT57, CT74 and CT88.
 
+- **Result (18 October 2026):** deferred; larger than one hill. Inference is
+  861 ms of a cold game build over 5,886 regions. The slowest region, the
+  principal region at `game.blot:9829` (5,137 scopes), takes 249 ms and the
+  next 31 ms, so four workers could save at most about 600 ms. Regions run
+  depth-first inside `Generator.function` and write session-wide state: the
+  evidence store, call-summary jobs and constant slots. The only private path
+  today, CT86's component jobs, shows the costs: a private Session starts
+  without the parent's completed summaries and re-infers every callee (before
+  CT86, 4 workers ran 11,772 regions for 5,886), and its adopted jobs are
+  leaves that save no measurable parent time. Design: (1) CT88 to know a
+  wavefront of instance keys before inferring them; (2) private Sessions that
+  look up completed summaries in the parent, which is immutable during a batch,
+  by structural lookup of private evidence in the parent store; (3) import of
+  results in key order before emission.
+
 ### CT88: split resolution from emission
 
 `Generator.function` interleaves specialization and emission depth-first
