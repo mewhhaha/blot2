@@ -2492,12 +2492,16 @@ pub const Owner = struct {
     pub fn allocate(self: *Emitter, bytes: u32, roles: AllocationRoles) Error!u32 {
         return self.allocateStorage(bytes, false, roles);
     }
-    fn markAcyclic(self: *Emitter, value: u32, ty: layout.Id) Error!void {
-        var active: [128]layout.Id = undefined;
-        var budget: usize = 65536;
-        if (!try self.generator.acyclicLayout(self.unit_id, ty, &active, 0, &budget)) return;
+    pub fn markAcyclic(self: *Emitter, value: u32, ty: layout.Id) Error!void {
+        if (!try self.generator.acyclicLayout(ty)) return;
         try self.emit(.local_get, value);
         try self.emit(.call, self.generator.module.arena.?.mark_acyclic);
+    }
+    /// The `new`/`from_array` row argument of a List with this element layout.
+    /// A reference layout with an exact acyclic proof marks the whole tree.
+    fn listKind(self: *Emitter, scalar_words: u32, element: layout.Id) Error!u32 {
+        if (scalar_words != 0 or !try self.generator.acyclicLayout(element)) return scalar_words;
+        return @import("../runtime/list_runtime.zig").acyclic_kind;
     }
     fn allocatePrivate(self: *Emitter, bytes: u32, roles: AllocationRoles) Error!u32 {
         const local = try self.allocate(bytes, roles);
@@ -2761,7 +2765,12 @@ pub const Owner = struct {
                 try self.emit(.local_get, payload.?);
                 try self.emit(if (floating) .f32_store else .i32_store, 0);
                 payload = address;
-            } else payload = try self.recordRepresentation(record, payload.?, true);
+            } else {
+                const source = payload.?;
+                payload = try self.recordRepresentation(record, source, true);
+                // A reordered copy is a fresh record of the same layout.
+                if (payload.? != source) try self.markAcyclic(payload.?, try self.codeLayout(unit_.typeOf(n.b), unit_.span(n.b)));
+            }
             floating = false;
         }
         // A constructor cell is its tag, then its payload or zero.
@@ -3288,7 +3297,7 @@ pub const Owner = struct {
                 const arena = try g.module.ensureArena();
                 try self.emit(.local_get, place.size.?);
                 if (place.array_scalar) |scalar_elements| {
-                    try self.allocateArray(scalar_elements);
+                    try self.allocateArray(scalar_elements, null);
                 } else if (place.scalar_storage) {
                     try self.emit(.call, arena.allocate_scalar);
                 } else if (place.mask) |mask_local| {
@@ -3744,7 +3753,7 @@ pub const Owner = struct {
             try self.emit(.i32_const, @intCast(children.len * @max(1, row_words)));
             var scalar_words: u32 = 0;
             if (scalar_elements) scalar_words = @max(1, row_words);
-            try self.emit(.i32_const, scalar_words);
+            try self.emit(.i32_const, try self.listKind(scalar_words, collection_layout.a));
             try self.emit(.i32_const, @import("../runtime/list_runtime.zig").leafLimit(@max(1, row_words)));
             try self.emit(.call, runtime.new);
             try self.emit(.local_set, address);
@@ -3774,6 +3783,7 @@ pub const Owner = struct {
         if (children.len > (std.math.maxInt(u32) - 4) / stride) return g.fail(self.unit_id, id, .complexity);
         // A length word, then the elements.
         const address = try self.allocateStorage(@intCast(children.len * stride + 4), scalar_elements or row_words != 0, .{ .words = &.{.scalar}, .rest = g.layoutRole(collection_layout.a) });
+        if (!scalar_elements and row_words == 0 and g.layoutRole(collection_layout.a) == .reference) try self.markAcyclic(address, collection_layout.a);
         try self.emit(.local_get, address);
         try self.emit(.i32_const, @intCast(children.len));
         try self.emit(.i32_store, 0);
@@ -3868,7 +3878,7 @@ pub const Owner = struct {
         try self.emit(.local_set, count);
         const size = try self.arraySize(count, 4);
         try self.emit(.local_get, size);
-        try self.allocateArray(true);
+        try self.allocateArray(true, null);
         try self.emit(.local_set, changed);
         try self.emit(.local_get, changed);
         try self.emit(.local_get, changed);
@@ -3901,11 +3911,19 @@ pub const Owner = struct {
         return size;
     }
     /// A numeric Array has no children; other elements are owning references.
-    fn allocateArray(self: *Emitter, scalar_elements: bool) Error!void {
+    /// A known reference element layout with an exact acyclic proof marks
+    /// the fresh Array once for all of its edges. Scalar storage has none.
+    fn allocateArray(self: *Emitter, scalar_elements: bool, element: ?layout.Id) Error!void {
         const arena = try self.generator.module.ensureArena();
         if (scalar_elements) return self.emit(.call, arena.allocate_scalar);
         try self.emit(.i32_const, 0xfffffffe);
         try self.emit(.call, arena.allocate_typed);
+        const known = element orelse return;
+        if (!try self.generator.acyclicLayout(known)) return;
+        const array_ = try self.temporary(.i32);
+        try self.emit(.local_tee, array_);
+        try self.emit(.call, arena.mark_acyclic);
+        try self.emit(.local_get, array_);
     }
     /// The address/value stack pair targets an explicitly known allocation.
     /// List element addresses borrow the descriptor's current leaf base.
@@ -3937,10 +3955,10 @@ pub const Owner = struct {
         if (is_list) {
             var scalar_words: u32 = 0;
             if (scalar_elements) scalar_words = @max(1, row_words);
-            try self.emit(.i32_const, scalar_words);
+            try self.emit(.i32_const, try self.listKind(scalar_words, element));
             try self.emit(.i32_const, @import("../runtime/list_runtime.zig").leafLimit(@max(1, row_words)));
         }
-        if (is_list) try self.emit(.call, (try self.generator.module.ensureLists()).new) else try self.allocateArray(scalar_elements);
+        if (is_list) try self.emit(.call, (try self.generator.module.ensureLists()).new) else try self.allocateArray(scalar_elements, element);
         try self.emit(.local_set, array_);
         try self.emit(.local_get, array_);
         try self.emit(.local_get, if (is_list) physical else count);
@@ -4196,10 +4214,10 @@ pub const Owner = struct {
         if (is_list) {
             var scalar_words: u32 = 0;
             if (scalar_elements) scalar_words = @max(1, row_words);
-            try self.emit(.i32_const, scalar_words);
+            try self.emit(.i32_const, try self.listKind(scalar_words, collection.a));
             try self.emit(.i32_const, @import("../runtime/list_runtime.zig").leafLimit(@max(1, row_words)));
         }
-        if (is_list) try self.emit(.call, (try g.module.ensureLists()).new) else try self.allocateArray(scalar_elements);
+        if (is_list) try self.emit(.call, (try g.module.ensureLists()).new) else try self.allocateArray(scalar_elements, collection.a);
         try self.emit(.local_set, storage);
         if (!is_list) {
             try self.emit(.local_get, storage);
@@ -4389,7 +4407,7 @@ pub const Owner = struct {
                     for (locals) |local| try self.emit(.local_get, local);
                     const runtime = try g.module.ensureLists();
                     try self.emit(.call, if (op == .concat) runtime.concat else runtime.slice);
-                } else try self.arrayStructural(op, locals, row_words != 0 or g.representations.store.scalar(g.representations.store.node(result_layout).a) != null, stride);
+                } else try self.arrayStructural(op, locals, row_words != 0 or g.representations.store.scalar(g.representations.store.node(result_layout).a) != null, stride, g.representations.store.node(result_layout).a);
             },
             .length => {
                 try self.emit(.local_get, locals[0]);
@@ -4435,7 +4453,7 @@ pub const Owner = struct {
                     try self.emit(.local_set, count);
                     const size = try self.arraySize(count, stride);
                     try self.emit(.local_get, size);
-                    try self.allocateArray(row_words != 0 or g.representations.store.scalar(g.representations.store.node(result_layout).a) != null);
+                    try self.allocateArray(row_words != 0 or g.representations.store.scalar(g.representations.store.node(result_layout).a) != null, g.representations.store.node(result_layout).a);
                     try self.emit(.local_set, changed);
                     try self.emit(.local_get, changed);
                     try self.emit(.local_get, changed);
@@ -4458,7 +4476,8 @@ pub const Owner = struct {
                 if (words != 0) return self.convertRows(locals[0], input_list, words);
                 try self.emit(.local_get, locals[0]);
                 const runtime = try g.module.ensureLists();
-                if (!input_list) try self.emit(.i32_const, @intFromBool(g.representations.store.scalar(g.representations.store.node(result_layout).a) != null));
+                const element = g.representations.store.node(result_layout).a;
+                if (!input_list) try self.emit(.i32_const, try self.listKind(@intFromBool(g.representations.store.scalar(element) != null), element));
                 try self.emit(.call, if (input_list) runtime.to_array else runtime.from_array);
             },
             .append, .prepend => {
@@ -4470,7 +4489,7 @@ pub const Owner = struct {
                     try self.emit(.i32_const, @intFromBool(op == .prepend));
                     try self.emit(.i32_const, @intFromBool(id != 0 and try g.ownsArrayUpdate(self.unit_id, id)));
                     try self.emit(.call, (try g.module.ensureLists()).push);
-                } else try self.arrayPush(locals[0], locals[1], machines[1], op == .prepend, row_words != 0 or g.representations.store.scalar(g.representations.store.node(result_layout).a) != null, row_words);
+                } else try self.arrayPush(locals[0], locals[1], machines[1], op == .prepend, row_words != 0 or g.representations.store.scalar(g.representations.store.node(result_layout).a) != null, row_words, g.representations.store.node(result_layout).a);
             },
         }
     }
@@ -4978,7 +4997,7 @@ pub const Owner = struct {
         }
         try self.emit(.local_get, address);
     }
-    fn arrayPush(self: *Emitter, source: u32, value: u32, machine: wasm.ValueType, front: bool, scalar_elements: bool, row_words: u32) Error!void {
+    fn arrayPush(self: *Emitter, source: u32, value: u32, machine: wasm.ValueType, front: bool, scalar_elements: bool, row_words: u32, element: layout.Id) Error!void {
         const count = try self.temporary(.i32);
         const result = try self.temporary(.i32);
         try self.emit(.local_get, source);
@@ -4989,7 +5008,7 @@ pub const Owner = struct {
         const stride = packed_layout.stride(row_words);
         const size = try self.arraySize(count, stride);
         try self.emit(.local_get, size);
-        try self.allocateArray(scalar_elements);
+        try self.allocateArray(scalar_elements, element);
         try self.emit(.local_set, result);
         try self.emit(.local_get, result);
         try self.emit(.local_get, count);
@@ -5186,7 +5205,7 @@ pub const Owner = struct {
         } else try self.simdPairLocals(try self.capture(id, depth), into);
         return 2;
     }
-    fn arrayStructural(self: *Emitter, op: core.ArrayOp, locals: []const u32, scalar_elements: bool, stride: u32) Error!void {
+    fn arrayStructural(self: *Emitter, op: core.ArrayOp, locals: []const u32, scalar_elements: bool, stride: u32, element: layout.Id) Error!void {
         const count = try self.temporary(.i32);
         const left_count = try self.temporary(.i32);
         try self.emit(.local_get, locals[0]);
@@ -5223,7 +5242,7 @@ pub const Owner = struct {
         const bytes = try self.arraySize(count, stride);
         const address = try self.temporary(.i32);
         try self.emit(.local_get, bytes);
-        try self.allocateArray(scalar_elements);
+        try self.allocateArray(scalar_elements, element);
         try self.emit(.local_set, address);
         try self.emit(.local_get, address);
         try self.emit(.local_get, count);
@@ -8351,13 +8370,13 @@ pub const Owner = struct {
             try self.emit(.local_get, physical);
             var scalar_words: u32 = 0;
             if (scalar_elements) scalar_words = @max(1, output_words);
-            try self.emit(.i32_const, scalar_words);
+            try self.emit(.i32_const, try self.listKind(scalar_words, output.a));
             try self.emit(.i32_const, @import("../runtime/list_runtime.zig").leafLimit(@max(1, output_words)));
             try self.emit(.call, (try g.module.ensureLists()).new);
         } else {
             const size = try self.arraySize(count, packed_layout.stride(output_words));
             try self.emit(.local_get, size);
-            try self.allocateArray(scalar_elements);
+            try self.allocateArray(scalar_elements, output.a);
         }
         try self.emit(.local_set, result);
         if (!is_list) {

@@ -489,7 +489,8 @@ pub const Module = struct {
         std.mem.writeInt(u32, self.data.items[arena_runtime.empty_list_address + heap_layout.offset(heap_layout.ListDescriptor, "immutable") ..][0..4], 1, .little);
         std.mem.writeInt(u32, self.data.items[arena_runtime.empty_scalar_list_address + heap_layout.offset(heap_layout.ListDescriptor, "immutable") ..][0..4], 1, .little);
         std.mem.writeInt(u32, self.data.items[arena_runtime.empty_scalar_list_address + heap_layout.offset(heap_layout.ListDescriptor, "scalar_elements") ..][0..4], 1, .little);
-        inline for (.{ arena_runtime.empty_list_address, arena_runtime.empty_scalar_list_address }) |address|
+        std.mem.writeInt(u32, self.data.items[arena_runtime.empty_acyclic_list_address + heap_layout.offset(heap_layout.ListDescriptor, "immutable") ..][0..4], @import("../runtime/list_runtime.zig").frozen | @import("../runtime/list_runtime.zig").acyclic_elements, .little);
+        inline for (.{ arena_runtime.empty_list_address, arena_runtime.empty_scalar_list_address, arena_runtime.empty_acyclic_list_address }) |address|
             std.mem.writeInt(u32, self.data.items[address + heap_layout.offset(heap_layout.ListDescriptor, "leaf_limit") ..][0..4], @import("../runtime/list_runtime.zig").capacity, .little);
         for (2..17) |width| {
             const address = arena_runtime.empty_rows_address + (width - 2) * @sizeOf(heap_layout.ListDescriptor);

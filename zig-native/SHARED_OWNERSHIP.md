@@ -212,15 +212,17 @@ memo fields are introduced.
 
 A descriptor may carry an exact `no_cycle` proof: its complete reachable strong
 structure is acyclic under every allowed mutation. Scalar-only allocations
-qualify immediately. Scalar-element List trees qualify from their immutable
-height-decreasing branches and downward descriptor/cache links. Closed immutable
-products may qualify when every strong edge has a strictly decreasing structural
-rank. Publication, updates and helpers must preserve the proof; otherwise the
-whole descriptor remains cycle-capable. Immutable storage alone is insufficient:
-reference-bearing List leaves, Array elements, recursive nominal values, State,
-closures and demands remain candidates unless a complete proof covers all of
-their edges. Never infer the proof from count 1, machine words or a uniqueness
-token.
+qualify immediately. List trees qualify from their immutable height-decreasing
+branches and downward descriptor/cache links when their elements are scalar or
+carry an exact element proof. Data records, products, nominal families of any
+unit, Arrays and Lists qualify when every reachable layout is such data:
+values are built from existing values, and an in-place write needs an owner
+that no other value reaches. Publication, updates and helpers must preserve the
+proof; otherwise the whole descriptor remains cycle-capable. Immutable storage
+alone is insufficient: State, closures, demands, providers, cursors and erased
+or unknown shapes remain candidates, as does every container or family that
+can reach one. Never infer the proof from count 1, machine words or a
+uniqueness token.
 
 Skip candidate enqueue only for a proven `no_cycle` object; ordinary zero-count
 destruction still releases its children. A cycle pass reached from another

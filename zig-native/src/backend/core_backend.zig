@@ -669,55 +669,9 @@ pub const Generator = struct {
         }
         return self.decline(owner, .{ .start = 0, .end = 0 }, .unresolved_type);
     }
-    pub fn acyclicLayout(self: *Generator, owner: u32, ty: layout.Id, active: []layout.Id, depth: usize, budget: *usize) Error!bool {
-        if (depth >= active.len or budget.* == 0) return false;
-        budget.* -= 1;
-        if (std.mem.findScalar(layout.Id, active[0..depth], ty) != null) return true;
-        active[depth] = ty;
-        const n = self.representations.store.node(ty);
-        switch (n.tag) {
-            .unit, .boolean, .u32, .f32, .never, .type_constructor, .resolver => return true,
-            .product, .record => {
-                const children = self.representations.store.children(ty);
-                var first: usize = 0;
-                var step: usize = 1;
-                if (n.tag == .record) {
-                    first = 1;
-                    step = 2;
-                }
-                var index = first;
-                while (index < children.len) : (index += step) if (!try self.acyclicLayout(owner, children[index], active, depth + 1, budget)) return false;
-                return true;
-            },
-            .nominal => {
-                if (n.a != owner or n.a == 0 or n.a > self.units.len) return false;
-                const source = self.unit(n.a);
-                var found = false;
-                for (source.constructors) |constructor| {
-                    if (budget.* == 0) return false;
-                    budget.* -= 1;
-                    const nominal = source.nominal(constructor.nominal);
-                    if (nominal.identity.unit != n.a or nominal.identity.decl != n.b) continue;
-                    found = true;
-                    if (constructor.payload == 0) continue;
-                    const parameters = source.types.list(nominal.parameters);
-                    const arguments = self.representations.store.children(ty);
-                    if (parameters.len != arguments.len or parameters.len > 32) return false;
-                    var mappings: [32]Mapping = undefined;
-                    for (parameters, arguments, 0..) |parameter, argument, index| {
-                        if (source.types.node(parameter).tag != .variable) return false;
-                        mappings[index] = .{ .variable = parameter, .layout = argument };
-                    }
-                    const payload = self.representations.store.fromTypePartial(source, constructor.payload, mappings[0..parameters.len]) catch |err| {
-                        if (err == error.OutOfMemory) return error.OutOfMemory;
-                        return false;
-                    };
-                    if (!try self.acyclicLayout(owner, payload, active, depth + 1, budget)) return false;
-                }
-                return found;
-            },
-            else => return false,
-        }
+    /// The exact immutable acyclic proof of `ty`; see `acyclic_layout.zig`.
+    pub fn acyclicLayout(self: *Generator, ty: layout.Id) Error!bool {
+        return @import("acyclic_layout.zig").proven(&self.representations.store, self.units, ty);
     }
     pub fn captureLayout(self: *Generator, owner: u32, binding: core.BindingId, value: core_eval.ValueId, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping)) Error!layout.Id {
         const source = self.unit(owner);
@@ -1557,8 +1511,10 @@ pub const Generator = struct {
             try emitter.emit(if (self.representations.store.machine(fn_type.a) == .f32) .f32_store else .i32_store, 0);
             break :blk record;
         } else if (payload_type.tag == .record) try emitter.recordRepresentation(payload_type, 1, true) else null;
+        if (record_local) |record| if (record != 1) try emitter.markAcyclic(record, fn_type.a);
         // A constructor cell is its tag, then its boxed record or argument.
         const address = try emitter.allocate(8, .{ .words = &.{ .scalar, if (record_local != null) .reference else self.layoutRole(fn_type.a) } });
+        if (record_local != null or self.layoutRole(fn_type.a) == .reference) try emitter.markAcyclic(address, fn_type.b);
         try emitter.emit(.local_get, address);
         try emitter.emit(.i32_const, metadata.tag);
         try emitter.emit(.i32_store, 0);

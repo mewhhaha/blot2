@@ -1083,18 +1083,35 @@ APIs require explicit pure, total algebra and consistent reducer captures.
 Cached summaries retain checked reference roles and persistent versions. Their
 implementation is ordinary source library code.
 
-The source emitter may mark a fresh record, product or algebraic node as
-immutable and acyclic only when its exact layout closes over scalar fields and
-other immutable shapes. It checks every constructor of a nominal in the emitting
-source unit, including unused variants. Foreign definitions, mutable containers,
-callables, demands, providers, erased fields and exhausted proofs decline.
-Repeated nominal layouts close an immutable recursive type proof; they do not
-assert runtime pointer uniqueness. The checked canonical allocation receives the
-existing no-cycle flag. Its typed edges, counts and iterative destructor remain
-unchanged. Trial discovery stops at the flag, because the proof excludes every
-cycle through the object. Copy/edit/static
-routes either preserve their own exact proof or leave the allocation eligible
-for candidates.
+The source emitter may mark a fresh record, product, algebraic node, Array or
+List as immutable and acyclic only when its exact layout closes over scalar
+fields and other immutable shapes (`backend/acyclic_layout.zig`). Data values
+are immutable and in-place writes need an owner no other value reaches, so only
+State, callables, demands, providers, cursors and erased or unknown fields can
+close a cycle; they decline, as do exhausted proofs. A nominal of any unit,
+including the prelude and std, checks every constructor of its defining unit,
+including unused variants. Executable reuse (retained fragments, the semantic
+gate and restart checkpoints) requires equal type, nominal and constructor
+catalogs in every unit, and optimizer records compare complete machine inputs,
+so editing a foreign definition re-emits every claim that depends on it. Array
+and List edges follow their element layout. Repeated nominal layouts close an
+immutable recursive type proof; they do not assert runtime pointer uniqueness.
+The checked canonical allocation receives the existing no-cycle flag. Its typed
+edges, counts and iterative destructor remain unchanged. Trial discovery stops
+at the flag, because the proof excludes every cycle through the object. A wrong
+flag could only leak a cycle, never free a live object.
+
+Arrays with a proven reference element layout take the flag at allocation:
+literals, `generate`/`fill`, exact builders, `set`/`append`/`concat`/`slice`
+copies and carrier conversions. A List records the proof as bit 1 of its
+descriptor's immutable word (bit 0 still freezes the descriptor), requested by a
+zero row width plus `acyclic_kind` in `new` and `from_array`; an empty such List
+uses its own static descriptor. Every descriptor, branch and leaf of that tree,
+and an Array converted from it, takes the flag. Freezing, thawing, copies,
+slices and conversions keep the bit, and a concatenation keeps it only when
+both inputs carry it. Update copies without a known element layout, static
+constant Lists and unknown or erased element layouts leave the allocation
+eligible for candidates.
 
 A named callable with exactly one applied argument may use that argument's
 canonical reference as its environment when the checked first parameter layout

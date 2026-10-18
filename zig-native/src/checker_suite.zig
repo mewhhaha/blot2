@@ -106,6 +106,7 @@ comptime {
     _ = @import("check/effect_evidence.zig");
     _ = @import("reuse/epoch_resolution_cache.zig");
     _ = @import("backend/persistent_roots_tests.zig");
+    _ = @import("backend/acyclic_layout_tests.zig");
     _ = @import("backend/suspended_ownership_tests.zig");
     _ = @import("reuse/code_expectation.zig");
     _ = @import("backend/demand_inline_tests.zig");

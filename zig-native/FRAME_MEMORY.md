@@ -5,8 +5,8 @@ collector, reclaiming nothing. The near-term fixes landed separately:
 - Trial discovery stops at `no_cycle` objects.
 - Removal traffic is charged once per queued candidate.
 - Passes trigger in proportion to the vertices the previous pass kept.
-- Wider acyclic proofs (cross-unit nominals, Array/List of acyclic elements) are
-  in progress.
+- The acyclic proof covers nominals of every unit and Array/List edges, so plain
+  data, including its temporary containers, never becomes a candidate.
 
 This note records larger directions, ordered by expected payoff per unit of
 risk. None is scheduled; each needs its own measured task.

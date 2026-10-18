@@ -132,8 +132,10 @@ and physically retained owning slots, not with the whole heap. Large still-live
 reference graphs can be rescanned, at a rate bounded by the threshold above.
 Discovery stops at `no_cycle` objects: their exact proof covers their whole
 reachable structure, so no cycle passes through them, and leaving them outside
-subtraction only keeps their children live. Scalar proofs avoid candidacy
-itself; other exact descriptor proofs are future hills.
+subtraction only keeps their children live. Exact proofs avoid candidacy
+itself: scalar storage, and data records, nominal families of any unit, Arrays
+and List trees whose element layouts reach no State, closure, demand, provider,
+cursor or erased shape.
 
 The counted-lease boundary preserves live or conservatively retained journal
 objects. It cannot reclaim a graph while an owner still holds it. Physical

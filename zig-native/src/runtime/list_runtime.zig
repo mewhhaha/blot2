@@ -43,6 +43,19 @@ pub const Runtime = struct {
 // Node: descriptor token (base + 1, zero if shared), height, length, capacity.
 // Tokens are not GC pointers: sharing never retains an obsolete descriptor.
 // Leaves store elements after the header; branches store left/right pointers.
+/// The immutable word's bits. `frozen` makes every writer copy the
+/// descriptor first. `acyclic_elements` is an exact acyclic proof of a
+/// reference element layout. It follows the element type, so freezing,
+/// thawing, copies, slices and same-type concatenations keep it.
+pub const frozen: u32 = 1;
+pub const acyclic_elements: u32 = 2;
+/// `new` and `from_array` take a row width; a zero width plus this bit asks
+/// for `acyclic_elements`. Bits above it trap.
+pub const acyclic_kind: u32 = acyclic_elements << 7;
+const width_bits: u32 = acyclic_kind - 1;
+comptime {
+    std.debug.assert(acyclic_kind > 16);
+}
 pub const header = @sizeOf(heap.ListNode);
 pub const capacity = (1024 - @sizeOf(heap.ArenaHeader) - header) / 4;
 pub fn leafLimit(words: u32) u32 {
@@ -175,6 +188,7 @@ fn emitNode(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.set(bucket, .{ .i32_mul, bucket, 2 });
     try c.again();
     try c.set(node, .{ .call, arena.allocate_typed, .{ .i32_sub, bucket, @sizeOf(heap.ArenaHeader) }, .{ .i32_mul, .{ .i32_eqz, .{ .load, owner, d.scalar_elements } }, 0xfffffff0 } });
+    try acyclic(c, arena, node, proof(owner));
     try c.zero(node, .{ .i32_sub, bucket, @sizeOf(heap.ArenaHeader) });
     try store(c, node, n.owner_token, .{ .i32_add, owner, 1 });
     try store(c, node, n.length, count);
@@ -197,16 +211,29 @@ fn emitNode(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.end();
     try c.value(node);
 }
-// Scalar List trees have only downward private branch/cache edges. The exact
-// scalar element proof is preserved by all descriptor constructors and clones;
-// reference Lists remain candidates even when their current contents are null.
-fn acyclic(c: Code, arena: wasm.Arena, value: Local, scalar_elements: anytype) Error!void {
+// List trees have only downward private branch/cache edges. A scalar row width
+// or an exact acyclic element proof therefore covers every descriptor and node
+// of the tree; all descriptor constructors and clones preserve both. Reference
+// Lists without the proof remain candidates even when their contents are null.
+fn acyclic(c: Code, arena: wasm.Arena, value: Local, proven: anytype) Error!void {
     try c.when(.{ .global, arena.rc_enabled });
-    try c.when(scalar_elements);
+    try c.when(proven);
     const flags = heap.offset(heap.ArenaHeader, "flags");
     try c.store(.{ .i32_sub, value, @sizeOf(heap.ArenaHeader) }, flags, .{ .i32_or, .{ .load, .{ .i32_sub, value, @sizeOf(heap.ArenaHeader) }, flags }, @import("cycles_runtime.zig").no_cycle });
     try c.end();
     try c.end();
+}
+/// Nonzero when the descriptor's whole tree is acyclic.
+fn proof(descriptor: Local) @TypeOf(.{ .i32_or, .{ .load, descriptor, d.scalar_elements }, .{ .i32_and, .{ .load, descriptor, d.immutable }, acyclic_elements } }) {
+    return .{ .i32_or, .{ .load, descriptor, d.scalar_elements }, .{ .i32_and, .{ .load, descriptor, d.immutable }, acyclic_elements } };
+}
+/// The `new` row argument that reproduces the descriptor's element proof.
+fn kindOf(descriptor: Local) @TypeOf(.{ .i32_or, .{ .load, descriptor, d.scalar_elements }, .{ .i32_shl, .{ .i32_and, .{ .load, descriptor, d.immutable }, acyclic_elements }, 7 } }) {
+    return .{ .i32_or, .{ .load, descriptor, d.scalar_elements }, .{ .i32_shl, .{ .i32_and, .{ .load, descriptor, d.immutable }, acyclic_elements }, 7 } };
+}
+/// Freezing keeps the element proof bit.
+fn freeze(c: Code, descriptor: Local) Error!void {
+    try store(c, descriptor, d.immutable, .{ .i32_or, .{ .load, descriptor, d.immutable }, frozen });
 }
 fn emitBranch(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     const left: Local = .{ .id = 0 };
@@ -214,7 +241,7 @@ fn emitBranch(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     const owner: Local = .{ .id = 2 };
     const node = try c.temp();
     try c.set(node, .{ .call, arena.allocate_typed, 24, 0x30 });
-    try acyclic(c, arena, node, .{ .load, owner, d.scalar_elements });
+    try acyclic(c, arena, node, proof(owner));
     try store(c, node, n.owner_token, .{ .i32_add, owner, 1 });
     try store(c, node, n.capacity, 0);
     try store(c, node, n.left, left);
@@ -256,7 +283,7 @@ fn emitOwn(c: Code, arena: wasm.Arena) Error!void {
     try c.set(mask, .{ .i32_mul, .{ .i32_eqz, .{ .load, owner, d.scalar_elements } }, 0xfffffff0 });
     try c.end();
     try c.set(result, .{ .call, arena.allocate_typed, bytes, mask });
-    try acyclic(c, arena, result, .{ .load, owner, d.scalar_elements });
+    try acyclic(c, arena, result, proof(owner));
     try copy(c, result, node, bytes);
     try store(c, result, n.owner_token, .{ .i32_add, owner, 1 });
     try c.value(result);
@@ -373,10 +400,13 @@ fn emitReplace(c: Code, r: Runtime) Error!void {
 }
 fn emitNew(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     const count: Local = .{ .id = 0 };
-    const row_words: Local = .{ .id = 1 };
+    const kind: Local = .{ .id = 1 };
     const leaf_limit: Local = .{ .id = 2 };
+    const row_words = try c.temp();
     const result = try c.temp();
     try c.trap(.{ .i32_gt_u, count, limit });
+    try c.trap(.{ .i32_gt_u, kind, acyclic_kind | width_bits });
+    try c.set(row_words, .{ .i32_and, kind, width_bits });
     try c.trap(.{ .i32_gt_u, row_words, 16 });
     try c.trap(.{ .i32_eqz, leaf_limit });
     try c.trap(.{ .i32_gt_u, leaf_limit, capacity });
@@ -385,6 +415,7 @@ fn emitNew(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     // must go through edit(), which detaches immutable descriptors.
     const empty = @import("arena_runtime.zig").empty_list_address;
     const scalar_empty = @import("arena_runtime.zig").empty_scalar_list_address;
+    const acyclic_empty = @import("arena_runtime.zig").empty_acyclic_list_address;
     try c.when(.{ .i32_eqz, count });
     for (2..17) |words| {
         const aligned = leafLimit(@intCast(words));
@@ -401,6 +432,10 @@ fn emitNew(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.module.emitReference(c.function, .{ .op = .i32_const, .operand = scalar_empty }, .static_address);
     try c.op(.return_, 0);
     try c.end();
+    try c.when(.{ .i32_and, kind, acyclic_kind });
+    try c.module.emitReference(c.function, .{ .op = .i32_const, .operand = acyclic_empty }, .static_address);
+    try c.op(.return_, 0);
+    try c.end();
     try c.module.emitReference(c.function, .{ .op = .i32_const, .operand = empty }, .static_address);
     try c.op(.return_, 0);
     try c.end();
@@ -411,6 +446,7 @@ fn emitNew(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     // Word four is checked scalar row width: zero denotes references. Leaf
     // flags normalize it to two; no descriptor field or allocation class grows.
     try store(c, result, d.scalar_elements, row_words);
+    try store(c, result, d.immutable, .{ .i32_shr_u, .{ .i32_and, kind, acyclic_kind }, 7 });
     try c.when(.{ .i32_gt_u, row_words, 1 });
     const leaves = try c.temp();
     const directory = try c.temp();
@@ -422,7 +458,7 @@ fn emitNew(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.end();
     try c.end();
     try store(c, result, d.leaf_limit, leaf_limit);
-    try acyclic(c, arena, result, row_words);
+    try acyclic(c, arena, result, proof(result));
     try store(c, result, d.root, .{ .call, r.chunk_new, count, result });
     try c.value(result);
 }
@@ -556,7 +592,7 @@ fn emitCopy(c: Code, r: Runtime) Error!void {
     const span = try c.temp();
     const available = try c.temp();
     try c.trap(.{ .i32_gt_u, .{ .load, sequence, d.length }, count });
-    try c.set(result, .{ .call, r.new, count, .{ .load, sequence, d.scalar_elements }, .{ .load, sequence, d.leaf_limit } });
+    try c.set(result, .{ .call, r.new, count, kindOf(sequence), .{ .load, sequence, d.leaf_limit } });
     try c.loop(.{ .i32_lt_u, index, .{ .load, sequence, d.length } });
     try c.set(from, .{ .call, r.address, sequence, index });
     try c.set(to, .{ .call, r.address, result, index });
@@ -578,7 +614,7 @@ pub fn emitSnapshot(module: *wasm.Module) Error!u32 {
     const id = try function(module, 1, .i32);
     const c = code(module, id);
     const sequence: Local = .{ .id = 0 };
-    try store(c, sequence, d.immutable, 1);
+    try freeze(c, sequence);
     try c.when(.{ .load, sequence, d.root });
     try store(c, .{ .load, sequence, d.root }, n.owner_token, 0);
     try c.end();
@@ -589,16 +625,16 @@ fn emitEdit(c: Code, arena: wasm.Arena) Error!void {
     const sequence: Local = .{ .id = 0 };
     const owned: Local = .{ .id = 1 };
     const result = try c.temp();
-    try c.when(.{ .i32_and, owned, .{ .i32_eqz, .{ .load, sequence, d.immutable } } });
+    try c.when(.{ .i32_and, owned, .{ .i32_eqz, .{ .i32_and, .{ .load, sequence, d.immutable }, frozen } } });
     try c.ret(sequence);
     try c.end();
     try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 134 });
     try copy(c, result, sequence, descriptor_bytes);
     // This copy retains the identical tree and its typed directory edge.
     // Writers invalidate the directory before changing that tree.
-    try acyclic(c, arena, result, .{ .load, sequence, d.scalar_elements });
+    try acyclic(c, arena, result, proof(sequence));
     try store(c, result, d.cached_leaf, 0);
-    try store(c, result, d.immutable, 0);
+    try store(c, result, d.immutable, .{ .i32_and, .{ .load, sequence, d.immutable }, acyclic_elements });
     try c.when(.{ .load, sequence, d.root });
     // This write is metadata only: both versions retain identical contents.
     try store(c, .{ .load, sequence, d.root }, n.owner_token, 0);
@@ -632,7 +668,7 @@ fn emitSet(c: Code, r: Runtime, checked: bool) Error!void {
     if (!checked) address = r.address_unchecked.?;
     try c.when(.{ .i32_eq, .{ .load, .{ .call, address, sequence, index }, 0 }, value });
     try c.when(.{ .i32_eqz, owned });
-    try store(c, sequence, d.immutable, 1);
+    try freeze(c, sequence);
     try c.end();
     try c.ret(sequence);
     try c.end();
@@ -654,7 +690,10 @@ fn emitConversion(c: Code, r: Runtime, arena: wasm.Arena, to_list: bool) Error!v
     if (to_list) {
         // Zero denotes reference words; positive values are the checked number
         // of scalar words per logical Array element. The tree stores words.
-        const width: Local = .{ .id = 1 };
+        // `new` checks and keeps the acyclic element bit of the kind.
+        const kind: Local = .{ .id = 1 };
+        const width = try c.temp();
+        try c.set(width, .{ .i32_and, kind, width_bits });
         try c.when(.{ .i32_gt_u, width, 1 });
         try c.trap(.{ .i32_gt_u, count, .{ .i32_div_u, limit, width } });
         try c.set(count, .{ .i32_mul, count, width });
@@ -665,9 +704,11 @@ fn emitConversion(c: Code, r: Runtime, arena: wasm.Arena, to_list: bool) Error!v
         try c.trap(.{ .i32_gt_u, width, 16 });
         try c.set(leaf_limit, .{ .i32_mul, .{ .i32_div_u, capacity, width }, width });
         try c.end();
-        try c.set(result, .{ .call, r.new, count, width, leaf_limit });
+        try c.set(result, .{ .call, r.new, count, kind, leaf_limit });
     } else {
         try c.set(result, .{ .call, arena.allocate_typed, .{ .cell, 4, count, 0 }, .{ .i32_mul, .{ .i32_eqz, .{ .load, source, d.scalar_elements } }, 0xfffffffe } });
+        // The Array holds the same elements, so the tree's proof covers it.
+        try acyclic(c, arena, result, proof(source));
         try store(c, result, heap.offset(heap.Array, "length"), count);
     }
     try c.loop(.{ .i32_lt_u, index, count });
@@ -766,11 +807,11 @@ fn emitConcat(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.set(count, .{ .i32_add, .{ .load, left, d.length }, .{ .load, right, d.length } });
     try c.trap(.{ .i32_gt_u, count, limit });
     try c.when(.{ .i32_eqz, count });
-    try c.ret(.{ .call, r.new, 0, .{ .i32_and, .{ .load, left, d.scalar_elements }, .{ .load, right, d.scalar_elements } }, .{ .load, left, d.leaf_limit } });
+    try c.ret(.{ .call, r.new, 0, .{ .i32_and, kindOf(left), kindOf(right) }, .{ .load, left, d.leaf_limit } });
     try c.end();
     inline for (.{ .{ left, right }, .{ right, left } }) |pair| {
         try c.when(.{ .i32_eqz, .{ .load, pair[0], d.length } });
-        try store(c, pair[1], d.immutable, 1);
+        try freeze(c, pair[1]);
         try c.ret(pair[1]);
         try c.end();
     }
@@ -784,7 +825,9 @@ fn emitConcat(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.set(leaf_limit, .{ .load, right, d.leaf_limit });
     try c.end();
     try store(c, result, d.leaf_limit, leaf_limit);
-    try acyclic(c, arena, result, .{ .load, result, d.scalar_elements });
+    // Equal element types carry equal proofs; mixed descriptors keep neither.
+    try store(c, result, d.immutable, .{ .i32_and, .{ .i32_and, .{ .load, left, d.immutable }, .{ .load, right, d.immutable } }, acyclic_elements });
+    try acyclic(c, arena, result, proof(result));
     try store(c, result, d.length, count);
     try store(c, result, d.root, .{ .call, r.join, .{ .load, left, d.root }, .{ .load, right, d.root }, result });
     try c.value(result);
@@ -797,17 +840,18 @@ fn emitSlice(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     try c.trap(.{ .i32_gt_u, start, .{ .load, source, d.length } });
     try c.trap(.{ .i32_gt_u, count, .{ .i32_sub, .{ .load, source, d.length }, start } });
     try c.when(.{ .i32_eqz, count });
-    try c.ret(.{ .call, r.new, 0, .{ .load, source, d.scalar_elements }, .{ .load, source, d.leaf_limit } });
+    try c.ret(.{ .call, r.new, 0, kindOf(source), .{ .load, source, d.leaf_limit } });
     try c.end();
     try c.when(.{ .i32_eq, count, .{ .load, source, d.length } });
-    try store(c, source, d.immutable, 1);
+    try freeze(c, source);
     try c.ret(source);
     try c.end();
     try c.set(result, .{ .call, arena.allocate_typed, descriptor_bytes, 134 });
     try c.zero(result, descriptor_bytes);
     try store(c, result, d.scalar_elements, .{ .load, source, d.scalar_elements });
     try store(c, result, d.leaf_limit, .{ .load, source, d.leaf_limit });
-    try acyclic(c, arena, result, .{ .load, source, d.scalar_elements });
+    try store(c, result, d.immutable, .{ .i32_and, .{ .load, source, d.immutable }, acyclic_elements });
+    try acyclic(c, arena, result, proof(result));
     try store(c, result, d.length, count);
     try store(c, result, d.root, .{ .call, r.cut, .{ .load, source, d.root }, start, count, result });
     try c.value(result);

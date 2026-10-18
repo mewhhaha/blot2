@@ -26,7 +26,10 @@ pub const empty_scalar_list_address: u32 = empty_list_address + @sizeOf(heap.Lis
 // Canonical width-two through width-sixteen empty descriptors are arena
 // resources, never source-owned payloads replayed beside rebuilt helpers.
 pub const empty_rows_address: u32 = 256;
-pub const metadata_bytes: u32 = empty_rows_address + 15 * @sizeOf(heap.ListDescriptor);
+// The empty reference descriptor whose element layout has an exact acyclic
+// proof. Writers copy it, so its dynamic successors keep the proof.
+pub const empty_acyclic_list_address: u32 = empty_rows_address + 15 * @sizeOf(heap.ListDescriptor);
+pub const metadata_bytes: u32 = empty_acyclic_list_address + @sizeOf(heap.ListDescriptor);
 
 pub fn emit(module: *wasm.Module, arena: wasm.Arena) Error!void {
     try allocate(module, arena);

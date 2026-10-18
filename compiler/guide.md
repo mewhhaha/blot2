@@ -618,6 +618,9 @@ leaves have no child pointers; pointer-looking integer bits stay scalar.
 
 Dynamic sharing uses counted strong edges, journal leases and a nonmoving
 allocator in linear memory. Trial deletion reclaims real unreachable cycles.
+Plain data never enters it: records, data types from any module, arrays and
+lists whose types reach no State, closure, demand, provider or erased value
+cannot form a cycle, so their allocations are not cycle candidates.
 Loop frames own incoming and outgoing carries; allocation traffic does not
 trigger a separate production tracing scan. Invocation retirement releases
 temporary owners while preserving module initialization values and independently
