@@ -1414,6 +1414,24 @@ One worker adds 27% CPU, and no worker count beats serial wall time.
 - **Fix:** after CT74, remove per-job setup and lock contention, and measure
   again.
 - **Target:** four workers beat serial wall time with at most 10% more CPU.
+- **Result (18 October 2026):** "CT86: Offer each private component once and
+  borrow parent tables". With 4 workers the game dispatched 465 component jobs
+  in 62 batches and ran 11,772 regions for the serial 5,886. 247 jobs declined
+  (all on a receipt read the package cannot carry), and 21 targets came back
+  up to 41 times each while they stayed ready. Setup was 85% of a job: copying
+  offsets and field locations, a fresh 580 KB slot table past the 512 KiB
+  scratch the worker kept, and a seed scan of all 72k bindings. Now a declined
+  component stays serial, private Sessions borrow the parent's immutable
+  tables and allocate trace marks lazily, the seed visits only completed
+  slots, and workers keep 4 MiB of scratch. Dispatch 147 → 19 ms, job time 420
+  → 55 ms, 240 jobs in 15 batches, 6,579 regions. Game, 10 pairs at load 1.6:
+  4 workers 2,499 → 2,368 ms wall and 2,840 → 2,470 ms CPU (20.97 → 19.94 G
+  instructions), against serial 2,403 ms wall and 2,370 ms CPU: −1.5% wall,
+  +4.2% CPU, peak RSS 278 against 274 MiB. Serial builds are
+  instruction-identical. Lowering alone (components off) gives −1.6% wall at
+  +2.3% CPU: the adopted jobs are leaves the parent would have finished
+  cheaply. The default stays serial: over all 56 test entries (one run each)
+  4 workers cost 6% more CPU for no wall gain. Wasm identical on every entry.
 
 ### CT87: parallel region inference
 

@@ -14,6 +14,10 @@ pub const Cancellation = struct {
 pub fn Outcome(comptime T: type) type {
     return union(enum) { pending, complete: T, declined, out_of_memory, cancelled };
 }
+/// Scratch each worker keeps between its jobs until the batch joins. A
+/// private Session's slot table alone is eight bytes per source binding
+/// (580 KB on the game); below that, every job maps and faults it afresh.
+const retained_scratch = 4 * 1024 * 1024;
 pub fn Batch(comptime T: type) type {
     return struct {
         allocator: A,
@@ -53,11 +57,11 @@ pub fn run(comptime T: type, a: A, io: std.Io, requests: anytype, requested: u8,
                 if (self.cancellation.cancelled()) return;
                 const value = execute(arena.allocator(), self.allocator, self.context, self.requests[index]) catch {
                     self.slots[index] = .out_of_memory;
-                    _ = arena.reset(.{ .retain_with_limit = 512 * 1024 });
+                    _ = arena.reset(.{ .retain_with_limit = retained_scratch });
                     continue;
                 };
                 self.slots[index] = if (value) |owned| .{ .complete = owned } else .declined;
-                _ = arena.reset(.{ .retain_with_limit = 512 * 1024 });
+                _ = arena.reset(.{ .retain_with_limit = retained_scratch });
             }
         }
     };

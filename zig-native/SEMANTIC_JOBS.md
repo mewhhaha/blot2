@@ -23,6 +23,11 @@ live solver variable, provider pointer or value handle. No evaluation is
 admitted: the worker must leave steps and its seeded value/child lengths
 unchanged.
 
+The private Session borrows the parent's unit offsets and field locations,
+which never change after `Session.init`, and allocates trace marks only when it
+first traces. A component whose private job returns no package is marked and
+stays on the serial path: the coordinator does not offer it again.
+
 Captured closure records copy source identity, type/row mappings, capture
 interfaces, alias ordinals and immutable origin words. Type/effect IDs are
 explicitly remapped. Origin words contain parent evidence/value ordinals; they

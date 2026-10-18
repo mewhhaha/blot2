@@ -670,7 +670,10 @@ const CallSummaries = struct {
     const JobState = enum { queued, running, waiting, complete, declined };
     /// `recorded` names the principal input recorder that was attached while
     /// the job ran, or zero. Its reads and publications went to that recorder.
-    const Job = struct { key: Key, state: JobState = .queued, region: ?*ClosureRegion = null, scope: ?u32 = null, result: type_evidence.Id = 0, recorded: u64 = 0 };
+    /// `private_declined` marks a member of a component whose private job
+    /// returned no publishable package; the coordinator does not offer it
+    /// again and the serial path, which decides every job either way, runs it.
+    const Job = struct { key: Key, state: JobState = .queued, region: ?*ClosureRegion = null, scope: ?u32 = null, result: type_evidence.Id = 0, recorded: u64 = 0, private_declined: bool = false };
     const HeaderParts = struct { mask: []bool, has_private: bool = false };
     regions: std.heap.MemoryPool(ClosureRegion) = .empty,
     keys: std.AutoHashMapUnmanaged(Key, usize) = .empty,
@@ -851,7 +854,7 @@ const CallSummaries = struct {
             var eligible = true;
             for (self.jobs.items, 0..) |member_, member_index| {
                 if (!self.member(index, member_index)) continue;
-                if ((member_.state != .queued and member_.state != .waiting) or member_.region != null or member_.key.lexical > session.specializations.lexical_inputs.inputs.items.len) {
+                if ((member_.state != .queued and member_.state != .waiting) or member_.region != null or member_.private_declined or member_.key.lexical > session.specializations.lexical_inputs.inputs.items.len) {
                     eligible = false;
                     break;
                 }
@@ -913,7 +916,10 @@ const CallSummaries = struct {
                 if (session.timing) |timing| timing.semantic_job_nanos +|= result.job_nanos;
                 session.counters.merge(result.counters);
                 if (!session.summaryCharge(result.transitions)) continue;
-                const snapshot_ = result.snapshot orelse continue;
+                const snapshot_ = result.snapshot orelse {
+                    self.declinePrivate(component_);
+                    continue;
+                };
                 var independent_sources = true;
                 for (result.sources) |source| {
                     const owner = session.findUnit(source.unit, null) orelse {
@@ -1014,11 +1020,24 @@ const CallSummaries = struct {
                 session.component_members_published += result.recursive_members;
                 progressed = true;
             },
+            .declined => self.declinePrivate(component_),
             else => {},
         };
         if (failed) return error.OutOfMemory;
         if (cancellation.cancelled()) return error.Declined;
         return progressed;
+    }
+    /// Private declines come from reads a package cannot carry (runtime or
+    /// suspended sources, implementation proofs, untracked principal reads),
+    /// which the same keys repeat on a later offer. Skipping that offer only
+    /// moves the job to the serial path, so publication is unchanged. Only
+    /// jobs still holding the dispatched keys are marked.
+    fn declinePrivate(self: *CallSummaries, component_: Component) void {
+        for (component_.members) |member_| {
+            if (member_.index >= self.jobs.items.len) continue;
+            const job = &self.jobs.items[member_.index];
+            if (std.meta.eql(job.key, member_.key)) job.private_declined = true;
+        }
     }
 
     fn deinit(self: *CallSummaries, session: *Session) void {
@@ -1380,7 +1399,11 @@ pub const Session = struct {
     binding_offsets: []usize,
     node_offsets: []usize,
     slots: []Slot,
-    visited_nodes: []bool,
+    /// Allocated by the first dependency trace; `node_count` entries.
+    visited_nodes: []bool = &.{},
+    node_count: usize = 0,
+    /// Offsets and field locations belong to the parent of initShared.
+    borrowed_tables: bool = false,
     pending: std.ArrayList(Target) = .empty,
     draining_pending: bool = false,
     indexed_region: ?*IndexedRegion = null,
@@ -1458,9 +1481,6 @@ pub const Session = struct {
         const slots = try allocator.alloc(Slot, binding_count);
         errdefer allocator.free(slots);
         @memset(slots, .{});
-        const visited_nodes = try allocator.alloc(bool, node_count);
-        errdefer allocator.free(visited_nodes);
-        @memset(visited_nodes, false);
         var storage = try value_storage.Store.init(allocator);
         errdefer storage.deinit(allocator);
         var field_locations: std.AutoHashMapUnmanaged(FieldKey, FieldLocation) = .empty;
@@ -1504,28 +1524,20 @@ pub const Session = struct {
                 for (0..payload.b) |field| field_locations.putAssumeCapacity(.{ .family = first.family, .tag = constructor.tag, .name = module.types.recordField(payload, field).name }, .{ .field = @intCast(field), .len = payload.b });
             }
         }
-        return .{ .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .visited_nodes = visited_nodes, .field_locations = field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = has_implementations, .has_generative_sources = has_generative_sources };
+        return .{ .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .node_count = node_count, .field_locations = field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = has_implementations, .has_generative_sources = has_generative_sources };
     }
     /// A private session over exactly `parent.units`. The facts Session.init
     /// derives from those immutable units (the implementation and generative
-    /// source probes, offsets and nominal field locations) are copied from the
-    /// parent instead of rescanning every module; all evaluation state starts
-    /// empty, as from Session.init.
+    /// source probes, offsets and nominal field locations) are borrowed from
+    /// the parent, which must outlive it and leave them unchanged; all
+    /// evaluation state starts empty, as from Session.init.
     pub fn initShared(allocator: Allocator, parent: *const Session) Allocator.Error!Session {
-        const binding_offsets = try allocator.dupe(usize, parent.binding_offsets);
-        errdefer allocator.free(binding_offsets);
-        const node_offsets = try allocator.dupe(usize, parent.node_offsets);
-        errdefer allocator.free(node_offsets);
         const slots = try allocator.alloc(Slot, parent.slots.len);
         errdefer allocator.free(slots);
         @memset(slots, .{});
-        const visited_nodes = try allocator.alloc(bool, parent.visited_nodes.len);
-        errdefer allocator.free(visited_nodes);
-        @memset(visited_nodes, false);
         var storage = try value_storage.Store.init(allocator);
         errdefer storage.deinit(allocator);
-        const field_locations = try parent.field_locations.clone(allocator);
-        return .{ .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = parent.units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .visited_nodes = visited_nodes, .field_locations = field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = parent.has_implementations, .has_generative_sources = parent.has_generative_sources };
+        return .{ .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = parent.units, .providers = provider_chain.Store.init(allocator), .binding_offsets = parent.binding_offsets, .node_offsets = parent.node_offsets, .slots = slots, .node_count = parent.node_count, .borrowed_tables = true, .field_locations = parent.field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = parent.has_implementations, .has_generative_sources = parent.has_generative_sources };
     }
     pub fn deinit(self: *Session) void {
         self.retained.deinit(self.allocator);
@@ -1533,8 +1545,11 @@ pub const Session = struct {
         self.regions.deinit(self.allocator);
         self.implementation_proofs.deinit();
         self.allocator.free(self.owned_diagnostic_message);
-        self.allocator.free(self.binding_offsets);
-        self.allocator.free(self.node_offsets);
+        if (!self.borrowed_tables) {
+            self.allocator.free(self.binding_offsets);
+            self.allocator.free(self.node_offsets);
+            self.field_locations.deinit(self.allocator);
+        }
         self.allocator.free(self.slots);
         self.allocator.free(self.visited_nodes);
         self.pending.deinit(self.allocator);
@@ -1544,7 +1559,6 @@ pub const Session = struct {
         self.request_cells.deinit(self.allocator);
         self.request_handlers.deinit(self.allocator);
         self.break_values.deinit(self.allocator);
-        self.field_locations.deinit(self.allocator);
         self.* = undefined;
     }
     pub fn principalQueryStorage(self: *const Session) struct { source_description: @import("../reuse/semantic_query_table.zig").Storage, open_residual: @import("../reuse/semantic_query_table.zig").Storage } {
@@ -1951,13 +1965,16 @@ pub const Session = struct {
     pub fn seedScalarInputs(self: *Session, current: *const Session) Error!void {
         if (self.units.ptr != current.units.ptr or self.units.len != current.units.len) return error.Declined;
         for (self.units, 0..) |module, owner| {
-            for (module.bindings, 0..) |binding, index| {
+            // Slots are laid out by unit, then binding: visiting the completed
+            // ones in that order seeds the bindings the full scan would.
+            const start = self.binding_offsets[owner];
+            for (current.slots[start..][0..module.bindings.len], 0..) |old, index| {
+                if (old.state != .complete) continue;
+                const binding = module.bindings[index];
                 if (binding.kind != .global) continue;
                 const body = module.body(@intCast(index)) orelse continue;
                 if (body.runtime) continue;
-                const offset = self.binding_offsets[owner] + index;
-                const old = current.slots[offset];
-                if (old.state != .complete) continue;
+                const offset = start + index;
                 const scalar_input = current.valueScalar(old.value) orelse continue;
                 const expected: u32 = switch (scalar_input.scalar) {
                     .unit => types.unit,
@@ -2838,6 +2855,12 @@ pub const Session = struct {
     }
     fn prepareWork(self: *Session, initial: Work) Error!void {
         if (self.diagnostic != null) return error.Declined;
+        if (self.visited_nodes.len != self.node_count) {
+            const visited = try self.allocator.alloc(bool, self.node_count);
+            @memset(visited, false);
+            self.allocator.free(self.visited_nodes);
+            self.visited_nodes = visited;
+        }
         const pending_start = self.pending.items.len;
         var work: std.ArrayList(Work) = .empty;
         defer work.deinit(self.allocator);
@@ -12296,12 +12319,14 @@ fn sharedSessionScenario(a: Allocator, units: []const core.Module) !void {
     defer shared.deinit();
     try std.testing.expectEqual(parent.units.ptr, shared.units.ptr);
     try std.testing.expectEqual(parent.units.len, shared.units.len);
-    try std.testing.expectEqualSlices(usize, parent.binding_offsets, shared.binding_offsets);
-    try std.testing.expectEqualSlices(usize, parent.node_offsets, shared.node_offsets);
+    try std.testing.expectEqual(parent.binding_offsets.ptr, shared.binding_offsets.ptr);
+    try std.testing.expectEqual(parent.node_offsets.ptr, shared.node_offsets.ptr);
+    try std.testing.expect(shared.borrowed_tables and !parent.borrowed_tables);
     try std.testing.expectEqual(parent.slots.len, shared.slots.len);
-    try std.testing.expectEqual(parent.visited_nodes.len, shared.visited_nodes.len);
+    try std.testing.expectEqual(parent.node_count, shared.node_count);
+    // Trace marks are allocated by the first trace, not by either init.
+    try std.testing.expectEqual(@as(usize, 0), shared.visited_nodes.len);
     for (shared.slots) |slot| try std.testing.expectEqual(Slot{}, slot);
-    for (shared.visited_nodes) |visited| try std.testing.expect(!visited);
     try std.testing.expectEqual(parent.has_implementations, shared.has_implementations);
     try std.testing.expectEqual(parent.has_generative_sources, shared.has_generative_sources);
     try std.testing.expectEqual(parent.field_locations.count(), shared.field_locations.count());
@@ -12408,6 +12433,41 @@ test "private semantic declined jobs preserve successful siblings and late activ
         try std.testing.expectEqual(@as(usize, 0), session.steps);
         try std.testing.expect(session.diagnostic == null);
     }
+}
+fn privateDeclineScenario(a: Allocator, module: *const core.Module, workers: u8) !void {
+    var session = try Session.init(a, &.{module.*});
+    defer session.deinit();
+    session.semantic_io = std.testing.io;
+    session.semantic_component_workers = workers;
+    session.options.max_steps = 0;
+    // F32 inputs to U32 bodies: every private job declines, and each would
+    // still be ready while the serial path takes the others one by one.
+    const inputs = try session.storage.evidence.intern(.product, 0, 0, &.{types.f32_type});
+    const names = [_][]const u8{ "first", "second", "third" };
+    var requested: [names.len]CallSummaries.Key = undefined;
+    for (names, &requested) |name, *key| {
+        key.* = .{ .target = semanticTestTarget(module, name), .inputs = inputs, .source_interface = false, .options = session.options };
+        _ = try session.specializations.call_summaries.request(&session, key.*);
+    }
+    try session.specializations.call_summaries.drain(&session);
+    try std.testing.expectEqual(@as(u64, 1), session.counters.semantic_component_batches);
+    try std.testing.expectEqual(@as(u64, names.len), session.counters.semantic_component_jobs);
+    for (requested) |key| {
+        const job = session.specializations.call_summaries.jobs.items[session.specializations.call_summaries.keys.get(key).?];
+        try std.testing.expectEqual(CallSummaries.JobState.declined, job.state);
+        try std.testing.expect(job.private_declined);
+    }
+    try std.testing.expect(session.diagnostic == null);
+}
+test "private semantic declines are offered once and the serial path still decides them" {
+    var module = try bodyRecipeLower(
+        \\entry const first: U32 -> U32 = fn value => @u32.add value 1
+        \\entry const second: U32 -> U32 = fn value => @u32.add value 2
+        \\entry const third: U32 -> U32 = fn value => @u32.add value 3
+    );
+    defer module.deinit(std.testing.allocator);
+    for ([_]u8{ 1, 4 }) |workers| try privateDeclineScenario(std.testing.allocator, &module, workers);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, privateDeclineScenario, .{ &module, @as(u8, 1) });
 }
 test "private semantic recursive generic jobs keep distinct complete U32 and F32 inputs" {
     const a = std.testing.allocator;
