@@ -919,6 +919,11 @@ sessions repeat it (`reuse/independent_call_proof.zig:90`).
 
 - **Fix:** pass pointers.
 - **Overlaps:** Hill 14.
+- **Result (18 October 2026):** dropped. `attemptConstraint` copies a
+  Constraint of about 160 bytes per visit (52,075 visits, about 8 MB on a
+  cold game build). `Body.get` is 0.3% of cold samples, nearly all from
+  `Body.deinit` copying each plan out, and plan put, deinit and init 1%
+  together; pointer access would save under 0.5%.
 
 ### CT59: a solver worklist
 
