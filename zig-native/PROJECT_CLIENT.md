@@ -104,10 +104,14 @@ without persistence.
 
 Files are keyed by compiler identity and entry, written atomically, and admitted
 through the same source and semantic checks as explicit checkpoints. Storage
-failures are ignored. A server saves its first successful revision before
-replying, so immediate `dispose()` still leaves restart candidates. Later edits
-avoid cache writes; `close()` saves the latest committed revision. Failed edits
-never replace the last successful checkpoint. Keep the compiler alive for
+failures are ignored. A server replies to its first successful revision before
+the cache is written, but on Linux a detached writer process already holds the
+key's lock, so an immediate `dispose()` still leaves restart candidates: the
+next compiler's open waits (at most 10 s) for that write and then loads it. A
+killed writer leaves the previous file, if any. Other platforms write before
+replying. Later edits avoid cache writes; `close()` saves the latest committed
+revision the same way. Failed edits never replace the last successful
+checkpoint. Keep the compiler alive for
 editing; restart caching and retained edits are measured separately by
 `deno task bench:compile --restart-cache`.
 

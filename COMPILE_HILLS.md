@@ -602,6 +602,23 @@ The project server persists its checkpoint before replying on revision 1
   reply comes first, a detached writer persists the cache, and a later open
   waits for that write to finish, so the warm-restart promise still holds.
   Scheduled with CT82–CT85.
+- **Result (19 October 2026):** CT24, "Persist the restart cache from a detached
+  writer after the reply". The server takes an exclusive lock on the key's
+  `.lock` file, forks a writer (new session, private heap, stdio on
+  `/dev/null`) that inherits it, and only then replies; the writer encodes its
+  copy-on-write image, writes `.partial` and renames it. Opens wait at most
+  10 s for a shared lock, so a SIGKILL right after the reply still leaves the
+  cache; a killed writer publishes nothing, the kernel frees its lock, and the
+  previous file stays whole. Other platforms write before replying. Game, 6
+  pairs at load 0.3–0.8, 4 codegen workers: first-reply wall 2,351 → 2,167 ms,
+  server CPU 2,407 → 2,255 ms; the file is on disk 31 ms later than before
+  (2,364 → 2,395 ms from the request). A restart's own first-build save leaves
+  the critical path too (restart wall 2,553 → 2,362 ms). Laws: detached
+  publication with waiting loaders, a killed writer (lock freed, last whole file
+  kept, partial file never read and replaced), failed encoding, a writer that
+  waits for a held lock, concurrent loaders, two parts from one writer;
+  restart-after-SIGKILL, killed writer then cold open, and concurrent opens
+  waiting for a write in executed tests. Wasm identical.
 
 ### CT25: bound retained memory
 

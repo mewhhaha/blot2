@@ -280,9 +280,15 @@ pub const Session = struct {
     /// Exports only the committed revision. Encoding never modifies it, and
     /// callers own the returned bytes independently of this Session.
     pub fn checkpointBytes(self: *const Session, compiler: [32]u8) ![]u8 {
+        return self.encodeCheckpoint(self.allocator, compiler);
+    }
+    /// As `checkpointBytes`, with every allocation from `a`. Encoding only
+    /// reads the session, so a forked restart-cache writer can run it on its
+    /// own heap over a copy-on-write image.
+    pub fn encodeCheckpoint(self: *const Session, a: Allocator, compiler: [32]u8) ![]u8 {
         if (self.epoch) |epoch| if (epoch.preparing or epoch.active != null) return error.RevisionBusy;
         const current = &(self.current orelse return error.NoSuccessfulRevision);
-        return @import("../backend/backend_checkpoint.zig").encode(self.allocator, compiler, &current.artifacts);
+        return @import("../backend/backend_checkpoint.zig").encode(a, compiler, &current.artifacts);
     }
     fn releaseSeed(self: *Session) void {
         if (self.seed_snapshot) |owner| owner.deinit() else dependency_format.deinit(self.allocator, &self.seed);

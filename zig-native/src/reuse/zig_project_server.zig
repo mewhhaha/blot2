@@ -152,12 +152,17 @@ const OpenProject = struct {
         session.policy.codegen_workers = request.codegenWorkers;
         return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session, .assets = assets, .cache_file = cache_file, .cache_loaded = cache_loaded };
     }
+    /// Starts saving the committed revision. Where writes are detached, the
+    /// writer holds the cache lock when this returns, so the caller can reply
+    /// at once and a later open still waits for the complete file.
     fn persist(self: *OpenProject, io: Io) void {
         if (self.saved_revision == self.session.revisions) return;
         const file = &(self.cache_file orelse return);
-        const bytes = self.session.checkpointBytes(file.compiler) catch return;
-        defer self.allocator.free(bytes);
-        if (file.save(io, bytes)) self.saved_revision = self.session.revisions;
+        const encoding: CheckpointEncoding = .{ .session = &self.session, .compiler = file.compiler };
+        switch (file.persist(io, .{ .context = &encoding, .encode = CheckpointEncoding.encode })) {
+            .failed => {},
+            .written, .detached => self.saved_revision = self.session.revisions,
+        }
     }
     fn deinit(self: *OpenProject) void {
         self.session.deinit();
@@ -166,6 +171,20 @@ const OpenProject = struct {
         self.options_owner.deinit();
         self.allocator.free(self.entry);
         self.* = undefined;
+    }
+};
+
+/// Encodes the committed revision, in a detached writer over its copy of the
+/// session, with the allocator the writer gives it.
+const CheckpointEncoding = struct {
+    session: *const retained.Session,
+    compiler: [32]u8,
+    fn encode(context: *const anyopaque, a: Allocator, part: restart_cache.Part, _: ?[]const u8) ?[]u8 {
+        const self: *const CheckpointEncoding = @ptrCast(@alignCast(context));
+        return switch (part) {
+            .checkpoint => self.session.encodeCheckpoint(a, self.compiler) catch null,
+            .output => null,
+        };
     }
 };
 
@@ -380,6 +399,9 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                 opened.assets.?.commit(snapshot);
                 assets = null;
             }
+            // Where writes are detached, the writer holds the cache lock before
+            // the reply and encodes after it; a kill after the reply loses
+            // nothing, since the next open waits for the writer.
             if (opened.session.revisions == 1) opened.persist(io);
             try frames.write(writer, metadata, payload);
         },

@@ -463,7 +463,27 @@ rather than leave the host and the server disagreeing about the revision.
 
 **The restart cache.** It is saved after the first successful build and again at
 close. Its file sits under the cache root, keyed by the compiler identity and
-the entry.
+the entry, with a `.lock` file beside it.
+
+- **Promise.** Once the first successful build's reply has been sent, the cache
+  for that revision is being written by a process the host does not own. Killing
+  the server, or its process group, right after the reply does not lose it: the
+  next open of the same entry by the same compiler waits for the write and loads
+  the file.
+- **Writer.** On Linux the server takes an exclusive lock on the `.lock` file,
+  forks a detached writer (a new session, stdio on `/dev/null`) that inherits
+  the lock, and only then replies. The writer encodes its copy of the committed
+  revision after the reply, writes `<file>.partial`, renames it over the cache
+  file and exits. Its CPU time is not the server's. On other platforms the
+  server writes the cache before replying.
+- **Readers.** An open waits for a shared lock on the `.lock` file, at most
+  10 s, before reading the cache. Concurrent opens all wait and read the same
+  file. After the timeout it reads whatever file is published.
+- **Failures.** A writer that dies, or cannot encode or write, publishes
+  nothing; the kernel releases its lock, and the previous file, if any, stays
+  whole. A `.partial` file is never read, and the next writer replaces it. A
+  file that fails to decode, or was made by another compiler identity, is
+  ignored.
 
 ## checkpoint
 
@@ -484,8 +504,9 @@ revision.
 
 The request carries `kind`, `id`, `epoch` and `revision`, with no payload. Other
 fields must have the defaults described under build. The reply is
-`{"kind": "close", "id": 3, "epoch": "1", "revision": 1}`. The server saves the
-restart cache, then exits 0.
+`{"kind": "close", "id": 3, "epoch": "1", "revision": 1}`. The server starts
+saving the restart cache as after a first build (on Linux, a detached writer
+holds the lock before the reply), then exits 0.
 
 Closing stdin at a frame boundary instead also ends the process with exit 0,
 with no reply and no cache save.
