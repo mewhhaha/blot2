@@ -497,6 +497,13 @@ Pool leases memcmp every pool and recopy grown ones
 
 - **Fix:** use chunked pools that share an unchanged prefix.
 - **Overlaps:** task 021.
+- **Result (18 October 2026):** dropped; leases are not the cost. Sampled at
+  `685ae93`, `pool_leases` is 0.09% of a literal edit and 0.04% of a body edit.
+  A literal edit copies 1.4 MB of evaluator snapshot in 14 fields
+  (`snapshot_copy_bytes`); a body-edit revert copies none. The rest of pool
+  capture was module stamps (CT18) and sorting field locations from their hash
+  map (0.28%). Chunked pools would change every consumer's contiguous slices
+  for under a millisecond. Retained memory does not grow either (CT25).
 
 ### CT22: reuse encoded functions
 
