@@ -826,6 +826,15 @@ It is 13.1% inclusive cold.
 Region `game.blot:9829` has 5,137 scopes and takes 262 ms.
 
 - **Fix:** extend Hill 2's general split to it.
+- **Result (18 October 2026):** deferred; far larger than a hill. The region
+  is the principal evidence of the `played` composition constant (253 ms
+  profiled at main, 260 ms after CT60/CT61). Its 5,137 scopes are 2,944
+  named-body instances of only 255 bindings, 2,192 constructor instantiations
+  from field accesses and updates, and one closure; 922 roots stay open. The
+  calls stay inline because summaries key only first-order parameters
+  (`summaryShapeEligible`), and plugins and systems arrive as functions.
+  Splitting it needs Hill 2's summaries parametric in their argument
+  functions' obligations, a semantic design change.
 
 ### CT52: certify incrementally
 
