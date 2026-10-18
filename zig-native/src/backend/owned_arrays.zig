@@ -69,7 +69,7 @@ pub const Proof = struct {
                 .array_op => if (receiver(units, unit_id, id)) |binding| {
                     consume(&states[binding], id);
                     consumed_refs[module.children(id)[0]] = true;
-                } else if (module.arrayOperation(id) == .length or module.arrayOperation(id) == .get) {
+                } else if (module.arrayOperation(id) == .length or module.arrayOperation(id) == .get or module.arrayOperation(id) == .simd_load) {
                     const operands = module.children(id);
                     if (operands.len != 0 and module.node(operands[0]).tag == .reference) {
                         read_refs[operands[0]] = true;
@@ -77,13 +77,21 @@ pub const Proof = struct {
                         // The outer array may still be consumed, but nested
                         // mutation must preserve the extracted value.
                         const ref = module.reference(operands[0]);
-                        if (ref.unit == 0 and ref.binding != 0 and module.arrayOperation(id) == .get and !scalarType(module, node.ty)) states[ref.binding].deep = false;
+                        const extracted = switch (module.arrayOperation(id)) {
+                            .get => !scalarType(module, node.ty),
+                            .simd_load => !scalarElements(module, module.typeOf(operands[0])),
+                            else => false,
+                        };
+                        if (ref.unit == 0 and ref.binding != 0 and extracted) states[ref.binding].deep = false;
                     }
                 },
                 .call, .apply => if (receiver(units, unit_id, id)) |binding| {
                     const edit = edit_call.analyze(units, unit_id, id).?;
                     consume(&states[binding], id);
                     consumed_refs[edit.receiver] = true;
+                } else if (edit_call.readReceiver(units, unit_id, id)) |array| {
+                    // A four-lane load copies scalar words out of the Array.
+                    if (module.node(array).tag == .reference) read_refs[array] = true;
                 },
                 .pattern_bind => {
                     const plan = edit_call.analyze(units, unit_id, node.b) orelse continue;
@@ -290,7 +298,7 @@ fn receiver(units: []const core.Module, unit_id: u32, id: core.Id) ?core.Binding
     const module = &units[unit_id - 1];
     const root = if (module.node(id).tag == .array_op) blk: {
         const op = module.arrayOperation(id);
-        if (op != .set and op != .append and op != .prepend) return null;
+        if (op != .set and op != .append and op != .prepend and op != .simd_store) return null;
         break :blk module.children(id)[0];
     } else if ((module.node(id).tag == .call or module.node(id).tag == .apply)) blk: {
         const plan = edit_call.analyze(units, unit_id, id) orelse return null;
@@ -319,7 +327,7 @@ fn fresh(units: []const core.Module, unit_id: u32, id: core.Id, depth: usize) bo
             break :blk result.tag == .return_ and fresh(units, unit_id, result.a, depth + 1);
         },
         .array_op => switch (module.arrayOperation(id)) {
-            .fill, .generate, .set, .append, .prepend, .convert => true,
+            .fill, .generate, .set, .append, .prepend, .convert, .simd_store => true,
             else => false,
         },
         .update => true,
@@ -345,6 +353,10 @@ fn fresh(units: []const core.Module, unit_id: u32, id: core.Id, depth: usize) bo
 // Deep reuse requires independent ownership of every nested container. An array
 // of repeated pointers (fill) and aggregate fields borrowed from another local
 // deliberately fail this proof, even if their outer allocation is fresh.
+fn scalarElements(module: *const core.Module, collection: @import("../check/types.zig").Id) bool {
+    const ty = module.types.node(collection);
+    return (ty.tag == .array or ty.tag == .list) and scalarType(module, ty.a);
+}
 fn scalarType(module: *const core.Module, ty: @import("../check/types.zig").Id) bool {
     return switch (module.types.node(ty).tag) {
         .unit, .boolean, .u32, .f32 => true,

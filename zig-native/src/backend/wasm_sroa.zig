@@ -2,14 +2,22 @@
 //! Copies get distinct scalar slots (including loop carries); stores are admitted
 //! only into freshly allocated locals before any alias is copied. ABI values,
 //! calls, unknown offsets, mutable aliases and GC roots keep ordinary storage.
+//! A four-word scalar family accessed as v128 values lives in one v128 local
+//! instead; it loads an outside address where one is copied in and boxes a
+//! fresh copy where a value leaves, when that runs no more often than the
+//! family allocated.
 const std = @import("std");
 const w = @import("wasm.zig");
 const ir = @import("runtime_ir.zig");
 const A = std.mem.Allocator;
 const none = std.math.maxInt(u32);
-const Value = struct { id: u32 = 0, offset: u32 = 0, constant: ?u32 = null };
-const Node = struct { parent: u32, copies: u8 = 0, empty: bool = false, bad: bool = false, size: u32 = 0, allocation: bool = false, first_copy: u32 = none, last_store: u32 = 0, store_mask: u32 = 0, scope: usize = 0, fields: u32 = 0, used_fields: u16 = 0, journaled: bool = false, untyped: bool = false, reference_fields: u16 = 0, roots: u32 = 0, root_fields: u16 = 0, shared_roots: bool = false, nullable: bool = false, journal_carrier: bool = false, zero_fields: u16 = 0, nonzero_fields: u16 = 0, control_start: usize = 0, control_end: usize = 0 };
-const Event = struct { input: Value = .{}, stored: Value = .{}, destination: u32 = 0, field: u32 = 0, allocation: u32 = 0, fresh: bool = false, static_words: bool = false, empty: bool = false, loop_scope: usize = 0, nonzero: bool = false };
+/// `get` is the `local.get` that pushed this object address, if any.
+const Value = struct { id: u32 = 0, offset: u32 = 0, constant: ?u32 = null, get: u32 = none };
+const Node = struct { parent: u32, copies: u8 = 0, empty: bool = false, bad: bool = false, size: u32 = 0, allocation: bool = false, first_copy: u32 = none, last_store: u32 = 0, store_mask: u32 = 0, scope: usize = 0, fields: u32 = 0, used_fields: u16 = 0, journaled: bool = false, untyped: bool = false, reference_fields: u16 = 0, roots: u32 = 0, root_fields: u16 = 0, shared_roots: bool = false, nullable: bool = false, journal_carrier: bool = false, zero_fields: u16 = 0, nonzero_fields: u16 = 0, control_start: usize = 0, control_end: usize = 0, vector: bool = false, first_store: u32 = none, read: bool = false };
+/// A box replaces the `local.get` at `at`, or precedes the `return` at `at`
+/// (`none`: the function end) by replacing the result on top of the stack.
+const Box = struct { value: Value, at: u32 };
+const Event = struct { input: Value = .{}, stored: Value = .{}, destination: u32 = 0, field: u32 = 0, allocation: u32 = 0, fresh: bool = false, static_words: bool = false, empty: bool = false, loop_scope: usize = 0, nonzero: bool = false, boxed: bool = false, unbox: bool = false };
 const Control = struct { height: usize, result: u32, unreachable_: bool = false, entry_unreachable: bool = false, conditional: bool = false, has_else: bool = false, then_live: bool = false, has_exit: bool = false, identity: usize = 0, loop_: bool = false };
 pub const Output = ir.Body;
 const Analysis = struct {
@@ -22,6 +30,19 @@ const Analysis = struct {
     constant_scopes: []?usize,
     defined_scopes: []?usize,
     zero_locals: []const bool,
+    locals: []const w.ValueType = &.{},
+    /// Only a body with whole four-word accesses can form a vector family;
+    /// every other body keeps the eager escape and join decisions.
+    vectors: bool = false,
+    /// Whole-object reads that leave this function: a vector family can box
+    /// a fresh copy there instead of keeping every value in storage.
+    boxes: std.ArrayList(Box) = .empty,
+    /// The function result boxes after its last instruction.
+    result_box: u32 = 0,
+    /// Copies of an outside four-lane address (a parameter, call result,
+    /// field or static constant) into a local: a vector family loads its
+    /// lanes there instead of joining the outside value's storage.
+    unboxes: std.ArrayList(u32) = .empty,
     valid: bool = true,
     owning: bool = false,
     children: bool = false,
@@ -85,13 +106,16 @@ const Analysis = struct {
         return if (self.stack.items.len > floor) self.stack.pop().? else .{};
     }
     fn copy(self: *Analysis, at: usize, dst: u32, v: Value) void {
+        self.record(at, dst, v);
+        self.join(dst, v);
+    }
+    fn record(self: *Analysis, at: usize, dst: u32, v: Value) void {
         // Only an exact empty constructor, propagated through a single write,
         // can cross a nested producer loop without holding a live child.
         const empty = v.id != 0 and v.offset == 0 and self.nodes.items[v.id].empty;
         self.events[at].empty = empty;
         self.nodes.items[dst].copies = @min(self.nodes.items[dst].copies + 1, 2);
         self.nodes.items[dst].empty = empty and self.nodes.items[dst].copies == 1;
-        self.join(dst, v);
         self.events[at].input = v;
         self.events[at].destination = dst;
         if (v.id != 0) self.nodes.items[v.id].first_copy = @min(self.nodes.items[v.id].first_copy, @as(u32, @intCast(at)));
@@ -108,9 +132,25 @@ const Analysis = struct {
             self.stack.shrinkRetainingCapacity(c.height);
         } else self.stack.clearRetainingCapacity();
     }
-    fn call(self: *Analysis, parameters: usize, result: w.ValueType) !void {
-        for (0..parameters) |_| self.escape(self.pop());
+    fn call(self: *Analysis, parameters: usize, result: w.ValueType, boxable: bool) !void {
+        for (0..parameters) |_| {
+            if (boxable) try self.box(self.pop()) else self.escape(self.pop());
+        }
         if (result != .none) try self.push(.{});
+    }
+    /// An escaping exact object read straight from a local; the decision to
+    /// box it there or retain storage waits for its family's shape.
+    fn box(self: *Analysis, v: Value) !void {
+        if (!self.vectors or v.id == 0 or v.offset != 0 or v.get == none) return self.escape(v);
+        self.nodes.items[v.id].first_copy = @min(self.nodes.items[v.id].first_copy, v.get);
+        try self.boxes.append(self.a, .{ .value = v, .at = v.get });
+    }
+    /// A returned value on top of the stack, such as a block result, can box
+    /// right where it leaves.
+    fn boxResult(self: *Analysis, v: Value, at: u32) !void {
+        if (!self.vectors or v.get != none or v.id == 0 or v.offset != 0) return self.box(v);
+        self.nodes.items[v.id].first_copy = @min(self.nodes.items[v.id].first_copy, if (at == none) @as(u32, @intCast(self.events.len -| 1)) else at);
+        try self.boxes.append(self.a, .{ .value = v, .at = at });
     }
     fn loopScope(self: *const Analysis) usize {
         var index = self.controls.items.len;
@@ -169,7 +209,7 @@ const Analysis = struct {
                     if (!self.dominates(self.defined_scopes[inst.operand])) {
                         if (self.children) self.nodes.items[self.root(inst.operand + 1)].nullable = true else self.escape(.{ .id = inst.operand + 1 });
                     }
-                    try self.push(if (self.dominates(self.constant_scopes[inst.operand]) and self.constants[inst.operand] != null) .{ .constant = self.constants[inst.operand].? } else .{ .id = inst.operand + 1 });
+                    try self.push(if (self.dominates(self.constant_scopes[inst.operand]) and self.constants[inst.operand] != null) .{ .constant = self.constants[inst.operand].? } else .{ .id = inst.operand + 1, .get = @intCast(at) });
                 },
                 .local_set, .local_tee => {
                     const value = self.pop();
@@ -178,7 +218,12 @@ const Analysis = struct {
                         self.constant_scopes[inst.operand] = 0;
                         if (!self.zero_locals[inst.operand] and self.controls.items.len != 0) self.constant_scopes[inst.operand] = self.controls.items[self.controls.items.len - 1].identity;
                     }
-                    self.copy(at, inst.operand + 1, value);
+                    const outside = value.offset == 0 and if (value.id == 0) value.constant == null or value.constant.? != 0 else value.id - 1 < function.parameters.len;
+                    const machine = if (inst.operand < function.parameters.len) function.parameters[inst.operand] else self.locals[inst.operand - function.parameters.len];
+                    if (self.vectors and outside and machine == .i32 and inst.operand >= function.parameters.len) {
+                        self.record(at, inst.operand + 1, value);
+                        try self.unboxes.append(self.a, @intCast(at));
+                    } else self.copy(at, inst.operand + 1, value);
                     // Allocation results are always captured immediately by
                     // the emitter; this local owns initialization stores.
                     if (at != 0 and self.events[at - 1].allocation != 0 and !self.events[at - 1].static_words and value.id == self.events[at - 1].allocation) {
@@ -218,7 +263,7 @@ const Analysis = struct {
                 .i32_store, .f32_store => {
                     const stored = self.pop();
                     const address = self.pop();
-                    if (address.id == 0 or !self.nodes.items[self.root(address.id)].journal_carrier) self.escape(stored);
+                    if (address.id == 0 or !self.nodes.items[self.root(address.id)].journal_carrier) try self.box(stored);
                     self.events[at].input = address;
                     self.events[at].stored = stored;
                     self.events[at].field = address.offset +% inst.operand;
@@ -229,9 +274,34 @@ const Analysis = struct {
                             if (stored.constant != null and stored.constant.? == 0) group.zero_fields |= bit else group.nonzero_fields |= bit;
                         }
                         self.nodes.items[address.id].last_store = @intCast(at);
+                        self.nodes.items[address.id].first_store = @min(self.nodes.items[address.id].first_store, @as(u32, @intCast(at)));
                         if (self.events[at].field < 64 and self.events[at].field % 4 == 0 and self.nodes.items[address.id].scope == (if (self.controls.items.len == 0) @as(usize, 0) else self.controls.items[self.controls.items.len - 1].identity)) self.nodes.items[address.id].store_mask |= @as(u32, 1) << @intCast(self.events[at].field / 4);
                     }
                     if (address.id == 0 or !self.nodes.items[address.id].allocation or self.events[at].field >= 64 or self.events[at].field % 4 != 0) self.escape(address);
+                },
+                // A whole four-word access at offset zero keeps a private
+                // object replaceable; its family then lives in one v128 local.
+                // Any other vector access observes memory and escapes.
+                .v128_load => {
+                    const address = self.pop();
+                    self.events[at].input = address;
+                    self.events[at].field = address.offset +% inst.operand;
+                    if (address.id != 0) self.nodes.items[address.id].first_copy = @min(self.nodes.items[address.id].first_copy, @as(u32, @intCast(at)));
+                    if (address.id == 0 or self.events[at].field != 0) self.escape(address);
+                    try self.push(.{});
+                },
+                .v128_store => {
+                    self.escape(self.pop());
+                    const address = self.pop();
+                    self.events[at].input = address;
+                    self.events[at].field = address.offset +% inst.operand;
+                    if (address.id != 0) {
+                        self.nodes.items[self.root(address.id)].nonzero_fields |= 0xf;
+                        self.nodes.items[address.id].last_store = @intCast(at);
+                        self.nodes.items[address.id].first_store = @min(self.nodes.items[address.id].first_store, @as(u32, @intCast(at)));
+                        if (self.events[at].field == 0 and self.nodes.items[address.id].scope == (if (self.controls.items.len == 0) @as(usize, 0) else self.controls.items[self.controls.items.len - 1].identity)) self.nodes.items[address.id].store_mask |= 0xf;
+                    }
+                    if (address.id == 0 or !self.nodes.items[address.id].allocation or self.events[at].field != 0) self.escape(address);
                 },
                 .call => {
                     const callee = ir.call(module, inst);
@@ -267,16 +337,16 @@ const Analysis = struct {
                             if (parameter + 1 != callee.parameters.len or input.id == 0 or !self.nodes.items[self.root(input.id)].journal_carrier) self.escape(input);
                         }
                         if (callee.result != .none) try self.push(.{});
-                    } else try self.call(callee.parameters.len, callee.result);
+                    } else try self.call(callee.parameters.len, callee.result, !module.runtimeHelper(inst.operand));
                 },
                 .call_indirect => {
                     self.escape(self.pop());
                     const signature = ir.call(module, inst);
-                    try self.call(signature.parameters.len, signature.result);
+                    try self.call(signature.parameters.len, signature.result, true);
                 },
                 .call_import => {
                     const signature = ir.call(module, inst);
-                    try self.call(signature.parameters.len, signature.result);
+                    try self.call(signature.parameters.len, signature.result, false);
                 },
                 .block, .loop, .if_ => {
                     if (inst.op == .if_) self.escape(self.pop());
@@ -338,7 +408,7 @@ const Analysis = struct {
                     if (inst.op == .br) self.dead();
                 },
                 .return_ => {
-                    if (function.result != .none) self.escape(self.pop());
+                    if (function.result != .none) try self.boxResult(self.pop(), @intCast(at));
                     self.dead();
                 },
                 .unreachable_ => self.dead(),
@@ -352,7 +422,7 @@ const Analysis = struct {
                 },
             }
         }
-        if (function.result != .none) self.escape(self.pop());
+        if (function.result != .none) try self.boxResult(self.pop(), none);
         for (self.nodes.items, 0..) |node, id| if (node.first_copy < node.last_store or (node.allocation and node.store_mask != (@as(u32, 1) << @intCast(self.nodes.items[self.root(@intCast(id))].size / 4)) - 1)) {
             self.nodes.items[self.root(@intCast(id))].bad = true;
         };
@@ -360,6 +430,17 @@ const Analysis = struct {
             const root_ = self.root(event.input.id);
             if (event.field >= self.nodes.items[root_].size) self.nodes.items[root_].bad = true;
         };
+        // A vector family is exactly one scalar-only four-word object per
+        // value. Lane accesses and copies then keep the whole value in a
+        // v128 local; owning, nullable or carrier families keep storage.
+        for (instructions, self.events) |inst, event| if ((inst.op == .v128_load or inst.op == .v128_store) and event.input.id != 0) {
+            self.nodes.items[self.root(event.input.id)].vector = true;
+        };
+        for (self.nodes.items, 0..) |*node, id| if (node.parent == id and node.vector) {
+            if (node.size != 16 or node.reference_fields != 0 or node.nullable or node.journal_carrier or node.untyped) node.bad = true;
+        };
+        self.resolveUnboxes();
+        try self.resolveBoxes(instructions);
         for (instructions, self.events) |inst, event| {
             if ((inst.op != .i32_load and inst.op != .f32_load) or event.input.id == 0) continue;
             const family = self.root(event.input.id);
@@ -380,6 +461,59 @@ const Analysis = struct {
                 }
             }
         }
+    }
+    /// An outside address copied into a vector family is read once there.
+    /// Every other family joins the outside value's storage, as before.
+    fn resolveUnboxes(self: *Analysis) void {
+        for (self.unboxes.items) |at| {
+            const event = self.events[at];
+            const family = self.nodes.items[self.root(event.destination)];
+            if (family.vector and !family.bad) {
+                self.events[at].unbox = true;
+            } else self.join(event.destination, event.input);
+        }
+        for (self.unboxes.items) |at| if (self.nodes.items[self.root(self.events[at].destination)].bad) {
+            self.events[at].unbox = false;
+        };
+    }
+    /// A vector family read in lanes here may box a fresh copy where a value
+    /// leaves the function, instead of keeping every value in storage. The
+    /// box must not run more often than the family's own allocations did: it
+    /// sits outside every loop or in a loop activation that allocates one.
+    /// Every other escape keeps the family's storage, as before.
+    fn resolveBoxes(self: *Analysis, instructions: []const w.Instruction) !void {
+        if (self.boxes.items.len == 0) return;
+        for (instructions, self.events) |inst, event| {
+            if (event.input.id == 0) continue;
+            if (inst.op == .i32_load or inst.op == .f32_load or inst.op == .v128_load) self.nodes.items[self.root(event.input.id)].read = true;
+        }
+        for (self.boxes.items) |item| {
+            const v = item.value;
+            const family = self.root(v.id);
+            const scope = if (item.at == none) 0 else self.events[item.at].loop_scope;
+            var admitted = self.nodes.items[family].vector and self.nodes.items[family].read and !self.nodes.items[family].bad;
+            if (admitted and scope != 0) {
+                admitted = false;
+                for (self.events) |event| if (event.allocation != 0 and !event.static_words and event.loop_scope == scope and self.root(event.allocation) == family) {
+                    admitted = true;
+                    break;
+                };
+            }
+            if (!admitted) {
+                self.escape(v);
+                continue;
+            }
+            if (item.at == none) {
+                self.result_box = v.id;
+                continue;
+            }
+            self.events[item.at].boxed = true;
+            self.events[item.at].input = .{ .id = v.id };
+        }
+        // A family can lose admission after an earlier box was marked.
+        for (self.boxes.items) |item| if (self.nodes.items[self.root(item.value.id)].bad) {
+            if (item.at == none) self.result_box = 0 else self.events[item.at].boxed = false;
+        };
     }
     fn selected(self: *Analysis, id: u32) bool {
         if (id == 0) return false;
@@ -570,6 +704,9 @@ const Analysis = struct {
         std.debug.assert(node.used_fields & (@as(u16, 1) << @intCast(field)) != 0);
         return node.fields + @popCount(@as(u32, node.used_fields) & lower);
     }
+    fn vector(self: *Analysis, id: u32) bool {
+        return self.nodes.items[self.root(id)].vector;
+    }
     fn fieldRoot(self: *Analysis, id: u32, field: u32) ?u32 {
         const node = self.nodes.items[id];
         const family = self.root(id);
@@ -585,6 +722,16 @@ fn emit(out: *Output, a: A, op: w.Op, operand: u32) !void {
 }
 fn copyFields(out: *Output, analysis: *Analysis, event: Event) !void {
     const a = analysis.a;
+    if (analysis.vector(event.destination)) {
+        // One v128 local holds every lane; a vector family never owns roots.
+        if (analysis.nodes.items[event.destination].used_fields == 0) return;
+        if (event.input.id == 0) {
+            try emit(out, a, .i32_const, 0);
+            try emit(out, a, .i32x4_splat, 0);
+        } else try emit(out, a, .local_get, analysis.nodes.items[event.input.id].fields);
+        try emit(out, a, .local_set, analysis.nodes.items[event.destination].fields);
+        return;
+    }
     const count = analysis.nodes.items[analysis.root(event.destination)].size / 4;
     // All sources precede all stores: a loop/branch may permute aliases.
     const mask = analysis.nodes.items[event.destination].used_fields;
@@ -599,6 +746,33 @@ fn copyFields(out: *Output, analysis: *Analysis, event: Event) !void {
     if (!analysis.nodes.items[analysis.root(event.destination)].shared_roots) {
         for (0..count) |field| try publishField(out, analysis, event.destination, @intCast(field));
     }
+}
+/// A fresh scalar-only box holding the value's lanes, exactly as the emitter
+/// builds a four-lane result; ordinary ownership passes then retire it.
+fn emitBox(out: *Output, a: A, module: *const w.Module, function: *const w.Function, lanes: u32) !void {
+    var buffer: [ir.max_annotations]ir.Instruction = undefined;
+    try out.instructions.appendSlice(a, ir.annotations(&.{}, .scalar, &buffer));
+    try emit(out, a, .i32_const, 16);
+    try emit(out, a, .call, module.arena.?.allocate_scalar);
+    const local: u32 = @intCast(function.parameters.len + out.locals.items.len);
+    try out.locals.append(a, .i32);
+    try emit(out, a, .local_set, local);
+    try emit(out, a, .local_get, local);
+    try emit(out, a, .local_get, lanes);
+    try emit(out, a, .v128_store, 0);
+    try emit(out, a, .local_get, local);
+}
+/// Removes an allocation's emitted size and role annotations when the output
+/// still ends with exactly that copied run.
+fn dropAllocationRun(out: *Output, instructions: []const w.Instruction, at: usize) bool {
+    const roles = ir.allocationAnnotations(instructions, at);
+    const emitted = out.instructions.items;
+    if (roles.len == 0 or emitted.len < roles.len + 1) return false;
+    const tail = emitted[emitted.len - roles.len - 1 ..];
+    if (!std.meta.eql(tail[roles.len], instructions[at - 1])) return false;
+    for (roles, tail[0..roles.len]) |expected, actual| if (!std.meta.eql(expected, actual)) return false;
+    out.instructions.shrinkRetainingCapacity(emitted.len - roles.len - 1);
+    return true;
 }
 fn publishField(out: *Output, analysis: *Analysis, id: u32, field: u32) !void {
     const slot = analysis.fieldRoot(id, field) orelse return;
@@ -872,8 +1046,14 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
         constants[id] = 0;
         constant_scopes[id] = 0;
     };
-    var analysis: Analysis = .{ .a = a, .events = events, .constants = constants, .constant_scopes = constant_scopes, .defined_scopes = defined_scopes, .zero_locals = zeros, .owning = owning, .children = children };
+    var analysis: Analysis = .{ .a = a, .events = events, .constants = constants, .constant_scopes = constant_scopes, .defined_scopes = defined_scopes, .zero_locals = zeros, .locals = locals, .owning = owning, .children = children };
+    for (instructions) |inst| if (inst.op == .v128_load or inst.op == .v128_store) {
+        analysis.vectors = true;
+        break;
+    };
     defer analysis.nodes.deinit(a);
+    defer analysis.boxes.deinit(a);
+    defer analysis.unboxes.deinit(a);
     defer analysis.stack.deinit(a);
     defer analysis.controls.deinit(a);
     _ = try analysis.add(true, 0);
@@ -888,7 +1068,10 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
     if (!any) return null;
     for (instructions, events) |inst, event| if ((inst.op == .i32_load or inst.op == .f32_load) and analysis.selected(event.input.id)) {
         analysis.nodes.items[event.input.id].used_fields |= @as(u16, 1) << @intCast(event.field / 4);
+    } else if ((inst.op == .v128_load or event.boxed) and analysis.selected(event.input.id)) {
+        analysis.nodes.items[event.input.id].used_fields |= 0xf;
     };
+    if (analysis.selected(analysis.result_box)) analysis.nodes.items[analysis.result_box].used_fields |= 0xf;
     try analysis.demandedFields();
     try analysis.shareFieldRoots(instructions);
     any = false;
@@ -912,8 +1095,12 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
         if (!analysis.selected(@intCast(id))) continue;
         const count = @popCount(analysis.nodes.items[id].used_fields);
         analysis.nodes.items[id].fields = @intCast(function.parameters.len + out.locals.items.len);
-        try out.locals.appendNTimes(a, .i32, count);
+        if (analysis.vector(@intCast(id))) {
+            if (count != 0) try out.locals.append(a, .v128);
+        } else try out.locals.appendNTimes(a, .i32, count);
     }
+    // Lane writes after the first need the value below the vector operand.
+    var lane_scratch: [2]?u32 = .{ null, null };
     // These slots belong to the function frame, outside source scope markers.
     // Each static virtual field has one reusable slot across loop activations.
     for (0..analysis.nodes.items.len) |id| {
@@ -957,7 +1144,7 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
         events[at].field = target + 1;
         events[at - 1].field = target + 1;
     }
-    for (instructions, events) |inst, event| {
+    for (instructions, events, 0..) |inst, event, at| {
         if (inst.op == .ownership) {
             const scope: ir.Ownership = @bitCast(inst.operand);
             if (scope.kind == .scope and ((scope.chunk == 3 and zero_slots[scope.roles]) or (scope.chunk == 4 and zero_slots[scope.roles & 8191]))) continue;
@@ -983,6 +1170,9 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
                     try emit(&out, a, .local_set, analysis.fieldLocal(event.allocation, @intCast(field)));
                     try publishField(&out, &analysis, event.allocation, @intCast(field));
                 }
+            } else if (analysis.vector(event.allocation) and dropAllocationRun(&out, instructions, at)) {
+                // The replaced object's word roles describe nothing, so they
+                // cannot keep an otherwise empty lexical frame.
             } else try emit(&out, a, .drop, 0);
             try emit(&out, a, .i32_const, 0);
             continue;
@@ -991,8 +1181,66 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
             try emitProjectedCall(&out, &analysis, function, &module.functions.items[event.field - 1]);
             continue;
         }
+        if (event.unbox and analysis.selected(event.destination) and analysis.vector(event.destination)) {
+            try out.instructions.append(a, inst);
+            const node = analysis.nodes.items[event.destination];
+            if (node.used_fields != 0) {
+                try emit(&out, a, .local_get, inst.operand);
+                try emit(&out, a, .v128_load, 0);
+                try emit(&out, a, .local_set, node.fields);
+            }
+            continue;
+        }
         if (event.destination != 0 and !event.fresh and analysis.selected(event.destination)) try copyFields(&out, &analysis, event);
-        if ((inst.op == .i32_load or inst.op == .f32_load) and analysis.selected(event.input.id)) {
+        if (event.boxed and analysis.selected(event.input.id) and analysis.vector(event.input.id)) {
+            // A boxed read replaces its get; a boxed result replaces the
+            // dead address on top of the stack before it returns.
+            if (inst.op != .local_get) try emit(&out, a, .drop, 0);
+            try emitBox(&out, a, module, function, analysis.nodes.items[event.input.id].fields);
+            if (inst.op == .local_get) continue;
+        }
+        const memory_access = inst.op == .i32_load or inst.op == .f32_load or inst.op == .v128_load or inst.op == .i32_store or inst.op == .f32_store or inst.op == .v128_store;
+        if (memory_access and analysis.selected(event.input.id) and analysis.vector(event.input.id)) {
+            const node = analysis.nodes.items[event.input.id];
+            const lane = event.field / 4;
+            switch (inst.op) {
+                .v128_load, .i32_load, .f32_load => {
+                    try emit(&out, a, .drop, 0);
+                    try emit(&out, a, .local_get, node.fields);
+                    if (inst.op == .i32_load) try emit(&out, a, .i32x4_extract_lane, lane);
+                    if (inst.op == .f32_load) try emit(&out, a, .f32x4_extract_lane, lane);
+                },
+                .v128_store => {
+                    if (node.used_fields != 0) try emit(&out, a, .local_set, node.fields) else try emit(&out, a, .drop, 0);
+                    try emit(&out, a, .drop, 0);
+                },
+                else => {
+                    const floating = inst.op == .f32_store;
+                    if (node.used_fields == 0) {
+                        try emit(&out, a, .drop, 0);
+                        try emit(&out, a, .drop, 0);
+                    } else if (node.allocation and node.first_store == at) {
+                        // Every lane is written before any read, so the first
+                        // write can define the whole value.
+                        try emit(&out, a, if (floating) .f32x4_splat else .i32x4_splat, 0);
+                        try emit(&out, a, .local_set, node.fields);
+                        try emit(&out, a, .drop, 0);
+                    } else {
+                        const slot = &lane_scratch[@intFromBool(floating)];
+                        if (slot.* == null) {
+                            slot.* = @intCast(function.parameters.len + out.locals.items.len);
+                            try out.locals.append(a, if (floating) .f32 else .i32);
+                        }
+                        try emit(&out, a, .local_set, slot.*.?);
+                        try emit(&out, a, .drop, 0);
+                        try emit(&out, a, .local_get, node.fields);
+                        try emit(&out, a, .local_get, slot.*.?);
+                        try emit(&out, a, if (floating) .f32x4_replace_lane else .i32x4_replace_lane, lane);
+                        try emit(&out, a, .local_set, node.fields);
+                    }
+                },
+            }
+        } else if ((inst.op == .i32_load or inst.op == .f32_load) and analysis.selected(event.input.id)) {
             try emit(&out, a, .drop, 0);
             try emit(&out, a, .local_get, analysis.fieldLocal(event.input.id, event.field / 4));
             if (inst.op == .f32_load) try emit(&out, a, .f32_reinterpret_i32, 0);
@@ -1004,6 +1252,10 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
             try emit(&out, a, .drop, 0);
             try publishField(&out, &analysis, event.input.id, event.field / 4);
         } else try out.instructions.append(a, inst);
+    }
+    if (analysis.selected(analysis.result_box) and analysis.vector(analysis.result_box)) {
+        try emit(&out, a, .drop, 0);
+        try emitBox(&out, a, module, function, analysis.nodes.items[analysis.result_box].fields);
     }
     return out;
 }
@@ -2015,4 +2267,127 @@ fn immortalConstructorFlow(a: A) !void {
 test "compiler static constructor references propagate immortality while forged facts decline through OOM" {
     try immortalConstructorFlow(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, immortalConstructorFlow, .{});
+}
+
+fn vectorFamilies(a: A) !void {
+    // 0 replaced; 1 offset access; 2 eight-byte family; 3 boxed escape after
+    // a lane read; 4 escape without a lane read; 5 escape in a loop that never
+    // allocates the family; 6 owning word role.
+    for (0..7) |scenario| {
+        var module = w.Module.init(a);
+        defer module.deinit();
+        const arena = try module.ensureArena();
+        const sink = try module.addTypedFunction(&.{.i32}, .none, .scalar);
+        try module.emit(sink, .{ .op = .local_get });
+        try module.emit(sink, .{ .op = .drop });
+        const f = try module.addTypedFunction(&.{.f32}, .f32, .scalar);
+        const lanes = try module.addLocal(f, .i32);
+        const sum = try module.addLocal(f, .i32);
+        var buffer: [ir.max_annotations]ir.Instruction = undefined;
+        const size: u32 = if (scenario == 2) 8 else 16;
+        try module.emitSlice(f, ir.annotations(if (scenario == 6) &.{.reference} else &.{}, .scalar, &buffer));
+        try module.emitSlice(f, &.{ .{ .op = .i32_const, .operand = size }, .{ .op = .call, .operand = if (scenario == 6) arena.allocate else arena.allocate_scalar }, .{ .op = .local_set, .operand = lanes } });
+        for (0..size / 4) |lane| try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = lanes }, .{ .op = .local_get }, .{ .op = .f32_store, .operand = @intCast(lane * 4) } });
+        try module.emitSlice(f, ir.annotations(&.{}, .scalar, &buffer));
+        try module.emitSlice(f, &.{
+            .{ .op = .i32_const, .operand = 16 },    .{ .op = .call, .operand = arena.allocate_scalar }, .{ .op = .local_set, .operand = sum },
+            .{ .op = .local_get, .operand = sum },   .{ .op = .local_get, .operand = lanes },            .{ .op = .v128_load, .operand = if (scenario == 1) 4 else 0 },
+            .{ .op = .local_get, .operand = lanes }, .{ .op = .v128_load },                              .{ .op = .f32x4_add },
+            .{ .op = .v128_store },
+        });
+        if (scenario == 3) try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = sum }, .{ .op = .f32_load, .operand = 4 }, .{ .op = .drop } });
+        if (scenario == 5) try module.emitSlice(f, &.{ .{ .op = .loop }, .{ .op = .local_get, .operand = sum }, .{ .op = .f32_load }, .{ .op = .drop } });
+        if (scenario >= 3 and scenario <= 5) try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = sum }, .{ .op = .call, .operand = sink } });
+        if (scenario == 5) try module.emit(f, .{ .op = .end });
+        if (scenario == 4) try module.emit(f, .{ .op = .f32_const }) else try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = sum }, .{ .op = .f32_load, .operand = 8 } });
+        const before = try a.dupe(w.Instruction, module.functions.items[f].instructions.items);
+        defer a.free(before);
+        var output = try run(a, &module, &module.functions.items[f]);
+        defer if (output) |*body| body.deinit(a);
+        var allocations: usize = 0;
+        var vectors: usize = 0;
+        var lanes_read = false;
+        if (output) |body| {
+            for (body.instructions.items) |inst| {
+                if (inst.op == .call and arena.isAllocation(inst.operand)) allocations += 1;
+                if (inst.op == .f32x4_extract_lane) lanes_read = true;
+                // No surviving v128 access may address replaced storage.
+                if (scenario == 0) try std.testing.expect(inst.op != .v128_load and inst.op != .v128_store);
+            }
+            for (body.locals.items) |ty| vectors += @intFromBool(ty == .v128);
+        } else allocations = 2;
+        switch (scenario) {
+            0 => try std.testing.expect(allocations == 0 and vectors != 0 and lanes_read),
+            // Partial, short or owning sources keep their storage; the
+            // independent sum still lives in a local.
+            1, 2, 6 => try std.testing.expect(allocations == 1 and lanes_read),
+            // One box where the value leaves; the lanes stay in a local.
+            3 => try std.testing.expect(allocations == 1 and lanes_read),
+            // Without a local lane use, or inside a loop that never allocated
+            // the value, boxing would add work: the sum keeps its storage.
+            4, 5 => try std.testing.expectEqual(@as(usize, 1), allocations),
+            else => unreachable,
+        }
+        try std.testing.expectEqualSlices(w.Instruction, before, module.functions.items[f].instructions.items);
+    }
+}
+test "four-lane private values live in v128 locals and box only where they leave through OOM" {
+    try vectorFamilies(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, vectorFamilies, .{});
+}
+
+fn vectorBoundaries(a: A) !void {
+    // 0: a parameter copied into a vector carry loads its lanes once;
+    // 1: the same copy into a scalar-field family keeps joining storage;
+    // 2: a block result leaving the function boxes once at the end.
+    for (0..3) |scenario| {
+        var module = w.Module.init(a);
+        defer module.deinit();
+        const arena = try module.ensureArena();
+        const f = try module.addTypedFunction(&.{.i32}, if (scenario == 2) .i32 else .f32, if (scenario == 2) .reference else .scalar);
+        try module.setParameterRoles(f, ir.packParameterRoles(&.{.reference}));
+        const carry = try module.addLocal(f, .i32);
+        const sum = try module.addLocal(f, .i32);
+        var buffer: [ir.max_annotations]ir.Instruction = undefined;
+        if (scenario == 2) try module.emit(f, .{ .op = .block, .operand = @backingInt(w.ValueType.i32) });
+        try module.emitSlice(f, &.{ .{ .op = .local_get }, .{ .op = .local_set, .operand = carry } });
+        try module.emitSlice(f, ir.annotations(&.{}, .scalar, &buffer));
+        try module.emitSlice(f, &.{ .{ .op = .i32_const, .operand = 16 }, .{ .op = .call, .operand = arena.allocate_scalar }, .{ .op = .local_set, .operand = sum } });
+        if (scenario == 1) {
+            for (0..4) |lane| try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = sum }, .{ .op = .local_get, .operand = carry }, .{ .op = .f32_load, .operand = @intCast(lane * 4) }, .{ .op = .f32_store, .operand = @intCast(lane * 4) } });
+        } else try module.emitSlice(f, &.{
+            .{ .op = .local_get, .operand = sum },   .{ .op = .local_get, .operand = carry }, .{ .op = .v128_load },
+            .{ .op = .local_get, .operand = carry }, .{ .op = .v128_load },                   .{ .op = .f32x4_mul },
+            .{ .op = .v128_store },
+        });
+        try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = sum }, .{ .op = .local_set, .operand = carry }, .{ .op = .local_get, .operand = carry }, .{ .op = .f32_load, .operand = 4 } });
+        if (scenario == 2) try module.emitSlice(f, &.{ .{ .op = .drop }, .{ .op = .local_get, .operand = carry }, .{ .op = .br }, .{ .op = .end } });
+        const before = try a.dupe(w.Instruction, module.functions.items[f].instructions.items);
+        defer a.free(before);
+        var output = try run(a, &module, &module.functions.items[f]);
+        defer if (output) |*body| body.deinit(a);
+        var allocations: usize = 0;
+        var parameter_loads: usize = 0;
+        if (output) |body| {
+            for (body.instructions.items, 0..) |inst, at| {
+                if (inst.op == .call and arena.isAllocation(inst.operand)) allocations += 1;
+                if (inst.op == .v128_load and at != 0 and body.instructions.items[at - 1].op == .local_get and body.instructions.items[at - 1].operand == carry) parameter_loads += 1;
+            }
+        } else allocations = 1;
+        switch (scenario) {
+            0 => try std.testing.expect(allocations == 0 and parameter_loads == 1),
+            1 => try std.testing.expectEqual(@as(usize, 1), allocations),
+            2 => {
+                try std.testing.expect(allocations == 1 and parameter_loads == 1);
+                const tail = output.?.instructions.items;
+                try std.testing.expectEqual(w.Op.local_get, tail[tail.len - 1].op);
+            },
+            else => unreachable,
+        }
+        try std.testing.expectEqualSlices(w.Instruction, before, module.functions.items[f].instructions.items);
+    }
+}
+test "outside four-lane values enter v128 locals once and block results box at the exit through OOM" {
+    try vectorBoundaries(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, vectorBoundaries, .{});
 }

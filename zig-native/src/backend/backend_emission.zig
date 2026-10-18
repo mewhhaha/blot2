@@ -3806,6 +3806,43 @@ pub const Owner = struct {
         try self.emit(.unreachable_, 0);
         try self.emit(.end, 0);
     }
+    /// One check admits four elements from `index`, before any address
+    /// arithmetic, so a wrapping index cannot select unrelated lanes.
+    fn simdArrayBounds(self: *Emitter, array_: u32, index: u32) Error!void {
+        const length = try self.temporary(.i32);
+        try self.emit(.local_get, array_);
+        try self.emit(.i32_load, 0);
+        try self.emit(.local_tee, length);
+        try self.emit(.i32_const, 4);
+        try self.emit(.i32_lt_u, 0);
+        try self.emit(.local_get, index);
+        try self.emit(.local_get, length);
+        try self.emit(.i32_const, 4);
+        try self.emit(.i32_sub, 0);
+        try self.emit(.i32_gt_u, 0);
+        try self.emit(.i32_or, 0);
+        try self.emit(.if_, 0);
+        try self.emit(.unreachable_, 0);
+        try self.emit(.end, 0);
+    }
+    /// A fresh copy of a word-element Array whose snapshot must survive.
+    fn copyScalarArray(self: *Emitter, source: u32) Error!u32 {
+        const changed = try self.temporary(.i32);
+        const count = try self.temporary(.i32);
+        try self.emit(.local_get, source);
+        try self.emit(.i32_load, 0);
+        try self.emit(.local_set, count);
+        const size = try self.arraySize(count, 4);
+        try self.emit(.local_get, size);
+        try self.allocateArray(true);
+        try self.emit(.local_set, changed);
+        try self.emit(.local_get, changed);
+        try self.emit(.local_get, changed);
+        try self.emit(.local_get, source);
+        try self.emit(.local_get, size);
+        try self.emit(.call, (try self.generator.module.ensureArena()).copy_words);
+        return changed;
+    }
     fn arraySize(self: *Emitter, count: u32, stride: u32) Error!u32 {
         try self.emit(.local_get, count);
         try self.emit(.i32_const, (std.math.maxInt(u32) - 4) / stride);
@@ -4290,6 +4327,26 @@ pub const Owner = struct {
         const expected = @import("collection_ops.zig").arity(op);
         if (locals.len == 0 or locals.len != expected or machines.len != expected) return g.fail(self.unit_id, id, .unsupported);
         switch (op) {
+            .simd_load, .simd_store => {
+                // Four word-sized scalar elements move as one v128 value.
+                const element = g.representations.store.scalar(input_node.a) orelse return g.fail(self.unit_id, id, .unsupported);
+                if (input_list or row_words != 0 or (element != .u32 and element != .f32 and element != .bool)) return g.fail(self.unit_id, id, .unsupported);
+                try self.simdArrayBounds(locals[0], locals[1]);
+                if (op == .simd_load) {
+                    const address = try self.allocateStorage(16, true, .scalar);
+                    try self.emit(.local_get, address);
+                    try self.arrayAddress(locals[0], locals[1], 4);
+                    try self.emit(.v128_load, 4);
+                    try self.emit(.v128_store, 0);
+                    return self.emit(.local_get, address);
+                }
+                const reuse = id != 0 and (self.owned_edit == id or try g.ownsArrayUpdate(self.unit_id, id));
+                const changed = if (reuse) locals[0] else try self.copyScalarArray(locals[0]);
+                try self.arrayAddress(changed, locals[1], 4);
+                try self.simdLoad(locals[2]);
+                try self.storeScalar(.v128_store, 4);
+                try self.emit(.local_get, changed);
+            },
             .cursor => try self.createCollectionCursor(locals[0], input_list, row_words),
             .cursor_has, .cursor_value, .cursor_advance => try self.readCollectionCursor(locals[0], op, input_list, input_collection, row_words, stride, result),
             .concat, .slice => {
@@ -4943,6 +5000,10 @@ pub const Owner = struct {
         try self.emit(vector_op, 0);
         try self.emit(.v128_store, 0);
         try self.emit(.local_get, address);
+    }
+    fn simdLoad(self: *Emitter, operand: u32) Error!void {
+        try self.emit(.local_get, operand);
+        try self.emit(.v128_load, 0);
     }
     fn arrayStructural(self: *Emitter, op: core.ArrayOp, locals: []const u32, scalar_elements: bool, stride: u32) Error!void {
         const count = try self.temporary(.i32);

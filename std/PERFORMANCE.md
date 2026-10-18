@@ -70,7 +70,7 @@ evaluation order and once-only demand behavior.
 | Staged construction | Private bounded indexed regions update scratch and freeze once. Published spans and observed intermediate versions remain immutable. Append/prepend can reuse unpublished end slack.                                            |
 | Traversal           | Word-element and packed-row cursors retain their own leaf cache. Cross-leaf fields use checked lookup. Generic iterator step/cursor allocations are not universally eliminated.                                                 |
 | Inlining            | A four-node source budget expands to 64 for aggregate results inside loops or known callbacks, with at most six nested expansions and a 4,096-instruction bound.                                                                |
-| SIMD and fusion     | Existing proofs apply to admitted typed loops. Bounded ragged count/fill and rolling/summary modules are implemented and qualified. Broader fusion and SIMD keep ordinary fallbacks.                                            |
+| SIMD and fusion     | Existing proofs apply to admitted typed loops. Private four-lane values use v128 locals. Bounded ragged count/fill and rolling/summary modules are implemented and qualified. Broader fusion and SIMD keep ordinary fallbacks.  |
 
 `prefix_sums` uses recursive pair sums with linear work and intermediate
 storage, including constant evaluation. Array `indices`, `filter` and

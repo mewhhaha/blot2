@@ -4628,6 +4628,21 @@ pub const Session = struct {
         }
         const index = try self.requireScalar(owner, id, values[1]);
         if (index.scalar != .u32) return self.failNode(owner, id, .unsupported);
+        if (operation == .simd_load or operation == .simd_store) {
+            if (array.len < 4 or index.bits > array.len - 4) return self.failNode(owner, id, .array_bounds);
+            if (operation == .simd_load) {
+                // Copy the handles first: allocation can move child storage.
+                const loaded: [4]ValueId = self.valueChildren(values[0])[index.bits..][0..4].*;
+                return self.makeAggregate(owner, id, .product, 0, 0, &loaded);
+            }
+            const lanes = self.valueInfo(values[2]);
+            if (lanes.kind != .product or lanes.len != 4) return self.failNode(owner, id, .unsupported);
+            try self.chargeCells(owner, id, array.len);
+            const copied = try self.allocator.dupe(ValueId, self.valueChildren(values[0]));
+            defer self.allocator.free(copied);
+            @memcpy(copied[index.bits..][0..4], self.valueChildren(values[2]));
+            return self.makeAggregate(owner, id, array.kind, 0, 0, copied);
+        }
         if (index.bits >= array.len) return self.failNode(owner, id, .array_bounds);
         if (operation == .get) return self.valueChildren(values[0])[index.bits];
         try self.chargeCells(owner, id, array.len);

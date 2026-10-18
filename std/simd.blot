@@ -23,26 +23,12 @@ const f32_trunc = fn value => @simd.f32x4.trunc value
 const to_f32 = fn value => @simd.u32x4.to_f32 value
 const to_u32 = fn value => @simd.f32x4.to_u32 value
 
-// Bounds and snapshot behavior are the ordinary Array contracts. A range check
-// precedes index arithmetic, so a wrapping index cannot select unrelated lanes.
-const load = fn index => fn values => do:
-  if index > values.length:
-    return @panic "SIMD load starts outside the array"
-  if values.length - index < 4:
-    return @panic "SIMD load requires four elements"
-  return (values[index], values[index + 1], values[index + 2], values[index + 3])
-const store = fn index => fn lanes => fn values => do:
-  if index > values.length:
-    return @panic "SIMD store starts outside the array"
-  if values.length - index < 4:
-    return @panic "SIMD store requires four elements"
-  let (a, b, c, d) = lanes
-  let result = values
-  result[index] := a
-  result[index + 1] := b
-  result[index + 2] := c
-  result[index + 3] := d
-  return result
+// One range check precedes the index arithmetic, so a wrapping index cannot
+// select unrelated lanes. Loads copy four elements; stores keep the ordinary
+// Array snapshot contract and replace in place when the Array is exclusive.
+// U32, F32 and Bool elements are supported.
+const load = fn index => fn values => @simd.load values index
+const store = fn index => fn lanes => fn values => @simd.store values index lanes
 
 // Reductions never reassociate implicitly. The pairwise variant is an explicit
 // choice of grouping and can round differently from the left-to-right version.

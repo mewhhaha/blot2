@@ -1,17 +1,21 @@
 //! Shared collection operations; the source prefix fixes the collection type.
 const std = @import("std");
-pub const Op = enum(u32) { length, get, set, fill, generate, append, prepend, identity, convert, cursor, cursor_has, cursor_value, cursor_advance, concat, slice };
+/// `simd_load`/`simd_store` read or replace four consecutive Array elements
+/// with one range check; their lanes are an ordinary four-element product.
+pub const Op = enum(u32) { length, get, set, fill, generate, append, prepend, identity, convert, cursor, cursor_has, cursor_value, cursor_advance, concat, slice, simd_load, simd_store };
 pub fn arity(op: Op) u8 {
     return switch (op) {
         .length, .identity, .convert, .cursor, .cursor_has, .cursor_value, .cursor_advance => 1,
-        .get, .fill, .generate, .append, .prepend, .concat => 2,
-        .set, .slice => 3,
+        .get, .fill, .generate, .append, .prepend, .concat, .simd_load => 2,
+        .set, .slice, .simd_store => 3,
     };
 }
 pub const Primitive = struct { op: Op, arity: u8, is_list: bool };
 pub fn lookup(name: []const u8) ?Primitive {
     inline for (.{ .{ "@cursor.has", Op.cursor_has }, .{ "@cursor.value", Op.cursor_value }, .{ "@cursor.advance", Op.cursor_advance } }) |entry|
         if (std.mem.eql(u8, name, entry[0])) return .{ .op = entry[1], .arity = 1, .is_list = false };
+    inline for (.{ .{ "@simd.load", Op.simd_load }, .{ "@simd.store", Op.simd_store } }) |entry|
+        if (std.mem.eql(u8, name, entry[0])) return .{ .op = entry[1], .arity = arity(entry[1]), .is_list = false };
     const is_list = std.mem.startsWith(u8, name, "@list.");
     if (!is_list and !std.mem.startsWith(u8, name, "@array.")) return null;
     const member = name[if (is_list) @as(usize, 6) else 7..];

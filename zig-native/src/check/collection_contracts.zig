@@ -64,6 +64,14 @@ pub fn validate(types: *const core.Types, operation: core.ArrayOp, inputs: []con
             try require((first.tag == .array or first.tag == .list) and result.tag == .cursor);
             try proof.same(inputs[0], result.a);
         },
+        .simd_load, .simd_store => {
+            try require(first.tag == .array);
+            try proof.same(T.u32_type, inputs[1]);
+            const lanes = types.node(if (operation == .simd_load) output_ else inputs[2]);
+            try require(lanes.tag == .product and lanes.b == 4);
+            for (types.list(.{ .start = lanes.a, .len = lanes.b })) |lane| try proof.same(first.a, lane);
+            if (operation == .simd_store) try proof.same(inputs[0], output_);
+        },
         .cursor_has, .cursor_value, .cursor_advance => {
             try require(first.tag == .cursor);
             const sequence = types.node(first.a);

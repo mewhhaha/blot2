@@ -1484,7 +1484,7 @@ fn encodeInstruction(bytes: *Bytes, inst: Instruction, functions: usize, table_s
                 try bytes.uleb(2);
                 try bytes.uleb(inst.operand);
             },
-            .i32x4_replace_lane, .i32x4_extract_lane, .f32x4_extract_lane => {
+            .i32x4_replace_lane, .i32x4_extract_lane, .f32x4_extract_lane, .f32x4_replace_lane => {
                 if (inst.operand >= 4) return error.ModuleTooLarge;
                 try bytes.byte(@intCast(inst.operand));
             },
@@ -1575,6 +1575,7 @@ fn encodeInstruction(bytes: *Bytes, inst: Instruction, functions: usize, table_s
         .i32x4_replace_lane => unreachable,
         .i32x4_extract_lane => unreachable,
         .f32x4_extract_lane => unreachable,
+        .f32x4_replace_lane => unreachable,
         .i32x4_add => unreachable,
         .i32x4_sub => unreachable,
         .i32x4_mul => unreachable,

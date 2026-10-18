@@ -10,8 +10,8 @@
 //! stays empty across: checked scalar stores (`ir.scalarStore`), which write a
 //! word whose checked layout has no edge; traps, which abandon the whole
 //! invocation to failure cleanup, where an unopened empty frame has nothing to
-//! close; calls to journal-neutral leaf functions (`neutralCall`); and nested
-//! frames this pass has already proved empty.
+//! close; calls to journal-neutral leaf functions (`neutralCall`); lane loads
+//! and v128 arithmetic; and nested frames this pass has already proved empty.
 const std = @import("std");
 const ir = @import("runtime_ir.zig");
 const wasm = @import("wasm.zig");
@@ -81,7 +81,10 @@ fn scalar(inst: ir.Instruction, module: *const wasm.Module) bool {
         .f32_reinterpret_i32,
         => true,
         .global_get => inst.operand < module.globals.items.len and module.globals.items[inst.operand].scalar.role() == .scalar,
-        else => false,
+        // Lane loads and arithmetic never call, allocate or publish; a vector
+        // store still needs its checked scalar fact below.
+        .v128_store => false,
+        else => @import("wasm_simd_ops.zig").code(inst.op) != null,
     };
 }
 

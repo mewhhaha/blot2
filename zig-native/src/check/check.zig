@@ -11362,6 +11362,8 @@ const Engine = struct {
                 .cursor => self.types.function(sequence, try self.types.sequence(.cursor, sequence)),
                 .concat => self.types.function(sequence, try self.types.function(sequence, sequence)),
                 .slice => self.types.function(sequence, try self.types.function(T.u32_type, try self.types.function(T.u32_type, sequence))),
+                .simd_load => self.types.function(sequence, try self.types.function(T.u32_type, try self.types.product(&.{ element, element, element, element }))),
+                .simd_store => self.types.function(sequence, try self.types.function(T.u32_type, try self.types.function(try self.types.product(&.{ element, element, element, element }), sequence))),
                 .cursor_has, .cursor_value, .cursor_advance => unreachable,
             };
         }

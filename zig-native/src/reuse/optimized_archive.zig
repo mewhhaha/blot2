@@ -269,7 +269,7 @@ const Resources = struct {
                 .call_indirect => inst.operand < self.signatures,
                 .global_get, .global_set => inst.operand < self.globals,
                 .local_get, .local_set, .local_tee => inst.operand < locals,
-                .i32x4_replace_lane, .i32x4_extract_lane, .f32x4_extract_lane => inst.operand < 4,
+                .i32x4_replace_lane, .i32x4_extract_lane, .f32x4_extract_lane, .f32x4_replace_lane => inst.operand < 4,
                 else => true,
             };
             if (!valid) return false;

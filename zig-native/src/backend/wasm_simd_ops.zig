@@ -10,6 +10,7 @@ pub fn code(op: w.Op) ?u32 {
         .i32x4_replace_lane => 0x1c,
         .i32x4_extract_lane => 0x1b,
         .f32x4_extract_lane => 0x1f,
+        .f32x4_replace_lane => 0x20,
         .i32x4_add => 0xae,
         .i32x4_sub => 0xb1,
         .i32x4_mul => 0xb5,

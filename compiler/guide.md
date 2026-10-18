@@ -689,10 +689,22 @@ const scaled = fn lanes => simd.f32_mul lanes (2.0, 2.0, 2.0, 2.0)
 
 The module provides U32 add/subtract/multiply and bitwise operations; F32
 arithmetic, abs/negate, sqrt and rounding; and saturating F32-to-U32 and
-U32-to-F32 conversion. `load index array` and `store index lanes array` check
-that all four elements fit and preserve array snapshots. Explicit compiler
-operations use `@simd.u32x4.*` and `@simd.f32x4.*` with their full argument
-lists, like the scalar compiler operations.
+U32-to-F32 conversion. `load index values` and `store index lanes values` read
+or replace four consecutive U32, F32 or Bool elements after one range check,
+which precedes the index arithmetic. A store keeps the Array snapshot contract
+and edits in place when the Array is exclusive; a direct `load` wrapper call
+only reads its Array, so it does not force a later update to copy. Explicit
+compiler operations use `@simd.u32x4.*` and `@simd.f32x4.*` with their full
+argument lists, like the scalar compiler operations; `@simd.load values index`
+and `@simd.store values index lanes` take the Array first.
+
+In the optimized tier a private four-lane value lives in a v128 local: tuple
+construction, destructuring, operations, loop carries and copies of parameters,
+call results and fields need no heap object. A value boxes once where it leaves
+the function (a non-inlined call, a stored record or closure field, a return)
+when that point runs no more often than the value was produced; otherwise it
+keeps ordinary refcounted storage. Values still cross non-inlined calls,
+including closure adapters such as partial applications in a pipeline, as boxes.
 
 Eligible independent numeric array-construction kernels automatically use
 four-lane Wasm SIMD and a scalar tail. Admission follows bounded ordinary

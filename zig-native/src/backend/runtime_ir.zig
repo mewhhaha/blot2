@@ -127,6 +127,7 @@ pub const Op = enum(u8) {
     f32x4_div,
     f32x4_convert_i32x4_u,
     i32x4_trunc_sat_f32x4_u,
+    f32x4_replace_lane,
     /// Ownership facts from checked layouts (`Ownership`). It has no stack
     /// effect, is never encoded, and is not code for size heuristics.
     ownership,
@@ -427,6 +428,7 @@ pub fn fixed(op: Op) Contract {
         .i32x4_splat => signature(&.{.i32}, .v128, .pure),
         .f32x4_splat => signature(&.{.f32}, .v128, .pure),
         .i32x4_replace_lane => signature(&.{ .v128, .i32 }, .v128, .pure),
+        .f32x4_replace_lane => signature(&.{ .v128, .f32 }, .v128, .pure),
         .i32x4_extract_lane => signature(&.{.v128}, .i32, .pure),
         .f32x4_extract_lane => signature(&.{.v128}, .f32, .pure),
         .i32x4_add, .i32x4_sub, .i32x4_mul, .v128_and, .v128_or, .v128_xor, .f32x4_add, .f32x4_sub, .f32x4_mul, .f32x4_div => signature(&.{ .v128, .v128 }, .v128, .pure),

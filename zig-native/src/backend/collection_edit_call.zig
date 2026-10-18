@@ -1,6 +1,8 @@
-//! Direct source wrappers of set/append/prepend retain the primitive's ownership
-//! contract. Parameters must be used exactly once; body matching never uses a
-//! source name. Actual arguments are still evaluated in their written order.
+//! Direct source wrappers of set/append/prepend and the four-lane store retain
+//! the primitive's ownership contract, and wrappers of the four-lane load keep
+//! its read-only borrow. Parameters must be used exactly once; body matching
+//! never uses a source name. Actual arguments are still evaluated in their
+//! written order.
 const core = @import("../check/core.zig");
 pub const Plan = struct {
     target: core.BindingRef,
@@ -57,7 +59,7 @@ pub fn analyze(units: []const core.Module, owner: u32, id: core.Id) ?Plan {
         }
         if (source.node(edit).tag != .array_op) return null;
         const op = source.arrayOperation(edit);
-        if (op != .set and op != .append and op != .prepend) return null;
+        if (op != .set and op != .append and op != .prepend and op != .simd_store) return null;
         const operands = source.children(edit);
         const count = @import("collection_ops.zig").arity(op);
         if (operands.len != count or call.count != count) return null;
@@ -78,6 +80,24 @@ pub fn analyze(units: []const core.Module, owner: u32, id: core.Id) ?Plan {
         return .{ .target = target, .op = op, .positions = positions, .count = count, .receiver = call.arguments[positions[0]], .edit = edit, .success = success, .arguments = call.arguments[0..3].* };
     }
     return null;
+}
+
+/// A direct source wrapper of `simd_load` borrows its Array exactly like the
+/// primitive: the call reads the collection and keeps no alias to it.
+pub fn readReceiver(units: []const core.Module, owner: u32, id: core.Id) ?core.Id {
+    const known_call = @import("known_call.zig");
+    const call = known_call.resolve(units, owner, id) orelse return null;
+    if (call.count != 2) return null;
+    const found = known_call.wrapper(units, owner, call) orelse return null;
+    const source = &units[found.target.unit - 1];
+    if (source.node(found.body.root).tag != .array_op or source.arrayOperation(found.body.root) != .simd_load) return null;
+    const operands = source.children(found.body.root);
+    if (operands.len != 2) return null;
+    var used: u8 = 0;
+    const parameters = source.bodyParameters(&found.body);
+    const receiver = known_call.parameterPosition(source, found.target.unit, parameters, operands[0], &used) orelse return null;
+    _ = known_call.parameterPosition(source, found.target.unit, parameters, operands[1], &used) orelse return null;
+    return call.arguments[receiver];
 }
 
 fn borrowPredicate(units: []const core.Module, unit: u32, id: core.Id, receiver: core.BindingId, depth: usize) bool {
