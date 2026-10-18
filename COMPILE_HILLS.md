@@ -343,6 +343,17 @@ A body or literal edit in `ink/math` (71 importers) reuses nothing.
   where fresh elaboration shares the constructor's. Hash-consing projected
   interface graphs, or comparing them modulo sharing, would remove that.
   Wasm identical.
+- **Follow-up, interface sharing (19 October 2026):** not landed. Projecting
+  structurally equal types, rows and operations to one interface node (only
+  identity-free nodes; variables, binders, quantifiers, rigid and scoped types
+  kept) makes the first `ink/math` edit's interface equal population's: it
+  validates 1 module instead of 76 and costs 1,299 instead of 2,195 ms (game,
+  one pair, Wasm identical). But the backend still regenerates every instance on
+  that edit: `ink/math`'s Core type table differs in the same sharing, so the
+  gate's exact `catalogEqual` disables reuse for the program. The next literal
+  edit then also lost its reuse (958 → 1,382 ms) for a reason not yet traced.
+  Landing it needs Core type tables canonicalized the same way, or the gate's
+  catalog comparison modulo sharing, plus the trace.
 
 ### CT12: instance-level dependencies
 
