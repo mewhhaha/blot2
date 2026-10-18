@@ -350,6 +350,14 @@ Constant serialization is 31% of a literal edit.
 - **Fix:** keep serialized static data per constant, keyed by the constant's
   value and layout. Re-serialize only the constants whose value changed.
 - **Overlaps:** task 086.
+- **Result (18 October 2026):** dropped; serialization is no longer the cost.
+  Sampled over 16 literal edits after CT9–CT12, `Generator.constant` is 34.7%
+  inclusive but 0.43% outside the closures and callables it reaches: closure
+  specialization 12.6%, fresh callable generation 16.8% and closure functions
+  4.9%. Retained aggregates are already replayed by value graph (684 per
+  edit); their cost is admission, the old graph inspection and value match in
+  `aggregateConstantRequest` (8.5%), whose correspondence the caller's
+  relocated operands need.
 
 ### CT14: cheaper `prepareReuse`
 
