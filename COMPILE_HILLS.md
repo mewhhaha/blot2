@@ -808,6 +808,20 @@ The loader reads, lexes and parses one file at a time (`reuse/project.zig`).
 
 - **Fix:** check independent modules of one dependency level in parallel. It
   needs a symbol-pool overlay. Large and high risk; do it after CT30–CT41.
+- **Result (18 October 2026):** deferred with measurements. Clocked per module
+  on the game, checking takes 856 ms over 129 modules. The critical path is
+  393 ms: `game.blot` (157 ms) ← `title` ← `scenes` ← `hover` ← `station` ←
+  `robots` (44 ms) ← … ← `ink/math` ← `std/vector` ← prelude. Checking level by
+  level with 4 workers would take 453 ms, about 400 ms of wall time saved.
+  It is blocked by shared state. Checking interns qualified names into the
+  shared symbol pool (`check.zig`, the `self.pool.intern` calls for dotted
+  names), so IDs would follow thread timing. The `associated_remaining` and
+  `resolution_remaining` budgets are spent across modules in order, and
+  diagnostics append in unit order. Design: per-module overlay pools whose
+  new symbols are renumbered in unit order after each level, which means
+  remapping every symbol in a checked module or proving checking interns none
+  that escape; per-module budget charges verified in unit order, with a serial
+  recheck on exhaustion; and diagnostics merged in unit order.
 
 ## Phase 3: frontend validation
 
