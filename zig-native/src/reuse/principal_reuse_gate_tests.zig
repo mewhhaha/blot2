@@ -1406,7 +1406,33 @@ test "foreign-only certificates require actual package callers and gates recheck
     defer current.deinit(a);
     var candidate_gate = try Gate.init(a, &pinned.pools, current.units, current.names.view());
     defer candidate_gate.deinit();
-    try std.testing.expect(candidate_gate.enabled and candidate_gate.dependency_validations > 0 and candidate_gate.reused_dependency_validations == 0);
+    // The existential consumer keeps the context from being reused for the
+    // current modules, but the certificate was captured for exactly the
+    // retained pins, so their own validation is not repeated.
+    try std.testing.expect(!certificate.matches(foreign, helper.names.view(), &actual_callers));
+    try std.testing.expect(candidate_gate.enabled and candidate_gate.dependency_validations == 2 and candidate_gate.reused_dependency_validations == 2);
+    // A certificate for any other context (here other validation bounds)
+    // certifies none of the pins.
+    pinned.pools.dependency_certificate.?.record.key.symbol_count = 0;
+    var other_context = try Gate.init(a, &pinned.pools, current.units, current.names.view());
+    defer other_context.deinit();
+    try std.testing.expect(other_context.enabled and other_context.dependency_validations == 4 and other_context.reused_dependency_validations == 0);
+    pinned.pools.dependency_certificate.?.record.key.symbol_count = before.names.view().symbols.len;
+    // Nor can a changed retained graph hide behind a restamped pin: its image
+    // no longer matches, so the pin is validated again and rejected.
+    const pinned_root = root(&before.units[0], "schema");
+    const kept_node = before.units[0].nodes[pinned_root];
+    const kept_current = current.units[0].nodes[pinned_root];
+    const kept_stamp = pinned.pools.modules[0].stamp;
+    before.units[0].nodes[pinned_root].ty = std.math.maxInt(u32);
+    current.units[0].nodes[pinned_root] = before.units[0].nodes[pinned_root];
+    pinned.pools.modules[0].stamp = artifacts.stamp(before.units[0]);
+    var corrupt = try Gate.init(a, &pinned.pools, current.units, current.names.view());
+    defer corrupt.deinit();
+    try std.testing.expect(!corrupt.enabled and !corrupt.dependencies_validated);
+    before.units[0].nodes[pinned_root] = kept_node;
+    current.units[0].nodes[pinned_root] = kept_current;
+    pinned.pools.modules[0].stamp = kept_stamp;
     const root_ = root(&current.units[0], "schema");
     try std.testing.expect(current.units[0].node(root_).tag == .reference);
     current.units[0].nodes[root_] = .{ .tag = .constant, .ty = T.boolean, .a = 1 };

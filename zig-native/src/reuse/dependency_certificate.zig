@@ -150,6 +150,18 @@ pub const Certificate = struct {
     pub fn matches(self: *const Certificate, context: validation.Context, names: identity.View, callers: []const *const @import("../check/core.zig").Module) bool {
         return self.record.dependencies.modules.len == context.units.len and self.record.key.matches(context, callers) and self.record.dependencies.namespace.matches(names);
     }
+    /// Whether this certificate was captured for exactly these modules: every
+    /// image equals its pin's module, and the namespace and validation bounds
+    /// are the same. The validated context is then identical, not merely
+    /// equivalent, so every unit's recorded validation holds even when foreign
+    /// observations keep `matches` from reusing an equivalent context.
+    pub fn sameContext(self: *const Certificate, context: validation.Context, names: identity.View, pins: anytype) bool {
+        if (self.record.dependencies.modules.len != pins.len or pins.len != context.units.len) return false;
+        if (!std.meta.eql(self.record.key.symbol_count, context.symbol_count) or !std.meta.eql(self.record.key.source_length, context.source_length)) return false;
+        if (!self.record.dependencies.namespace.matches(names)) return false;
+        for (pins, context.units, 0..) |pin, unit, ordinal| if (pin.module != unit or !self.admits(ordinal, pin)) return false;
+        return true;
+    }
     pub fn admits(self: *const Certificate, unit: usize, pin: anytype) bool {
         if (unit >= self.record.dependencies.modules.len) return false;
         const module = self.record.dependencies.modules[unit];

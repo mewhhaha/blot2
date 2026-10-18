@@ -160,8 +160,12 @@ pub const Gate = struct {
         );
         const old_context: validation.Context = .{ .units = old_units, .symbol_count = previous.symbols.len };
         const certified_context = if (old.dependency_certificate) |*certificate| certificate.matches(old_context, previous, old_units) else false;
+        // A certificate captured for exactly these pins (the previous edit's
+        // current modules) certifies every one of them, whatever the
+        // validators observe across modules.
+        const same_context = !certified_context and if (old.dependency_certificate) |*certificate| certificate.sameContext(old_context, previous, old.modules) else false;
         for (units, old.modules, structural_units, 0..) |*module, pin, structural, unit| {
-            if (certified_context and old.dependency_certificate.?.admits(unit, pin)) {
+            if (same_context or (certified_context and old.dependency_certificate.?.admits(unit, pin))) {
                 // Every pin was checked against its current immutable bytes
                 // above; the certificate also owns its original stamp.
                 result.reused_dependency_validations += 1;

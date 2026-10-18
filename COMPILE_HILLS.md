@@ -341,6 +341,19 @@ Constant serialization is 31% of a literal edit.
 
 - **Fix:** index the previous revision's instances by key instead of scanning
   them, and skip modules whose stamps match.
+- **Result (18 October 2026):** CT14, "Certify retained pins by an identical
+  certificate context". Sampled after CT15, `prepareReuse` is 11.3% of a
+  literal edit: 6.6% frozen-Core validation of every module twice (the old
+  pins and the current modules), 3.7% module stamps (CT18), no instance scan
+  and 0.1% `dirtySelections` even on a body edit. gdev's capability recipes,
+  scoped types and staging make the validation context non-reusable, so the
+  previous edit's certificate never matched. A certificate whose every module
+  image equals its retained pin, under the same namespace and bounds, was
+  captured for exactly this context and now certifies the pins; current
+  modules are still validated. Game, 5 pairs at load 1.1–2.2: revert of
+  literal_constant 1,161 → 1,098 ms (10.86 → 10.40 G instructions),
+  literal_in_body edit 1,155 → 1,089 ms, body_change 1,782 → 1,713 ms; the
+  first edit after population has no certificate yet. Wasm identical.
 
 ### CT15: cache `source_value_template.moduleGenerative`
 
