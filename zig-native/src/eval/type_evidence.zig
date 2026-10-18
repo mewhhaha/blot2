@@ -830,11 +830,29 @@ pub const Store = struct {
                 if (selection.remaining.* == 0) return error.EvidenceLimit;
                 selection.remaining.* -= 1;
             }
+            // Owned projection memoizes each solver label like a subtree: a
+            // label and its argument nodes are immutable until the cache's
+            // clocks move. A hit charges the arguments' exact visits and
+            // fails at the depth where re-projecting them would.
+            if (retained) if (memo.?.labels.get(label)) |answer| {
+                if (depth + answer.height > 1024 or budget.* < answer.visits) return error.EvidenceLimit;
+                budget.* -= answer.visits;
+                height.* = @max(height.*, answer.height);
+                try labels.append(allocator, answer.value);
+                continue;
+            };
             const instance = types.selectionAtom(source, source.operation(label).instance);
             if (instance.unit == 0 and instance.decl != 0) return error.UnresolvedType;
             arguments.clearRetainingCapacity();
-            for (source.operationArguments(label)) |argument| try arguments.append(allocator, try self.projectDepth(source, argument, mappings, rows, depth + 1, budget, retained, memo, height, resolver));
-            try labels.append(allocator, try self.effects.internOperationInstance(source.operation(label).identity, arguments.items, instance));
+            const before = budget.*;
+            var label_height: u16 = 0;
+            for (source.operationArguments(label)) |argument| try arguments.append(allocator, try self.projectDepth(source, argument, mappings, rows, depth + 1, budget, retained, memo, if (retained) &label_height else height, resolver));
+            const projected = try self.effects.internOperationInstance(source.operation(label).identity, arguments.items, instance);
+            if (retained) {
+                height.* = @max(height.*, label_height);
+                try memo.?.labels.put(memo.?.allocator orelse self.allocator, label, .{ .value = projected, .visits = @intCast(before - budget.*), .height = label_height });
+            }
+            try labels.append(allocator, projected);
         }
         try labels.appendSlice(allocator, self.effects.view().rowLabels(suffix));
         if (suffix != 0) formal = self.effects.rows.items[suffix].formal;

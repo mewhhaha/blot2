@@ -885,6 +885,19 @@ sessions repeat it (`reuse/independent_call_proof.zig:90`).
 2.1% in a literal edit.
 
 - **Fix:** memoize them per (type, mapping).
+- **Result (18 October 2026):** CT60, "Memoize owned projection of operation
+  labels". Owned (mapping-free) projection memoized type nodes but re-projected
+  every effect row label: per call-site `project` in `collectCallAt` and
+  `collectSelected` was 12% of cold game samples, half of it interning the same
+  operations. The region's projection cache now also memoizes each solver
+  label, charging its arguments' exact visits and failing at the depth where
+  re-projection would; it shares the type memo's clocks. Laws compare with
+  unmemoized projection, invalidate on rollback and argument writes, sweep
+  allocation failures, and pin hit budgets and depths. 5 pairs at load 1.2–1.8:
+  game 2,502 → 2,343 ms CPU, 22.68 → 20.62 G instructions (-9.1%); devtools 835
+  → 815 ms, 6.96 → 6.74 G (-3.3%); `robot_pickup` 5,499 → 5,328 ms (-3.6%
+  instructions); literal-in-body edit 1,363 → 1,262 ms, body edit 1,910 → 1,806
+  ms. Wasm identical.
 
 ### CT61: memoize `ClosureRegion.importType`
 
