@@ -593,6 +593,21 @@ Every body of an edited module is rechecked.
 - **Overlaps:** tasks 024 and 102, and `zig-native/BODY_CUTOFF.md` (remaining
   scope).
 - **Target:** only edited bodies and their dependents recheck.
+- **Result (18 October 2026):** CT26, "Keep importers when an edit only moves a
+  producer's obligations". The body_change edit (`floor` → `ceil`) rechecked
+  `robots.blot` and its 13 importers: one byte fewer moved the source spans of
+  every later obligation, and the interface comparison counted
+  `obligation_spans`, which only the producer's diagnostics and body-cache
+  qualification digests (admission, never results) read. The comparison now
+  ignores them; obligations themselves, including explicit qualification spans,
+  are still compared. Any size-changing edit before a qualified declaration
+  rechecked every importer before. Game, 5 pairs at load 1.7–4.8: body_change
+  edit 1,629 → 1,248 ms (13.72 → 10.58 G instructions), revert 1,548 → 1,169 ms,
+  validated modules 14 → 1, body elaborations 502 → 107; other edits unchanged.
+  The 107 are every declaration of `robots.blot`: the body check cache admits
+  none of its bodies, so per-body cutoff inside the edited module needs body
+  receipts for gdev's forms (tasks 024 and 053), which this hill does not
+  attempt. Wasm identical.
 
 ### CT27: wider inference receipts
 

@@ -56,10 +56,17 @@ pub fn namespaceMatches(source: *const project.Project, names: identity.View) bo
     return true;
 }
 
-/// Compare every principal fact after omitting only unreferenced local suffixes.
+/// Compare every principal fact after omitting only unreferenced local
+/// suffixes, wherever the producer's obligations sit in its source.
 pub fn interfaceEqual(left: PI.Interface, right: PI.Interface, symbol_count: usize, unit_count: usize) bool {
-    if (equal(left, right)) return true;
-    var views = [_]PI.Interface{ left, right };
+    // Obligation spans place each predicate in the producer's own source.
+    // Only the producer's diagnostics and body-cache qualification digests
+    // (admission, never results) read them; no importer's check result does.
+    // A size-changing edit before a qualified declaration moves them alone.
+    var moved = right;
+    if (left.obligation_spans.len == right.obligation_spans.len) moved.obligation_spans = left.obligation_spans;
+    if (equal(left, moved)) return true;
+    var views = [_]PI.Interface{ left, moved };
     for (&views) |*view| {
         var count = view.bindings.len;
         while (count != 0) {

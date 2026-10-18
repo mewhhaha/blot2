@@ -1424,3 +1424,59 @@ test "shared scoped dependency validation observes global invocation catalog act
         try richOwnerRevision(a, &fixture, &session, &next, 2);
     }
 }
+
+const qualified_producer = "const pad: U32 = 1\ntype Box is data = #Box { first: U32 }\nconst first = fn value => value.first\nconst value: U32 = first (#Box { first: 41 })\n";
+const qualified_moved = "const pad: U32 = 10\ntype Box is data = #Box { first: U32 }\nconst first = fn value => value.first\nconst value: U32 = first (#Box { first: 41 })\n";
+const qualified_reader = "import {value, first, Box} from \"./changed\"\nconst read: Unit -> U32 = fn () => @u32.add value (first (#Box { first: 1 }))\n";
+fn producerInterface(fixture: *Fixture) !@import("principal_interface.zig").Interface {
+    var source = try project.load(a, io, fixture.path, .{});
+    defer source.deinit(a);
+    var checked = try @import("project_check.zig").checkProject(a, &source);
+    defer checked.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    for (source.units.items, 1..) |_, id| {
+        if (!std.mem.endsWith(u8, source.filename(@intCast(id)), "/changed.blot")) continue;
+        return @import("dependency_snapshot.zig").freezePrincipal(a, &source.unit(@intCast(id)).tree, &checked.module(@intCast(id)).checked);
+    }
+    return error.MissingProducer;
+}
+test "module interface cutoff keeps importers when an edit only moves the producer's obligations" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    try fixture.write("left.blot", qualified_reader);
+    try fixture.write("changed.blot", qualified_producer);
+    var before = try producerInterface(&fixture);
+    defer @import("dependency_snapshot.zig").deinit(a, &before);
+    try fixture.write("changed.blot", qualified_moved);
+    var after = try producerInterface(&fixture);
+    defer @import("dependency_snapshot.zig").deinit(a, &after);
+    const cutoff = @import("entry_frontend_cutoff.zig");
+    // Only the obligations' source spans differ, and the comparison keeps them.
+    try std.testing.expect(before.obligations.len != 0);
+    try std.testing.expect(!std.mem.eql(u8, std.mem.sliceAsBytes(before.obligation_spans), std.mem.sliceAsBytes(after.obligation_spans)));
+    try std.testing.expect(cutoff.interfaceEqual(before, after, 1 << 16, 8));
+    // A changed obligation still changes the interface.
+    const changed = try a.dupe(@TypeOf(after.obligations[0]), after.obligations);
+    defer a.free(changed);
+    changed[0].ty +%= 1;
+    var altered = after;
+    altered.obligations = changed;
+    try std.testing.expect(!cutoff.interfaceEqual(before, altered, 1 << 16, 8));
+
+    try fixture.write("changed.blot", qualified_producer);
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    try initialize(&session, &fixture);
+    for ([_][]const u8{ qualified_moved, qualified_producer, qualified_moved }) |text| {
+        try fixture.write("changed.blot", text);
+        var expected = try fresh(&fixture);
+        defer expected.deinit(a);
+        var actual = try session.revise(io, fixture.path, null, .{});
+        defer actual.deinit(a);
+        try equal(&actual, &expected);
+        // The reader keeps its check; only the edited producer is validated.
+        try std.testing.expectEqual(@as(usize, 1), session.last.fallback.module_cutoff.reused);
+        try std.testing.expectEqual(@as(usize, 0), session.last.fallback.module_cutoff.interfaces_changed);
+        try std.testing.expectEqual(@as(usize, 1), session.last.fallback.validated_modules);
+    }
+}
