@@ -121,12 +121,12 @@ pub const Importer = struct {
             mapped.* = spelling_ids.get(spelling) orelse 0;
         }
         result.enabled = true;
-        for (old.modules, 0..) |pin, i| {
+        for (old.modules, 0..) |*pin, i| {
             const mapped = unit_map[i];
             if (mapped == 0 or mapped > cached_units) continue;
-            // A hash is an accelerator, followed by exact content equality.
-            // Check the retained pointer still names the originally pinned Core.
-            if (!std.mem.eql(u8, &pin.stamp, &try artifacts.moduleStamp(pin.module, stamps))) continue;
+            // Check the retained pointer still names the originally pinned
+            // Core, then compare current content exactly.
+            if (!try artifacts.pinIntact(pin, stamps)) continue;
             stable[i] = result.coreEqual(pin.module, &units[mapped - 1]) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.Declined => false,

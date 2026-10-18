@@ -68,7 +68,14 @@ pub const limits: format.Limits = .{ .elements = 64 * 1024 * 1024 };
 /// completed selected receipt to replay. An owner over the artifact limit is
 /// also omitted; restart then recomputes.
 pub fn encode(a: A, compiler: format.Digest, source: *const capture.Capture) format.Error!?[]u8 {
+    return encodeWithDigests(a, compiler, source, null);
+}
+/// Tokens are never persisted. Each unit stores the digest of its pinned Core
+/// (`digests[i]` when given, else the pin's own or a fresh one), and decoded
+/// pins carry it, so the first admission after a restart validates them.
+pub fn encodeWithDigests(a: A, compiler: format.Digest, source: *const capture.Capture, digests: ?[]const format.Digest) format.Error!?[]u8 {
     const pools = &(source.metadata.pools orelse return null);
+    if (digests) |known| if (known.len != pools.modules.len) return error.InvalidArtifact;
     const names = if (pools.identity) |value| value else return null;
     if (!pools.project_identity or pools.modules.len == 0) return null;
     const complete = for (source.metadata.specialization_queries.records.items) |query| {
@@ -82,7 +89,7 @@ pub fn encode(a: A, compiler: format.Digest, source: *const capture.Capture) for
         for (certificates.items) |words| a.free(words);
         certificates.deinit(a);
     }
-    for (pools.modules, units) |pin, *unit| {
+    for (pools.modules, units, 0..) |pin, *unit, index| {
         const nodes = pin.module.types.nodes;
         var words: []u32 = &.{};
         for (nodes) |node| if (node.closed_height != 0 or node.closed_generation != 0) {
@@ -91,7 +98,8 @@ pub fn encode(a: A, compiler: format.Digest, source: *const capture.Capture) for
             for (nodes, words) |item, *word| word.* = @as(u32, item.closed_height) | @as(u32, item.closed_generation) << 8;
             break;
         };
-        unit.* = .{ .unit = pin.unit, .canonical_path = pin.canonical_path, .stamp = pin.stamp, .certificates = words, .core = pin.module.* };
+        const digest = if (digests) |known| known[index] else pin.stamp orelse metadata.stamp(pin.module.*);
+        unit.* = .{ .unit = pin.unit, .canonical_path = pin.canonical_path, .stamp = digest, .certificates = words, .core = pin.module.* };
     }
     var records: std.ArrayList(Record) = .empty;
     defer records.deinit(a);
@@ -281,7 +289,8 @@ fn adopt(a: A, snapshot: *Snapshot) format.Error!Archive {
     defer if (context_owned) context.deinit();
     var next: usize = 0;
     for (snapshot.units, pins, offsets) |*unit, *pin, *offset| {
-        pin.* = .{ .unit = unit.unit, .module = &unit.core, .canonical_path = unit.canonical_path, .stamp = unit.stamp };
+        pin.* = metadata.ModulePin.init(unit.unit, &unit.core, unit.canonical_path);
+        pin.stamp = unit.stamp;
         offset.* = next;
         next += unit.core.bindings.len;
     }

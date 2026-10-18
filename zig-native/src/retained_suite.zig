@@ -4,6 +4,7 @@ comptime {
     _ = @import("reuse/portable_query.zig");
     _ = @import("reuse/semantic_archive.zig");
     _ = @import("reuse/semantic_archive_tests.zig");
+    _ = @import("reuse/module_token_tests.zig");
     _ = @import("eval/pool_leases.zig");
     _ = @import("reuse/pool_lease_tests.zig");
     _ = @import("backend/aggregate_constant_tests.zig");

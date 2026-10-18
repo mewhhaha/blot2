@@ -32,7 +32,7 @@ const wasm = @import("../backend/wasm.zig");
 const Allocator = std.mem.Allocator;
 const a = std.testing.allocator;
 
-test "compilation scoped exact stamps recognize independent Core copies without admitting unrelated owners" {
+test "compilation scoped tokens recognize independent Core copies without admitting unrelated owners" {
     var first = try Fixture.init();
     defer first.deinit();
     var second = try Fixture.init();
@@ -41,22 +41,23 @@ test "compilation scoped exact stamps recognize independent Core copies without 
     var memo: artifacts.ModuleStamps = .{ .allocator = a, .current = &views, .previous = null, .compare_contents = true };
     defer memo.deinit();
     try std.testing.expect(!try memo.proveSame(&views[0], &views[1]));
-    const expected = artifacts.stampReference(views[0]);
-    try std.testing.expectEqual(expected, try memo.get(&views[0]));
+    const token = try memo.get(&views[0]);
     try std.testing.expect(try memo.proveSame(&views[0], &views[1]));
-    try std.testing.expectEqual(expected, try memo.get(&views[1]));
+    try std.testing.expectEqual(token, try memo.get(&views[1]));
     try std.testing.expectEqual(@as(usize, 1), memo.computed);
     try std.testing.expectEqual(@as(usize, 1), memo.copied);
     try std.testing.expectEqual(@as(usize, 2), memo.reused);
+    try std.testing.expectEqual(@as(usize, 0), memo.hashed);
     const unrelated = views[1];
     try std.testing.expect(!try memo.proveSame(&views[0], &unrelated));
     try std.testing.expect(!try memo.proveSame(&unrelated, &views[1]));
-    try std.testing.expectEqual(expected, try memo.get(&unrelated));
+    // A view outside the declared owners never reads or shares a token.
+    try std.testing.expect(try memo.get(&unrelated) != token);
     try std.testing.expectEqual(@as(usize, 1), memo.computed);
     try std.testing.expectEqual(@as(usize, 1), memo.copied);
 }
 
-test "compilation scoped exact stamps reject changed executable type catalog span and source metadata" {
+test "compilation scoped tokens give changed executable type catalog span and source metadata a fresh token" {
     var first = try Fixture.init();
     defer first.deinit();
     const expected = artifacts.stampReference(first.units[0]);
@@ -80,28 +81,31 @@ test "compilation scoped exact stamps reject changed executable type catalog spa
         var views = [_]core.Module{ first.units[0], module.* };
         const changed = artifacts.stampReference(views[1]);
         try std.testing.expect(!std.mem.eql(u8, &expected, &changed));
-        var memo: artifacts.ModuleStamps = .{ .allocator = a, .current = &views, .previous = null, .compare_contents = true };
-        defer memo.deinit();
-        try std.testing.expectEqual(expected, try memo.get(&views[0]));
-        try std.testing.expect(!try memo.proveSame(&views[0], &views[1]));
-        try std.testing.expectEqual(changed, try memo.get(&views[1]));
-        try std.testing.expectEqual(@as(usize, 2), memo.computed);
-        try std.testing.expectEqual(@as(usize, 0), memo.copied);
+        for ([_]bool{ false, true }) |validate| {
+            var memo: artifacts.ModuleStamps = .{ .allocator = a, .current = &views, .previous = null, .compare_contents = true, .validate = validate };
+            defer memo.deinit();
+            const token = try memo.get(&views[0]);
+            try std.testing.expect(!try memo.proveSame(&views[0], &views[1]));
+            try std.testing.expect(try memo.get(&views[1]) != token);
+            try std.testing.expectEqual(@as(usize, 2), memo.computed);
+            try std.testing.expectEqual(@as(usize, 0), memo.copied);
+            try std.testing.expectEqual(@as(usize, if (validate) 2 else 0), memo.hashed);
+        }
     }
 }
 
-fn exactStampAllocationScenario(allocator: Allocator, units: []const core.Module) !void {
+fn exactTokenAllocationScenario(allocator: Allocator, units: []const core.Module) !void {
     var memo: artifacts.ModuleStamps = .{ .allocator = allocator, .current = units, .previous = null, .compare_contents = true };
     defer memo.deinit();
-    const expected = artifacts.stampReference(units[0]);
+    const token = try memo.get(&units[0]);
     for (units, 0..) |*module, index| {
         if (index != 0) try std.testing.expect(try memo.proveSame(&units[0], module));
-        try std.testing.expectEqual(expected, try memo.get(module));
+        try std.testing.expectEqual(token, try memo.get(module));
     }
     try std.testing.expectEqual(@as(usize, 1), memo.computed);
     try std.testing.expectEqual(units.len - 1, memo.copied);
 }
-test "compilation scoped exact stamp allocation failure preserves copied owners across memo growth" {
+test "compilation scoped exact token allocation failure preserves copied owners across memo growth" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
     var views: [80]core.Module = undefined;
@@ -113,12 +117,12 @@ test "compilation scoped exact stamp allocation failure preserves copied owners 
         initialized += 1;
     }
     const before = artifacts.stampReference(fixture.units[0]);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, exactStampAllocationScenario, .{&views});
-    try exactStampAllocationScenario(a, &views);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, exactTokenAllocationScenario, .{&views});
+    try exactTokenAllocationScenario(a, &views);
     try std.testing.expectEqual(before, artifacts.stampReference(fixture.units[0]));
 }
 
-test "compilation scoped stamps reuse identical immutable storage but distinguish owners boundaries and header values" {
+test "compilation scoped tokens reuse identical immutable storage but distinguish owners boundaries and header values" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
     const copied_nodes = try a.dupe(core.Node, fixture.units[0].nodes);
@@ -129,58 +133,134 @@ test "compilation scoped stamps reuse identical immutable storage but distinguis
     views[4].nodes = views[4].nodes[0 .. views[4].nodes.len - 1];
     var memo: artifacts.ModuleStamps = .{ .allocator = a, .current = &views, .previous = null };
     defer memo.deinit();
-    for (&views, 0..) |*module, index| {
-        const actual = try memo.get(module);
-        const expected = artifacts.stampReference(module.*);
-        try std.testing.expectEqualSlices(u8, &expected, &actual);
+    var tokens: [5]artifacts.Token = undefined;
+    for (&views, &tokens, 0..) |*module, *token, index| {
+        token.* = try memo.get(module);
         try std.testing.expectEqual(@as(usize, if (index == 0) 1 else index), memo.computed);
     }
+    // Only the same buffers share a token without a content comparison.
+    try std.testing.expectEqual(tokens[0], tokens[1]);
+    for (tokens[2..], 2..) |token, index| for (tokens[0..index]) |earlier| try std.testing.expect(token != earlier);
     try std.testing.expectEqual(@as(usize, 1), memo.reused);
-    // An equal view outside the declared owners must not read or populate the
-    // memo. Its content is still hashed normally.
     const unrelated = fixture.units[0];
-    const expected = artifacts.stampReference(unrelated);
-    const actual = try memo.get(&unrelated);
-    try std.testing.expectEqualSlices(u8, &expected, &actual);
+    try std.testing.expect(try memo.get(&unrelated) != tokens[0]);
     try std.testing.expectEqual(@as(usize, 4), memo.computed);
     try std.testing.expectEqual(@as(usize, 1), memo.reused);
 }
 
-test "compilation scoped stamps rehash reused addresses after the immutable borrow ends" {
-    for ([_]bool{ false, true }) |exact| {
-        var fixture = try Fixture.init();
-        defer fixture.deinit();
-        const original = blk: {
-            var first: artifacts.ModuleStamps = .{ .allocator = a, .current = fixture.units, .previous = null, .compare_contents = exact };
-            defer first.deinit();
-            const digest = try first.get(&fixture.units[0]);
-            _ = try first.get(&fixture.units[0]);
-            try std.testing.expectEqual(@as(usize, 1), first.computed);
-            break :blk digest;
-        };
-        fixture.units[0].nodes[0].a ^= 1;
-        var next: artifacts.ModuleStamps = .{ .allocator = a, .current = fixture.units, .previous = null, .compare_contents = exact };
-        defer next.deinit();
-        const changed = try next.get(&fixture.units[0]);
-        try std.testing.expect(!std.mem.eql(u8, &original, &changed));
-        const expected = artifacts.stampReference(fixture.units[0]);
-        try std.testing.expectEqualSlices(u8, &expected, &changed);
-        try std.testing.expectEqual(@as(usize, 1), next.computed);
-        try std.testing.expectEqual(@as(usize, 0), next.reused);
+/// A previous revision's pins, as a capture leaves them; only `modules` is read.
+fn pinnedPools(pins: []artifacts.ModulePin) artifacts.Pools {
+    var pools: artifacts.Pools = undefined;
+    pools.modules = pins;
+    return pools;
+}
+
+test "retained pins lend their tokens to unchanged views and never to changed ones" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    var other = try Fixture.init();
+    defer other.deinit();
+    // Three retained units: one kept in place, one re-frozen with equal
+    // content, one edited.
+    var retained: [3]core.Module = @splat(fixture.units[0]);
+    for (&retained, 1..) |*module, unit| module.unit = @intCast(unit);
+    const edited_names = try a.dupe(u8, other.units[0].names);
+    defer a.free(edited_names);
+    edited_names[0] ^= 1;
+    var current: [3]core.Module = .{ retained[0], other.units[0], other.units[0] };
+    current[1].unit = 2;
+    current[2].unit = 3;
+    current[2].names = edited_names;
+    for ([_]bool{ false, true }) |validate| {
+        var pins: [3]artifacts.ModulePin = undefined;
+        for (&pins, &retained, 1..) |*pin, *module, unit| pin.* = if (validate) artifacts.ModulePin.validated(@intCast(unit), module, @constCast("")) else artifacts.ModulePin.init(@intCast(unit), module, @constCast(""));
+        var pools = pinnedPools(&pins);
+        var memo: artifacts.ModuleStamps = .{ .allocator = a, .current = &current, .previous = &pools, .compare_contents = true, .validate = validate };
+        defer memo.deinit();
+        for (&pins) |*pin| try std.testing.expect(try artifacts.pinIntact(pin, &memo));
+        try std.testing.expect(try memo.proveSame(pins[1].module, &current[1]));
+        try std.testing.expect(!try memo.proveSame(pins[2].module, &current[2]));
+        try std.testing.expectEqual(pins[0].token, try memo.get(&current[0]));
+        try std.testing.expectEqual(pins[1].token, try memo.get(&current[1]));
+        const edited = try memo.get(&current[2]);
+        for (pins) |pin| try std.testing.expect(edited != pin.token);
+        // Validation computes each view's digest once; tokens alone hash nothing.
+        try std.testing.expectEqual(@as(usize, if (validate) 4 else 0), memo.hashed);
+        if (validate) {
+            for (&current) |*module| try std.testing.expectEqual(artifacts.stamp(module.*), (try memo.digestOf(module)).?);
+        } else try std.testing.expect(try memo.digestOf(&current[0]) == null);
     }
 }
 
-fn stampAllocationScenario(allocator: Allocator, units: []const core.Module) !void {
-    var memo: artifacts.ModuleStamps = .{ .allocator = allocator, .current = units, .previous = null };
+test "token admission trusts pinned buffers and validation also catches changed contents" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    var views = [_]core.Module{fixture.units[0]};
+    for ([_]bool{ false, true }) |validate| {
+        var pins = [_]artifacts.ModulePin{if (validate) artifacts.ModulePin.validated(1, &views[0], @constCast("")) else artifacts.ModulePin.init(1, &views[0], @constCast(""))};
+        var pools = pinnedPools(&pins);
+        try std.testing.expect(try artifacts.pinIntact(&pins[0], null));
+        // An in-place content change breaks the immutability contract; only
+        // the opt-in digest observes it, since the pinned buffers are kept.
+        views[0].nodes[0].a ^= 1;
+        try std.testing.expectEqual(!validate, try artifacts.pinIntact(&pins[0], null));
+        {
+            var memo: artifacts.ModuleStamps = .{ .allocator = a, .current = &.{}, .previous = &pools, .compare_contents = true, .validate = validate };
+            defer memo.deinit();
+            try std.testing.expectEqual(!validate, try artifacts.pinIntact(&pins[0], &memo));
+        }
+        views[0].nodes[0].a ^= 1;
+        // A header naming other buffers is never the pinned Core.
+        const saved = views[0].nodes;
+        views[0].nodes = saved[0 .. saved.len - 1];
+        try std.testing.expect(!try artifacts.pinIntact(&pins[0], null));
+        {
+            var memo: artifacts.ModuleStamps = .{ .allocator = a, .current = &.{}, .previous = &pools, .compare_contents = true, .validate = validate };
+            defer memo.deinit();
+            try std.testing.expect(!try artifacts.pinIntact(&pins[0], &memo));
+        }
+        views[0].nodes = saved;
+        // The memo refuses a token it did not issue for these buffers.
+        var memo: artifacts.ModuleStamps = .{ .allocator = a, .current = &views, .previous = &pools, .compare_contents = true, .validate = validate };
+        defer memo.deinit();
+        try std.testing.expectEqual(pins[0].token, try memo.get(&views[0]));
+        var forged = pins[0];
+        forged.token +%= 1;
+        try std.testing.expect(!try artifacts.pinIntact(&forged, &memo));
+        try std.testing.expect(try artifacts.pinIntact(&pins[0], &memo));
+    }
+}
+
+test "fresh tokens are distinct across invocations and threads" {
+    var seen: std.AutoHashMapUnmanaged(artifacts.Token, void) = .empty;
+    defer seen.deinit(a);
+    const Worker = struct {
+        fn run(out: []artifacts.Token) void {
+            for (out) |*token| token.* = artifacts.freshToken();
+        }
+    };
+    var issued: [4][256]artifacts.Token = undefined;
+    var threads: [4]std.Thread = undefined;
+    for (&threads, &issued) |*thread, *out| thread.* = try std.Thread.spawn(.{}, Worker.run, .{@as([]artifacts.Token, out)});
+    for (threads) |thread| thread.join();
+    for (issued) |out| for (out) |token| {
+        try std.testing.expect(token != 0);
+        try std.testing.expect(!(try seen.getOrPut(a, token)).found_existing);
+    };
+}
+
+fn tokenAllocationScenario(allocator: Allocator, units: []const core.Module) !void {
+    var memo: artifacts.ModuleStamps = .{ .allocator = allocator, .current = units, .previous = null, .validate = true };
     defer memo.deinit();
+    var first: ?artifacts.Token = null;
     for (units) |*module| {
-        const expected = artifacts.stampReference(module.*);
-        const actual = try memo.get(module);
-        try std.testing.expectEqualSlices(u8, &expected, &actual);
+        const token = try memo.get(module);
+        if (first) |earlier| try std.testing.expect(token != earlier) else first = token;
+        try std.testing.expectEqual(artifacts.stampReference(module.*), (try memo.digestOf(module)).?);
     }
 }
 
-test "compilation scoped stamp allocation failure releases storage and leaves source owners unchanged" {
+test "compilation scoped token allocation failure releases storage and leaves source owners unchanged" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
     var views: [80]core.Module = undefined;
@@ -189,10 +269,10 @@ test "compilation scoped stamp allocation failure releases storage and leaves so
         module.unit = @intCast(index + 1);
     }
     const before = artifacts.stampReference(fixture.units[0]);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stampAllocationScenario, .{&views});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, tokenAllocationScenario, .{&views});
     const after = artifacts.stampReference(fixture.units[0]);
     try std.testing.expectEqualSlices(u8, &before, &after);
-    try stampAllocationScenario(a, &views);
+    try tokenAllocationScenario(a, &views);
 }
 
 fn graphScenario(allocator: Allocator) !void {
@@ -488,7 +568,9 @@ fn verify(pool: *const artifacts.Pools, fixture: *const Fixture, physical: u32, 
     try std.testing.expect(pool.operations_finalized);
     try std.testing.expect(pool.operations[0].runtime != 0);
     try std.testing.expect(pool.operations[0].key.len != 0);
-    try std.testing.expectEqualSlices(u8, &artifacts.stamp(fixture.units[0]), &pool.modules[0].stamp);
+    // Unvalidated pins carry a token and their pinned header, not a digest.
+    try std.testing.expect(pool.modules[0].stamp == null and pool.modules[0].token != 0);
+    try std.testing.expect(try artifacts.pinIntact(&pool.modules[0], null));
     try std.testing.expectEqualSlices(u8, &artifacts.stamp(pool.field_locations), &pool.field_locations_stamp);
 }
 test "artifact pools survive evaluator layout template identity teardown with physical catalog order and nested captures" {

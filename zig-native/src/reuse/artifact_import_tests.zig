@@ -152,7 +152,7 @@ fn capture(g: *const Generator, fixture: *const Fixture) !artifacts.Pools {
         a.free(modules);
     }
     for (fixture.units, modules, 0..) |*unit, *pin, i| {
-        pin.* = .{ .unit = @intCast(i + 1), .module = unit, .canonical_path = try a.dupe(u8, fixture.names.view().owner(@intCast(i + 1)).?), .stamp = artifacts.stamp(unit.*) };
+        pin.* = artifacts.ModulePin.validated(@intCast(i + 1), unit, try a.dupe(u8, fixture.names.view().owner(@intCast(i + 1)).?));
         count += 1;
     }
     const layouts = try a.dupe(layout.Node, g.representations.store.nodes.items);

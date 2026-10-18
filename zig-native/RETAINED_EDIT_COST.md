@@ -69,7 +69,9 @@ discarding about 16 MB of images.
   the importer and the gate re-hash every retained module to prove its pointer
   still names the pinned Core before comparing current structure. That is a
   deliberate integrity check; replacing it with owned lifetimes is a design
-  decision.
+  decision. (On 18 October 2026 the owner approved generation tokens, CT18 in
+  [the compile-time hills](../COMPILE_HILLS.md); the digest check is now the
+  opt-in `validate_pins`.)
 - Constant evaluation is 26 ms above `f7be6e7` (closure specialization in
   retained constants); constant evaluation and serialization together, about 270
   ms, belong to the [retained constant work](CONSTANT_REUSE.md).

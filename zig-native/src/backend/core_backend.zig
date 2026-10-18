@@ -57,7 +57,7 @@ pub const Result = struct {
     counters: @import("../work_counters.zig").Counters = .{},
     optimization: function_facts.Stats = .{},
     runtime_optimization: @import("optimized_bodies.zig").Stats = .{},
-    module_stamps: struct { computed: usize = 0, reused: usize = 0, comparisons: usize = 0, copied: usize = 0 } = .{},
+    module_stamps: struct { computed: usize = 0, reused: usize = 0, comparisons: usize = 0, copied: usize = 0, hashed: usize = 0 } = .{},
     refinements: @import("../reuse/refinement_receipt.zig").Stats = .{},
     completed_queries: completed_specialization_query.Stats = .{},
     query_tables: struct {
@@ -2317,6 +2317,10 @@ pub const CompileOptions = struct {
     principal_previous: ?*const artifact_capture.Capture = null,
     query_previous: ?*const artifact_capture.Capture = null,
     cached_units: usize = 0,
+    /// Opt-in integrity validation: captured pins carry their Core digest, and
+    /// a later revision recomputes it before trusting a retained pin. Tokens
+    /// alone decide reuse otherwise; the decisions are the same either way.
+    validate_pins: bool = false,
 };
 
 pub fn compileWithIdentity(allocator: Allocator, units: []const core.Module, entry: u32, names: runtime_identity.View) Error!Result {
@@ -2413,7 +2417,7 @@ const CompileRun = struct {
         // Gate, Importer and graph Plan admission run against it; an in-process
         // previous revision always takes precedence.
         const query_previous = self.options.query_previous orelse self.options.previous orelse if (self.options.checkpoint) |checkpoint| (if (checkpoint.semantic) |*owner| &owner.capture else null) else null;
-        self.module_stamps = .{ .allocator = self.allocator, .current = self.units, .previous = if (query_previous) |old| if (old.metadata.pools) |*pools| pools else null else null, .compare_contents = true };
+        self.module_stamps = .{ .allocator = self.allocator, .current = self.units, .previous = if (query_previous) |old| if (old.metadata.pools) |*pools| pools else null else null, .compare_contents = true, .validate = self.options.validate_pins };
         self.stamps_alive = true;
         self.stamps = if (self.module_stamps.previous != null) &self.module_stamps else null;
         self.journal = artifact_emitter.Recorder.init(self.allocator);
@@ -2690,7 +2694,7 @@ const CompileRun = struct {
             };
             result.query_tables.selected = self.metadata.specialization_queries.storage();
             result.query_tables.principal = self.metadata.principal_queries.storage();
-            try self.metadata.capturePoolsWithStamps(&self.generator, self.options.identity, self.stamps);
+            try self.metadata.capturePoolsWithStamps(&self.generator, self.options.identity, &self.module_stamps);
             result.counters = self.generator.evaluator.counters;
             // Publish validation only with this candidate's owned artifact pools.
             // A failed edit leaves the previous certificate and source pins intact.
@@ -2734,7 +2738,7 @@ const CompileRun = struct {
                 try printArtifact(self.allocator, "ARTIFACT_DEMAND_EVENTS", self.metadata.events.items);
                 try printArtifact(self.allocator, "ARTIFACT_EMISSION", .{ .records = self.journal.records.items, .bytes = self.journal.bytes.items, .parameters = self.journal.parameters.items, .operations = self.journal.operations.items, .functions = self.journal.functions, .locals = self.journal.locals, .instructions = self.journal.instructions });
                 const pools = &self.metadata.pools.?;
-                for (pools.modules) |pin| try printArtifact(self.allocator, "ARTIFACT_MODULE_PIN", .{ .unit = pin.unit, .path = pin.canonical_path, .stamp = pin.stamp });
+                for (pools.modules) |pin| try printArtifact(self.allocator, "ARTIFACT_MODULE_PIN", .{ .unit = pin.unit, .path = pin.canonical_path, .token = pin.token, .stamp = pin.stamp });
                 try printArtifact(self.allocator, "ARTIFACT_OWNED_POOLS", .{ .project_identity = pools.project_identity, .identity = pools.identity, .layouts = pools.layouts, .evaluator = pools.evaluator, .rows = pools.rows, .templates = pools.templates, .captures = pools.captures, .bridge = pools.bridge, .field_locations = pools.field_locations, .field_locations_stamp = pools.field_locations_stamp, .functions = pools.functions, .serialized = pools.serialized, .runtime_globals = pools.runtime_globals, .runtime_order = pools.runtime_order, .operations = pools.operations, .operation_relocations = pools.operation_relocations, .operations_finalized = pools.operations_finalized });
                 std.debug.print("ARTIFACT_METADATA {{\"demands\":{d},\"events\":{d},\"complete_functions\":{d},\"templates\":{d},\"pinned_modules\":{d}}}\n", .{ self.metadata.jobs.items.len, self.metadata.events.items.len, self.metadata.pools.?.functions.len, self.metadata.pools.?.captures.len, self.metadata.pools.?.modules.len });
                 std.debug.print("ARTIFACT_REPLAY {{\"events\":{d},\"owned_bytes\":{d},\"functions\":{d},\"globals\":{d},\"imports\":{d},\"signatures\":{d},\"data_bytes\":{d},\"source_work_during_replay\":0,\"semantic_reuse\":false}}\n", .{ self.journal.records.items.len, self.journal.bytes.items.len, result.emitted_functions, globals, imports, signatures, data_bytes });
@@ -2781,7 +2785,7 @@ const CompileRun = struct {
             result.query_tables.executable_fragment = result.capture.?.executable_queries.storage();
             if (result.capture.?.optimized) |*owner| result.query_tables.executable_optimizer = owner.queries.storage();
         }
-        result.module_stamps = .{ .computed = self.module_stamps.computed, .reused = self.module_stamps.reused, .comparisons = self.module_stamps.comparisons, .copied = self.module_stamps.copied };
+        result.module_stamps = .{ .computed = self.module_stamps.computed, .reused = self.module_stamps.reused, .comparisons = self.module_stamps.comparisons, .copied = self.module_stamps.copied, .hashed = self.module_stamps.hashed };
         self.timing.capture_us = self.clock.lap();
         result.timing = self.timing;
     }

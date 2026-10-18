@@ -129,7 +129,7 @@ fn pools(g: *const Generator, fixture: *const Fixture) !artifacts.Pools {
     for (fixture.units, 1..) |*unit, id| {
         const path = try a.dupe(u8, fixture.names.view().owner(@intCast(id)).?);
         errdefer a.free(path);
-        try pins.append(a, .{ .unit = @intCast(id), .module = unit, .canonical_path = path, .stamp = artifacts.stamp(unit.*) });
+        try pins.append(a, artifacts.ModulePin.validated(@intCast(id), unit, path));
     }
     result.modules = try pins.toOwnedSlice(a);
     result.layouts.nodes = try a.dupe(layout.Node, g.representations.store.nodes.items);

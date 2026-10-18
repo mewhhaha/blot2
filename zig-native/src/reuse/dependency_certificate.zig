@@ -12,7 +12,8 @@ const A = std.mem.Allocator;
 const Module = struct {
     unit: u32,
     path: []u8,
-    stamp: [32]u8,
+    /// The token of the pinned Core this image was captured from.
+    token: u64,
     graph: Image,
     /// Owns nonempty `graph.bytes`. Consecutive certificates share the image
     /// of an exactly unchanged unit instead of copying it.
@@ -74,7 +75,7 @@ pub const Certificate = struct {
     }
     /// `reusable[i]` must certify that the previous certificate's image of unit
     /// i exactly equals the current module's image; the unit, producer path
-    /// and stamp are rechecked before its bytes are copied.
+    /// and token are rechecked before its bytes are copied.
     pub fn captureReusing(a: A, context: validation.Context, pins: anytype, names: identity.View, previous: ?*const Certificate, reusable: []const bool) A.Error!?Certificate {
         return captureReusingWithBudget(a, context, pins, names, previous, reusable, owned_bytes);
     }
@@ -85,7 +86,7 @@ pub const Certificate = struct {
         const old = previous orelse return null;
         if (ordinal >= reusable.len or !reusable[ordinal] or ordinal >= old.record.dependencies.modules.len) return null;
         const module = old.record.dependencies.modules[ordinal];
-        if (module.unit != pin.unit or !std.mem.eql(u8, module.path, pin.canonical_path) or !std.mem.eql(u8, &module.stamp, &pin.stamp)) return null;
+        if (module.unit != pin.unit or !std.mem.eql(u8, module.path, pin.canonical_path) or module.token != pin.token) return null;
         return module.lease;
     }
     pub fn captureReusingWithBudget(a: A, context: validation.Context, pins: anytype, names: identity.View, previous: ?*const Certificate, reusable: []const bool, budget: usize) A.Error!?Certificate {
@@ -129,7 +130,7 @@ pub const Certificate = struct {
                 const captured = try Image.capture(a, unit.*, &remaining) orelse return null;
                 lease = try leased(a, captured);
             }
-            module.* = .{ .unit = pin.unit, .path = path, .stamp = pin.stamp, .graph = .{ .bytes = if (lease) |shared| shared.memory else &.{} }, .lease = lease };
+            module.* = .{ .unit = pin.unit, .path = path, .token = pin.token, .graph = .{ .bytes = if (lease) |shared| shared.memory else &.{} }, .lease = lease };
             owned_path = false;
             initialized += 1;
         }
@@ -165,6 +166,6 @@ pub const Certificate = struct {
     pub fn admits(self: *const Certificate, unit: usize, pin: anytype) bool {
         if (unit >= self.record.dependencies.modules.len) return false;
         const module = self.record.dependencies.modules[unit];
-        return module.unit == pin.unit and std.mem.eql(u8, module.path, pin.canonical_path) and std.mem.eql(u8, &module.stamp, &pin.stamp) and module.graph.matches(pin.module.*);
+        return module.unit == pin.unit and std.mem.eql(u8, module.path, pin.canonical_path) and module.token == pin.token and module.graph.matches(pin.module.*);
     }
 };

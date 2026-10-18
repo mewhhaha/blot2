@@ -73,7 +73,7 @@ const Pinned = struct {
     fn init(fixture: *const Fixture, generator: *const Generator) !Pinned {
         const pins = try a.alloc(artifacts.ModulePin, 1);
         errdefer a.free(pins);
-        pins[0] = .{ .unit = 1, .module = &fixture.units[0], .canonical_path = @constCast(fixture.names.view().owner(1).?), .stamp = artifacts.stamp(fixture.units[0]) };
+        pins[0] = artifacts.ModulePin.validated(1, &fixture.units[0], @constCast(fixture.names.view().owner(1).?));
         const fields = try a.alloc(artifacts.FieldLocation, generator.evaluator.field_locations.count());
         errdefer a.free(fields);
         var iterator = generator.evaluator.field_locations.iterator();

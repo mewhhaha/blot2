@@ -118,8 +118,8 @@ pub const Gate = struct {
         for (units, 0..) |module, index| if (module.unit != 0 and module.unit != index + 1) return result;
         // Check every retained pointer against its original pin before comparing
         // any current structure or using a retained dependency recipe.
-        for (old.modules, 0..) |pin, index| {
-            if (!std.mem.eql(u8, &pin.stamp, &try artifacts.moduleStamp(pin.module, stamps))) return result;
+        for (old.modules, 0..) |*pin, index| {
+            if (!try artifacts.pinIntact(pin, stamps)) return result;
             if (pin.module.unit != 0 and pin.module.unit != index + 1) return result;
         }
         for (units, old.modules) |*module, pin| {
@@ -167,7 +167,7 @@ pub const Gate = struct {
         for (units, old.modules, structural_units, 0..) |*module, pin, structural, unit| {
             if (same_context or (certified_context and old.dependency_certificate.?.admits(unit, pin))) {
                 // Every pin was checked against its current immutable bytes
-                // above; the certificate also owns its original stamp.
+                // above; the certificate also owns its original token.
                 result.reused_dependency_validations += 1;
             } else {
                 certified_images[unit] = false;

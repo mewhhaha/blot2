@@ -34,11 +34,20 @@ pub fn wireKey(compiler: format.Digest) format.Key {
 /// Only records with complete dynamic observations are portable. Exact-source
 /// proofs without them, selected judgments and local templates stay behind.
 pub fn encode(a: A, compiler: format.Digest, context: *const metadata.Context) format.Error![]u8 {
+    return encodeWithDigests(a, compiler, context, null);
+}
+/// `digests[i]`, when given, is the digest of the i-th pinned Core.
+pub fn encodeWithDigests(a: A, compiler: format.Digest, context: *const metadata.Context, digests: ?[]const format.Digest) format.Error![]u8 {
     const pools = &(context.pools orelse return error.InvalidArtifact);
     const names = if (pools.identity) |*owned| owned.view() else return error.InvalidArtifact;
     const modules = try a.alloc(format.Digest, pools.modules.len);
     defer a.free(modules);
-    for (pools.modules, modules) |pin, *stamp| stamp.* = metadata.stamp(pin.module.*);
+    if (digests) |known| {
+        if (known.len != modules.len) return error.InvalidArtifact;
+        @memcpy(modules, known);
+    } else for (pools.modules, modules) |pin, *stamp| {
+        stamp.* = pin.stamp orelse metadata.stamp(pin.module.*);
+    }
     var records: std.ArrayList(Record) = .empty;
     defer records.deinit(a);
     for (context.principal_queries.records.items) |proof| {

@@ -714,7 +714,11 @@ executable body/value checks remain separate.
 Successful revision candidates may retain frozen-Core/dependency validation
 certificates. They own the validated module stamps and exactly the foreign
 binding bounds and symbol/source bounds observed by validation. Retained pins
-are still checked against their bytes. A certificate saves validation work; it
+are checked by generation token: a pin holds while its module still names the
+pinned buffers, since Core is immutable once pinned, and a view inherits a token
+only from those buffers or from exactly equal contents. The opt-in
+`validate_pins` option also recomputes each pin's Core digest; checkpoints store
+digests, never tokens. A certificate saves validation work; it
 grants no interface, value or executable reuse. Only successful publication can
 make the new certificate available to a later revision.
 

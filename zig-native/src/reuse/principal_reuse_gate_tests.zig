@@ -66,7 +66,7 @@ const Pinned = struct {
 
     fn init(allocator: std.mem.Allocator, fixture: *Fixture) !Pinned {
         const pins = try allocator.alloc(artifacts.ModulePin, fixture.units.len);
-        for (fixture.units, pins, 0..) |*module, *pin, i| pin.* = .{ .unit = @intCast(i + 1), .module = module, .canonical_path = @constCast(fixture.names.view().owner(@intCast(i + 1)).?), .stamp = artifacts.stamp(module.*) };
+        for (fixture.units, pins, 0..) |*module, *pin, i| pin.* = artifacts.ModulePin.validated(@intCast(i + 1), module, @constCast(fixture.names.view().owner(@intCast(i + 1)).?));
         var pools: artifacts.Pools = undefined;
         pools.dependency_certificate = null;
         pools.project_identity = true;
@@ -282,7 +282,7 @@ test "unaffected module queries still validate current cross unit edges and reje
         }
         if (variant == 0) after.units[0].types.nodes[T.u32_type].tag = .f32;
         if (variant == 1) after.units[1].calls[0].target.binding = std.math.maxInt(u32);
-        if (variant == 2) pinned.pools.modules[0].stamp[0] ^= 1;
+        if (variant == 2) pinned.pools.modules[0].stamp.?[0] ^= 1;
         var gate = try Gate.init(a, &pinned.pools, after.units, after.names.view());
         defer gate.deinit();
         try std.testing.expect(!gate.enabled);
@@ -1224,6 +1224,12 @@ test "published certificates share exactly proven unchanged images and recapture
     defer gate.deinit();
     try std.testing.expect(gate.enabled);
     try std.testing.expectEqualSlices(bool, &.{ false, true }, gate.certified_images);
+    // As a capture does, current pins take their tokens from this memo: the
+    // stream-equal unit keeps its pin's token and the edited one gets a new one.
+    for (current_pins.pools.modules, current.units, pinned.pools.modules, 0..) |*pin, *module, old, unit| {
+        pin.token = try stamps.get(module);
+        try std.testing.expectEqual(unit == 1, pin.token == old.token);
+    }
     // The copied image must equal the current graph exactly: `admits` walks
     // every byte against the current module.
     try reusedCertificate(a, &gate, current_pins.pools.modules);

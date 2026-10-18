@@ -15,12 +15,17 @@ fn key(compiler: format.Digest) format.Key {
 }
 pub fn encode(a: A, compiler: format.Digest, source: *const capture.Capture) format.Error![]u8 {
     if (!source.emission.sealed) return error.InvalidArtifact;
-    const principal = try principals.encode(a, compiler, &source.metadata);
+    // Both archives record each pinned Core's digest; compute it once.
+    const pins = if (source.metadata.pools) |*pools| pools.modules else return error.InvalidArtifact;
+    const digests = try a.alloc(format.Digest, pins.len);
+    defer a.free(digests);
+    for (pins, digests) |pin, *digest| digest.* = pin.stamp orelse @import("../reuse/code_artifacts.zig").stamp(pin.module.*);
+    const principal = try principals.encodeWithDigests(a, compiler, &source.metadata, digests);
     defer a.free(principal);
     const optimizer = if (source.optimized) |*bodies| try optimized.encode(a, compiler, bodies) else &.{};
     defer a.free(optimizer);
     // An unsupported or oversized semantic owner is omitted, never partial.
-    const owner = try semantic.encode(a, compiler, source) orelse &.{};
+    const owner = try semantic.encodeWithDigests(a, compiler, source, digests) orelse &.{};
     defer a.free(owner);
     return format.encodeWithLimits(a, key(compiler), Wire{ .principal = principal, .optimizer = optimizer, .semantic = owner }, .{ .elements = 64 * 1024 * 1024 });
 }

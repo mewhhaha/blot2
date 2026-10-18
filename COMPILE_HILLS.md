@@ -434,6 +434,24 @@ are linear (`reuse/code_artifacts.zig:665-730`).
   validation. The current design is a documented decision, so this needs the
   owner.
 - **Overlaps:** tasks 093 and 101.
+- **Result (18 October 2026):** CT18, "Pin retained Core by generation token".
+  Approved by the owner. Sampled before, stamps were 5.3% of a literal edit
+  (the importer re-hashed every retained module). A pin now carries a token,
+  issued once when its Core image is first pinned, and the header it pinned; it
+  holds while its module names those buffers. A view inherits a token only from
+  the same buffers or from complete content equality (the existing `proveSame`
+  comparison), so a changed module never keeps one. Certificates compare tokens.
+  `validate_pins` keeps the digest check opt-in; checkpoints store digests,
+  never tokens, and restored pins validate them once. `owns()` is a range check.
+  Laws: token memo (copies, every change kind, storage, unowned views, threads,
+  allocation failure), admission (in-place change caught only by validation,
+  header change and forged token always), identical decisions with and without
+  validation over an edit series, checkpoint restore, and a retained revision
+  under allocation failure. Game, 5 pairs at load 1.1–2.0: −0.70 G instructions
+  per build; literal_constant revert 1,027 → 969 ms (9.90 → 9.21 G),
+  literal_in_body revert 1,043 → 983 ms, body_change revert 1,647 → 1,584 ms,
+  population 2,491 → 2,425 ms. Every deterministic stat equal to the previous
+  build, and to a validating build over a 42-build mixed series. Wasm identical.
 
 ### CT19: cheaper revision input snapshots
 

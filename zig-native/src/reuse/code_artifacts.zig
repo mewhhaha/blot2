@@ -203,12 +203,38 @@ pub const RequestCell = struct { state: core_eval.ValueId, exit: core_eval.Value
 pub const RequestHandler = struct { callback: core_eval.ValueId, cell: u32, outer: provider_chain.Head };
 pub const ArrayProof = struct { unit: u32, updates: []bool };
 pub const DiscardProof = struct { unit: u32, unused: []bool };
+/// Names one immutable Core image within this process. A token is issued once
+/// when an image is first pinned and inherited only by a view of the same
+/// buffers or of exactly equal contents, so equal tokens mean equal Core and a
+/// changed module never keeps an old token. Tokens are never persisted.
+pub const Token = u64;
+var next_token: std.atomic.Value(Token) = .init(1);
+pub fn freshToken() Token {
+    return next_token.fetchAdd(1, .monotonic);
+}
 pub const ModulePin = struct {
     unit: u32,
     /// Exact immutable caller-owned module, retained until replay is finished.
     module: *const core.Module,
     canonical_path: []u8,
-    stamp: [32]u8,
+    token: Token,
+    /// The header `module` held when pinned. The pin stays intact while
+    /// `module` names these same buffers; Core is immutable once pinned.
+    view: core.Module,
+    /// Opt-in integrity validation: the digest of the pinned Core, which every
+    /// later admission recomputes before trusting the pin.
+    stamp: ?[32]u8 = null,
+
+    /// A pin with a fresh token and no digest.
+    pub fn init(unit: u32, module: *const core.Module, canonical_path: []u8) ModulePin {
+        return .{ .unit = unit, .module = module, .canonical_path = canonical_path, .token = freshToken(), .view = module.* };
+    }
+    /// A pin whose admissions also recompute and compare its Core digest.
+    pub fn validated(unit: u32, module: *const core.Module, canonical_path: []u8) ModulePin {
+        var pin = init(unit, module, canonical_path);
+        pin.stamp = stamp(module.*);
+        return pin;
+    }
 };
 pub const Pools = struct {
     /// This run's namespaces are owned below; there is deliberately no portable
@@ -665,77 +691,138 @@ fn measuredStamp(value: anytype, comptime buffered: bool, counts: *StampCounts) 
     inline for (@typeInfo(StampCounts).@"struct".field_names) |name| @field(counts, name) += @field(hash.counts, name);
     return result;
 }
-/// One backend invocation owns this memo. All current/previous Core buffers
-/// must remain alive and immutable until deinit; nothing is retained in a
-/// published artifact. Every invocation freshly hashes or exactly compares its
-/// inputs before reuse.
+/// One backend invocation owns this memo of module tokens. All current and
+/// previous Core buffers must remain alive and immutable until deinit; nothing
+/// is retained in a published artifact. A view inherits a token only from the
+/// same buffers or from complete content equality; any other view receives a
+/// fresh token. With `validate`, each view's Core digest is computed once and
+/// pins captured here carry it.
 pub const ModuleStamps = struct {
     allocator: Allocator,
     current: []const core.Module,
     previous: ?*const Pools,
     compare_contents: bool = false,
+    /// Opt-in integrity validation (see ModulePin.stamp).
+    validate: bool = false,
     entries: std.ArrayList(Entry) = .empty,
+    /// Views that received a fresh token.
     computed: usize = 0,
     reused: usize = 0,
     comparisons: usize = 0,
     /// Distinct immutable views admitted by complete stamp-input equality.
     copied: usize = 0,
-    const Entry = struct { module: core.Module, digest: [32]u8 };
+    /// Core digests computed; zero unless validating.
+    hashed: usize = 0,
+    const Entry = struct { module: core.Module, token: Token, digest: ?[32]u8 };
 
     pub fn deinit(self: *ModuleStamps) void {
         self.entries.deinit(self.allocator);
         self.* = undefined;
     }
     fn owns(self: *const ModuleStamps, module: *const core.Module) bool {
-        for (self.current) |*owned| if (owned == module) return true;
-        if (self.previous) |old| for (old.modules) |pin| {
-            if (pin.module == module) return true;
-        };
+        const address = @intFromPtr(module);
+        const first = @intFromPtr(self.current.ptr);
+        if (address >= first and address - first < self.current.len * @sizeOf(core.Module) and (address - first) % @sizeOf(core.Module) == 0) return true;
+        const old = self.previous orelse return false;
+        if (module.unit != 0 and module.unit <= old.modules.len and old.modules[module.unit - 1].module == module) return true;
+        for (old.modules) |pin| if (pin.module == module) return true;
         return false;
     }
+    fn find(self: *ModuleStamps, module: core.Module) ?*Entry {
+        for (self.entries.items) |*entry| if (entry.module.unit == module.unit and sameStorage(entry.module, module)) return entry;
+        return null;
+    }
+    fn record(self: *ModuleStamps, module: core.Module, token: Token, digest: ?[32]u8) Allocator.Error!*Entry {
+        var known = digest;
+        if (self.validate and known == null) {
+            known = stamp(module);
+            self.hashed += 1;
+        }
+        try self.entries.append(self.allocator, .{ .module = module, .token = token, .digest = known });
+        return &self.entries.items[self.entries.items.len - 1];
+    }
     /// Let an existing structural admission pass share this exact comparison.
-    /// The left input must already have been hashed in this invocation. Success
+    /// The left input must already have a token in this invocation. Success
     /// proves complete Core equality and records the right immutable view;
     /// it grants no namespace, dependency, evidence or code admission.
     pub fn proveSame(self: *ModuleStamps, left: *const core.Module, right: *const core.Module) Allocator.Error!bool {
         if (!self.compare_contents or !self.owns(left) or !self.owns(right)) return false;
-        const digest = for (self.entries.items) |entry| {
-            if (sameStorage(entry.module, left.*)) break entry.digest;
-        } else return false;
+        const known = self.find(left.*) orelse return false;
+        const token = known.token;
+        const digest = known.digest;
         if (sameStorage(left.*, right.*)) return true;
         self.comparisons += 1;
         if (!sameStampValue(left.*, right.*)) return false;
-        try self.entries.append(self.allocator, .{ .module = right.*, .digest = digest });
+        _ = try self.record(right.*, token, digest);
         self.reused += 1;
         self.copied += 1;
         return true;
     }
-    pub fn get(self: *ModuleStamps, module: *const core.Module) Allocator.Error![32]u8 {
-        // Unpaired owners keep the ordinary path. Pointer equality here only
-        // identifies buffers covered by this invocation's immutable borrow.
-        if (!self.owns(module)) return stamp(module.*);
-        for (self.entries.items) |*entry| if (sameStorage(entry.module, module.*)) {
-            self.reused += 1;
-            return entry.digest;
+    /// The token of an owned view; an unowned view always gets a fresh one.
+    pub fn get(self: *ModuleStamps, module: *const core.Module) Allocator.Error!Token {
+        const known = try self.tokenEntry(module) orelse return freshToken();
+        return known.token;
+    }
+    /// Whether `pin.module` still names the Core pinned with `pin.token`: the
+    /// same buffers and, for a validated pin, the same recomputed digest. The
+    /// pin then lends its token to every later view of those buffers.
+    pub fn intact(self: *ModuleStamps, pin: *const ModulePin) Allocator.Error!bool {
+        if (!sameStorage(pin.view, pin.module.*)) return false;
+        const known = try self.tokenEntry(pin.module) orelse return pinIntact(pin, null);
+        if (known.token != pin.token) return false;
+        const expected = pin.stamp orelse return true;
+        const actual = known.digest orelse computed: {
+            const digest = stamp(known.module);
+            known.digest = digest;
+            self.hashed += 1;
+            break :computed digest;
         };
-        if (self.compare_contents) for (self.entries.items) |entry| {
-            if (entry.module.unit != module.unit) continue;
+        return std.mem.eql(u8, &expected, &actual);
+    }
+    fn tokenEntry(self: *ModuleStamps, module: *const core.Module) Allocator.Error!?*Entry {
+        // Pointer equality here only identifies buffers covered by this
+        // invocation's immutable borrow.
+        if (!self.owns(module)) return null;
+        if (self.find(module.*)) |known| {
+            self.reused += 1;
+            return known;
+        }
+        if (self.previous) |old| for (old.modules) |*pin| {
+            if (pin.view.unit != module.unit or !sameStorage(pin.view, module.*)) continue;
+            self.reused += 1;
+            return try self.record(module.*, pin.token, null);
+        };
+        if (self.compare_contents) for (self.entries.items) |known| {
+            if (known.module.unit != module.unit) continue;
             self.comparisons += 1;
-            if (!sameStampValue(entry.module, module.*)) continue;
+            if (!sameStampValue(known.module, module.*)) continue;
             // Both views belong to this immutable borrow. Equality covers the
             // entire stamp input, not just a type/catalog projection. Record
             // the copied view so later requests need only compare its header.
-            try self.entries.append(self.allocator, .{ .module = module.*, .digest = entry.digest });
             self.reused += 1;
             self.copied += 1;
-            return entry.digest;
+            return try self.record(module.*, known.token, known.digest);
         };
-        const digest = stamp(module.*);
-        try self.entries.append(self.allocator, .{ .module = module.*, .digest = digest });
         self.computed += 1;
-        return digest;
+        return try self.record(module.*, freshToken(), null);
+    }
+    /// The digest a pin of this view carries: null unless validating.
+    pub fn digestOf(self: *ModuleStamps, module: *const core.Module) Allocator.Error!?[32]u8 {
+        if (!self.validate) return null;
+        const known = try self.tokenEntry(module) orelse return stamp(module.*);
+        return known.digest;
     }
 };
+
+/// Whether a retained pin still names the Core it was pinned with. Without a
+/// memo (or for a pin the memo does not pair) this checks the pinned buffers
+/// and, for a validated pin, recomputes its digest.
+pub fn pinIntact(pin: *const ModulePin, memo: ?*ModuleStamps) Allocator.Error!bool {
+    if (memo) |tokens| if (tokens.owns(pin.module)) return tokens.intact(pin);
+    if (!sameStorage(pin.view, pin.module.*)) return false;
+    const expected = pin.stamp orelse return true;
+    return std.mem.eql(u8, &expected, &stamp(pin.module.*));
+}
 
 fn comparableStampBytes(comptime T: type) bool {
     return switch (@typeInfo(T)) {
@@ -844,10 +931,6 @@ fn sameStorage(left: anytype, right: @TypeOf(left)) bool {
     };
 }
 
-pub fn moduleStamp(module: *const core.Module, memo: ?*ModuleStamps) Allocator.Error![32]u8 {
-    return if (memo) |cache| cache.get(module) else stamp(module.*);
-}
-
 fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity.View, memo: ?*ModuleStamps) Allocator.Error!Pools {
     // Unchanged immutable fields of the previous revision are leased rather
     // than copied. A failed capture releases every lease it took.
@@ -872,9 +955,14 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
     for (generator.units, modules, 0..) |*module, *pin, index| {
         const unit: u32 = if (module.unit != 0) module.unit else @intCast(index + 1);
         const path = if (names) |*view| view.view().owner(unit) orelse "" else "";
-        pin.* = .{ .unit = unit, .module = module, .canonical_path = try allocator.dupe(u8, path), .stamp = undefined };
+        pin.* = ModulePin.init(unit, module, try allocator.dupe(u8, path));
         module_count += 1;
-        pin.stamp = try moduleStamp(module, memo);
+        // A view of retained buffers, or exactly equal to them, keeps their
+        // token; any other Core keeps the fresh token issued above.
+        if (memo) |tokens| {
+            pin.token = try tokens.get(module);
+            pin.stamp = try tokens.digestOf(module);
+        }
     }
     const Effects = type_evidence.Effects;
     const old_layouts: ?*const Layouts = if (previous) |pools| &pools.layouts else null;
