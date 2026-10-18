@@ -510,6 +510,18 @@ Retained RSS doubles over an edit series (312 to 630 MiB).
 - **Fix:** release superseded revisions' pools, captures and checkpoints once no
   lease holds them.
 - **Target:** flat RSS over 50 alternating edits.
+- **Result (18 October 2026):** CT25, "Give serve-project one heap of size-class
+  free lists". Nothing retained accumulates: a site-tracking allocator showed
+  live bytes repeating exactly (171.5 or 202.5 MiB) over a 72-build mixed series
+  of the seven scenarios, while RSS grew 312 → 640 MiB. std's SmpAllocator moves
+  a thread to the next per-thread slot whenever its slot has no free block of a
+  class, stranding the blocks freed there; the one compile thread cycled through
+  all 16 slots. `runtime/session_heap.zig` keeps one set of size-class free
+  lists for the process (large blocks still map and unmap directly). Same
+  series: RSS 273 → 270–303 MiB, flat after the first cycle; peak 810 → 472 MiB;
+  population 259 → 232 MiB. Game, 5 pairs at load 1.3: instructions −0.07% to
+  −0.26%, CPU population 2,508 → 2,489 ms, literal_constant revert 1,014 → 1,029
+  ms, body_change revert 1,622 → 1,641 ms (within layout noise). Wasm identical.
 
 ### CT26: per-body recheck cutoff
 

@@ -586,7 +586,11 @@ fn run(init: std.process.Init) !bool {
         var output_buffer: [4096]u8 = undefined;
         var input = Io.File.stdin().readerStreaming(init.io, &input_buffer);
         var output = Io.File.stdout().writerStreaming(init.io, &output_buffer);
-        try @import("reuse/zig_project_server.zig").runWithPolicy(backing, init.io, &input.interface, &output.interface, configured_identity, cache_root, policy);
+        // A retained session outlives many revisions; its heap reuses freed
+        // blocks across them instead of stranding them per thread slot.
+        var heap: @import("runtime/session_heap.zig").Heap = .{};
+        const serving = if (builtin.mode == .debug) backing else heap.allocator();
+        try @import("reuse/zig_project_server.zig").runWithPolicy(serving, init.io, &input.interface, &output.interface, configured_identity, cache_root, policy);
         return true;
     }
     const command = (if (std.mem.eql(u8, args[1], "parse-project")) Command.parse_project else if (std.mem.eql(u8, args[1], "check-project")) Command.check_project else if (std.mem.eql(u8, args[1], "build-project")) Command.build_project else std.meta.stringToEnum(Command, args[1])) orelse {
