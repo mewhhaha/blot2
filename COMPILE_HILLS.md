@@ -891,6 +891,15 @@ The solver requests 262 MB in 477k allocations, and scratch requests 122 MB in
 
 - **Fix:** reset region arenas instead of freeing, and size pools from counters.
 - **Overlaps:** Hill 7.
+- **Result (18 October 2026):** deferred. The solver's final capacities sum
+  to 109 MB over a cold game build (effect rows 37 MB, type nodes 26 MB,
+  effect versions 14 MB, labels 11 MB, extra 7 MB, operations 6 MB); the
+  rest of its 262 MB is ArrayList regrowth inside pooled arenas, under 1% of
+  cold CPU. Rows dominate because chronological resolution publishes a fresh
+  row header per resolved fragment. Under 100 MB needs solver stores pooled
+  beyond one region's arena, or fewer row headers in `effects.zig`, a memory
+  model change. CT60's label memo and CT61's chains raise the requests to 266
+  MB solver and 132 MB scratch.
 
 ### CT57: share program tables between sessions
 
