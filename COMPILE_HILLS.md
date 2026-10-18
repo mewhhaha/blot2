@@ -818,6 +818,12 @@ instruction (`backend/wasm_inline.zig:95, 105, 334-360`).
 (`backend/wasm.zig:1077`).
 
 - **Fix:** share one `Analysis` per function.
+- **Result (18 October 2026):** "CT69: Share one lifetime scan between the
+  lifetime and rc passes". The validation in `assemblePrepared` scans the
+  root-lowered body, a different one, so it keeps its scan. Wasm identical.
+  Instructions: game 28.123 → 28.056 G (−0.24%), devtools 8.940 → 8.910 G,
+  literal edit 14.556 → 14.527 G. CPU: game 3,036 → 2,946 ms, devtools 1,030 →
+  1,010 ms.
 
 ### CT70: in-place pass pipeline
 
