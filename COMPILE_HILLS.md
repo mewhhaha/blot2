@@ -615,6 +615,20 @@ Receipt admission is per declaration and requires exact projections.
 
 - **Fix:** admit consumers whose interface did not change.
 - **Overlaps:** tasks 023, 088 and 093.
+- **Result (19 October 2026):** dropped; the misses are not interface changes.
+  After CT26 a literal_constant edit still solves 346 inference regions fresh
+  (about 28% of the edit, sampled). An instrumented build classified its 263
+  receipt-lookup misses: 249 declined on call presence (a consumed call judgment
+  established in one session and not the other), 12 had no receipt and 2
+  declined on seeds alone; none declined on a changed interface or root. The
+  receipts already admit consumers whose callee interfaces are unchanged.
+  Recovering every judgment a receipt read as established but the new session
+  lacks, by an independent recheck as completed specialization queries do,
+  gained 4 hits per edit while doubling generate time (724 → 1,856 ms; game, one
+  pair): the presence mismatches are mostly not recoverable that way. Admitting
+  a receipt whose judgment is established now but was collected from source when
+  recorded would need a proof that both inference paths agree, which the
+  receipts deliberately do not assume.
 
 ### CT28: a development codegen tier for `pen dev`
 
