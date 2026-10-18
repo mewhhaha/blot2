@@ -6,6 +6,60 @@ const ir = @import("runtime_ir.zig");
 const wasm = @import("wasm.zig");
 const A = std.mem.Allocator;
 
+/// Callee facts each call instruction asks for: an adapter's returned
+/// parameter and whether the callee is an admitted producer or a framed
+/// callee. They read only the callee's source body and module facts, which
+/// stay fixed while one pipeline session optimizes, so each is computed once
+/// per callee. Workers share the slots; every writer of a slot computes the
+/// same bits.
+pub const Facts = struct {
+    slots: []std.atomic.Value(u32) = &.{},
+    const returned_known: u32 = 1 << 0;
+    const returned_shift = 1;
+    const returned_mask: u32 = 0x7f << returned_shift;
+    const admitted_known: u32 = 1 << 8;
+    const admitted_bit: u32 = 1 << 9;
+    const framed_known: u32 = 1 << 10;
+    const framed_bit: u32 = 1 << 11;
+    pub fn init(a: A, module: *const wasm.Module) A.Error!Facts {
+        const slots = try a.alloc(std.atomic.Value(u32), module.functions.items.len);
+        @memset(slots, .init(0));
+        return .{ .slots = slots };
+    }
+    pub fn deinit(self: *Facts, a: A) void {
+        a.free(self.slots);
+        self.* = .{};
+    }
+    fn returned(self: *const Facts, module: *const wasm.Module, id: u32) ?u32 {
+        if (id >= self.slots.len) return returnedParameter(module, id);
+        const bits = self.slots[id].load(.monotonic);
+        if (bits & returned_known != 0) {
+            const encoded = (bits & returned_mask) >> returned_shift;
+            return if (encoded == 0) null else encoded - 1;
+        }
+        const value = returnedParameter(module, id);
+        const encoded: u32 = if (value) |parameter| parameter + 1 else 0;
+        _ = self.slots[id].fetchOr(returned_known | (encoded << returned_shift), .monotonic);
+        return value;
+    }
+    fn admits(self: *const Facts, module: *const wasm.Module, id: u32) bool {
+        if (id >= self.slots.len) return admitted(module, &module.functions.items[id]);
+        const bits = self.slots[id].load(.monotonic);
+        if (bits & admitted_known != 0) return bits & admitted_bit != 0;
+        const value = admitted(module, &module.functions.items[id]);
+        _ = self.slots[id].fetchOr(admitted_known | (if (value) admitted_bit else 0), .monotonic);
+        return value;
+    }
+    fn frames(self: *const Facts, module: *const wasm.Module, id: u32) bool {
+        if (id >= self.slots.len) return framed(module, id);
+        const bits = self.slots[id].load(.monotonic);
+        if (bits & framed_known != 0) return bits & framed_bit != 0;
+        const value = framed(module, id);
+        _ = self.slots[id].fetchOr(framed_known | (if (value) framed_bit else 0), .monotonic);
+        return value;
+    }
+};
+
 // A complete local/control proof identifies representation-only adapters. It
 // follows the executed branch, including constructor-pattern return blocks,
 // rather than recognizing a source spelling or guessing from the signature.
@@ -90,9 +144,9 @@ fn returnedParameter(module: *const wasm.Module, id: u32) ?u32 {
     return result;
 }
 
-fn eraseAdapters(a: A, module: *const wasm.Module, source: *const ir.Function) A.Error!?ir.Body {
+fn eraseAdapters(a: A, module: *const wasm.Module, source: *const ir.Function, facts: *const Facts) A.Error!?ir.Body {
     var selected = false;
-    for (source.instructions.items) |inst| if (inst.op == .call and returnedParameter(module, inst.operand) != null) {
+    for (source.instructions.items) |inst| if (inst.op == .call and facts.returned(module, inst.operand) != null) {
         selected = true;
         break;
     };
@@ -102,7 +156,7 @@ fn eraseAdapters(a: A, module: *const wasm.Module, source: *const ir.Function) A
     try result.locals.appendSlice(a, source.locals.items);
     for (source.instructions.items) |inst| {
         var parameter: ?u32 = null;
-        if (inst.op == .call) parameter = returnedParameter(module, inst.operand);
+        if (inst.op == .call) parameter = facts.returned(module, inst.operand);
         if (parameter) |returned| {
             const callee = &module.functions.items[inst.operand];
             for (returned + 1..callee.parameters.len) |_| try dropArgument(a, &result);
@@ -331,15 +385,15 @@ fn framed(module: *const wasm.Module, id: u32) bool {
     };
     return depth == 0 and allocation and reference;
 }
-fn framedLocals(module: *const wasm.Module, body: *const ir.Function) usize {
+fn framedLocals(module: *const wasm.Module, body: *const ir.Function, facts: *const Facts) usize {
     var count = body.parameters.len + body.locals.items.len + 1;
     for (body.instructions.items) |inst| if (inst.op == .call) {
         const callee = &module.functions.items[inst.operand];
-        if (admitted(module, callee)) count += callee.parameters.len + callee.locals.items.len;
+        if (facts.admits(module, inst.operand)) count += callee.parameters.len + callee.locals.items.len;
     };
     return count;
 }
-fn emitFramed(a: A, module: *const wasm.Module, out: *ir.Body, body: *const ir.Function, base: u32, parameters: usize) !void {
+fn emitFramed(a: A, module: *const wasm.Module, out: *ir.Body, body: *const ir.Function, base: u32, parameters: usize, facts: *const Facts) !void {
     const result: u32 = @intCast(base + body.parameters.len + body.locals.items.len);
     try out.locals.append(a, body.result);
     // Every read is dominated by a parameter or a write in this activation.
@@ -356,7 +410,7 @@ fn emitFramed(a: A, module: *const wasm.Module, out: *ir.Body, body: *const ir.F
             copy.op = .br;
             copy.operand = depth;
         }
-        if (copy.op == .call and admitted(module, &module.functions.items[copy.operand])) {
+        if (copy.op == .call and facts.admits(module, copy.operand)) {
             const producer = &module.functions.items[copy.operand];
             const nested: u32 = @intCast(parameters + out.locals.items.len);
             try out.locals.appendSlice(a, producer.parameters);
@@ -388,24 +442,30 @@ fn emitFramed(a: A, module: *const wasm.Module, out: *ir.Body, body: *const ir.F
 }
 
 pub fn run(a: A, module: *const wasm.Module, source: *const ir.Function) A.Error!?ir.Body {
-    var adapters = try eraseAdapters(a, module, source);
+    var facts = try Facts.init(a, module);
+    defer facts.deinit(a);
+    return runWithFacts(a, module, source, &facts);
+}
+/// `run` with callee facts shared by every body of one pipeline session.
+pub fn runWithFacts(a: A, module: *const wasm.Module, source: *const ir.Function, facts: *const Facts) A.Error!?ir.Body {
+    var adapters = try eraseAdapters(a, module, source, facts);
     errdefer if (adapters) |*body| body.deinit(a);
     var view = source.*;
     if (adapters) |body| {
         view.locals = body.locals;
         view.instructions = body.instructions;
     }
-    if (try inlineAllocations(a, module, &view)) |result| {
+    if (try inlineAllocations(a, module, &view, facts)) |result| {
         if (adapters) |*body| body.deinit(a);
         return result;
     }
     return adapters;
 }
 
-fn inlineAllocations(a: A, module: *const wasm.Module, source: *const ir.Function) A.Error!?ir.Body {
+fn inlineAllocations(a: A, module: *const wasm.Module, source: *const ir.Function, facts: *const Facts) A.Error!?ir.Body {
     if (module.arena == null or ir.codeLength(source.instructions.items) > 4096) return null;
     var selected = false;
-    for (source.instructions.items) |inst| if (inst.op == .call and (admitted(module, &module.functions.items[inst.operand]) or framed(module, inst.operand))) {
+    for (source.instructions.items) |inst| if (inst.op == .call and (facts.admits(module, inst.operand) or facts.frames(module, inst.operand))) {
         selected = true;
         break;
     };
@@ -416,7 +476,7 @@ fn inlineAllocations(a: A, module: *const wasm.Module, source: *const ir.Functio
     // Ownership annotations are copied but are not code for this budget.
     var code: usize = 0;
     for (source.instructions.items) |inst| {
-        if (inst.op == .call and code < 4096 and (admitted(module, &module.functions.items[inst.operand]) or framed(module, inst.operand)) and source.parameters.len + result.locals.items.len + framedLocals(module, &module.functions.items[inst.operand]) < 8192) {
+        if (inst.op == .call and code < 4096 and (facts.admits(module, inst.operand) or facts.frames(module, inst.operand)) and source.parameters.len + result.locals.items.len + framedLocals(module, &module.functions.items[inst.operand], facts) < 8192) {
             const callee = &module.functions.items[inst.operand];
             const base: u32 = @intCast(source.parameters.len + result.locals.items.len);
             try result.locals.appendSlice(a, callee.parameters);
@@ -427,8 +487,8 @@ fn inlineAllocations(a: A, module: *const wasm.Module, source: *const ir.Functio
                 try result.instructions.append(a, .{ .op = .local_set, .operand = base + @as(u32, @intCast(parameter)) });
             }
             code += callee.parameters.len + callee.codeLength();
-            if (framed(module, inst.operand)) {
-                try emitFramed(a, module, &result, callee, base, source.parameters.len);
+            if (facts.frames(module, inst.operand)) {
+                try emitFramed(a, module, &result, callee, base, source.parameters.len, facts);
                 continue;
             }
             for (callee.instructions.items) |instruction| {
@@ -637,4 +697,52 @@ fn framedScalarProducer(a: A) !void {
 test "private scalar callback inlining preserves eager frames early exits default locals and exact producer replay through OOM" {
     try framedScalarProducer(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, framedScalarProducer, .{});
+}
+
+fn sharedFactsScenario(a: A) !void {
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    const arena = try module.ensureArena();
+    const producer = try module.addFunction(&.{.i32}, .i32);
+    const row = try module.addLocal(producer, .i32);
+    try module.emitSlice(producer, &.{
+        .{ .op = .i32_const, .operand = 4 },   .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = row },
+        .{ .op = .local_get, .operand = row }, .{ .op = .local_get, .operand = 0 },         .{ .op = .i32_store },
+        .{ .op = .local_get, .operand = row },
+    });
+    const adapter = try module.addTypedFunction(&.{ .i32, .f32 }, .f32, .scalar);
+    try module.setParameterRoles(adapter, ir.packParameterRoles(&.{ .scalar, .scalar }));
+    try module.emitSlice(adapter, &.{.{ .op = .local_get, .operand = 1 }});
+    const consumer = try module.addFunction(&.{.i32}, .i32);
+    const captured = try module.addLocal(consumer, .i32);
+    try module.emitSlice(consumer, &.{
+        .{ .op = .local_get, .operand = 0 },        .{ .op = .call, .operand = producer }, .{ .op = .local_set, .operand = captured },
+        .{ .op = .local_get, .operand = captured }, .{ .op = .i32_load },
+    });
+    const caller = try module.addTypedFunction(&.{ .i32, .f32 }, .f32, .scalar);
+    try module.emitSlice(caller, &.{ .{ .op = .local_get }, .{ .op = .local_get, .operand = 1 }, .{ .op = .call, .operand = adapter } });
+    var facts = try Facts.init(a, &module);
+    defer facts.deinit(a);
+    // Each answer, computed or cached, equals the analysis it replaces.
+    for (0..2) |_| for (0..module.functions.items.len) |index| {
+        const id: u32 = @intCast(index);
+        try std.testing.expectEqual(returnedParameter(&module, id), facts.returned(&module, id));
+        try std.testing.expectEqual(admitted(&module, &module.functions.items[id]), facts.admits(&module, id));
+        try std.testing.expectEqual(framed(&module, id), facts.frames(&module, id));
+    };
+    try std.testing.expect(facts.admits(&module, producer));
+    try std.testing.expectEqual(@as(?u32, 1), facts.returned(&module, adapter));
+    // Bodies optimized with one session's facts equal fresh runs.
+    for ([_]u32{ consumer, caller }) |id| {
+        var fresh = (try run(a, &module, &module.functions.items[id])).?;
+        defer fresh.deinit(a);
+        var shared = (try runWithFacts(a, &module, &module.functions.items[id], &facts)).?;
+        defer shared.deinit(a);
+        try std.testing.expectEqualSlices(ir.ValueType, fresh.locals.items, shared.locals.items);
+        try std.testing.expectEqualSlices(ir.Instruction, fresh.instructions.items, shared.instructions.items);
+    }
+}
+test "inlining callee facts shared by a session equal fresh analyses through allocation failure" {
+    try sharedFactsScenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, sharedFactsScenario, .{});
 }

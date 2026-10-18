@@ -45,6 +45,7 @@ pub const Session = struct {
     allocator: A,
     module: *const wasm.Module,
     summaries: lifetimes.Summaries,
+    inline_facts: @import("wasm_inline.zig").Facts = .{},
     providers: @import("provider_modes.zig").Catalog = .{},
     roots: bool = false,
     needs_roots: bool = false,
@@ -53,7 +54,9 @@ pub const Session = struct {
     pub fn init(a: A, module: *const wasm.Module) A.Error!Session {
         var summaries = try lifetimes.Summaries.init(a, module);
         errdefer summaries.deinit();
-        var result: Session = .{ .allocator = a, .module = module, .summaries = summaries };
+        var inline_facts = try @import("wasm_inline.zig").Facts.init(a, module);
+        errdefer inline_facts.deinit(a);
+        var result: Session = .{ .allocator = a, .module = module, .summaries = summaries, .inline_facts = inline_facts };
         result.roots = module.arena != null and !module.mutable_static;
         for (module.imports.items, 0..) |_, index| if (module.hostCallbackImport(index) == null and !module.ownedCleanupBindImport(index) and !module.resourceImport(index) and !module.taskImport(index)) {
             result.roots = false;
@@ -99,6 +102,7 @@ pub const Session = struct {
         return result;
     }
     pub fn deinit(self: *Session) void {
+        self.inline_facts.deinit(self.allocator);
         self.providers.deinit(self.allocator);
         self.summaries.deinit();
     }
@@ -153,7 +157,7 @@ pub const Session = struct {
             const next: ?ir.Body = if (self.tier == .development and !std.mem.eql(u8, pass, "lifetime") and !std.mem.eql(u8, pass, "rc"))
                 null
             else if (comptime std.mem.eql(u8, pass, "inline"))
-                try @import("wasm_inline.zig").run(self.allocator, self.module, &view)
+                try @import("wasm_inline.zig").runWithFacts(self.allocator, self.module, &view, &self.inline_facts)
             else if (comptime std.mem.eql(u8, pass, "scalar"))
                 try @import("wasm_sroa.zig").runWithRoots(self.allocator, self.module, &view, self.roots)
             else if (comptime std.mem.eql(u8, pass, "vector"))
