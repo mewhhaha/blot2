@@ -848,6 +848,9 @@ About ten passes each build a new body and copy every instruction
 (`backend/wasm.zig:653-684`).
 
 - **Fix:** use a worklist.
+- **Result (18 October 2026):** dropped. A worklist that stops at the first
+  reached allocator measured 28.0358 → 28.0358 G instructions on the game
+  (+0.02 M) and the same on devtools: the fixpoint already stopped early.
 
 ### CT72: skip capture when no retained consumer exists
 
