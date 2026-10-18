@@ -814,6 +814,12 @@ It is 13.1% inclusive cold.
 
 - **Fix:** memoize refinements per canonical (callee, mapping) key.
 - **Overlaps:** Hill 4.
+- **Result (18 October 2026):** dropped. Refinement receipts already memoize
+  per (root, expected, seeds, rows): on a cold game build 16,254 of 19,248
+  requests hit the local memo, leaving 2,994 fresh regions, of which only 63
+  repeat an earlier key (physical-shape queries that cannot publish). A
+  canonical memo could save at most 2% of refinement regions; the 28%
+  inclusive is those regions' own inference, which CT60 and CT61 cut.
 
 ### CT51: split the largest region
 
