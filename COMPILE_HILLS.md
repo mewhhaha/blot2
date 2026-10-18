@@ -1444,6 +1444,16 @@ Hill 9. It needs CT57, CT74 and CT88.
 
 - **Fix:** resolve instances first, then emit them. That lets both phases run in
   parallel. Large and high risk.
+- **Result (18 October 2026):** deferred. Of 1,064 ms of profiled game
+  generation, inference is 861 ms, constants 125 ms, layouts 17 ms, evaluation
+  20 ms and specialization 14 ms; emission and the rest are about 25 ms. The
+  split alone would parallelize only those 25 ms; its value is enabling CT87.
+  A callee's key exists only once its caller's region is solved, so
+  resolution is a top-down wavefront, and each resolution writes the evidence
+  store, the summary jobs and constant slots. Function IDs follow depth-first
+  order, so byte identity needs emission to keep that order. Design: resolve
+  each wavefront's keys (on CT87's private Sessions), publish in key order,
+  then emit depth-first exactly as today.
 
 ### CT89: parallel lifetime planning and codegen
 
