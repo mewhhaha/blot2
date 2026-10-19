@@ -149,3 +149,27 @@ test "restart cache: restored outputs encode, decode and publish under allocatio
     defer a.free(header);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, encodeOnce, .{ &session, header[0..64] });
 }
+
+test "restart cache: restored outputs past the default element limit round-trip" {
+    // Wasm and sources are byte slices, which the format counts as elements.
+    const wasm = try a.alloc(u8, 5 * 1024 * 1024);
+    defer a.free(wasm);
+    @memset(wasm, 0x2a);
+    const files = [_]@import("revision_inputs.zig").Persisted.Pair{.{ .key = "/p/main.blot", .value = "entry const x: U32 = 1\n" }};
+    const bytes = try retained.Restored.encodeWire(a, compiler, .{
+        .settings = @splat(3),
+        .entry_request = "/p/main.blot",
+        .entry_canonical = "/p/main.blot",
+        .output_identity = null,
+        .policy = .{},
+        .wasm = wasm,
+        .source_bytes = files[0].value.len,
+        .modules = 1,
+        .checkpoint_digest = null,
+        .inputs = .{ .options = .{}, .paths = &.{}, .files = &files, .imports = &.{} },
+    });
+    defer a.free(bytes);
+    var restored = try retained.Restored.decode(a, compiler, bytes);
+    defer restored.deinit();
+    try std.testing.expectEqualSlices(u8, wasm, restored.output.bytes);
+}

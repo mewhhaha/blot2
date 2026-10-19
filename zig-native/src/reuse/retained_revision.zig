@@ -135,10 +135,16 @@ pub const Restored = struct {
     fn key(compiler: [32]u8) dependency_format.Key {
         return .{ .compiler = compiler, .settings = dependency_format.digest("blot-restored-output-v1"), .source = @splat(0), .dependencies = @splat(0) };
     }
+    /// Byte slices count as elements: Wasm and sources together pass the
+    /// default four million, so allow what a checkpoint may hold.
+    const limits: dependency_format.Limits = .{ .elements = 64 * 1024 * 1024 };
+    pub fn encodeWire(a: Allocator, compiler: [32]u8, wire: Wire) dependency_format.Error![]u8 {
+        return dependency_format.encodeWithLimits(a, key(compiler), wire, limits);
+    }
     /// Rejects bytes that do not decode for `compiler`, or whose entry is not
     /// among their own source observations.
     pub fn decode(a: Allocator, compiler: [32]u8, bytes: []const u8) !Restored {
-        var wire = try dependency_format.decode(Wire, a, bytes, key(compiler));
+        var wire = try dependency_format.decodeWithLimits(Wire, a, bytes, key(compiler), limits);
         var wire_alive = true;
         defer if (wire_alive) dependency_format.deinit(a, &wire);
         const entry_read = for (wire.inputs.files) |file| {
@@ -376,7 +382,7 @@ pub const Session = struct {
         if (output.demand_lowering != null or prepared.entry == 0 or prepared.entry > prepared.paths.len) return null;
         const observed = try inputs.Persisted.capture(a, current.snapshot.view()) orelse return null;
         defer inputs.Persisted.releaseWire(a, observed);
-        return try dependency_format.encode(a, Restored.key(compiler), Restored.Wire{
+        return try Restored.encodeWire(a, compiler, .{
             .settings = self.seed_settings,
             .entry_request = output.entry_request,
             .entry_canonical = prepared.paths[prepared.entry - 1],

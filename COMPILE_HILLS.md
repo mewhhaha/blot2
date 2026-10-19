@@ -1538,7 +1538,10 @@ against 3.0 s).
   tier and explained demands decline), byte identity with fresh builds, foreign
   and damaged bytes, allocation failure through encode, decode and publication,
   and in executed tests unchanged, changed, foreign, truncated and corrupt
-  restarts plus export after a restored build. Wasm identical.
+  restarts plus export after a restored build. Wasm identical. CT84's write
+  report later showed 9 test entries (3 MB of Wasm each) over the default
+  element limit, which counts bytes; the output part now uses the
+  checkpoint's.
 
 ### CT83: cache the frontend
 
