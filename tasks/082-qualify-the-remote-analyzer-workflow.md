@@ -2,12 +2,12 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Awaiting external evidence — the local analyzer builds at
-  `9a78ce1`, but its backend bootstrap needs `codeberg.org`, blocked by the
-  enforced environment policy. The Codeberg configuration is published, but this
-  running instance still reports its earlier source version and enforced
-  revision 3 without that host. The published settings need to apply here.
-  Final-source qualification also retains its documented dependencies.
+- **Status:** In progress — the published Codeberg configuration is now active
+  in enforced revision 4, and Git access to the pinned Zig source succeeds. The
+  local analyzer and its backend build at `9a78ce1` with the upstream-supported
+  `-Duse-llvm=true` host compiler option. Doctor reports Zig 0.17.0 and a
+  compatible backend. Final-source qualification retains its documented
+  dependencies.
 - **19 October 2026:** rerun the local analyzers after task 084. CI lint has
   reported 0 findings on every compile-time-hill merge through 19 October.
 - **Dependencies:** [081](081-finalize-durable-documentation.md)

@@ -130,16 +130,22 @@ zero findings. Current runtime and staging measurements are recorded in
 
 ## Remaining qualification
 
-A local analyzer at `9a78ce1` builds, but its backend bootstrap requires access
-to `codeberg.org`, currently blocked by the environment's enforced allowlist.
-The configuration adding that host is now published, with no pending draft. The
-running instance still reports source version ending `184c37ff85fd4` and
-enforced revision 3 without Codeberg, whereas the published version ends
-`4f2c40ba7f3a6c6`. A direct HTTPS request still receives CONNECT 403. The
-observation is retained in ignored `.tools/published-network-observation.json`
-beside the repository. The current forced gate and heap measurement pass. The
-local analyzer gate and the remaining module, iterator and final performance
-requirements stay open.
+A local analyzer at `9a78ce1` and its backend build. The published `codeberg.org` rule is now
+active in enforced revision 4, and Git resolves Zig 0.17.0 to the expected
+commit `7647adab80dd088f4de3610fd245915a912eb6ad`. The supported
+`-Duse-llvm=true` host compiler option builds the analyzer backend; the resulting
+backend still uses `-Denable-llvm=false`. Its source, analysis patch and protocol
+checks remain exact. Doctor reports Zig 0.17.0 and a compatible backend.
+The analyzer binary SHA-256 is
+`1ff727d14e0e6d75f882d6b9decdae9cab657a4815cff4d7703069aa0b4d4b25`, and
+the backend executable SHA-256 is
+`010850fcfe0ec617d2477ff5f7beca4edfbfa88536ad97ccea549cd0a0183c2c`.
+The manifest's `backend_sha256` names its source/patch inputs, not the executable.
+The earlier revision-3 rejection is retained
+as historical evidence in ignored `.tools/published-network-observation.json`.
+The forced gate above qualifies the earlier source milestone. New module-cutoff
+source changes require a new gate. The local analyzer gate and the remaining
+module, iterator and final performance requirements stay open.
 
 ## Current external and tooling checks
 
@@ -150,7 +156,17 @@ historical `86a527b` and `48eda0a` releases. All required current/pinned ratios
 are below 1.5, break writes scale by 1.821 when the count doubles, and 60,480
 guest calls preserve witnesses and warmed memory. Each compiler uses its own
 standard library and guest API. The production compiler is unchanged from the
-full gate above. The program now has 96 complete tasks and 14 open.
+full gate above. The callback qualification below brings the program to 97 complete tasks and
+13 open.
+
+Task 108 closes on the same qualified production compiler with owner-approved
+recreated full-Ink inputs. Its 1,854 result checks pass in both guest codegen
+tiers, including retained edit/revert and fresh-byte parity. The exact pre-fix
+parent `05401a9`, built with Zig 0.17.0 in development mode and its own standard
+library, reports `effect_mismatch` for the pure stored callback cases. See
+[stored callback captures](STATIC_CAPTURE_ROWS.md) for pins, commands and the
+scope of the memory observations. New task-053 compiler changes are separate
+unqualified work.
 
 The public Ink app-hooks input at Ink `1a291a1b90b9197e6a9fc327f52d77bf965d8cf3`
 passes `scripts/bench_ink_acceptance.ts` with the release compiler in both

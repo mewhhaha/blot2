@@ -633,16 +633,16 @@ have zero findings; the full gate takes 697.812 s. Exact frozen inputs and
 release qualification are in
 [the checkpoint](../zig-native/CONTINUATION_QUALIFICATION.md#qualified-continuation-15-october-2026).
 Tasks 070/071 now satisfy their finite acceptance criteria. The current 19
-October statuses are **96 complete** (including four designs), **6 in
-progress**, **1 awaiting external evidence** and **7 pending**: **14 remain
-open**. The broader program and performance targets remain open.
+October statuses are **97 complete** (including four designs), **6 in progress**
+and **7 pending**: **13 remain open**. The broader program and performance
+targets remain open.
 
 On 18–19 October 2026 the compile-time hills in
 [COMPILE_HILLS.md](../COMPILE_HILLS.md) (CT1–CT94) and the runtime issues
 #12–#16 landed outside this index. Their effect on tasks 024, 082, 086, 093 and
 100–104 is in each task's dated status note. Tasks 105–109 are implemented in
-committed source. Current acceptance records close 105–107 and 109; 108 remains
-open.
+committed source. Current acceptance records close 105–109, including owner-approved recreated
+Ink callback probes for 108.
 
 Owner decisions of 15 October 2026: language tasks 058/059/061/062/064/065,
 067/068 and 073/074 close against fixed acceptance rows or traces recorded in
@@ -761,7 +761,7 @@ the forced complete gate pass. The authoritative statuses are below.
 | [079] — Relocate fixtures through a test module         | Complete                   | [078]                                  |
 | [080] — Organize the source tree                        | Complete                   | [079]                                  |
 | [081] — Finalize durable documentation                  | In progress                | [080]                                  |
-| [082] — Qualify the analyzer workflow locally           | Awaiting external evidence | [081]                                  |
+| [082] — Qualify the analyzer workflow locally           | In progress                | [081]                                  |
 | [083] — Review and clean old build artifacts            | Complete                   | [081]                                  |
 | [084] — Qualify the complete program                    | Pending                    | [082], [083], [085]–[099]              |
 | [085] — Gate principal-graph sharing on payoff          | Complete                   | —                                      |
@@ -787,7 +787,7 @@ the forced complete gate pass. The authoritative statuses are below.
 | [105] — Admit agreeing generalized local instances      | Complete                   | None                                   |
 | [106] — Fit small guest objects and journal pages       | Complete                   | None                                   |
 | [107] — Reject dead rebinding in nested blocks          | Complete                   | None                                   |
-| [108] — Widen stored callback rows in static captures   | In progress                | None                                   |
+| [108] — Widen stored callback rows in static captures   | Complete                   | None                                   |
 | [109] — Restore Array loop throughput                   | Complete                   | None                                   |
 | [999] — Remove tasks and plan                           | Pending                    | All [001]–[109], plus every added task |
 

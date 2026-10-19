@@ -2,9 +2,9 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — fix and law recorded on 17 October 2026 and
-  committed in `f6a2942`; later full gates on main pass. The acceptance evidence
-  (Ink repros) remains to be recorded.
+- **Status:** Complete — the fix and committed law pass the qualified source
+  gate; owner-approved recreated full-Ink probes pass both tiers and retained
+  replay, with verified pre-fix failure controls on 19 October 2026.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink by peer session on 16 October
   2026 (`effect_mismatch` on `fn () => ecs.checkpoint engine` with a generic
@@ -44,17 +44,39 @@ commit.
 
 ## Acceptance criteria
 
-- [ ] Ink's `v0`, `v1` and `v3` repros and the new law build and run; nominal
+- [x] The owner-approved recreated Ink probes and the new law build and run; nominal
       argument invariance laws in `zig-native/src/check/types_tests.zig` still
       pass.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending.
-- Validation: Ink's `v0`, `v1`, `v3`, `v2` and `u1` build with the patched dev
-  compiler; the new law passes and fails on the previous compiler.
+- Replacement decision, 19 October 2026: the original local `v0`, `v1` and
+  `v3` files did not survive and are absent from the available history. The
+  owner authorized recreated probes using the checked-out Ink ECS library:
+  `one_resource`, `two_resources` and `snapshot_resource`. These are replacement
+  acceptance inputs, not recovered originals. Qualification must record their
+  exact source/library/compiler pins, both code generation tiers, retained edit
+  and revert parity, execution and ownership witnesses, and a pre-fix
+  `effect_mismatch` control. The qualification below supplies that evidence.
+- Implementation commit: `f6a2942`; qualified production source: `e29dd0d`.
+- Prior report: Ink's `v0`, `v1`, `v3`, `v2` and `u1` built with the patched
+  development compiler. Their missing original source files prevent using that
+  report as reproducible acceptance evidence. The committed trimmed law and
+  nominal invariance laws pass the forced 2,470-law native gate and 1,556
+  guest/client checks on qualified source `e29dd0d`.
+- Current acceptance: the portable `scripts/qualify_static_capture_rows.ts`
+  passes three full-Ink inputs at Ink `1a291a1b`, two code generation tiers,
+  retained edits/reverts, fresh byte equality and 1,854 executed result checks.
+  All recorded input pins verify. Parent `05401a9`, built in development mode
+  with its own standard library, reports `effect_mismatch` for `one_resource`
+  and `two_resources`; `snapshot_resource` is a positive control. Harness
+  formatting, type checking and lint pass. This qualifies the callback fix in
+  the prior production source; uncommitted task-053 changes remain unqualified.
 - Comparison: not applicable; evaluator typing only.
-- Remaining limitations: none known.
-- Durable record: the comment at the fix site and this law.
+- Remaining limitations: the original files were lost; the owner approved the
+  replacement inputs. Scalar guest memory visibility does not measure private
+  heap usage, and this typing qualification makes no heap claim.
+- Durable record: [stored callback captures](../zig-native/STATIC_CAPTURE_ROWS.md),
+  the comment at the fix site and the committed regression law.

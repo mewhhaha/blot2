@@ -23,10 +23,12 @@ unverified Zig run-cache hits from becoming native qualification evidence.
 
 Task 024's declared/qualified field recipes and the missing staging/scoped-task
 trace laws are qualified. Tasks 035, 067/068, 073/074, 075–080 and 105–107 also
-close against the current gate and measurements; 95 tasks are complete and 15
-remain open. General iterator/module cutoff work and all final performance
-targets remain open. The local analyzer backend additionally needs the saved
-`codeberg.org` network rule published; CI analyzer success does not replace it.
+close against the current gate and measurements. Task 108 also closes with
+[recreated Ink callback probes](STATIC_CAPTURE_ROWS.md); 97 tasks are complete
+and 13 remain open. General iterator/module cutoff work and all final performance
+targets remain open. The published `codeberg.org` network rule is active and
+the local analyzer backend builds and doctor passes; its final source scan is
+still required.
 
 CT92–CT94's retained work budgets and explicit five-percent CPU gate pass. The
 final seven-pair pinned candidate/baseline median is 0.941, with substantial
@@ -211,8 +213,8 @@ proof obligations. Higher-order and recursive jobs retain bounded ordinary
 fallbacks when their inputs are incomplete. The captured-project latency and
 allocation targets remain open. Semantic workers stay opt-in until paired CPU
 and wall measurements justify a default change. The local analyzer backend
-requires the saved Codeberg network change published, followed by its final
-source scan; a remote run does not replace this owner-specified gate.
+builds with the active Codeberg network policy and doctor passes; its final
+source scan remains required by the owner-specified gate.
 
 The current continuation replaces ordinary tracing with counted strong edges,
 journal/invocation leases and nonmoving trial deletion for real cycles. Its
