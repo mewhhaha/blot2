@@ -1,4 +1,13 @@
 const [mode, log, command] = Deno.args;
+let initialGeneration = false;
+if (mode === "completion-restart") {
+  try {
+    (await Deno.open(`${log}.started`, { createNew: true, write: true })).close();
+    initialGeneration = true;
+  } catch (error) {
+    if (!(error instanceof Deno.errors.AlreadyExists)) throw error;
+  }
+}
 await Deno.writeTextFile(
   log,
   JSON.stringify({
@@ -104,7 +113,7 @@ while (true) {
   if (request.kind === "complete") {
     builds++;
     if (mode === "completion-hold" && builds === 1) await new Promise((resolve) => setTimeout(resolve, 150));
-    if (mode === "completion-stall") await new Promise((resolve) => setTimeout(resolve, 60_000));
+    if (mode === "completion-stall" || (mode === "completion-restart" && initialGeneration)) await new Promise((resolve) => setTimeout(resolve, 60_000));
     const result = {
       kind: "complete", id: request.id, epoch: "epoch", revision,
       snapshot: request.snapshot, filename: request.filename, position: request.position,

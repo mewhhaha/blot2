@@ -25,6 +25,18 @@ Deno.test("resume requires completed laws and exact binary, logs and input ident
       "console.log('law passed')",
     ], directory);
     await journal.record(key, result, [binary]);
+    await journal.invalidate("native-run");
+    await journal.record(key, { ...result, cache: "hit" }, [binary]);
+    assert.equal(await journal.reuse("native-run", key), undefined);
+    await journal.record(key, result, [binary]);
+    const accepted = await Deno.readTextFile(path);
+    const legacy = JSON.parse(accepted);
+    legacy.entries["native-run"].phase.cache = "hit";
+    await Deno.writeTextFile(path, JSON.stringify(legacy));
+    const legacyJournal = new NativeJournal(path);
+    await legacyJournal.load();
+    assert.equal(await legacyJournal.reuse("native-run", key), undefined);
+    await Deno.writeTextFile(path, accepted);
     const loaded = new NativeJournal(path);
     await loaded.load();
     assert.equal((await loaded.reuse("native-run", key))?.cache, "resumed");
@@ -269,6 +281,7 @@ Deno.test("full runner resumes native qualification after a guest repair and inv
     for (
       const file of [
         "test_compiler",
+        "bench_compile",
         "compiler_gate_state",
         "compiler_fingerprint",
         "compiler_fixtures",

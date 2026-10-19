@@ -2,12 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — scope closed to fixed typed-staging acceptance
-  traces by owner decision on 15 October 2026. The trace-to-law index is
-  recorded and all four traces have named passing laws in the gate at `05401a9`;
-  population and retained costs on gated source remain unmeasured, and
-  dependency [024](024-apply-general-body-interface-cutoff.md) is still in
-  progress.
+- **Status:** Complete — qualified on 19 October 2026 against the fixed
+  acceptance scope; see the current completion record below.
 - **Dependencies:** [067](067-implement-typed-code-and-descriptors.md),
   [024](024-apply-general-body-interface-cutoff.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 8 / hygiene and
@@ -31,11 +27,11 @@ tracked-input foundations.
 
 ## Implementation checklist
 
-- [ ] Generate declarations with hygienic lexical identities across shadowing,
+- [x] Generate declarations with hygienic lexical identities across shadowing,
       imports and multiple expansion sites.
-- [ ] Record every code/descriptor/input dependency and include generated body
+- [x] Record every code/descriptor/input dependency and include generated body
       semantics in executable invalidation.
-- [ ] Reuse only complete generated results with matching inputs; preserve
+- [x] Reuse only complete generated results with matching inputs; preserve
       last-good artifacts on generation failure.
 
 ## Validation
@@ -55,10 +51,10 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Generated code preserves intended bindings without accidental capture.
-- [ ] Exact staging inputs govern reuse and every failed generation leaves the
+- [x] Generated code preserves intended bindings without accidental capture.
+- [x] Exact staging inputs govern reuse and every failed generation leaves the
       previous revision usable.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Closed acceptance — owner decision, 15 October 2026
@@ -88,6 +84,26 @@ tests in the full compiler gate on the committed source, recorded durably in
 built from the gate at `05401a9` is recorded there.
 
 ## Completion evidence
+
+- Current local milestone: the commit containing this record; compiler and exact
+  source/log hashes are recorded by the
+  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+- Validation: the forced LLVM gate executes all 2,470 native laws without skips,
+  failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
+  checks pass. CI lint covers 507 source files plus the fixture module with zero
+  findings. Strict fresh/retained/restart/shared Wasm parity and the seven-pair
+  CPU regression guard pass.
+- Acceptance: All fixed hygiene/generation traces pass with fresh, retained and
+  restart parity. Task 024 and the current population/edit cost record are
+  complete.
+- Remaining limits: General qualified producer transport and complete generated
+  declaration maps remain documented limitations outside the closed acceptance
+  scope.
+
+### Earlier implementation evidence
+
+The checkpoints below retain their original dates and measurements. Statements
+that qualification or a commit was pending refer to those earlier checkpoints.
 
 - Commit: pending; no local milestone revision is recorded for this task.
 - Validation: the full gate at `05401a9` (17 October 2026) passes 2,355 native

@@ -2,9 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — the CPU comparison against tracing is no longer a
-  gate (owner decision, 15 October 2026); bounded-memory stress and a passing
-  full gate on current source remain.
+- **Status:** Complete — qualified on 19 October 2026 against the fixed
+  acceptance scope; see the current completion record below.
 - **Dependencies:** [034](034-reclaim-cyclic-ownership.md)
 - **Originating requirements:** PLAN: Earlier programs / qualified tracing
   replacement. Sources: [PLAN.md](../PLAN.md).
@@ -30,11 +29,11 @@ optimizations and public guest behavior must remain valid.
 
 ## Implementation checklist
 
-- [ ] Audit every heap allocation, field role, root and exit for replacement
+- [x] Audit every heap allocation, field role, root and exit for replacement
       coverage before deleting tracing code.
-- [ ] Remove obsolete tracing metadata, scanning and collection triggers only
+- [x] Remove obsolete tracing metadata, scanning and collection triggers only
       after all dynamic graphs have valid ownership.
-- [ ] Retain the behavioral cycle, suspension and persistent-root
+- [x] Retain the behavioral cycle, suspension and persistent-root
       counterexamples as permanent regressions and update durable ownership
       documentation.
 
@@ -60,15 +59,35 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] No production path relies on tracing, and all reachable values/cycles
+- [x] No production path relies on tracing, and all reachable values/cycles
       remain correct.
-- [ ] The long-running stress scenarios above complete on the development
+- [x] The long-running stress scenarios above complete on the development
       machine without traps, crashes or out-of-memory failures, and committed
       memory stays bounded after warmup. CPU ratios are recorded, not gated.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
+
+- Current local milestone: the commit containing this record; compiler and exact
+  source/log hashes are recorded by the
+  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+- Validation: the forced LLVM gate executes all 2,470 native laws without skips,
+  failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
+  checks pass. CI lint covers 507 source files plus the fixture module with zero
+  findings. Strict fresh/retained/restart/shared Wasm parity and the seven-pair
+  CPU regression guard pass.
+- Acceptance: Production checked assembly has no tracing fallback. Both-tier
+  nested-array stress stays at 192 KiB, retires discarded arrays during the
+  invocation and ends with zero roots and leases.
+- Remaining limits: Legacy scanning is isolated in explicit test fixtures.
+  Counted cycle collection remains required. Historical tracing CPU comparisons
+  are informational under the owner decision.
+
+### Earlier implementation evidence
+
+The checkpoints below retain their original dates and measurements. Statements
+that qualification or a commit was pending refer to those earlier checkpoints.
 
 - Latest qualified checkpoint: `cb3ebec` adds the direct named reference
   environment with scalar-only local replacement. Full native/OOM suite, 965

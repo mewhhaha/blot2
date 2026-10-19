@@ -49,6 +49,10 @@ import {
   testWorkloads,
   type Workload,
 } from "./bench/gdev.ts";
+import {
+  pairedCpuGuard,
+  unexpectedBuildFailures,
+} from "./bench/verification.ts";
 
 const repo = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const manifestPath = `${repo}/scripts/bench/gdev-manifest.json`;
@@ -57,7 +61,7 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   [--runs 5] [--workload all|gdev|game|devtools|tests|synthetic|NAME,...]
   [--test-runs 1] [--no-retained] [--profile] [--out DIR] [--snapshot DIR]
   [--allow-wasm-diff] [--write-hashes] [--write-manifest] [--restart-cache]
-  [--shared-session]
+  [--shared-session] [--guard-cpu] [--codegen-workers 4]
 
   --baseline/--candidate  blotc executables. Pass one binary twice to measure noise.
   --workload              comma-separated: gdev entries (game, devtools), every
@@ -81,6 +85,10 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
                           src/test_fixture.blot as pen's test workers do; each
                           must equal its fresh build.
   --write-manifest        rewrite scripts/bench/gdev-manifest.json from the snapshot.
+  --guard-cpu             require at least three paired fresh game builds; fail
+                          if the median candidate/baseline CPU ratio exceeds 1.05.
+                          Output-difference declarations never waive this guard.
+  --codegen-workers       pin both compilers to 1..16 codegen workers (default 4).
 Results: build/tmp/bench/<timestamp>/{results.json,samples.jsonl}.`;
 
 const { values: args } = parseArgs({
@@ -99,6 +107,8 @@ const { values: args } = parseArgs({
     "write-hashes": { type: "boolean", default: false },
     "restart-cache": { type: "boolean", default: false },
     "shared-session": { type: "boolean", default: false },
+    "guard-cpu": { type: "boolean", default: false },
+    "codegen-workers": { type: "string", default: "4" },
     help: { type: "boolean", default: false },
   },
 });
@@ -106,6 +116,7 @@ const { values: args } = parseArgs({
 const snapshotRoot = resolve(
   args.snapshot ?? `${repo}/build/bench/gdev-snapshot`,
 );
+const codegenWorkers = Number(args["codegen-workers"]);
 
 type Hash = string;
 async function sha256(bytes: Uint8Array<ArrayBuffer>): Promise<Hash> {
@@ -321,6 +332,7 @@ async function openSession(
 ): Promise<Session> {
   const compiler = await createZigProjectCompiler({
     ...sessionOptions(variant.executable, workload),
+    codegenWorkers,
     cacheDirectory,
     ...(args.profile ? { profileBackend: true } : {}),
   });
@@ -505,6 +517,12 @@ async function main(): Promise<number> {
     "",
   );
   const out = resolve(args.out ?? `${repo}/build/tmp/bench/${timestamp}`);
+  if (
+    !Number.isInteger(codegenWorkers) || codegenWorkers < 1 ||
+    codegenWorkers > 16
+  ) {
+    throw new Error("--codegen-workers must be an integer in 1..16");
+  }
   await Deno.mkdir(out, { recursive: true });
 
   const variants: Variant[] = await Promise.all(
@@ -547,6 +565,11 @@ async function main(): Promise<number> {
   }
   if (!workloads.length) {
     throw new Error(`No workload matches --workload ${args.workload}`);
+  }
+  if (
+    args["guard-cpu"] && (runs < 3 || !workloads.some((w) => w.name === "game"))
+  ) {
+    throw new Error("--guard-cpu requires --runs >= 3 and the game workload");
   }
   const runsOf = (workload: Workload) =>
     workload.group === "tests" ? testRuns : runs;
@@ -865,18 +888,25 @@ async function main(): Promise<number> {
   const failures = failureTable(samples);
   // A rejection never passes as an output change. Only rejections recorded
   // in gdev-wasm.json, or of unrecorded test entries, are expected.
-  for (const failure of failures) {
-    const workload = workloads.find((w) => w.name === failure.workload)!;
-    const known = workload.group === "tests" &&
-      (expectedRejections.has(workload.name) || unrecorded.has(workload.name));
-    if (!known || (failure.phase !== "fresh" && failure.phase !== "shared")) {
-      problems.push(
-        `${failure.workload} ${failure.phase}: ${failure.variant} failed with ${failure.code}`,
-      );
-    }
-  }
+  problems.push(
+    ...unexpectedBuildFailures(
+      failures,
+      workloads,
+      expectedRejections,
+      unrecorded,
+    ),
+  );
   const reuse = reuseTables(workloads, samples, medians);
   const phases = args.profile ? phaseTables(workloads, samples) : {};
+  const cpuGuard = args["guard-cpu"] ? pairedCpuGuard(samples) : null;
+  if (cpuGuard) {
+    problems.push(...cpuGuard.problems);
+    console.log(
+      `\nCPU guard: game paired median ${
+        cpuGuard.median_ratio?.toFixed(3) ?? "unavailable"
+      }; limit 1.050; ${cpuGuard.problems.length ? "FAILED" : "passed"}`,
+    );
+  }
 
   const loadEnd = loadAverage();
   // Intentional backend changes may differ between binaries. They must never
@@ -937,6 +967,7 @@ async function main(): Promise<number> {
           deno: Deno.version.deno,
           os: Deno.build.os,
           cpus,
+          codegen_workers: codegenWorkers,
           load_start: loadStart,
           load_end: loadEnd,
         },
@@ -954,6 +985,7 @@ async function main(): Promise<number> {
         failures,
         reuse,
         phases,
+        cpu_guard: cpuGuard,
         wasm,
         recorded_hashes: recorded
           ? { manifest_matches: recorded.manifest === manifestHash }
@@ -972,7 +1004,7 @@ async function main(): Promise<number> {
   );
   if (problems.length) {
     console.log(
-      `\nWasm verification ${
+      `\nBenchmark verification ${
         unexpectedProblems.length
           ? "FAILED"
           : "declared output differences (allowed by --allow-wasm-diff)"

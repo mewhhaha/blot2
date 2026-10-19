@@ -221,10 +221,10 @@ Memory stayed at its warmed size. The carry-loop route retired 5,555,202 objects
 and ended with zero roots and leases. The startup route retained exactly one
 module-table root/lease; teardown removed it and retired the remaining six
 objects. Wasm linear memory does not shrink on teardown. This measures reuse and
-retirement, not returned OS pages. Journal storage added an 8192-byte base
-class with a 4096-byte payload; pages now use one 4096-byte block. Header,
-Array layout and 244-word List geometry are unchanged from 031, so those
-earlier costs are separate from this root extension.
+retirement, not returned OS pages. Journal storage added an 8192-byte base class
+with a 4096-byte payload; pages now use one 4096-byte block. Header, Array
+layout and 244-word List geometry are unchanged from 031, so those earlier costs
+are separate from this root extension.
 
 Focused checks passed: eight source ownership/plateau laws (seven at both
 codegen tiers), 11 checked RC execution laws, 45 startup/demand/State/GC/Foreign
@@ -381,3 +381,15 @@ calls.
 `deno task test:compiler` passes 2,365 native laws with zero leaks, plus 1,517
 guest, 48 smoke and 28 harness tests. The analyzer reports zero findings across
 487 Zig files. Ink's suite passes 362 of 362 tests on the task build.
+
+## Current journal-page measurement, 19 October 2026
+
+The
+[small-object histogram](SHARED_RC.md#current-small-object-histogram-19-october-2026)
+confirms that 4,064 payload bytes plus the 32-byte header fit one 4 KiB class.
+The page has 507 eight-byte slots after its link word. The 4,096-element Array
+construction uses nine such pages; both the numeric witness and teardown
+roots/leases pass. Its 384 KiB committed memory is distinct from the 260 KiB
+block high-water and the remaining 4,064-byte live journal payload. The
+[complete current gate](CLOUD_QUALIFICATION.md) also reruns the class, journal,
+cycle, suspension and Array-loop ownership laws.

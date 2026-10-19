@@ -2,11 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — scope closed to fixed acceptance traces by owner
-  decision on 15 October 2026; the five traces map to named passing laws in the
-  gate at `05401a9` (see
-  [STRUCTURED_TASK_QUALIFICATION](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#trace-to-law-index-17-october-2026)),
-  one only in part; task 035 remains.
+- **Status:** Complete — qualified on 19 October 2026 against the fixed
+  acceptance scope; see the current completion record below.
 - **Dependencies:** [073](073-implement-scoped-tasks-and-cancellation.md),
   [071](071-eliminate-checks-from-proved-branch-facts.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 10 / disjoint
@@ -29,11 +26,11 @@ contracts define host-facing boundaries.
 
 ## Implementation checklist
 
-- [ ] Check ownership/disjoint-access evidence before concurrent access,
+- [x] Check ownership/disjoint-access evidence before concurrent access,
       retaining conservative rejection for overlapping or unknown aliases.
-- [ ] Integrate host scheduling, completion, failures and cancellation using the
+- [x] Integrate host scheduling, completion, failures and cancellation using the
       agreed ABI and lifetime rules.
-- [ ] Preserve capability scope, task joining and only the nondeterminism
+- [x] Preserve capability scope, task joining and only the nondeterminism
       explicitly permitted by task 072.
 
 ## Validation
@@ -53,11 +50,11 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Concurrent accesses require sound disjointness or allowed sharing and
+- [x] Concurrent accesses require sound disjointness or allowed sharing and
       invalid escapes are rejected.
-- [ ] Host execution handles failures/cancellation within the specified
+- [x] Host execution handles failures/cancellation within the specified
       nondeterminism and ownership contract.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Closed acceptance — owner decision, 15 October 2026
@@ -91,6 +88,25 @@ built from the gate at `05401a9` is recorded in the implementation record.
 
 ## Completion evidence
 
+- Current local milestone: the commit containing this record; compiler and exact
+  source/log hashes are recorded by the
+  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+- Validation: the forced LLVM gate executes all 2,470 native laws without skips,
+  failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
+  checks pass. CI lint covers 507 source files plus the fixture module with zero
+  findings. Strict fresh/retained/restart/shared Wasm parity and the seven-pair
+  CPU regression guard pass.
+- Acceptance: All five fixed access/host traces pass, including dedicated child
+  callback/package-result rejection and recovery laws; task 035 is complete.
+- Remaining limits: Unknown or overlapping partition evidence and shared pending
+  demand forcing reject. Detached workers and simultaneous Wasm reentry remain
+  outside the closed scope.
+
+### Earlier implementation evidence
+
+The checkpoints below retain their original dates and measurements. Statements
+that qualification or a commit was pending refer to those earlier checkpoints.
+
 - Commit: pending; record the local milestone revision when the task closes.
 - Validation: the full gate at `05401a9` (17 October 2026) passes 2,355 native
   laws with zero leaks, 1,501 guest tests and zero analyzer findings over 486
@@ -103,11 +119,13 @@ built from the gate at `05401a9` is recorded in the implementation record.
 - Comparison: pending; the fixed traces set no performance target. Record the
   comparison, or why it does not apply, when the task closes.
 - Remaining limitations: task [035](035-remove-the-tracing-runtime.md) must
-  complete before closure. Add a task-specific law for a child returning a
-  scoped callback or package, or accept the ordinary escape laws for that part
-  of the trace by owner decision. Forms outside the traces (detached tasks,
-  shared mutable state across tasks, host worker transport, simultaneous Wasm
-  reentry, unknown or overlapping partition evidence) reject, as recorded in the
+  complete before closure. The 19 October working tree supplies a task-specific
+  callback/package result law and guest rejection/recovery checks; their final
+  LLVM qualification is pending. See the
+  [scoped result trace](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#scoped-result-trace-19-october-2026-working-tree).
+  Forms outside the traces (detached tasks, shared mutable state across tasks,
+  host worker transport, simultaneous Wasm reentry, unknown or overlapping
+  partition evidence) reject, as recorded in the
   [implementation record](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#deliberate-limits-and-remaining-qualification).
 - Durable record:
   [trace-to-law index](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#trace-to-law-index-17-october-2026),

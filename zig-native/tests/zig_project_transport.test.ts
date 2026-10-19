@@ -9,23 +9,19 @@ import {
   type ZigProjectCompiler,
   type ZigProjectCompilerOptions,
 } from "../../compiler/zig_project_client.ts";
-import { fileURLToPath } from "node:url";
-const peer = fileURLToPath(
-  new URL("./fixtures/zig_project_peer.ts", import.meta.url),
-);
+import { projectPeerExecutable } from "./fixtures/project_peer_executable.ts";
 function quote(value: string): string {
   return "'" + value.replaceAll("'", "'\\''") + "'";
 }
 async function fixture(mode: string) {
+  const peer = await projectPeerExecutable();
   const directory = await Deno.makeTempDir({
     prefix: "blot-zig-project-peer-",
   });
   const executable = directory + "/compiler", log = directory + "/log.jsonl";
   await Deno.writeTextFile(
     executable,
-    `#!/bin/sh\nexec ${quote(Deno.execPath())} run --quiet --allow-all ${
-      quote(peer)
-    } ${quote(mode)} ${quote(log)} "$@"\n`,
+    `#!/bin/sh\nexec ${quote(peer)} ${quote(mode)} ${quote(log)} "$@"\n`,
   );
   await Deno.chmod(executable, 0o755);
   const options: ZigProjectCompilerOptions = {

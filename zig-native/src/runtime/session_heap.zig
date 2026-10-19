@@ -87,11 +87,12 @@ pub const Heap = struct {
         const self: *Heap = @ptrCast(@alignCast(raw));
         const class = classIndex(memory.len, alignment);
         if (class >= class_count) return PageAllocator.unmap(@alignCast(memory));
-        const node: *usize = @ptrCast(@alignCast(memory.ptr));
         self.lock();
         defer self.unlock();
-        node.* = self.frees[class];
-        self.frees[class] = @intFromPtr(node);
+        // The size class owns at least one machine word, even for a shorter
+        // requested slice. Store its free-list link without reinterpreting it.
+        std.mem.writeInt(usize, memory.ptr[0..@sizeOf(usize)], self.frees[class], @import("builtin").cpu.arch.endian());
+        self.frees[class] = @intFromPtr(memory.ptr);
     }
 };
 
@@ -133,6 +134,20 @@ test "blocks above the largest class are mapped directly and keep their bytes ac
     try std.testing.expect(a.resize(small, 33));
     a.free(small[0..33]);
     a.free(large);
+}
+
+test "sub-word allocations retain a complete free-list link" {
+    var heap: Heap = .{};
+    const a = heap.allocator();
+    var original: [@sizeOf(usize)][]u8 = undefined;
+    for (&original, 0..) |*block, index| block.* = try a.alloc(u8, index + 1);
+    for (original) |block| a.free(block);
+    var reused: [@sizeOf(usize)][]u8 = undefined;
+    for (&reused, 0..) |*block, index| {
+        block.* = try a.alloc(u8, index + 1);
+        try std.testing.expectEqual(original[original.len - 1 - index].ptr, block.ptr);
+    }
+    for (reused) |block| a.free(block);
 }
 
 test "alignment selects a class at least as large as the alignment" {

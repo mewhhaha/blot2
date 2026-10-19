@@ -16,7 +16,7 @@ lands as its own commit after `deno task test:compiler` and `deno task lint:zig`
 pass, with emitted Wasm byte-identical to its baseline unless the hill says
 otherwise.
 
-## Baseline (17 October 2026, `3cf6de1`)
+## Historical baseline (17 October 2026, `3cf6de1`)
 
 Release `blotc` (ReleaseFast) on a frozen copy of the current gdev:
 `build/bench/gdev-snapshot`, re-frozen in `scripts/bench/gdev-manifest.json`. It
@@ -84,6 +84,50 @@ RSS grows from 312 to 630 MiB over an edit series.
   57 MB file is near the 64 MiB limit.
 - **`--semantic-workers`:** one worker adds 27% CPU, and no worker count beats
   serial wall time.
+
+## Recreated cloud baseline (19 October 2026)
+
+The original local snapshot was lost. With the owner's approval, the current
+gdev `52fbc5af4ba4accf5559d87e2fffed335fa920ad` and Ink
+`1a291a1b90b9197e6a9fc327f52d77bf965d8cf3` were frozen again: 583 files and 69
+test entries. The game reports 1,319,275 source bytes. The new manifest and 78
+output references replace the lost workload's references; its earlier absolute
+timings remain historical.
+
+Pre-CT90 `ba5decb` was compared with `9036a75` plus the working-tree lint
+repairs, using three alternating game/devtools pairs and one test-suite pair,
+four default codegen workers in both binaries, and
+`--shared-session --restart-cache`. The cloud machine has a four-CPU quota; load
+was 0.6–1.1. Results and exact binary hashes are in ignored
+`build/bench/ct90-cloud/results.json`.
+
+| Measure                              | Before CT90 |   Current |
+| ------------------------------------ | ----------: | --------: |
+| Game cold CPU                        |    2,946 ms |  2,939 ms |
+| Devtools cold CPU                    |      842 ms |    831 ms |
+| Literal-in-body edit CPU             |    1,192 ms |  1,088 ms |
+| Body edit CPU                        |    1,488 ms |  1,457 ms |
+| Game restart CPU                     |     15.9 ms |   16.9 ms |
+| All test entries, fresh CPU          |    166.09 s |  165.87 s |
+| All test entries, shared-session CPU |    153.72 s |  120.84 s |
+| Shared-session wall time             |    146.24 s |  113.36 s |
+| Shared-session peak RSS              |   808.5 MiB | 836.3 MiB |
+
+Shared-session CPU fell 21.4% in this pair. Every successful Wasm output was
+identical between binaries and across fresh, retained, restart and shared
+phases. Of the 69 test entries, 68 compiled and one rejected in both binaries:
+`tests/protocol.blot` omits Ink's new `SessionStarted` event in its exhaustive
+match. Its `non_exhaustive_match` diagnostic code also matched across phases;
+this is a pre-existing gdev test defect, not an executed passing test. The
+current game Wasm is 2,235,460 bytes, cold peak RSS is 312.4 MiB, and the
+largest fresh test entry is `tests/goals_game.blot` at 7.54 s CPU.
+
+The complete compiler gate passes 2,466 native laws, 1,552 guest/client checks
+and 33 harness tests; Zig lint has zero findings. Publication enabled
+`dl.deno.land`, and the standalone executable test passes. Source, binary and
+log pins are in `build/bench/ct90-cloud-qualification/qualified-pins.json`; see
+[the current handoff](CONTINUE.md). No source-language or runtime output change
+was declared for this comparison.
 
 ## Order
 
@@ -1753,13 +1797,28 @@ overlaid.
 
 - **Fix:** assert the CT5 reuse counts and the new phase counters in
   `compile_budget.test.ts`, and tighten them as hills land.
+- **Result (19 October 2026):** direct lower bounds on named reuse and upper
+  bounds on body elaboration/lowering cover every edit/revert, alongside the
+  existing revalidation and entry-switch budgets. Missing or invalid counters
+  fail. All 11 budget cases pass; see [compile guards](zig-native/COMPILE_GUARDS.md).
 
 ### CT93: a timing guard
 
 - **Fix:** add a paired CPU comparison of the game entry against the last
   recorded binary to the bench task. Fail it on a regression above 5%.
+- **Result (19 October 2026):** `--guard-cpu` requires at least three fresh game
+  pairs and fails a median paired ratio above 1.05 independently of declared
+  output differences. Four boundary/invalid-sample cases pass. An unpinned
+  identity control failed from noise; with one pinned CPU and one codegen
+  worker, seven identity pairs give 1.000 and seven pre-CT90/current pairs give
+  0.930, both passing with identical Wasm. No new speedup is claimed. Conditions
+  and complete evidence are in [compile guards](zig-native/COMPILE_GUARDS.md).
 
 ### CT94: keep the docs current
 
 - **Fix:** update this file's baseline, `zig-native/STATUS.md` and PLAN.md as
   hills land.
+- **Result (19 October 2026):** the recreated production baseline and provenance
+  are current in all three documents. Guard qualification is linked separately
+  because its worker/affinity settings differ. All 94 hills have a result or
+  measured/design deferral; open targets and tasks remain explicit.

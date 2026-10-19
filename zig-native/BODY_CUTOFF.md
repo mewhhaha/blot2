@@ -1400,3 +1400,74 @@ ticks; this small screen includes the separate cursor proof and is neither an
 isolated feature ratio nor release qualification. Exact source pins and raw
 samples:
 `build/bench/complete-program-20261015/static-operation-body-receipts/`.
+
+## Declared fields and the closed acceptance map (19 October 2026)
+
+The remaining row 11 admission now accepts explicit field predicates through the
+same owned qualification-origin proof as written associated/representation
+requirements. The complete field name, receiver/result types, declaration origin
+and member frontier remain part of the receipt. Global clauses are recreated
+from current syntax; local clauses relocate through the existing bounded origin
+recipe. No type IDs or source spans acquire cross-owner validity.
+
+Qualified dotted roots also distinguish their own projection requirements from
+requirements forwarded by the root principal. Replay instantiates the current
+principal once. Capture copies only a direct field step whose field name and
+receiver/result heads match the checked path; written qualifications retain
+their original origin proof. Copying a forwarded requirement too changed the
+replayed interface and made a caller fall back, despite correct execution.
+
+The new native law
+`body check cache owns declared field principals and
+qualified projected receivers through OOM`
+first failed on the previous compiler's cache admission. It now retains global
+and local field principals, qualified local roots, a qualified call's projected
+result, and an inferred two-step path with the same field name at both steps.
+After source/symbol insertion only the new constant elaborates; callers retain
+their original interfaces. Complete fresh-capture/replay allocation-failure
+sweeps pass without leaks. This focused result uses incremental Safe/noLLVM;
+the complete LLVM gate now also passes, as recorded in
+[CLOUD_QUALIFICATION.md](CLOUD_QUALIFICATION.md).
+
+The existing generic explicit/dotted field guest matrix now also runs written
+global/local field clauses and imports a written-field principal from source and
+compiled dependencies. It keeps inferred method controls separate from declared
+fields, compares every fresh/retained output and rejection, executes scalar and
+owning results, changes layouts/candidates/effects, rejects a changed field
+clause, corrects it and reverts. The extended matrix passes in development. The
+older compiler also rejects a declared field used as an associated method; this
+change does not extend that language case.
+
+`body_qualified_roots.test.ts` separately exercises inferred projected roots,
+local record roots and declared principals in both codegen tiers, including
+scalar/owning payloads, insertion, layout changes, a missing field, correction
+and revert. It compares fresh/retained bytes and diagnostics and checks reduced
+elaboration work. Both it and the extended source/compiled field matrix disable
+persistence so the fresh work comparison cannot restore a checkpoint instead.
+
+The fixed task-024 rows map to the following permanent laws. Quoted native names
+are exact suffixes after `body check cache`, except the two inline refinement
+laws; other entries group the named families. The shared native file contains 95
+registered tests; the full gate also exercises additional owner-graph coverage.
+
+| Row | Native laws/families                                                                                                                                                                                                                                                        | Executed guest coverage                                                                                                                                                                                                              |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Inline `local refinement memo preserves dynamic facts identity ownership and failed allocation`; `refinement receipt partial shape keys preserve holes owners collection kinds and physical record order`; `relocates untouched siblings across syntax types and spellings` | `body_cutoff_reuse.test.ts`; `body_check_cache.test.ts`                                                                                                                                                                              |
+| 2   | `ownership survives all allocation failures`; `relocates generic principal binders and independently specializes consumers`; nominal/structural spelling, callback-effect and closed-row families                                                                           | `body_check_cache.test.ts`; `body_general_receipts_expanded.test.ts`                                                                                                                                                                 |
+| 3   | `relocates shared principal edges and reinstantiates current selection`; `recreates declared associated and representation qualifications`; applied-annotation and original-imported-spelling families                                                                      | `body_check_cache.test.ts`; `body_cutoff_reuse.test.ts`                                                                                                                                                                              |
+| 4   | `relocates ordinary block locals mutations joins and cases`; `relocates constructor cases and record pattern fields by spelling`; generic-local-principal family                                                                                                            | `body_check_cache.test.ts`; `body_general_receipts_expanded.test.ts`                                                                                                                                                                 |
+| 5   | Concrete record/nominal projection, dotted owning/method path, generic explicit/dotted field, generic array indexing and mixed nominal Array update families                                                                                                                | `body_check_cache.test.ts` (concrete and generic field matrices); `body_path_update_cache.test.ts`                                                                                                                                   |
+| 6   | Inferred/local result-directed requirements; `relocates declared local qualification origins`; bounded-origin rejection; original producer/annotation authority and shared-local-principal families                                                                         | `body_check_cache.test.ts` (source/archive clause and producer cases)                                                                                                                                                                |
+| 7   | Foreign-arrow, if-let, statement-case, pure collection/unary, loop/use and demanded-body families                                                                                                                                                                           | `body_check_cache.test.ts`; `body_loop_cache.test.ts`; `body_demand_cache.test.ts`; `body_general_receipts.test.ts`                                                                                                                  |
+| 8   | `user operation rows` and `static operation calls` families                                                                                                                                                                                                                 | `body_user_rows_cache.test.ts`; `body_static_operation_cache.test.ts`                                                                                                                                                                |
+| 9   | `mixed implementation`, closed implementation call, generic contract caller and local contract requirement families                                                                                                                                                         | `body_implementation_cache.test.ts`; `body_check_cache.test.ts`                                                                                                                                                                      |
+| 10  | Selected/candidate revocation, obsolete-chunk compaction/publication, third-revision Core ordering and every capture/replay allocation-failure family                                                                                                                       | `body_cutoff_reuse.test.ts`; `module_cutoff_all_dirty_execution.test.ts`; `body_check_cache.test.ts`; general/path/demand/effect/implementation files above                                                                          |
+| 11  | `owns declared field principals and qualified projected receivers through OOM`, plus row 5's field families                                                                                                                                                                 | `body_qualified_roots.test.ts`; `body_check_cache.test.ts`: `body checker reuse owns generic explicit and dotted fields through source compiled recipes`, including declared mode, imported principal, invalid clause and correction |
+
+Native sources: [body cache laws](src/reuse/body_check_cache_tests.zig) and
+[inline refinement laws](src/reuse/refinement_receipt.zig). Guest files are
+under [`tests/`](tests/). Current full-gate and paired-comparison evidence will
+be recorded here before task 024 is marked complete. The under-100-ms general
+edit target and the zero-of-107 gdev body-cache admission observation remain
+separate performance work in tasks 102/093; closing these fixed rows does not
+close them.

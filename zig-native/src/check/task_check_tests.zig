@@ -63,6 +63,24 @@ test "structured task checking rejects escaped groups and consumed handles" {
     , .task_handle_consumed);
     try law(std.testing.allocator, "entry const answer = fn () => @task.scope (fn group => @task.spawn group (fn () => 42))", .task_escape);
 }
+
+fn scopedTaskResults(allocator: std.mem.Allocator) !void {
+    try law(allocator,
+        \\const bad = fn () => @task.scope (fn group => do:
+        \\  let child = @task.spawn group (fn () => fn () => @task.join (@task.spawn group (fn () => 42)))
+        \\  return @task.join child)
+    , .task_escape);
+    try law(allocator,
+        \\type Package = exists [a] => {value: a, apply: a -> U32}
+        \\const bad = fn () => @task.scope (fn group => do:
+        \\  let child = @task.spawn group (fn () => pack [U32] {value: 0, apply: fn (value: U32) => @task.join (@task.spawn group (fn () => value))} as Package)
+        \\  return @task.join child)
+    , .task_escape);
+}
+test "structured tasks reject children returning group scoped callbacks and packages through OOM" {
+    try scopedTaskResults(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, scopedTaskResults, .{});
+}
 test "structured task checking transfers unique captures and rejects ordinary Foreign contracts" {
     try law(std.testing.allocator,
         \\const take = fn (value: unique U32) => @task.scope (fn group => do:

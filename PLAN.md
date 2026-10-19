@@ -10,6 +10,23 @@ version of this file, with every earlier program's measurements, is
 The next program, 94 compile-time hills measured on the current gdev, is in
 [COMPILE_HILLS.md](COMPILE_HILLS.md).
 
+The owner approved recreating the lost local snapshot on 19 October 2026 from
+current gdev/Ink. The active manifest has 583 files and 69 test entries. Paired
+cloud measurements against pre-CT90 `ba5decb` show shared-session compilation
+CPU 153.72 → 120.84 s, with identical Wasm and diagnostic codes across binaries,
+fresh builds, retained edits, restarts and shared sessions. Current game cold,
+literal-edit and body-edit medians are 2,939, 1,088 and 1,457 ms CPU; the
+targets remain open. The detailed baseline, source pins and the one pre-existing
+gdev test rejection are recorded in COMPILE_HILLS.md. The complete compiler gate
+now passes 2,466 native laws, 1,552 guest/client checks and 33 harness tests,
+with zero-finding Zig lint; see [CONTINUE.md](CONTINUE.md).
+
+CT92–CT94 now guard every retained edit phase's body work and named reuse, and
+`bench:compile --guard-cpu` checks paired fresh game CPU against a five-percent
+regression limit. [Compile guards](zig-native/COMPILE_GUARDS.md) records
+commands, sample requirements, noise controls and qualification; its single-CPU
+campaigns remain separate from the production baseline above.
+
 ## Twenty-hill program
 
 Approved on 2026-10-08 after a review of checkpoint `be33230`. Resumed with the
@@ -77,10 +94,11 @@ remaining work. Each milestone lands as a local commit on `main` after
   other sessions share its 8 cores. Compare CPU, never wall time, use
   alternating pairs and note the load average.
 
-Current baseline (17 October 2026, `3cf6de1`, release `blotc` through
+Historical baseline (17 October 2026, `3cf6de1`, release `blotc` through
 `serve-project` on the 1.09 MB snapshot; see
-[COMPILE_HILLS.md](COMPILE_HILLS.md#baseline-17-october-2026-3cf6de1) and
-[STATUS.md](zig-native/STATUS.md#compile-time-baseline)):
+[COMPILE_HILLS.md](COMPILE_HILLS.md#historical-baseline-17-october-2026-3cf6de1)
+and
+[STATUS.md](zig-native/STATUS.md#historical-compile-time-baseline-17-october-2026)):
 
 - Cold CPU: game 3,011 ms (312 MiB peak RSS, 1.84 MB Wasm), devtools 1,051 ms,
   all 55 test entries 167.5 s, the largest test entry 19.5 s.
@@ -545,3 +563,16 @@ Gates for all of these: language fixtures, negative diagnostics, allocation
 failure tests, executed Wasm, and fresh-versus-retained output comparisons.
 Measure cold compiles, dependency population, first edit, subsequent edit, no-op
 and failed-edit recovery separately.
+
+## Cloud task closure, 19 October 2026
+
+The current local milestone closes tasks 024, 035, 067/068, 073/074, 075–080 and
+105–107 against their fixed acceptance scope. The forced gate executes 2,470
+native laws without skips, failures, leaks or logged errors; 1,556 guest and 37
+harness checks pass. CI lint, strict Wasm parity, the seven-pair CPU guard,
+heap/runtime measurements, staging costs, editor, package dry run and local
+links also pass. [Current qualification](zig-native/CLOUD_QUALIFICATION.md)
+records exact pins and limitations. The task index now has 95 complete and 15
+open tasks. The remaining feature/performance requirements and conditional
+cleanup stay open. Task 082's local backend needs the saved `codeberg.org`
+network addition published; current source has not been pushed upstream.

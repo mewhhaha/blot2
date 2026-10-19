@@ -597,14 +597,14 @@ reconstruct the record; they do not mutate it.
 Passing an array to a saturated direct call is not an alias once the call
 returns if the callee only reads that parameter: lengths, element or
 `@simd.load` lane reads, finite traversal, or passing it on to another such
-parameter. A closure literal that
-`@array.generate` or such a call runs and then drops borrows the captures its
-body only reads in the same way. The proof follows each callee's body, whether
-or not it is inlined, so a later `values[i] := x` updates in place. Returning
-the argument, storing it in a value, capturing it in a closure that survives,
-generic dispatch the proof cannot resolve, or an edit of the same array in a
-later argument of that call keeps the copy. A non-scalar element the callee
-reads still blocks nested in-place edits, as a direct read does.
+parameter. A closure literal that `@array.generate` or such a call runs and then
+drops borrows the captures its body only reads in the same way. The proof
+follows each callee's body, whether or not it is inlined, so a later
+`values[i] := x` updates in place. Returning the argument, storing it in a
+value, capturing it in a closure that survives, generic dispatch the proof
+cannot resolve, or an edit of the same array in a later argument of that call
+keeps the copy. A non-scalar element the callee reads still blocks nested
+in-place edits, as a direct read does.
 
 For proven local temporaries, the compiler releases storage after the final
 borrowed read or write. This also covers objects larger than the scalar
@@ -620,11 +620,11 @@ Dynamic sharing uses counted strong edges, journal leases and a nonmoving
 allocator in linear memory. Trial deletion reclaims real unreachable cycles.
 Plain data never enters it: records, data types from any module, arrays and
 lists whose types reach no State, closure, demand, provider or erased value
-cannot form a cycle, so their allocations are not cycle candidates.
-Loop frames own incoming and outgoing carries; allocation traffic does not
-trigger a separate production tracing scan. Invocation retirement releases
-temporary owners while preserving module initialization values and independently
-held results. Generated host callbacks, suspended requests and demand memos keep
+cannot form a cycle, so their allocations are not cycle candidates. Loop frames
+own incoming and outgoing carries; allocation traffic does not trigger a
+separate production tracing scan. Invocation retirement releases temporary
+owners while preserving module initialization values and independently held
+results. Generated host callbacks, suspended requests and demand memos keep
 counted roots until completion or cancellation. Production emission requires
 complete ownership facts and returns a diagnostic when that proof is incomplete.
 See `zig-native/TRACING_REPLACEMENT.md`, `zig-native/PERSISTENT_ROOTS.md` and
@@ -760,11 +760,11 @@ construction, destructuring, operations, loop carries and copies of parameters,
 call results and fields need no heap object. A value boxes once where it leaves
 the function (a non-inlined call, a stored record or closure field, a return)
 when that point runs no more often than the value was produced; otherwise it
-keeps ordinary refcounted storage. A private function whose parameter or
-result such operations prove to be four lanes takes and returns it as a v128
-value at direct calls, so a non-inlined helper, recursion or a pipeline into a
-named function allocates nothing. Closure calls, including partial applications
-and pipelines into them, keep the boxed ABI and box the value once per call.
+keeps ordinary refcounted storage. A private function whose parameter or result
+such operations prove to be four lanes takes and returns it as a v128 value at
+direct calls, so a non-inlined helper, recursion or a pipeline into a named
+function allocates nothing. Closure calls, including partial applications and
+pipelines into them, keep the boxed ABI and box the value once per call.
 
 Eligible independent numeric array-construction kernels automatically use
 four-lane Wasm SIMD and a scalar tail. Admission follows bounded ordinary

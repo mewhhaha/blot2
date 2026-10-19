@@ -20,7 +20,7 @@ generalization separates candidate selection, connected variable/row closure,
 and residual requirement publication without changing query order.
 
 The lifecycle coordinator still owns allocation guards and final `Checked`
-publication. Its remaining 407 lines are visible; no completion claim hides that
+publication. Its current 417 lines are visible; no completion claim hides that
 remaining size. Source/header validation stays separate from retained body
 replay and immutable Core admission.
 
@@ -38,3 +38,9 @@ executed guests, interface compilation and analyzer logs are in
 `build/bench/finish-rest-20261015/checker-owners/`. The existing prefix snapshot
 law also checks the contents of actual auxiliary body owners, preserving strict
 generic rejection of borrowed pointers.
+
+The [19 October cloud gate](CLOUD_QUALIFICATION.md) reruns the complete current
+native and guest suites. The 407-line lifecycle count belongs to the earlier
+split checkpoint; later checker work brings it to 417. This remaining
+coordinator is an explicit size exception, not a forwarding wrapper counted as a
+reduced implementation.

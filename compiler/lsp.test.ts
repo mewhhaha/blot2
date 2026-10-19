@@ -6,6 +6,7 @@ import {
 } from "node:assert/strict";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { CompletionBridge } from "./lsp.ts";
+import { completionPeerExecutable } from "../zig-native/tests/fixtures/project_peer_executable.ts";
 import {
   byteOffset,
   LspReader,
@@ -178,21 +179,14 @@ Deno.test("LSP completes unsaved UTF-16 buffers and imports without an entry and
 });
 
 async function peer(mode: string) {
+  const executable = await completionPeerExecutable();
   const directory = await Deno.makeTempDir(),
     compiler = directory + "/compiler",
     log = directory + "/log";
   const quote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'";
-  const script = fileURLToPath(
-    new URL(
-      "../zig-native/tests/fixtures/zig_project_peer.ts",
-      import.meta.url,
-    ),
-  );
   await Deno.writeTextFile(
     compiler,
-    `#!/bin/sh\nexec ${quote(Deno.execPath())} run --quiet --allow-all ${
-      quote(script)
-    } ${quote(mode)} ${quote(log)} "$@"\n`,
+    `#!/bin/sh\nexec ${quote(executable)} ${quote(mode)} ${quote(log)} "$@"\n`,
   );
   await Deno.chmod(compiler, 0o755);
   return { directory, compiler, log };
@@ -212,7 +206,9 @@ function reaped(pid: number) {
   throws(() => Deno.kill(pid, 0), Deno.errors.NotFound);
 }
 Deno.test("LSP invalidates held replies, cancels active queries and reopens a new child generation", async () => {
-  const fixture = await peer("completion-hold"),
+  // Hold the original child until cancellation; its replacement answers
+  // immediately, without a sleep competing with the production deadline.
+  const fixture = await peer("completion-restart"),
     item = await setup(fixture.compiler);
   try {
     await item.open("val", 10);

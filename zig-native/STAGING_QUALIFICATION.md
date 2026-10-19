@@ -1,9 +1,30 @@
 # Typed staging qualification
 
-Tasks 067/068 remain in progress. The ordinary frontend, immutable Core and
-evaluator own the admitted code/descriptor graphs; no generated strings or
-second frontend are used. Focused results below do not establish release or
-performance qualification.
+Tasks 067/068 are complete against the seven owner-fixed acceptance traces. The
+ordinary frontend, immutable Core and evaluator own admitted code/descriptor
+graphs. The [19 October full gate](CLOUD_QUALIFICATION.md) executes their native
+allocation-failure laws and guest checks; current source/archive population and
+edit costs are recorded below. Forms outside the fixed frontier retain their
+conservative rejection or decline.
+
+## Missing trace laws (19 October 2026, working tree)
+
+The two gaps in the dated index below now have dedicated native laws, each
+including a complete allocation-failure sweep:
+
+- `typed staging rejects a spliced callable with a different usage shape through OOM`
+  checks an affine-parameter function against an ordinary callback at its
+  spliced use (`type_mismatch`), with the ordinary shape as a positive control.
+- `typed staging refuses a lifted live skolem before code publication through OOM`
+  rejects a lifted argument of `forall [a] => a -> code [a, row {}]` with
+  `cross_stage_authority`.
+
+Both live in `src/check/typed_staging_tests.zig`. Their guest counterparts in
+`tests/closed_stage_task_boundaries.test.ts` execute the ordinary splice control
+and verify that both rejected programs publish no Wasm and release compiler
+owners. The four-law combined native screen and all four new guest groups pass;
+the complete LLVM gate and current population/retained cost campaign also pass.
+These results do not change the admitted forms or the owner-fixed scope.
 
 ## Trace-to-law index, 17 October 2026
 
@@ -396,3 +417,44 @@ body certificate. Initial missing-certificate native failures are preserved in
 `sealed-packages/`; the separately reviewed correction passes three native/OOM
 laws in `package-foreign-rows/`. These focused results await the final combined
 gate and do not qualify general staging.
+
+## Current population and edit costs, 19 October 2026
+
+The reproducible command is
+`deno run -A scripts/bench_staging.ts
+zig-native/zig-out/bin/blotc build/bench/staging-current-qualified-cost`.
+The LLVM release executable is the `0f531509…` compiler identified in
+[CLOUD_QUALIFICATION.md](CLOUD_QUALIFICATION.md). Harness SHA-256:
+`554ac6e607126311ebdb48b6259b992d8d17900c0c99545378b1be464c4cd036`. Seven
+alternating ordinary/staged pairs cover both codegen tiers and source / portable
+dependencies: 336 measured builds. Persistence is disabled and `codegenWorkers`
+is one. Session opening and dependency packing are outside the measured build
+interval. The ordinary control computes the same values without quote/emit; the
+staged producer uses imported opaque values, two independent emissions, a scalar
+generator argument and a quoted executable body.
+
+Each cell is median compiler process CPU in milliseconds, measured from the live
+threads' Linux scheduler counters. These small samples are descriptive; they
+establish neither a speedup nor a pass/fail performance target.
+
+| Tier        | Producer | Variant  | Population | No-op | Literal | Input |  Body | Revert |
+| ----------- | -------- | -------- | ---------: | ----: | ------: | ----: | ----: | -----: |
+| development | source   | ordinary |      3.080 | 0.149 |   2.992 | 1.387 | 1.782 |  1.436 |
+| development | source   | staged   |      3.297 | 0.156 |   2.732 | 1.354 | 1.535 |  1.671 |
+| development | archive  | ordinary |      1.528 | 0.148 |   1.712 | 1.296 | 1.358 |  1.342 |
+| development | archive  | staged   |      1.635 | 0.141 |   1.948 | 1.343 | 1.691 |  1.743 |
+| optimized   | source   | ordinary |      2.615 | 0.181 |   1.740 | 1.391 | 1.320 |  1.352 |
+| optimized   | source   | staged   |      2.384 | 0.139 |   2.337 | 1.375 | 2.045 |  2.143 |
+| optimized   | archive  | ordinary |      1.500 | 0.123 |   1.996 | 1.485 | 1.402 |  1.398 |
+| optimized   | archive  | staged   |      2.516 | 0.127 |   2.641 | 2.546 | 1.574 |  1.628 |
+
+Every build matches a fresh compiler byte for byte and executes the expected
+four-word witness. Revert restores population bytes. A separate fresh CLI
+compilation agrees with the project API for both variants and releases all
+requested compiler memory: ordinary 240,221 allocated bytes / 781 allocations /
+101,621 peak bytes; staged 265,892 / 865 / 103,750. Both end with zero live
+bytes. These are compiler allocations, separate from guest committed memory. Raw
+distributions, input hashes, work counters and CLI records remain in
+`build/bench/staging-current-qualified-cost/results.json`. The closed semantic
+traces are qualified by the common native/guest gate; forms outside those traces
+retain the documented conservative rejection or decline.

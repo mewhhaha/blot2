@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — implementation and focused checks are recorded;
-  final common qualification remains required.
+- **Status:** Complete — qualified on 19 October 2026 against the fixed
+  acceptance scope; see the current completion record below.
 - **Dependencies:** None. Owner-delegated decision, 16 October 2026: the former
   edge on all of 001–074 only sequenced refactors after feature work. Nothing
   here consumes a feature task's result, so open feature tasks that touch the
@@ -52,14 +52,33 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Evaluator state is separated by ownership and responsibility with reduced
+- [x] Evaluator state is separated by ownership and responsibility with reduced
       large dispatch functions.
-- [ ] Behavior and publication remain unchanged and handwritten functions move
+- [x] Behavior and publication remain unchanged and handwritten functions move
       toward the approximately 120-line target.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
+
+- Current local milestone: the commit containing this record; compiler and exact
+  source/log hashes are recorded by the
+  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+- Validation: the forced LLVM gate executes all 2,470 native laws without skips,
+  failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
+  checks pass. CI lint covers 507 source files plus the fixture module with zero
+  findings. Strict fresh/retained/restart/shared Wasm parity and the seven-pair
+  CPU regression guard pass.
+- Acceptance: The evaluator owners and reduced dispatches pass the common
+  compiler, ownership and paired-output gates.
+- Remaining limits: Current expression/collection dispatches are 113/76 lines;
+  larger non-dispatch coordinators remain explicit. Historical refactor
+  comparisons retain their original pins.
+
+### Earlier implementation evidence
+
+The checkpoints below retain their original dates and measurements. Statements
+that qualification or a commit was pending refer to those earlier checkpoints.
 
 The focused implementation separates value storage, region backing,
 specialization caches and retained records. Evaluation dispatch is 380 → 117

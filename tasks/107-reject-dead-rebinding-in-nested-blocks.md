@@ -2,9 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — implemented on 17 October 2026 and committed in
-  `05401a9`/`f6a2942`; later full gates on main pass. The acceptance evidence
-  remains to be recorded.
+- **Status:** Complete — qualified on 19 October 2026 against the fixed
+  acceptance scope; see the current completion record below.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink by peer session on 17 October
   2026 as [issue #11](https://github.com/mewhhaha/blot2/issues/11), a silent
@@ -60,15 +59,33 @@ commit.
 
 ## Acceptance criteria
 
-- [ ] The issue repro returns 7 and 3; one-arm, single-arm, three-arm, field,
+- [x] The issue repro returns 7 and 3; one-arm, single-arm, three-arm, field,
       guarded, type-changing, looped and owned-array arms execute correctly with
       stable guest memory; a plain statement `do:` with an unread `:=` is
       rejected with `dead_rebinding`; a nested `return` in a rebinding arm is
       rejected with `case_arm_return`.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
+
+- Current local milestone: the commit containing this record; compiler and exact
+  source/log hashes are recorded by the
+  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+- Validation: the forced LLVM gate executes all 2,470 native laws without skips,
+  failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
+  checks pass. CI lint covers 507 source files plus the fixture module with zero
+  findings. Strict fresh/retained/restart/shared Wasm parity and the seven-pair
+  CPU regression guard pass.
+- Acceptance: All nested-block rebinding and rejection laws pass the current
+  native/OOM and executed guest gate.
+- Remaining limits: Plain nested do blocks keep their scope; nested returns in
+  rebinding statement-case arms reject with case_arm_return as documented.
+
+### Earlier implementation evidence
+
+The checkpoints below retain their original dates and measurements. Statements
+that qualification or a commit was pending refer to those earlier checkpoints.
 
 - Commit: pending.
 - Validation: in the implementation worktree the full gate passed with 2,360

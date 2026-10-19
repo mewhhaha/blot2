@@ -1,10 +1,26 @@
 # Structured task implementation qualification
 
-Tasks 073/074 implement the cooperative contract in
-[STRUCTURED_CONCURRENCY.md](STRUCTURED_CONCURRENCY.md). This records focused
-qualification, not completion of the combined release gate. Task 035 remains an
-unmet prerequisite, and the final union must run `deno task test:compiler` and
-`deno task lint:zig` before a milestone commit.
+Tasks 073/074 complete the eight owner-fixed cooperative traces in
+[STRUCTURED_CONCURRENCY.md](STRUCTURED_CONCURRENCY.md). The
+[19 October full gate](CLOUD_QUALIFICATION.md) executes the mapped native/OOM
+laws and guest checks. Task 035 also passes the required bounded-memory stress.
+The deliberate limits below remain in force.
+
+## Scoped result trace (19 October 2026, working tree)
+
+The partially mapped child-result trace now has a task-specific native law:
+`structured tasks reject children returning group scoped callbacks and packages through OOM`
+in `src/check/task_check_tests.zig`. Both a returned callback and a returned
+existential package retain their child group's authority and produce
+`task_escape`; the complete allocation-failure sweep passes.
+
+The matching `tests/closed_stage_task_boundaries.test.ts` group rejects both
+sources, executes the last accepted task program after each rejection, and
+corrects to its exact prior Wasm. The project protocol reports the first
+diagnostic: `task_escape` for the callback and `task_capture_transfer` for the
+package; the native law also checks the package's subsequent `task_escape`. The
+new native and guest checks pass in the complete LLVM gate, and the
+tracing-replacement prerequisite is complete.
 
 ## Implemented boundary
 

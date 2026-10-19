@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — owned scheme import and checker rule separation are
-  implemented; focused and final common qualification remain required.
+- **Status:** Complete — qualified on 19 October 2026 against the fixed
+  acceptance scope; see the current completion record below.
 - **Dependencies:** [076](076-split-core-module-and-builder.md)
 - **Originating requirements:** PLAN: Hill 14 / checker structure and function
   size. Sources: [PLAN.md](../PLAN.md).
@@ -47,13 +47,31 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Checker concerns have clear boundaries and materially smaller production
+- [x] Checker concerns have clear boundaries and materially smaller production
       functions.
-- [ ] Chronology, diagnostics, imports and ownership retain parity.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Chronology, diagnostics, imports and ownership retain parity.
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
+
+- Current local milestone: the commit containing this record; compiler and exact
+  source/log hashes are recorded by the
+  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+- Validation: the forced LLVM gate executes all 2,470 native laws without skips,
+  failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
+  checks pass. CI lint covers 507 source files plus the fixture module with zero
+  findings. Strict fresh/retained/restart/shared Wasm parity and the seven-pair
+  CPU regression guard pass.
+- Acceptance: Checker responsibility owners pass current native/OOM, guest,
+  import, diagnostic and retained/restart gates.
+- Remaining limits: Expression/statement dispatches are 46/19 lines; the
+  lifecycle coordinator is still 417 lines and is an explicit exception.
+
+### Earlier implementation evidence
+
+The checkpoints below retain their original dates and measurements. Statements
+that qualification or a commit was pending refer to those earlier checkpoints.
 
 - Commit: pending; record the local milestone revision.
 - Validation: Zig 0.17.0 Safe/noLLVM; eight focused checker laws including

@@ -78,3 +78,9 @@ length. Its affected-closure rerun verifies all 429 files with zero findings.
 The original failed output and the correction remain in the qualification
 artifacts. Final combined CPU qualification, ownership performance gates and the
 full compiler gate remain required before claiming the complete milestone.
+
+The [19 October cloud gate](CLOUD_QUALIFICATION.md) supplies the current common
+native, guest, release and packaging checks. Current compilation entry wrappers
+are not counted as substantive routine reductions; the extracted phase and
+storage owners above carry the implementation work. Historical paired costs stay
+attached to their measured source revisions.

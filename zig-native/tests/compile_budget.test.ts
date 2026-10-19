@@ -229,11 +229,15 @@ interface Reuse {
   /** Named and closure instances specialized afresh (`stats.backend`). */
   fresh_named: number;
   fresh_closures: number;
+  /** Named instances reused from a previous revision; higher is better. */
+  reused_named: number;
   /** Modules whose frontend was validated again (`attemptStats.fallback`). */
   validated_modules: number;
   recheck_body_elaborations: number;
   /** Bodies elaborated within the whole-project check of a rebuilt seed. */
-  check_body_elaborations?: number;
+  check_body_elaborations: number;
+  /** Bodies lowered in the whole-project check; lower is better. */
+  check_body_lowerings: number;
   /** The dependency seed was rebuilt; true permits either outcome. */
   rebuilt_seed: boolean;
   /** The previous output was published unchanged; true requires it. */
@@ -247,9 +251,11 @@ function reuse(result: ZigProjectBuildResult): Reuse {
   return {
     fresh_named: backend.fresh_named,
     fresh_closures: backend.fresh_closures,
+    reused_named: backend.reused_named,
     validated_modules: fallback.validated_modules,
     recheck_body_elaborations: fallback.recheck_body_elaborations,
     check_body_elaborations: fallback.body_elaborations,
+    check_body_lowerings: fallback.body_lowerings,
     rebuilt_seed: attempt.rebuilt_seed as boolean,
     reused_output: attempt.reused_output as boolean,
   };
@@ -263,125 +269,169 @@ const retainedToday: Record<string, Reuse> = {
   "population": {
     fresh_named: 10,
     fresh_closures: 0,
+    reused_named: 0,
     validated_modules: 5,
     recheck_body_elaborations: 0,
     check_body_elaborations: 150,
     rebuilt_seed: true,
     reused_output: false,
+    check_body_lowerings: 150,
   },
   "edit:trivia": {
     fresh_named: 0,
     fresh_closures: 0,
+    reused_named: 0,
     validated_modules: 0,
     recheck_body_elaborations: 0,
     rebuilt_seed: false,
     reused_output: true,
+    check_body_elaborations: 0,
+    check_body_lowerings: 0,
   },
   "revert:trivia": {
     fresh_named: 0,
     fresh_closures: 0,
+    reused_named: 0,
     validated_modules: 0,
     recheck_body_elaborations: 0,
     rebuilt_seed: false,
     reused_output: true,
+    check_body_elaborations: 0,
+    check_body_lowerings: 0,
   },
   "edit:literal_constant": {
     fresh_named: 2,
     fresh_closures: 0,
+    reused_named: 8,
     validated_modules: 1,
     recheck_body_elaborations: 0,
     rebuilt_seed: true,
     reused_output: false,
+    check_body_elaborations: 5,
+    check_body_lowerings: 5,
   },
   "revert:literal_constant": {
     fresh_named: 2,
     fresh_closures: 0,
+    reused_named: 8,
     validated_modules: 1,
     recheck_body_elaborations: 0,
     rebuilt_seed: true,
     reused_output: false,
+    check_body_elaborations: 5,
+    check_body_lowerings: 5,
   },
   "edit:literal_in_body": {
     fresh_named: 3,
     fresh_closures: 0,
+    reused_named: 7,
     validated_modules: 1,
     recheck_body_elaborations: 0,
     rebuilt_seed: true,
     reused_output: false,
+    check_body_elaborations: 5,
+    check_body_lowerings: 5,
   },
   "revert:literal_in_body": {
     fresh_named: 3,
     fresh_closures: 0,
+    reused_named: 7,
     validated_modules: 1,
     recheck_body_elaborations: 0,
     rebuilt_seed: true,
     reused_output: false,
+    check_body_elaborations: 5,
+    check_body_lowerings: 5,
   },
   "edit:body_change": {
     fresh_named: 3,
     fresh_closures: 0,
+    reused_named: 7,
     validated_modules: 1,
     recheck_body_elaborations: 0,
     rebuilt_seed: true,
     reused_output: false,
+    check_body_elaborations: 5,
+    check_body_lowerings: 5,
   },
   "revert:body_change": {
     fresh_named: 3,
     fresh_closures: 0,
+    reused_named: 7,
     validated_modules: 1,
     recheck_body_elaborations: 0,
     rebuilt_seed: true,
     reused_output: false,
+    check_body_elaborations: 5,
+    check_body_lowerings: 5,
   },
   // A changed data type re-specializes every instance today.
   "edit:type_change": {
     fresh_named: 10,
     fresh_closures: 0,
+    reused_named: 0,
     validated_modules: 2,
     recheck_body_elaborations: 0,
     rebuilt_seed: true,
     reused_output: false,
+    check_body_elaborations: 8,
+    check_body_lowerings: 8,
   },
   "revert:type_change": {
     fresh_named: 10,
     fresh_closures: 0,
+    reused_named: 0,
     validated_modules: 2,
     recheck_body_elaborations: 0,
     rebuilt_seed: true,
     reused_output: false,
+    check_body_elaborations: 8,
+    check_body_lowerings: 8,
   },
   "edit:imported_body": {
     fresh_named: 4,
     fresh_closures: 0,
+    reused_named: 6,
     validated_modules: 1,
     recheck_body_elaborations: 0,
     rebuilt_seed: true,
     reused_output: false,
+    check_body_elaborations: 5,
+    check_body_lowerings: 5,
   },
   "revert:imported_body": {
     fresh_named: 4,
     fresh_closures: 0,
+    reused_named: 6,
     validated_modules: 1,
     recheck_body_elaborations: 0,
     rebuilt_seed: true,
     reused_output: false,
+    check_body_elaborations: 5,
+    check_body_lowerings: 5,
   },
   // An unused export leaves the Wasm unchanged but rebuilds everything today.
   "edit:unused_export": {
     fresh_named: 10,
     fresh_closures: 0,
+    reused_named: 0,
     validated_modules: 4,
     recheck_body_elaborations: 0,
     rebuilt_seed: true,
     reused_output: false,
+    check_body_elaborations: 16,
+    check_body_lowerings: 16,
   },
   "revert:unused_export": {
     fresh_named: 10,
     fresh_closures: 0,
+    reused_named: 0,
     validated_modules: 4,
     recheck_body_elaborations: 0,
     rebuilt_seed: true,
     reused_output: false,
+    check_body_elaborations: 15,
+    check_body_lowerings: 15,
   },
 };
 
@@ -483,6 +533,10 @@ Deno.test("budget: retained edit suite reuses at least today's work", async () =
   for (const [phase, budget] of Object.entries(revalidationToday)) {
     for (const [name, limit] of Object.entries(budget)) {
       const value = revalidated[phase][name as keyof Revalidation];
+      assert(
+        Number.isSafeInteger(value) && value >= 0,
+        `${phase} ${name}: missing or invalid counter`,
+      );
       if (value > limit) {
         failures.push(`${phase} ${name}: ${value} exceeds ${limit}`);
       } else if (value < limit) improved.push(`${phase} ${name}`);
@@ -492,12 +546,32 @@ Deno.test("budget: retained edit suite reuses at least today's work", async () =
     const actual = observed[phase];
     for (const [name, limit] of Object.entries(budget)) {
       const value = actual[name as keyof Reuse];
-      if (name === "reused_output") {
+      if (typeof limit === "boolean") {
+        assert.equal(
+          typeof value,
+          "boolean",
+          `${phase} ${name}: missing boolean counter`,
+        );
+      } else {
+        assert(
+          Number.isSafeInteger(value) && Number(value) >= 0,
+          `${phase} ${name}: missing or invalid counter`,
+        );
+      }
+      if (name === "reused_named") {
+        if (Number(value) < Number(limit)) {
+          failures.push(`${phase} ${name}: ${value} below ${limit}`);
+        } else if (Number(value) > Number(limit)) {
+          improved.push(`${phase} ${name}`);
+        }
+      } else if (name === "reused_output") {
         if (limit && !value) failures.push(`${phase} ${name}: lost`);
         else if (!limit && value) improved.push(`${phase} ${name}`);
       } else if (Number(value) > Number(limit)) {
         failures.push(`${phase} ${name}: ${value} exceeds ${limit}`);
-      } else if (Number(value) < Number(limit)) improved.push(`${phase} ${name}`);
+      } else if (Number(value) < Number(limit)) {
+        improved.push(`${phase} ${name}`);
+      }
     }
   }
   if (improved.length) {
@@ -564,7 +638,10 @@ Deno.test("budget: retained edits with check errors publish one partial check", 
       const original = editSuite.files[edit.file];
       assert.equal(original.split(edit.search).length, 2, edit.name);
       const sources = {
-        [`${directory}/${edit.file}`]: original.replace(edit.search, edit.replace),
+        [`${directory}/${edit.file}`]: original.replace(
+          edit.search,
+          edit.replace,
+        ),
       };
       const rejected = await retained.build({ sources });
       assert(!rejected.success, edit.name);
@@ -653,6 +730,12 @@ Deno.test("budget: entry switches check only modules no earlier entry reached", 
       const attempt = built.stats.attemptStats as Record<string, unknown>;
       const fallback = attempt.fallback as Record<string, number>;
       const budget = switchToday[name];
+      for (const counter of ["validated_modules", "relocated_modules"]) {
+        assert(
+          Number.isSafeInteger(fallback[counter]) && fallback[counter] >= 0,
+          `${name} ${counter}: missing or invalid counter`,
+        );
+      }
       if (fallback.validated_modules > budget.validated_modules) {
         failures.push(
           `${name} validated_modules: ${fallback.validated_modules} exceeds ${budget.validated_modules}`,

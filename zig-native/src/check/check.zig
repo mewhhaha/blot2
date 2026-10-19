@@ -9849,10 +9849,11 @@ const Engine = struct {
         if (principal.generative.len > 32 or principal.generative.len % 2 != 0) return error.TypeLimit;
         const generators = try temporary.dupe(T.Id, self.types.list(principal.generative));
         defer temporary.free(generators);
-        for (0..generators.len / 2) |index| try self.generative_bindings.append(self.allocator, .{
-            .arrow = try self.types.substitutePrepared(&substitution, generators[index * 2]),
-            .selection = try self.types.substitutePrepared(&substitution, generators[index * 2 + 1]),
-        });
+        for (0..generators.len / 2) |index| {
+            const arrow = try self.types.substitutePrepared(&substitution, generators[index * 2]);
+            const selection = try self.types.substitutePrepared(&substitution, generators[index * 2 + 1]);
+            try self.generative_bindings.append(self.allocator, .{ .arrow = arrow, .selection = selection });
+        }
         if (self.exact_argument_types) return value;
         return self.types.openCovariant(value);
     }

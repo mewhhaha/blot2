@@ -337,7 +337,8 @@ pub fn prepare(a: A, source: *const w.Module) (A.Error || error{ModuleTooLarge})
 fn private(module: *const w.Module, id: u32) bool {
     const body = &module.functions.items[id];
     if (body.entry or (module.start != null and module.start.? == id) or body.parameters.len > 32) return false;
-    if (body.parameters.len + body.locals.items.len >= 4096) return false;
+    const locals = std.math.add(usize, body.parameters.len, body.locals.items.len) catch return false;
+    if (locals >= 4096) return false;
     if (module.resourceAdapterFunction(id) or module.taskAdapterFunction(id)) return false;
     if (@import("../runtime/region_runtime.zig").scope(module, id) != null) return false;
     // Late region and cohort owners stay with their original identity.

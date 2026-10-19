@@ -216,3 +216,36 @@ allocation results and raw distributions remain under ignored
 Tasks 024/053 still own broader semantic cutoffs and wrapper-operation
 qualification; tasks 034/035 own complete cycle reclamation and final tracing
 removal. No push or whole-program completion is claimed.
+
+## Current closed-row screen, 19 October 2026
+
+A release screen on the `0f531509…` compiler uses an opaque producer, an
+unchanged forwarding module and an unchanged entry, with persistence disabled.
+All seven edits match fresh bytes and execute the expected result. The body
+control, parameter alpha-renaming and a private record-field rename each reuse
+both semantic callers. Inserting an unrelated private declaration before the
+opaque type, relocating a private declaration, changing U32 storage to F32, and
+changing it to an Array representation still recheck both callers.
+
+| Edit                                     | Intermediate / entry reused | Body elaborations |
+| ---------------------------------------- | --------------------------- | ----------------: |
+| Private body control                     | 1 / 1                       |                 3 |
+| Private declaration inserted before type | 0 / 0                       |                 6 |
+| Private declaration moved                | 0 / 0                       |                 5 |
+| Parameter alpha-renamed                  | 1 / 1                       |                 3 |
+| Opaque U32 storage changed to F32        | 0 / 0                       |                 4 |
+| Private field renamed                    | 1 / 1                       |                 3 |
+| Opaque storage gains a reference         | 0 / 0                       |                 4 |
+
+The screen is source-only optimized codegen, not the complete source/archive/
+checkpoint acceptance matrix. It does not close task 053. Its raw work records
+are `build/bench/task053-current-screen/results.json`.
+
+Current cutoff comparison includes positional principal slots and exact external
+binding targets, so declaration movement cannot be admitted merely by ignoring
+private fields. The backend layout store resolves opaque physical storage
+through the current producer modules (`layout.Store.opaque_sources`). That
+boundary is relevant to separating semantic equality from changed ABI and
+ownership recipes, but any broader reuse still needs fresh-output, changed
+storage, failed-publication and allocation-failure laws. Existing guards remain
+in force; no screen result is a reason to relax them.

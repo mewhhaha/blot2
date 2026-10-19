@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — implementation and focused checks are recorded;
-  final common qualification remains required.
+- **Status:** Complete — qualified on 19 October 2026 against the fixed
+  acceptance scope; see the current completion record below.
 - **Dependencies:** [075](075-split-evaluator-state-and-dispatch.md)
 - **Originating requirements:** PLAN: Hill 14 / Core module and builder.
   Sources: [PLAN.md](../PLAN.md).
@@ -46,13 +46,31 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Immutable module data and mutable construction have separate owners and
+- [x] Immutable module data and mutable construction have separate owners and
       clear APIs.
-- [ ] No behavior, ownership or representation change is hidden in the refactor.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] No behavior, ownership or representation change is hidden in the refactor.
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
+
+- Current local milestone: the commit containing this record; compiler and exact
+  source/log hashes are recorded by the
+  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+- Validation: the forced LLVM gate executes all 2,470 native laws without skips,
+  failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
+  checks pass. CI lint covers 507 source files plus the fixture module with zero
+  findings. Strict fresh/retained/restart/shared Wasm parity and the seven-pair
+  CPU regression guard pass.
+- Acceptance: Immutable Core and mutable construction have distinct owners; the
+  common native/OOM, guest, package and comparison gates pass.
+- Remaining limits: Earlier matched refactor cost records remain historical; no
+  new source-layout performance gain is claimed.
+
+### Earlier implementation evidence
+
+The checkpoints below retain their original dates and measurements. Statements
+that qualification or a commit was pending refer to those earlier checkpoints.
 
 - Commit: pending; record the local milestone revision.
 - Validation: Zig 0.17.0 Safe/noLLVM dev build; seven focused native laws,

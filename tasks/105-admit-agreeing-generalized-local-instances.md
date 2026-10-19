@@ -2,12 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — agreeing instances and closed promotion recorded on
-  16 October 2026; per-use-layout runtime instances and their checks recorded on
-  17 October 2026; Ink's app-hooks builders recorded on 17 October 2026;
-  ambiguous holes recorded on 17 October 2026. Committed in `05401a9`,
-  `f6a2942`, `4599957` and `332b496`; later full gates on main pass. The
-  acceptance evidence remains to be recorded.
+- **Status:** Complete — qualified on 19 October 2026 against the fixed
+  acceptance scope; see the current completion record below.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink by peer session on 16 October
   2026 as [issue #10](https://github.com/mewhhaha/blot2/issues/10); owner
@@ -146,16 +142,36 @@ before the local milestone commit. Re-run the Ink ownership repro folder.
 
 ## Acceptance criteria
 
-- [ ] Alias, dead alias, same-layout multi-use, partial application, rebinding
+- [x] Alias, dead alias, same-layout multi-use, partial application, rebinding
       chain and unobserved-local laws execute correctly with stable guest
       memory, and fail on the unpatched compiler.
-- [ ] Closed initializers used at different layouts execute correctly, and so do
+- [x] Closed initializers used at different layouts execute correctly, and so do
       pure runtime-dependent ones, with one instance per use layout and stable
       guest memory; declined runtime-dependent ones report `ownership_unproved`.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
+
+- Current local milestone: the commit containing this record; compiler and exact
+  source/log hashes are recorded by the
+  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+- Validation: the forced LLVM gate executes all 2,470 native laws without skips,
+  failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
+  checks pass. CI lint covers 507 source files plus the fixture module with zero
+  findings. Strict fresh/retained/restart/shared Wasm parity and the seven-pair
+  CPU regression guard pass.
+- Acceptance: Current generalized-local laws and Ink app-hooks execute
+  correctly. The two codegen tiers each complete 3,000 app-hooks calls with
+  exact witnesses and flat 128 KiB memory.
+- Remaining limits: The conservative unproved cases recorded below remain
+  unchanged, including generic named-call holes, captured generalized locals,
+  nested producers and more than four runtime layouts.
+
+### Earlier implementation evidence
+
+The checkpoints below retain their original dates and measurements. Statements
+that qualification or a commit was pending refer to those earlier checkpoints.
 
 - Commit: pending.
 - Validation (16 October): the seven new laws pass with the patched dev

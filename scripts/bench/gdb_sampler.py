@@ -73,6 +73,15 @@ open(os.path.join(control, "attached"), "w").write("1")
 wait_for("start")
 started = time.time()
 taken = 0
+def thread_cpu(tid):
+    try:
+        with open("/proc/%d/task/%d/schedstat" % (pid, tid)) as source:
+            return int(source.read().split()[0])
+    except FileNotFoundError:
+        return None
+
+previous_cpu = {t.ptid[1]: thread_cpu(t.ptid[1])
+                for t in gdb.selected_inferior().threads()}
 with open(os.environ["SAMPLE_OUT"], "a") as out:
     while not flag("stop") and (limit is None or taken < limit):
         delay = random.uniform(low, high)
@@ -86,11 +95,23 @@ with open(os.environ["SAMPLE_OUT"], "a") as out:
         if flag("stop"):
             break  # The measured builds finished while this stop was pending.
         try:
-            stacks = [s for s in map(stack, gdb.selected_inferior().threads())
-                      if not any(f[0] == "main.main" for f in s)]
+            stacks, tids, cpu_ns = [], [], []
+            for thread in gdb.selected_inferior().threads():
+                tid = thread.ptid[1]
+                current = thread_cpu(tid)
+                previous = previous_cpu.get(tid)
+                previous_cpu[tid] = current
+                frames = stack(thread)
+                if any(f[0] == "main.main" for f in frames):
+                    continue
+                stacks.append(frames)
+                tids.append(tid)
+                cpu_ns.append(None if current is None or previous is None
+                              else max(0, current - previous))
         except gdb.error:
             break
-        out.write(json.dumps({"t": time.time() - started, "st": stacks}) + "\n")
+        out.write(json.dumps({"t": time.time() - started, "st": stacks,
+                              "tid": tids, "cpu_ns": cpu_ns}) + "\n")
         out.flush()
         taken += 1
 try:

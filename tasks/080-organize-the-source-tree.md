@@ -2,9 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — source areas and live references are moved; dev
-  build, interfaces, discovery, fingerprints and analyzer pass; release,
-  packaging and final qualification remain required.
+- **Status:** Complete — qualified on 19 October 2026 against the fixed
+  acceptance scope; see the current completion record below.
 - **Dependencies:** [079](079-relocate-fixtures-through-a-test-module.md)
 - **Originating requirements:** PLAN: Hill 15 / source layout. Sources:
   [PLAN.md](../PLAN.md).
@@ -52,12 +51,30 @@ development and the scenarios below.
 
 - [x] The planned source areas exist with correct imports, nearby tests and
       external fixtures.
-- [ ] Builds, tests, fingerprints, analyzer, packaging and links all use the new
+- [x] Builds, tests, fingerprints, analyzer, packaging and links all use the new
       layout.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
+
+- Current local milestone: the commit containing this record; compiler and exact
+  source/log hashes are recorded by the
+  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+- Validation: the forced LLVM gate executes all 2,470 native laws without skips,
+  failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
+  checks pass. CI lint covers 507 source files plus the fixture module with zero
+  findings. Strict fresh/retained/restart/shared Wasm parity and the seven-pair
+  CPU regression guard pass.
+- Acceptance: The organized source tree passes release/package, full test
+  discovery/execution, fingerprints, analyzer, editor and local-link checks.
+- Remaining limits: Schema/compiler identity changes caused by the earlier
+  source move remain intentional, with ordinary incompatible-cache fallback.
+
+### Earlier implementation evidence
+
+The checkpoints below retain their original dates and measurements. Statements
+that qualification or a commit was pending refer to those earlier checkpoints.
 
 - No commit or push, as required by the current continuation.
 - Zig 0.17.0: the dev build passes in 5.48 s and all native interfaces compile

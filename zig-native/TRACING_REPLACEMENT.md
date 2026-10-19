@@ -1,5 +1,41 @@
 # Tracing replacement work
 
+## Current production audit (19 October 2026)
+
+The remaining task-035 implementation notes predate the integrated production
+assembly path. Current source emits through `backend/core_backend.zig`'s
+`assembleCheckedWithOptions` calls, including retained replay verification. The
+checked entry in `backend/wasm.zig` rejects fixture helpers and requires
+complete ownership. Unproved graphs diagnose; they do not select a production
+tracer.
+
+`runtime/arena_runtime.zig` emits allocation, direct reclamation and shared RC.
+The production `Arena` and portable function-role catalog contain no scanner
+identities. Legacy scanning is constructed explicitly by
+`runtime/fixture_tracing.zig`, imported only by private arena/shared-RC/List
+fixtures and their regression tests. It cannot enter checked production
+assembly. The cycle collector's counted-edge traversal remains part of the
+replacement ownership system; removing it is not tracing removal.
+
+The allocation/layout/exit audit is enforced by typed ownership preparation and
+complete checked assembly, with these permanent coverage groups:
+
+| Boundary                                                     | Enforcement and regression coverage                                                                                                                                                                                                                                           |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Every production allocation and field role                   | `runtime_layout.zig` roles, shared-RC preparation, `backend/runtime_flags_tests.zig` checked-production acceptance/rejection and its full allocation-failure sweep                                                                                                            |
+| Fixture isolation and retained helper catalogs               | `production helper catalog contains no scanner identity`, explicit fixture-construction/OOM laws, immutable runtime-flag lowering and retained/portable replay laws                                                                                                           |
+| Invocation roots, leases and persistent aliases              | `persistent_roots_execution.test.ts`, `root_borrow_execution.test.ts`, `activation_ownership_execution.test.ts`, `tracing_replacement_execution.test.ts`                                                                                                                      |
+| Legal cycles, duplicate edges and disposal                   | `cyclic_ownership_execution.test.ts`, `shared_rc_execution.test.ts`, `cohort_runtime_execution.test.ts`                                                                                                                                                                       |
+| Suspension, scoped state, task exits and resource retirement | `suspended_ownership_execution.test.ts`, `state_provider_ownership_execution.test.ts`, task/context, conditional-root and resource-retirement execution files                                                                                                                 |
+| Nested discarded allocations with live outer rows            | The first `tracing_replacement_execution.test.ts` case uses 90 outer rows, 8,192-word discarded Arrays, and inner counts 8, 8, 40, 200, 8, 200; it checks values, positive in-invocation destruction, warm committed memory within one page, and zero roots/leases after exit |
+
+All source paths above are under `src/`; guest files are under `tests/`. The
+complete gate for the current field-receipt continuation passes, and task 035 is
+complete. The current memory/runtime observation is recorded below. The owner's
+15 October no-crash/no-OOM and bounded-memory bar applies; the dated historical
+tracing CPU comparisons below are informational, and their ignored raw artifacts
+were removed under the owner's task-083 decision.
+
 The current production candidate uses counted edges, leases and trial deletion;
 incomplete ownership diagnoses instead of selecting a tracer. The final common
 release/runtime performance gate remains open. Dated records below retain
@@ -820,3 +856,29 @@ executed groups and 112 affected analyzer files pass; ordinary Cost and captured
 project bytes remain exact. Captured retained reuse recovers 489 fragments. This
 compiler-work repair supplies no new ownership permission or tracing-removal
 evidence. See `build/bench/complete-program-20261015/nested-callable-reuse/`.
+
+## Current nested-array observation, 19 October 2026
+
+The exact permanent nested-array stress case runs in development and optimized
+codegen tiers with complete counted ownership (`blot:ownership = [2,2,0]`). Its
+90 live outer rows survive inner loops discarding 8,192-word Arrays at counts 8,
+8, 40, 200, 8 and 200. Every call commits **196,608 bytes (192 KiB)**, from
+first warmup through both 200-iteration calls. Each 200-iteration call retires
+18,092 objects before invocation exit; roots and leases are zero after leave and
+reset. No crash, trap or memory exhaustion occurs.
+
+Informational process CPU for the two 200-iteration calls is 100/90 ms in
+development and 30/30 ms optimized, using Linux 10 ms ticks and including the
+JavaScript boundary/accounting. These are observations, not tracing ratios or
+performance gates. A fresh optimized CLI build matches API Wasm exactly and
+requests 3,618,884 bytes across 11,031 allocations, peaks at 1,105,442 requested
+live bytes and ends at zero; one warm-filesystem sample takes 27.064 ms child
+user plus system CPU, 30.306 ms wall and 11,304 KiB peak RSS.
+
+The compiler is `0f531509…`, pinned in
+[CLOUD_QUALIFICATION.md](CLOUD_QUALIFICATION.md). Raw measurements are
+`build/bench/task035-runtime/results.json` and `compiler-cli.json` beside it.
+The previous raw tracing baseline was removed under the owner's artifact cleanup
+decision; its historical ratios above are retained as information and are not
+represented as a new matched comparison. The common forced native and guest gate
+remains the final closure check.

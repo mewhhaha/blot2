@@ -32,7 +32,7 @@ const repo = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const usage = `Usage: deno task profile:compile [--blotc BLOTC]
   [--workload game|devtools] [--test tests/NAME.blot] [--edit SCENARIO]
   [--runs 3] [--reps 10] [--min-ms 3] [--max-ms 10] [--top 40]
-  [--snapshot DIR] [--out DIR]
+  [--snapshot DIR] [--out DIR] [--codegen-workers 4]
        deno task profile:compile --aggregate SAMPLES.jsonl... [--top 40]
 Results: build/tmp/profile/<timestamp>/{samples.jsonl,report.txt}.`;
 
@@ -50,10 +50,17 @@ const { values: args, positionals } = parseArgs({
     top: { type: "string", default: "40" },
     snapshot: { type: "string" },
     out: { type: "string" },
+    "codegen-workers": { type: "string", default: "4" },
     aggregate: { type: "boolean", default: false },
     help: { type: "boolean", default: false },
   },
 });
+const codegenWorkers = Number(args["codegen-workers"]);
+if (
+  !Number.isInteger(codegenWorkers) || codegenWorkers < 1 || codegenWorkers > 16
+) {
+  throw new Error("--codegen-workers must be an integer from 1 to 16");
+}
 
 // ------------------------------------------------------------------ sampling
 
@@ -102,6 +109,17 @@ async function sampleRun(
   wrapper: string,
   workload: Workload,
 ): Promise<void> {
+  const scenario = args.edit
+    ? workload.scenarios.find((s) => s.name === args.edit)
+    : undefined;
+  if (args.edit && !scenario) {
+    throw new Error(
+      `No scenario ${args.edit}; known: ${
+        workload.scenarios.map((s) => s.name).join(", ")
+      }`,
+    );
+  }
+  const edited = scenario ? await editedSources(workload, scenario) : undefined;
   const control = `${out}/control-${run}`;
   await Deno.mkdir(control, { recursive: true });
   const gdb = new Deno.Command("gdb", {
@@ -127,13 +145,27 @@ async function sampleRun(
       new Uint8Array([...stdout, ...stderr]),
     )
   );
-  const compiler = await createZigProjectCompiler({
-    ...sessionOptions(wrapper, workload),
-    cacheDirectory: false,
-  });
+  let compiler:
+    | Awaited<ReturnType<typeof createZigProjectCompiler>>
+    | undefined;
+  let detached = false;
   try {
+    compiler = await createZigProjectCompiler({
+      ...sessionOptions(wrapper, workload),
+      cacheDirectory: false,
+      codegenWorkers,
+      profileBackend: true,
+    });
+    const project = compiler;
+    let sampling = false;
+    const ticks = async () => {
+      const stat = await Deno.readTextFile(`/proc/${project.pid}/stat`);
+      const fields = stat.slice(stat.lastIndexOf(") ") + 2).trim().split(/\s+/);
+      return Number(fields[11]) + Number(fields[12]);
+    };
     const build = async (sources: Record<string, string>, label: string) => {
-      const result = await compiler.build({
+      const before = await ticks(), started = Date.now();
+      const result = await project.build({
         sources: { ...workload.overlay, ...sources },
       });
       if (!result.success) {
@@ -141,18 +173,24 @@ async function sampleRun(
           `${label} failed: ${JSON.stringify(result.diagnostics.slice(0, 2))}`,
         );
       }
+      await Deno.writeTextFile(
+        `${out}/builds.jsonl`,
+        JSON.stringify({
+          run,
+          label,
+          sampled: sampling,
+          started_ms: started,
+          finished_ms: Date.now(),
+          cpu_ms: ((await ticks()) - before) * 10,
+          cpu_accounting: "Linux USER_HZ=100 child user plus system ticks",
+          codegen_workers: codegenWorkers,
+          stats: result.stats,
+        }) + "\n",
+        { append: true },
+      );
     };
     let measured: () => Promise<void>;
-    if (args.edit) {
-      const scenario = workload.scenarios.find((s) => s.name === args.edit);
-      if (!scenario) {
-        throw new Error(
-          `No scenario ${args.edit}; known: ${
-            workload.scenarios.map((s) => s.name).join(", ")
-          }`,
-        );
-      }
-      const edited = await editedSources(workload, scenario);
+    if (scenario && edited) {
       await build({}, "population");
       measured = async () => {
         for (let rep = 0; rep < Number(args.reps); rep++) {
@@ -166,11 +204,20 @@ async function sampleRun(
     await waitFor(`${control}/attached`, gdb, "attached");
     await sleep(150);
     await Deno.writeTextFile(`${control}/start`, "1");
+    sampling = true;
     await measured();
     await Deno.writeTextFile(`${control}/stop`, "1");
     await waitFor(`${control}/detached`, gdb, "detached");
+    detached = true;
   } finally {
-    await compiler.dispose();
+    if (!detached) {
+      // Failure before the PID/start handshake must not leave gdb waiting
+      // forever and hide the original error while awaiting its output.
+      try {
+        gdb.kill("SIGTERM");
+      } catch { /* The sampler may already have exited. */ }
+    }
+    await compiler?.dispose();
     await log;
   }
   console.log(
@@ -260,7 +307,10 @@ function counter() {
 
 function report(stacks: Frame[][], top: number): string {
   const total = stacks.length;
-  const lines: string[] = [`samples ${total}`];
+  const lines: string[] = [
+    `samples ${total}`,
+    "Unweighted stack inventory; idle threads count. Use raw per-thread cpu_ns for CPU attribution.",
+  ];
   if (!total) return lines.join("\n");
   const percent = (count: number) =>
     `${(100 * count / total).toFixed(1).padStart(5)}%`;
@@ -360,6 +410,48 @@ async function main(): Promise<number> {
   );
   const out = resolve(args.out ?? `${repo}/build/tmp/profile/${timestamp}`);
   await Deno.mkdir(out, { recursive: true });
+  if (
+    await exists(`${out}/samples.jsonl`) || await exists(`${out}/metadata.json`)
+  ) {
+    throw new Error(
+      "Profile output already contains a run; choose a new --out directory",
+    );
+  }
+  const pins: Record<string, string> = {};
+  for (
+    const path of [
+      blotc,
+      fileURLToPath(import.meta.url),
+      `${repo}/scripts/bench/gdb_sampler.py`,
+      `${repo}/scripts/bench/gdev-manifest.json`,
+    ]
+  ) {
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      await Deno.readFile(path),
+    );
+    pins[path] = [...new Uint8Array(digest)].map((byte) =>
+      byte.toString(16).padStart(2, "0")
+    ).join("");
+  }
+  await Deno.writeTextFile(
+    `${out}/metadata.json`,
+    JSON.stringify(
+      {
+        pins,
+        workload: name,
+        snapshot: snapshotRoot,
+        codegen_workers: codegenWorkers,
+        cache_directory: false,
+        profile_backend: true,
+        args,
+        attribution:
+          "Report tables count stacks including idle threads; raw cpu_ns records per-thread scheduler CPU deltas",
+      },
+      null,
+      2,
+    ) + "\n",
+  );
   const wrapper = await ptracerWrapper(out, blotc);
   for (let run = 0; run < Number(args.runs); run++) {
     await sampleRun(run, out, blotc, wrapper, workload);

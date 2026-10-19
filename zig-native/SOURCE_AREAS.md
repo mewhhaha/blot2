@@ -65,3 +65,14 @@ execution passes 77 groups; the opt-in packed fixture also builds. Cohort
 controls use actual transferred member leases and journal records, including a
 real second-page spill and transactional premature-retirement rejection.
 Production runtime behavior is unchanged.
+
+## Current common qualification, 19 October 2026
+
+The [cloud qualification](CLOUD_QUALIFICATION.md) passes release, package and
+publish dry run; all 2,470 native laws execute, 1,556 guest/client and 37
+harness checks pass, and CI lint checks all 507 source files plus the fixture
+module at zero findings. Independent subsystem inventories form the exact full
+test set, and exact-name relocated fixture consumers execute. The editor grammar
+corpus, seven example parses, six Helix configuration checks and local
+documentation links also pass. These final checks qualify the integrated layout.
+Dated before/after move measurements above remain historical records.

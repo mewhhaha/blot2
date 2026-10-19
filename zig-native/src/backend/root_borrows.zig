@@ -525,7 +525,7 @@ pub fn run(a: A, module: *const wasm.Module, source: *const ir.Function) A.Error
     // A close also drains resource cleanup; keep its exact owner boundary.
     if (module.resourceDrainImport() != null) return null;
     const code = source.instructions.items;
-    const locals = source.parameters.len + source.locals.items.len;
+    const locals = std.math.add(usize, source.parameters.len, source.locals.items.len) catch return null;
     if (locals > max_locals or code.len > max_code) return null;
     var stores = false;
     for (code) |inst| if (scope(inst)) |marker| if (marker.chunk == 4) {

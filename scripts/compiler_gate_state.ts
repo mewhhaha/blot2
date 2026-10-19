@@ -89,7 +89,7 @@ export async function nativeInputs(root: string): Promise<string[]> {
   return paths;
 }
 
-export async function nativeToolchain(): Promise<string> {
+export async function nativeToolchainFiles(): Promise<string> {
   const result = await new Deno.Command("zig", { args: ["env"] }).output();
   if (!result.success) throw new Error("Cannot identify Zig toolchain");
   const text = new TextDecoder().decode(result.stdout);
@@ -101,8 +101,12 @@ export async function nativeToolchain(): Promise<string> {
     return JSON.parse(match[1]) as string;
   };
   const paths = [field("zig_exe"), ...await filesBelow(field("lib_dir"))];
+  return inputDigest(paths);
+}
+
+export async function nativeToolchain(): Promise<string> {
   const hash = createHash("sha256");
-  hash.update(await inputDigest(paths));
+  hash.update(await nativeToolchainFiles());
   hash.update(JSON.stringify(Deno.version));
   hash.update(JSON.stringify(Deno.build));
   hash.update(JSON.stringify(Object.entries(Deno.env.toObject()).sort()));
@@ -141,6 +145,7 @@ export class NativeJournal {
   async reuse(name: string, key: string): Promise<Phase | undefined> {
     const entry = this.entries[name];
     if (!entry || entry.key !== key || entry.phase.code !== 0) return;
+    if (name === "native-run" && entry.phase.cache === "hit") return;
     if (!Object.keys(entry.outputs).length) return;
     try {
       for (const [path, digest] of Object.entries(entry.outputs)) {
@@ -155,6 +160,9 @@ export class NativeJournal {
 
   async record(key: string, phase: Phase, artifacts: string[]) {
     if (phase.code !== 0 || phase.stopped) return;
+    // Zig's own run cache contains no execution log. Only a completed run or
+    // our separately verified journal may provide reusable native evidence.
+    if (phase.name === "native-run" && phase.cache === "hit") return;
     const outputs: Record<string, string> = {};
     for (const path of [...artifacts, phase.stdout, phase.stderr]) {
       outputs[path] = await fileDigest(path);

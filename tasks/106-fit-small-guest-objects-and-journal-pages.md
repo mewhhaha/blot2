@@ -2,9 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — owner approved both fixes on 16 October 2026;
-  implemented and committed in `05401a9`; later full gates on main pass. The
-  acceptance evidence (memory histogram) remains to be recorded.
+- **Status:** Complete — qualified on 19 October 2026 against the fixed
+  acceptance scope; see the current completion record below.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink by peer session on 16 October
   2026: `array.generate 4096 (fn index => #[128578, 97 + index % 26])` grew
@@ -45,14 +44,34 @@ and after.
 
 ## Acceptance criteria
 
-- [ ] The 4096-element workload commits less guest memory than 448 KiB, with a
+- [x] The 4096-element workload commits less guest memory than 448 KiB, with a
       heap histogram explaining the change.
-- [ ] Every changed allocation-count or byte expectation is explained by the new
+- [x] Every changed allocation-count or byte expectation is explained by the new
       classes.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
+
+- Current local milestone: the commit containing this record; compiler and exact
+  source/log hashes are recorded by the
+  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+- Validation: the forced LLVM gate executes all 2,470 native laws without skips,
+  failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
+  checks pass. CI lint covers 507 source files plus the fixture module with zero
+  findings. Strict fresh/retained/restart/shared Wasm parity and the seven-pair
+  CPU regression guard pass.
+- Acceptance: The current 1,024/2,048/4,096/8,192-element measurements and
+  allocation-class histograms pass; the 4,096-element case commits less than 448
+  KiB.
+- Remaining limits: The histogram includes retired/recycled dynamic blocks at
+  return; committed pages, block traffic and live payload are distinct. Classes
+  at or above 2 KiB and List leaf doubling retain their documented policies.
+
+### Earlier implementation evidence
+
+The checkpoints below retain their original dates and measurements. Statements
+that qualification or a commit was pending refer to those earlier checkpoints.
 
 - Commit: pending.
 - Validation: in the implementation worktree the native suite passed 2,355 laws

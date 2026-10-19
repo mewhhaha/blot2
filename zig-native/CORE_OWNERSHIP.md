@@ -25,3 +25,7 @@ dependency payloads. The compiler provenance key changes because compiler source
 changed. Existing lowering, freeze, clone and complete failed allocation laws
 check the ownership boundary. The combined compiler/lint gate and prerequisite
 qualification remain necessary before a milestone commit.
+
+The [19 October cloud gate](CLOUD_QUALIFICATION.md) supplies the current common
+native, guest, release and packaging checks. The earlier matched split
+comparison above remains historical evidence for the ownership extraction.

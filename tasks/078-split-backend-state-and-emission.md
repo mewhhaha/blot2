@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — implementation and focused checks are recorded;
-  final common qualification remains required.
+- **Status:** Complete — qualified on 19 October 2026 against the fixed
+  acceptance scope; see the current completion record below.
 - **Dependencies:** [077](077-split-checker-responsibilities.md)
 - **Originating requirements:** PLAN: Hill 14 / backend structure. Sources:
   [PLAN.md](../PLAN.md).
@@ -47,13 +47,31 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Backend responsibilities and state owners are separated and large routines
+- [x] Backend responsibilities and state owners are separated and large routines
       are substantially reduced.
-- [ ] Code generation, cleanup, relocation and reuse remain equivalent.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Code generation, cleanup, relocation and reuse remain equivalent.
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
+
+- Current local milestone: the commit containing this record; compiler and exact
+  source/log hashes are recorded by the
+  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+- Validation: the forced LLVM gate executes all 2,470 native laws without skips,
+  failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
+  checks pass. CI lint covers 507 source files plus the fixture module with zero
+  findings. Strict fresh/retained/restart/shared Wasm parity and the seven-pair
+  CPU regression guard pass.
+- Acceptance: Backend planning, static data, representation and emission owners
+  pass current native/OOM, guest, relocation and retained/restart gates.
+- Remaining limits: Compilation entry wrappers are not counted as substantive
+  routine reductions. Recorded larger dispatch/ABI exceptions remain explicit.
+
+### Earlier implementation evidence
+
+The checkpoints below retain their original dates and measurements. Statements
+that qualification or a commit was pending refer to those earlier checkpoints.
 
 - Commit: pending; the continuation handoff authorizes no commit or push.
 - Implementation: the four storage/work owners and the compilation-attempt owner

@@ -1255,7 +1255,7 @@ fn supportedPredicate(value: T.Obligation) bool {
     return !value.explicit and value.identity.unit == 0 and value.identity.decl == 0 and value.qualification_span == null and value.qualification_unit == 0;
 }
 fn declaredPredicate(value: T.Obligation) bool {
-    return (value.kind == .dispatch or value.kind == .result_dispatch or value.kind == .type_rep) and value.explicit and value.identity.unit == 0 and value.identity.decl == 0 and value.qualification_span != null and value.qualification_unit != 0;
+    return (value.kind == .dispatch or value.kind == .result_dispatch or value.kind == .type_rep or value.kind == .field) and value.explicit and value.identity.unit == 0 and value.identity.decl == 0 and value.qualification_span != null and value.qualification_unit != 0;
 }
 fn sharedPredicate(value: T.Obligation, unit: u32) bool {
     return value.kind == .callee_use and !value.explicit and value.identity.unit == unit and value.identity.decl != 0 and value.other == 0 and value.result == 0 and value.signature == 0 and value.name == 0 and value.qualification_span == null and value.qualification_unit == 0;
@@ -2941,10 +2941,26 @@ fn orderBindings(a: A, bindings: []Binding, origins: []check.BindingId, facts: [
 /// copying requirements forwarded through them would duplicate predicates.
 fn instantiatedReference(tree: *const ast.Tree, checked: *const check.Checked, predicate: T.Obligation) check.BindingId {
     const tag = tree.node(predicate.source).tag;
-    const generic_path = predicate.name != 0 and tag == .name and checked.access_paths[predicate.source].len != 0;
-    if (generic_path or (tag != .name and tag != .binary)) return 0;
+    if (tag != .name and tag != .binary) return 0;
     const target = checked.resolved[predicate.source];
-    return if (target != 0 and checked.bindings[target].scheme.obligations.len != 0) target else 0;
+    if (target == 0 or checked.bindings[target].scheme.obligations.len == 0) return 0;
+    // A dotted use creates its own field requirements as well as forwarding
+    // the root's principal. Only the actual path steps need copying: replay
+    // instantiates the root's current requirements, including written clauses.
+    if (tag == .name and directPathField(checked, predicate)) return 0;
+    return target;
+}
+fn directPathField(checked: *const check.Checked, predicate: T.Obligation) bool {
+    if (predicate.kind != .field or predicate.explicit or predicate.name == 0 or predicate.result == 0) return false;
+    const path = checked.types.list(checked.access_paths[predicate.source]);
+    const types = checked.types.list(checked.access_types[predicate.source]);
+    if (path.len == 0 or types.len != path.len + 1) return false;
+    for (path, 0..) |projection, index| {
+        if (projection >= checked.projection_catalog.len) return false;
+        const step = checked.projection_catalog[projection];
+        if (step.field == predicate.name and checked.types.head(predicate.ty, 0) == checked.types.head(types[index], 0) and checked.types.head(predicate.result, 0) == checked.types.head(types[index + 1], 0)) return true;
+    }
+    return false;
 }
 // Forwarded source requirements may name a transitive callee rather than the
 // direct lexical reference. The completed principal must actually reach it.

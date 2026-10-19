@@ -18,11 +18,10 @@ word from 31 onward; heterogeneous tails decline admission. Allocation classes
 include the header. Power-of-two classes start at 64 bytes; below 2 KiB each
 also has a 1.5x companion, giving 48, 64, 96, 128, 192, …, 1,536 and 2,048
 bytes. Companion free lists use the heads of the power classes below 64 bytes,
-which no block can use. Each class is a multiple of 16 bytes, so a heap
-starting at 64 KiB keeps 16-byte aligned payloads. Checked type roles
-resolve dynamic value fields before counting. Table-function and List
-owner-token words are scalars. Numeric arrays and List leaves have zero-child
-descriptors.
+which no block can use. Each class is a multiple of 16 bytes, so a heap starting
+at 64 KiB keeps 16-byte aligned payloads. Checked type roles resolve dynamic
+value fields before counting. Table-function and List owner-token words are
+scalars. Numeric arrays and List leaves have zero-child descriptors.
 
 Zero-byte typed allocation returns null and acquires no lease. Allocation
 initializes reference payloads before publication. Each nonempty allocation
@@ -170,3 +169,33 @@ the isolated qualified compiler. Binary differences include build paths; source
 changes were compared exactly before integration. Raw paired distributions,
 exact Wasm/compiler hashes, load samples and geometry reports are kept in the
 ignored `build/bench/shared-rc/` qualification directory.
+
+## Current small-object histogram, 19 October 2026
+
+`scripts/bench_guest_heap.ts` builds the reported nested-Array construction,
+then reads every row into a scalar checksum. It checks the original executable
+sections with memory-only exports against full telemetry exports. The release
+compiler is `0f531509…`, pinned in
+[cloud qualification](CLOUD_QUALIFICATION.md). Each size starts in a fresh
+guest; ownership leave ends with zero roots and leases. The histogram includes
+retired/recycled dynamic blocks at return, not only live payload.
+
+| Elements | Committed KiB | Dynamic block high-water KiB | Inner Array blocks | Journal pages |
+| -------: | ------------: | ---------------------------: | -----------------: | ------------: |
+|     1024 |           192 |                           68 |        1024 × 48 B |     3 × 4 KiB |
+|     2048 |           256 |                          132 |        2048 × 48 B |     5 × 4 KiB |
+|     4096 |           384 |                          260 |        4096 × 48 B |     9 × 4 KiB |
+|     8192 |           640 |                          516 |        8192 × 48 B |    17 × 4 KiB |
+
+At 4,096 elements the 260 KiB dynamic high-water consists of 192 KiB of inner
+Arrays, 36 KiB of journals and a 32 KiB outer Array. Committed memory is 384
+KiB, below the reported pre-fix 448 KiB. The historical before/after record is
+192→192, 256→256, 448→384 and 832→640 KiB; those earlier before samples are not
+represented as a new same-host run. The current histogram confirms the 48-byte
+inner class and 4 KiB journal page directly. Only the 4,064-byte live journal
+payload remains requested at the observation point; dead Array payload is
+already retired. Blocks at or above 2 KiB keep power classes, and List leaf
+doubling is unchanged. The arena fixture's changed expectation is explained by
+128 payload bytes plus the 32-byte header fitting the 192-byte companion class
+instead of 256 bytes. Raw hashes and records:
+`build/bench/task106-current/results.json`.

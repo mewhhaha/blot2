@@ -19,7 +19,7 @@
     "test:compiler": "deno run --allow-read --allow-write --allow-run --allow-env scripts/test_compiler.ts",
     "test:compiler:dev": "deno run --allow-read --allow-write --allow-run --allow-env scripts/test_compiler.ts --dev",
     "test:compiler:stress": "deno task build:compiler && deno test --allow-read --allow-write --allow-run zig-native/tests/stage_chain_budget.stress.ts -- zig-native/zig-out/bin/blotc",
-    "test:compiler:tasks": "deno test --allow-read --allow-write --allow-run --allow-env scripts/test_compiler.test.ts scripts/compiler_gate_state.test.ts scripts/compiler_fingerprint.test.ts scripts/compiler_fixtures.test.ts scripts/build_compiler.test.ts scripts/native_test_runner.test.ts scripts/lint_zig.test.ts",
+    "test:compiler:tasks": "deno test --allow-read --allow-write --allow-run --allow-env scripts/test_compiler.test.ts scripts/bench_compile.test.ts scripts/compiler_gate_state.test.ts scripts/compiler_fingerprint.test.ts scripts/compiler_fixtures.test.ts scripts/build_compiler.test.ts scripts/native_test_runner.test.ts scripts/lint_zig.test.ts",
     "test": "deno task test:editor && deno task test:compiler",
     "check": "deno fmt --check mod.ts deno.json compiler scripts .github && deno check mod.ts compiler/cli.ts compiler/installed_cli.ts scripts/*.ts && deno task lint:zig && deno task test",
     "lint:zig": "deno run --allow-env=ZIG_ANALYZER --allow-read --allow-write --allow-run scripts/lint_zig.ts",

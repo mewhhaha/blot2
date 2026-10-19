@@ -962,7 +962,8 @@ them.
 
 The earlier compiler-coupled ECS bootstrap was retired: its `@ecs.*` and
 platform intrinsics, component/resource special cases, generated storage/query
-plans, and `compileEcs`/`compileApp` entry points have been removed. The obsolete prototype was removed with the legacy compiler.
+plans, and `compileEcs`/`compileApp` entry points have been removed. The
+obsolete prototype was removed with the legacy compiler.
 
 Source-library scheduling should derive hazards from checked descriptors. Reads
 may share a batch, writes conflict with overlapping reads/writes, and structural
@@ -1034,12 +1035,12 @@ The repository contains a Deno project, Baba 9.0.1, generated lexer/parser
 artifacts, and a [Zig compiler](zig-native/README.md). The executable
 `grammar.baba`/`baba.json` describe the generic functional core and executable
 provider, monadic resolver, and request-handler blocks. They no longer claim to
-accept the old Blot language. The broader syntax design is preserved here. Files under `examples/` use the currently
-supported language.
+accept the old Blot language. The broader syntax design is preserved here. Files
+under `examples/` use the currently supported language.
 
 A separate, permissive Tree-sitter grammar supports Helix highlighting of the
 showcase, including proposals. It is editor support, not a validating compiler
-frontend; see the [Helix setup](README.md#helix-highlighting).
+frontend; see the [Helix setup](README.md#helix).
 
 | Area                    | Current status                                                                                                                                                                       |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -1055,7 +1056,7 @@ frontend; see the [Helix setup](README.md#helix-highlighting).
 | Named functions         | Unary/curried functions, closures, static qualified names, recursive groups.                                                                                                         |
 | Text interpolation      | Target design only; literal strings currently serve generic panic messages.                                                                                                          |
 | `self`                  | Previous value of a local binding or field/index path during immutable rebinding.                                                                                                    |
-| Layout and AST          | Indented continuations, a structure-preserving formatter, native syntax tables; native name resolution and Core lowering.                                                                          |
+| Layout and AST          | Indented continuations, a structure-preserving formatter, native syntax tables; native name resolution and Core lowering.                                                            |
 | Types and effects       | Rank-1 HM with inferred latent effect rows and source-declared operations.                                                                                                           |
 | Bindings                | Pure-RHS `let`, effect-preserving `use … <- …`; `use expression` discards.                                                                                                           |
 | Resolver blocks         | Scoped effect providers, source-defined monad resolvers, and `return $` execute; request loops handle captured computations with reply or cancellation.                              |

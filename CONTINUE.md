@@ -9,9 +9,8 @@ below it, unchanged.
 
 ### State
 
-- Everything merged is on main and pushed. 91 hills have a dated Result bullet
-  in COMPILE_HILLS.md (landed, dropped with numbers, or deferred with a design
-  note).
+- All 94 hills have a dated Result bullet in COMPILE_HILLS.md. The current cloud
+  milestone is local; its qualification is recorded below.
 - Landed highlights:
   - **Game:** cold build about 2.5 s → 2.3 s.
   - **Edits:** body edit 1.9 → 1.2 s, literal edit 1.4 → 1.0 s.
@@ -30,16 +29,20 @@ below it, unchanged.
 
 ### Started but unfinished
 
-- **CT90 is merged on main but not validated after its rebase.**
+- **CT90 post-rebase qualification is complete.**
   - It reuses frozen modules when a shared session switches test entries (commit
     "CT90: Reuse frozen modules when the entry's closure changes"): suite CPU 96
     → 73 s, Wasm identical to fresh builds before the rebase.
   - It passed the gate and lint before being rebased onto `ba5decb`, where a
     `Session.deinit` conflict in `retained_revision.zig` was resolved by keeping
     both release lines. The owner had it merged as is.
-  - **First step next session:** run `deno task build:compiler`, the full gate,
-    lint, and `bench:compile --workload game,devtools,tests --shared-session`.
-    Fix anything that fails.
+  - Initial CT90 cloud validation passed the complete gate: release builds, all
+    2,466 native laws, 1,552 guest/client checks and 33 harness tests. Zig lint
+    and the paired benchmark on the owner-approved recreated snapshot also pass.
+    No entry-switch implementation repair was needed.
+  - CT92–CT94 guards and documentation are implemented and validated in the
+    local milestone; see [compile guards](zig-native/COMPILE_GUARDS.md). Task
+    024's fixed acceptance rows are now complete; 047 and 053 are next.
   - CT91 is dropped (pen already runs 8 workers).
 
 P1 (closed-label certificates) was measured but not started. Next step:
@@ -57,21 +60,74 @@ P1 (closed-label certificates) was measured but not started. Next step:
 P2 (robot_pickup obligations), P3 (constructor memo for the `played` region) and
 P4 (`namespaceEqual` in `reuse/principal_reuse_gate.zig`) aren't started.
 
+### Cloud continuation (19 October 2026, local milestone)
+
+- Source `/workspace/.tools/activate.sh` before commands. Zig is 0.17.0, Deno
+  2.9.6 and Rust 1.99.0. Heavy jobs use `/workspace/.tools/run-heavy.py`: a
+  shared lock and a 14 GiB process-tree RSS watchdog. There is no systemd user
+  bus. Scratch stays under ignored `build/`.
+- The forced complete compiler gate passes **2,470 native laws executed, 1,556
+  guest/client checks and 37 harness checks**. Native laws have zero skips,
+  failures, leaks or logged errors. CI lint checks 507 source files plus the
+  fixture module with zero findings; package dry run, editor grammar, example
+  parses, Helix configuration, formatting and local documentation links pass.
+  See [current qualification](zig-native/CLOUD_QUALIFICATION.md) and ignored
+  `build/bench/iteration/run-cfd5c1f6733154b7/`.
+- The gate now refuses Zig run-cache hits as native journal evidence. A miss in
+  verified journal reuse forces execution. The timing report records source,
+  toolchain-file, executable and log hashes inside the qualifying environment;
+  the strict journal key still includes the whole environment. The earlier
+  guest-passing cached run is retained as diagnostic history.
+- Task **024** closes with declared field-principal admission and correct
+  forwarding through qualified roots, complete allocation-failure laws,
+  both-tier execution and fresh/retained/source/archive parity. Its eleven-row
+  law map is in [body cutoff](zig-native/BODY_CUTOFF.md). The gdev
+  body-admission and latency gaps remain with 093/102.
+- Tasks **035, 067/068, 073/074, 075–080 and 105–107** also close against
+  current evidence. Nested-array stress stays at 192 KiB; the 4,096-element
+  small-object case commits 384 KiB with its class histogram explained. Staging
+  costs have seven paired repetitions in both tiers and dependency modes. Ink's
+  app-hooks pass 6,000 calls at flat 128 KiB guest memory. Deliberate language
+  and ownership limits remain documented.
+- CT92–CT94 guards pass. The final strict comparison matches fresh, retained,
+  restart and shared output for the game, devtools and selected slow tests.
+  Seven pinned CPU pairs pass the 1.05 regression limit with median 0.941.
+  Spreads are large; no speedup is claimed. The noisy failed identity control
+  remains preserved in [compile guards](zig-native/COMPILE_GUARDS.md).
+- The owner approved recreating the lost gdev freeze from current repositories:
+  **583 files and 69 test entries**, at gdev `52fbc5af` and Ink `1a291a1b`. The
+  active manifest/references are updated. The CT90 campaign compiled 68 tests
+  successfully and retained one pre-existing protocol rejection: the match omits
+  Ink's `SessionStarted` event. This is a compilation count, not executed
+  passing game tests. gdev/Ink sources remain unchanged and private source stays
+  ignored. Old absolute timings are not comparable to this freeze.
+- GDB 16.3 and tree-sitter CLI 0.27.1 are installed locally. The profiler
+  records compiler/harness hashes, one-worker phase/receipt data and per-thread
+  CPU deltas; its ordinary stack report includes idle threads. Its smoke passes,
+  but task 086's seven-pair constant-cost decision remains open.
+- The local analyzer at `9a78ce1` builds. Its compiler backend is blocked by
+  HTTP 403 from `codeberg.org`. The saved environment draft adds that host to
+  the existing allowlist and needs review, save and publication in environment
+  settings. Task 082 is awaiting that external step and final-source evidence.
+  No source changes or benchmark evidence were pushed upstream.
+
 ### Open work, in suggested order
 
-1. **O: CT92–CT94 (guards and docs).**
-   - Reuse budgets in `compile_budget.test.ts`.
-   - A paired timing guard in bench:compile.
-   - Refresh the COMPILE_HILLS.md baseline, `zig-native/STATUS.md` and PLAN.md.
-   - Also fix `bench:compile --restart-cache`, which prints "Wasm verification
-     FAILED" for salt_hauling's expected restart rejection. No hash differs.
+1. **Task program: 047, then 053 and the next ready tasks.**
+   - The all-width cursor comparison is byte-exact but still exposes the
+     performance gap; Window and broader generic state remain open.
+   - The current module screen reuses callers after alpha/field renames. Private
+     declaration insertion/movement and opaque storage changes still recheck.
+     Complete the fixed 053 matrix and required implementation.
+   - Keep 086's measured constant-work gate, 093's edit attribution and tasks
+     100–104's targets open until their actual requirements pass.
 2. **Follow-ups recorded under their hills:**
    - **CT10:** binding-renumbering cutoff (design only).
    - **CT11:** hash-consed interfaces plus the Core type-table sharing
      difference.
    - **CT22:** the first edit after population re-optimizes 2,737 functions.
    - **CT26:** the body check cache admits none of robots.blot's 107 bodies
-     (tasks 024/053).
+     (tasks 093/102).
    - **CT29:** a rejected population is still about 10% over pre-CT9, because of
      the dependency freeze.
    - **CT51:** summaries parametric in argument functions.
@@ -92,6 +148,8 @@ P4 (`namespaceEqual` in `reuse/principal_reuse_gate.zig`) aren't started.
 
 ### Waiting on the owner
 
+- **Environment:** publish the saved `codeberg.org` allowlist addition so the
+  local analyzer backend can bootstrap.
 - **pen:** `pen dev` must pass `codegenTier: "development"` for its own session
   (CT28, in ../pen). CT90 needs no pen change: its workers already keep one
   session each.
@@ -138,8 +196,8 @@ P4 (`namespaceEqual` in `reuse/principal_reuse_gate.zig`) aren't started.
 
 Finish every task in the program. As of 19 October 2026:
 
-- 80 are complete (including four designs);
-- 30 remain open: 23 in progress and 7 pending.
+- 95 are complete (including four designs);
+- 15 remain open: 7 in progress, 1 awaiting external evidence and 7 pending.
 
 The index in tasks/README.md is authoritative. Each task file carries its own
 status, evidence and closed-acceptance rows.
@@ -149,29 +207,15 @@ The previous long handoff, with per-task evidence through 17 October, is in git:
 
 ### Open tasks
 
-- **In progress:**
-  - **Cutoffs and constants:**
-    - 024 (general body-interface cutoff; CT26 removed the obligation-span
-      cause);
-    - 053 (module cutoffs and wrapper erasure);
-    - 086 (retain constant evaluation);
-    - 093 (close the gdev edit gap).
-  - **Runtime:**
-    - 035 (remove the tracing runtime);
-    - 047 (generic iterator state).
-  - **Language:**
-    - 067 and 068 (typed staging);
-    - 073 and 074 (structured concurrency);
-    - 105–109 (Ink-reported checker and runtime fixes; 109 is Array loop
-      throughput).
-  - **Restructuring:** 075–081 (evaluator, Core, checker and backend splits;
-    fixtures; source tree; durable docs).
-  - **Analyzer:** 082 (local analyzer workflow; rerun the analyzers after 084).
-- **Pending:**
-  - 084 (qualify the complete program);
-  - 100–104 (the cold, literal-edit, body-edit, largest-region and allocation
-    targets). CT results moved these numbers; re-pin them in 084;
-  - 999 (remove tasks and PLAN.md).
+- **In progress:** 047 (iterator state and cursor cost), 053 (module cutoff and
+  wrapper rows), 081 (final durable documentation), 086 (constant-work
+  decision), 093 (gdev edit gap), 108 (stored callback-row acceptance evidence)
+  and 109 (current Ink throughput evidence).
+- **Awaiting external evidence:** 082 (local analyzer backend needs the saved
+  Codeberg network change published; final-source checks remain required).
+- **Pending:** 084 (complete-program qualification), 100–104 (cold, literal,
+  body, largest-region and requested-allocation targets), and 999 (conditional
+  removal of tasks and PLAN.md).
 
 ### Owner decisions still in force
 

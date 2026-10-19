@@ -1721,6 +1721,39 @@ test "body check cache restores generic dotted templates through allocation fail
     try parity(source, candidate, 5);
 }
 
+test "body check cache owns declared field principals and qualified projected receivers through OOM" {
+    const source =
+        \\const first: a -> b where { field "first" a b } = fn value => value.first
+        \\const extract = fn value => (first value).count
+        \\const scoped = fn value => do:
+        \\  let local: a -> b where { field "first" a b } = fn row => row.first
+        \\  let root = local value
+        \\  return root.count
+        \\const inferred = fn value => do:
+        \\  let root = value.count
+        \\  return root.count
+        \\entry const run = fn (value: U32) => extract { first: { count: value, tail: 2.0 }, other: 3 }
+        \\entry const packed = fn (value: U32) => scoped { other: 2.0, first: { tail: 3, count: #[value] } }
+        \\entry const plain = fn (value: U32) => inferred { count: { count: value } }
+    ;
+    var before = try prepare(a, source, null);
+    defer before.deinit(a);
+    try std.testing.expect(before.bodies.find("first") != null);
+    try std.testing.expect(before.bodies.find("extract") != null);
+    try std.testing.expect(before.bodies.find("scoped") != null);
+    try std.testing.expect(before.bodies.find("inferred") != null);
+    const inserted = try a.print("const earlier_spelling = {{ other: 2, first: 3.0 }}\n{s}", .{source});
+    defer a.free(inserted);
+    var fresh = try prepare(a, inserted, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, inserted, expected.bytes, 1);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
+    const empty: cache.Cache = .{};
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
+}
+
 test "body check cache owns if let pattern scopes and predecessor joins" {
     const source =
         \\type Maybe a is data = #None | #Some a

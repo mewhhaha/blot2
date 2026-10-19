@@ -9,6 +9,7 @@ import {
   nativeInputs,
   NativeJournal,
   nativeToolchain,
+  nativeToolchainFiles,
   recentFailures,
 } from "./compiler_gate_state.ts";
 import { fixturesForGuestFiles } from "./compiler_fixtures.ts";
@@ -235,6 +236,12 @@ async function main() {
     started_at: new Date().toISOString(),
     wall_seconds: 0,
     success: false,
+    native_toolchain_files: null as string | null,
+    native_runtime: { version: Deno.version, build: Deno.build },
+    native_qualification: {} as Record<string, {
+      key: string;
+      outputs: Record<string, string>;
+    }>,
     active: [] as string[],
     phases: [] as Phase[],
     oom_profile: values["oom-profile"],
@@ -287,6 +294,7 @@ async function main() {
     let inputs: string[] = [];
     const qualifyKey = async () => {
       toolchain ??= nativeToolchain();
+      report.native_toolchain_files ??= await nativeToolchainFiles();
       inputs = await nativeInputs(root);
       return JSON.stringify({
         command,
@@ -364,6 +372,11 @@ async function main() {
         throw new Error(`${name} failed; logs: ${runDirectory}`);
       }
       if (key) {
+        if (name === "native-run" && result.cache === "hit") {
+          throw new Error(
+            "Native execution was cached without verified journal evidence",
+          );
+        }
         if (key !== await qualifyKey()) {
           throw new Error(
             "Native inputs changed during " + name + "; retry qualification",
@@ -377,6 +390,11 @@ async function main() {
         if (result.cache !== "resumed") {
           await journal.record(key, result, [binary]);
         }
+        const outputs: Record<string, string> = {};
+        for (const path of [binary, result.stdout, result.stderr]) {
+          outputs[path] = await fileDigest(path);
+        }
+        report.native_qualification[name] = { key, outputs };
       }
       return result;
     } finally {
@@ -435,7 +453,7 @@ async function main() {
     nativeOptions.push(`-Dtest-suite=${values["native-suite"]}`);
   }
   if (values["oom-profile"]) nativeOptions.push("-Doom-profile=true");
-  if (values["oom-profile"] || values["force-native"]) {
+  if (!values.dev || values["oom-profile"] || values["force-native"]) {
     nativeOptions.push("-Dtest-force-run=true");
   }
   for (const filter of values["native-filter"] ?? []) {
@@ -506,6 +524,7 @@ async function main() {
           "--allow-env",
           "--fail-fast",
           "scripts/test_compiler.test.ts",
+          "scripts/bench_compile.test.ts",
           "scripts/compiler_gate_state.test.ts",
           "scripts/compiler_fingerprint.test.ts",
           "scripts/compiler_fixtures.test.ts",

@@ -2,11 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — scope closed to fixed acceptance traces by owner
-  decision on 15 October 2026; all three traces map to named passing laws in the
-  gate at `05401a9` (see
-  [STRUCTURED_TASK_QUALIFICATION](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#trace-to-law-index-17-october-2026));
-  only task 035 remains.
+- **Status:** Complete — qualified on 19 October 2026 against the fixed
+  acceptance scope; see the current completion record below.
 - **Dependencies:** [072](072-specify-structured-concurrency.md),
   [035](035-remove-the-tracing-runtime.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 10 / task
@@ -29,11 +26,11 @@ suspension.
 
 ## Implementation checklist
 
-- [ ] Implement task scopes, spawn/join and result/failure ownership, joining
+- [x] Implement task scopes, spawn/join and result/failure ownership, joining
       children before their scope disappears.
-- [ ] Apply specified cancellation and resource cleanup across nested scopes and
+- [x] Apply specified cancellation and resource cleanup across nested scopes and
       suspended effects.
-- [ ] Enforce the task design's demand forcing rules and prevent orphaned task
+- [x] Enforce the task design's demand forcing rules and prevent orphaned task
       roots or escaped capabilities.
 
 ## Validation
@@ -53,11 +50,11 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Tasks obey scoped lifecycle/join rules and cancel with complete ownership
+- [x] Tasks obey scoped lifecycle/join rules and cancel with complete ownership
       cleanup.
-- [ ] Suspended effects, demands and nested failures satisfy the documented
+- [x] Suspended effects, demands and nested failures satisfy the documented
       concurrency contract.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Closed acceptance — owner decision, 15 October 2026
@@ -88,6 +85,25 @@ compiler gate on the committed source and task
 built from the gate at `05401a9` is recorded in the implementation record.
 
 ## Completion evidence
+
+- Current local milestone: the commit containing this record; compiler and exact
+  source/log hashes are recorded by the
+  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+- Validation: the forced LLVM gate executes all 2,470 native laws without skips,
+  failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
+  checks pass. CI lint covers 507 source files plus the fixture module with zero
+  findings. Strict fresh/retained/restart/shared Wasm parity and the seven-pair
+  CPU regression guard pass.
+- Acceptance: All three scoped lifecycle/cancellation traces pass in the
+  complete gate, and task 035 is complete.
+- Remaining limits: Execution remains cooperative; detached tasks, shared
+  mutable task state, host worker transport and simultaneous Wasm reentry are
+  outside the fixed traces.
+
+### Earlier implementation evidence
+
+The checkpoints below retain their original dates and measurements. Statements
+that qualification or a commit was pending refer to those earlier checkpoints.
 
 - Commit: pending; record the local milestone revision when the task closes.
 - Validation: the full gate at `05401a9` (17 October 2026) passes 2,355 native

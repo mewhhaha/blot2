@@ -1,16 +1,40 @@
 # Zig compiler status
 
 Blot's production compiler is handwritten Zig 0.17. Deno hosts the public
-compiler API, formatter and Wasm guest API. The latest full-qualified source
+compiler API, formatter and Wasm guest API. The earlier full-qualified source
 freeze passes 2,223 native laws, 1,404 guest/client tests and all 455 Zig
 analyzer files with zero findings. It includes 1,366 complete allocation-failure
 sweeps. Exact source/executable pins and logs are in
 `build/bench/complete-program-20261015/final-proof-repaired-gate/qualified-pins.json`.
-Later uncommitted continuation changes await their combined final gate;
+The local cloud milestone passes its combined final gate below;
 [language qualification](LANGUAGE_QUALIFICATION.md) maps the qualified language
 contracts and their separate costs. Language behavior remains defined by
 [the guide](../compiler/guide.md), with ownership rules in
 [CONTRACT.md](CONTRACT.md).
+
+The current cloud milestone on 19 October 2026 passes **2,470 native laws
+executed, 1,556 guest/client checks and 37 harness checks**. All native counts
+are free of skips, failures, leaks and logged errors. CI lint checks 507 source
+files plus the fixture module at zero findings. Package dry run, editor and
+local-link checks pass. The [complete current record](CLOUD_QUALIFICATION.md)
+includes exact source, compiler/test-binary and toolchain pins, paired
+comparison, heap and runtime measurements, and the correction preventing
+unverified Zig run-cache hits from becoming native qualification evidence.
+
+Task 024's declared/qualified field recipes and the missing staging/scoped-task
+trace laws are qualified. Tasks 035, 067/068, 073/074, 075–080 and 105–107 also
+close against the current gate and measurements; 95 tasks are complete and 15
+remain open. General iterator/module cutoff work and all final performance
+targets remain open. The local analyzer backend additionally needs the saved
+`codeberg.org` network rule published; CI analyzer success does not replace it.
+
+CT92–CT94's retained work budgets and explicit five-percent CPU gate pass. The
+final seven-pair pinned candidate/baseline median is 0.941, with substantial
+sample variation; no speedup is claimed. [Compile guards](COMPILE_GUARDS.md)
+retains the failed noisy identity control and measurement conditions. LSP
+cancellation/deadline fixtures use a native peer prepared before timed requests;
+transport uses the compiled TypeScript peer. Production deadlines and assertions
+are unchanged. [CONTINUE.md](../CONTINUE.md) tracks the remaining work.
 
 The default path shares frontend callee schemes, infers closed first-order
 callees through an iterative queue, and reuses complete semantic queries and
@@ -48,7 +72,36 @@ validation from direct packed-row loops. Its three-field fold fixture uses about
 24% less CPU against the preceding packed compiler, with unchanged guest memory.
 Full traversal and cursor regression closure remain open.
 
-## Compile-time baseline
+## Recreated cloud baseline (19 October 2026)
+
+The original local snapshot was lost and the owner approved freezing current
+gdev/Ink again. The active manifest covers 583 files and 69 test entries; source
+pins and the paired results are in
+[COMPILE_HILLS.md](../COMPILE_HILLS.md#recreated-cloud-baseline-19-october-2026).
+Three alternating game/devtools pairs and one test-suite pair compared pre-CT90
+`ba5decb` with the current compiler, including isolated restart caches and
+shared test sessions. Successful Wasm and the one existing test rejection match
+between binaries and phases.
+
+| Current measurement               |                           Value |
+| --------------------------------- | ------------------------------: |
+| Game cold CPU                     |                        2,939 ms |
+| Devtools cold CPU                 |                          831 ms |
+| All 69 test entries, fresh CPU    |                        165.87 s |
+| Shared test session, CPU          | 120.84 s (153.72 s before CT90) |
+| Largest fresh test (`goals_game`) |                          7.54 s |
+| Game cold peak RSS                |                       312.4 MiB |
+| Game Wasm                         |                 2,235,460 bytes |
+| Game restart CPU                  |                         16.9 ms |
+| Retained literal-in-body edit CPU |                        1,088 ms |
+| Retained body edit CPU            |                        1,457 ms |
+
+The test entries have 68 successful compilations and one pre-existing rejection:
+`tests/protocol.blot` does not cover Ink's new `SessionStarted` event. They are
+compile benchmarks, not executed game-test results. The old workload's absolute
+times below are historical and do not compare directly with this new freeze.
+
+## Historical compile-time baseline (17 October 2026)
 
 The current measured workload is the gdev game as of 17 October 2026 (`3cf6de1`
 compiler; the CT1–CT8 measurement hills in
@@ -157,14 +210,15 @@ Selected, principal, refinement, constant and executable records retain separate
 proof obligations. Higher-order and recursive jobs retain bounded ordinary
 fallbacks when their inputs are incomplete. The captured-project latency and
 allocation targets remain open. Semantic workers stay opt-in until paired CPU
-and wall measurements justify a default change. A remote CI run for the final
-local source has not occurred; the continuation remains uncommitted.
+and wall measurements justify a default change. The local analyzer backend
+requires the saved Codeberg network change published, followed by its final
+source scan; a remote run does not replace this owner-specified gate.
 
 The current continuation replaces ordinary tracing with counted strong edges,
 journal/invocation leases and nonmoving trial deletion for real cycles. Its
-latest result-slot transfer and iterator changes still require the final common
-release and performance qualification. General iterator allocation, broader
-fusion/SIMD and complete retained-body/constant coverage also remain open. See
-[standard-library guidance](../std/PERFORMANCE.md),
+latest result-slot transfer and iterator changes pass the current common
+compiler gate. General iterator allocation and its performance comparison,
+broader fusion/SIMD and complete retained-body/constant coverage also remain
+open. See [standard-library guidance](../std/PERFORMANCE.md),
 [language evolution](LANGUAGE_EVOLUTION.md), [demand evaluation](DEMANDS.md) and
 [the architecture](ARCHITECTURE.md) for current contracts and limits.

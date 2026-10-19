@@ -21,3 +21,8 @@ suite execution. `build/bench/finish-rest-20261015/evaluator-owners/` contains
 exact before/source pins and measurements. Final common CPU qualification and
 the compiler gate remain required; longer non-dispatch inference/scheduling
 routines remain visible.
+
+The [19 October cloud gate](CLOUD_QUALIFICATION.md) reruns the complete current
+native and guest suites. Current expression and collection dispatches are 113
+and 76 lines. The earlier focused before/after measurements remain tied to their
+original source; the common gate does not recreate those removed raw artifacts.

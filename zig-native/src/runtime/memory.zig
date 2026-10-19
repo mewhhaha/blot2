@@ -98,7 +98,11 @@ test "a shared meter counts concurrent jobs exactly once they join" {
     const Job = struct {
         fn run(a: std.mem.Allocator, seed: usize) void {
             var kept: [64][]u8 = undefined;
-            for (&kept, 0..) |*slot, index| slot.* = a.alloc(u8, 1 + (seed * 7 + index) % 97) catch @panic("out of memory");
+            const offset = std.math.mul(usize, seed, 7) catch @panic("seed overflow");
+            for (&kept, 0..) |*slot, index| {
+                const mixed = std.math.add(usize, offset, index) catch @panic("seed overflow");
+                slot.* = a.alloc(u8, 1 + mixed % 97) catch @panic("out of memory");
+            }
             for (kept[0..32]) |*slot| slot.* = a.realloc(slot.*, slot.len + 300) catch @panic("out of memory");
             for (kept) |slot| a.free(slot);
         }

@@ -2,10 +2,10 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — re-scoped by owner decision on 15 October 2026 to a
-  local run of the analyzer built from `../zig-analyzer`. The run passes on
-  committed tree `4599957`; completion waits for a rerun over the tree task 084
-  qualifies.
+- **Status:** Awaiting external evidence — the local analyzer builds at
+  `9a78ce1`, but its backend bootstrap needs `codeberg.org`, blocked by the
+  enforced environment policy. The saved network draft needs publication.
+  Final-source qualification also retains its documented dependencies.
 - **19 October 2026:** rerun the local analyzers after task 084. CI lint has
   reported 0 findings on every compile-time-hill merge through 19 October.
 - **Dependencies:** [081](081-finalize-durable-documentation.md)

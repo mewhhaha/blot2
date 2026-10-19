@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — fixtures and consumers are relocated; final combined
-  compiler/analyzer qualification remains pending.
+- **Status:** Complete — qualified on 19 October 2026 against the fixed
+  acceptance scope; see the current completion record below.
 - **Dependencies:** [078](078-split-backend-state-and-emission.md)
 - **Originating requirements:** PLAN: Hills 15 and 20 / fixtures and test
   discovery. Sources: [PLAN.md](../PLAN.md).
@@ -28,7 +28,7 @@ test suite. Many `@embedFile` paths still point inside production `src/`.
       expose needed embedded data through it.
 - [x] Move top-level `.blot` and fixture directories out of production sources,
       updating test consumers and build wiring.
-- [ ] Preserve complete comptime test import/discovery and correct module-root
+- [x] Preserve complete comptime test import/discovery and correct module-root
       restrictions; do not make production depend on test data.
 
 ## Validation
@@ -48,14 +48,34 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Fixtures live outside production sources behind a dedicated module with no
+- [x] Fixtures live outside production sources behind a dedicated module with no
       invalid embed paths.
-- [ ] All tests remain discoverable, including filtered runs; no test is
+- [x] All tests remain discoverable, including filtered runs; no test is
       silently dropped.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
+
+- Current local milestone: the commit containing this record; compiler and exact
+  source/log hashes are recorded by the
+  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+- Validation: the forced LLVM gate executes all 2,470 native laws without skips,
+  failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
+  checks pass. CI lint covers 507 source files plus the fixture module with zero
+  findings. Strict fresh/retained/restart/shared Wasm parity and the seven-pair
+  CPU regression guard pass.
+- Acceptance: All 130 integrated data fixtures retain their bytes; test-only
+  wiring, three exact-name fixture consumers and the exact 2,470-test subsystem
+  union pass.
+- Remaining limits: 126 inputs match predecessor-tree blobs; four inputs were
+  added or edited during integration. The catalog module is separate, and
+  production checked assembly rejects fixture helpers.
+
+### Earlier implementation evidence
+
+The checkpoints below retain their original dates and measurements. Statements
+that qualification or a commit was pending refer to those earlier checkpoints.
 
 - Commit: pending; record the local milestone revision.
 - Implementation: the `fixtures` native test module owns 126 Blot inputs and two

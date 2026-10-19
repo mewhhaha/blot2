@@ -2783,9 +2783,12 @@ Deno.test("body checker reuse owns generic explicit and dotted fields through so
 const wrap = fn (value: U32) => #Scalar value
 type Box is data = #Box {${fields}}
 const make = fn (value: U32) => #Box {${values}}
+const project: a -> b where { field "item" a b } = fn value => ${
+      genericSpine("value.item")
+    }
 ${member}`;
   };
-  const source = (inserted = false, dotted = false) => {
+  const source = (inserted = false, dotted = false, declared = false) => {
     let getter = `(${genericSpine("value")}).item`;
     let local = `(${genericSpine("row")}).item`;
     if (dotted) {
@@ -2794,23 +2797,34 @@ ${member}`;
     }
     let prefix = "";
     if (inserted) prefix = "const earlier_spelling = {head: 3.0, tail: 2}\n";
-    return `import {Box, make, Scalar, wrap} from "./boxes"
-${prefix}const extract = fn value => ${getter}
-const scoped = fn value => do:
-  let local = fn row => ${local}
+    const requirement = declared ? ': a -> b where { field "item" a b }' : "";
+    // Written field constraints require an actual field. Keep the existing
+    // associated-method controls under their inferred member principal.
+    const methodGetter = declared
+      ? `const method_extract = fn value => ${getter}\n`
+      : "";
+    return `import {Box, make, Scalar, wrap, project} from "./boxes"
+${prefix}const extract${requirement} = fn value => ${getter}
+${methodGetter}const scoped = fn value => do:
+  let local${requirement} = fn row => ${local}
   return local value
 const require_pure = fn (callback: U32 -> U32) => callback 40
-entry const selected = fn (value: U32) => extract (wrap value)
+entry const selected = fn (value: U32) => ${
+      declared ? "method_extract" : "extract"
+    } (wrap value)
 entry const strict = fn () => require_pure selected
 entry const local = fn (value: U32) => scoped (make value)
 entry const run = fn (value: U32) => extract (make value)
+entry const forwarded = fn (value: U32) => ${
+      genericSpine("project (make value)")
+    }
 entry const packed = fn (value: U32) => extract {tail: 3.0, item: #[value]}
 `;
   };
   async function pack() {
     await Deno.writeTextFile(
       entry,
-      'import {Box, make, Scalar, wrap} from "./boxes"\nentry const pack = fn (value: U32) => value\n',
+      'import {Box, make, Scalar, wrap, project} from "./boxes"\nentry const pack = fn (value: U32) => value\n',
     );
     const result = await new Deno.Command(executable, {
       args: ["dependencies", entry, bundle, "--prelude", "none"],
@@ -2826,9 +2840,22 @@ entry const packed = fn (value: U32) => extract {tail: 3.0, item: #[value]}
   try {
     await Deno.writeTextFile(producer, library());
     await pack();
-    for (const dotted of [false, true]) {
+    for (
+      const [dotted, declared] of [
+        [false, false],
+        [true, false],
+        [false, true],
+        [true, true],
+      ]
+    ) {
       for (const dependencies of [undefined, bundle]) {
-        const options = { executable, entry, prelude: null, dependencies };
+        const options = {
+          executable,
+          entry,
+          prelude: null,
+          dependencies,
+          cacheDirectory: false as const,
+        };
         const retained = await createZigProjectCompiler(options);
         try {
           for (
@@ -2850,7 +2877,7 @@ entry const packed = fn (value: U32) => extract {tail: 3.0, item: #[value]}
             const fresh = await createZigProjectCompiler(options);
             try {
               const sources = {
-                [entry]: source(inserted, dotted),
+                [entry]: source(inserted, dotted, declared),
                 [producer]: producerText,
               };
               const expected = await fresh.build({ sources });
@@ -2876,7 +2903,47 @@ entry const packed = fn (value: U32) => extract {tail: 3.0, item: #[value]}
                 assert.ok(
                   Number(actual.stats.frontend.body_elaborations) <
                     Number(expected.stats.frontend.body_elaborations),
+                  JSON.stringify({
+                    dotted,
+                    declared,
+                    dependencies,
+                    revision,
+                    actual: actual.stats.frontend,
+                    expected: expected.stats.frontend,
+                  }),
                 );
+              }
+              if (declared && revision === 1) {
+                const invalidSources = {
+                  ...sources,
+                  [entry]: source(inserted, dotted, true).replaceAll(
+                    'field "item" a b',
+                    'field "absent" a b',
+                  ),
+                };
+                const ordinary = await createZigProjectCompiler(options);
+                try {
+                  const invalidExpected = await ordinary.build({
+                    sources: invalidSources,
+                  });
+                  const invalidActual = await retained.build({
+                    sources: invalidSources,
+                  });
+                  assert.ok(!invalidExpected.success && !invalidActual.success);
+                  if (!invalidExpected.success && !invalidActual.success) {
+                    assert.deepEqual(
+                      invalidActual.diagnostics,
+                      invalidExpected.diagnostics,
+                    );
+                  }
+                  const recovered = await retained.build({ sources });
+                  assert.ok(recovered.success);
+                  if (recovered.success) {
+                    assert.deepEqual(recovered.bytes, actual.bytes);
+                  }
+                } finally {
+                  await ordinary.dispose();
+                }
               }
               const guest = await instantiateGuest(actual.bytes);
               try {
@@ -2890,7 +2957,12 @@ entry const packed = fn (value: U32) => extract {tail: 3.0, item: #[value]}
                       guest.call("run", 40),
                       new Uint32Array([40, 41]),
                     );
+                    assert.deepEqual(
+                      guest.call("forwarded", 40),
+                      new Uint32Array([40, 41]),
+                    );
                   } else assert.equal(guest.call("run", 40), 40);
+                  if (!owning) assert.equal(guest.call("forwarded", 40), 40);
                   if (owning) {
                     assert.deepEqual(
                       guest.call("local", 40),

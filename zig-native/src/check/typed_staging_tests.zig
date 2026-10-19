@@ -107,6 +107,31 @@ test "typed staging rejects bare earlier values malformed shapes and authority c
     try law(a, "const bad = @descriptor.fields (@code.describe (@code.quote 1)).result", .descriptor_private);
 }
 
+fn spliceUsageShape(allocator: std.mem.Allocator) !void {
+    try law(allocator,
+        \\const generated = @code.quote (fn (value: U32) => value)
+        \\const accepted = @code.quote ((fn (callback: U32 -> U32) => callback 42) (@code.splice generated))
+    , null);
+    try law(allocator,
+        \\const generated = @code.quote (fn (value: unique U32) => value)
+        \\const bad = @code.quote ((fn (callback: U32 -> U32) => callback 42) (@code.splice generated))
+    , .type_mismatch);
+}
+test "typed staging rejects a spliced callable with a different usage shape through OOM" {
+    try spliceUsageShape(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, spliceUsageShape, .{});
+}
+
+fn liveSkolemLift(allocator: std.mem.Allocator) !void {
+    try law(allocator,
+        \\const bad: forall [a] => a -> code [a, row {}] = fn value => @code.quote (@code.lift value)
+    , .cross_stage_authority);
+}
+test "typed staging refuses a lifted live skolem before code publication through OOM" {
+    try liveSkolemLift(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, liveSkolemLift, .{});
+}
+
 test "typed staging nominal descriptors expose only common public constructor fields" {
     const source =
         \\data Packet a = #Packet {payload: a, flag: Bool}

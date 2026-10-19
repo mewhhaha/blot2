@@ -2,9 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — scope closed to fixed acceptance rows by owner
-  decision on 17 October 2026. Rows 1–10 are implemented in committed source;
-  row 11 and the durable row-to-law mapping remain. No completion is claimed.
+- **Status:** Complete — qualified on 19 October 2026 against the fixed
+  acceptance scope; see the current completion record below.
 - **19 October 2026:** CT26 (`c622b99`) stopped interface comparison from
   reading `obligation_spans`. A one-byte body edit no longer rechecks the 13
   importers of `robots.blot`: the gdev body edit went 1,616 → 1,228 ms. Still
@@ -29,7 +28,7 @@ semantic dependencies from executable and staging reads.
 
 ## Implementation checklist
 
-- [ ] Compare complete public body interfaces after individual rechecking,
+- [x] Compare complete public body interfaces after individual rechecking,
       including residual predicates, effects, captures and identities.
 - [x] Stop semantic propagation only on exact interface equality; rebuild
       executable consumers of changed bodies, selected evidence, captures or
@@ -54,12 +53,12 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Unchanged interfaces stop semantic propagation without hiding executable
+- [x] Unchanged interfaces stop semantic propagation without hiding executable
       or staged changes.
 - [x] The under-100-ms body-edit target is measured or remains an explicit
       unfinished performance gate (owned by task
       [102](102-reach-the-body-edit-target.md) since 15 October 2026).
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Closed acceptance — owner decision, 17 October 2026
@@ -115,10 +114,11 @@ correct, and the form is a recorded limitation rather than required work here.
     complete allocation-failure sweeps
     ([nested fragments](../zig-native/BODY_CUTOFF.md#nested-callable-fragment-owners-15-october-2026),
     [chains](../zig-native/BODY_CUTOFF.md#chains-with-no-clean-dependency-15-october-2026)).
-11. Not yet implemented: generic dotted paths with qualified roots, projected
-    receivers and declared field requirements, qualified by the same law set as
-    row 5 (named as remaining in the generic dotted-template slice of
-    [BODY_CUTOFF.md](../zig-native/BODY_CUTOFF.md)).
+11. Implemented in the working tree: generic dotted paths with qualified roots,
+    projected receivers and declared field requirements, with global/local and
+    imported qualification origins. The extended row-5 matrix and the new native
+    fault-sweep law pass; full LLVM qualification is pending. See the
+    [closed acceptance map](../zig-native/BODY_CUTOFF.md#declared-fields-and-the-closed-acceptance-map-19-october-2026).
 
 The task completes when row 11 is implemented, every native law and guest test
 mapped to rows 1–11 passes in the full compiler gate (`deno task test:compiler`
@@ -149,6 +149,24 @@ What moved where (nothing is dropped silently):
 
 ## Completion evidence
 
+- Current local milestone: the commit containing this record; compiler and exact
+  source/log hashes are recorded by the
+  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+- Validation: the forced LLVM gate executes all 2,470 native laws without skips,
+  failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
+  checks pass. CI lint covers 507 source files plus the fixture module with zero
+  findings. Strict fresh/retained/restart/shared Wasm parity and the seven-pair
+  CPU regression guard pass.
+- Acceptance: All eleven fixed body-cutoff rows pass, including declared field
+  principals and forwarded qualified roots.
+- Remaining limits: The under-100-ms body target and attribution-gated ordinary
+  forms remain with task 102; no general gdev body-admission gain is claimed.
+
+### Earlier implementation evidence
+
+The checkpoints below retain their original dates and measurements. Statements
+that qualification or a commit was pending refer to those earlier checkpoints.
+
 - Current state: rows 1–10 are in committed source (the continuation landed in
   `23a934f`; the `05401a9` gate passes 2,355 native laws and 1,501 guest tests
   with zero analyzer findings). Row 11 and the row-to-law mapping are open.
@@ -174,8 +192,9 @@ What moved where (nothing is dropped silently):
   about 6–54%, while population CPU rises about 7–45% and retained memory
   usually grows. These are Safe/noLLVM screens; no total edit gain on the
   captured 93-unit project is claimed.
-- Remaining: row 11 and the durable row-to-law mapping. Limitations and moved
-  scope are listed in the closed acceptance above.
+- Remaining: full LLVM qualification, the paired compiler comparison and a local
+  milestone commit. Row 11 and its durable law map are implemented and focused
+  checks pass. Limitations and moved scope remain explicit above.
 - Durable record: [body interface cutoff](../zig-native/BODY_CUTOFF.md) (every
   slice, its laws, pins and costs),
   [frontend ownership](../zig-native/FRONTEND_OWNERSHIP_QUALIFICATION.md) and
