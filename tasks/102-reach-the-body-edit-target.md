@@ -4,6 +4,7 @@
 
 - **Status:** Pending — split from task 084 by owner decision on 15 October
   2026; no completion is claimed.
+- **19 October 2026:** the body edit is about 1.23 s; see task 024's note.
 - **Dependencies:** [084](084-qualify-the-complete-program.md),
   [024](024-apply-general-body-interface-cutoff.md)
 - **Originating requirements:** PLAN: Hill 6 / general body edits under 100 ms.

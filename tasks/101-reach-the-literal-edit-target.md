@@ -4,6 +4,7 @@
 
 - **Status:** Pending — split from task 084 by owner decision on 15 October
   2026; no completion is claimed.
+- **19 October 2026:** the literal edit is about 1.0 s; see task 093's note.
 - **Dependencies:** [084](084-qualify-the-complete-program.md),
   [086](086-retain-constant-evaluation-across-revisions.md),
   [093](093-close-the-gdev-edit-gap.md)

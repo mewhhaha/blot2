@@ -5,6 +5,9 @@
 - **Status:** In progress — owner approved the constant-receipt design on 12
   October 2026; since 17 October 2026 further work is gated on the measurement
   below. No completion is claimed.
+- **19 October 2026:** the compile-time hills cut the gdev literal edit to about
+  1.0 s, from 1.88 s before CT9. Results for CT9, CT12, CT14–CT17, CT22, CT27
+  and CT89 are in [COMPILE_HILLS.md](../COMPILE_HILLS.md).
 - **Dependencies:** [023](023-narrow-literal-edit-invalidation.md)
 - **Originating requirements:** discovered while qualifying task
   [023](023-narrow-literal-edit-invalidation.md); PLAN: Hill 6 / literal edits

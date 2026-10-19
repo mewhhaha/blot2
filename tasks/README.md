@@ -634,6 +634,12 @@ Tasks 070/071 now satisfy their finite acceptance criteria. Statuses are **80
 complete** (including four designs), **23 in progress** and **7 pending**: **30
 remain open**. The broader program and performance targets remain open.
 
+On 18–19 October 2026 the compile-time hills in
+[COMPILE_HILLS.md](../COMPILE_HILLS.md) (CT1–CT94) and the runtime issues
+#12–#16 landed outside this index. Their effect on tasks 024, 082, 086, 093 and
+100–104 is in each task's dated status note. Tasks 105–109 are committed; their
+acceptance evidence remains to be recorded.
+
 Owner decisions of 15 October 2026: language tasks 058/059/061/062/064/065,
 067/068 and 073/074 close against fixed acceptance rows or traces recorded in
 each task; the five final performance targets move to follow-up tasks

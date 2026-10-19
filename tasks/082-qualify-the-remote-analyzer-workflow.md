@@ -2,10 +2,12 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — re-scoped by owner decision on 15 October 2026 to
-  a local run of the analyzer built from `../zig-analyzer`. The run passes on
-  committed tree `4599957`; completion waits for a rerun over the tree task
-  084 qualifies.
+- **Status:** In progress — re-scoped by owner decision on 15 October 2026 to a
+  local run of the analyzer built from `../zig-analyzer`. The run passes on
+  committed tree `4599957`; completion waits for a rerun over the tree task 084
+  qualifies.
+- **19 October 2026:** rerun the local analyzers after task 084. CI lint has
+  reported 0 findings on every compile-time-hill merge through 19 October.
 - **Dependencies:** [081](081-finalize-durable-documentation.md)
 - **Originating requirements:** PLAN: Hill 17 follow-up / first remote analyzer
   run. Sources: [PLAN.md](../PLAN.md).
@@ -64,15 +66,17 @@ changes; run code gates only when code or build inputs change.
   task, and its known false positives are accepted for now.
 - Latest local run (17 October 2026, committed tree `4599957`, clean
   `zig-native/`): `../zig-analyzer` at `9a78ce1` (0.17.0-2, pushed), which
-  merges the upstream fixes for the false positives below. `zig-analyzer
-  doctor` reports Zig 0.17.0 and a compatible compiler backend. `deno task
-  lint:zig` and an uncached `zig-analyzer check --no-cache` each report 0
-  findings over all 487 `zig-native/src` files and the fixture module. The
-  CI-pinned `756bfd5` (0.17.0-1) also reports 0 findings over the same tree,
-  so no finding is reported by only one revision. Outside the gated
-  directories, `check .` under the default profile warns about five deprecated
-  `std.fs.path` uses (such as `zig-native/compiler_fingerprint.zig`); they are
-  not part of this gate.
+  merges the upstream fixes for the false positives below.
+  `zig-analyzer
+  doctor` reports Zig 0.17.0 and a compatible compiler backend.
+  `deno task
+  lint:zig` and an uncached `zig-analyzer check --no-cache` each
+  report 0 findings over all 487 `zig-native/src` files and the fixture module.
+  The CI-pinned `756bfd5` (0.17.0-1) also reports 0 findings over the same tree,
+  so no finding is reported by only one revision. Outside the gated directories,
+  `check .` under the default profile warns about five deprecated `std.fs.path`
+  uses (such as `zig-native/compiler_fingerprint.zig`); they are not part of
+  this gate.
 - Earlier local run (16 October 2026, committed tree `2b2ffbb`):
   `../zig-analyzer` at `13b7e03` (0.17.0-2), Zig 0.17.0. `zig build backend`
   succeeded (8:02) and `zig-analyzer doctor` reports Zig 0.17.0 and a compatible

@@ -3,6 +3,13 @@
 ## Status, dependencies, and originating requirements
 
 - **Status:** In progress — milestone `aef65e7`; no completion is claimed.
+- **19 October 2026:** the compile-time hills cut retained gdev edits:
+  - literal edit 1.88 → about 1.0 s (CT9, CT14–CT17, CT60, CT89);
+  - body edit 2.11 → 1.23 s (CT26);
+  - error edits 0.6–1.0 s → 12–48 ms (CT29).
+
+  Open follow-ups are recorded under CT10, CT11 and CT22 in
+  [COMPILE_HILLS.md](../COMPILE_HILLS.md).
 - **Dependencies:** [088](088-restore-summary-job-inference-cost.md)
 - **Originating requirements:** discovered while qualifying task
   [088](088-restore-summary-job-inference-cost.md), whose outcome asked for

@@ -2,8 +2,9 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — implemented with focused checks on 17 October 2026;
-  the full gate and commit remain.
+- **Status:** In progress — implemented on 17 October 2026 and committed in
+  `05401a9`/`f6a2942`; later full gates on main pass. The acceptance evidence
+  remains to be recorded.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink by peer session on 17 October
   2026 as [issue #11](https://github.com/mewhhaha/blot2/issues/11), a silent

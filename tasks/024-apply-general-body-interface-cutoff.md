@@ -5,6 +5,11 @@
 - **Status:** In progress — scope closed to fixed acceptance rows by owner
   decision on 17 October 2026. Rows 1–10 are implemented in committed source;
   row 11 and the durable row-to-law mapping remain. No completion is claimed.
+- **19 October 2026:** CT26 (`c622b99`) stopped interface comparison from
+  reading `obligation_spans`. A one-byte body edit no longer rechecks the 13
+  importers of `robots.blot`: the gdev body edit went 1,616 → 1,228 ms. Still
+  open: the body check cache admits none of `robots.blot`'s 107 bodies. See CT26
+  in [COMPILE_HILLS.md](../COMPILE_HILLS.md).
 - **Dependencies:** [023](023-narrow-literal-edit-invalidation.md)
 - **Originating requirements:** PLAN: Hill 6 / general body edits under 100 ms.
   Sources: [PLAN.md](../PLAN.md).

@@ -2,8 +2,9 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — fix and law recorded on 17 October 2026; the full
-  gate and commit remain.
+- **Status:** In progress — fix and law recorded on 17 October 2026 and
+  committed in `f6a2942`; later full gates on main pass. The acceptance evidence
+  (Ink repros) remains to be recorded.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink by peer session on 16 October
   2026 (`effect_mismatch` on `fn () => ecs.checkpoint engine` with a generic

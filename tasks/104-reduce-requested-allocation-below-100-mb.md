@@ -4,6 +4,10 @@
 
 - **Status:** Pending — split from task 084 by owner decision on 15 October
   2026; no completion is claimed.
+- **19 October 2026:** final solver capacities are 109 MB, led by effect rows at
+  37 MB (CT56, deferred). Getting under 100 MB needs solver stores that outlive
+  a region's arena. CT60 and CT61 raised requested allocation to 266 MB (solver)
+  and 132 MB (scratch). See [COMPILE_HILLS.md](../COMPILE_HILLS.md).
 - **Dependencies:** [084](084-qualify-the-complete-program.md)
 - **Originating requirements:** PLAN: Hill 7 / under-100-MB cumulative requested
   allocation. Sources: [PLAN.md](../PLAN.md),

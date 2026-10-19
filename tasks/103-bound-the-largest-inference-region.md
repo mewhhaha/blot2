@@ -4,6 +4,10 @@
 
 - **Status:** Pending — split from task 084 by owner decision on 15 October
   2026; no completion is claimed.
+- **19 October 2026:** one principal game region takes 249 ms (CT87). The
+  `played` composition region has 5,137 scopes; splitting it needs summaries
+  that stay parametric in their argument functions (CT51, deferred). See
+  [COMPILE_HILLS.md](../COMPILE_HILLS.md).
 - **Dependencies:** [084](084-qualify-the-complete-program.md)
 - **Originating requirements:** PLAN: final performance / largest inference
   region under 50 ms. Sources: [PLAN.md](../PLAN.md),

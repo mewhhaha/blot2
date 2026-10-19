@@ -3,7 +3,8 @@
 ## Status, dependencies, and originating requirements
 
 - **Status:** In progress — owner approved both fixes on 16 October 2026;
-  implemented, combined gate and commit remain.
+  implemented and committed in `05401a9`; later full gates on main pass. The
+  acceptance evidence (memory histogram) remains to be recorded.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink by peer session on 16 October
   2026: `array.generate 4096 (fn index => #[128578, 97 + index % 26])` grew

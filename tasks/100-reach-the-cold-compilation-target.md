@@ -4,6 +4,9 @@
 
 - **Status:** Pending — split from task 084 by owner decision on 15 October
   2026; no completion is claimed.
+- **19 October 2026:** cold gdev game is about 2.3 s wall through serve-project
+  with 4 codegen workers (CT89), from 3.0 s CPU at the CT1 baseline. See
+  [COMPILE_HILLS.md](../COMPILE_HILLS.md).
 - **Dependencies:** [084](084-qualify-the-complete-program.md)
 - **Originating requirements:** PLAN: final performance / cold compilation of
   approximately 500 ms. Sources: [PLAN.md](../PLAN.md),
