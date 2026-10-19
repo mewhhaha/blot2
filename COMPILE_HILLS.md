@@ -1733,6 +1733,19 @@ overlaid.
 
 - **Fix:** run test entries on separate workers that share CT90's frozen
   dependency.
+- **Result (19 October 2026):** dropped. pen already runs test modules on
+  `--jobs` workers (cores/2, at most 8), each with its own session, and CT90
+  applies to each. pen's 68 modules after CT90, one run each at load 0.8–3.7
+  (before CT90 in brackets): 1 worker 72.9 s CPU, 67.5 s wall, 0.74 GB [96.1
+  s, 91.0 s]; 2 workers 76.0 s, 35.3 s, 1.3 GB [102.3 s, 49.2 s]; 4 workers
+  79.8 s, 20.5 s, 2.3 GB [107.6 s, 26.6 s]; 8 workers 94.0 s, 13.6 s, 4.3 GB
+  summed peak RSS [120.0 s, 17.1 s]. At 8 workers the sessions check 1,149
+  modules where one checks 211, but most of the 21 s of extra CPU is
+  contention (it is 24 s without CT90): sharing one library would save about
+  3–6 s of CPU and under 1 s of wall time. That needs concurrent sessions in one
+  process over refcounted module payloads, which are not thread-safe, and a
+  batch request in pen's protocol; memory would barely change, since each
+  test's backend peak dominates.
 
 ## Phase 9: guards and docs
 
