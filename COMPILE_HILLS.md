@@ -1547,6 +1547,25 @@ The cache holds only the backend checkpoint.
 - **Fix:** persist the frozen dependency, so restart skips loading, checking and
   lowering of unchanged modules.
 - **Overlaps:** Hill 8 and task 020.
+- **Result (19 October 2026):** CT83, "Start a restarted build from the cached
+  dependency seed". The writer also persists the session's frozen dependency
+  seed (22.8 MB for the game, keyed by compiler and project settings). The
+  first build of a process that compiles, without explicit `dependencies`,
+  validates and adopts it in place of the empty seed, so unchanged
+  dependencies are admitted as with a `dependencies` bundle and changed ones
+  and their importers are rebuilt through the ordinary fallback; an unchanged
+  restart still restores the output without reading it. Game, 4 runs each at
+  load 1.2–1.3, restart after an edit, CPU against CT84: `literal_constant`
+  2,462 → 2,064 ms, `body_change` 2,469 → 2,064 ms, `type_change` 2,322 →
+  1,919 ms (8–14% under a cold build of the edited tree, 2,230–2,238 ms), but
+  `imported_body` (in `ink/math`, which most modules import) 2,458 → 2,539
+  ms: decoding and validating the seed costs more than the few modules it
+  keeps. First reply and the unchanged restart are unchanged; the writer takes
+  136 ms more. Laws: entry and dependency edits after adoption, a stale seed at
+  the first build, refusal of other compilers, settings and damaged bytes, a
+  second adoption refused, allocation failure through decode and adoption, and
+  in executed tests entry, dependency and damaged-seed restarts. Wasm identical
+  to cold on every scenario.
 
 ### CT84: a compact cache
 

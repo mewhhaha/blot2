@@ -49,12 +49,13 @@ fn beneath(a: A, base: []const u8, suffix: []const u8) A.Error!?[]u8 {
 
 /// The files one writer publishes for a key, in this order. The checkpoint is
 /// the backend checkpoint format the CLI also reads; the output part holds a
-/// server revision's output and the inputs it read.
-pub const Part = enum { checkpoint, output };
+/// server revision's output and the inputs it read; the seed is its frozen
+/// dependency frontend.
+pub const Part = enum { checkpoint, output, seed };
 const parts = std.enums.values(Part);
 
 /// Produces each part with the allocator it is given, or null to leave that
-/// part out (an omitted output also removes the published one). The output
+/// part out (an omitted output or seed also removes the published one). The output
 /// part receives the checkpoint bytes just produced, if any. A detached writer
 /// calls it after the fork, on a private heap, over the caller's copy-on-write
 /// memory; it must not take locks other threads may hold. It notes in `report`
@@ -71,6 +72,7 @@ pub const Report = struct {
     /// Encoded size of each part, zero when it was not produced.
     checkpoint_bytes: usize = 0,
     output_bytes: usize = 0,
+    seed_bytes: usize = 0,
     /// A part was not published, or not produced, because it exceeds a limit;
     /// the previous file of that part, if any, stays.
     over_limit: bool = false,
@@ -81,6 +83,7 @@ pub const Report = struct {
         switch (part) {
             .checkpoint => self.checkpoint_bytes = bytes.len,
             .output => self.output_bytes = bytes.len,
+            .seed => self.seed_bytes = bytes.len,
         }
         if (bytes.len <= limit) return bytes.len != 0;
         self.over_limit = true;
@@ -104,6 +107,7 @@ pub const File = struct {
     /// The checkpoint part.
     path: [:0]u8,
     output_path: [:0]u8,
+    seed_path: [:0]u8,
     lock_path: [:0]u8,
     /// `<part>.partial` by part, written only by the exclusive lock's holder.
     partial_paths: [parts.len][:0]u8,
@@ -119,17 +123,22 @@ pub const File = struct {
         errdefer a.free(path);
         const output_path = try a.printSentinel("{s}/{s}.blotout", .{ folder, digest }, 0);
         errdefer a.free(output_path);
+        const seed_path = try a.printSentinel("{s}/{s}.blotseed", .{ folder, digest }, 0);
+        errdefer a.free(seed_path);
         const lock_path = try a.printSentinel("{s}/{s}.lock", .{ folder, digest }, 0);
         errdefer a.free(lock_path);
         const checkpoint_partial = try a.printSentinel("{s}.partial", .{path}, 0);
         errdefer a.free(checkpoint_partial);
         const output_partial = try a.printSentinel("{s}.partial", .{output_path}, 0);
-        return .{ .allocator = a, .compiler = compiler, .directory = folder, .path = path, .output_path = output_path, .lock_path = lock_path, .partial_paths = .{ checkpoint_partial, output_partial } };
+        errdefer a.free(output_partial);
+        const seed_partial = try a.printSentinel("{s}.partial", .{seed_path}, 0);
+        return .{ .allocator = a, .compiler = compiler, .directory = folder, .path = path, .output_path = output_path, .seed_path = seed_path, .lock_path = lock_path, .partial_paths = .{ checkpoint_partial, output_partial, seed_partial } };
     }
     pub fn deinit(self: *File) void {
         self.allocator.free(self.directory);
         self.allocator.free(self.path);
         self.allocator.free(self.output_path);
+        self.allocator.free(self.seed_path);
         self.allocator.free(self.lock_path);
         for (self.partial_paths) |partial| self.allocator.free(partial);
         self.* = undefined;
@@ -138,6 +147,7 @@ pub const File = struct {
         return switch (part) {
             .checkpoint => self.path,
             .output => self.output_path,
+            .seed => self.seed_path,
         };
     }
     /// Waits, at most `wait_limit_ms`, until no writer holds this key's lock.
@@ -218,7 +228,7 @@ pub const File = struct {
         defer if (produced) |bytes| self.allocator.free(bytes);
         for (parts) |part| {
             const bytes = producer.encode(producer.context, self.allocator, part, produced, &report) orelse {
-                if (part == .output) Io.Dir.cwd().deleteFile(io, self.output_path) catch {};
+                if (part != .checkpoint) Io.Dir.cwd().deleteFile(io, self.final(part)) catch {};
                 continue;
             };
             defer if (part != .checkpoint) self.allocator.free(bytes);
@@ -286,7 +296,7 @@ pub const File = struct {
         var produced: ?[]u8 = null;
         for (parts) |part| {
             const bytes = producer.encode(producer.context, heap.allocator(), part, produced, &report) orelse {
-                if (part == .output) _ = linux.unlinkat(linux.AT.FDCWD, self.output_path, 0);
+                if (part != .checkpoint) _ = linux.unlinkat(linux.AT.FDCWD, self.final(part), 0);
                 continue;
             };
             if (part == .checkpoint) produced = bytes;

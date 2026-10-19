@@ -60,6 +60,7 @@ const Gate = struct {
     fn encode(context: *const anyopaque, allocator: std.mem.Allocator, part: cache.Part, checkpoint: ?[]const u8, report: *cache.Report) ?[]u8 {
         const self: *const Gate = @ptrCast(@alignCast(context));
         report.semantic_over_limit = report.semantic_over_limit or self.semantic_over_limit;
+        if (part == .seed) return null;
         if (part == .output) {
             const suffix = self.output orelse return null;
             return std.mem.concat(allocator, u8, &.{ checkpoint orelse "", suffix }) catch null;

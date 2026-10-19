@@ -466,7 +466,8 @@ rather than leave the host and the server disagreeing about the revision.
 **The restart cache.** It is saved after the first successful build and again at
 close. Its files sit under the cache root, keyed by the compiler identity and
 the entry: the backend checkpoint (`.blotcache`), the revision's output with
-every input it read (`.blotout`), and a `.lock` file.
+every input it read (`.blotout`), its frozen dependency frontend
+(`.blotseed`, keyed also by the project settings), and a `.lock` file.
 
 - **Restored output.** The first build of a process whose inputs equal the
   saved revision's exactly (every source byte, path resolution and import, the
@@ -474,8 +475,12 @@ every input it read (`.blotout`), and a `.lock` file.
   `explainDemands`) replies with the saved Wasm without compiling, under the
   same rule as an unchanged build in one session. Its `attemptStats` has
   `restored_output` true, it keeps no retained state, and the next build that
-  differs compiles in full. Otherwise the checkpoint is read then, before
-  compiling.
+  differs compiles in full. Otherwise the checkpoint and the seed are read
+  then, before compiling.
+- **Seed.** Without `dependencies` at open, the first build that compiles
+  starts from the saved seed, as if opened with it: dependencies whose sources
+  are unchanged are not checked or lowered again, and changed ones and their
+  importers are rebuilt. A seed that fails validation is ignored.
 
 - **Promise.** Once the first successful build's reply has been sent, the cache
   for that revision is being written by a process the host does not own. Killing
@@ -499,7 +504,7 @@ every input it read (`.blotout`), and a `.lock` file.
 - **Limits.** A part over 64 MiB is not published, and an archive over its own
   limit is left out of the checkpoint; the previous file of that part stays.
   Neither is silent: the writer leaves
-  `{"writer", "checkpoint_bytes", "output_bytes", "over_limit", "semantic_over_limit"}`
+  `{"writer", "checkpoint_bytes", "output_bytes", "seed_bytes", "over_limit", "semantic_over_limit"}`
   as JSON in the `.lock` file, and the next open reports it as
   `restartCacheWrite`. The CLI reports the same fields in `restart_cache`.
 

@@ -112,6 +112,8 @@ const OpenProject = struct {
     /// The cache's checkpoint is read at the first build that compiles, so a
     /// restored output never pays for decoding it.
     checkpoint_pending: bool = false,
+    /// So is its dependency seed, when no explicit dependencies were opened.
+    seed_pending: bool = false,
     /// What the cache's last writer reported when this process opened.
     last_write: ?restart_cache.Report = null,
     saved_revision: usize = 0,
@@ -166,7 +168,26 @@ const OpenProject = struct {
             checkpoint_pending = true;
         }
         session.policy.codegen_workers = request.codegenWorkers;
-        return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session, .assets = assets, .cache_file = cache_file, .cache_loaded = cache_loaded, .checkpoint_pending = checkpoint_pending, .last_write = last_write };
+        return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session, .assets = assets, .cache_file = cache_file, .cache_loaded = cache_loaded, .checkpoint_pending = checkpoint_pending, .seed_pending = checkpoint_pending and request.dependencies == null, .last_write = last_write };
+    }
+    /// A seed that fails to decode for this compiler and these settings, or
+    /// fails validation, is ignored.
+    fn loadSeed(self: *OpenProject, io: Io) !void {
+        if (!self.seed_pending) return;
+        self.seed_pending = false;
+        const file = &(self.cache_file orelse return);
+        const bytes = file.read(io, .seed) orelse return;
+        defer self.allocator.free(bytes);
+        var seed = retained.decodeSeed(self.allocator, file.compiler, self.session.seed_settings, bytes) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => return,
+        };
+        self.session.adoptCachedSeed(seed) catch |err| {
+            @import("dependency_format.zig").deinit(self.allocator, &seed);
+            if (err == error.OutOfMemory) return error.OutOfMemory;
+            return;
+        };
+        self.cache_loaded = true;
     }
     fn loadCheckpoint(self: *OpenProject, io: Io) void {
         if (!self.checkpoint_pending) return;
@@ -228,6 +249,10 @@ const CheckpointEncoding = struct {
                 };
             },
             .output => return self.session.encodeRestored(a, self.compiler, checkpoint) catch |err| {
+                report.over_limit = report.over_limit or err == error.ArtifactLimit;
+                return null;
+            },
+            .seed => return self.session.encodeSeed(a, self.compiler) catch |err| {
                 report.over_limit = report.over_limit or err == error.ArtifactLimit;
                 return null;
             },
@@ -358,6 +383,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
     };
     var preparation = restored orelse compiled: {
         opened.loadCheckpoint(io);
+        try opened.loadSeed(io);
         break :compiled opened.session.prepareRevisionWithSources(io, opened.entry, null, opened.options_owner.options, complete_sources) catch |err| {
             return operationFailure(a, writer, opened, id, @errorName(err), "Compiler operation failed", null);
         };

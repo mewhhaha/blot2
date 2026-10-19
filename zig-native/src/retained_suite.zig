@@ -19,6 +19,7 @@ comptime {
     _ = @import("reuse/restart_cache.zig");
     _ = @import("reuse/restart_cache_tests.zig");
     _ = @import("reuse/restored_output_tests.zig");
+    _ = @import("reuse/cached_seed_tests.zig");
     _ = @import("reuse/revision_inputs.zig");
     _ = @import("reuse/optimized_archive_tests.zig");
     _ = @import("backend/machine_code_sharing_tests.zig");

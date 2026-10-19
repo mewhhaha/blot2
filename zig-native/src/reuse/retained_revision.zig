@@ -167,6 +167,17 @@ pub const Restored = struct {
         self.* = undefined;
     }
 };
+/// Restart-cache seeds are keyed by compiler and project settings.
+fn seedKey(compiler: [32]u8, seed_settings: [32]u8) dependency_format.Key {
+    return .{ .compiler = compiler, .settings = seed_settings, .source = dependency_format.digest("blot-restart-seed-v1"), .dependencies = @splat(0) };
+}
+const seed_limits: dependency_format.Limits = .{ .elements = 64 * 1024 * 1024 };
+/// Decodes a seed from `Session.encodeSeed` for a session whose settings are
+/// `seed_settings`; another compiler or other settings are `StaleArtifact`.
+pub fn decodeSeed(a: Allocator, compiler: [32]u8, seed_settings: [32]u8, bytes: []const u8) dependency_format.Error!dependency.FrozenDependency {
+    return dependency_format.decodeWithLimits(dependency.FrozenDependency, a, bytes, seedKey(compiler, seed_settings), seed_limits);
+}
+
 pub const FallbackStats = struct {
     validated_modules: usize = 0,
     reused_frontend_modules: usize = 0,
@@ -377,6 +388,28 @@ pub const Session = struct {
             .checkpoint_digest = if (checkpoint) |bytes| dependency_format.digest(bytes) else null,
             .inputs = observed,
         });
+    }
+    /// The committed revision's dependency seed for `decodeSeed`, or null when
+    /// it has no dependencies.
+    pub fn encodeSeed(self: *const Session, a: Allocator, compiler: [32]u8) !?[]u8 {
+        if (self.epoch) |epoch| if (epoch.preparing or epoch.active != null) return error.RevisionBusy;
+        if (self.current == null or self.seed.modules.len == 0) return null;
+        return try dependency_format.encodeWithLimits(a, seedKey(compiler, self.seed_settings), self.seed, seed_limits);
+    }
+    /// Gives a session that has committed nothing compiled a seed from the
+    /// restart cache, in place of its empty one. The seed is validated here,
+    /// so a damaged one is refused before it can fail a revision; like any
+    /// seed, every revision checks its sources and rebuilds what changed. On
+    /// error the caller still owns `seed`.
+    pub fn adoptCachedSeed(self: *Session, seed: dependency.FrozenDependency) !void {
+        if (self.current != null or self.seed.modules.len != 0) return error.SeedInUse;
+        if (self.epoch) |epoch| if (epoch.preparing or epoch.active != null) return error.CandidateActive;
+        try closure.validate(self.allocator, &seed);
+        const owner = try retained_dependency.Snapshot.adopt(self.allocator, seed);
+        owner.validated = true;
+        self.releaseSeed();
+        self.seed = seed;
+        self.seed_snapshot = owner;
     }
     /// A first build may publish the restored output. Returns null, having
     /// published nothing, unless this build's inputs equal the restored ones.

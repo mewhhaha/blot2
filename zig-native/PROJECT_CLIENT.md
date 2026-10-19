@@ -113,8 +113,9 @@ replying. Later edits avoid cache writes; `close()` saves the latest committed
 revision the same way. Failed edits never replace the last successful
 checkpoint. The cache also holds the saved revision's Wasm and every input it
 read: a restarted compiler whose first build has exactly those inputs and the
-same settings returns that Wasm without compiling (`attemptStats.restored_output`)
-and compiles in full on the next change. Keep the compiler alive for
+same settings returns that Wasm without compiling (`attemptStats.restored_output`).
+A restarted compiler whose sources changed starts from the saved dependency
+frontend instead, so unchanged dependencies are not checked again. Keep the compiler alive for
 editing; restart caching and retained edits are measured separately by
 `deno task bench:compile --restart-cache`.
 

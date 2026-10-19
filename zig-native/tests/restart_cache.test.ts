@@ -225,11 +225,15 @@ Deno.test("project server persists committed checkpoints across disposal and gra
   }
 });
 
-/** Waits for every detached writer under `directory`, then removes it. */
-async function cleanup(directory: string) {
+/** Waits for every detached writer under `directory`. */
+async function settleAll(directory: string) {
   for (const path of await files(directory).catch(() => [])) {
     if (path.endsWith(".lock")) await settle(path);
   }
+}
+/** Waits for every detached writer under `directory`, then removes it. */
+async function cleanup(directory: string) {
+  await settleAll(directory);
   await Deno.remove(directory, { recursive: true });
 }
 /** Waits, as an open does, until no writer holds the key's lock. */
@@ -504,6 +508,62 @@ Deno.test("project server reports the cache's last write, including growth past 
     const grown = { ...written, checkpoint_bytes: 70_000_000, over_limit: true };
     await Deno.writeTextFile(lock, JSON.stringify(grown));
     assert.deepEqual((await build()).stats.restartCacheWrite, grown);
+  } finally {
+    await cleanup(directory);
+  }
+});
+
+Deno.test("project server restarts edited projects from the cached dependency seed", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const dependency = `${directory}/dep.blot`;
+  const cache = `${directory}/cache`;
+  const options = { executable, entry, prelude: null, cacheDirectory: cache };
+  const producer = (value: string) =>
+    `const value: U32 = ${value}\nconst read = fn (x: U32) => @u32.add x value\n`;
+  const consumer = (offset: string) =>
+    `import * as dep from "./dep"\nentry const answer = fn (x: U32) => @u32.add (dep.read x) ${offset}\n`;
+  const build = async (cacheDirectory: string | false = cache) => {
+    const compiler = await createZigProjectCompiler({
+      ...options,
+      cacheDirectory,
+    });
+    try {
+      const built = await compiler.build();
+      assert(built.success, JSON.stringify(built));
+      return built;
+    } finally {
+      await compiler.dispose();
+    }
+  };
+  const restart = async () => {
+    const built = await build();
+    assert.deepEqual(built.bytes, (await build(false)).bytes);
+    assert.equal(built.stats.attemptStats.restored_output, false);
+    await settleAll(cache);
+    return built.stats.attemptStats.rebuilt_seed;
+  };
+  try {
+    await Deno.writeTextFile(dependency, producer("1"));
+    await Deno.writeTextFile(entry, consumer("0"));
+    await build();
+    await settleAll(cache);
+    const [seed] = (await files(cache)).filter((path) =>
+      path.endsWith(".blotseed")
+    );
+    assert(seed, "the writer publishes the dependency seed");
+    // An entry edit admits the seed: the dependency is not checked again.
+    await Deno.writeTextFile(entry, consumer("2"));
+    assert.equal(await restart(), false);
+    // A dependency edit rebuilds from the seed.
+    await Deno.writeTextFile(dependency, producer("5"));
+    assert.equal(await restart(), true);
+    // A damaged seed is ignored.
+    const damaged = await Deno.readFile(seed);
+    damaged[damaged.length - 1] ^= 1;
+    await Deno.writeFile(seed, damaged);
+    await Deno.writeTextFile(entry, consumer("3"));
+    assert.equal(await restart(), true);
   } finally {
     await cleanup(directory);
   }
