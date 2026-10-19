@@ -454,13 +454,13 @@ test "import path decoding preserves Unicode and rejects malformed escapes" {
 /// before this operation. All symbol publication and project mutation are owned
 /// by the returned candidate; failure leaves no caller project to repair.
 pub fn loadCompiled(allocator: Allocator, io: Io, entrypath: []const u8, options: Options, dependency: *D.FrozenDependency) !Project {
-    return loadCompiledMode(allocator, io, entrypath, options, dependency, dependency, null, null);
+    return loadCompiledMode(allocator, io, entrypath, options, dependency, dependency, null, null, false);
 }
 
 /// Dense artifact owners and their exact dictionary are borrowed unchanged.
 /// Unlike relink, this path can safely consume an already published seed.
 pub fn loadCompiledReadOnly(allocator: Allocator, io: Io, entrypath: []const u8, options: Options, dependency: *const D.FrozenDependency, inputs: ?InputProvider) !Project {
-    return loadCompiledMode(allocator, io, entrypath, options, dependency, null, inputs, null);
+    return loadCompiledMode(allocator, io, entrypath, options, dependency, null, inputs, null, false);
 }
 /// Reused frontend results must form a closed dependency subgraph. Callers
 /// also admit exact source bytes, settings and resolution before using this API.
@@ -487,9 +487,59 @@ pub fn validateReuseMask(dependency: *const D.FrozenDependency, reuse: []const b
 }
 pub fn loadCompiledMixedReadOnly(allocator: Allocator, io: Io, entrypath: []const u8, options: Options, dependency: *const D.FrozenDependency, inputs: ?InputProvider, reuse: []const bool) !Project {
     try validateReuseMask(dependency, reuse);
-    return loadCompiledMode(allocator, io, entrypath, options, dependency, null, inputs, reuse);
+    return loadCompiledMode(allocator, io, entrypath, options, dependency, null, inputs, reuse, false);
 }
-fn loadCompiledMode(allocator: Allocator, io: Io, entrypath: []const u8, options: Options, dependency: *const D.FrozenDependency, mutable: ?*D.FrozenDependency, inputs: ?InputProvider, reuse: ?[]const bool) !Project {
+/// loadCompiledMixedReadOnly over a library of frozen modules that need not
+/// be the entry's closure: library modules the entry does not reach stay
+/// unloaded and unchecked, and modules the library lacks load after the
+/// entry. The caller must freeze only the modules reachable from the prelude
+/// and the entry (freshOrder), never publish the library itself as a closure,
+/// and never read an unreached library module's unit.
+pub fn loadLibraryReadOnly(allocator: Allocator, io: Io, entrypath: []const u8, options: Options, library: *const D.FrozenDependency, inputs: ?InputProvider, reuse: []const bool) !Project {
+    try validateReuseMask(library, reuse);
+    return loadCompiledMode(allocator, io, entrypath, options, library, null, inputs, reuse, true);
+}
+/// The units a fresh load of this project's program would number, in its
+/// order: Loader.read numbers each module when the depth-first walk from the
+/// prelude, then from the entry, first meets it, following each module's
+/// imports in declaration order. The entry itself is left out, as freezing
+/// leaves it out of a dependency closure. Every listed unit's imports are
+/// listed too.
+pub fn freshOrder(allocator: Allocator, source: *const Project) ![]u32 {
+    const seen = try allocator.alloc(bool, source.units.items.len);
+    defer allocator.free(seen);
+    @memset(seen, false);
+    var order: std.ArrayList(u32) = .empty;
+    errdefer order.deinit(allocator);
+    var stack: std.ArrayList(Frame) = .empty;
+    defer stack.deinit(allocator);
+    for ([_]UnitId{ source.prelude_unit, source.entry }) |root| {
+        if (root == 0) continue;
+        if (root > seen.len) return error.InvalidUnit;
+        if (seen[root - 1]) continue;
+        seen[root - 1] = true;
+        if (root != source.entry) try order.append(allocator, root);
+        try stack.append(allocator, .{ .unit = root });
+        while (stack.items.len != 0) {
+            const top = stack.items.len - 1;
+            const frame = stack.items[top];
+            const edges = source.unitImports(frame.unit);
+            if (frame.next == edges.len) {
+                _ = stack.pop();
+                continue;
+            }
+            stack.items[top].next += 1;
+            const target = edges[frame.next].target;
+            if (target == 0 or target > seen.len or target == source.entry) return error.InvalidUnit;
+            if (seen[target - 1]) continue;
+            seen[target - 1] = true;
+            try order.append(allocator, target);
+            try stack.append(allocator, .{ .unit = target });
+        }
+    }
+    return order.toOwnedSlice(allocator);
+}
+fn loadCompiledMode(allocator: Allocator, io: Io, entrypath: []const u8, options: Options, dependency: *const D.FrozenDependency, mutable: ?*D.FrozenDependency, inputs: ?InputProvider, reuse: ?[]const bool, library: bool) !Project {
     const timing = phase_profile.enter(.load);
     defer timing.exit();
     if (options.input_mode != .project) return error.InputModeUnsupported;
@@ -546,6 +596,7 @@ fn loadCompiledMode(allocator: Allocator, io: Io, entrypath: []const u8, options
     if (entry <= dependency.modules.len) return error.DependencySetChanged;
     loader.project.entry = entry;
     try loader.walk(entry);
+    if (library) return loader.project;
     if (reuse != null and loader.project.units.items.len != dependency.modules.len + 1) return error.DependencySetChanged;
     if (loader.project.diagnostics.items.len == 0) {
         // An unused retained catalog could participate in backend-wide selection.

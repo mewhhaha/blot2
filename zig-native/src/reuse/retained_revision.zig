@@ -20,6 +20,9 @@ const Allocator = std.mem.Allocator;
 
 const Policy = @import("../execution_policy.zig").Policy;
 const OutputPolicy = Policy;
+/// Session.library is kept while its sources total at most this or four
+/// times the current closure's, whichever is larger.
+const library_source_budget = 4 * 1024 * 1024;
 
 /// Owned successful output; no frontend, caller Result or source-byte borrow.
 const CachedOutput = struct {
@@ -202,6 +205,11 @@ pub const FallbackStats = struct {
     /// changed modules, or the entry against frozen dependencies, without
     /// checking the whole project again (partial.portableRejection).
     portable_rejection: bool = false,
+    /// The entry-switch lane (Session.libraryFrontend): modules in the
+    /// library it read, and library modules it reused in the new seed
+    /// without checking them again.
+    library_modules: usize = 0,
+    relocated_modules: usize = 0,
 };
 pub const Stats = struct { rebuilt_seed: bool = false, reused_output: bool = false, trivia_only: bool = false, restored_output: bool = false, inputs: inputs.Counts = .{}, fallback: FallbackStats = .{} };
 
@@ -220,6 +228,18 @@ const Epoch = struct {
     }
 };
 
+/// What a revision does to Session.library on commit. A replacement library
+/// belongs to its candidate until then.
+const LibraryUpdate = union(enum) {
+    keep,
+    clear,
+    replace: *retained_dependency.Snapshot,
+    fn deinit(self: *LibraryUpdate) void {
+        if (self.* == .replace) self.replace.deinit();
+        self.* = .keep;
+    }
+};
+
 /// A successful, fully emitted revision awaiting caller publication. Borrowed
 /// seed/current owners remain alive until commit, discard or Session teardown.
 /// A Candidate stays at its allocated address and is released with deinit.
@@ -232,6 +252,7 @@ pub const Candidate = struct {
     stats: Stats,
     pending: ?Current,
     seed: ?retained_dependency.Seed,
+    library: LibraryUpdate = .keep,
     emission: ?partial.Result,
     kind: enum { compiled, unchanged } = .compiled,
     state: enum { prepared, committed, discarded } = .prepared,
@@ -259,6 +280,7 @@ pub const Candidate = struct {
         self.pending = null;
         if (self.seed) |*seed| seed.deinit(self.allocator);
         self.seed = null;
+        self.library.deinit();
         if (self.epoch.active == self) self.epoch.active = null;
         self.state = .discarded;
     }
@@ -316,6 +338,12 @@ pub const Session = struct {
     seed_snapshot: ?*retained_dependency.Snapshot = null,
     seed_settings: [32]u8,
     current: ?Current = null,
+    /// Frozen modules of earlier revisions' closures, for an entry whose
+    /// closure differs from the seed's (CT90: a test runner switching the
+    /// module overlaid at one entry). Null when the seed is the library.
+    /// Library modules keep the seed settings they were checked under; every
+    /// use admits each one against its current source and imports.
+    library: ?*retained_dependency.Snapshot = null,
     revisions: usize = 0,
     last: Stats = .{},
     // Bound lazily, after init's returned Session has reached its final address.
@@ -353,6 +381,7 @@ pub const Session = struct {
         if (self.current) |*current| current.deinit(self.allocator);
         if (self.checkpoint) |*checkpoint| checkpoint.deinit();
         if (self.restored) |*restored| restored.deinit();
+        if (self.library) |library| library.deinit();
         self.releaseSeed();
         if (self.epoch) |epoch| epoch.release();
         self.* = undefined;
@@ -481,6 +510,17 @@ pub const Session = struct {
         switch (candidate.kind) {
             .compiled => {
                 if (self.current) |*current| current.deinit(a);
+                // Library modules belong to the settings that checked them.
+                const library: LibraryUpdate = if (!std.mem.eql(u8, &self.seed_settings, &candidate.settings_key) and candidate.library == .keep) .clear else candidate.library;
+                candidate.library = .keep;
+                switch (library) {
+                    .keep => {},
+                    .clear, .replace => if (self.library) |old| {
+                        old.deinit();
+                        self.library = null;
+                    },
+                }
+                if (library == .replace) self.library = library.replace;
                 if (candidate.seed) |seed| {
                     self.releaseSeed();
                     self.seed = seed.value;
@@ -605,7 +645,7 @@ pub const Session = struct {
         transferred = true;
         return output;
     }
-    fn fallback(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, snapshot: *inputs.Snapshot, candidate_seed: *?retained_dependency.Seed, counts: *FallbackStats) !partial.Preparation {
+    fn fallback(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, snapshot: *inputs.Snapshot, candidate_seed: *?retained_dependency.Seed, counts: *FallbackStats, library: *LibraryUpdate) !partial.Preparation {
         const a = self.allocator;
         if (std.mem.eql(u8, &self.seed_settings, &settings(snapshot.options))) {
             const reusable = reused: {
@@ -621,7 +661,14 @@ pub const Session = struct {
                 };
                 if (mixed) |prepared| return prepared;
             }
+            const switched = self.libraryFrontend(io, entry_path, output_identity, snapshot, candidate_seed, counts, library) catch |err| blk: {
+                if (err == error.OutOfMemory) return error.OutOfMemory;
+                break :blk null;
+            };
+            if (switched) |prepared| return prepared;
         }
+        // The ordinary lane's seed starts the library afresh.
+        library.* = .clear;
         var source = try project.loadWithInputs(a, io, entry_path, snapshot.options, snapshot.provider());
         defer source.deinit(a);
         source.lowering = .{ .io = io, .workers = self.policy.semantic_workers };
@@ -694,6 +741,79 @@ pub const Session = struct {
         var consumer = try partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &candidate_seed.*.?.value, snapshot.provider(), body_offer);
         errdefer consumer.deinit(a);
         if (consumer == .ready) try consumer.ready.inheritBodyCaches(a, body_caches, body_paths);
+        return consumer;
+    }
+    /// The entry-switch lane (CT90): the entry's closure differs from the
+    /// seed's, as when a test runner overlays one test module after another
+    /// at one entry. Library modules whose sources and imports are unchanged
+    /// are reused without checking; modules the library lacks, or whose
+    /// sources changed, are loaded and checked with the entry deferred. The
+    /// entry is then prepared once against the new seed, as population's
+    /// consumer is (consumeDeferred). The seed numbers its modules as a fresh
+    /// load would (closure.freezeLibrary), so it differs from the seed a
+    /// fresh build freezes only in its dictionary, as every retained seed
+    /// does. Success and a portable consumer rejection are published; any
+    /// other outcome returns null with the candidate seed, library and
+    /// counts untouched, and the ordinary lane establishes the fresh result.
+    fn libraryFrontend(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, snapshot: *inputs.Snapshot, candidate_seed: *?retained_dependency.Seed, counts: *FallbackStats, library_update: *LibraryUpdate) !?partial.Preparation {
+        const a = self.allocator;
+        const library = self.library orelse self.seed_snapshot orelse return null;
+        if (library.value.modules.len == 0) return null;
+        const reuse = admitted: {
+            const timing = phase_profile.enter(.inputs);
+            defer timing.exit();
+            break :admitted (try snapshot.libraryModules(io, &library.value)) orelse return null;
+        };
+        defer a.free(reuse);
+        var source = try project.loadLibraryReadOnly(a, io, entry_path, snapshot.options, &library.value, snapshot.provider(), reuse);
+        defer source.deinit(a);
+        source.lowering = .{ .io = io, .workers = self.policy.semantic_workers };
+        // A load diagnostic, and every check diagnostic below, is the
+        // ordinary lane's to publish: it orders and limits a fresh load.
+        if (source.diagnostics.items.len != 0 or outputIsSource(&source, output_identity)) return null;
+        const body_offer = self.bodyOffer(snapshot.options);
+        const check_offer: ?@import("entry_frontend_cutoff.zig").Previous = if (body_offer) |offer| partial.checkPrevious(offer) else null;
+        var checked = try checker.checkProjectDeferringEntryToFirstDiagnostic(a, &source, check_offer);
+        defer checked.deinit(a);
+        if (checked.deferred_entry == null or checked.diagnostics.len != 0) return null;
+        const order = try project.freshOrder(a, &source);
+        defer a.free(order);
+        var storage: retained_dependency.Stats = .{};
+        const frozen = try closure.freezeLibrary(a, &source, &checked, library, order, library_source_budget, &storage);
+        var seed: retained_dependency.Seed = .{ .value = frozen.seed.value, .snapshot = frozen.seed };
+        var seed_alive = true;
+        defer if (seed_alive) seed.deinit(a);
+        const next: LibraryUpdate = if (frozen.library) |owner| .{ .replace = owner } else .clear;
+        var next_alive = true;
+        defer if (next_alive) if (frozen.library) |owner| owner.deinit();
+        var consumer = try partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &seed.value, snapshot.provider(), body_offer);
+        if (consumer == .rejected) {
+            if (consumer.rejected.portable) {
+                counts.portable_rejection = true;
+                return consumer;
+            }
+            consumer.deinit(a);
+            return null;
+        }
+        errdefer consumer.deinit(a);
+        const paths = try a.alloc([]const u8, source.units.items.len);
+        defer a.free(paths);
+        for (paths, 1..) |*path, unit| path.* = source.filename(@intCast(unit));
+        try consumer.ready.inheritBodyCaches(a, checked.body_caches, paths);
+        var work: FallbackStats = .{ .validated_modules = order.len - frozen.relocated + 1, .reused_frontend_modules = frozen.relocated, .body_elaborations = checked.body_elaborations, .reused_check_body_elaborations = checked.body_elaborations, .frozen_modules = order.len, .dependency_storage = storage, .library_modules = library.value.modules.len, .relocated_modules = frozen.relocated };
+        for (source.units.items, 1..) |unit, id| {
+            if (source.compiledModule(id) == null and unit.tree.nodes.items.len != 0) work.syntax_nodes += unit.tree.nodes.items.len - 1;
+        }
+        // Each fresh dependency body was lowered once, straight into the seed.
+        for (order, seed.value.modules) |unit, module| {
+            if (source.compiledModule(unit) == null) work.body_lowerings += module.core.body_lowerings;
+        }
+        work.reused_core_bodies = work.body_lowerings;
+        counts.* = work;
+        candidate_seed.* = seed;
+        seed_alive = false;
+        library_update.* = next;
+        next_alive = false;
         return consumer;
     }
     fn outputIsSource(source: *const project.Project, output_identity: ?[]const u8) bool {
@@ -795,13 +915,15 @@ pub const Session = struct {
         input_timing.exit();
         capturing = false;
         var fallback_counts: FallbackStats = .{};
+        var library_update: LibraryUpdate = .keep;
+        defer library_update.deinit();
         var preparation: partial.Preparation = undefined;
         if (admitted) {
             var fast_result = true;
             preparation = partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &self.seed, snapshot.provider(), self.frontendOffer(snapshot.options)) catch |err| switch (err) {
                 error.DependencySetChanged => blk: {
                     fast_result = false;
-                    break :blk try self.fallback(io, entry_path, output_identity, &snapshot, &candidate_seed, &fallback_counts);
+                    break :blk try self.fallback(io, entry_path, output_identity, &snapshot, &candidate_seed, &fallback_counts, &library_update);
                 },
                 else => return err,
             };
@@ -814,11 +936,11 @@ pub const Session = struct {
                     // error. Fresh graph limits and diagnostic ordering then
                     // differ from a compiled prefix; establish the fresh result.
                     result.deinit(a);
-                    preparation = try self.fallback(io, entry_path, output_identity, &snapshot, &candidate_seed, &fallback_counts);
+                    preparation = try self.fallback(io, entry_path, output_identity, &snapshot, &candidate_seed, &fallback_counts, &library_update);
                 },
                 .ready => {},
             };
-        } else preparation = try self.fallback(io, entry_path, output_identity, &snapshot, &candidate_seed, &fallback_counts);
+        } else preparation = try self.fallback(io, entry_path, output_identity, &snapshot, &candidate_seed, &fallback_counts, &library_update);
         var preparation_alive = true;
         defer if (preparation_alive) preparation.deinit(a);
         switch (preparation) {
@@ -871,8 +993,10 @@ pub const Session = struct {
                     .stats = .{ .rebuilt_seed = rebuilt, .inputs = input_counts, .fallback = fallback_counts },
                     .pending = .{ .prepared = prepared.*, .artifacts = artifacts, .snapshot = snapshot.freeze(), .output = cached_output },
                     .seed = candidate_seed,
+                    .library = library_update,
                     .emission = result,
                 };
+                library_update = .keep;
                 epoch.token = candidate.token;
                 epoch.references += 1;
                 epoch.active = candidate;

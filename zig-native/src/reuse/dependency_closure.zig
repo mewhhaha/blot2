@@ -337,6 +337,136 @@ pub fn freezeSharedFromMixed(a: std.mem.Allocator, source: *const project.Projec
     result.validated = true;
     return result;
 }
+/// What the entry-switch lane froze: `seed` is the entry's dependency
+/// closure, numbered and ordered as a fresh load of the program numbers it;
+/// `library`, when it could be kept, holds every module of the previous
+/// library with this lane's fresh modules in place or appended.
+pub const Relocation = struct {
+    seed: *retained.Snapshot,
+    library: ?*retained.Snapshot,
+    /// Library modules reused in the seed without checking them again.
+    relocated: usize = 0,
+};
+
+/// Freezes a project loaded by project.loadLibraryReadOnly whose dependencies
+/// were checked with the entry deferred. `order` is project.freshOrder of the
+/// same project. Seed modules are copies of library modules, renumbered as a
+/// fresh load numbers them, so the seed equals the closure a fresh load would
+/// freeze up to symbol IDs (whose dictionary keeps the library's spellings,
+/// as every retained seed keeps its earlier ones). The library is dropped when
+/// a changed library module stayed unreached, because a library entry is
+/// reused only while its source and its imports' entries are current, or when
+/// it outgrows `library_budget` source bytes.
+pub fn freezeLibrary(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, library: *const retained.Snapshot, order: []const u32, library_budget: usize, stats: *retained.Stats) Error!Relocation {
+    const timing = phase_profile.enter(.freeze);
+    defer timing.exit();
+    const count = library.value.modules.len;
+    try require(source.input_mode == .project and source.diagnostics.items.len == 0 and checked.diagnostics.len == 0 and checked.deferred_entry != null);
+    try require(library.initialized == count and source.compiled_modules.ptr == library.value.modules.ptr and source.compiled_modules.len == count);
+    try require(source.compiled_reuse.len == count and source.entry == count + 1 and checked.modules.len == source.units.items.len);
+    try require(source.prelude_unit == 0 or (source.prelude_unit <= count and source.compiledModule(source.prelude_unit) != null));
+    const units = source.units.items.len;
+    // Library numbering: library modules keep theirs, the entry leaves.
+    const library_units = try a.alloc(u32, units);
+    defer a.free(library_units);
+    for (library_units, 1..) |*id, unit| id.* = if (unit <= count) @intCast(unit) else if (unit == source.entry) 0 else @intCast(unit - 1);
+    const reached = try a.alloc(bool, units);
+    defer a.free(reached);
+    @memset(reached, false);
+    for (order) |unit| {
+        try require(unit != 0 and unit <= units and unit != source.entry and !reached[unit - 1]);
+        reached[unit - 1] = true;
+        if (source.compiledModule(unit) == null) {
+            const typed = if (checked.modules[unit - 1]) |*module| module else return error.InvalidArtifact;
+            try require(typed.valid and typed.checked.diagnostics.len == 0);
+        }
+    }
+    for (count + 1..units) |index| try require(index + 1 == source.entry or reached[index]);
+    var keep = true;
+    for (0..count) |index| keep = keep and (reached[index] or source.compiledModule(index + 1) != null);
+
+    const next = try createSnapshot(a, source, units - 1);
+    var next_alive = true;
+    defer if (next_alive) next.deinit();
+    var lowered = try lowerFresh(a, source, checked, library_units);
+    defer if (lowered) |*batch| batch.deinit();
+    for (1..units + 1) |unit| {
+        if (unit == source.entry) continue;
+        if (unit <= count and (source.compiledModule(unit) != null or !reached[unit - 1])) {
+            try next.appendShared(library, unit - 1);
+            stats.shared_modules += 1;
+            continue;
+        }
+        const module = fresh: {
+            var module = try freezeOne(a, source, checked, @intCast(unit), library_units, if (lowered) |*batch| .{ .lowered = batch } else .lower);
+            errdefer format.deinit(a, &module);
+            if (units != count + 1) {
+                try relink.moduleUnits(&module.core, library_units);
+                try relink.interfaceUnits(&module.interface, library_units);
+                for (module.exports) |*exported| exported.target.unit = try mapped(library_units, exported.target.unit);
+                for (module.fixities) |*f| f.producer.unit = try mapped(library_units, f.producer.unit);
+            }
+            break :fresh module;
+        };
+        try next.appendOwned(module);
+        stats.fresh_modules += 1;
+    }
+
+    // Seed numbering: the fresh load's order over the library's modules.
+    const seed_units = try a.alloc(u32, units - 1);
+    defer a.free(seed_units);
+    @memset(seed_units, 0);
+    for (order, 1..) |unit, id| seed_units[library_units[unit - 1] - 1] = @intCast(id);
+    const seed = try createSnapshot(a, source, order.len);
+    var seed_alive = true;
+    defer if (seed_alive) seed.deinit();
+    var relocated: usize = 0;
+    var seed_bytes: usize = 0;
+    for (order) |unit| {
+        const module = copied: {
+            var module = try copyCoreValue(a, next.value.modules[library_units[unit - 1] - 1]);
+            errdefer format.deinit(a, &module);
+            try relink.moduleUnits(&module.core, seed_units);
+            try relink.interfaceUnits(&module.interface, seed_units);
+            for (module.exports) |*exported| exported.target.unit = try mapped(seed_units, exported.target.unit);
+            for (module.fixities) |*f| f.producer.unit = try mapped(seed_units, f.producer.unit);
+            for (module.imports) |*target| target.* = try mapped(seed_units, target.*);
+            for (module.source_imports) |*request| request.target = try mapped(seed_units, request.target);
+            break :copied module;
+        };
+        seed_bytes += module.identity.source_bytes;
+        try seed.appendOwned(module);
+        relocated += @intFromBool(source.compiledModule(unit) != null);
+    }
+    try validateMode(a, &seed.value, null, null, stats);
+    try validateSourcesWith(a, &seed.value, source, order);
+    seed.validated = true;
+
+    var library_bytes: usize = 0;
+    for (next.value.modules) |module| library_bytes += module.identity.source_bytes;
+    if (library_bytes > @max(library_budget, seed_bytes *| 4)) keep = false;
+    seed_alive = false;
+    next_alive = false;
+    if (!keep) next.deinit();
+    // Every library module was validated as a member of the seed that first
+    // froze it (this one for the fresh modules); the library is loader input
+    // only, never published, so it is not marked validated as a closure.
+    return .{ .seed = seed, .library = if (keep) next else null, .relocated = relocated };
+}
+/// An empty snapshot owning a copy of the project's dictionary.
+fn createSnapshot(a: std.mem.Allocator, source: *const project.Project, count: usize) Error!*retained.Snapshot {
+    const symbols = try a.alloc(D.Symbol, source.symbols.entries.items.len + 1);
+    @memset(symbols, .{ .text = &.{} });
+    var owned = true;
+    defer if (owned) {
+        for (symbols) |symbol| a.free(symbol.text);
+        a.free(symbols);
+    };
+    for (symbols[1..], 1..) |*symbol, id| symbol.text = try a.dupe(u8, source.symbols.get(@intCast(id)));
+    const result = try retained.Snapshot.create(a, symbols, count);
+    owned = false;
+    return result;
+}
 fn freezeMode(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, cores: Cores) Error!D.FrozenDependency {
     try checkChecked(source, checked);
     var result: D.FrozenDependency = .{ .symbols = &.{}, .modules = &.{} };
@@ -580,32 +710,59 @@ pub fn validateSources(value: *const D.FrozenDependency, source: *const project.
     defer timing.exit();
     try require(source.entry != 0 and source.entry <= source.units.items.len);
     try require(value.modules.len == source.units.items.len - 1);
-    for (source.units.items, 1..) |src, source_id| {
+    for (1..source.units.items.len + 1) |source_id| {
         if (source_id == source.entry) continue;
-        const id = try ordinal(source, @intCast(source_id));
-        const m = &value.modules[id - 1];
-        try require(std.mem.eql(u8, m.identity.normalized_path, source.filename(@intCast(source_id))));
-        if (source.compiledModule(source_id)) |previous| {
-            try require(m.identity.source_bytes == previous.identity.source_bytes and std.mem.eql(u8, &m.identity.source_digest, &previous.identity.source_digest));
-        } else try require(m.identity.source_bytes == src.source.len and std.mem.eql(u8, &m.identity.source_digest, &format.digest(src.source)));
-        try require(m.identity.prelude == (source_id == source.prelude_unit));
-        const prelude = src.implicit_prelude;
-        const edges = source.unitImports(@intCast(source_id));
-        try require(m.implicit_prelude == prelude and m.source_imports.len == edges.len);
-        for (edges, m.source_imports) |edge, request| {
-            try require(request.target == try ordinal(source, edge.target));
-            try require(std.mem.eql(u8, request.path, source.symbols.get(edge.path)));
-        }
-        try require(m.imports.len == edges.len + @intFromBool(prelude));
-        var next: usize = 0;
-        if (prelude) {
-            try require(m.imports[0] == try ordinal(source, source.prelude_unit));
-            next = 1;
-        }
-        for (edges) |edge| {
-            try require(m.imports[next] == try ordinal(source, edge.target));
-            next += 1;
-        }
+        try validateSource(value, source, @intCast(source_id), try ordinal(source, @intCast(source_id)), Ordinals{ .source = source });
+    }
+}
+/// validateSources for a closure that holds only the units of `order`, in
+/// its order (freezeLibrary's seed): unit `order[i]` is module i + 1.
+fn validateSourcesWith(a: std.mem.Allocator, value: *const D.FrozenDependency, source: *const project.Project, order: []const u32) Error!void {
+    const timing = phase_profile.enter(.validation);
+    defer timing.exit();
+    try require(value.modules.len == order.len);
+    const ids = try a.alloc(u32, source.units.items.len);
+    defer a.free(ids);
+    @memset(ids, 0);
+    for (order, 1..) |unit, id| {
+        try require(unit != 0 and unit <= ids.len and unit != source.entry and ids[unit - 1] == 0);
+        ids[unit - 1] = @intCast(id);
+    }
+    for (order, 1..) |unit, id| try validateSource(value, source, unit, @intCast(id), Ordinals{ .source = source, .ids = ids });
+}
+const Ordinals = struct {
+    source: *const project.Project,
+    ids: ?[]const u32 = null,
+    fn of(self: Ordinals, unit: u32) Error!u32 {
+        const ids = self.ids orelse return ordinal(self.source, unit);
+        try require(unit != 0 and unit <= ids.len and ids[unit - 1] != 0);
+        return ids[unit - 1];
+    }
+};
+fn validateSource(value: *const D.FrozenDependency, source: *const project.Project, source_id: u32, id: u32, ordinals: Ordinals) Error!void {
+    const src = source.unit(source_id);
+    const m = &value.modules[id - 1];
+    try require(std.mem.eql(u8, m.identity.normalized_path, source.filename(source_id)));
+    if (source.compiledModule(source_id)) |previous| {
+        try require(m.identity.source_bytes == previous.identity.source_bytes and std.mem.eql(u8, &m.identity.source_digest, &previous.identity.source_digest));
+    } else try require(m.identity.source_bytes == src.source.len and std.mem.eql(u8, &m.identity.source_digest, &format.digest(src.source)));
+    try require(m.identity.prelude == (source_id == source.prelude_unit));
+    const prelude = src.implicit_prelude;
+    const edges = source.unitImports(source_id);
+    try require(m.implicit_prelude == prelude and m.source_imports.len == edges.len);
+    for (edges, m.source_imports) |edge, request| {
+        try require(request.target == try ordinals.of(edge.target));
+        try require(std.mem.eql(u8, request.path, source.symbols.get(edge.path)));
+    }
+    try require(m.imports.len == edges.len + @intFromBool(prelude));
+    var next: usize = 0;
+    if (prelude) {
+        try require(m.imports[0] == try ordinals.of(source.prelude_unit));
+        next = 1;
+    }
+    for (edges) |edge| {
+        try require(m.imports[next] == try ordinals.of(edge.target));
+        next += 1;
     }
 }
 

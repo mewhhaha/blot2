@@ -26,7 +26,8 @@
 // and the synthetic corpus in scripts/bench/corpus.ts. Retained sessions run
 // the edit suite (scripts/bench/gdev.ts on the game, `edit_suite` in the
 // corpus): population, no-op, then each scenario's edit and revert, reported
-// with reuse and recheck counters.
+// with reuse and recheck counters. --shared-session also builds every selected
+// test entry in turn in one session, as pen's test workers do (CT90).
 import { parseArgs } from "node:util";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,6 +57,7 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   [--runs 5] [--workload all|gdev|game|devtools|tests|synthetic|NAME,...]
   [--test-runs 1] [--no-retained] [--profile] [--out DIR] [--snapshot DIR]
   [--allow-wasm-diff] [--write-hashes] [--write-manifest] [--restart-cache]
+  [--shared-session]
 
   --baseline/--candidate  blotc executables. Pass one binary twice to measure noise.
   --workload              comma-separated: gdev entries (game, devtools), every
@@ -74,6 +76,10 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
                           expected rejections) for the measured entries in
                           scripts/bench/gdev-wasm.json.
   --restart-cache         measure isolated cold cache population and process restarts.
+  --shared-session        also build the selected test entries in turn in one
+                          session per variant and run, overlaying each at
+                          src/test_fixture.blot as pen's test workers do; each
+                          must equal its fresh build.
   --write-manifest        rewrite scripts/bench/gdev-manifest.json from the snapshot.
 Results: build/tmp/bench/<timestamp>/{results.json,samples.jsonl}.`;
 
@@ -92,6 +98,7 @@ const { values: args } = parseArgs({
     "write-manifest": { type: "boolean", default: false },
     "write-hashes": { type: "boolean", default: false },
     "restart-cache": { type: "boolean", default: false },
+    "shared-session": { type: "boolean", default: false },
     help: { type: "boolean", default: false },
   },
 });
@@ -244,11 +251,11 @@ interface Variant {
   readonly sha256: Hash;
 }
 interface Sample {
-  kind: "fresh" | "restart" | "retained";
+  kind: "fresh" | "restart" | "retained" | "shared";
   workload: string;
   variant: string;
   run: number;
-  /** `fresh`, `restart`, or the retained phase name. */
+  /** `fresh`, `restart`, `shared`, or the retained phase name. */
   phase: string;
   cpu_ms: number;
   /** /proc tick time over the same interval; 10 ms resolution cross-check. */
@@ -405,6 +412,34 @@ async function retainedSession(
         await editedSources(workload, scenario),
       );
       await phase(`revert:${scenario.name}`, {});
+    }
+  } finally {
+    await session.compiler.dispose();
+  }
+  return samples;
+}
+
+/**
+ * One session builds every test entry in turn, each overlaid at the shared
+ * fixture entry, as each of pen's test workers does.
+ */
+async function sharedSession(
+  variant: Variant,
+  workloads: Workload[],
+  run: number,
+): Promise<Sample[]> {
+  const session = await openSession(variant, workloads[0]);
+  const samples: Sample[] = [];
+  try {
+    for (const workload of workloads) {
+      samples.push({
+        kind: "shared",
+        workload: workload.name,
+        variant: variant.name,
+        run,
+        phase: "shared",
+        ...await measuredBuild({ ...session, workload }, {}),
+      });
     }
   } finally {
     await session.compiler.dispose();
@@ -580,6 +615,14 @@ async function main(): Promise<number> {
         }
       }
     }
+    const shared = workloads.filter((w) => w.group === "tests");
+    if (args["shared-session"] && shared.length && run < testRuns) {
+      for (const variant of order) {
+        for (const sample of await sharedSession(variant, shared, run)) {
+          await record(sample);
+        }
+      }
+    }
   }
 
   // Wasm parity: baseline = candidate; fresh = retained; edit phases agree
@@ -640,6 +683,11 @@ async function main(): Promise<number> {
         `fresh/${variant}`,
         `noop/${variant}`,
         "no-op rebuild changed the bytes",
+      );
+      compare(
+        `fresh/${variant}`,
+        `shared/${variant}`,
+        "shared test session differs from fresh build",
       );
       for (const scenario of workload.scenarios) {
         compare(
@@ -813,6 +861,7 @@ async function main(): Promise<number> {
     printTable(counterRows);
   }
   const tests = testTable(workloads, samples, medians);
+  const shared = sharedTable(workloads, samples, variants);
   const failures = failureTable(samples);
   // A rejection never passes as an output change. Only rejections recorded
   // in gdev-wasm.json, or of unrecorded test entries, are expected.
@@ -820,7 +869,7 @@ async function main(): Promise<number> {
     const workload = workloads.find((w) => w.name === failure.workload)!;
     const known = workload.group === "tests" &&
       (expectedRejections.has(workload.name) || unrecorded.has(workload.name));
-    if (!known || failure.phase !== "fresh") {
+    if (!known || (failure.phase !== "fresh" && failure.phase !== "shared")) {
       problems.push(
         `${failure.workload} ${failure.phase}: ${failure.variant} failed with ${failure.code}`,
       );
@@ -901,6 +950,7 @@ async function main(): Promise<number> {
         medians,
         counters,
         tests,
+        shared,
         failures,
         reuse,
         phases,
@@ -1023,6 +1073,55 @@ function testTable(
       ratio(row.baseline_ms, row.candidate_ms),
       (row.peak_rss_kib / 1024).toFixed(0),
     ]),
+  ]);
+  return result;
+}
+
+/**
+ * The shared test session against fresh builds: suite CPU (sum of per-entry
+ * medians), the session's wall time and peak RSS per variant.
+ */
+function sharedTable(
+  workloads: Workload[],
+  samples: Sample[],
+  variants: Variant[],
+) {
+  const entries = workloads.filter((w) => w.group === "tests");
+  const shared = samples.filter((s) => s.kind === "shared");
+  if (!entries.length || !shared.length) return null;
+  const total = (variant: string, phase: string, field: "cpu_ms" | "wall_ms") =>
+    entries.reduce((sum, workload) => {
+      const values = samples.filter((s) =>
+        s.workload === workload.name && s.variant === variant &&
+        s.phase === phase
+      ).map((s) => s[field]);
+      return sum + (values.length ? median(values) : 0);
+    }, 0);
+  const result = Object.fromEntries(variants.map((variant) => [variant.name, {
+    fresh_cpu_ms: total(variant.name, "fresh", "cpu_ms"),
+    shared_cpu_ms: total(variant.name, "shared", "cpu_ms"),
+    shared_wall_ms: total(variant.name, "shared", "wall_ms"),
+    peak_rss_kib: Math.max(
+      0,
+      ...shared.filter((s) => s.variant === variant.name).map((s) =>
+        s.peak_rss_kib
+      ),
+    ),
+  }]));
+  console.log(`
+shared test session over ${entries.length} entries`);
+  printTable([
+    ["variant", "fresh cpu ms", "shared cpu ms", "shared wall ms", "RSS MiB"],
+    ...variants.map((variant) => {
+      const row = result[variant.name];
+      return [
+        variant.name,
+        row.fresh_cpu_ms.toFixed(0),
+        row.shared_cpu_ms.toFixed(0),
+        row.shared_wall_ms.toFixed(0),
+        (row.peak_rss_kib / 1024).toFixed(0),
+      ];
+    }),
   ]);
   return result;
 }
