@@ -58,6 +58,29 @@ and constant evaluation, which dominate an edit, are the same in both tiers.
 Game, 5 pairs: population 2,367 → 2,268 ms, a literal edit 1,087 → 996 ms, a
 body change 1,621 → 1,565 ms, an `ink/math` body edit 2,333 → 2,229 ms.
 
+A test runner keeps one session per worker on one fixture entry and overlays
+each test module at it. A session keeps a library of the dependency modules
+its revisions froze. When a build's entry reaches other modules than the last
+seed holds, the library supplies every module whose source and imports are
+unchanged, renumbered as a fresh load numbers it; only modules no earlier
+build froze, changed ones and the entry are checked
+(`attemptStats.fallback.relocated_modules` counts the reused modules). Each
+build's Wasm and diagnostics equal a fresh session's, and a rejected build
+leaves the library as it was. Generated code is not shared between entries:
+each test still pays its own backend.
+
+`pen test-blot` adopts this without a protocol change. Its workers already
+keep one session for the fixture entry (`run_module` in
+`crates/pen/src/blot_test.rs`) and overlay each module at
+`src/test_fixture.blot`. pen must keep doing exactly that: open each worker's
+session on the fixture entry once, overlay only that path for every test
+module, and keep the session after rejected builds rather than reopening it per
+module. Each worker's first build pays for every module it reaches; later
+builds pay for the test module and any module no earlier build of that worker
+reached. On the gdev snapshot one session over pen's 68 test modules takes
+72.9 s of CPU instead of 96.1 s (91.0 → 67.5 s wall, peak RSS 717 → 742 MiB);
+`deno task bench:compile --workload tests --shared-session` measures it.
+
 `shareMachineCode: true` enables the internal body-sharing prototype. Identical
 resolved functions share one Wasm body while their source/evidence identities
 and indirect table slots remain distinct. Exported functions keep distinct

@@ -524,6 +524,16 @@ pub const Snapshot = struct {
     /// Exact raw-input admission plus transitive import invalidation. The
     /// returned mask is private to this candidate; no prior owner is changed.
     pub fn reusableModules(self: *Snapshot, io: std.Io, seed: *const D.FrozenDependency) Allocator.Error!?[]bool {
+        return self.reuseMask(io, seed, true);
+    }
+    /// reusableModules for a library of frozen modules (the CT90 entry-switch
+    /// lane), which may be reused whole: the mask is returned even when no
+    /// module changed. A module the entry does not reach is still read and
+    /// admitted here, so a stale one is known to the caller.
+    pub fn libraryModules(self: *Snapshot, io: std.Io, library: *const D.FrozenDependency) Allocator.Error!?[]bool {
+        return self.reuseMask(io, library, false);
+    }
+    fn reuseMask(self: *Snapshot, io: std.Io, seed: *const D.FrozenDependency, changed_only: bool) Allocator.Error!?[]bool {
         const a = self.allocator;
         if (self.options.input_mode != .project or seed.modules.len == 0 or seed.modules.len >= self.options.max_files) return null;
         const reuse = try a.alloc(bool, seed.modules.len);
@@ -596,7 +606,7 @@ pub const Snapshot = struct {
         for (reuse) |same| count += @intFromBool(same);
         // A changed leaf can dirty every importer while preserving its public
         // interface. The mixed checker must still offer those semantic cutoffs.
-        if (count == reuse.len) return null;
+        if (changed_only and count == reuse.len) return null;
         transferred = true;
         return reuse;
     }

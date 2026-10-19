@@ -58,6 +58,7 @@ comptime {
     _ = @import("reuse/fallback_check_sharing_tests.zig");
     _ = @import("reuse/fallback_core_reuse_tests.zig");
     _ = @import("reuse/population_seed_tests.zig");
+    _ = @import("reuse/entry_switch_tests.zig");
     _ = @import("reuse/rejected_revision_tests.zig");
     _ = @import("reuse/producer_capability_tests.zig");
     _ = @import("reuse/selection_cutoff_tests.zig");

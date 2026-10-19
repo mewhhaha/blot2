@@ -186,7 +186,9 @@ test "owner-scoped validation reuse revalidates a shared importer once its produ
     try std.testing.expectEqual(@as(usize, 2), stats.shared_modules);
     try std.testing.expectEqual(@as(usize, 2), stats.core_reused);
     // Changing the bounds `left` reads revalidates it. The stale owner is
-    // rejected and the revision falls back to freezing every module afresh.
+    // rejected; the library lane then freezes `left` afresh from its source,
+    // as it does every module whose import changed, and reuses only `right`,
+    // validating every module of the new seed.
     try fixture.write("changed.blot", "const value: U32 = (fn (fixed: U32) -> U32 => fixed) 42\n");
     var expected = try fresh(&fixture);
     defer expected.deinit(a);
@@ -194,8 +196,10 @@ test "owner-scoped validation reuse revalidates a shared importer once its produ
     defer result.deinit(a);
     try equal(&result, &expected);
     stats = session.last.fallback.dependency_storage;
-    try std.testing.expectEqual(@as(usize, 0), stats.shared_modules);
-    try std.testing.expectEqual(@as(usize, 3), stats.fresh_modules);
+    try std.testing.expectEqual(@as(usize, 1), session.last.fallback.relocated_modules);
+    try std.testing.expectEqual(@as(usize, 1), stats.shared_modules);
+    try std.testing.expectEqual(@as(usize, 2), stats.fresh_modules);
+    try std.testing.expectEqual(@as(usize, 3), stats.core_checked);
 }
 
 test "shared dependency revisions bound storage across repeated errors and reversions" {

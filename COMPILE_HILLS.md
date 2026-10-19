@@ -1706,6 +1706,28 @@ overlaid.
 - **Fix:** keep one retained session per fixture and switch overlays, so each
   test pays only for its own module.
 - **Target:** the suite under 30 s CPU.
+- **Result (19 October 2026):** "CT90: Reuse frozen modules when the entry's
+  closure changes". pen already keeps one session per worker and overlays each
+  test (`run_module`), but a switch to a test reaching other modules than the
+  seed (58 of 67 switches) declined the fast and mixed lanes and checked the
+  whole project again: 44.8 of 98.0 s was frontend. A session now keeps a
+  library of the modules its revisions froze; the new lane reuses every one
+  whose source and imports are unchanged, checks only the rest and defers the
+  entry, freezes the reached modules in a fresh load's order and prepares the
+  entry once against them. A rejection, or an unreached changed module (the
+  library is then dropped), falls back to the ordinary lane. One session over
+  pen's 68 modules, 5 pairs at load 0.9–2.2: 96.1 → 72.9 s CPU (0.758), wall
+  91.0 → 67.5 s, peak RSS 717 → 742 MiB; frontend 44.8 → 21.6 s, of which a
+  switch costs 24 ms of relocation and 62 ms of seed validation and the rest is
+  the test modules' own checks (robot_pickup's alone is 2.1 s).
+  `bench:compile --shared-session` (56 entries, one run): 86.5 → 65.0 s, fresh
+  builds unchanged. Wasm and diagnostics identical to fresh builds on every
+  entry. The target needs the 45 s of backend shared too, and every backend
+  gate declines across entries: the principal gate wants byte-equal
+  dictionaries (each test adds spellings) and index-aligned modules, and
+  `selectionStable` wants equal module lists and entry catalogs, so no test
+  reuses an instance (`reused_named` 0). Sharing it needs CT10's relocation of
+  retained artifacts through unit and symbol maps; deferred.
 
 ### CT91: parallel test entries
 
