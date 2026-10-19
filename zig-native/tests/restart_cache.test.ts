@@ -219,10 +219,17 @@ Deno.test("project server persists committed checkpoints across disposal and gra
       await fresh.dispose();
     }
   } finally {
-    await Deno.remove(directory, { recursive: true });
+    await cleanup(directory);
   }
 });
 
+/** Waits for every detached writer under `directory`, then removes it. */
+async function cleanup(directory: string) {
+  for (const path of await files(directory).catch(() => [])) {
+    if (path.endsWith(".lock")) await settle(path);
+  }
+  await Deno.remove(directory, { recursive: true });
+}
 /** Waits, as an open does, until no writer holds the key's lock. */
 async function settle(lock: string) {
   const file = await Deno.open(lock, { read: true });
@@ -343,7 +350,7 @@ Deno.test({
         await warm.dispose();
       }
     } finally {
-      await Deno.remove(directory, { recursive: true });
+      await cleanup(directory);
     }
   },
 });
@@ -399,7 +406,7 @@ Deno.test({
         await Promise.all(compilers.map((c) => c.dispose()));
       }
     } finally {
-      await Deno.remove(directory, { recursive: true });
+      await cleanup(directory);
     }
   },
 });
@@ -459,6 +466,6 @@ Deno.test("project server restores an output only for exactly its inputs and its
     assert.equal(restored.stats.attemptStats.restored_output, true);
     assert.deepEqual(restored.bytes, original);
   } finally {
-    await Deno.remove(directory, { recursive: true });
+    await cleanup(directory);
   }
 });
