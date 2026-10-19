@@ -63,7 +63,9 @@ P4 (`namespaceEqual` in `reuse/principal_reuse_gate.zig`) aren't started.
 ### Cloud continuation (19 October 2026, local milestone)
 
 Qualified implementation commit: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c` on
-local `main`.
+local `main`. The later workload/Array qualification record is
+`237a5065ecd8a5debc406ef77a79d4a489c37b9b`; native compiler inputs are
+unchanged.
 
 - Source `/workspace/.tools/activate.sh` before commands. Zig is 0.17.0, Deno
   2.9.6 and Rust 1.99.0. Heavy jobs use `/workspace/.tools/run-heavy.py`: a

@@ -82,6 +82,8 @@ and patched release builds with the same harness.
 
 ## Completion evidence
 
+- Recording milestone: `237a5065ecd8a5debc406ef77a79d4a489c37b9b` on local
+  `main`; no push. The final harness passes Deno type, format and lint checks.
 - Current qualification: compiler source milestone
   `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`, with unchanged native inputs and
   the executed 2,470-native/1,556-guest/37-harness gate and zero CI lint
