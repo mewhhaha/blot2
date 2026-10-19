@@ -42,6 +42,8 @@ const Gate = struct {
     release: [2]linux.fd_t,
     payload: []const u8,
     output: ?[]const u8 = null,
+    /// Reported as a semantic owner left out for size.
+    semantic_over_limit: bool = false,
 
     fn init(payload: []const u8) !Gate {
         var gate: Gate = .{ .ready = undefined, .release = undefined, .payload = payload };
@@ -55,8 +57,9 @@ const Gate = struct {
     fn producer(self: *const Gate) cache.Producer {
         return .{ .context = self, .encode = encode };
     }
-    fn encode(context: *const anyopaque, allocator: std.mem.Allocator, part: cache.Part, checkpoint: ?[]const u8) ?[]u8 {
+    fn encode(context: *const anyopaque, allocator: std.mem.Allocator, part: cache.Part, checkpoint: ?[]const u8, report: *cache.Report) ?[]u8 {
         const self: *const Gate = @ptrCast(@alignCast(context));
+        report.semantic_over_limit = report.semantic_over_limit or self.semantic_over_limit;
         if (part == .output) {
             const suffix = self.output orelse return null;
             return std.mem.concat(allocator, u8, &.{ checkpoint orelse "", suffix }) catch null;
@@ -78,6 +81,8 @@ const Gate = struct {
     }
 };
 
+var unreported: cache.Report = .{};
+
 fn settled(file: *const cache.File) bool {
     // Generous: a scheduled writer finishes in milliseconds.
     return file.settleWithin(io, 5_000);
@@ -89,7 +94,7 @@ test "restart cache: a detached writer publishes after persist returns, and load
     defer fixture.deinit();
     var gate = try Gate.init("second");
     defer gate.deinit();
-    try std.testing.expect(fixture.file.save(io, "first"));
+    try std.testing.expect(fixture.file.save(io, "first", &unreported));
     try std.testing.expectEqual(cache.Persisted.detached, fixture.file.persist(io, gate.producer()));
     _ = try gate.writer();
     // The writer holds the lock from before persist returned until it renames.
@@ -109,7 +114,7 @@ test "restart cache: a killed writer frees the lock and never publishes, so load
     if (!cache.detached_writes) return error.SkipZigTest;
     var fixture = try Fixture.init();
     defer fixture.deinit();
-    try std.testing.expect(fixture.file.save(io, "whole"));
+    try std.testing.expect(fixture.file.save(io, "whole", &unreported));
     // What a writer killed mid-write leaves: a partial file nobody reads.
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = fixture.file.partial_paths[0], .data = "trunc" });
     var gate = try Gate.init("never");
@@ -118,10 +123,7 @@ test "restart cache: a killed writer frees the lock and never publishes, so load
     const pid = try gate.writer();
     try std.testing.expect(!fixture.file.settleWithin(io, 30));
     // The lock file names the writer.
-    const note = try std.Io.Dir.cwd().readFileAlloc(io, fixture.file.lock_path, a, .limited(64));
-    defer a.free(note);
-    var expected_note: [32]u8 = undefined;
-    try std.testing.expectEqualStrings(try std.mem.print(&expected_note, "{{\"writer\":{d}}}\n", .{pid}), note);
+    try std.testing.expectEqual(pid, fixture.file.readReport(io).?.writer);
     if (linux.errno(linux.kill(pid, .KILL)) != .SUCCESS) return error.Kill;
     try std.testing.expect(settled(&fixture.file));
     const kept = fixture.published().?;
@@ -233,14 +235,52 @@ test "restart cache: concurrent loaders all wait for a write in flight and read 
 test "restart cache: synchronous saves publish whole files and decline oversized or empty bytes" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
-    try std.testing.expect(!fixture.file.save(io, ""));
+    try std.testing.expect(!fixture.file.save(io, "", &unreported));
     try std.testing.expect(fixture.published() == null);
-    try std.testing.expect(fixture.file.save(io, "one"));
-    try std.testing.expect(fixture.file.save(io, "two"));
+    try std.testing.expect(fixture.file.save(io, "one", &unreported));
+    try std.testing.expect(fixture.file.save(io, "two", &unreported));
     const bytes = fixture.published().?;
     defer a.free(bytes);
     try std.testing.expectEqualStrings("two", bytes);
     try std.testing.expect(!Fixture.exists(fixture.file.partial_paths[0]));
     // Bytes that do not decode for this compiler never load.
     try std.testing.expect(fixture.file.load(io) == null);
+}
+
+test "restart cache: a part over the limit is reported in the lock file and the old file stays" {
+    if (!cache.detached_writes) return error.SkipZigTest;
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    fixture.file.limit = 4;
+    var report: cache.Report = .{};
+    try std.testing.expect(fixture.file.save(io, "old", &report));
+    var gate = try Gate.init("too large");
+    defer gate.deinit();
+    gate.semantic_over_limit = true;
+    try gate.open(1);
+    try std.testing.expectEqual(cache.Persisted.detached, fixture.file.persist(io, gate.producer()));
+    const pid = try gate.writer();
+    try std.testing.expect(settled(&fixture.file));
+    const kept = fixture.published().?;
+    defer a.free(kept);
+    try std.testing.expectEqualStrings("old", kept);
+    const written = fixture.file.readReport(io).?;
+    try std.testing.expectEqual(pid, written.writer);
+    try std.testing.expectEqual(@as(usize, 9), written.checkpoint_bytes);
+    try std.testing.expect(written.over_limit and written.semantic_over_limit);
+    try std.testing.expectEqual(@as(usize, 0), written.output_bytes);
+}
+
+test "restart cache: a synchronous save over the limit is reported too" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    fixture.file.limit = 4;
+    var report: cache.Report = .{};
+    try std.testing.expect(!fixture.file.save(io, "too large", &report));
+    try std.testing.expect(report.over_limit and report.checkpoint_bytes == 9);
+    try std.testing.expect(fixture.published() == null);
+    try std.testing.expect(fixture.file.readReport(io).?.over_limit);
+    var empty: cache.Report = .{};
+    try std.testing.expect(!fixture.file.save(io, null, &empty));
+    try std.testing.expect(!fixture.file.readReport(io).?.over_limit);
 }

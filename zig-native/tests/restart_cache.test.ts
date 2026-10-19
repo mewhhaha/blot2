@@ -30,6 +30,12 @@ async function caches(directory: string): Promise<string[]> {
   return found.filter((path) => path.endsWith(".blotcache"));
 }
 
+// deno-lint-ignore no-explicit-any
+const saving = (metrics: any) => ({
+  loaded: metrics.restart_cache.loaded,
+  saved: metrics.restart_cache.saved,
+});
+
 for (const project of [false, true]) {
   Deno.test(`default ${project ? "project" : "source"} CLI restart cache validates source and replaces corrupt candidates atomically`, async () => {
     const directory = await Deno.makeTempDir();
@@ -76,10 +82,9 @@ for (const project of [false, true]) {
       await Deno.writeTextFile(entry, source("1"));
       const fresh = await build("");
       const populated = await build();
-      assert.deepEqual(populated.metrics.restart_cache, {
-        loaded: false,
-        saved: true,
-      });
+      assert.deepEqual(saving(populated.metrics), { loaded: false, saved: true });
+      assert(populated.metrics.restart_cache.bytes > 0);
+      assert.equal(populated.metrics.restart_cache.over_limit, false);
       const restarted = await build();
       assert(restarted.metrics.restart_cache.loaded);
       assert(restarted.metrics.principals.persisted_hits > 0);
@@ -89,10 +94,7 @@ for (const project of [false, true]) {
       const valid = await Deno.readFile(artifact);
       await Deno.writeTextFile(artifact, "truncated checkpoint");
       const repaired = await build();
-      assert.deepEqual(repaired.metrics.restart_cache, {
-        loaded: false,
-        saved: true,
-      });
+      assert.deepEqual(saving(repaired.metrics), { loaded: false, saved: true });
       assert.deepEqual(repaired.bytes, fresh.bytes);
       // A foreign identity is rejected even if its file is placed under this key.
       const foreign = valid.slice();
@@ -465,6 +467,43 @@ Deno.test("project server restores an output only for exactly its inputs and its
     const restored = await build();
     assert.equal(restored.stats.attemptStats.restored_output, true);
     assert.deepEqual(restored.bytes, original);
+  } finally {
+    await cleanup(directory);
+  }
+});
+
+Deno.test("project server reports the cache's last write, including growth past its limits", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const cache = `${directory}/cache`;
+  const options = { executable, entry, prelude: null, cacheDirectory: cache };
+  const build = async () => {
+    const compiler = await createZigProjectCompiler(options);
+    try {
+      const built = await compiler.build();
+      assert(built.success, JSON.stringify(built));
+      return built;
+    } finally {
+      await compiler.dispose();
+    }
+  };
+  try {
+    await Deno.writeTextFile(entry, source("1"));
+    assert.equal((await build()).stats.restartCacheWrite, null);
+    const [lock] = (await files(cache)).filter((path) =>
+      path.endsWith(".lock")
+    );
+    await settle(lock);
+    const written = JSON.parse(await Deno.readTextFile(lock));
+    assert(written.writer > 0 && written.checkpoint_bytes > 0, JSON.stringify(written));
+    assert(written.output_bytes > 0 && !written.over_limit && !written.semantic_over_limit);
+    const next = await build();
+    assert.deepEqual(next.stats.restartCacheWrite, written);
+    // A writer whose cache outgrew its limit says so to the next open.
+    await settle(lock);
+    const grown = { ...written, checkpoint_bytes: 70_000_000, over_limit: true };
+    await Deno.writeTextFile(lock, JSON.stringify(grown));
+    assert.deepEqual((await build()).stats.restartCacheWrite, grown);
   } finally {
     await cleanup(directory);
   }

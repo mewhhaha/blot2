@@ -429,7 +429,7 @@ test "startup source edges and project component order survive borrowed and cons
     }
 }
 
-test "implementation and associated members preserve compiled forwarding opaque identity and wire four parity" {
+test "implementation and associated members preserve compiled forwarding opaque identity and wire five parity" {
     const entry =
         \\import {Same, Store, Source, make, read, keep} from "./facade"
         \\type Alias a = Same.Item a
@@ -456,7 +456,7 @@ test "implementation and associated members preserve compiled forwarding opaque 
     defer a.free(path);
     var owned = try freezeEntry(path);
     defer owned.deinit();
-    try std.testing.expectEqual(@as(u32, 4), std.mem.readInt(u32, owned.bytes[8..12], .little));
+    try std.testing.expectEqual(@as(u32, 5), std.mem.readInt(u32, owned.bytes[8..12], .little));
     var loaded = try format.decode(D.FrozenDependency, a, owned.bytes, key);
     defer format.deinit(a, &loaded);
     try closure.validate(a, &loaded);

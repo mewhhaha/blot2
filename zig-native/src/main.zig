@@ -42,6 +42,21 @@ const usage =
 const dependency_cli = @import("reuse/dependency_cli.zig");
 const compiler_identity = @import("compiler_identity");
 const restart_cache = @import("reuse/restart_cache.zig");
+/// A cache that was not saved says why: `over_limit` and
+/// `semantic_over_limit` report growth past the cache's limits.
+const CacheMetrics = struct {
+    loaded: bool = false,
+    saved: bool = false,
+    bytes: usize = 0,
+    over_limit: bool = false,
+    semantic_over_limit: bool = false,
+    fn record(self: *CacheMetrics, saved: bool, report: restart_cache.Report) void {
+        self.saved = saved;
+        self.bytes = report.checkpoint_bytes;
+        self.over_limit = report.over_limit;
+        self.semantic_over_limit = report.semantic_over_limit;
+    }
+};
 /// Immutable executable defaults; individual compiler invocations own options.
 pub const compiler_defaults = .{ .artifact_replay = compiler_identity.artifact_replay, .inference_budget = compiler_identity.inference_budget };
 var configured_inference_budget: usize = compiler_identity.inference_budget;
@@ -72,7 +87,7 @@ const Stats = struct {
     optimization: @import("backend/function_facts.zig").Stats = .{},
     runtime_optimization: @import("backend/optimized_bodies.zig").Stats = .{},
     principals: @import("reuse/principal_evidence_reuse.zig").Stats = .{},
-    restart_cache: struct { loaded: bool = false, saved: bool = false } = .{},
+    restart_cache: CacheMetrics = .{},
     source_bytes: usize = 0,
     tokens: usize = 0,
     syntax_nodes: usize = 0,
@@ -277,7 +292,8 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
         stats.wasm_bytes = compiled.bytes.len;
         try Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path.?, .data = compiled.bytes });
         if (cache_file) |*file| if (compiled.capture) |*capture| {
-            stats.restart_cache.saved = file.capture(io, capture);
+            var report: restart_cache.Report = .{};
+            stats.restart_cache.record(file.capture(io, capture, &report), report);
         };
         break :compilation true;
     };
@@ -333,8 +349,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
     var emitted_functions: usize = 0;
     var wasm_bytes: usize = 0;
     var constant_steps: usize = 0;
-    var cache_loaded = false;
-    var cache_saved = false;
+    var cache_metrics: CacheMetrics = .{};
     var principals: @import("reuse/principal_evidence_reuse.zig").Stats = .{};
     var selected_queries: @import("eval/completed_specialization_query.zig").Stats = .{};
     var load_us: i64 = 0;
@@ -467,7 +482,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         defer if (cache_file) |*file| file.deinit();
         var checkpoint = if (cache_file) |*file| file.load(io) else null;
         defer if (checkpoint) |*candidate| candidate.deinit();
-        cache_loaded = checkpoint != null;
+        cache_metrics.loaded = checkpoint != null;
         var compiled = emitted: {
             const timing = phase_profile.enter(.backend);
             defer timing.exit();
@@ -505,7 +520,8 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         const write_start = now(io);
         try Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path.?, .data = compiled.bytes });
         if (cache_file) |*file| if (compiled.capture) |*capture| {
-            cache_saved = file.capture(io, capture);
+            var report: restart_cache.Report = .{};
+            cache_metrics.record(file.capture(io, capture, &report), report);
         };
         write_us = elapsed(write_start, io);
         break :compilation true;
@@ -545,7 +561,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         .constant_steps = constant_steps,
         .principals = principals,
         .selected_queries = selected_queries,
-        .restart_cache = .{ .loaded = cache_loaded, .saved = cache_saved },
+        .restart_cache = cache_metrics,
         .wasm_bytes = wasm_bytes,
         .load_us = load_us,
         .check_us = check_us,

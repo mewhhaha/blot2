@@ -57,10 +57,41 @@ const parts = std.enums.values(Part);
 /// part out (an omitted output also removes the published one). The output
 /// part receives the checkpoint bytes just produced, if any. A detached writer
 /// calls it after the fork, on a private heap, over the caller's copy-on-write
-/// memory; it must not take locks other threads may hold.
+/// memory; it must not take locks other threads may hold. It notes in `report`
+/// anything it leaves out for size.
 pub const Producer = struct {
     context: *const anyopaque,
-    encode: *const fn (context: *const anyopaque, a: A, part: Part, checkpoint: ?[]const u8) ?[]u8,
+    encode: *const fn (context: *const anyopaque, a: A, part: Part, checkpoint: ?[]const u8, report: *Report) ?[]u8,
+};
+
+/// What the last writer of a key did, kept as JSON in its lock file so that
+/// the next open can report it: growth past a limit is never a silent skip.
+pub const Report = struct {
+    writer: i32 = 0,
+    /// Encoded size of each part, zero when it was not produced.
+    checkpoint_bytes: usize = 0,
+    output_bytes: usize = 0,
+    /// A part was not published, or not produced, because it exceeds a limit;
+    /// the previous file of that part, if any, stays.
+    over_limit: bool = false,
+    /// The checkpoint left out its semantic owner, which exceeds its limit.
+    semantic_over_limit: bool = false,
+
+    fn note(self: *Report, part: Part, bytes: []const u8, limit: usize) bool {
+        switch (part) {
+            .checkpoint => self.checkpoint_bytes = bytes.len,
+            .output => self.output_bytes = bytes.len,
+        }
+        if (bytes.len <= limit) return bytes.len != 0;
+        self.over_limit = true;
+        return false;
+    }
+    fn text(self: *const Report, buffer: []u8) ?[]const u8 {
+        var writer: Io.Writer = .fixed(buffer);
+        std.json.Stringify.value(self.*, .{}, &writer) catch return null;
+        writer.writeByte('\n') catch return null;
+        return writer.buffered();
+    }
 };
 
 /// How `persist` went: `detached` means a writer holding the lock is running.
@@ -76,6 +107,8 @@ pub const File = struct {
     lock_path: [:0]u8,
     /// `<part>.partial` by part, written only by the exclusive lock's holder.
     partial_paths: [parts.len][:0]u8,
+    /// The largest part published; laws lower it.
+    limit: usize = maximum_bytes,
 
     pub fn init(a: A, directory: []const u8, compiler: [32]u8, entry: []const u8) A.Error!File {
         const version = std.fmt.bytesToHex(compiler, .lower);
@@ -134,19 +167,38 @@ pub const File = struct {
     pub fn read(self: *const File, io: Io, part: Part) ?[]u8 {
         return Io.Dir.cwd().readFileAlloc(io, self.final(part), self.allocator, .limited(maximum_bytes)) catch null;
     }
-    /// Writes the checkpoint part synchronously under the exclusive lock.
-    pub fn save(self: *const File, io: Io, bytes: []const u8) bool {
-        if (!fits(bytes)) return false;
+    /// The last writer's report, if its lock file holds one. Settle first.
+    pub fn readReport(self: *const File, io: Io) ?Report {
+        const bytes = Io.Dir.cwd().readFileAlloc(io, self.lock_path, self.allocator, .limited(1024)) catch return null;
+        defer self.allocator.free(bytes);
+        const parsed = std.json.parseFromSlice(Report, self.allocator, bytes, .{ .ignore_unknown_fields = true }) catch return null;
+        defer parsed.deinit();
+        return parsed.value;
+    }
+    /// Writes the checkpoint part synchronously under the exclusive lock, when
+    /// there are bytes, and records `report` as a writer does.
+    pub fn save(self: *const File, io: Io, bytes: ?[]const u8, report: *Report) bool {
         const lock = self.openLock(io) orelse return false;
         defer lock.close(io);
         if (!acquire(io, lock, .exclusive, wait_limit_ms)) return false;
         defer lock.unlock(io);
-        return self.publish(io, .checkpoint, bytes);
+        const saved = if (bytes) |checkpoint_bytes| report.note(.checkpoint, checkpoint_bytes, self.limit) and self.publish(io, .checkpoint, checkpoint_bytes) else false;
+        writeReport(io, lock, report);
+        return saved;
     }
-    pub fn capture(self: *const File, io: Io, artifacts: *const @import("artifact_capture.zig").Capture) bool {
-        const bytes = checkpoint.encode(self.allocator, self.compiler, artifacts) catch return false;
-        defer self.allocator.free(bytes);
-        return self.save(io, bytes);
+    /// Encodes and saves the checkpoint; `report` says what was left out.
+    pub fn capture(self: *const File, io: Io, artifacts: *const @import("artifact_capture.zig").Capture, report: *Report) bool {
+        var notes: checkpoint.Report = .{};
+        const bytes = checkpoint.encodeReporting(self.allocator, self.compiler, artifacts, &notes) catch |err| switch (err) {
+            error.ArtifactLimit => blk: {
+                report.over_limit = true;
+                break :blk null;
+            },
+            else => return false,
+        };
+        defer if (bytes) |owned| self.allocator.free(owned);
+        report.semantic_over_limit = notes.semantic_over_limit;
+        return self.save(io, bytes, report);
     }
     /// Persists `producer`'s parts. With `detached_writes` this returns once a
     /// detached writer holds the lock (the caller's later mutations cannot
@@ -160,18 +212,20 @@ pub const File = struct {
         }
         if (!held and !acquire(io, lock, .exclusive, wait_limit_ms)) return .failed;
         defer lock.unlock(io);
+        var report: Report = .{};
         var written = true;
         var produced: ?[]u8 = null;
         defer if (produced) |bytes| self.allocator.free(bytes);
         for (parts) |part| {
-            const bytes = producer.encode(producer.context, self.allocator, part, produced) orelse {
+            const bytes = producer.encode(producer.context, self.allocator, part, produced, &report) orelse {
                 if (part == .output) Io.Dir.cwd().deleteFile(io, self.output_path) catch {};
                 continue;
             };
             defer if (part != .checkpoint) self.allocator.free(bytes);
             if (part == .checkpoint) produced = bytes;
-            written = fits(bytes) and self.publish(io, part, bytes) and written;
+            written = report.note(part, bytes, self.limit) and self.publish(io, part, bytes) and written;
         }
+        writeReport(io, lock, &report);
         return if (written) .written else .failed;
     }
 
@@ -222,24 +276,23 @@ pub const File = struct {
             for (0..3) |fd| _ = linux.dup2(@intCast(sink), @intCast(fd));
             if (sink > 2) _ = linux.close(@intCast(sink));
         }
-        // The lock file names its latest writer, for people and tests.
-        var note: [32]u8 = undefined;
-        if (std.mem.print(&note, "{{\"writer\":{d}}}\n", .{linux.getpid()})) |text| {
-            _ = linux.ftruncate(lock, 0);
-            _ = linux.pwrite(lock, text.ptr, text.len, 0);
-        } else |_| {}
+        // The lock file names its latest writer, for people and tests, and
+        // then holds its report.
+        var report: Report = .{ .writer = linux.getpid() };
+        writeReportRaw(lock, &report);
         if (!held and !acquireRaw(lock)) return false;
         var heap: @import("../runtime/session_heap.zig").Heap = .{};
         var written = true;
         var produced: ?[]u8 = null;
         for (parts) |part| {
-            const bytes = producer.encode(producer.context, heap.allocator(), part, produced) orelse {
+            const bytes = producer.encode(producer.context, heap.allocator(), part, produced, &report) orelse {
                 if (part == .output) _ = linux.unlinkat(linux.AT.FDCWD, self.output_path, 0);
                 continue;
             };
             if (part == .checkpoint) produced = bytes;
-            written = fits(bytes) and self.publishRaw(part, bytes) and written;
+            written = report.note(part, bytes, self.limit) and self.publishRaw(part, bytes) and written;
         }
+        writeReportRaw(lock, &report);
         return written;
     }
     fn publishRaw(self: *const File, part: Part, bytes: []const u8) bool {
@@ -263,8 +316,25 @@ pub const File = struct {
     }
 };
 
-fn fits(bytes: []const u8) bool {
-    return bytes.len != 0 and bytes.len <= maximum_bytes;
+fn writeReport(io: Io, lock: Io.File, report: *const Report) void {
+    var buffer: [256]u8 = undefined;
+    const text = report.text(&buffer) orelse return;
+    lock.setLength(io, 0) catch return;
+    lock.writePositionalAll(io, text, 0) catch {};
+}
+fn writeReportRaw(lock: linux.fd_t, report: *const Report) void {
+    var buffer: [256]u8 = undefined;
+    const text = report.text(&buffer) orelse return;
+    if (linux.errno(linux.ftruncate(lock, 0)) != .SUCCESS) return;
+    var written: usize = 0;
+    while (written < text.len) {
+        const count = linux.pwrite(lock, text[written..].ptr, text.len - written, @intCast(written));
+        switch (linux.errno(count)) {
+            .SUCCESS => written += count,
+            .INTR => {},
+            else => return,
+        }
+    }
 }
 /// Polls for `kind`, at most `limit_ms`.
 fn acquire(io: Io, lock: Io.File, kind: Io.File.Lock, limit_ms: i64) bool {

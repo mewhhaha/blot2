@@ -4,7 +4,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Hash = std.crypto.hash.Blake3;
 const magic = "BLOTDEP1";
-const version: u32 = 4;
+const version: u32 = 5;
 const header_size = 212;
 
 pub const Digest = [32]u8;
@@ -128,6 +128,19 @@ const Encoder = struct {
         std.mem.writeInt(T, &data, number, .little);
         try self.append(&data);
     }
+    /// LEB128: seven bits per byte, low bits first, the high bit marking
+    /// continuation.
+    fn varint(self: *Encoder, number: u64) Error!void {
+        var data: [10]u8 = undefined;
+        var len: usize = 0;
+        var rest = number;
+        while (rest >= 0x80) : (rest >>= 7) {
+            data[len] = @as(u8, @truncate(rest)) | 0x80;
+            len += 1;
+        }
+        data[len] = @truncate(rest);
+        try self.append(data[0 .. len + 1]);
+    }
     fn append(self: *Encoder, bytes: []const u8) Error!void {
         if (self.len > self.limits.payload_bytes or bytes.len > self.limits.payload_bytes - self.len) return error.ArtifactLimit;
         if (self.out) |out| @memcpy(out[self.len..][0..bytes.len], bytes);
@@ -156,15 +169,16 @@ const Encoder = struct {
             return;
         }
         switch (@typeInfo(T)) {
-            .int => {
-                if (T == usize) try self.integer(u64, item) else if (T == isize) try self.integer(i64, item) else try self.integer(T, item);
+            .int => |number| {
+                if (number.bits > 64) @compileError("Dependency payload integers are at most 64 bits");
+                if (number.bits <= 8) try self.integer(T, item) else try self.varint(zigzag(item));
             },
             .float => |number| {
                 const Bits = @Int(.unsigned, number.bits);
                 try self.integer(Bits, @bitCast(item));
             },
             .bool => try self.integer(u8, @intFromBool(item)),
-            .@"enum" => try self.integer(u32, @intCast(@backingInt(item))),
+            .@"enum" => try self.varint(@as(u32, @intCast(@backingInt(item)))),
             .void => {},
             .array => for (item) |child| try self.value(child, depth + 1),
             .@"struct" => |structure| inline for (structure.field_names) |name| try self.value(@field(item, name), depth + 1),
@@ -183,7 +197,7 @@ const Encoder = struct {
                 if (pointer.size != .slice or pointer.sentinel_ptr != null) @compileError("Dependency payload pointers must be nonsentinel slices");
                 if (item.len > self.remaining or item.len > std.math.maxInt(u32)) return error.ArtifactLimit;
                 self.remaining -= item.len;
-                try self.integer(u32, @intCast(item.len));
+                try self.varint(item.len);
                 if (pointer.child == u8) try self.append(item) else for (item) |child| try self.value(child, depth + 1);
             },
             else => @compileError("Unsupported dependency payload type " ++ @typeName(T)),
@@ -207,6 +221,23 @@ const Decoder = struct {
         const data = try self.take(@sizeOf(T));
         return std.mem.readInt(T, data[0..@sizeOf(T)], .little);
     }
+    /// Only the shortest encoding of a value decodes.
+    fn varint(self: *Decoder) Error!u64 {
+        var result: u64 = 0;
+        var shift: u32 = 0;
+        while (true) : (shift += 7) {
+            if (self.at == self.bytes.len or shift > 63) return error.InvalidArtifact;
+            const byte = self.bytes[self.at];
+            self.at += 1;
+            const bits: u64 = byte & 0x7f;
+            if (shift == 63 and bits > 1) return error.InvalidArtifact;
+            result |= bits << @intCast(shift);
+            if (byte & 0x80 == 0) {
+                if (byte == 0 and shift != 0) return error.InvalidArtifact;
+                return result;
+            }
+        }
+    }
     fn value(self: *Decoder, comptime T: type, depth: usize) Error!T {
         @setEvalBranchQuota(20_000);
         if (depth > self.limits.depth) return error.ArtifactLimit;
@@ -229,7 +260,7 @@ const Decoder = struct {
             return result;
         }
         return switch (@typeInfo(T)) {
-            .int => if (T == usize) std.math.cast(usize, try self.integer(u64)) orelse return error.ArtifactLimit else if (T == isize) std.math.cast(isize, try self.integer(i64)) orelse return error.ArtifactLimit else self.integer(T),
+            .int => |number| if (number.bits <= 8) self.integer(T) else std.math.cast(T, unzigzag(number.signedness, try self.varint())) orelse return if (T == usize or T == isize) error.ArtifactLimit else error.InvalidArtifact,
             .float => |number| @bitCast(try self.integer(@Int(.unsigned, number.bits))),
             .bool => switch (try self.integer(u8)) {
                 0 => false,
@@ -237,7 +268,7 @@ const Decoder = struct {
                 else => return error.InvalidArtifact,
             },
             .@"enum" => |enumeration| enumeration: {
-                const raw = try self.integer(u32);
+                const raw = try self.varint();
                 inline for (enumeration.field_values) |raw_value| {
                     if (raw == raw_value) break :enumeration @fromBackingInt(@intCast(raw_value));
                 }
@@ -281,7 +312,7 @@ const Decoder = struct {
             },
             .pointer => |pointer| slice: {
                 if (pointer.size != .slice or pointer.sentinel_ptr != null) @compileError("Dependency payload pointers must be nonsentinel slices");
-                const count = try self.integer(u32);
+                const count = std.math.cast(u32, try self.varint()) orelse return error.InvalidArtifact;
                 if (count > self.remaining) return error.ArtifactLimit;
                 self.remaining -= count;
                 const minimum = comptime minimumSize(pointer.child);
@@ -304,13 +335,15 @@ const Decoder = struct {
     }
 };
 
+/// Integers wider than a byte, enum tags and slice lengths take at least one
+/// byte each.
 fn minimumSize(comptime T: type) usize {
-    if (T == @import("../check/types.zig").Node) return 4 * @sizeOf(u32);
+    if (T == @import("../check/types.zig").Node) return 4;
     return switch (@typeInfo(T)) {
-        .int => if (T == usize or T == isize) 8 else @sizeOf(T),
+        .int => 1,
         .float => @sizeOf(T),
         .bool, .optional => 1,
-        .@"enum", .pointer, .@"union" => 4,
+        .@"enum", .pointer, .@"union" => 1,
         .void => 0,
         .array => |array| array.len * minimumSize(array.child),
         .@"struct" => |structure| size: {
@@ -320,6 +353,17 @@ fn minimumSize(comptime T: type) usize {
         },
         else => @compileError("Unsupported dependency payload type " ++ @typeName(T)),
     };
+}
+
+fn zigzag(number: anytype) u64 {
+    if (@typeInfo(@TypeOf(number)).int.signedness == .unsigned) return number;
+    const wide: i64 = number;
+    return @bitCast((wide << 1) ^ (wide >> 63));
+}
+fn unzigzag(comptime signedness: std.lang.Signedness, raw: u64) if (signedness == .signed) i64 else u64 {
+    if (signedness == .unsigned) return raw;
+    const half: i64 = @bitCast(raw >> 1);
+    return half ^ -@as(i64, @bitCast(raw & 1));
 }
 
 fn schema(comptime T: type) Digest {

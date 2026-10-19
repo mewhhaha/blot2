@@ -304,7 +304,9 @@ the revision.
 - objects: `frontend`, `backend`, `optimization`, `runtimeOptimization`,
   `backendTiming`, `phaseProfile`, `workCounters`, `principals`,
   `refinements`, `selectedQueries`, `constantReceipts` and `attemptStats`;
-- a boolean: `restartCacheLoaded`.
+- a boolean: `restartCacheLoaded`;
+- `restartCacheWrite`: null, or the report the cache's last writer left in the
+  `.lock` file when this process opened (see the restart cache below).
 
 `demandLowering` is null by default. With `explainDemands: true`, it is
 `{sites, omitted}`: up to 256 owned source-site decisions and a count of omitted
@@ -494,6 +496,12 @@ every input it read (`.blotout`), and a `.lock` file.
   whole. A `.partial` file is never read, and the next writer replaces it. A
   file that fails to decode, or was made by another compiler identity, is
   ignored.
+- **Limits.** A part over 64 MiB is not published, and an archive over its own
+  limit is left out of the checkpoint; the previous file of that part stays.
+  Neither is silent: the writer leaves
+  `{"writer", "checkpoint_bytes", "output_bytes", "over_limit", "semantic_over_limit"}`
+  as JSON in the `.lock` file, and the next open reports it as
+  `restartCacheWrite`. The CLI reports the same fields in `restart_cache`.
 
 ## checkpoint
 

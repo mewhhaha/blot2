@@ -19,8 +19,8 @@ test "dependency invocation wire keeps ordinary payloads compact and validates o
     const P = @import("../check/capability_flow.zig").Parameters;
     const ordinary = try format.encode(a, key, P.init(3, 5));
     defer a.free(ordinary);
-    try std.testing.expectEqual(@as(usize, 212 + 7), ordinary.len);
-    try std.testing.expectEqualSlices(u8, &.{ 0, 0, 0, 0, 5, 0, 3 }, ordinary[212..]);
+    try std.testing.expectEqual(@as(usize, 212 + 3), ordinary.len);
+    try std.testing.expectEqualSlices(u8, &.{ 0, 5, 3 }, ordinary[212..]);
     try std.testing.expectEqualDeep(P.init(3, 5), try format.decode(P, a, ordinary, key));
     const invocation: P = .{ .kind = .invoke_inputs, .mask = 0x8000, .inputs = 16, .invocation_count = 16, .invocation_arguments = 0xe0123456789abcde };
     try std.testing.expect(invocation.valid());
@@ -207,12 +207,38 @@ test "dependency format validates decoded enum discriminants boolean tags counts
     reseal(changed);
     try std.testing.expectError(error.InvalidArtifact, format.decode(Simple, a, changed, key));
     @memcpy(changed, bytes);
-    std.mem.writeInt(u32, changed[212..216], std.math.maxInt(u32), .little);
+    // The string count, as the five-byte LEB128 of the largest u32.
+    @memcpy(changed[212..217], &[_]u8{ 0xff, 0xff, 0xff, 0xff, 0x0f });
     reseal(changed);
     try std.testing.expectError(error.ArtifactLimit, format.decode(Simple, a, changed, key));
     @memcpy(changed, bytes);
-    // Three strings encode as count4, then (4+1), (4+6), (4+0), so tail starts at235.
-    std.mem.writeInt(u32, changed[235..239], 19, .little);
+    // Three strings encode as count1, then (1+1), (1+6), (1+0), so the tail
+    // tag is at 223.
+    changed[223] = 19;
     reseal(changed);
     try std.testing.expectError(error.InvalidArtifact, format.decode(Simple, a, changed, key));
+    // Only the shortest encoding of a length decodes.
+    @memcpy(changed, bytes);
+    try std.testing.expectEqual(@as(u8, 3), changed[212]);
+    const padded = try std.mem.concat(a, u8, &.{ changed[0..212], &.{ 0x83, 0x00 }, changed[213..] });
+    defer a.free(padded);
+    std.mem.writeInt(u64, padded[172..180], padded.len - 212, .little);
+    reseal(padded);
+    try std.testing.expectError(error.InvalidArtifact, format.decode(Simple, a, padded, key));
+}
+
+test "dependency format integers round-trip at every width and sign through LEB128" {
+    const Wide = struct { small: u8, signed: i8, word: u16, half: i32, full: u64, negative: i64, size: usize, list: []const u32 };
+    const cases = [_]Wide{
+        .{ .small = 0, .signed = 0, .word = 0, .half = 0, .full = 0, .negative = 0, .size = 0, .list = &.{} },
+        .{ .small = 255, .signed = -128, .word = 0xffff, .half = std.math.minInt(i32), .full = std.math.maxInt(u64), .negative = std.math.minInt(i64), .size = std.math.maxInt(usize), .list = &.{ 0, 127, 128, 16383, 16384, std.math.maxInt(u32) } },
+        .{ .small = 1, .signed = 127, .word = 128, .half = std.math.maxInt(i32), .full = 1 << 63, .negative = std.math.maxInt(i64), .size = 1, .list = &.{1} },
+    };
+    for (cases) |case| {
+        const bytes = try format.encode(a, key, case);
+        defer a.free(bytes);
+        var decoded = try format.decode(Wide, a, bytes, key);
+        defer format.deinit(a, &decoded);
+        try std.testing.expectEqualDeep(case, decoded);
+    }
 }

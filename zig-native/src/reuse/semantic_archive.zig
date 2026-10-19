@@ -68,12 +68,13 @@ pub const limits: format.Limits = .{ .elements = 64 * 1024 * 1024 };
 /// completed selected receipt to replay. An owner over the artifact limit is
 /// also omitted; restart then recomputes.
 pub fn encode(a: A, compiler: format.Digest, source: *const capture.Capture) format.Error!?[]u8 {
-    return encodeWithDigests(a, compiler, source, null);
+    return encodeWithDigests(a, compiler, source, null, null);
 }
 /// Tokens are never persisted. Each unit stores the digest of its pinned Core
 /// (`digests[i]` when given, else the pin's own or a fresh one), and decoded
 /// pins carry it, so the first admission after a restart validates them.
-pub fn encodeWithDigests(a: A, compiler: format.Digest, source: *const capture.Capture, digests: ?[]const format.Digest) format.Error!?[]u8 {
+/// `over_limit`, when given, is set if the owner was omitted for its size.
+pub fn encodeWithDigests(a: A, compiler: format.Digest, source: *const capture.Capture, digests: ?[]const format.Digest, over_limit: ?*bool) format.Error!?[]u8 {
     const pools = &(source.metadata.pools orelse return null);
     if (digests) |known| if (known.len != pools.modules.len) return error.InvalidArtifact;
     const names = if (pools.identity) |value| value else return null;
@@ -121,7 +122,10 @@ pub fn encodeWithDigests(a: A, compiler: format.Digest, source: *const capture.C
         error.InvalidArtifact => return null,
     };
     return format.encodeWithLimits(a, wireKey(compiler), snapshot, limits) catch |err| switch (err) {
-        error.ArtifactLimit => null,
+        error.ArtifactLimit => {
+            if (over_limit) |flag| flag.* = true;
+            return null;
+        },
         else => err,
     };
 }

@@ -1554,6 +1554,26 @@ The game's cache file is 57 MB against a 64 MiB limit.
 
 - **Fix:** shrink the encoding and split it per module, so growth does not
   silently disable the cache.
+- **Result (19 October 2026):** CT84, "Encode payload integers as LEB128 and
+  report cache writes past a limit". The checkpoint was 78% zero bytes:
+  `dependency_format` wrote every `usize` as 8 bytes and every enum and slice
+  length as 4. Version 5 writes integers wider than a byte, enum values and
+  lengths as LEB128 (signed ones zigzagged; only the shortest encoding
+  decodes), so dependency bundles and checkpoints shrink too. The game's
+  checkpoint is 57.4 → 20.1 MB (the principal, optimizer and semantic archives
+  were 0.3, 18.4 and 38.6 MB), with 3.2 times headroom under the 64 MiB limit,
+  so it is not split per module. Nothing over a limit is silent now: the writer
+  leaves a JSON report in the key's `.lock` file (part sizes, `over_limit`,
+  `semantic_over_limit`), the next open reports it as `restartCacheWrite`, and
+  the CLI reports the same fields. Game, 6 pairs at load 0.8–0.9: the file is
+  on disk 54 ms sooner (2,431 → 2,377 ms from the request); first reply and
+  unchanged restart unchanged; a restart after the `literal_constant` edit,
+  6 runs each, CPU 2,485 → 2,457 ms (within noise), still about 220 ms over a
+  cold build of the edited tree (2,240 ms): the checkpoint's semantic gate and
+  replays cost more than they save on gdev. Laws: integer round trips at every
+  width and sign, overlong and oversized lengths rejected, over-limit parts
+  reported with the old file kept (detached and synchronous), and in executed
+  tests the open's report and CLI metrics. Wasm identical.
 
 ### CT85: populate the cache off the critical path
 

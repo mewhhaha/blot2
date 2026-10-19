@@ -42,10 +42,12 @@ Deno.test("public examples restart from their own portable query checkpoints", a
       const cache = `${directory}/${name}.cache`;
       const fresh = await build("", `${directory}/${name}.fresh.wasm`);
       const populated = await build(cache, `${directory}/${name}.saved.wasm`);
-      assert.deepEqual(populated.metrics.restart_cache, {
+      const saved = populated.metrics.restart_cache;
+      assert.deepEqual({ loaded: saved.loaded, saved: saved.saved }, {
         loaded: false,
         saved: true,
       }, name);
+      assert(saved.bytes > 0 && !saved.over_limit, name);
       const restarted = await build(cache, `${directory}/${name}.loaded.wasm`);
       assert(restarted.metrics.restart_cache.loaded, name);
       assert.deepEqual(restarted.bytes, fresh.bytes, name);

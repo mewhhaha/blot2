@@ -112,6 +112,8 @@ const OpenProject = struct {
     /// The cache's checkpoint is read at the first build that compiles, so a
     /// restored output never pays for decoding it.
     checkpoint_pending: bool = false,
+    /// What the cache's last writer reported when this process opened.
+    last_write: ?restart_cache.Report = null,
     saved_revision: usize = 0,
     /// Present for profiled sessions: every session allocation passes it.
     allocation_counter: ?*phase_profile.CountingAllocator = null,
@@ -146,11 +148,13 @@ const OpenProject = struct {
         errdefer if (cache_file) |*file| file.deinit();
         var cache_loaded = false;
         var checkpoint_pending = false;
+        var last_write: ?restart_cache.Report = null;
         if (checkpoint_bytes.len != 0) session.checkpoint = @import("../backend/backend_checkpoint.zig").decode(a, compiler, checkpoint_bytes) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             else => null, // Optional candidates never replace source validation.
         } else if (cache_file) |*file| {
             _ = file.settle(io);
+            last_write = file.readReport(io);
             if (file.read(io, .output)) |bytes| {
                 defer a.free(bytes);
                 session.restored = retained.Restored.decode(a, compiler, bytes) catch |err| switch (err) {
@@ -162,7 +166,7 @@ const OpenProject = struct {
             checkpoint_pending = true;
         }
         session.policy.codegen_workers = request.codegenWorkers;
-        return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session, .assets = assets, .cache_file = cache_file, .cache_loaded = cache_loaded, .checkpoint_pending = checkpoint_pending };
+        return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session, .assets = assets, .cache_file = cache_file, .cache_loaded = cache_loaded, .checkpoint_pending = checkpoint_pending, .last_write = last_write };
     }
     fn loadCheckpoint(self: *OpenProject, io: Io) void {
         if (!self.checkpoint_pending) return;
@@ -212,12 +216,22 @@ const OpenProject = struct {
 const CheckpointEncoding = struct {
     session: *const retained.Session,
     compiler: [32]u8,
-    fn encode(context: *const anyopaque, a: Allocator, part: restart_cache.Part, checkpoint: ?[]const u8) ?[]u8 {
+    fn encode(context: *const anyopaque, a: Allocator, part: restart_cache.Part, checkpoint: ?[]const u8, report: *restart_cache.Report) ?[]u8 {
         const self: *const CheckpointEncoding = @ptrCast(@alignCast(context));
-        return switch (part) {
-            .checkpoint => self.session.encodeCheckpoint(a, self.compiler) catch null,
-            .output => self.session.encodeRestored(a, self.compiler, checkpoint) catch null,
-        };
+        switch (part) {
+            .checkpoint => {
+                var notes: @import("../backend/backend_checkpoint.zig").Report = .{};
+                defer report.semantic_over_limit = notes.semantic_over_limit;
+                return self.session.encodeCheckpoint(a, self.compiler, &notes) catch |err| {
+                    report.over_limit = report.over_limit or err == error.ArtifactLimit;
+                    return null;
+                };
+            },
+            .output => return self.session.encodeRestored(a, self.compiler, checkpoint) catch |err| {
+                report.over_limit = report.over_limit or err == error.ArtifactLimit;
+                return null;
+            },
+        }
     }
 };
 
@@ -368,6 +382,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                 .selectedQueries = result.result.compiled.completed_queries,
                 .constantReceipts = result.result.compiled.constant_receipts,
                 .restartCacheLoaded = opened.cache_loaded,
+                .restartCacheWrite = opened.last_write,
                 .sourceBytes = result.source_bytes,
                 .freshModules = result.fresh_modules,
                 .cachedModules = result.cached_modules,
