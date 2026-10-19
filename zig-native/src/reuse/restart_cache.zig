@@ -122,6 +122,10 @@ pub const File = struct {
     /// Settles, then decodes the checkpoint part.
     pub fn load(self: *const File, io: Io) ?checkpoint.Checkpoint {
         _ = self.settle(io);
+        return self.loadPublished(io);
+    }
+    /// Decodes the published checkpoint part without settling.
+    pub fn loadPublished(self: *const File, io: Io) ?checkpoint.Checkpoint {
         const bytes = self.read(io, .checkpoint) orelse return null;
         defer self.allocator.free(bytes);
         return checkpoint.decode(self.allocator, self.compiler, bytes) catch null;

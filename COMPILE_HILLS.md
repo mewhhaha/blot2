@@ -1516,6 +1516,29 @@ against 3.0 s).
 - **Fix:** find why the seed is rebuilt (`rebuilt_seed=true`, principal hits 0
   of 14), and fix the key or the seed.
 - **Target:** restart under 25% of cold.
+- **Result (19 October 2026):** CT82, "Restore an unchanged restart's output
+  from the cache". Neither the key nor the seed was wrong. `rebuilt_seed` is
+  set by every first build of a process, and the checkpoint holds no executable
+  fragments (`semantic_archive.zig` says so), so no named instance can be
+  reused. Its principal archive keeps 1 portable record of the 14 principal
+  queries: the first lookup (`game.blot:9829`, 272 ms) declines on evidence
+  import, and the other 13 run with 4,753 or more validated calls, which
+  `principal_inputs.Key.matches` declines by design. Loading the checkpoint
+  cost about 440 ms (decode at open 200, the semantic gate 166, evaluation and
+  constants 100) for 84 selected replays that saved nothing. The writer now
+  also persists the revision's Wasm with every input it read, and a first build
+  whose inputs, settings, entry and output policy equal them exactly publishes
+  it under the unchanged-input contract of a retained session; the checkpoint
+  is read only when that build compiles. Game, 6 pairs at load 0.8–1.5:
+  unchanged restart wall 2,361 → 20 ms, CPU 2,334 → 16 ms (0.9% of the 2,160 ms
+  cold build), open 5 ms once the writer is done; first reply unchanged; the
+  writer takes 36 ms more for the 3.1 MB output part. A restart with changed
+  sources still compiles cold; that needs CT83 and persisted fragments. Laws:
+  publication only on equal inputs (changed source, prelude, output identity,
+  tier and explained demands decline), byte identity with fresh builds, foreign
+  and damaged bytes, allocation failure through encode, decode and publication,
+  and in executed tests unchanged, changed, foreign, truncated and corrupt
+  restarts plus export after a restored build. Wasm identical.
 
 ### CT83: cache the frontend
 

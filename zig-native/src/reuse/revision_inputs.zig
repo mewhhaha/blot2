@@ -111,6 +111,74 @@ pub const View = struct {
     }
 };
 
+/// A frozen record's observations in portable form, for a later process. Only
+/// records whose every observation succeeded persist: unchanged-input
+/// admission declines a failed observation anyway.
+pub const Persisted = struct {
+    pub const Pair = struct { key: []const u8, value: []const u8 };
+    pub const Import = struct { source: []const u8, request: []const u8, value: []const u8 };
+    /// Encoded by `dependency_format`. `capture` borrows every byte slice.
+    pub const Wire = struct { options: project.Options, paths: []const Pair, files: []const Pair, imports: []const Import };
+
+    allocator: Allocator,
+    wire: Wire,
+    /// Views of `wire` in the frozen record's own types.
+    paths: []Entry,
+    files: []Entry,
+    imports: []Resolution,
+
+    /// Null when an observation failed. Free with `release`.
+    pub fn capture(a: Allocator, record: View) Allocator.Error!?Wire {
+        const paths = try a.alloc(Pair, record.paths.len);
+        errdefer a.free(paths);
+        const files = try a.alloc(Pair, record.files.len);
+        errdefer a.free(files);
+        const imports = try a.alloc(Import, record.imports.len);
+        errdefer a.free(imports);
+        for (record.paths, paths) |entry, *pair| pair.* = .{ .key = entry.key, .value = success(entry.result) orelse return release(a, paths, files, imports) };
+        for (record.files, files) |entry, *pair| pair.* = .{ .key = entry.key, .value = success(entry.result) orelse return release(a, paths, files, imports) };
+        for (record.imports, imports) |entry, *import| import.* = .{ .source = entry.source, .request = entry.request, .value = success(entry.result) orelse return release(a, paths, files, imports) };
+        return .{ .options = record.options, .paths = paths, .files = files, .imports = imports };
+    }
+    pub fn releaseWire(a: Allocator, wire: Wire) void {
+        _ = release(a, wire.paths, wire.files, wire.imports);
+    }
+    fn release(a: Allocator, paths: []const Pair, files: []const Pair, imports: []const Import) ?Wire {
+        a.free(paths);
+        a.free(files);
+        a.free(imports);
+        return null;
+    }
+    fn success(result: Outcome) ?[]const u8 {
+        return switch (result) {
+            .bytes => |bytes| bytes,
+            .failure => null,
+        };
+    }
+    /// Takes a decoded `wire`; on success the owner frees it.
+    pub fn adopt(a: Allocator, wire: Wire) Allocator.Error!Persisted {
+        const paths = try a.alloc(Entry, wire.paths.len);
+        errdefer a.free(paths);
+        const files = try a.alloc(Entry, wire.files.len);
+        errdefer a.free(files);
+        const imports = try a.alloc(Resolution, wire.imports.len);
+        for (wire.paths, paths) |pair, *entry| entry.* = .{ .key = @constCast(pair.key), .result = .{ .bytes = @constCast(pair.value) } };
+        for (wire.files, files) |pair, *entry| entry.* = .{ .key = @constCast(pair.key), .result = .{ .bytes = @constCast(pair.value) } };
+        for (wire.imports, imports) |import, *entry| entry.* = .{ .source = @constCast(import.source), .request = @constCast(import.request), .result = .{ .bytes = @constCast(import.value) } };
+        return .{ .allocator = a, .wire = wire, .paths = paths, .files = files, .imports = imports };
+    }
+    pub fn deinit(self: *Persisted) void {
+        self.allocator.free(self.paths);
+        self.allocator.free(self.files);
+        self.allocator.free(self.imports);
+        @import("dependency_format.zig").deinit(self.allocator, &self.wire);
+        self.* = undefined;
+    }
+    pub fn view(self: *const Persisted) View {
+        return .{ .options = self.wire.options, .paths = self.paths, .files = self.files, .imports = self.imports, .counts = .{} };
+    }
+};
+
 fn freeOptions(a: Allocator, options: project.Options) void {
     if (options.prelude_path) |path| a.free(path);
     if (options.std_root) |root| a.free(root);
@@ -578,3 +646,49 @@ pub const Snapshot = struct {
         return found_prelude == (self.options.prelude_path != null);
     }
 };
+
+fn persistedRoundTrip(a: Allocator, record: View) !void {
+    const format = @import("dependency_format.zig");
+    const wire = (try Persisted.capture(a, record)).?;
+    defer Persisted.releaseWire(a, wire);
+    const key: format.Key = .{ .compiler = @splat(1), .settings = @splat(2), .source = @splat(3), .dependencies = @splat(4) };
+    const bytes = try format.encode(a, key, wire);
+    defer a.free(bytes);
+    var decoded = try format.decode(Persisted.Wire, a, bytes, key);
+    var owner = Persisted.adopt(a, decoded) catch |err| {
+        format.deinit(a, &decoded);
+        return err;
+    };
+    defer owner.deinit();
+    const view = owner.view();
+    try std.testing.expectEqualStrings(record.options.prelude_path.?, view.options.prelude_path.?);
+    try std.testing.expectEqualStrings(record.options.aliases[0].root, view.options.aliases[0].root);
+    for ([_][2][]const Entry{ .{ record.paths, view.paths }, .{ record.files, view.files } }) |pair| {
+        try std.testing.expectEqual(pair[0].len, pair[1].len);
+        for (pair[0], pair[1]) |old, new| {
+            try std.testing.expectEqualStrings(old.key, new.key);
+            try std.testing.expectEqualStrings(old.result.bytes, new.result.bytes);
+        }
+    }
+    try std.testing.expectEqualStrings(record.imports[0].request, view.imports[0].request);
+    try std.testing.expectEqualStrings(record.imports[0].result.bytes, view.imports[0].result.bytes);
+}
+
+test "restart cache: persisted input records round-trip successful observations and decline failed ones" {
+    var key = "/p/main.blot".*;
+    var canonical = "/real/main.blot".*;
+    var source = "entry const x = 1\n".*;
+    var request = "./dep".*;
+    var resolved = "/real/dep.blot".*;
+    const paths = [_]Entry{.{ .key = &key, .result = .{ .bytes = &canonical } }};
+    const files = [_]Entry{.{ .key = &canonical, .result = .{ .bytes = &source } }};
+    const imports = [_]Resolution{.{ .source = &canonical, .request = &request, .result = .{ .bytes = &resolved } }};
+    const options: project.Options = .{ .prelude_path = "/std/prelude.blot", .aliases = &.{.{ .prefix = "ink/", .root = "/ink" }} };
+    const record: View = .{ .options = options, .paths = &paths, .files = &files, .imports = &imports, .counts = .{} };
+    try persistedRoundTrip(std.testing.allocator, record);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, persistedRoundTrip, .{record});
+    const failed = [_]Entry{.{ .key = &canonical, .result = .{ .failure = error.FileNotFound } }};
+    var declined = record;
+    declined.files = &failed;
+    try std.testing.expect(try Persisted.capture(std.testing.allocator, declined) == null);
+}

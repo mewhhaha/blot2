@@ -107,6 +107,66 @@ const Current = struct {
         if (self.output) |*output| output.deinit(a);
     }
 };
+/// A previous process's successful output and the inputs it read, from the
+/// restart cache. A first build whose inputs, settings, entry and output policy
+/// equal them exactly publishes that output without compiling, under the same
+/// unchanged-input contract as a retained session; it keeps no retained state.
+pub const Restored = struct {
+    allocator: Allocator,
+    inputs: inputs.Persisted,
+    output: CachedOutput,
+    entry_canonical: []u8,
+    settings: [32]u8,
+    /// Digest of the checkpoint the same writer published, if any.
+    checkpoint_digest: ?[32]u8,
+
+    pub const Wire = struct {
+        settings: [32]u8,
+        entry_request: []const u8,
+        entry_canonical: []const u8,
+        output_identity: ?[]const u8,
+        policy: Policy,
+        wasm: []const u8,
+        source_bytes: usize,
+        modules: usize,
+        checkpoint_digest: ?[32]u8,
+        inputs: inputs.Persisted.Wire,
+    };
+    fn key(compiler: [32]u8) dependency_format.Key {
+        return .{ .compiler = compiler, .settings = dependency_format.digest("blot-restored-output-v1"), .source = @splat(0), .dependencies = @splat(0) };
+    }
+    /// Rejects bytes that do not decode for `compiler`, or whose entry is not
+    /// among their own source observations.
+    pub fn decode(a: Allocator, compiler: [32]u8, bytes: []const u8) !Restored {
+        var wire = try dependency_format.decode(Wire, a, bytes, key(compiler));
+        var wire_alive = true;
+        defer if (wire_alive) dependency_format.deinit(a, &wire);
+        const entry_read = for (wire.inputs.files) |file| {
+            if (std.mem.eql(u8, file.key, wire.entry_canonical)) break true;
+        } else false;
+        if (!entry_read or wire.wasm.len == 0) return error.InvalidArtifact;
+        var persisted = try inputs.Persisted.adopt(a, wire.inputs);
+        wire.inputs = .{ .options = .{}, .paths = &.{}, .files = &.{}, .imports = &.{} };
+        errdefer persisted.deinit();
+        // The output owns the decoded strings and bytes from here on.
+        const result: Restored = .{
+            .allocator = a,
+            .inputs = persisted,
+            .output = .{ .entry_request = @constCast(wire.entry_request), .output_identity = @constCast(wire.output_identity), .bytes = @constCast(wire.wasm), .source_bytes = wire.source_bytes, .modules = wire.modules, .policy = wire.policy },
+            .entry_canonical = @constCast(wire.entry_canonical),
+            .settings = wire.settings,
+            .checkpoint_digest = wire.checkpoint_digest,
+        };
+        wire_alive = false;
+        return result;
+    }
+    pub fn deinit(self: *Restored) void {
+        self.inputs.deinit();
+        self.output.deinit(self.allocator);
+        self.allocator.free(self.entry_canonical);
+        self.* = undefined;
+    }
+};
 pub const FallbackStats = struct {
     validated_modules: usize = 0,
     reused_frontend_modules: usize = 0,
@@ -126,7 +186,7 @@ pub const FallbackStats = struct {
     /// checking the whole project again (partial.portableRejection).
     portable_rejection: bool = false,
 };
-pub const Stats = struct { rebuilt_seed: bool = false, reused_output: bool = false, trivia_only: bool = false, inputs: inputs.Counts = .{}, fallback: FallbackStats = .{} };
+pub const Stats = struct { rebuilt_seed: bool = false, reused_output: bool = false, trivia_only: bool = false, restored_output: bool = false, inputs: inputs.Counts = .{}, fallback: FallbackStats = .{} };
 
 // A live Candidate keeps this lease allocated even after Session teardown or
 // reinitialization at the same address. It grants no semantic cache admission.
@@ -247,6 +307,8 @@ pub const Session = struct {
     profile_backend: bool = false,
     explain_demands: bool = false,
     checkpoint: ?@import("../backend/backend_checkpoint.zig").Checkpoint = null,
+    /// Released when a compiled revision commits.
+    restored: ?Restored = null,
 
     /// Moves an already wire/semantic/compiler-admitted seed and pins its exact
     /// source/check/backend settings. Compiler identity cannot change within
@@ -273,6 +335,7 @@ pub const Session = struct {
         }
         if (self.current) |*current| current.deinit(self.allocator);
         if (self.checkpoint) |*checkpoint| checkpoint.deinit();
+        if (self.restored) |*restored| restored.deinit();
         self.releaseSeed();
         if (self.epoch) |epoch| epoch.release();
         self.* = undefined;
@@ -289,6 +352,57 @@ pub const Session = struct {
         if (self.epoch) |epoch| if (epoch.preparing or epoch.active != null) return error.RevisionBusy;
         const current = &(self.current orelse return error.NoSuccessfulRevision);
         return @import("../backend/backend_checkpoint.zig").encode(a, compiler, &current.artifacts);
+    }
+    /// The committed revision's output and inputs for `Restored.decode`, or
+    /// null when it cannot be restored: an explained output, or an input
+    /// observation that failed. `checkpoint` is what the same writer publishes.
+    pub fn encodeRestored(self: *const Session, a: Allocator, compiler: [32]u8, checkpoint: ?[]const u8) !?[]u8 {
+        if (self.epoch) |epoch| if (epoch.preparing or epoch.active != null) return error.RevisionBusy;
+        const current = &(self.current orelse return null);
+        const output = current.output orelse return null;
+        const prepared = &current.prepared;
+        if (output.demand_lowering != null or prepared.entry == 0 or prepared.entry > prepared.paths.len) return null;
+        const observed = try inputs.Persisted.capture(a, current.snapshot.view()) orelse return null;
+        defer inputs.Persisted.releaseWire(a, observed);
+        return try dependency_format.encode(a, Restored.key(compiler), Restored.Wire{
+            .settings = self.seed_settings,
+            .entry_request = output.entry_request,
+            .entry_canonical = prepared.paths[prepared.entry - 1],
+            .output_identity = output.output_identity,
+            .policy = output.policy,
+            .wasm = output.bytes,
+            .source_bytes = output.source_bytes,
+            .modules = output.modules,
+            .checkpoint_digest = if (checkpoint) |bytes| dependency_format.digest(bytes) else null,
+            .inputs = observed,
+        });
+    }
+    /// A first build may publish the restored output. Returns null, having
+    /// published nothing, unless this build's inputs equal the restored ones.
+    pub fn prepareRestored(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, options: project.Options, sources: []const inputs.overlays.Source) !?Preparation {
+        const restored = if (self.restored) |*value| value else return null;
+        if (self.current != null or options.input_mode != .project) return null;
+        const epoch = try self.bind();
+        if (epoch.preparing or epoch.active != null) return error.CandidateActive;
+        if (self.revisions == std.math.maxInt(usize) or epoch.token == std.math.maxInt(usize) or epoch.references == std.math.maxInt(usize)) return error.RevisionLimit;
+        epoch.preparing = true;
+        defer epoch.preparing = false;
+        const a = self.allocator;
+        const timing = phase_profile.enter(.inputs);
+        defer timing.exit();
+        var snapshot = try inputs.Snapshot.initWithSources(a, io, options, sources);
+        defer snapshot.deinit();
+        const settings_key = settings(snapshot.options);
+        if (!std.mem.eql(u8, &restored.settings, &settings_key) or !restored.output.matches(entry_path, output_identity, self.policy, self.explain_demands)) return null;
+        if (!try snapshot.entryPathEqualsPrevious(io, entry_path, restored.entry_canonical) or !try snapshot.equalsPrevious(io, restored.inputs.view())) return null;
+        var emission = try restored.output.emission(a);
+        errdefer emission.deinit(a);
+        const candidate = try a.create(Candidate);
+        candidate.* = .{ .allocator = a, .epoch = epoch, .token = epoch.token + 1, .base_revision = self.revisions, .settings_key = settings_key, .stats = .{ .reused_output = true, .restored_output = true, .inputs = snapshot.counts }, .pending = null, .seed = null, .emission = emission, .kind = .unchanged };
+        epoch.token = candidate.token;
+        epoch.references += 1;
+        epoch.active = candidate;
+        return .{ .ready = candidate };
     }
     fn releaseSeed(self: *Session) void {
         if (self.seed_snapshot) |owner| owner.deinit() else dependency_format.deinit(self.allocator, &self.seed);
@@ -335,9 +449,11 @@ pub const Session = struct {
                 }
                 self.current = candidate.pending.?;
                 candidate.pending = null;
+                if (self.restored) |*restored| restored.deinit();
+                self.restored = null;
             },
             .unchanged => {
-                std.debug.assert(self.current != null and candidate.pending == null and candidate.seed == null);
+                std.debug.assert((self.current != null or self.restored != null) and candidate.pending == null and candidate.seed == null);
             },
         }
         self.seed_settings = candidate.settings_key;

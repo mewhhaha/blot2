@@ -54,7 +54,12 @@ Deno.test("principal inputs survive summary jobs drained inside the recorded reg
     } finally {
       await first.dispose();
     }
-    const retained = await createZigProjectCompiler(options);
+    // Another output policy cannot take the saved output, so this restart
+    // compiles from the persisted checkpoint.
+    const retained = await createZigProjectCompiler({
+      ...options,
+      codegenWorkers: 1,
+    });
     try {
       const restored = await retained.build();
       assert(restored.success, JSON.stringify(restored));

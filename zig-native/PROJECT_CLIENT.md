@@ -111,7 +111,10 @@ next compiler's open waits (at most 10 s) for that write and then loads it. A
 killed writer leaves the previous file, if any. Other platforms write before
 replying. Later edits avoid cache writes; `close()` saves the latest committed
 revision the same way. Failed edits never replace the last successful
-checkpoint. Keep the compiler alive for
+checkpoint. The cache also holds the saved revision's Wasm and every input it
+read: a restarted compiler whose first build has exactly those inputs and the
+same settings returns that Wasm without compiling (`attemptStats.restored_output`)
+and compiles in full on the next change. Keep the compiler alive for
 editing; restart caching and retained edits are measured separately by
 `deno task bench:compile --restart-cache`.
 

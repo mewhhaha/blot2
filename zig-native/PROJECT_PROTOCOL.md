@@ -462,8 +462,18 @@ and fits the limits. If writing a committed reply then fails, the process exits
 rather than leave the host and the server disagreeing about the revision.
 
 **The restart cache.** It is saved after the first successful build and again at
-close. Its file sits under the cache root, keyed by the compiler identity and
-the entry, with a `.lock` file beside it.
+close. Its files sit under the cache root, keyed by the compiler identity and
+the entry: the backend checkpoint (`.blotcache`), the revision's output with
+every input it read (`.blotout`), and a `.lock` file.
+
+- **Restored output.** The first build of a process whose inputs equal the
+  saved revision's exactly (every source byte, path resolution and import, the
+  open settings, entry, codegen tier, workers and machine-code sharing, without
+  `explainDemands`) replies with the saved Wasm without compiling, under the
+  same rule as an unchanged build in one session. Its `attemptStats` has
+  `restored_output` true, it keeps no retained state, and the next build that
+  differs compiles in full. Otherwise the checkpoint is read then, before
+  compiling.
 
 - **Promise.** Once the first successful build's reply has been sent, the cache
   for that revision is being written by a process the host does not own. Killing
@@ -495,7 +505,9 @@ revision.
   `{"kind": "checkpoint", "id": 2, "epoch": "1", "revision": 1, "success": true}`,
   with the checkpoint as payload: portable backend candidates of the last
   successful revision. Open a later process of the same compiler with it
-  (`checkpoint: true`) to start warm.
+  (`checkpoint: true`) to start warm. After a restored output, it is the
+  checkpoint saved with that output; if the cache no longer holds exactly that
+  file, the request fails with `NoSuccessfulRevision`.
 - **Failure:** the same fields with `"success": false`, a `code` (the error's
   name, or `"checkpoint_limit"` when the bytes would exceed `maxFrameBytes`
   − 1024) and no payload.

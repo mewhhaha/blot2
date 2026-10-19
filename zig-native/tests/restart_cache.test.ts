@@ -134,19 +134,41 @@ Deno.test("project server persists committed checkpoints across disposal and gra
   try {
     await Deno.writeTextFile(entry, source("1"));
     const first = await createZigProjectCompiler(options);
+    let original: Uint8Array<ArrayBuffer>;
     try {
       const built = await first.build();
       assert(built.success, JSON.stringify(built));
       assert.equal(built.stats.restartCacheLoaded, false);
+      original = built.bytes;
     } finally {
       await first.dispose();
     }
-    const retained = await createZigProjectCompiler(options);
+    // Unchanged inputs publish the persisted output without compiling, and
+    // export the checkpoint written with it.
+    const unchanged = await createZigProjectCompiler(options);
+    try {
+      const built = await unchanged.build();
+      assert(built.success, JSON.stringify(built));
+      assert.equal(built.stats.restartCacheLoaded, true);
+      assert.equal(built.stats.attemptStats.restored_output, true);
+      assert.deepEqual(built.bytes, original!);
+      assert((await unchanged.exportCheckpoint()).length > 0);
+    } finally {
+      await unchanged.dispose();
+    }
+    // Another output policy cannot take the output; it compiles warm from
+    // the checkpoint instead.
+    const retained = await createZigProjectCompiler({
+      ...options,
+      codegenWorkers: 1,
+    });
     let expected: Uint8Array<ArrayBuffer>;
     try {
       const built = await retained.build();
       assert(built.success, JSON.stringify(built));
       assert.equal(built.stats.restartCacheLoaded, true);
+      assert.equal(built.stats.attemptStats.restored_output, false);
+      assert.deepEqual(built.bytes, original!);
       assert(
         (built.stats.principals as Record<string, number>).persisted_hits > 0,
       );
@@ -163,8 +185,13 @@ Deno.test("project server persists committed checkpoints across disposal and gra
     } finally {
       await retained.dispose();
     }
+    // The closed revision read its entry from an overlay; the same bytes on
+    // disk are the same input.
     await Deno.writeTextFile(entry, source("2"));
-    const restored = await createZigProjectCompiler(options);
+    const restored = await createZigProjectCompiler({
+      ...options,
+      codegenWorkers: 1,
+    });
     const fresh = await createZigProjectCompiler({
       ...options,
       cacheDirectory: false,
@@ -176,6 +203,7 @@ Deno.test("project server persists committed checkpoints across disposal and gra
       ]);
       assert(current.success && reference.success);
       assert.equal(current.stats.restartCacheLoaded, true);
+      assert.equal(current.stats.attemptStats.restored_output, true);
       assert.equal(reference.stats.restartCacheLoaded, false);
       assert.deepEqual(current.bytes, expected!);
       assert.deepEqual(current.bytes, reference.bytes);
@@ -232,7 +260,7 @@ async function keyPaths(cache: string) {
   await settle(lock);
   const [artifact] = await caches(cache);
   assert(artifact);
-  return { lock, artifact };
+  return { lock, artifact, output: artifact.replace(/\.blotcache$/, ".blotout") };
 }
 
 // A detached writer only exists where the server forks one (Linux).
@@ -267,8 +295,9 @@ Deno.test({
       } finally {
         await first.dispose();
       }
-      const { lock, artifact } = await keyPaths(cache);
+      const { lock, artifact, output } = await keyPaths(cache);
       await Deno.remove(artifact);
+      await Deno.remove(output);
       const previous = await writer(lock);
       assert(previous !== undefined, "a writer names itself in the lock file");
       // Holding the lock stalls the next writer before it publishes.
@@ -339,9 +368,10 @@ Deno.test({
       } finally {
         await first.dispose();
       }
-      const { lock, artifact } = await keyPaths(cache);
+      const { lock, artifact, output } = await keyPaths(cache);
       const published = await Deno.readFile(artifact);
       await Deno.remove(artifact);
+      await Deno.remove(output);
       // This test stands in for a writer: it holds the lock, then publishes.
       const holder = await Deno.open(lock, { read: true, write: true });
       await holder.lock(true);
@@ -372,4 +402,63 @@ Deno.test({
       await Deno.remove(directory, { recursive: true });
     }
   },
+});
+
+Deno.test("project server restores an output only for exactly its inputs and its compiler", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const cache = `${directory}/cache`;
+  const options = { executable, entry, prelude: null, cacheDirectory: cache };
+  const build = async (overrides = {}) => {
+    const compiler = await createZigProjectCompiler({
+      ...options,
+      ...overrides,
+    });
+    try {
+      const built = await compiler.build();
+      assert(built.success, JSON.stringify(built));
+      return built;
+    } finally {
+      await compiler.dispose();
+    }
+  };
+  try {
+    await Deno.writeTextFile(entry, source("1"));
+    const original = (await build({ cacheDirectory: false })).bytes;
+    await build();
+    const [lock] = (await files(cache)).filter((path) =>
+      path.endsWith(".lock")
+    );
+    await settle(lock);
+    const [output] = (await files(cache)).filter((path) =>
+      path.endsWith(".blotout")
+    );
+    assert(output, "the writer publishes the output part");
+    const valid = await Deno.readFile(output);
+    // A changed source compiles; its bytes equal a fresh build.
+    await Deno.writeTextFile(entry, source("2"));
+    const changed = await build();
+    assert.equal(changed.stats.attemptStats.restored_output, false);
+    assert.deepEqual(changed.bytes, (await build({ cacheDirectory: false })).bytes);
+    await settle(lock);
+    await Deno.writeTextFile(entry, source("1"));
+    // Truncated, corrupt or foreign output bytes are ignored.
+    const foreign = valid.slice();
+    foreign[44] ^= 1;
+    const corrupt = valid.slice();
+    corrupt[corrupt.length - 1] ^= 1;
+    for (const bytes of [valid.slice(0, valid.length >> 1), corrupt, foreign]) {
+      await Deno.writeFile(output, bytes);
+      const built = await build();
+      assert.equal(built.stats.attemptStats.restored_output, false);
+      assert.deepEqual(built.bytes, original);
+      await settle(lock);
+    }
+    await Deno.writeFile(output, valid);
+    const restored = await build();
+    assert.equal(restored.stats.attemptStats.restored_output, true);
+    assert.deepEqual(restored.bytes, original);
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
 });

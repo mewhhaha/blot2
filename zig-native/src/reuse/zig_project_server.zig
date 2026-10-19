@@ -109,6 +109,9 @@ const OpenProject = struct {
     assets: ?native_assets.Session = null,
     cache_file: ?restart_cache.File,
     cache_loaded: bool,
+    /// The cache's checkpoint is read at the first build that compiles, so a
+    /// restored output never pays for decoding it.
+    checkpoint_pending: bool = false,
     saved_revision: usize = 0,
     /// Present for profiled sessions: every session allocation passes it.
     allocation_counter: ?*phase_profile.CountingAllocator = null,
@@ -142,21 +145,51 @@ const OpenProject = struct {
         var cache_file: ?restart_cache.File = if (cache_root) |root| restart_cache.File.init(a, root, compiler, entry) catch null else null;
         errdefer if (cache_file) |*file| file.deinit();
         var cache_loaded = false;
+        var checkpoint_pending = false;
         if (checkpoint_bytes.len != 0) session.checkpoint = @import("../backend/backend_checkpoint.zig").decode(a, compiler, checkpoint_bytes) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             else => null, // Optional candidates never replace source validation.
         } else if (cache_file) |*file| {
-            session.checkpoint = file.load(io);
-            cache_loaded = session.checkpoint != null;
+            _ = file.settle(io);
+            if (file.read(io, .output)) |bytes| {
+                defer a.free(bytes);
+                session.restored = retained.Restored.decode(a, compiler, bytes) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    else => null,
+                };
+                cache_loaded = session.restored != null;
+            }
+            checkpoint_pending = true;
         }
         session.policy.codegen_workers = request.codegenWorkers;
-        return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session, .assets = assets, .cache_file = cache_file, .cache_loaded = cache_loaded };
+        return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session, .assets = assets, .cache_file = cache_file, .cache_loaded = cache_loaded, .checkpoint_pending = checkpoint_pending };
+    }
+    fn loadCheckpoint(self: *OpenProject, io: Io) void {
+        if (!self.checkpoint_pending) return;
+        self.checkpoint_pending = false;
+        const file = &(self.cache_file orelse return);
+        // Open already waited for writers; published files are whole.
+        self.session.checkpoint = file.loadPublished(io);
+        if (self.session.checkpoint != null) self.cache_loaded = true;
+    }
+    /// A restored revision exports the checkpoint its writer published with
+    /// it, if the cache still holds exactly that file.
+    fn checkpointBytes(self: *OpenProject, io: Io, compiler: [32]u8) ![]u8 {
+        const restored: ?*retained.Restored = if (self.session.current != null) null else if (self.session.restored) |*value| value else null;
+        const owner = restored orelse return self.session.checkpointBytes(compiler);
+        const expected = owner.checkpoint_digest orelse return error.NoSuccessfulRevision;
+        const file = &(self.cache_file orelse return error.NoSuccessfulRevision);
+        const bytes = file.read(io, .checkpoint) orelse return error.NoSuccessfulRevision;
+        errdefer self.allocator.free(bytes);
+        if (!std.mem.eql(u8, &expected, &@import("dependency_format.zig").digest(bytes))) return error.NoSuccessfulRevision;
+        return bytes;
     }
     /// Starts saving the committed revision. Where writes are detached, the
     /// writer holds the cache lock when this returns, so the caller can reply
     /// at once and a later open still waits for the complete file.
     fn persist(self: *OpenProject, io: Io) void {
-        if (self.saved_revision == self.session.revisions) return;
+        // A restored revision is already what the cache holds.
+        if (self.saved_revision == self.session.revisions or self.session.current == null) return;
         const file = &(self.cache_file orelse return);
         const encoding: CheckpointEncoding = .{ .session = &self.session, .compiler = file.compiler };
         switch (file.persist(io, .{ .context = &encoding, .encode = CheckpointEncoding.encode })) {
@@ -179,11 +212,11 @@ const OpenProject = struct {
 const CheckpointEncoding = struct {
     session: *const retained.Session,
     compiler: [32]u8,
-    fn encode(context: *const anyopaque, a: Allocator, part: restart_cache.Part, _: ?[]const u8) ?[]u8 {
+    fn encode(context: *const anyopaque, a: Allocator, part: restart_cache.Part, checkpoint: ?[]const u8) ?[]u8 {
         const self: *const CheckpointEncoding = @ptrCast(@alignCast(context));
         return switch (part) {
             .checkpoint => self.session.encodeCheckpoint(a, self.compiler) catch null,
-            .output => null,
+            .output => self.session.encodeRestored(a, self.compiler, checkpoint) catch null,
         };
     }
 };
@@ -305,8 +338,15 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
         try merged.appendSlice(a, sources);
     }
     const complete_sources = if (assets != null) merged.items else sources;
-    var preparation = opened.session.prepareRevisionWithSources(io, opened.entry, null, opened.options_owner.options, complete_sources) catch |err| {
-        return operationFailure(a, writer, opened, id, @errorName(err), "Compiler operation failed", null);
+    const restored = opened.session.prepareRestored(io, opened.entry, null, opened.options_owner.options, complete_sources) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => null, // The ordinary preparation reports it.
+    };
+    var preparation = restored orelse compiled: {
+        opened.loadCheckpoint(io);
+        break :compiled opened.session.prepareRevisionWithSources(io, opened.entry, null, opened.options_owner.options, complete_sources) catch |err| {
+            return operationFailure(a, writer, opened, id, @errorName(err), "Compiler operation failed", null);
+        };
     };
     defer preparation.deinit();
     switch (preparation) {
@@ -555,7 +595,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
                 }
                 if (request.kind == .checkpoint) {
                     if (request.sources.len != 0 or request.assetSources.len != 0 or frame.payload().len != 0) return error.InvalidRequest;
-                    const bytes = owner.session.checkpointBytes(compiler) catch |err| {
+                    const bytes = owner.checkpointBytes(io, compiler) catch |err| {
                         try reply(a, writer, .{ .kind = "checkpoint", .id = request.id, .epoch = epoch, .revision = owner.session.revisions, .success = false, .code = @errorName(err) }, &.{});
                         continue;
                     };
