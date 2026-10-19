@@ -1559,6 +1559,13 @@ The game's cache file is 57 MB against a 64 MiB limit.
 
 - **Fix:** write the cache after the reply, or on a worker.
 - **Overlaps:** CT24 and CT72.
+- **Result (19 October 2026):** no separate change. CT24's detached writer
+  takes every server save (first build and close) off the critical path, and
+  CT72 found capture is read by the next build. What remains is the CLI's
+  synchronous save after it writes the Wasm: 6–7 ms on the CLI-buildable
+  corpus programs (`chain_generic` 1500, `fanout` 400, caches of 267 and 289
+  KB). gdev needs native assets, which only the server supports, so a detached
+  CLI writer would save nothing measurable and is not added.
 
 ## Phase 8: parallelism and test runs
 
