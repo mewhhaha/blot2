@@ -8,7 +8,9 @@
   - body edit 2.11 → 1.23 s (CT26);
   - error edits 0.6–1.0 s → 12–48 ms (CT29).
 
-  Open follow-ups are recorded under CT10, CT11 and CT22 in
+  CT90 (merged on 19 October 2026 without a post-rebase gate; see CONTINUE.md)
+  reuses frozen modules across test-entry switches: suite CPU 96 → 73 s. Open
+  follow-ups are recorded under CT10, CT11 and CT22 in
   [COMPILE_HILLS.md](../COMPILE_HILLS.md).
 - **Dependencies:** [088](088-restore-summary-job-inference-cost.md)
 - **Originating requirements:** discovered while qualifying task

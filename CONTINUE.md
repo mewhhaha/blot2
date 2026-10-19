@@ -30,14 +30,17 @@ below it, unchanged.
 
 ### Started but unfinished
 
-- **CT90 is on branch `worktree-agent-acc90bd2852d65caf` (head `188506f`, also
-  pushed to origin), not merged.**
-  - It reuses frozen modules when a shared session switches test entries: suite
-    CPU 96 → 73 s, Wasm identical to fresh builds.
-  - It passed the gate and lint before its rebase onto `ba5decb`. After the
-    rebase (a `Session.deinit` conflict), the gate, lint and a
-    `bench:compile --shared-session` identity check must rerun before it lands.
-  - CT91 is dropped on the same branch.
+- **CT90 is merged on main but not validated after its rebase.**
+  - It reuses frozen modules when a shared session switches test entries (commit
+    "CT90: Reuse frozen modules when the entry's closure changes"): suite CPU 96
+    → 73 s, Wasm identical to fresh builds before the rebase.
+  - It passed the gate and lint before being rebased onto `ba5decb`, where a
+    `Session.deinit` conflict in `retained_revision.zig` was resolved by keeping
+    both release lines. The owner had it merged as is.
+  - **First step next session:** run `deno task build:compiler`, the full gate,
+    lint, and `bench:compile --workload game,devtools,tests --shared-session`.
+    Fix anything that fails.
+  - CT91 is dropped (pen already runs 8 workers).
 
 P1 (closed-label certificates) was measured but not started. Next step:
 
@@ -90,8 +93,8 @@ P4 (`namespaceEqual` in `reuse/principal_reuse_gate.zig`) aren't started.
 ### Waiting on the owner
 
 - **pen:** `pen dev` must pass `codegenTier: "development"` for its own session
-  (CT28, in ../pen). CT90, once merged, needs no pen change: its workers already
-  keep one session each.
+  (CT28, in ../pen). CT90 needs no pen change: its workers already keep one
+  session each.
 - **Checkpoint cost:** a restart after an edit still pays about 250 ms for the
   checkpoint and reuses nothing from it. Gating or reshaping it is a design
   call.
