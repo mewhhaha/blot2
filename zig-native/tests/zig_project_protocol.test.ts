@@ -272,6 +272,7 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
       "freshModules",
       "cachedModules",
       "restartCacheLoaded",
+      "restartCacheWrite",
       ...statObjects,
     ]);
     for (

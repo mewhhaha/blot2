@@ -267,6 +267,7 @@ the reference client rejects an empty or invalid module.
     "freshModules": 0,
     "cachedModules": 0,
     "restartCacheLoaded": false,
+    "restartCacheWrite": null,
     "demandLowering": null,
     "frontend": {},
     "backend": {},
