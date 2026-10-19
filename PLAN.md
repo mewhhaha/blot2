@@ -572,7 +572,9 @@ native laws without skips, failures, leaks or logged errors; 1,556 guest and 37
 harness checks pass. CI lint, strict Wasm parity, the seven-pair CPU guard,
 heap/runtime measurements, staging costs, editor, package dry run and local
 links also pass. [Current qualification](zig-native/CLOUD_QUALIFICATION.md)
-records exact pins and limitations. The task index now has 95 complete and 15
-open tasks. The remaining feature/performance requirements and conditional
-cleanup stay open. Task 082's local backend needs the saved `codeberg.org`
-network addition published; current source has not been pushed upstream.
+records exact pins and limitations. Current-host original issue/Ink throughput
+evidence also closes task 109. The task index now has 96 complete and 14 open
+tasks. The remaining feature/performance requirements and conditional cleanup
+stay open. Task 082's `codeberg.org` network addition is published; the running
+instance still enforces its earlier revision 3 and needs the published settings
+applied. Current source has not been pushed upstream.

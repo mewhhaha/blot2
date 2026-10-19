@@ -2,9 +2,9 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — implemented on 17 October 2026 and committed in
-  `3cf6de1`; later full gates on main pass. The acceptance evidence (Ink
-  timings) remains to be recorded.
+- **Status:** Complete — implementation `3cf6de1` passes the current full gate;
+  the original issue repro and all four Ink probes pass current-host timing,
+  witness and memory qualification on 19 October 2026.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink as
   [issue #9](https://github.com/mewhhaha/blot2/issues/9): a guarded insertion
@@ -72,23 +72,34 @@ and patched release builds with the same harness.
 
 ## Acceptance criteria
 
-- [ ] The issue repro and Ink's `inline_writes`, `unsigned_sort` and
+- [x] The issue repro and Ink's `inline_writes`, `unsigned_sort` and
       `pathfinding` at 2000 run within 1.5 times the pinned compiler, and
       `break_writes` stays linear.
-- [ ] Loops whose carries are shared, replaced or stored as owning elements keep
+- [x] Loops whose carries are shared, replaced or stored as owning elements keep
       their journal operations, and module admission stays complete.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending.
+- Current qualification: compiler source milestone
+  `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`, with unchanged native inputs and
+  the executed 2,470-native/1,556-guest/37-harness gate and zero CI lint
+  findings. The original `guarded_sum(256)` runs at 1.107 times `86a527b`; Ink's
+  three required probes are at 1.082, 1.089 and 0.008. `break_writes` scales by
+  1.821 when count doubles. All witnesses and warmed memory checks pass over
+  60,480 calls. The
+  [durable current record](../zig-native/PERSISTENT_ROOTS.md#current-array-throughput-qualification-19-october-2026)
+  pins source archives, binaries, harness, distributions and limitations.
+
+### Historical implementation qualification, 17 October 2026
+
 - Validation: in the implementation worktree `deno task test:compiler` passed
   2,365 native laws with zero leaks, 1,517 guest, 48 smoke and 28 harness tests
   in 19 min 37 s; lint reported zero findings across 487 Zig files; Ink's suite
-  passed 362 of 362 tests on the gated build. On main the new executed law fails
-  its throughput guard: journal retains per call are 8, 2,416 and 133,298 at
-  counts 2, 64 and 512. See the dated record in
+  passed 362 of 362 tests on the gated build. On pre-fix main `48eda0a` the new
+  executed law fails its throughput guard: journal retains per call are 8, 2,416
+  and 133,298 at counts 2, 64 and 512. See the dated record in
   [PERSISTENT_ROOTS.md](../zig-native/PERSISTENT_ROOTS.md#array-loop-throughput-17-october-2026).
 - Comparison: median release-guest times, in ms, after 400 warm-up rounds,
   paired on one host:

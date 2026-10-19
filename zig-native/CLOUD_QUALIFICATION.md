@@ -89,6 +89,22 @@ routine reductions. The responsibility boundaries are documented in
 
 ## Paired compiler comparison and CI analyzer
 
+### Current workload pin
+
+Task 084's current workload is the owner-approved recreated freeze at
+`build/bench/gdev-snapshot`: gdev `52fbc5af4ba4accf5559d87e2fffed335fa920ad` and
+Ink `1a291a1b90b9197e6a9fc327f52d77bf965d8cf3`, with 583 files and 69 test
+entries. The committed [input manifest](../scripts/bench/gdev-manifest.json) has
+SHA-256 `4689301ed5ef13f9cce244a474fbe353ebfeceeb072101c85f6663995e0b0728`; the
+[output references](../scripts/bench/gdev-wasm.json) have SHA-256
+`8054af76dff612509f04006626163ad5646e77ce7b52d097e97f09be45e64492`. The
+benchmark verifies every input before measuring. Private source remains ignored;
+historical measurements on the lost freeze are separate workloads. This pin also
+supplies task 086's measurement workload. Its seven-pair constant-cost decision
+and task 084's remaining qualification are still open.
+
+### Current comparison
+
 The preserved baseline executable has SHA-256
 `807d3f05f1a884290014d6b698f2263faa938e072df3cdbf4feca1b53f60584e`. Against it,
 strict comparison passes for three alternating game/devtools pairs and one pair
@@ -116,11 +132,25 @@ zero findings. Current runtime and staging measurements are recorded in
 
 A local analyzer at `9a78ce1` builds, but its backend bootstrap requires access
 to `codeberg.org`, currently blocked by the environment's enforced allowlist.
-The saved network draft adds that host only; saving does not apply or publish
-it. The current forced gate and heap measurement pass. The local analyzer gate
-and the remaining module, iterator and final performance requirements stay open.
+The configuration adding that host is now published, with no pending draft. The
+running instance still reports source version ending `184c37ff85fd4` and
+enforced revision 3 without Codeberg, whereas the published version ends
+`4f2c40ba7f3a6c6`. A direct HTTPS request still receives CONNECT 403. The
+observation is retained in ignored `.tools/published-network-observation.json`
+beside the repository. The current forced gate and heap measurement pass. The
+local analyzer gate and the remaining module, iterator and final performance
+requirements stay open.
 
 ## Current external and tooling checks
+
+Task 109's
+[current Array throughput qualification](PERSISTENT_ROOTS.md#current-array-throughput-qualification-19-october-2026)
+passes the recovered original issue source and Ink's four probes against
+historical `86a527b` and `48eda0a` releases. All required current/pinned ratios
+are below 1.5, break writes scale by 1.821 when the count doubles, and 60,480
+guest calls preserve witnesses and warmed memory. Each compiler uses its own
+standard library and guest API. The production compiler is unchanged from the
+full gate above. The program now has 96 complete tasks and 14 open.
 
 The public Ink app-hooks input at Ink `1a291a1b90b9197e6a9fc327f52d77bf965d8cf3`
 passes `scripts/bench_ink_acceptance.ts` with the release compiler in both

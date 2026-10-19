@@ -92,6 +92,11 @@ local `main`.
   costs have seven paired repetitions in both tiers and dependency modes. Ink's
   app-hooks pass 6,000 calls at flat 128 KiB guest memory. Deliberate language
   and ownership limits remain documented.
+- Task **109** now closes with the recovered original issue repro and all four
+  Ink probes measured against exact historical release sources. Required
+  current/pinned ratios stay below 1.5, break writes scale linearly, and all
+  60,480 calls preserve witnesses and warmed memory. See the
+  [current Array qualification](zig-native/PERSISTENT_ROOTS.md#current-array-throughput-qualification-19-october-2026).
 - CT92–CT94 guards pass. The final strict comparison matches fresh, retained,
   restart and shared output for the game, devtools and selected slow tests.
   Seven pinned CPU pairs pass the 1.05 regression limit with median 0.941.
@@ -109,10 +114,12 @@ local `main`.
   CPU deltas; its ordinary stack report includes idle threads. Its smoke passes,
   but task 086's seven-pair constant-cost decision remains open.
 - The local analyzer at `9a78ce1` builds. Its compiler backend is blocked by
-  HTTP 403 from `codeberg.org`. The saved environment draft adds that host to
-  the existing allowlist and needs review, save and publication in environment
-  settings. Task 082 is awaiting that external step and final-source evidence.
-  No source changes or benchmark evidence were pushed upstream.
+  HTTP 403 from `codeberg.org`. Publication of the configuration adding that
+  host is confirmed, with no pending draft. This running instance still reports
+  its earlier source configuration and enforced revision 3 without Codeberg; it
+  needs to run with the published configuration. Task 082 is awaiting that
+  external step and final-source evidence. No source changes or benchmark
+  evidence were pushed upstream.
 
 ### Open work, in suggested order
 
@@ -151,8 +158,9 @@ local `main`.
 
 ### Waiting on the owner
 
-- **Environment:** publish the saved `codeberg.org` allowlist addition so the
-  local analyzer backend can bootstrap.
+- **Environment:** the `codeberg.org` allowlist addition is published. Apply
+  that configuration to the running environment while preserving this workspace;
+  its current revision 3 still rejects the backend source download.
 - **pen:** `pen dev` must pass `codegenTier: "development"` for its own session
   (CT28, in ../pen). CT90 needs no pen change: its workers already keep one
   session each.
@@ -199,8 +207,8 @@ local `main`.
 
 Finish every task in the program. As of 19 October 2026:
 
-- 95 are complete (including four designs);
-- 15 remain open: 7 in progress, 1 awaiting external evidence and 7 pending.
+- 96 are complete (including four designs);
+- 14 remain open: 6 in progress, 1 awaiting external evidence and 7 pending.
 
 The index in tasks/README.md is authoritative. Each task file carries its own
 status, evidence and closed-acceptance rows.
@@ -212,10 +220,11 @@ The previous long handoff, with per-task evidence through 17 October, is in git:
 
 - **In progress:** 047 (iterator state and cursor cost), 053 (module cutoff and
   wrapper rows), 081 (final durable documentation), 086 (constant-work
-  decision), 093 (gdev edit gap), 108 (stored callback-row acceptance evidence)
-  and 109 (current Ink throughput evidence).
-- **Awaiting external evidence:** 082 (local analyzer backend needs the saved
-  Codeberg network change published; final-source checks remain required).
+  decision), 093 (gdev edit gap) and 108 (stored callback-row acceptance
+  evidence).
+- **Awaiting external evidence:** 082 (local analyzer backend needs this running
+  environment to use the published Codeberg network change; final-source checks
+  remain required).
 - **Pending:** 084 (complete-program qualification), 100–104 (cold, literal,
   body, largest-region and requested-allocation targets), and 999 (conditional
   removal of tasks and PLAN.md).

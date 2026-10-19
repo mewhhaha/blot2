@@ -393,3 +393,65 @@ roots/leases pass. Its 384 KiB committed memory is distinct from the 260 KiB
 block high-water and the remaining 4,064-byte live journal payload. The
 [complete current gate](CLOUD_QUALIFICATION.md) also reruns the class, journal,
 cycle, suspension and Array-loop ownership laws.
+
+## Current Array throughput qualification, 19 October 2026
+
+Task 109 is complete on the compiler qualified in
+[the cloud gate](CLOUD_QUALIFICATION.md). The original issue #9 source was
+recovered from its GitHub page, rather than reconstructed. Its 1,671 bytes have
+SHA-256 `7b5a758dbd6aaebf3f233632b021f8d95c006757826dedc94e10c15f12ece4b6`. The
+two historical source archives match 456 and 1,120 Git blobs respectively, with
+no mismatches. Their full revisions are
+`86a527b97c32331993c4a006da2c982a7336c365` and
+`48eda0ad112e2a28be11aa9ac0498738229469c2`.
+
+[The comparison harness](../scripts/bench_array_throughput.ts) uses each release
+compiler's matching standard library and guest API, the same Ink `1a291a1b`
+sources and original issue source, and CPU 0. Each probe warms both sizes for
+400 rounds, then runs 101 alternating timing rounds of 16 calls per size and
+compiler. Timings include result decoding. All 60,480 calls preserve their
+numeric witnesses, and committed guest memory stays at its warmed size. Median
+milliseconds per call:
+
+| Probe                | Pinned `86a527b` | Pre-fix `48eda0a` |  Current | Current/pinned |
+| -------------------- | ---------------: | ----------------: | -------: | -------------: |
+| `guarded_sum` 256    |         0.126542 |          2.458508 | 0.140054 |          1.107 |
+| `inline_writes` 2000 |         0.004580 |          0.048013 | 0.004954 |          1.082 |
+| `break_writes` 2000  |         0.337544 |          0.048336 | 0.005652 |          0.017 |
+| `unsigned_sort` 2000 |         0.038121 |          0.435611 | 0.041504 |          1.089 |
+| `pathfinding` 2000   |        10.994788 |          1.561656 | 0.083919 |          0.008 |
+
+Every required throughput ratio is below 1.5. Current `break_writes` doubles
+from 0.003104 to 0.005652 ms between 1,000 and 2,000 elements (1.821×),
+preserving linear scaling. Median paired current/pinned ratios for the four
+required throughput rows are 1.108, 1.083, 1.071 and 0.00769. The large
+pathfinding difference spans historical toolchains and their standard libraries;
+it is not an isolated estimate of the root-proof change.
+
+Both counted-owner compilers declare ownership `[2,2,0]`. The much older
+`86a527b` artifact predates that custom section and uses its matching guest API;
+the historical comparison does not change current admission. The complete
+2,470-native/1,556-guest/37-harness gate includes shared, replaced and
+owning-element carry controls, replay/checkpoint/OOM laws, constant journal work
+and plateaued memory. Compiler source and toolchain input hashes still match
+that gate, and CI lint remains qualified at zero findings. No compiler change
+was needed for this timing follow-up; the local analyzer remains task 082's
+separate gate.
+
+Release SHA-256 values, in table order, are
+`27c5c88bb10fb1e9ef63f00067281220b07cee50f01883881e6460f058bf4ddd`,
+`b4aab5ad5969977c5056bb5db5e018bea9eb2dc7bc8b6e0c856ab313b52d40da`, and
+`0f531509c7316dfb318510c668152f4c2bdbb48d188863f1d4c3d82362823aa3`. Raw
+distributions, source/API hashes, compile allocations and Wasm hashes are in
+ignored `build/bench/task109-final/results.json`, SHA-256
+`4b434f70f8f130b50df01347f8a56ab3325130ebe32449e47a32cff8e7fa23e7`. The failed
+attempts using today's prelude or requiring new metadata from the historical
+compiler remain preserved separately.
+
+Reproduce from the matching source checkouts (each executable stays under its
+own `zig-native/zig-out/bin/`):
+
+```sh
+deno run --allow-all scripts/bench_array_throughput.ts \
+  PINNED_BLOTC PRE_FIX_BLOTC CURRENT_BLOTC INK_ROOT OUTPUT ISSUE_REPRO
+```

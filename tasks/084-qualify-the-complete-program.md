@@ -43,9 +43,10 @@ results rather than the starting baseline.
 - [ ] Run final semantic/ownership, sync/JSPI, editor, packaging, analyzer,
       source-layout, dependency/checkpoint, retained/restart and failed-edit
       recovery gates.
-- [ ] Pin a reproducible current workload (the frozen gdev manifest was waived
-      on 11 October 2026; the 415-input captured project is the candidate) and
-      record its manifest durably.
+- [x] Pin the owner-approved recreated gdev workload and record its manifest
+      durably: 583 files and 69 test entries, with exact source and manifest
+      hashes in
+      [current qualification](../zig-native/CLOUD_QUALIFICATION.md#current-workload-pin).
 - [ ] Measure that workload against pinned baselines in paired runs, including
       cold/population/first-edit/later-edit/no-op/restart/recovery and guest
       runtime/memory.
@@ -89,8 +90,10 @@ development and the scenarios below.
 ## Completion evidence
 
 - Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
+- Partial qualification: the current workload pin and the executed compiler gate
+  are recorded in [current qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  The other predecessor requirements, final-source analyzer gate and complete
+  final measurement set remain open; this does not complete task 084.
 - Comparison: pending; record baseline/candidate hashes and benchmark
   distributions, or explain why performance measurement does not apply.
 - Remaining limitations: not yet assessed; list unresolved scope explicitly.

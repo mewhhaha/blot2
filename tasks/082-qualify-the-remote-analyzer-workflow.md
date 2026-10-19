@@ -4,7 +4,9 @@
 
 - **Status:** Awaiting external evidence — the local analyzer builds at
   `9a78ce1`, but its backend bootstrap needs `codeberg.org`, blocked by the
-  enforced environment policy. The saved network draft needs publication.
+  enforced environment policy. The Codeberg configuration is published, but this
+  running instance still reports its earlier source version and enforced
+  revision 3 without that host. The published settings need to apply here.
   Final-source qualification also retains its documented dependencies.
 - **19 October 2026:** rerun the local analyzers after task 084. CI lint has
   reported 0 findings on every compile-time-hill merge through 19 October.
