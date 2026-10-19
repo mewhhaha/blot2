@@ -6,6 +6,10 @@ development screens are identified separately.
 
 ## Compiler gate
 
+Qualified compiler/source milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`
+on local `main`. Later documentation-only recording commits preserve its native
+inputs.
+
 The forced complete run passes:
 `deno task test:compiler --resume --force-native --budget-seconds 7200
 --phase-seconds 5400 --jobs 2 --build-jobs 2 --native-shards 2`.

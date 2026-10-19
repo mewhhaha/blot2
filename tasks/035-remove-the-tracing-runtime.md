@@ -69,8 +69,8 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Current local milestone: the commit containing this record; compiler and exact
-  source/log hashes are recorded by the
+- Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
+  and exact source/log hashes are recorded by the
   [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
