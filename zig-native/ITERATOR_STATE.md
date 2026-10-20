@@ -353,8 +353,105 @@ measured against the actual directory path. Original/instrumented Wasm and WAT
 hashes are in `build/bench/task047-prior-path-counts/results.json`, SHA-256
 `0806c74edf4e413a782dd148f4a9ef829429abd34c5a941f2afb8a8e6d03927f`.
 
-The isolated monotone-path prototype and reconstructed boxed/task-002 references
-still require executed controls and actual comparisons. The earlier 62-case
-task-024/current comparison is not the required boxed/task-002 gate. All-width
-packed cursor cost, Window state and broader generic state therefore remain
-open.
+The qualified `4fda7c2` compiler reproduces this exact width-16 Wasm in the
+current standard-library screen, so the route count also describes that current
+artifact. The scope is still one artifact, with no runtime CPU claim from its
+diagnostic counters.
+
+### Shared traversal-path screen, rejected
+
+The isolated shared-path candidate passes three new native laws plus their root
+harness, complete allocation-failure/replay controls and eight guest groups.
+These cover all supported widths, saved versions, forks, pressure and JSPI. Its
+safe/no-LLVM compiler is
+`8eadc35a59ea3c81f4e2d53dbbd958efaa6709e2c16c2b73217c5f207404583a`; focused pins
+and binaries remain in `build/bench/task047-linear-focused/`.
+
+The current-std U32 record screen uses the qualified release as baseline, the
+same optimized guest tier and one worker, CPU 2, 16,384 rows, 20 warmups and 31
+alternating pairs of sixteen traversals. Executed witnesses pass, but cursor
+sample medians regress:
+
+| Width | Baseline ms / traversal | Candidate ms / traversal | Candidate / baseline |
+| ----- | ----------------------: | -----------------------: | -------------------: |
+| 1     |                0.688250 |                 2.026000 |             2.943698 |
+| 3     |                0.382438 |                 1.070000 |             2.797843 |
+| 16    |                0.465500 |                 1.315750 |             2.826531 |
+
+The variant is rejected and remains outside main. Native compiler CPU is not
+compared across its different host build modes. Results:
+`build/bench/task047-linear-current-u32-screen/report.json`, SHA-256
+`37a1d761aa61544c118101102b338b242f2bc99def4a1c3e0d1a67399e6bbd82`.
+
+A first directory candidate also passes the focused correctness checks but
+regresses cursor runtime 2.56–3.49×. Runtime counters show about one additional
+retain/release per row in both rejected candidates, with zero cycle passes. The
+existing persistent-slot proof correctly declines the holder's final
+`Arena.recycle`: it can detach an original journal root. That helper must retain
+its existing ownership classification.
+
+### Scoped directory candidate, focused checks passed
+
+The next directory candidate opens the cursor-carry root frame after
+constructing the owning directory holder. The frame closes before the holder is
+recycled; the existing proof can cover the complete loop without changing root
+authority. Leaf crossings read the next directory leaf and its actual length.
+Saved cursor versions keep their independent collection, index, leaf and base
+fields. The bounded proof requires one creation, one loop carry and one direct
+advance that supplies its backedge. Resets, additional carries and nested
+advances decline.
+
+The safe/no-LLVM compiler is
+`ad19cf8961258d70c329c9de0583deedde30443c5796ac96ae076db8ff9373f6`. Five native
+tests, complete OOM/replay checks, eight guest groups and the 124-file backend
+analyzer pass. The tests include uneven sliced leaves, returned cursors,
+pressure, snapshots, all widths, forks and JSPI. Artifacts and source pins are
+in `build/bench/task047-directory-scoped-focused/`.
+
+The same CPU-2/current-std protocol measures cursor ratios at widths 1/3/16:
+
+| Scalar | Width 1 | Width 3 | Width 16 |
+| ------ | ------: | ------: | -------: |
+| U32    | 0.22284 | 0.25209 |  0.26691 |
+| F32    | 0.25915 | 0.28364 |  0.75129 |
+
+Actual work counters show three retains and four releases per traversal at both
+U32 widths 1 and 16, plus one 48-byte rounded setup allocation. The baseline
+performs 69 and 1,094 retain/release pairs respectively. All cycle counters stay
+zero. The global List keeps its original one root and one lease; calls add
+neither and warmed committed memory stays flat. These are runtime work counters,
+not instruction counts. Reports remain in
+`build/bench/task047-directory-scoped-current-{u32,f32}-screen/`.
+
+Both historical-source LLVM reconstructions pass an actual common-std ABI,
+result and warmed-memory smoke: 84 checks across boxed, task-002 and current.
+These are newly rebuilt references, not the lost original binaries or timings.
+The all-width comparison passes 186 width/type/shape pairs: 62 against each
+reference on their common historical std and another 62 against the current
+release on current std. Every executed witness agrees; no cursor median
+regresses. Candidate/reference cursor ratios are:
+
+| Reference and std               | Minimum |  Median | Maximum |
+| ------------------------------- | ------: | ------: | ------: |
+| Boxed, common historical std    | 0.31636 | 0.67376 | 0.90473 |
+| Task 002, common historical std | 0.09933 | 0.13757 | 0.35757 |
+| Current, current std            | 0.22899 | 0.32135 | 0.92292 |
+
+The verified summary is `build/bench/task047-scoped-all-width-summary.json`,
+SHA-256 `1a485353f9eab93ac9ba974377c18fa8e0cc1e9445e0ddef48099383604f82e1`.
+Compiler inputs, standard sources, harnesses and all Wasm hashes remain pinned;
+compiler teardown is zero. This qualifies the development candidate's guest
+screen. Native compiler cost and final LLVM/full checks remain open. The earlier
+62-case task-024/current comparison does not satisfy this historical gate.
+
+An additional reference exit from inside the cursor loop passes both tiers. The
+eleven-adapter diagnostic also passes executed results, roots/leases and flat
+warmed memory at counts 0/2/3/4,096. Enumerate, zip and strict zip allocate
+zero. A named partially applied fold still allocates per input in range, map,
+filter and take chains. Nested three-element Window folding makes 65,518
+allocator requests per 4,096 inputs; direct nested loops make 40,954. Those
+counts include semantic buffers as well as remaining state. The scoped cursor
+change leaves these adapter counts exact. Results:
+`build/bench/task047-scoped-adapter-screen-v2/results.json`, SHA-256
+`d9e1812fa29ec43355b578dc9ea6c1d728ab021b340e806583c3e5f57021c691`. Main remains
+unchanged; Window and broader generic state are still open.

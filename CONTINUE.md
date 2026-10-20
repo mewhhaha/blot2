@@ -244,7 +244,14 @@ the CPU guard.
 
 1. **Task program: 047, then the next ready tasks.**
    - The all-width cursor comparison is byte-exact but still exposes the
-     performance gap; Window and broader generic state remain open.
+     performance gap; Window and broader generic state remain open. The new
+     shared-path experiment is rejected. Its scoped directory successor passes
+     focused laws and measures U32 cursor CPU ratios 0.223–0.267 at widths
+     1/3/16. All 186 width/type/shape pairs pass against both rebuilt historical
+     references and current std separately, with no cursor regression. Compiler
+     cost, LLVM/full checks, Window and broader state remain open. Main remains
+     unchanged pending qualification. See the
+     [directory screen](zig-native/ITERATOR_STATE.md#scoped-directory-candidate-focused-checks-passed).
    - Keep 086's measured constant-work gate, 093's edit attribution and tasks
      100–104's targets open until their actual requirements pass.
 2. **Follow-ups recorded under their hills:**
