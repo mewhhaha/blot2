@@ -1999,6 +1999,14 @@ fn Walker(comptime Context: type) type {
             const owner = self.module.types.node(projection.source_type);
             if (projection.nominal.unit != 0 or projection.nominal.decl != 0) return self.nominalProjection(projection, depth + 1);
             if (projection.variants.len == 0) {
+                // Symbolic getters carry no physical nominal projection.
+                // Reconstruct the original receiver from its checked type;
+                // the ordinary member/scheme proof still owns selection.
+                if (owner.tag == .nominal) {
+                    var member = projection;
+                    member.nominal = .{ .unit = owner.a, .decl = owner.b };
+                    return self.nominalProjection(member, depth + 1);
+                }
                 const goal: core.Obligation = .{ .ty = projection.source_type, .kind = .field, .name = projection.field, .result = projection.result_type, .span = self.module.span(source) };
                 return require(try self.goalGiven(goal, depth + 1));
             }

@@ -7550,6 +7550,10 @@ const Engine = struct {
                     try self.constrain(function, expected_function, source);
                     self.dispatch_signatures[source] = expected_function;
                 }
+                // A getter uses public associated dispatch, not a physical
+                // nominal payload projection. Its source type retains the
+                // original receiver identity for ordinary member selection.
+                identity = .{ .unit = 0, .decl = 0 };
                 variants.clearRetainingCapacity();
             }
         } else if (result == 0) {

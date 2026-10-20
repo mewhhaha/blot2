@@ -65,8 +65,8 @@ A generalized local result from a call, application, selected named member or
 local alias whose concrete checked uses all agree on one layout may prepare its
 private storage at that instance. Bindings are visited last to first, so the
 facts of a later local close the uses feeding it through aliases and rebinding
-chains; a use read only by an unused local alias is ignored. A local with no
-use observes nothing, so its quantified holes take scalar word storage. Only
+chains; a use read only by an unused local alias is ignored. A local with no use
+observes nothing, so its quantified holes take scalar word storage. Only
 quantified local holes gain physical facts; known layouts still reconcile
 exactly. Captures, merges and carries decline this bounded proof. When uses
 disagree, a closed initializer built by a call, application, projection or
@@ -75,40 +75,39 @@ serializes it at its own layout. A callback whose rows that use leaves open is
 serialized at the instance its own body infers: each arrow the closure owns,
 including every literal arrow of a curried anonymous closure, closes to its own
 effects. That attempt reads only enclosing locals that already hold evaluator
-values, so each link of a rebinding chain headed by a promoted value is
-promoted too; it publishes no diagnostic when it declines and marks its code
-fresh. A compilation that fails after such a promotion runs once more without
-promotions, and that attempt owns the reported outcome. Otherwise a producer
-built only from pure calls, applications, projections, construction and local
-reads, whose value has a representation-free shape, runs once per distinct
-concrete use layout (at most four), in order at its binding. Each instance
-owns a Body prepared under facts that close only the local's quantified type
-holes and its quantified or still unknown rows; each use reads the instance of
-its own layout. A read inside an instanced producer counts once per instance,
-so alias and rebinding chains instance every link. The producer's free locals
-are immutable, so every instance reads the same values. Built data, arrays
-included, with a single use takes a single instance. A use whose remaining
-holes are all ambiguous type variables, which no scheme, type declaration,
-operation, contract or implementation of the unit quantifies, observes nothing
-there: checking left them unconstrained, so no value of such a type is ever
-built. The whole body stores each as a scalar word and closes each such row
-tail at that use as the empty row. The choice depends only on the variable, so
-bodies that make it agree, and nested closures and callee instances receive it
-through their layouts. A quantified hole never takes this storage: it stands
-for each type its instances choose, and a later use may read its shared storage
-at a concrete type. In the promoting attempt a promotable local that only such
-storage closes stays undecided, so a closed initializer keeps its evaluator
-value; one that is not promoted fails that attempt, and the retry decides it
-under the same storage. Captures, merges, carries, qualified or generative
-schemes, authority-bearing or usage-contract values, effects, blocks, matches,
-collection edits proven to run in place and any use that leaves a quantified
-hole open decline. A declined runtime-dependent initializer whose uses disagree
-still reports `ownership_unproved`. That is not only an ownership limit: no
-single physical value serves both uses, because closure signatures and field
-words depend on the layout, and emitting one traps with a signature mismatch.
-The source scheme and semantic generalization remain unchanged. Substitutions
-belong to the owned resolved Body, including encoding, an inlined body's too;
-they never become solver evidence.
+values, so each link of a rebinding chain headed by a promoted value is promoted
+too; it publishes no diagnostic when it declines and marks its code fresh. A
+compilation that fails after such a promotion runs once more without promotions,
+and that attempt owns the reported outcome. Otherwise a producer built only from
+pure calls, applications, projections, construction and local reads, whose value
+has a representation-free shape, runs once per distinct concrete use layout (at
+most four), in order at its binding. Each instance owns a Body prepared under
+facts that close only the local's quantified type holes and its quantified or
+still unknown rows; each use reads the instance of its own layout. A read inside
+an instanced producer counts once per instance, so alias and rebinding chains
+instance every link. The producer's free locals are immutable, so every instance
+reads the same values. Built data, arrays included, with a single use takes a
+single instance. A use whose remaining holes are all ambiguous type variables,
+which no scheme, type declaration, operation, contract or implementation of the
+unit quantifies, observes nothing there: checking left them unconstrained, so no
+value of such a type is ever built. The whole body stores each as a scalar word
+and closes each such row tail at that use as the empty row. The choice depends
+only on the variable, so bodies that make it agree, and nested closures and
+callee instances receive it through their layouts. A quantified hole never takes
+this storage: it stands for each type its instances choose, and a later use may
+read its shared storage at a concrete type. In the promoting attempt a
+promotable local that only such storage closes stays undecided, so a closed
+initializer keeps its evaluator value; one that is not promoted fails that
+attempt, and the retry decides it under the same storage. Captures, merges,
+carries, qualified or generative schemes, authority-bearing or usage-contract
+values, effects, blocks, matches, collection edits proven to run in place and
+any use that leaves a quantified hole open decline. A declined runtime-dependent
+initializer whose uses disagree still reports `ownership_unproved`. That is not
+only an ownership limit: no single physical value serves both uses, because
+closure signatures and field words depend on the layout, and emitting one traps
+with a signature mismatch. The source scheme and semantic generalization remain
+unchanged. Substitutions belong to the owned resolved Body, including encoding,
+an inlined body's too; they never become solver evidence.
 
 Finite closed local data can instead retain its evaluator value, including
 independent generic uses and captures. The proof checks exact constructor
@@ -424,17 +423,17 @@ cycle link cannot serve both the journal and a cycle queue simultaneously. A
 slot that provably keeps one value until its frame closes covers duplicate
 stores, publications and slots of that value. A lexical frame that owns nothing
 loses its open/close but keeps its collector safe point. Both proofs use exact
-copies and current executable control flow, never pointer bits.
-Checked globals and mutable static reference fields publish through one typed
-module owner table. Scalar fields never add edges. Optimizer context includes
-root mode and owner-table geometry; start bodies cannot reuse an old table size.
-ABI 3 private entry/leave hooks preserve the public value set and copy numeric
-results before leave. [Suspended ownership](SUSPENDED_OWNERSHIP.md) admits exact
-generated host imports and checked request graphs with the same counted journal
-through JSPI. Failed leave terminalizes active evaluating demands before
-retirement; request cancellation resets them to pending. Externref cleanup and
-revoked-descriptor checks prevent a strong ready memo from rebinding an old host
-closure. Unknown imports retain the complete tracing fallback.
+copies and current executable control flow, never pointer bits. Checked globals
+and mutable static reference fields publish through one typed module owner
+table. Scalar fields never add edges. Optimizer context includes root mode and
+owner-table geometry; start bodies cannot reuse an old table size. ABI 3 private
+entry/leave hooks preserve the public value set and copy numeric results before
+leave. [Suspended ownership](SUSPENDED_OWNERSHIP.md) admits exact generated host
+imports and checked request graphs with the same counted journal through JSPI.
+Failed leave terminalizes active evaluating demands before retirement; request
+cancellation resets them to pending. Externref cleanup and revoked-descriptor
+checks prevent a strong ready memo from rebinding an old host closure. Unknown
+imports retain the complete tracing fallback.
 
 Optimized body captures own their inputs and outputs. Reuse requires exact local
 instructions and types, called bodies, call signatures, arena roles and
@@ -718,9 +717,9 @@ are checked by generation token: a pin holds while its module still names the
 pinned buffers, since Core is immutable once pinned, and a view inherits a token
 only from those buffers or from exactly equal contents. The opt-in
 `validate_pins` option also recomputes each pin's Core digest; checkpoints store
-digests, never tokens. A certificate saves validation work; it
-grants no interface, value or executable reuse. Only successful publication can
-make the new certificate available to a later revision.
+digests, never tokens. A certificate saves validation work; it grants no
+interface, value or executable reuse. Only successful publication can make the
+new certificate available to a later revision.
 
 An already completed scalar constant no longer blocks its enclosing code
 fragment when source admission, layout, scalar kind and bits match. Admission
@@ -1014,32 +1013,32 @@ names are numbered within their top-level declaration. See
 [body interface cutoff](BODY_CUTOFF.md).
 
 Population checks every dependency within the whole project and the entry once,
-as the consumer of the frozen dependencies. Published capability collections
-are built children-first from each binding's recipe, so a module checked
-against live dependencies publishes the same Core and interface as one checked
-against their frozen interfaces, and the first edit after population cuts off
-like any later one.
+as the consumer of the frozen dependencies. Published capability collections are
+built children-first from each binding's recipe, so a module checked against
+live dependencies publishes the same Core and interface as one checked against
+their frozen interfaces, and the first edit after population cuts off like any
+later one.
 
-A build publishes only its first diagnostic, so a project check that reports
-one stops after that module. A portable check rejection is published by the
-lane that found it: the entry checked against the frozen dependencies, or the
-changed modules checked against the seed. Portable means the diagnostic belongs
-to a module that lane parsed, its text is the code's fixed message with at most
-a name (no hole, explanation, purity witness, numeric fault or detail), it is no
+A build publishes only its first diagnostic, so a project check that reports one
+stops after that module. A portable check rejection is published by the lane
+that found it: the entry checked against the frozen dependencies, or the changed
+modules checked against the seed. Portable means the diagnostic belongs to a
+module that lane parsed, its text is the code's fixed message with at most a
+name (no hole, explanation, purity witness, numeric fault or detail), it is no
 budget, analysis-limit or dependency-failure rejection, and every loaded module
 is reachable from the entry or the prelude. The modules taken from the seed are
 closed under imports and checked successfully on the same inputs, and a frozen
 producer publishes what a live one does, so a fresh check meets the same first
-failing module and diagnostic: the premise successful retained revisions
-already rely on. The published fields are identical; the unit ordinal, which is
-not published, numbers the lane's own modules. Any other rejection, lowering
+failing module and diagnostic: the premise successful retained revisions already
+rely on. The published fields are identical; the unit ordinal, which is not
+published, numbers the lane's own modules. Any other rejection, lowering
 diagnostic or freeze failure finishes the deferred entry check with the same
 budgets and body offers and takes the undivided lane, which reports it.
 
 Receiver syntax, operators and `from` select an associated function by type,
-through no named reference. A dirty associated candidate therefore dirties
-every declaration whose body may resolve its member name or operator (recipe
-members plus projected and updated fields and every obligation,
+through no named reference. A dirty associated candidate therefore dirties every
+declaration whose body may resolve its member name or operator (recipe members
+plus projected and updated fields and every obligation,
 `declaration_dependencies.selectionMembers`) and their transitive readers; the
 rest of the program keeps the gate.
 
@@ -1068,6 +1067,23 @@ preserves original kinds/targets and validates reachable producers within a
 shared bounded graph walk. No private catalog can become public through a
 source, dependency or checkpoint import. Delayed generic dispatch and field
 resolution enforce the defining-module boundary too.
+
+A retained semantic caller may relocate public bindings and catalog positions
+only after complete original-producer correspondence. Public implementation
+members additionally compare their hidden methods' flow, positional capability
+parameters and owned capability recipes against complete old Core and current
+Checked owners. Those views are borrowed only during comparison; returned maps
+own numeric slots and unambiguous provenance spans. Private names, schemes and
+recipes stay redacted at the public boundary. Symbolic associated type
+projections retain exact contract/member identities and argument relationships;
+they confer no selected implementation proof. Missing owners, unsupported
+catalogs and exhausted bounds keep ordinary checking.
+
+A checked associated getter remains symbolic Core dispatch. Its receiver type
+retains the original nominal identity; its projection metadata grants no
+physical payload view. Artifact validation continues to reject foreign opaque
+construction, patterns and physical projections. Executable consumers still
+rebuild after private method bodies or storage facts change.
 
 Erasure changes physical storage, never semantic identity: scalar payload bits
 and reference payload addresses pass through unchanged. There is no wrapper
@@ -1108,10 +1124,10 @@ descriptor's immutable word (bit 0 still freezes the descriptor), requested by a
 zero row width plus `acyclic_kind` in `new` and `from_array`; an empty such List
 uses its own static descriptor. Every descriptor, branch and leaf of that tree,
 and an Array converted from it, takes the flag. Freezing, thawing, copies,
-slices and conversions keep the bit, and a concatenation keeps it only when
-both inputs carry it. Update copies without a known element layout, static
-constant Lists and unknown or erased element layouts leave the allocation
-eligible for candidates.
+slices and conversions keep the bit, and a concatenation keeps it only when both
+inputs carry it. Update copies without a known element layout, static constant
+Lists and unknown or erased element layouts leave the allocation eligible for
+candidates.
 
 A named callable with exactly one applied argument may use that argument's
 canonical reference as its environment when the checked first parameter layout
@@ -1129,17 +1145,17 @@ demand-force markers decline. Source arithmetic, eager operands and F32 bits
 remain exact; this grants no semantic or value-cache validity. See
 [iterator state qualification](ITERATOR_STATE.md).
 
-A version/copy group of 16-byte scalar-only objects accessed through whole
-v128 loads or stores keeps one v128 local per version instead; lane loads and
-stores become lane extracts and replacements, every lane written before any
-read. Only in such a body, an address from outside the function (parameter,
-call result, field or static constant) copied into the group loads its lanes
-there, and an escaping read straight from a local (a non-helper call argument,
-a stored field, a return) or a returned block result boxes a fresh scalar-only
-copy, annotated like an emitted allocation, when the group is read in lanes and
-the box runs outside every loop or in a loop activation that allocates the
-group. Any other escape keeps the group's storage. Ordinary lifetime and root
-passes then own every remaining allocation.
+A version/copy group of 16-byte scalar-only objects accessed through whole v128
+loads or stores keeps one v128 local per version instead; lane loads and stores
+become lane extracts and replacements, every lane written before any read. Only
+in such a body, an address from outside the function (parameter, call result,
+field or static constant) copied into the group loads its lanes there, and an
+escaping read straight from a local (a non-helper call argument, a stored field,
+a return) or a returned block result boxes a fresh scalar-only copy, annotated
+like an emitted allocation, when the group is read in lanes and the box runs
+outside every loop or in a loop activation that allocates the group. Any other
+escape keeps the group's storage. Ordinary lifetime and root passes then own
+every remaining allocation.
 
 A private function whose parameter or result holds a proved four-lane product
 gets a v128 worker in a detached assembly view, and every direct call in that
@@ -1148,16 +1164,16 @@ block results, direct arguments and parameters, and returns and direct results
 connected by copies share one type, and a class read or written whole by a v128
 access at offset zero is a four-lane product. An arithmetic address, plain
 constant, host or helper result, erased or provider parameter, access outside
-sixteen bytes, or allocation other than a sixteen-byte scalar-only box makes
-the class ineligible. The worker stores each v128 parameter in a fresh
-scalar-only box on entry and loads its returned box at every exit; callers load
-argument lanes and box a v128 result the same way, and scalar replacement then
-removes the boxes that do not escape. Entries, start, adapters, region or
-cohort owners, callees the inline pass expands and bodies branching to their
-own label keep their ABI. The original keeps its boxed body for tables, exports
-and helper callers, and otherwise becomes a trapping body. The view is rebuilt
-for every optimized assembly and artifact replay; the development tier
-assembles without it.
+sixteen bytes, or allocation other than a sixteen-byte scalar-only box makes the
+class ineligible. The worker stores each v128 parameter in a fresh scalar-only
+box on entry and loads its returned box at every exit; callers load argument
+lanes and box a v128 result the same way, and scalar replacement then removes
+the boxes that do not escape. Entries, start, adapters, region or cohort owners,
+callees the inline pass expands and bodies branching to their own label keep
+their ABI. The original keeps its boxed body for tables, exports and helper
+callers, and otherwise becomes a trapping body. The view is rebuilt for every
+optimized assembly and artifact replay; the development tier assembles without
+it.
 
 An exact table target in a selected private closure may expose a bounded checked
 scalar consumer with internal blocks. Copied locals start at typed zero on every

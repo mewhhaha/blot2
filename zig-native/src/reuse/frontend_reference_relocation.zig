@@ -12,7 +12,7 @@ const Error = error{Declined};
 fn contains(comptime T: type) bool {
     @setEvalBranchQuota(20000);
     if (T == core.BindingRef or T == PI.ExternalTarget) return true;
-    if (T == Types.Obligation or T == core.Obligation or T == D.Export) return true;
+    if (T == Types.Obligation or T == core.Obligation or T == D.Export or T == PI.Implementation) return true;
     return switch (@typeInfo(T)) {
         .pointer => |pointer| if (pointer.size == .slice) contains(pointer.child) else false,
         .optional => |optional| contains(optional.child),
@@ -68,6 +68,14 @@ fn walk(comptime writing: bool, value: anytype, targets: relocation.Targets, rem
         if (mapped.unit != value.unit) return error.Declined;
         changed.* = changed.* or mapped.binding != value.binding;
         if (comptime writing) value.binding = mapped.binding;
+        return;
+    }
+    if (comptime T == PI.Implementation) {
+        if (value.origin_span) |before| {
+            const after = targets.qualification(value.identity.unit, before);
+            changed.* = changed.* or !std.meta.eql(before, after);
+            if (comptime writing) value.origin_span = after;
+        }
         return;
     }
     if (comptime T == Types.Obligation or T == core.Obligation) {
@@ -191,4 +199,23 @@ test "frontend relocation preserves contract provenance in owned principal and e
     try std.testing.expectEqual(before, original.principal.qualification_span.?);
     try std.testing.expectEqual(before, owned.executable.span);
     try std.testing.expectEqualDeep(original.unrelated, owned.unrelated);
+}
+
+test "frontend relocation implementation origins update owned diagnostic provenance without changing declaration identities" {
+    const before: @import("../parse/ast.zig").Span = .{ .start = 10, .end = 20 };
+    const after: @import("../parse/ast.zig").Span = .{ .start = 40, .end = 50 };
+    var qualifications = [_]relocation.Qualification{.{ .before = before, .after = after }};
+    var implementations = [_]u32{1};
+    const maps = [_]?relocation.Map{.{ .bindings = &.{}, .implementations = &implementations, .qualifications = &qualifications }};
+    var value: PI.Implementation = .{ .origin_span = before, .identity = .{ .unit = 1, .decl = Types.opaque_name_bit | 7 }, .name = 7, .contract = .{ .unit = 2, .decl = Types.opaque_name_bit | 9 } };
+    const original = value;
+    const targets: relocation.Targets = .{ .units = &maps };
+    try std.testing.expect(changes(&value, targets).?);
+    try std.testing.expectEqual(before, value.origin_span.?);
+    try rewrite(&value, targets);
+    try std.testing.expectEqual(after, value.origin_span.?);
+    value.origin_span = before;
+    try std.testing.expectEqual(original, value);
+    value.identity.unit = 2;
+    try std.testing.expect(!changes(&value, targets).?);
 }

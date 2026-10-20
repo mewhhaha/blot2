@@ -632,17 +632,18 @@ allocation sweeps** plus two expected-error harness laws. All 455 analyzer files
 have zero findings; the full gate takes 697.812 s. Exact frozen inputs and
 release qualification are in
 [the checkpoint](../zig-native/CONTINUATION_QUALIFICATION.md#qualified-continuation-15-october-2026).
-Tasks 070/071 now satisfy their finite acceptance criteria. The current 19
-October statuses are **97 complete** (including four designs), **6 in progress**
-and **7 pending**: **13 remain open**. The broader program and performance
-targets remain open.
+Tasks 070/071 now satisfy their finite acceptance criteria. The current 20
+October statuses are **98 complete** (including four designs), **5 in progress**
+and **7 pending**: **12 remain open**. The broader program and performance
+targets remain open. Task [053] now closes against its fixed rows with the
+[final repaired-source qualification](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#final-task-053-qualification-20-october-2026).
 
 On 18–19 October 2026 the compile-time hills in
 [COMPILE_HILLS.md](../COMPILE_HILLS.md) (CT1–CT94) and the runtime issues
 #12–#16 landed outside this index. Their effect on tasks 024, 082, 086, 093 and
 100–104 is in each task's dated status note. Tasks 105–109 are implemented in
-committed source. Current acceptance records close 105–109, including owner-approved recreated
-Ink callback probes for 108.
+committed source. Current acceptance records close 105–109, including
+owner-approved recreated Ink callback probes for 108.
 
 Owner decisions of 15 October 2026: language tasks 058/059/061/062/064/065,
 067/068 and 073/074 close against fixed acceptance rows or traces recorded in
@@ -732,7 +733,7 @@ the forced complete gate pass. The authoritative statuses are below.
 | [050] — Implement editor completion                     | Complete                   | [049]                                  |
 | [051] — Specify module abstraction                      | Complete                   | [020]                                  |
 | [052] — Implement opaque types and privacy              | Complete                   | [051]                                  |
-| [053] — Qualify module cutoffs and wrapper erasure      | In progress                | [052], [024]                           |
+| [053] — Qualify module cutoffs and wrapper erasure      | Complete                   | [052], [024]                           |
 | [054] — Specify associated types and implementations    | Complete                   | [052]                                  |
 | [055] — Implement associated type members               | Complete                   | [054]                                  |
 | [056] — Implement declarations and evidence diagnostics | Complete                   | [055]                                  |

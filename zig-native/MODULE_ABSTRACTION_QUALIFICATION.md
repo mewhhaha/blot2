@@ -30,6 +30,9 @@ last-good owners and output.
 
 ## Focused checks
 
+These are the original task 052 focused results; later full qualifications
+follow.
+
 Zig 0.17.0 was checked before every build batch. The focused native run passed
 37 laws (module abstraction, allocation-budget and editor completion filters),
 the LLVM executed- Wasm run passed 31 laws, and the analyzer checked 339 files
@@ -88,8 +91,8 @@ ratio median/p90 0.9976/1.0058); reference median CPU is 3.734 → 3.703 μs/cal
 (paired ratio 1.0000/1.0317). Whole modules differ: 190 → 228 scalar bytes and
 3,373 → 3,404 reference bytes. No whole-module parity or runtime gain is
 claimed. The scalar no-memory law proves heap absence for that case; exact
-operation-body and allocation-traffic qualification across all wrappers remains
-task 053.
+operation-body and allocation-traffic qualification across the eligible wrappers
+now passes in the final task 053 record below.
 
 Raw distributions, source/Wasm/binary hashes and commands are retained in
 `build/bench/module-abstraction/{compile,erasure,pins.json}`. Focused commands
@@ -100,12 +103,13 @@ analyzer.
 
 ## Limits and next qualification
 
-Task 053/024 still owns semantic cutoffs across unrelated private insertion,
-private declaration relocation and alpha-renamed parameters. This implementation
-keeps exact positional interface/catalog comparisons; such edits may
-conservatively recheck callers. The executed edit laws require fresh output and
-diagnostic parity, not semantic reuse. Private body changes with an unchanged
-public interface still retain ordinary exact executable dependency checks.
+The original handoff used positional interface/catalog comparisons. The final 20
+October continuation below qualifies private insertion, declaration relocation,
+alpha changes and bounded public contract/associated/implementation
+correspondence for task 053's fixed rows. Unsupported rank, usage,
+selected-proof and exhausted forms keep task 024's ordinary-checking limits.
+Public contracts and original producer identities still compare exactly;
+executable dependencies invalidate independently of semantic caller reuse.
 
 Deep, exhausted or unresolved ABI proofs decline emission rather than guess a
 machine/ownership type. Forwarding and public scans retain fixed graph budgets.
@@ -252,12 +256,16 @@ in force; no screen result is a reason to relax them.
 
 ## Task 053 continuation (19 October 2026, qualification in progress)
 
-The current development changes separate a known opaque machine recipe from
-semantic caller equality. Nominal identity, visibility, public schemes,
-relationships, graph sharing and unknown recipes retain their exact checks. A
-hidden constructor's AST ordinal may move only under its matched, known opaque
-parent; its unit, catalog slot, tag, privacy and remaining facts still match.
-Artifact and executable admission retain their original identities and recipes.
+This heading preserves existing links to the chronological record and law map.
+The [final qualification](#final-task-053-qualification-20-october-2026) closes
+the fixed rows on the repaired source.
+
+The continuation separates a known opaque machine recipe from semantic caller
+equality. Nominal identity, visibility, public schemes, relationships, graph
+sharing and unknown recipes retain their exact checks. A hidden constructor's
+AST ordinal may move only under its matched, known opaque parent; its unit,
+catalog slot, tag, privacy and remaining facts still match. Artifact and
+executable admission retain their original identities and recipes.
 
 A changed recipe stops semantic propagation through ordinary callers, while the
 backend consumes the current producer's Core. An unchanged module or entry that
@@ -318,24 +326,25 @@ executable is
 `7593408b9110b701a846539ef0375d990354f726194764f89547a2f4f99425ef`. The timing
 report has SHA-256
 `f4928e303c17876822447b803f412c4fe84ec8b947b0661a83503df34f1343b1`. The final
-compile/CPU qualification below also passes this source. The remaining
-public-contract case keeps the whole task open.
+compile/CPU qualification below also passes this source. That milestone preceded
+the public-contract and catalog follow-ups; the final qualification supersedes
+its open task status.
 
-| Row | Laws and observations                                                                                                                                                                                                             | Current result                                                                                                                                                  |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Native `module interface cutoff reuses opaque callers when every dependency is dirty through OOM`; both-tier `module_cutoff_all_dirty_execution.test.ts`                                                                          | Existing body cutoff; current full gate passes                                                                                                                  |
-| 2   | Native `inert principal suffixes retain opaque callers through private local edits and OOM`, with changed-prefix, omitted-slot and namespace rejection controls                                                                   | Existing suffix cutoff; current full gate passes                                                                                                                |
-| 3   | Native owned-reference insertion/movement OOM law; typed map/graph laws; both-tier `opaque_binding_relocation_execution.test.ts`                                                                                                  | Focused private binding, datatype, effect and contract insertion, movement, revert and owned-copy laws pass; complex public authority/catalog cases remain open |
-| 4   | Native generic parameter alpha and public effect parameter alpha OOM laws; value-alpha storage law and both-tier relocation/effect guests                                                                                         | Type/scheme/value/effect alpha reuse, actual handled effect invocation, fresh/source/archive/checkpoint and failed-edit parity and full gate pass               |
-| 5   | The same native law and both-tier storage guest law, U32 → F32 → U32                                                                                                                                                              | Focused semantic callers reuse; current machine consumers rebuild                                                                                               |
-| 6   | The same native and guest laws, equal-layout private record field rename                                                                                                                                                          | Focused callers reuse with fresh executable parity                                                                                                              |
-| 7   | Those laws plus `opaque derived storage producers refresh their recipes while semantic callers reuse through OOM`; derived-storage guest scenarios                                                                                | Focused scalar/reference transitions, derived module/entry refresh, unrelated opaque reuse, roots, rollback and restart pass                                    |
-| 8   | Native `opaque semantic comparison preserves identities visibility contracts and unknown-storage declines`; project-check module abstraction privacy, producer and forwarding laws; `module_abstraction_import_execution.test.ts` | Identity, visibility, ownership facts and public changes retain conservative invalidation                                                                       |
-| 9   | Native `module abstraction allocation failure releases every unpublished compiled owner`, forged-interface and publication-OOM laws; storage candidate OOM sweeps and failed-edit/checkpoint guest controls                       | No last-good owner or output mutation on rejection or allocation failure                                                                                        |
-| 10  | `opaque_wrapper_operations.test.ts`, U32/F32 in both tiers: exact exported signature/body bytes, absence of a memory section, quiet NaN payload bits, signed zero and infinities                                                  | Focused operation and no-heap checks pass                                                                                                                       |
-| 11  | The same guest file's reference/generic-record allocation laws, including aliases, COW and captured/returned values; five operation benchmark pairs                                                                               | Focused actual allocation/ownership traffic matches the plain programs                                                                                          |
-| 12  | `scripts/qualify_wrapper_contexts.ts`: four representations × two tiers × plain/opaque × source/archive × initial/edit/revert, with fresh bytes, checkpoint restart, captures, aliases, traps and effects                         | All 96 rows pass exact exported and private function signatures/bodies, non-custom executable sections and allocation comparisons                               |
-| 13  | Original module abstraction ABI validation, forged recipe and bounded-emission laws; unknown-recipe comparison control; nested literal-pattern guard guest law                                                                    | Unsupported or refutable cases retain ordinary checking, emission or rejection                                                                                  |
+| Row | Laws and observations                                                                                                                                                                                                             | Current result                                                                                                                                                                              |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Native `module interface cutoff reuses opaque callers when every dependency is dirty through OOM`; both-tier `module_cutoff_all_dirty_execution.test.ts`                                                                          | Existing body cutoff; current full gate passes                                                                                                                                              |
+| 2   | Native `inert principal suffixes retain opaque callers through private local edits and OOM`, with changed-prefix, omitted-slot and namespace rejection controls                                                                   | Existing suffix cutoff; current full gate passes                                                                                                                                            |
+| 3   | Native owned-reference, public-contract, associated and implementation/member correspondence OOM laws; both-tier relocation, public-contract, associated and implementation guests                                                | Full gate passes private binding/type/effect/contract insertion and movement, public contract/catalog correspondence, symbolic getters and bounded original method capability relationships |
+| 4   | Native generic parameter alpha and public effect parameter alpha OOM laws; value-alpha storage law and both-tier relocation/effect guests                                                                                         | Type/scheme/value/effect alpha reuse, actual handled effect invocation, fresh/source/archive/checkpoint and failed-edit parity and full gate pass                                           |
+| 5   | The same native law and both-tier storage guest law, U32 → F32 → U32                                                                                                                                                              | Focused semantic callers reuse; current machine consumers rebuild                                                                                                                           |
+| 6   | The same native and guest laws, equal-layout private record field rename                                                                                                                                                          | Focused callers reuse with fresh executable parity                                                                                                                                          |
+| 7   | Those laws plus `opaque derived storage producers refresh their recipes while semantic callers reuse through OOM`; derived-storage guest scenarios                                                                                | Focused scalar/reference transitions, derived module/entry refresh, unrelated opaque reuse, roots, rollback and restart pass                                                                |
+| 8   | Native `opaque semantic comparison preserves identities visibility contracts and unknown-storage declines`; project-check module abstraction privacy, producer and forwarding laws; `module_abstraction_import_execution.test.ts` | Identity, visibility, ownership facts and public changes retain conservative invalidation                                                                                                   |
+| 9   | Native `module abstraction allocation failure releases every unpublished compiled owner`, forged-interface and publication-OOM laws; storage candidate OOM sweeps and failed-edit/checkpoint guest controls                       | No last-good owner or output mutation on rejection or allocation failure                                                                                                                    |
+| 10  | `opaque_wrapper_operations.test.ts`, U32/F32 in both tiers: exact exported signature/body bytes, absence of a memory section, quiet NaN payload bits, signed zero and infinities                                                  | Focused operation and no-heap checks pass                                                                                                                                                   |
+| 11  | The same guest file's reference/generic-record allocation laws, including aliases, COW and captured/returned values; five operation benchmark pairs                                                                               | Focused actual allocation/ownership traffic matches the plain programs                                                                                                                      |
+| 12  | `scripts/qualify_wrapper_contexts.ts`: four representations × two tiers × plain/opaque × source/archive × initial/edit/revert, with fresh bytes, checkpoint restart, captures, aliases, traps and effects                         | All 96 rows pass exact exported and private function signatures/bodies, non-custom executable sections and allocation comparisons                                                           |
+| 13  | Original module abstraction ABI validation, forged recipe and bounded-emission laws; unknown-recipe comparison control; nested literal-pattern guard guest law                                                                    | Unsupported or refutable cases retain ordinary checking, emission or rejection                                                                                                              |
 
 The exact continuation law names make the mapping above reproducible:
 
@@ -353,6 +362,23 @@ The exact continuation law names make the mapping above reproducible:
   `module interface cutoff preserves generic parameter alpha correspondence through OOM`
   and
   `module interface cutoff preserves public effect parameter alpha through OOM`.
+- Rows 3, 4, 8 and 9 additionally cover
+  `module interface cutoff preserves public contract recipes and forwarded catalogs through OOM`,
+  `module interface cutoff preserves public associated relationships and original targets through OOM`
+  and
+  `module interface cutoff preserves bounded implementation catalogs selected callers and original producers through OOM`.
+  [Method source laws](src/reuse/frontend_method_sources.zig) require complete
+  original public roles, private method names and bounded source context;
+  [graph laws](src/reuse/frontend_graph_correspondence.zig) preserve symbolic
+  associated producers, members, arguments and arity. The both-tier guests are
+  [public contracts](tests/opaque_public_contract_cutoff_execution.test.ts),
+  [associated getters](tests/opaque_associated_cutoff_execution.test.ts) and
+  [implementation catalogs](tests/opaque_implementation_cutoff_execution.test.ts).
+- Rows 3, 8, 9 and 13 include
+  `package symbolic nominal getters retain exact public member authority and reject payload guesses through OOM`
+  in [package laws](src/check/package_contracts_tests.zig). Associated getter
+  guests exercise the same package proof through archives, restart, failed
+  privacy edits and last-good recovery.
 - Rows 5–9, in that same file:
   `opaque storage changes retain semantic callers and rebuild current executable layouts through OOM`,
   `opaque derived storage producers refresh their recipes while semantic callers reuse through OOM`,
@@ -590,6 +616,133 @@ ignored `build/bench/task053-associated-cutoff-screen/`,
 artifact-publication issue to diagnose; no passing associated cutoff or
 prototype execution is claimed.
 
+### Bounded public catalogs and getter metadata, focused continuation
+
+The counterexamples above describe the qualified `04e41ef` baseline. The next
+continuation now integrates the reviewed isolated fix. Public implementation
+catalog positions, including zero, have owned injective maps. Matching compares
+original identities, visibility, contract heads, parameters, predicates, member
+signatures and templates. Symbolic associated type projections compare exact
+original contract/member identities, arity and argument graphs with injective
+variable sharing; no selected implementation proof is inferred.
+
+A public member's hidden method slot additionally requires its complete old Core
+and current Checked owners. Ephemeral callbacks validate the original
+implementation/member role and the current generated private name, then compare
+flow, positional capability parameters and exact capability-recipe graphs.
+Absent context, another producer/name or changed capability facts decline. No
+source borrow enters a returned map, and no private binding is unredacted in a
+public artifact. Implementation-origin spans relocate only in unpublished
+copies, just like matched authored qualification origins. Ordinary diagnostic
+spans remain separate. The 64-catalog/4,096-work bounds and ordinary-checking
+limits for unsupported row catalogs, rank/usage/generative forms and selected
+proof payloads remain.
+
+The initial getter failure came from a symbolic associated access retaining a
+physical nominal projection marker in an intermediate module. The checker now
+keeps its original receiver identity in the source type and clears only that
+physical marker when selecting the method. The existing artifact validator still
+rejects foreign opaque payload access. The new native/OOM and both-tier guest
+laws pass this repair with source/archive/checkpoint/failed-edit controls; the
+three existing import/privacy guest laws also pass.
+
+The combined focused campaign passes thirteen helper laws and six integration
+laws, including complete allocation-failure sweeps. Ten guest groups check
+43,200 calls across source and archived dependencies, edits, reverts and
+restart; 27,200 calls belong to the new associated/implementation groups.
+Private binding/type/catalog insertion, alpha changes and same-interface
+method-body edits reuse both semantic callers and match fresh bytes. Changed
+implementation heads, associated types, losing candidates, visibility and public
+method signatures force rechecking and preserve fresh results or diagnostics.
+Both analyzers report zero findings over all 511 source files and the fixture
+module.
+
+The isolated development compiler is
+`98f059e303acf91f31c676a427155980343ea8f9d9b8fcf9edf5ab2e11b98d68`; its focus
+log SHA-256 is
+`fd0acc2e259e28162ebbce4e9743a0de63ce8a69e99d32dff3bb4a7178cdb41c`. The
+implementation is now in the working tree. The forced complete LLVM gate
+`run-618a85eed20faf7f` built both LLVM binaries, then passed 2,495 of 2,496
+native laws with zero skips, leaks or logged errors. The package
+mixed-composition law failed with `InvalidArtifact`: its lexical validator still
+classified a zero-nominal getter as an abstract field goal. GDB confirms that
+path, while the same isolated law passes on the preceding qualified compiler.
+The failed run's 1,165-input manifest is
+`0920ce42eb5855cd623ffe217eda125c0576dadd0559cbf9ed71e196016b845c`; its compiler
+is `4cdfba0f2abeb6fba40416fe42bbfb64491eef334ba141511196bcfa41cc31a3`.
+
+The targeted repair reconstructs a symbolic getter's nominal receiver from its
+checked source type and invokes the existing exact member and scheme proof. It
+keeps explicit identity mismatches and physical projection rules unchanged. All
+78 focused package laws pass, including the original regression, explicit legacy
+receiver metadata, wrong-member/receiver and payload-guess controls with
+complete OOM and immutable-Core checks. Eighteen guest groups pass, including a
+new opaque-getter/package case through both-tier source/archive, checkpoint
+restart and failed privacy edits (800 executed calls). The focused compiler is
+`3902038f6b01576b82ec146c5f54f016fdcdde445a0fdf69bd5837261865f955`; source and
+log pins are in `build/bench/task053-package-focused/pins.json`.
+
+The replacement full gate `run-94ee2a5814168d09` passes **2,497 executed native
+laws, 1,585 guest/client checks and 37 harness checks** on 1,165 frozen inputs,
+manifest `73ddc05986cd4e765296e0cea9cc049b7bec973ab87242a49edd0e4a16b673e7`.
+Native laws have zero skips, failures, leaks or logged errors; both LLVM builds
+and the native execution are cache misses. Wall time is 4,993.391 s. The release
+is `1b05518e501b001a972a1815379aa433d697807a6084da3358a3464dd342d294`
+(67,705,424 bytes); the native executable is
+`6bcc0c1680a61f3c99df3f6f5e02b2a57c8b26e8beb38ea8a61bb24a7d55bfe8`. The timing
+report has SHA-256
+`1f1b3125fce13aa1afaba35f467ab290ba00470df690561af208b4e693a1a1f1`. Its
+replacement allocation campaign passes all 176 observations/88 pairs and
+fourteen zero-live Session teardowns; every Wasm hash and work counter matches
+the preceding campaign. The new report is
+`build/bench/task053-catalog-package-allocation/results.json`, SHA-256
+`2cfee1fbc5530ab601622e802c082f6770f4b1fb92496e43b8522bcf380db58c`.
+
+The repaired release also passes all 96 exact wrapper contexts and five
+operation comparisons. Reports are
+`build/bench/task053-catalog-package-wrapper-contexts/results.json`, SHA-256
+`d3ef4ab558779410ad5880ed1b29885b5f30562d67a75affc6f79727b8257d9d`, and
+`build/bench/task053-catalog-package-wrapper-pairs/results.json`, SHA-256
+`f5f77e917ae4e96de3adfb8a436ce1974dac5e1c4f5216dfa01d553c3d2e00fd`. The
+preselected CPU identity/candidate comparisons and strict gdev parity campaign
+also pass; their distributions and exact report pins are in the final task 053
+qualification below.
+
+The failed gate and immutable binaries remain under
+`build/bench/task053-catalog-pre-package-fix/`. Its guest, pack and final
+release wrapper/CPU/gdev stages did not run. That failure remains separate from
+the passing repaired full gate, wrapper campaign and final CPU/gdev
+qualification.
+
+### Expanded Session allocation observations
+
+The integrated standalone campaign passes 176 observations/88 fresh-retained
+pairs across both tiers, including associated methods and used/unused public
+implementations. Every pair has the same Wasm hash; all fourteen Session groups
+end at zero requested live bytes. Edited states reuse both semantic callers. The
+SMP-backed meter, empty-seed baseline and exclusions remain as recorded below;
+this safe/no-LLVM campaign makes no release CPU claim. Executed values are
+covered by the guest laws above.
+
+| Optimized edit                 | Fallback elaborations fresh / retained | Requested bytes fresh / retained | Peak live bytes fresh / retained |
+| ------------------------------ | -------------------------------------: | -------------------------------: | -------------------------------: |
+| Associated private insertion   |                                  8 / 4 |                818,285 / 757,980 |                437,624 / 805,792 |
+| Unused implementation catalogs |                                  7 / 4 |                921,848 / 854,038 |                432,298 / 804,321 |
+| Used implementation insertion  |                                  8 / 5 |                960,794 / 892,830 |                443,380 / 815,702 |
+| Selected private method body   |                                  7 / 4 |                954,699 / 888,352 |                442,917 / 812,498 |
+
+These rows additionally take one fresh entry elaboration and zero retained entry
+elaborations. Retained publication keeps the accepted owner alive while building
+its candidate, accounting for the higher peak. The complete report, with source,
+benchmark/options and executable hashes, is
+`build/bench/task053-catalog-package-allocation/results.json`, SHA-256
+`2cfee1fbc5530ab601622e802c082f6770f4b1fb92496e43b8522bcf380db58c`. The
+preceding campaign remains in
+`build/bench/task053-catalog-allocation/results.json`, SHA-256
+`82cb36687e2ffd7fe5d8e3a6c7b8705e27fa8798ea58ff04cc6a0d57bf0b75d7`. Every Wasm
+hash and work counter agrees; requested-byte equality is not assumed for other
+observations.
+
 ### Preceding release erasure screen, 20 October 2026
 
 The new release has SHA-256
@@ -677,3 +830,65 @@ Raw records, executable/harness/source pins and the measurement scope are in
 `build/bench/task053-cutoff-allocation/results.json`, SHA-256
 `072adb8cb652bae0b00a84feb4a2999c0abcb2928703fdafe6592e4e7e22d881`. The higher
 retained peak is recorded rather than presented as a memory saving.
+
+### Final task 053 qualification, 20 October 2026
+
+The repaired continuation completes fixed acceptance rows 1–13. The row-to-law
+map above includes public-contract, associated-method, implementation/member and
+symbolic-getter package controls. Unsupported or exhausted proofs keep the
+ordinary checking limits already recorded by task 024; original producer,
+nominal identity, visibility, capability and executable dependency checks
+remain.
+
+The full LLVM gate `run-94ee2a5814168d09` passes **2,497 executed native laws,
+1,585 guest/client checks and 37 harness checks**, with zero native skips,
+failures, leaks or logged errors. Zig is 0.17.0. Both release/native compilation
+and native execution are cache misses. Wall time is 4,993.391 s. Immutable
+executables are in `build/bench/task053-catalog-package-release/`:
+
+- Release: `1b05518e501b001a972a1815379aa433d697807a6084da3358a3464dd342d294`
+  (67,705,424 bytes).
+- Native suite:
+  `6bcc0c1680a61f3c99df3f6f5e02b2a57c8b26e8beb38ea8a61bb24a7d55bfe8`.
+- Timing report:
+  `1f1b3125fce13aa1afaba35f467ab290ba00470df690561af208b4e693a1a1f1`.
+- Frozen 1,165-input manifest:
+  `73ddc05986cd4e765296e0cea9cc049b7bec973ab87242a49edd0e4a16b673e7`.
+
+Both CI-pinned and local analyzers report zero findings over 511 source files
+and the fixture. The local uncached source, fixture and benchmark checks also
+pass. All 96 wrapper contexts and five operation comparisons match exact
+executable sections and allocation/ownership traffic; their report pins are
+recorded in the repaired-source section above.
+
+The preselected CPU-2 controls use one codegen worker and disable persistence.
+Seven identity pairs of the preceding qualified release have paired median
+0.923863, range 0.648149–1.556488. The 15 candidate pairs against `832ea709…`
+pass the 1.05 regression limit: paired median 0.998133, range 0.493901–1.248983.
+The distributions are broad; no speedup is claimed. Reports:
+
+- `build/bench/task053-catalog-package-cpu-identity/results.json`, SHA-256
+  `fe8a268bd71a9db820e457f1a6b8e70e5304d59de570d91757d86b3f5992a3a0`.
+- `build/bench/task053-catalog-package-cpu-guard/results.json`, SHA-256
+  `ffa7da3349ec7cab65a56788c336df8321212dd4272d6bf45f5c16d59ac88b10`.
+
+All 162 strict compile samples and 14 fresh-edited controls pass without output
+waivers or hash writes. This covers three paired game/devtools rounds, five
+selected test entries, fresh/retained edits and reverts, restart and shared
+sessions. The 583-file workload manifest and recorded Wasm hashes match. The
+protocol entry retains its expected `non_exhaustive_match` rejection; this
+compilation campaign does not claim executed game tests. Report
+`build/bench/task053-catalog-package-parity/results.json`, SHA-256
+`53e68cf1920eeed90ed326b13475fdccb09b33b0350d4a115d96484dc5cbc444`.
+
+The repaired allocation campaign records 176 observations/88 fresh-retained
+pairs with exact Wasm and unchanged work against the preceding campaign. All
+fourteen Session groups end at zero requested live bytes. Its safe/no-LLVM,
+SMP-backed requested-byte scope, 16-byte empty seed, retained publication peaks
+and exclusions are recorded above; it is separate from release CPU and guest
+allocation traffic. Report
+`build/bench/task053-catalog-package-allocation/results.json`, SHA-256
+`2cfee1fbc5530ab601622e802c082f6770f4b1fb92496e43b8522bcf380db58c`.
+
+The earlier failed package-getter gate and noisy CPU screens remain historical
+evidence. They are not substituted for the repaired source's complete results.

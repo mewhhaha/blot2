@@ -227,7 +227,8 @@ fn compareInterface(a: Allocator, source: *const project.Project, checked: anyty
             stats.interfaces_changed += 1;
             return false;
         }
-        mapping = try binding_relocation.compare(a, &old.interface, &published, .{ .units = checked.binding_maps });
+        var methods: @import("frontend_method_sources.zig").Context(@TypeOf(old.core), @TypeOf(current.checked)) = .{ .before = &old.core, .after = &current.checked, .names = &source.symbols };
+        mapping = try binding_relocation.compare(a, &old.interface, &published, .{ .units = checked.binding_maps, .methods = methods.view() });
         if (mapping == null) {
             stats.interfaces_changed += 1;
             return false;

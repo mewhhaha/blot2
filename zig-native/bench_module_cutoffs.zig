@@ -131,6 +131,34 @@ const public_contract_cases = [_]Case{
     .{ .name = "public_revert", .source = public_header ++ scalar },
 };
 
+const associated_scalar = "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst Token.read: Token -> U32 = fn (#Token value) => value\n";
+const associated_alpha = "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn item => #Token (@u32.add item offset)\nconst Token.read: Token -> U32 = fn (#Token item) => item\n";
+const associated_bridge = "import {Token, make} from \"./tokens\"\nconst read: Token -> U32 = fn token => token.read\nconst factories = #[make, fn value => make value]\nconst readers = #[read, fn value => read value]\nconst transform = fn (value: U32) => (readers[@u32.rem value 2]) ((factories[@u32.rem value 2]) value)\n";
+const associated_cases = [_]Case{
+    .{ .name = "associated_initial", .source = associated_scalar },
+    .{ .name = "associated_private_binding_insert", .source = "private const unrelated = 99\n" ++ associated_scalar },
+    .{ .name = "associated_private_type_insert", .source = "private type Spare is data = #Spare U32\n" ++ associated_scalar },
+    .{ .name = "associated_alpha", .source = associated_alpha },
+    .{ .name = "associated_revert", .source = associated_scalar },
+};
+
+const implementation_unused_cases = [_]Case{
+    .{ .name = "implementation_unused_initial", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = fn value => @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst read: Token -> U32 = fn (#Token value) => value\n", .expected = 42 },
+    .{ .name = "implementation_unused_private_binding_insert", .source = "private const unrelated = 99\ntype Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = fn value => @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst read: Token -> U32 = fn (#Token value) => value\n", .expected = 42 },
+    .{ .name = "implementation_unused_private_catalog_insert", .source = "private type Hidden a is contract = { type Item }\nprivate impl HiddenSource : Hidden F32 = { type Item = F32 }\ntype Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = fn value => @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst read: Token -> U32 = fn (#Token value) => value\n", .expected = 42 },
+    .{ .name = "implementation_unused_alpha", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = fn item => @u32.add item 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn item => #Token (@u32.add item offset)\nconst read: Token -> U32 = fn (#Token item) => item\n", .expected = 42 },
+    .{ .name = "implementation_unused_body", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = fn value => @u32.add value 300,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst read: Token -> U32 = fn (#Token value) => value\n", .expected = 42 },
+    .{ .name = "implementation_unused_revert", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = fn value => @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst read: Token -> U32 = fn (#Token value) => value\n", .expected = 42 },
+};
+const implementation_selected_cases = [_]Case{
+    .{ .name = "implementation_selected_initial", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = fn value => @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst read: Token -> U32 = fn (#Token value) => Source.first value\n", .expected = 43 },
+    .{ .name = "implementation_selected_private_binding_insert", .source = "private const unrelated = 99\ntype Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = fn value => @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst read: Token -> U32 = fn (#Token value) => Source.first value\n", .expected = 43 },
+    .{ .name = "implementation_selected_private_catalog_insert", .source = "private type Hidden a is contract = { type Item }\nprivate impl HiddenSource : Hidden F32 = { type Item = F32 }\ntype Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = fn value => @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst read: Token -> U32 = fn (#Token value) => Source.first value\n", .expected = 43 },
+    .{ .name = "implementation_selected_alpha", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = fn item => @u32.add item 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn item => #Token (@u32.add item offset)\nconst read: Token -> U32 = fn (#Token item) => Source.first item\n", .expected = 43 },
+    .{ .name = "implementation_selected_body", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = fn value => @u32.add value 300,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst read: Token -> U32 = fn (#Token value) => Source.first value\n", .expected = 342 },
+    .{ .name = "implementation_selected_revert", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = fn value => @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst read: Token -> U32 = fn (#Token value) => Source.first value\n", .expected = 43 },
+};
+
 const cases = [_]Case{
     .{ .name = "initial", .source = scalar },
     .{ .name = "private_binding_insert", .source = "private const unrelated = 99\n" ++ scalar },
@@ -278,4 +306,7 @@ test "cutoff allocation observations" {
     try campaign("generic", generic_bridge, &generic_cases);
     try campaign("public_contract", "export {Public} from \"./tokens\"\n" ++ bridge, &public_contract_cases);
     try campaign("used_contract", "export {Public} from \"./tokens\"\n" ++ bridge, &used_contract_cases);
+    try campaign("public_associated", associated_bridge, &associated_cases);
+    try campaign("unused_implementation", "export {Source, ScalarSource} from \"./tokens\"\n" ++ bridge, &implementation_unused_cases);
+    try campaign("selected_implementation", "export {Source, ScalarSource} from \"./tokens\"\n" ++ bridge, &implementation_selected_cases);
 }

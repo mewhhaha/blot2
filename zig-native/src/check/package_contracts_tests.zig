@@ -43,6 +43,56 @@ test "package ordinary composition retains actual Scope request loan and demand 
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, validatePortable, .{&module});
 }
 
+fn symbolicNominalGetterScenario(allocator: std.mem.Allocator) !void {
+    var module = try portableFixture(allocator, "package/mixed-composition.blot");
+    defer module.deinit(allocator);
+    const before = @import("core_snapshot_tests.zig").stamp(module);
+    try validatePortable(allocator, &module);
+    var found = false;
+    for (module.projections) |*projection| {
+        const receiver = module.types.node(projection.source_type);
+        if (receiver.tag != .nominal or projection.variants.len != 0 or projection.nominal.unit != 0 or projection.nominal.decl != 0) continue;
+        const original = projection.*;
+        defer projection.* = original;
+        // Previously published explicit receiver metadata keeps its exact
+        // public method proof too; neither representation authorizes payloads.
+        projection.nominal = .{ .unit = receiver.a, .decl = receiver.b };
+        try validatePortable(allocator, &module);
+        projection.* = original;
+        // Equal payload/result layouts cannot supply a different public
+        // member, receiver or physical payload projection.
+        projection.field = 0;
+        try rejectPortable(allocator, &module);
+        projection.* = original;
+        const unrelated = for (module.implementation_members) |member| {
+            if (member.name != 0 and member.name != original.field) break member.name;
+        } else return error.TestUnexpectedResult;
+        projection.field = unrelated;
+        try rejectPortable(allocator, &module);
+        projection.* = original;
+        projection.source_type = T.u32_type;
+        try rejectPortable(allocator, &module);
+        projection.* = original;
+        projection.nominal = .{ .unit = receiver.a + 1, .decl = receiver.b };
+        try rejectPortable(allocator, &module);
+        projection.* = original;
+        try std.testing.expect(module.projection_variants.len != 0);
+        projection.variants = .{ .start = 0, .len = 1 };
+        try rejectPortable(allocator, &module);
+        projection.* = original;
+        found = true;
+        break;
+    }
+    try std.testing.expect(found);
+    try validatePortable(allocator, &module);
+    try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
+}
+
+test "package symbolic nominal getters retain exact public member authority and reject payload guesses through OOM" {
+    try symbolicNominalGetterScenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, symbolicNominalGetterScenario, .{});
+}
+
 test "package ordinary control keeps request decision loop pattern update and demand owners through OOM" {
     try ordinaryControl(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, ordinaryControl, .{});

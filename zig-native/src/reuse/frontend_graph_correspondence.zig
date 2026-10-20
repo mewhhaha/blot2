@@ -126,11 +126,12 @@ pub const Match = struct {
                     try self.typeDepth(from.ty, to.ty, depth + 1);
                 }
             },
-            .nominal, .type_constructor => {
+            .nominal, .type_constructor, .projection => {
                 if (before.a != after.a or before.b != after.b) return error.Declined;
                 if (before.tag == .type_constructor) {
                     if (before.c != after.c) return error.Declined;
                 } else {
+                    if (before.tag == .projection and self.left.projectionMember(before) != self.right.projectionMember(after)) return error.Declined;
                     const arguments = self.left.nominalArguments(before);
                     const supplied = self.right.nominalArguments(after);
                     if (arguments.len != supplied.len) return error.Declined;
@@ -214,4 +215,46 @@ test "frontend relocation principal correspondence owns injective sharing and bu
         match.remaining = 1;
         try std.testing.expectError(error.Declined, match.ty(2, 3));
     }
+}
+
+fn projectionScenario(a: A) !void {
+    var before_nodes = [_]T.Node{ .{ .tag = .absent }, .{ .tag = .u32 }, .{ .tag = .f32 }, .{ .tag = .variable, .a = 0 }, .{ .tag = .projection, .a = 1, .b = T.opaque_name_bit | 9, .c = 0 } };
+    var after_nodes = before_nodes;
+    after_nodes[3].a = 7;
+    after_nodes[4].c = 1;
+    var before_extra = [_]u32{ 1, 3, 15 };
+    var after_extra = [_]u32{ 99, 1, 3, 15, 0 };
+    const before: F.Graph = .{ .nodes = &before_nodes, .extra = &before_extra, .rows = &.{}, .labels = &.{}, .operations = &.{}, .row_variable_count = 0 };
+    const after: F.Graph = .{ .nodes = &after_nodes, .extra = &after_extra, .rows = &.{}, .labels = &.{}, .operations = &.{}, .row_variable_count = 0 };
+    var matching = (try Match.init(a, &before, &after)) orelse return error.MissingProjectionMatch;
+    defer matching.deinit();
+    try matching.ty(4, 4);
+    // Both owners use the same raw type ID. Original producer/member identity,
+    // arguments and alias relationships still decide the symbolic recipe.
+    after_extra[3] = 16;
+    var member = (try Match.init(a, &before, &after)).?;
+    defer member.deinit();
+    try std.testing.expectError(error.Declined, member.ty(4, 4));
+    after_extra[3] = 15;
+    after_nodes[4].a = 2;
+    var producer = (try Match.init(a, &before, &after)).?;
+    defer producer.deinit();
+    try std.testing.expectError(error.Declined, producer.ty(4, 4));
+    after_nodes[4].a = 1;
+    after_extra[2] = 1;
+    var argument = (try Match.init(a, &before, &after)).?;
+    defer argument.deinit();
+    try std.testing.expectError(error.Declined, argument.ty(4, 4));
+    after_extra[2] = 3;
+    after_extra[1] = 2;
+    after_extra[3] = 1;
+    after_extra[4] = 15;
+    var arity = (try Match.init(a, &before, &after)).?;
+    defer arity.deinit();
+    try std.testing.expectError(error.Declined, arity.ty(4, 4));
+}
+
+test "frontend relocation symbolic associated projections keep original producers members arguments and arity through OOM" {
+    try projectionScenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, projectionScenario, .{});
 }

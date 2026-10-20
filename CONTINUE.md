@@ -42,7 +42,8 @@ below it, unchanged.
     No entry-switch implementation repair was needed.
   - CT92–CT94 guards and documentation are implemented and validated in the
     local milestone; see [compile guards](zig-native/COMPILE_GUARDS.md). Task
-    024's fixed acceptance rows are now complete; 047 and 053 are next.
+    024's fixed acceptance rows and task 053's fixed rows are complete; 047 is
+    next.
   - CT91 is dropped (pen already runs 8 workers).
 
 P1 (closed-label certificates) was measured but not started. Next step:
@@ -130,11 +131,12 @@ unchanged.
 ### Task 053 qualified continuation, 20 October 2026
 
 The qualified continuation is saved in local `709237c`, based on `8ff153a`; its
-measured output hashes are separately saved in `ed3b0af`. Known opaque storage
-changes now retain ordinary semantic callers while derived producers republish
-their physical recipes. The wrapper matrix compares all private and exported
-machine bodies, executable sections and allocation/ownership traffic; all 96
-rows pass in development and release screens.
+measured output hashes are separately saved in `ed3b0af`. The public-contract
+follow-up below is qualified in `04e41ef`. Known opaque storage changes now
+retain ordinary semantic callers while derived producers republish their
+physical recipes. The wrapper matrix compares all private and exported machine
+bodies, executable sections and allocation/ownership traffic; all 96 rows pass
+in development and release screens.
 
 The first full gate passes 2,476 native laws, 1,570 guest/client checks and 37
 harness checks. Its release is `8a8cfb7c…`. A later negative control found that
@@ -190,9 +192,35 @@ despite identical Wasm. The independent seven-pair identity control passes
 is preserved and no speedup is claimed. All 162 strict compile-parity samples
 and the separate fresh-edited controls pass, including restart and shared
 sessions, without output waivers or hash changes. This public-contract slice is
-qualified. Task 053 stays open: the bounded used/unused implementation-catalog
-probe still rechecks both callers (0/0 reuse); an associated-method probe fails
-at its initial artifact publication and needs diagnosis.
+qualified. At that checkpoint task 053 stayed open: the bounded used/unused
+implementation-catalog probe still rechecks both callers (0/0 reuse); an
+associated-method probe fails at its initial artifact publication and needs
+diagnosis.
+
+The final continuation qualifies those ordinary catalog cases. It matches
+complete bounded public implementation/member recipes, original method
+capability relationships and forwarded catalog zero, while getters keep symbolic
+dispatch. The first full gate exposed a package getter compatibility failure.
+Its targeted repair reconstructs the checked receiver and uses the existing
+exact public member/scheme proof, including legacy and wrong-member,
+wrong-receiver and physical payload-guess controls through complete OOM.
+
+The repaired source passes **2,497 executed native laws, 1,585 guest/client
+checks and 37 harness checks**, with zero native skips, failures, leaks or
+logged errors. Both analyzers cover 511 source files and the fixture with zero
+findings. Release `1b05518e…` passes all 96 exact wrapper contexts and five
+operation comparisons. The preselected CPU-2 identity control and 15-pair
+comparison pass (candidate paired median 0.998133, limit 1.05; broad
+distributions, no speedup claim). All 162 strict compile samples and fourteen
+fresh-edited controls pass, including restart/shared sessions, without output
+waivers or hash writes.
+
+The 176-observation/88-pair allocation campaign preserves exact Wasm and work;
+all fourteen Session groups end at zero requested live bytes. Source and report
+pins are in the
+[final qualification](zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#final-task-053-qualification-20-october-2026).
+Task **053** now closes against its fixed rows 1–13. The failed package gate and
+previous noisy CPU screens remain preserved as history.
 
 The standalone allocation campaign passes 68 observations: both tiers,
 fresh/retained work, source-byte parity and zero live requested bytes after
@@ -213,13 +241,9 @@ the CPU guard.
 
 ### Open work, in suggested order
 
-1. **Task program: 047, then 053 and the next ready tasks.**
+1. **Task program: 047, then the next ready tasks.**
    - The all-width cursor comparison is byte-exact but still exposes the
      performance gap; Window and broader generic state remain open.
-   - Task 053's storage, wrapper and declaration-relocation slice passes the
-     full qualification above. Finish the remaining public-contract cases in
-     bounded implementation catalogs and associated methods, then qualify that
-     final source.
    - Keep 086's measured constant-work gate, 093's edit attribution and tasks
      100–104's targets open until their actual requirements pass.
 2. **Follow-ups recorded under their hills:**
@@ -293,10 +317,10 @@ the CPU guard.
 
 ## Tasks program ([tasks/README.md](tasks/README.md))
 
-Finish every task in the program. As of 19 October 2026:
+Finish every task in the program. As of 20 October 2026:
 
-- 97 are complete (including four designs);
-- 13 remain open: 6 in progress and 7 pending.
+- 98 are complete (including four designs);
+- 12 remain open: 5 in progress and 7 pending.
 
 The index in tasks/README.md is authoritative. Each task file carries its own
 status, evidence and closed-acceptance rows.
@@ -306,10 +330,9 @@ The previous long handoff, with per-task evidence through 17 October, is in git:
 
 ### Open tasks
 
-- **In progress:** 047 (iterator state and cursor cost), 053 (module cutoff and
-  wrapper rows), 081 (final durable documentation), 086 (constant-work
-  decision), 093 (gdev edit gap) and 082 (local analyzer backend and
-  final-source checks).
+- **In progress:** 047 (iterator state and cursor cost), 081 (final durable
+  documentation), 082 (local analyzer backend and final-source checks), 086
+  (constant-work decision) and 093 (gdev edit gap).
 - **Pending:** 084 (complete-program qualification), 100–104 (cold, literal,
   body, largest-region and requested-allocation targets), and 999 (conditional
   removal of tasks and PLAN.md).

@@ -6,6 +6,8 @@ const T = @import("../check/types.zig");
 const D = @import("frozen_dependency.zig");
 const graphs = @import("frontend_graph_correspondence.zig");
 const ast = @import("../parse/ast.zig");
+const methods = @import("frontend_method_sources.zig");
+const capabilities = @import("../check/capability_contracts.zig");
 const A = std.mem.Allocator;
 const Error = A.Error || error{Declined};
 const unmapped = std.math.maxInt(u32);
@@ -23,12 +25,14 @@ pub const Map = struct {
     nominals: []u32 = &.{},
     constructors: []u32 = &.{},
     contracts: []u32 = &.{},
+    implementations: []u32 = &.{},
     qualifications: []Qualification = &.{},
     pub fn deinit(self: *Map, a: A) void {
         a.free(self.bindings);
         a.free(self.nominals);
         a.free(self.constructors);
         a.free(self.contracts);
+        a.free(self.implementations);
         a.free(self.qualifications);
         self.* = .{ .bindings = &.{} };
     }
@@ -53,12 +57,14 @@ pub const Map = struct {
         for (self.nominals, 0..) |current, old| if (current != 0 and current != old) return true;
         for (self.constructors, 0..) |current, old| if (current != 0 and current != old) return true;
         for (self.contracts, 0..) |current, old| if (current != unmapped and current != old) return true;
+        for (self.implementations, 0..) |current, old| if (current != unmapped and current != old) return true;
         return false;
     }
     pub fn catalog(self: Map, kind: @FieldType(D.Export, "kind"), old: u32) ?u32 {
         // Contract catalog zero is a valid declaration, unlike the nominal
         // and constructor sentinel entries.
         if (kind == .contract) return if (old < self.contracts.len and self.contracts[old] != unmapped) self.contracts[old] else null;
+        if (kind == .implementation) return if (old < self.implementations.len and self.implementations[old] != unmapped) self.implementations[old] else null;
         const entries = switch (kind) {
             .nominal => self.nominals,
             .constructor => self.constructors,
@@ -71,6 +77,7 @@ pub const Map = struct {
 
 pub const Targets = struct {
     units: []const ?Map = &.{},
+    methods: ?methods.Sources = null,
     pub fn changes(self: Targets) bool {
         for (self.units) |map| if (map) |value| if (value.changes()) return true;
         return false;
@@ -106,8 +113,14 @@ fn visible(value: PI.Binding) bool {
 pub fn compare(a: A, left: *const PI.Interface, right: *const PI.Interface, targets: Targets) A.Error!?Map {
     if (left.unit != right.unit or left.bindings.len > 65_536 or right.bindings.len > 65_536) return null;
     if (left.has_rank_contracts or right.has_rank_contracts or left.has_usage_contracts or right.has_usage_contracts or left.has_numeric_proofs or right.has_numeric_proofs) return null;
-    inline for (.{ "proof_contracts", "associated", "implementations", "implementation_predicates", "implementation_members", "member_templates", "selected_proofs", "selected_members", "selected_edges" }) |field| {
+    inline for (.{ "proof_contracts", "selected_proofs", "selected_members", "selected_edges" }) |field| {
         if (@field(left, field).len != 0 or @field(right, field).len != 0) return null;
+    }
+    // Keep the already-qualified ordinary implementation-catalog bounds.
+    if (left.implementations.len != 0 or right.implementations.len != 0) {
+        if (left.contracts.len > 64 or right.contracts.len > 64 or left.implementations.len > 64 or right.implementations.len > 64) return null;
+        for (left.implementations) |value| if (!value.private and (value.row_variables.len != 0 or value.row_parameters.len != 0)) return null;
+        for (right.implementations) |value| if (!value.private and (value.row_variables.len != 0 or value.row_parameters.len != 0)) return null;
     }
     // Moving effects changes their generative AST identity. They do not take
     // the opaque-name exception and remain on ordinary checking here.
@@ -215,9 +228,78 @@ pub fn compare(a: A, left: *const PI.Interface, right: *const PI.Interface, targ
         for (right.contracts, contract_used) |value, matched| if (!value.private and !matched) return null;
     }
 
+    map.implementations = try a.alloc(u32, left.implementations.len);
+    @memset(map.implementations, unmapped);
+    const implementation_used = try a.alloc(bool, right.implementations.len);
+    defer a.free(implementation_used);
+    @memset(implementation_used, false);
+    for (left.implementations, 0..) |old, index| {
+        if (old.private) continue;
+        var matched: ?u32 = null;
+        for (right.implementations, 0..) |current, next| {
+            if (comparisons == 0) return null;
+            comparisons -= 1;
+            if (current.private or old.name != current.name or !std.meta.eql(old.identity, current.identity)) continue;
+            if (matched != null or implementation_used[next]) return null;
+            matched = @intCast(next);
+        }
+        const next = matched orelse return null;
+        implementation_used[next] = true;
+        map.implementations[index] = next;
+        const current = right.implementations[next];
+        if (old.members.len != current.members.len) return null;
+        for (left.implementation_members[old.members.start..][0..old.members.len], right.implementation_members[current.members.start..][0..current.members.len]) |from, to| {
+            if (comparisons == 0) return null;
+            comparisons -= 1;
+            if (from.name != to.name or from.kind != to.kind) return null;
+            if (from.kind != .value) continue;
+            if (from.target.unit == 0 or from.target.binding == 0 or to.target.unit != from.target.unit or to.target.binding == 0) return null;
+            if (from.target.unit != left.unit) {
+                if (!std.meta.eql(targets.target(from.target) orelse return null, to.target)) return null;
+                continue;
+            }
+            if (from.target.binding >= map.bindings.len or to.target.binding >= right.bindings.len) return null;
+            const before = left.bindings[from.target.binding];
+            const after = right.bindings[to.target.binding];
+            // A public member's exact original implementation/member identity
+            // owns this hidden method slot, just as an opaque parent owns its
+            // private constructor. Never match arbitrary private functions by
+            // their type or ordinal. The whole public recipe is checked below
+            // before this unpublished map can be returned.
+            if (before.private != after.private or before.kind != .global or after.kind != .global) return null;
+            if (before.private) {
+                const sources = targets.methods orelse return null;
+                const role: methods.Role = .{ .implementation = old.identity, .member = from.name };
+                const old_method = sources.before(sources.context, role, from.target.binding) orelse return null;
+                const new_method = sources.after(sources.context, role, to.target.binding) orelse return null;
+                if (old_method.flow != new_method.flow or !std.meta.eql(old_method.parameters, new_method.parameters) or (old_method.recipe == null) != (new_method.recipe == null)) return null;
+                if (old_method.recipe) |recipe| {
+                    if (recipe.arity != new_method.recipe.?.arity) return null;
+                    const same = capabilities.equivalent(recipe.view(), recipe.root, new_method.recipe.?.view(), new_method.recipe.?.root) catch |err| switch (err) {
+                        error.OutOfMemory => return error.OutOfMemory,
+                        else => return null,
+                    };
+                    if (!same) return null;
+                }
+            }
+            if (map.binding(from.target.binding)) |prior| {
+                if (prior != to.target.binding) return null;
+            } else {
+                if (!before.private or before.name != 0 or after.name != 0 or used[to.target.binding]) return null;
+                map.bindings[from.target.binding] = to.target.binding;
+                used[to.target.binding] = true;
+            }
+        }
+    }
+    for (right.implementations, implementation_used) |value, matched| if (!value.private and !matched) return null;
+
     var graph = (try graphs.Match.init(a, &left.graph, &right.graph)) orelse return null;
     defer graph.deinit();
     var checker: Checker = .{ .left = left, .right = right, .graph = &graph, .map = map, .targets = targets };
+    if (left.implementations.len != 0 or right.implementations.len != 0) {
+        checker.remaining = 4096;
+        graph.remaining = 4096;
+    }
     defer checker.qualifications.deinit(a);
     checker.check() catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
@@ -231,10 +313,9 @@ pub fn compare(a: A, left: *const PI.Interface, right: *const PI.Interface, targ
 
 // Admitted private catalogs contain redacted tombstones. They confer no public
 // authority and no external catalog position. Public recipes are compared
-// separately; selected implementations still require ordinary checking.
+// separately; selected proof payloads retain ordinary checking.
 fn privateContractsOnly(owner: *const PI.Interface) bool {
     for (owner.contracts) |contract| if (!contract.private) return false;
-    if (owner.implementations.len != 0 or owner.implementation_members.len != 0 or owner.implementation_predicates.len != 0) return false;
     for (owner.contract_members) |member| if (member.name != 0 or member.root != 0) return false;
     const inert: T.Obligation = .{ .ty = 0, .kind = .type_rep, .source = 0, .explicit = true };
     for (owner.contract_predicates) |predicate| if (!std.meta.eql(predicate, inert)) return false;
@@ -326,6 +407,98 @@ const Checker = struct {
         }
         try self.effects();
         try self.contracts();
+        try self.associated();
+        try self.implementations();
+        try self.memberTemplates();
+    }
+    fn implementations(self: *Checker) Error!void {
+        // Every non-redacted flat slot must belong to a checked public recipe.
+        inline for (.{ .{ "implementation_members", "members" }, .{ "implementation_predicates", "predicates" } }) |fields| {
+            for (@field(self.left, fields[0]), 0..) |value, index| {
+                try self.implementationSlot(self.left, fields[0], fields[1], value, index);
+            }
+            for (@field(self.right, fields[0]), 0..) |value, index| {
+                try self.implementationSlot(self.right, fields[0], fields[1], value, index);
+            }
+        }
+        for (self.left.implementations, 0..) |old, index| {
+            if (old.private) continue;
+            try self.work(0);
+            const current = self.right.implementations[self.map.catalog(.implementation, @intCast(index)) orelse return error.Declined];
+            if (old.private != current.private or old.name != current.name or old.declaration != current.declaration or !std.meta.eql(old.identity, current.identity) or !std.meta.eql(old.contract, current.contract) or old.parameter_names.len != current.parameter_names.len or old.row_parameter_names.len != current.row_parameter_names.len) return error.Declined;
+            try self.graph.typeList(old.head, current.head);
+            try self.graph.typeList(old.variables, current.variables);
+            try self.graph.rowVariables(old.row_variables, current.row_variables);
+            try self.graph.rowList(old.row_parameters, current.row_parameters);
+            if (old.predicates.len != current.predicates.len or old.members.len != current.members.len) return error.Declined;
+            for (self.left.implementation_predicates[old.predicates.start..][0..old.predicates.len], self.right.implementation_predicates[current.predicates.start..][0..current.predicates.len]) |from, to| try self.obligation(from, to);
+            for (self.left.implementation_members[old.members.start..][0..old.members.len], self.right.implementation_members[current.members.start..][0..current.members.len]) |from, to| {
+                try self.work(0);
+                if (from.name != to.name or from.kind != to.kind) return error.Declined;
+                try self.graph.ty(from.root, to.root);
+                if (from.kind == .type_) {
+                    if (!std.meta.eql(from.target, to.target)) return error.Declined;
+                } else if (from.target.unit == self.left.unit) {
+                    if (to.target.unit != self.right.unit or (self.map.binding(from.target.binding) orelse return error.Declined) != to.target.binding) return error.Declined;
+                } else if (!std.meta.eql(self.targets.target(from.target) orelse return error.Declined, to.target)) return error.Declined;
+            }
+            if ((old.origin_span == null) != (current.origin_span == null)) return error.Declined;
+            if (old.origin_span) |before| try self.provenance(old.identity.unit, before, current.origin_span.?);
+        }
+    }
+    fn implementationSlot(self: *Checker, owner: *const PI.Interface, comptime table: []const u8, comptime field: []const u8, value: anytype, index: usize) Error!void {
+        if (comptime std.mem.eql(u8, table, "implementation_members")) {
+            if (value.name == 0 and value.root == 0 and value.target.unit == 0 and value.target.binding == 0) return;
+        } else {
+            const inert: T.Obligation = .{ .ty = 0, .kind = .type_rep, .source = 0, .explicit = true };
+            if (std.meta.eql(value, inert)) return;
+        }
+        var claims: usize = 0;
+        for (owner.implementations) |header| {
+            try self.work(0);
+            const span = @field(header, field);
+            if (!header.private and index >= span.start and index - span.start < span.len) claims += 1;
+        }
+        if (claims != 1) return error.Declined;
+    }
+    fn memberTemplates(self: *Checker) Error!void {
+        if (self.left.member_templates.len != self.right.member_templates.len) return error.Declined;
+        const used = try self.graph.allocator.alloc(bool, self.right.member_templates.len);
+        defer self.graph.allocator.free(used);
+        @memset(used, false);
+        for (self.left.member_templates) |old| {
+            const binding = self.map.binding(old.binding) orelse return error.Declined;
+            var matched: ?usize = null;
+            for (self.right.member_templates, 0..) |current, index| {
+                try self.work(0);
+                if (current.binding != binding or old.name != current.name or !std.meta.eql(old.contract, current.contract)) continue;
+                if (matched != null or used[index]) return error.Declined;
+                matched = index;
+            }
+            const index = matched orelse return error.Declined;
+            used[index] = true;
+            try self.graph.typeList(old.arguments, self.right.member_templates[index].arguments);
+        }
+        for (used) |matched| if (!matched) return error.Declined;
+    }
+    fn associated(self: *Checker) Error!void {
+        if (self.left.associated.len != self.right.associated.len) return error.Declined;
+        if (self.left.associated.len == 0) return;
+        const used = try self.graph.allocator.alloc(bool, self.right.associated.len);
+        defer self.graph.allocator.free(used);
+        @memset(used, false);
+        for (self.left.associated) |old| {
+            const binding = self.map.binding(old.binding) orelse return error.Declined;
+            var matched: ?usize = null;
+            for (self.right.associated, 0..) |current, index| {
+                try self.work(0);
+                if (binding != current.binding or old.member != current.member or old.operator != current.operator or !std.meta.eql(old.identity, current.identity)) continue;
+                if (matched != null or used[index]) return error.Declined;
+                matched = index;
+            }
+            used[matched orelse return error.Declined] = true;
+        }
+        for (used) |matched| if (!matched) return error.Declined;
     }
     fn contracts(self: *Checker) Error!void {
         if (privateContractsOnly(self.left) and privateContractsOnly(self.right)) return;
@@ -416,8 +589,9 @@ const Checker = struct {
         try self.work(0);
         if (from.kind != to.kind or from.name != to.name or from.operator != to.operator or from.explicit != to.explicit or from.qualification_unit != to.qualification_unit or from.source != 0 or to.source != 0) return error.Declined;
         if (from.kind == .callee_use) {
-            // Only an owned public binding map establishes this relation.
-            // Formal, private and missing callees have no admitted target.
+            // Only a public binding or a complete public-member relationship
+            // establishes this target. Lexical formals and private slots
+            // without that source-owned relationship remain unadmitted.
             if (from.identity.unit == 0 or from.identity.unit != self.left.unit or to.identity.unit != self.right.unit) return error.Declined;
             if ((self.map.binding(from.identity.decl) orelse return error.Declined) != to.identity.decl) return error.Declined;
         } else if (!std.meta.eql(from.identity, to.identity)) return error.Declined;
@@ -426,20 +600,25 @@ const Checker = struct {
         const before = from.qualification_span orelse return;
         const after = to.qualification_span.?;
         if (before.start > before.end or after.start > after.end) return error.Declined;
-        if (from.explicit and from.qualification_unit == self.left.unit) {
-            // This span belongs to the matched public scheme or contract. Its
-            // complete predicate graph has passed; retain the correspondence
-            // so owned caller copies keep current evidence provenance too.
-            for (self.qualifications.items) |prior| {
-                try self.work(0);
-                if (std.meta.eql(prior.before, before)) {
-                    if (!std.meta.eql(prior.after, after)) return error.Declined;
-                    return;
-                }
-                if (std.meta.eql(prior.after, after)) return error.Declined;
-            }
-            try self.qualifications.append(self.graph.allocator, .{ .before = before, .after = after });
+        if (from.explicit) {
+            try self.provenance(from.qualification_unit, before, after);
         } else if (!std.meta.eql(self.targets.qualification(from.qualification_unit, before), after)) return error.Declined;
+    }
+    fn provenance(self: *Checker, unit: u32, before: ast.Span, after: ast.Span) Error!void {
+        if (before.start > before.end or after.start > after.end) return error.Declined;
+        if (unit != self.left.unit) {
+            if (!std.meta.eql(self.targets.qualification(unit, before), after)) return error.Declined;
+            return;
+        }
+        for (self.qualifications.items) |prior| {
+            try self.work(0);
+            if (std.meta.eql(prior.before, before)) {
+                if (!std.meta.eql(prior.after, after)) return error.Declined;
+                return;
+            }
+            if (std.meta.eql(prior.after, after)) return error.Declined;
+        }
+        try self.qualifications.append(self.graph.allocator, .{ .before = before, .after = after });
     }
     fn patternList(self: *Checker, old: T.List, current: T.List, depth: usize) Error!void {
         try self.work(depth);
@@ -635,4 +814,196 @@ fn sharedCalleeMapScenario(a: A) !void {
 test "frontend relocation shared public callee schemes retain original targets and reject formal or private substitutions through OOM" {
     try sharedCalleeMapScenario(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, sharedCalleeMapScenario, .{});
+}
+
+fn associatedMapScenario(a: A) !void {
+    var nodes = [_]T.Node{ .{ .tag = .absent }, .{ .tag = .u32 }, .{ .tag = .function, .a = 1, .b = 1 } };
+    var rows = [_]T.Effects.Row{.{ .labels = .{}, .tail = .closed }};
+    const inert: PI.Binding = .{ .private = true, .name = 0, .kind = .global, .named_function = false, .ty = 0, .scheme = .{}, .external = null };
+    const method: PI.Binding = .{ .name = 7, .kind = .global, .named_function = true, .ty = 2, .scheme = .{ .root = 2 }, .external = null };
+    var helper = method;
+    helper.name = 9;
+    var old_bindings = [_]PI.Binding{ inert, inert, method, helper };
+    var new_bindings = [_]PI.Binding{ inert, inert, inert, method, helper };
+    var before = [_]PI.Associated{.{ .identity = .{ .unit = 0, .decl = T.u32_type }, .member = 8, .operator = .none, .binding = 2 }};
+    var after = before;
+    after[0].binding = 3;
+    const old: PI.Interface = .{
+        .unit = 1,
+        .graph = .{ .nodes = &nodes, .extra = &.{}, .rows = &rows, .labels = &.{}, .operations = &.{}, .row_variable_count = 0 },
+        .patterns = .{ .nodes = &.{}, .extra = &.{} },
+        .bindings = &old_bindings,
+        .obligations = &.{},
+        .obligation_spans = &.{},
+        .nominals = &.{},
+        .constructors = &.{},
+        .effect_families = &.{},
+        .effect_templates = &.{},
+        .associated = &before,
+    };
+    var current = old;
+    current.bindings = &new_bindings;
+    current.associated = &after;
+    var map = (try compare(a, &old, &current, .{})) orelse return error.MissingAssociatedMap;
+    defer map.deinit(a);
+    try std.testing.expectEqual(@as(?u32, 3), map.binding(2));
+    // Equal function types cannot authorize a different public relationship.
+    after[0].binding = 4;
+    var retargeted = try compare(a, &old, &current, .{});
+    defer if (retargeted) |*value| value.deinit(a);
+    try std.testing.expect(retargeted == null);
+    after[0].binding = 3;
+    after[0].operator = .add;
+    var changed_operator = try compare(a, &old, &current, .{});
+    defer if (changed_operator) |*value| value.deinit(a);
+    try std.testing.expect(changed_operator == null);
+    after[0].operator = .none;
+    after[0].identity.decl = T.f32_type;
+    var changed_owner = try compare(a, &old, &current, .{});
+    defer if (changed_owner) |*value| value.deinit(a);
+    try std.testing.expect(changed_owner == null);
+    after[0].identity.decl = T.u32_type;
+    var duplicate = [_]PI.Associated{ after[0], after[0] };
+    current.associated = &duplicate;
+    var duplicated = try compare(a, &old, &current, .{});
+    defer if (duplicated) |*value| value.deinit(a);
+    try std.testing.expect(duplicated == null);
+}
+
+test "frontend relocation associated relationships keep exact receiver member operator and original targets through OOM" {
+    try associatedMapScenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, associatedMapScenario, .{});
+}
+
+fn implementationMapScenario(a: A) !void {
+    var nodes = [_]T.Node{ .{ .tag = .absent }, .{ .tag = .u32 }, .{ .tag = .f32 }, .{ .tag = .function, .a = 1, .b = 1 }, .{ .tag = .variable, .a = 0 }, .{ .tag = .function, .a = 4, .b = 1 } };
+    var rows = [_]T.Effects.Row{.{ .labels = .{}, .tail = .closed }};
+    var extra = [_]u32{ 1, 4, 11 };
+    var new_extra = extra;
+    const inert: PI.Binding = .{ .private = true, .name = 0, .kind = .global, .named_function = false, .ty = 0, .scheme = .{}, .external = null };
+    const member: PI.Binding = .{ .name = 7, .kind = .global, .named_function = true, .ty = 5, .scheme = .{ .root = 5, .variables = .{ .start = 1, .len = 1 } }, .external = null };
+    var old_bindings = [_]PI.Binding{ inert, inert, member };
+    var new_bindings = [_]PI.Binding{ inert, inert, inert, member };
+    const contract: PI.Contract = .{ .identity = .{ .unit = 1, .decl = T.opaque_name_bit | 8 }, .name = 8, .parameters = .{ .start = 1, .len = 1 }, .variables = .{ .start = 1, .len = 1 }, .parameter_names = .{ .start = 2, .len = 1 }, .members = .{ .start = 0, .len = 1 }, .requires_implementation = true };
+    var contracts = [_]PI.Contract{contract};
+    var contract_members = [_]PI.ContractMember{.{ .contract = contract.identity, .name = 15, .kind = .value, .root = 5 }};
+    const before: ast.Span = .{ .start = 10, .end = 20 };
+    const after: ast.Span = .{ .start = 40, .end = 50 };
+    const implementation: PI.Implementation = .{ .origin_span = before, .identity = .{ .unit = 1, .decl = T.opaque_name_bit | 9 }, .name = 9, .contract = contract.identity, .head = .{ .start = 0, .len = 1 }, .members = .{ .start = 0, .len = 1 } };
+    var old_implementations = [_]PI.Implementation{implementation};
+    var new_implementations = [_]PI.Implementation{ .{ .private = true, .identity = .{ .unit = 1, .decl = T.opaque_name_bit | 10 }, .name = 0, .contract = contract.identity }, implementation };
+    new_implementations[1].origin_span = after;
+    var old_members = [_]PI.ImplementationMember{.{ .name = 15, .kind = .value, .root = 3, .target = .{ .unit = 1, .binding = 1 } }};
+    var new_members = old_members;
+    new_members[0].target.binding = 2;
+    var old_templates = [_]PI.MemberTemplate{.{ .binding = 2, .contract = contract.identity, .name = 15, .arguments = .{ .start = 1, .len = 1 } }};
+    var new_templates = old_templates;
+    new_templates[0].binding = 3;
+    const old: PI.Interface = .{
+        .unit = 1,
+        .graph = .{ .nodes = &nodes, .extra = &extra, .rows = &rows, .labels = &.{}, .operations = &.{}, .row_variable_count = 0 },
+        .patterns = .{ .nodes = &.{}, .extra = &.{} },
+        .bindings = &old_bindings,
+        .obligations = &.{},
+        .obligation_spans = &.{},
+        .nominals = &.{},
+        .constructors = &.{},
+        .effect_families = &.{},
+        .effect_templates = &.{},
+        .associated = &.{},
+        .contracts = &contracts,
+        .contract_members = &contract_members,
+        .implementations = &old_implementations,
+        .implementation_members = &old_members,
+        .member_templates = &old_templates,
+    };
+    var current = old;
+    current.graph.extra = &new_extra;
+    current.bindings = &new_bindings;
+    current.implementations = &new_implementations;
+    current.implementation_members = &new_members;
+    current.member_templates = &new_templates;
+    const Source = struct {
+        before: methods.Header = .{ .flow = .unknown, .parameters = .{}, .recipe = null },
+        after: methods.Header = .{ .flow = .unknown, .parameters = .{}, .recipe = null },
+        authorized: bool = true,
+        fn readBefore(raw: *anyopaque, role: methods.Role, binding: u32) ?methods.Header {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            if (binding != 1 or role.implementation.unit != 1 or role.implementation.decl != T.opaque_name_bit | 9 or role.member != 15) return null;
+            return self.before;
+        }
+        fn readAfter(raw: *anyopaque, role: methods.Role, binding: u32) ?methods.Header {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            if (!self.authorized or binding != 2 or role.implementation.unit != 1 or role.implementation.decl != T.opaque_name_bit | 9 or role.member != 15) return null;
+            return self.after;
+        }
+        fn view(self: *@This()) methods.Sources {
+            return .{ .context = self, .before = readBefore, .after = readAfter };
+        }
+    };
+    var source: Source = .{};
+    const targets: Targets = .{ .methods = source.view() };
+    var map = (try compare(a, &old, &current, targets)) orelse return error.MissingImplementationMap;
+    defer map.deinit(a);
+    try std.testing.expectEqual(@as(?u32, 1), map.catalog(.implementation, 0));
+    try std.testing.expectEqual(@as(?u32, 2), map.binding(1));
+    try std.testing.expectEqual(@as(?u32, 3), map.binding(2));
+    try std.testing.expectEqual(after, map.qualification(before));
+    var no_sources = try compare(a, &old, &current, .{});
+    defer if (no_sources) |*value| value.deinit(a);
+    try std.testing.expect(no_sources == null);
+    source.after.flow = .identity;
+    var changed_flow = try compare(a, &old, &current, targets);
+    defer if (changed_flow) |*value| value.deinit(a);
+    try std.testing.expect(changed_flow == null);
+    source.after.flow = .unknown;
+    source.after.parameters = .init(1, 0);
+    var changed_parameters = try compare(a, &old, &current, targets);
+    defer if (changed_parameters) |*value| value.deinit(a);
+    try std.testing.expect(changed_parameters == null);
+    source.after.parameters = .{};
+    var capability_nodes = [_]capabilities.Term{ .{ .tag = .empty }, .{ .tag = .parameter, .a = 0 } };
+    source.before.recipe = .{ .arity = 1, .root = 1, .nodes = &capability_nodes, .words = &.{} };
+    source.after.recipe = .{ .arity = 1, .root = 0, .nodes = &capability_nodes, .words = &.{} };
+    var changed_capability = try compare(a, &old, &current, targets);
+    defer if (changed_capability) |*value| value.deinit(a);
+    try std.testing.expect(changed_capability == null);
+    source.before.recipe = null;
+    source.after.recipe = null;
+    source.authorized = false;
+    var wrong_method = try compare(a, &old, &current, targets);
+    defer if (wrong_method) |*value| value.deinit(a);
+    try std.testing.expect(wrong_method == null);
+    source.authorized = true;
+    // Same-layout scalar heads, another original producer, changed public
+    // member names and missing method slots cannot confer this relationship.
+    new_extra[0] = 2;
+    var changed_head = try compare(a, &old, &current, targets);
+    defer if (changed_head) |*value| value.deinit(a);
+    try std.testing.expect(changed_head == null);
+    new_extra[0] = 1;
+    new_members[0].target.unit = 2;
+    var changed_producer = try compare(a, &old, &current, targets);
+    defer if (changed_producer) |*value| value.deinit(a);
+    try std.testing.expect(changed_producer == null);
+    new_members[0].target.unit = 1;
+    new_members[0].name = 16;
+    var changed_member = try compare(a, &old, &current, targets);
+    defer if (changed_member) |*value| value.deinit(a);
+    try std.testing.expect(changed_member == null);
+    new_members[0].name = 15;
+    new_members[0].target.binding = 0;
+    var missing = try compare(a, &old, &current, targets);
+    defer if (missing) |*value| value.deinit(a);
+    try std.testing.expect(missing == null);
+    new_members[0].target.binding = 2;
+    new_implementations[0] = new_implementations[1];
+    var duplicated = try compare(a, &old, &current, targets);
+    defer if (duplicated) |*value| value.deinit(a);
+    try std.testing.expect(duplicated == null);
+}
+
+test "frontend relocation bounded implementation catalogs preserve original member relationships and provenance through OOM" {
+    try implementationMapScenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, implementationMapScenario, .{});
 }

@@ -1938,3 +1938,72 @@ test "module interface cutoff preserves public contract recipes and forwarded ca
         }
     }
 }
+
+const associated_storage_original = "opaque type Token = U32\nopaque type Other = U32\nconst make: U32 -> Token = fn value => #Token value\nconst make_other: U32 -> Other = fn value => #Other value\nconst Token.read: Token -> U32 = fn (#Token value) => value\nconst Other.read: Other -> U32 = fn (#Other value) => @u32.add value 1\n";
+const associated_storage_alpha = "opaque type Token = U32\nopaque type Other = U32\nconst make: U32 -> Token = fn item => #Token item\nconst make_other: U32 -> Other = fn item => #Other item\nconst Token.read: Token -> U32 = fn (#Token item) => item\nconst Other.read: Other -> U32 = fn (#Other item) => @u32.add item 1\n";
+
+test "module interface cutoff preserves public associated relationships and original targets through OOM" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    try fixture.write("changed.blot", associated_storage_original);
+    try fixture.write("left.blot", "import {Token, Other, make, make_other} from \"./changed\"\nconst bridge = fn (value: U32) => @u32.add ((make value).read) ((make_other value).read)\n");
+    try fixture.write("main.blot", "import {bridge} from \"./left\"\nentry const answer = fn (value: U32) => bridge value\n");
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    try initialize(&session, &fixture);
+    for ([_][]const u8{
+        "private const unrelated = 7\n" ++ associated_storage_original,
+        "private type Spare is data = #Spare U32\n" ++ associated_storage_original,
+        associated_storage_alpha,
+        associated_storage_original,
+    }) |text| {
+        try fixture.write("changed.blot", text);
+        var expected = try fresh(&fixture);
+        defer expected.deinit(a);
+        try allocationFailure(a, &fixture, &session, &expected);
+        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, allocationFailure, .{ &fixture, &session, &expected });
+        var actual = try session.revise(io, fixture.path, null, .{});
+        defer actual.deinit(a);
+        try equal(&actual, &expected);
+        try std.testing.expectEqual(@as(usize, 1), session.last.fallback.module_cutoff.reused);
+        try std.testing.expectEqual(@as(usize, 1), session.last.fallback.entry_cutoff.reused);
+    }
+}
+
+const implementation_storage_header = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = fn value => @u32.add value 1,\n}\n";
+const implementation_storage_private = "private type Hidden a is contract = { type Item }\nprivate impl HiddenSource : Hidden F32 = { type Item = F32 }\n";
+const implementation_storage_unused = implementation_storage_header ++ "opaque type Token = U32\nconst make: U32 -> Token = fn value => #Token value\nconst read: Token -> U32 = fn (#Token value) => value\n";
+const implementation_storage_used = implementation_storage_header ++ "opaque type Token = U32\nconst make: U32 -> Token = fn value => #Token value\nconst read: Token -> U32 = fn (#Token value) => Source.first value\n";
+
+test "module interface cutoff preserves bounded implementation catalogs selected callers and original producers through OOM" {
+    for ([_][]const u8{ implementation_storage_unused, implementation_storage_used }) |initial_source| {
+        var fixture = try Fixture.init();
+        defer fixture.deinit();
+        try fixture.write("changed.blot", initial_source);
+        try fixture.write("left.blot", "export {Source, ScalarSource} from \"./changed\"\nimport {make, read} from \"./changed\"\nconst bridge: U32 -> U32 = fn value => read (make value)\n");
+        try fixture.write("main.blot", "import {bridge} from \"./left\"\nentry const answer: U32 -> U32 = fn value => bridge value\n");
+        var session = try retained.Session.initEmpty(a, .{});
+        defer session.deinit();
+        try initialize(&session, &fixture);
+        const inserted = try std.mem.concat(a, u8, &.{ "private const unrelated = 99\n", initial_source });
+        defer a.free(inserted);
+        const catalog = try std.mem.concat(a, u8, &.{ implementation_storage_private, initial_source });
+        defer a.free(catalog);
+        const alpha = try std.mem.replaceOwned(u8, a, initial_source, "value", "item");
+        defer a.free(alpha);
+        const body = try std.mem.replaceOwned(u8, a, initial_source, "@u32.add value 1", "@u32.add value 300");
+        defer a.free(body);
+        for ([_][]const u8{ inserted, catalog, alpha, body, initial_source }) |text| {
+            try fixture.write("changed.blot", text);
+            var expected = try fresh(&fixture);
+            defer expected.deinit(a);
+            try allocationFailure(a, &fixture, &session, &expected);
+            try @import("../allocation_failures.zig").checkAllAllocationFailures(a, allocationFailure, .{ &fixture, &session, &expected });
+            var actual = try session.revise(io, fixture.path, null, .{});
+            defer actual.deinit(a);
+            try equal(&actual, &expected);
+            try std.testing.expectEqual(@as(usize, 1), session.last.fallback.module_cutoff.reused);
+            try std.testing.expectEqual(@as(usize, 1), session.last.fallback.entry_cutoff.reused);
+        }
+    }
+}
