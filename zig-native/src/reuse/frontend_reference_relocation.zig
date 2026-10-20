@@ -12,7 +12,7 @@ const Error = error{Declined};
 fn contains(comptime T: type) bool {
     @setEvalBranchQuota(20000);
     if (T == core.BindingRef or T == PI.ExternalTarget) return true;
-    if (T == Types.Obligation or T == D.Export) return true;
+    if (T == Types.Obligation or T == core.Obligation or T == D.Export) return true;
     return switch (@typeInfo(T)) {
         .pointer => |pointer| if (pointer.size == .slice) contains(pointer.child) else false,
         .optional => |optional| contains(optional.child),
@@ -70,7 +70,12 @@ fn walk(comptime writing: bool, value: anytype, targets: relocation.Targets, rem
         if (comptime writing) value.binding = mapped.binding;
         return;
     }
-    if (comptime T == Types.Obligation) {
+    if (comptime T == Types.Obligation or T == core.Obligation) {
+        if (value.qualification_span) |before| {
+            const after = targets.qualification(value.qualification_unit, before);
+            changed.* = changed.* or !std.meta.eql(before, after);
+            if (comptime writing) value.qualification_span = after;
+        }
         // callee_use is the one predicate whose identity denotes a value
         // binding. Contract/effect/nominal identities keep their own class.
         if (value.kind == .callee_use and value.identity.decl != 0) {
@@ -144,4 +149,46 @@ test "frontend relocation forwarded public catalog positions require a complete 
     exports[0].catalog = 2;
     try std.testing.expect(!admits(&exports, targets));
     try std.testing.expectEqual(@as(u32, 2), exports[0].catalog);
+}
+
+test "frontend relocation forwarded contract catalog zero is rewritten only in an owned copy" {
+    var bindings = [_]u32{0};
+    var contracts = [_]u32{1};
+    const maps = [_]?relocation.Map{.{ .bindings = &bindings, .contracts = &contracts }};
+    const targets: relocation.Targets = .{ .units = &maps };
+    var exported: D.Export = .{ .name = 7, .kind = .contract, .target = .{ .unit = 1, .binding = 0 }, .catalog = 0 };
+    try std.testing.expect(changes(&exported, targets).?);
+    try std.testing.expectEqual(@as(u32, 0), exported.catalog);
+    try rewrite(&exported, targets);
+    try std.testing.expectEqual(@as(u32, 1), exported.catalog);
+    try std.testing.expectEqual(@as(u32, 0), exported.target.binding);
+    exported.catalog = 2;
+    try std.testing.expect(!admits(&exported, targets));
+    try std.testing.expectEqual(@as(u32, 2), exported.catalog);
+}
+
+test "frontend relocation preserves contract provenance in owned principal and executable copies" {
+    const ast = @import("../parse/ast.zig");
+    const before: ast.Span = .{ .start = 4, .end = 9 };
+    const after: ast.Span = .{ .start = 12, .end = 17 };
+    var qualifications = [_]relocation.Qualification{.{ .before = before, .after = after }};
+    var bindings = [_]u32{0};
+    const maps = [_]?relocation.Map{.{ .bindings = &bindings, .qualifications = &qualifications }};
+    const targets: relocation.Targets = .{ .units = &maps };
+    const Example = struct { principal: Types.Obligation, executable: core.Obligation, unrelated: Types.Obligation };
+    const original: Example = .{
+        .principal = .{ .ty = 0, .kind = .type_rep, .source = 0, .explicit = true, .qualification_unit = 1, .qualification_span = before },
+        .executable = .{ .ty = 0, .kind = .type_rep, .span = before, .explicit = true, .qualification_unit = 1, .qualification_span = before },
+        .unrelated = .{ .ty = 0, .kind = .type_rep, .source = 0, .explicit = true, .qualification_unit = 2, .qualification_span = before },
+    };
+    var owned = original;
+    try std.testing.expect(targets.changes());
+    try std.testing.expect(changes(&owned, targets).?);
+    try std.testing.expectEqualDeep(original, owned);
+    try rewrite(&owned, targets);
+    try std.testing.expectEqual(after, owned.principal.qualification_span.?);
+    try std.testing.expectEqual(after, owned.executable.qualification_span.?);
+    try std.testing.expectEqual(before, original.principal.qualification_span.?);
+    try std.testing.expectEqual(before, owned.executable.span);
+    try std.testing.expectEqualDeep(original.unrelated, owned.unrelated);
 }

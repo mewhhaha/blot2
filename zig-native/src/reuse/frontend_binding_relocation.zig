@@ -5,30 +5,60 @@ const PI = @import("principal_interface.zig");
 const T = @import("../check/types.zig");
 const D = @import("frozen_dependency.zig");
 const graphs = @import("frontend_graph_correspondence.zig");
+const ast = @import("../parse/ast.zig");
 const A = std.mem.Allocator;
 const Error = A.Error || error{Declined};
+const unmapped = std.math.maxInt(u32);
+
+pub const Qualification = struct {
+    before: ast.Span,
+    after: ast.Span,
+    fn less(_: void, left: Qualification, right: Qualification) bool {
+        return left.before.start < right.before.start or (left.before.start == right.before.start and left.before.end < right.before.end);
+    }
+};
 
 pub const Map = struct {
     bindings: []u32,
     nominals: []u32 = &.{},
     constructors: []u32 = &.{},
+    contracts: []u32 = &.{},
+    qualifications: []Qualification = &.{},
     pub fn deinit(self: *Map, a: A) void {
         a.free(self.bindings);
         a.free(self.nominals);
         a.free(self.constructors);
+        a.free(self.contracts);
+        a.free(self.qualifications);
         self.* = .{ .bindings = &.{} };
     }
     pub fn binding(self: Map, old: u32) ?u32 {
         if (old == 0 or old >= self.bindings.len or self.bindings[old] == 0) return null;
         return self.bindings[old];
     }
+    pub fn qualification(self: Map, old: ast.Span) ast.Span {
+        var low: usize = 0;
+        var high = self.qualifications.len;
+        while (low < high) {
+            const middle = low + (high - low) / 2;
+            const value = self.qualifications[middle];
+            if (std.meta.eql(value.before, old)) return value.after;
+            if (Qualification.less({}, value, .{ .before = old, .after = old })) low = middle + 1 else high = middle;
+        }
+        return old;
+    }
     pub fn changes(self: Map) bool {
+        for (self.qualifications) |value| if (!std.meta.eql(value.before, value.after)) return true;
         for (self.bindings, 0..) |current, old| if (current != 0 and current != old) return true;
         for (self.nominals, 0..) |current, old| if (current != 0 and current != old) return true;
         for (self.constructors, 0..) |current, old| if (current != 0 and current != old) return true;
+        for (self.contracts, 0..) |current, old| if (current != unmapped and current != old) return true;
         return false;
     }
     pub fn catalog(self: Map, kind: @FieldType(D.Export, "kind"), old: u32) ?u32 {
+        // Contract catalog zero is a valid declaration, unlike the nominal
+        // and constructor sentinel entries.
+        if (kind == .contract) return if (old < self.contracts.len and self.contracts[old] != unmapped) self.contracts[old] else null;
         const entries = switch (kind) {
             .nominal => self.nominals,
             .constructor => self.constructors,
@@ -49,6 +79,11 @@ pub const Targets = struct {
         if (old.binding == 0 or old.unit == 0 or old.unit > self.units.len) return old;
         const map = self.units[old.unit - 1] orelse return old;
         return .{ .unit = old.unit, .binding = map.binding(old.binding) orelse return null };
+    }
+    pub fn qualification(self: Targets, unit: u32, span: ast.Span) ast.Span {
+        if (unit == 0 or unit > self.units.len) return span;
+        const map = self.units[unit - 1] orelse return span;
+        return map.qualification(span);
     }
     pub fn exported(self: Targets, old: D.Export) ?D.Export {
         var result = old;
@@ -74,7 +109,6 @@ pub fn compare(a: A, left: *const PI.Interface, right: *const PI.Interface, targ
     inline for (.{ "proof_contracts", "associated", "implementations", "implementation_predicates", "implementation_members", "member_templates", "selected_proofs", "selected_members", "selected_edges" }) |field| {
         if (@field(left, field).len != 0 or @field(right, field).len != 0) return null;
     }
-    if (!privateContractsOnly(left) or !privateContractsOnly(right)) return null;
     // Moving effects changes their generative AST identity. They do not take
     // the opaque-name exception and remain on ordinary checking here.
     if (!privateEffectsOnly(left) or !privateEffectsOnly(right)) {
@@ -92,12 +126,18 @@ pub fn compare(a: A, left: *const PI.Interface, right: *const PI.Interface, targ
     for (left.bindings, 0..) |old, index| {
         if (index == 0) continue;
         if (!visible(old)) continue;
-        if (old.name == 0) return null;
+        if (old.name == 0 and (old.kind != .external or old.external == null)) return null;
         var matched: ?u32 = null;
         for (right.bindings, 0..) |current, next| {
             if (comparisons == 0) return null;
             comparisons -= 1;
             if (next == 0 or !visible(current) or old.name != current.name or old.kind != current.kind) continue;
+            // Shared imported schemes have no exposed spelling. Their exact
+            // original public producer target, not an ordinal, identifies them.
+            if (old.name == 0) {
+                const target = targets.target(old.external.?) orelse return null;
+                if (current.external == null or !std.meta.eql(target, current.external.?)) continue;
+            }
             if (matched != null or used[next]) return null;
             matched = @intCast(next);
         }
@@ -152,20 +192,46 @@ pub fn compare(a: A, left: *const PI.Interface, right: *const PI.Interface, targ
         if (index != 0 and value.nominal != 0 and !right.nominals[value.nominal].private and !matched) return null;
     }
 
+    if (!privateContractsOnly(left) or !privateContractsOnly(right)) {
+        map.contracts = try a.alloc(u32, left.contracts.len);
+        @memset(map.contracts, unmapped);
+        const contract_used = try a.alloc(bool, right.contracts.len);
+        defer a.free(contract_used);
+        @memset(contract_used, false);
+        for (left.contracts, 0..) |old, index| {
+            if (old.private) continue;
+            var matched: ?u32 = null;
+            for (right.contracts, 0..) |current, next| {
+                if (comparisons == 0) return null;
+                comparisons -= 1;
+                if (current.private or old.name != current.name or !std.meta.eql(old.identity, current.identity)) continue;
+                if (matched != null or contract_used[next]) return null;
+                matched = @intCast(next);
+            }
+            const next = matched orelse return null;
+            contract_used[next] = true;
+            map.contracts[index] = next;
+        }
+        for (right.contracts, contract_used) |value, matched| if (!value.private and !matched) return null;
+    }
+
     var graph = (try graphs.Match.init(a, &left.graph, &right.graph)) orelse return null;
     defer graph.deinit();
     var checker: Checker = .{ .left = left, .right = right, .graph = &graph, .map = map, .targets = targets };
+    defer checker.qualifications.deinit(a);
     checker.check() catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.Declined => return null,
     };
+    map.qualifications = try checker.qualifications.toOwnedSlice(a);
+    std.mem.sort(Qualification, map.qualifications, {}, Qualification.less);
     published = true;
     return map;
 }
 
 // Admitted private catalogs contain redacted tombstones. They confer no public
-// authority and no external catalog position. Actual public authority graphs
-// remain on ordinary checking until their full correspondence is implemented.
+// authority and no external catalog position. Public recipes are compared
+// separately; selected implementations still require ordinary checking.
 fn privateContractsOnly(owner: *const PI.Interface) bool {
     for (owner.contracts) |contract| if (!contract.private) return false;
     if (owner.implementations.len != 0 or owner.implementation_members.len != 0 or owner.implementation_predicates.len != 0) return false;
@@ -187,6 +253,7 @@ fn privateEffectsOnly(owner: *const PI.Interface) bool {
 }
 
 const Checker = struct {
+    qualifications: std.ArrayList(Qualification) = .empty,
     left: *const PI.Interface,
     right: *const PI.Interface,
     graph: *graphs.Match,
@@ -258,6 +325,53 @@ const Checker = struct {
             try self.scheme(old.scheme, current.scheme);
         }
         try self.effects();
+        try self.contracts();
+    }
+    fn contracts(self: *Checker) Error!void {
+        if (privateContractsOnly(self.left) and privateContractsOnly(self.right)) return;
+        try self.privateContractSlots(self.left);
+        try self.privateContractSlots(self.right);
+        for (self.left.contracts, 0..) |old, index| {
+            if (old.private) continue;
+            try self.work(0);
+            const current = self.right.contracts[self.map.catalog(.contract, @intCast(index)) orelse return error.Declined];
+            if (old.private != current.private or old.name != current.name or old.declaration != current.declaration or !std.meta.eql(old.identity, current.identity) or old.requires_implementation != current.requires_implementation or old.parameter_names.len != current.parameter_names.len or old.row_parameter_names.len != current.row_parameter_names.len) return error.Declined;
+            try self.graph.typeList(old.parameters, current.parameters);
+            try self.graph.typeList(old.variables, current.variables);
+            try self.patternList(old.patterns, current.patterns, 0);
+            try self.graph.rowVariables(old.row_variables, current.row_variables);
+            try self.graph.rowList(old.row_parameters, current.row_parameters);
+            if (old.predicates.len != current.predicates.len or old.members.len != current.members.len) return error.Declined;
+            for (self.left.contract_predicates[old.predicates.start..][0..old.predicates.len], self.right.contract_predicates[current.predicates.start..][0..current.predicates.len]) |from, to| try self.obligation(from, to);
+            for (self.left.contract_members[old.members.start..][0..old.members.len], self.right.contract_members[current.members.start..][0..current.members.len]) |from, to| {
+                try self.work(0);
+                if (from.name != to.name or from.kind != to.kind or !std.meta.eql(from.contract, to.contract)) return error.Declined;
+                try self.graph.ty(from.root, to.root);
+            }
+        }
+    }
+    fn privateContractSlots(self: *Checker, owner: *const PI.Interface) Error!void {
+        // Redacted private headers have empty spans. Any substantive flat slot
+        // must therefore belong to a public recipe that is compared above.
+        for (owner.contract_members, 0..) |member, index| {
+            if (member.name == 0 and member.root == 0) continue;
+            var public = false;
+            for (owner.contracts) |header| {
+                try self.work(0);
+                if (!header.private and std.meta.eql(header.identity, member.contract) and index >= header.members.start and index - header.members.start < header.members.len) public = true;
+            }
+            if (!public) return error.Declined;
+        }
+        const inert: T.Obligation = .{ .ty = 0, .kind = .type_rep, .source = 0, .explicit = true };
+        for (owner.contract_predicates, 0..) |predicate, index| {
+            if (std.meta.eql(predicate, inert)) continue;
+            var public = false;
+            for (owner.contracts) |header| {
+                try self.work(0);
+                if (!header.private and index >= header.predicates.start and index - header.predicates.start < header.predicates.len) public = true;
+            }
+            if (!public) return error.Declined;
+        }
     }
     fn effects(self: *Checker) Error!void {
         if (privateEffectsOnly(self.left) and privateEffectsOnly(self.right)) return;
@@ -295,13 +409,37 @@ const Checker = struct {
         const old_goals = self.left.obligations[old.obligations.start..][0..old.obligations.len];
         const new_goals = self.right.obligations[current.obligations.start..][0..current.obligations.len];
         for (old_goals, new_goals) |from, to| {
-            try self.work(0);
-            // Formal value binders need a separate lexical correspondence;
-            // numeric coincidence after movement cannot prove one.
-            if (from.kind == .callee_use or to.kind == .callee_use) return error.Declined;
-            if (from.kind != to.kind or from.name != to.name or from.operator != to.operator or !std.meta.eql(from.identity, to.identity) or from.explicit != to.explicit or from.qualification_unit != to.qualification_unit or !std.meta.eql(from.qualification_span, to.qualification_span) or from.source != 0 or to.source != 0) return error.Declined;
-            inline for (.{ "ty", "result", "other", "signature" }) |field| try self.graph.ty(@field(from, field), @field(to, field));
+            try self.obligation(from, to);
         }
+    }
+    fn obligation(self: *Checker, from: T.Obligation, to: T.Obligation) Error!void {
+        try self.work(0);
+        if (from.kind != to.kind or from.name != to.name or from.operator != to.operator or from.explicit != to.explicit or from.qualification_unit != to.qualification_unit or from.source != 0 or to.source != 0) return error.Declined;
+        if (from.kind == .callee_use) {
+            // Only an owned public binding map establishes this relation.
+            // Formal, private and missing callees have no admitted target.
+            if (from.identity.unit == 0 or from.identity.unit != self.left.unit or to.identity.unit != self.right.unit) return error.Declined;
+            if ((self.map.binding(from.identity.decl) orelse return error.Declined) != to.identity.decl) return error.Declined;
+        } else if (!std.meta.eql(from.identity, to.identity)) return error.Declined;
+        inline for (.{ "ty", "result", "other", "signature" }) |field| try self.graph.ty(@field(from, field), @field(to, field));
+        if ((from.qualification_span == null) != (to.qualification_span == null)) return error.Declined;
+        const before = from.qualification_span orelse return;
+        const after = to.qualification_span.?;
+        if (before.start > before.end or after.start > after.end) return error.Declined;
+        if (from.explicit and from.qualification_unit == self.left.unit) {
+            // This span belongs to the matched public scheme or contract. Its
+            // complete predicate graph has passed; retain the correspondence
+            // so owned caller copies keep current evidence provenance too.
+            for (self.qualifications.items) |prior| {
+                try self.work(0);
+                if (std.meta.eql(prior.before, before)) {
+                    if (!std.meta.eql(prior.after, after)) return error.Declined;
+                    return;
+                }
+                if (std.meta.eql(prior.after, after)) return error.Declined;
+            }
+            try self.qualifications.append(self.graph.allocator, .{ .before = before, .after = after });
+        } else if (!std.meta.eql(self.targets.qualification(from.qualification_unit, before), after)) return error.Declined;
     }
     fn patternList(self: *Checker, old: T.List, current: T.List, depth: usize) Error!void {
         try self.work(depth);
@@ -361,4 +499,140 @@ fn bindingMapScenario(a: A) !void {
 test "frontend relocation public slot maps own private insertion and reject changed contracts through OOM" {
     try bindingMapScenario(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, bindingMapScenario, .{});
+}
+
+fn publicContractMapScenario(a: A) !void {
+    var old_nodes = [_]T.Node{ .{ .tag = .absent }, .{ .tag = .u32 }, .{ .tag = .array, .a = 1 } };
+    var new_nodes = old_nodes;
+    const inert: PI.Binding = .{ .private = true, .name = 0, .kind = .global, .named_function = false, .ty = 0, .scheme = .{}, .external = null };
+    const public: PI.Binding = .{ .name = 7, .kind = .global, .named_function = false, .ty = 1, .scheme = .{ .root = 1, .obligations = .{ .start = 0, .len = 1 } }, .external = null };
+    var old_bindings = [_]PI.Binding{ inert, inert, public };
+    var new_bindings = [_]PI.Binding{ inert, inert, inert, public };
+    const contract: PI.Contract = .{ .identity = .{ .unit = 1, .decl = T.opaque_name_bit | 9 }, .name = 9, .predicates = .{ .start = 0, .len = 2 } };
+    var old_contracts = [_]PI.Contract{contract};
+    var new_contracts = [_]PI.Contract{ .{ .private = true, .identity = .{ .unit = 1, .decl = T.opaque_name_bit | 10 }, .name = 0 }, contract };
+    const before: ast.Span = .{ .start = 10, .end = 20 };
+    const after: ast.Span = .{ .start = 40, .end = 50 };
+    const predicate: T.Obligation = .{ .ty = 2, .kind = .type_rep, .source = 0, .explicit = true, .qualification_unit = 1, .qualification_span = before };
+    var predicates = [_]T.Obligation{ predicate, predicate };
+    var moved = predicates;
+    for (&moved) |*value| value.qualification_span = after;
+    const clause_before: ast.Span = .{ .start = 60, .end = 70 };
+    const clause_after: ast.Span = .{ .start = 90, .end = 100 };
+    var old_goals = [_]T.Obligation{.{ .ty = 1, .kind = .type_rep, .source = 0, .explicit = true, .qualification_unit = 1, .qualification_span = clause_before }};
+    var new_goals = old_goals;
+    new_goals[0].qualification_span = clause_after;
+    const old: PI.Interface = .{
+        .unit = 1,
+        .graph = .{ .nodes = &old_nodes, .extra = &.{}, .rows = &.{}, .labels = &.{}, .operations = &.{}, .row_variable_count = 0 },
+        .patterns = .{ .nodes = &.{}, .extra = &.{} },
+        .bindings = &old_bindings,
+        .obligations = &old_goals,
+        .obligation_spans = &.{},
+        .nominals = &.{},
+        .constructors = &.{},
+        .effect_families = &.{},
+        .effect_templates = &.{},
+        .associated = &.{},
+        .contracts = &old_contracts,
+        .contract_predicates = &predicates,
+    };
+    var current = old;
+    current.bindings = &new_bindings;
+    current.graph.nodes = &new_nodes;
+    current.contracts = &new_contracts;
+    current.contract_predicates = &moved;
+    current.obligations = &new_goals;
+    var map = (try compare(a, &old, &current, .{})) orelse return error.MissingContractMap;
+    defer map.deinit(a);
+    try std.testing.expectEqual(@as(?u32, 1), map.catalog(.contract, 0));
+    try std.testing.expect(map.changes());
+    try std.testing.expectEqual(@as(usize, 2), map.qualifications.len);
+    try std.testing.expectEqual(after, map.qualification(before));
+    try std.testing.expectEqual(clause_after, map.qualification(clause_before));
+    // One authored clause may supply several predicates, but its old/new
+    // provenance relation must be unambiguous and keep the original unit.
+    moved[1].qualification_span = .{ .start = 41, .end = 51 };
+    var ambiguous = try compare(a, &old, &current, .{});
+    defer if (ambiguous) |*value| value.deinit(a);
+    try std.testing.expect(ambiguous == null);
+    moved[1].qualification_span = after;
+    moved[1].qualification_unit = 2;
+    var foreign = try compare(a, &old, &current, .{});
+    defer if (foreign) |*value| value.deinit(a);
+    try std.testing.expect(foreign == null);
+    moved[1].qualification_unit = 1;
+    moved[1].qualification_span = null;
+    var omitted = try compare(a, &old, &current, .{});
+    defer if (omitted) |*value| value.deinit(a);
+    try std.testing.expect(omitted == null);
+    moved[1].qualification_span = after;
+    // Equal raw predicate root IDs cannot conceal a changed public graph.
+    new_nodes[2].tag = .list;
+    var rejected = try compare(a, &old, &current, .{});
+    defer if (rejected) |*value| value.deinit(a);
+    try std.testing.expect(rejected == null);
+}
+
+test "frontend relocation public contracts preserve zero catalog slots and reject changed graph recipes through OOM" {
+    try publicContractMapScenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, publicContractMapScenario, .{});
+}
+
+fn sharedCalleeMapScenario(a: A) !void {
+    var nodes = [_]T.Node{ .{ .tag = .absent }, .{ .tag = .u32 }, .{ .tag = .function, .a = 1, .b = 1 }, .{ .tag = .product } };
+    var rows = [_]T.Effects.Row{.{ .labels = .{}, .tail = .closed }};
+    const inert: PI.Binding = .{ .private = true, .name = 0, .kind = .global, .named_function = false, .ty = 0, .scheme = .{}, .external = null };
+    const callee: PI.Binding = .{ .name = 0, .kind = .external, .named_function = true, .ty = 2, .scheme = .{ .root = 2 }, .external = .{ .unit = 2, .binding = 2 } };
+    const caller: PI.Binding = .{ .name = 7, .kind = .external, .named_function = true, .ty = 2, .scheme = .{ .root = 2, .obligations = .{ .start = 0, .len = 1 } }, .external = .{ .unit = 2, .binding = 3 } };
+    var before = [_]PI.Binding{ inert, inert, callee, caller };
+    var after = [_]PI.Binding{ inert, inert, inert, callee, caller };
+    after[3].external.?.binding = 4;
+    after[4].external.?.binding = 5;
+    var old_goals = [_]T.Obligation{.{ .kind = .callee_use, .ty = 3, .source = 0, .identity = .{ .unit = 1, .decl = 2 } }};
+    var new_goals = old_goals;
+    new_goals[0].identity.decl = 3;
+    const old: PI.Interface = .{
+        .unit = 1,
+        .graph = .{ .nodes = &nodes, .extra = &.{}, .rows = &rows, .labels = &.{}, .operations = &.{}, .row_variable_count = 0 },
+        .patterns = .{ .nodes = &.{}, .extra = &.{} },
+        .bindings = &before,
+        .obligations = &old_goals,
+        .obligation_spans = &.{},
+        .nominals = &.{},
+        .constructors = &.{},
+        .effect_families = &.{},
+        .effect_templates = &.{},
+        .associated = &.{},
+    };
+    var current = old;
+    current.bindings = &after;
+    current.obligations = &new_goals;
+    var producer_slots = [_]u32{ 0, 0, 4, 5 };
+    const producers = [_]?Map{ null, .{ .bindings = &producer_slots } };
+    const targets: Targets = .{ .units = &producers };
+    var map = (try compare(a, &old, &current, targets)) orelse return error.MissingSharedCalleeMap;
+    defer map.deinit(a);
+    try std.testing.expectEqual(@as(?u32, 3), map.binding(2));
+    try std.testing.expectEqual(@as(?u32, 4), map.binding(3));
+    after[3].external.?.binding = 5;
+    var retargeted = try compare(a, &old, &current, targets);
+    defer if (retargeted) |*value| value.deinit(a);
+    try std.testing.expect(retargeted == null);
+    after[3].external.?.binding = 4;
+    new_goals[0].identity.decl = 1;
+    var private = try compare(a, &old, &current, targets);
+    defer if (private) |*value| value.deinit(a);
+    try std.testing.expect(private == null);
+    new_goals[0].identity.decl = 3;
+    old_goals[0].identity.unit = 0;
+    new_goals[0].identity.unit = 0;
+    var formal = try compare(a, &old, &current, targets);
+    defer if (formal) |*value| value.deinit(a);
+    try std.testing.expect(formal == null);
+}
+
+test "frontend relocation shared public callee schemes retain original targets and reject formal or private substitutions through OOM" {
+    try sharedCalleeMapScenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, sharedCalleeMapScenario, .{});
 }

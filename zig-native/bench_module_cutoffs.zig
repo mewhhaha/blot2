@@ -106,6 +106,31 @@ const generic_bridge =
     \\
 ;
 const Case = struct { name: []const u8, source: []const u8, expected: u32 = 42 };
+const public_header = "type Public a is contract = {type_rep a}\n";
+const qualified_scalar =
+    \\opaque type Token = U32
+    \\private const offset = 2
+    \\const keep: a -> a where {Public a} = fn value => value
+    \\const make: U32 -> Token = fn value => #Token (keep (@u32.add value offset))
+    \\const read: Token -> U32 = fn (#Token value) => value
+    \\
+;
+const used_contract_cases = [_]Case{
+    .{ .name = "used_initial", .source = public_header ++ qualified_scalar },
+    .{ .name = "used_private_binding_insert", .source = public_header ++ "private const unrelated = 99\n" ++ qualified_scalar },
+    .{ .name = "used_private_contract_insert", .source = "private type Hidden a is contract = {type_rep a}\n" ++ public_header ++ qualified_scalar },
+    .{ .name = "used_contract_alpha", .source = "type Public item is contract = {type_rep item}\n" ++ qualified_scalar },
+    .{ .name = "used_revert", .source = public_header ++ qualified_scalar },
+};
+
+const public_contract_cases = [_]Case{
+    .{ .name = "public_initial", .source = public_header ++ scalar },
+    .{ .name = "public_private_binding_insert", .source = public_header ++ "private const unrelated = 99\n" ++ scalar },
+    .{ .name = "public_private_contract_insert", .source = "private type Hidden a is contract = {type_rep a}\n" ++ public_header ++ scalar },
+    .{ .name = "public_contract_alpha", .source = "type Public item is contract = {type_rep item}\n" ++ scalar },
+    .{ .name = "public_revert", .source = public_header ++ scalar },
+};
+
 const cases = [_]Case{
     .{ .name = "initial", .source = scalar },
     .{ .name = "private_binding_insert", .source = "private const unrelated = 99\n" ++ scalar },
@@ -251,4 +276,6 @@ fn campaign(group: []const u8, bridge_text: []const u8, inputs: []const Case) !v
 test "cutoff allocation observations" {
     try campaign("storage", bridge, &cases);
     try campaign("generic", generic_bridge, &generic_cases);
+    try campaign("public_contract", "export {Public} from \"./tokens\"\n" ++ bridge, &public_contract_cases);
+    try campaign("used_contract", "export {Public} from \"./tokens\"\n" ++ bridge, &used_contract_cases);
 }

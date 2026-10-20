@@ -4,9 +4,16 @@
 
 - **Status:** In progress — scope closed to fixed acceptance rows by owner
   decision on 17 October 2026. The 20 October continuation passes the full
-  compiler gate and exact wrapper comparisons. Row 3 still has a confirmed
-  unchanged-public-contract cutoff gap. Compile parity and the seven-pair CPU
-  guard also pass this slice. No completion is claimed.
+  compiler gate and exact wrapper comparisons. Row 3's unchanged-public-contract
+  gap has a fix, including authored scheme origins and used contracts. Its new
+  full gate passes 2,489 native laws, 1,578 guest/client checks and 37 harness
+  checks; all 96 release wrapper contexts also pass. Its first CPU guard failed
+  (paired median 1.187 against 1.05); the independent identity control and
+  expanded 15-pair comparison pass (0.983 and 1.021). Strict compile parity
+  passes 162 samples plus fresh-edited controls, including restart/shared.
+  Public-contract correspondence is qualified. Bounded implementation catalogs
+  still give 0/0 caller reuse, and an initial associated-method artifact failure
+  needs diagnosis. No completion is claimed.
 - **Dependencies:** [052](052-implement-opaque-types-and-privacy.md),
   [024](024-apply-general-body-interface-cutoff.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 2 / interface
@@ -209,5 +216,5 @@ a private insertion reuses neither caller when the producer also has an unused
 public contract, while the same insertion without that contract reuses both.
 Fresh bytes and executed witnesses agree. The
 [durable screen](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#remaining-public-contract-cutoff-20-october-2026)
-records this remaining requirement; an isolated public-catalog prototype is
-being developed separately from the qualified source.
+records the original gap and the integrated focused fix. Complete qualification
+of the public-catalog and authored-origin continuation remains required.

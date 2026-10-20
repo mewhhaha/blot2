@@ -129,11 +129,12 @@ unchanged.
 
 ### Task 053 qualified continuation, 20 October 2026
 
-The qualified continuation starts from `8ff153a`. Known opaque storage changes
-now retain ordinary semantic callers while derived producers republish their
-physical recipes. The wrapper matrix compares all private and exported machine
-bodies, executable sections and allocation/ownership traffic; all 96 rows pass
-in development and release screens.
+The qualified continuation is saved in local `709237c`, based on `8ff153a`; its
+measured output hashes are separately saved in `ed3b0af`. Known opaque storage
+changes now retain ordinary semantic callers while derived producers republish
+their physical recipes. The wrapper matrix compares all private and exported
+machine bodies, executable sections and allocation/ownership traffic; all 96
+rows pass in development and release screens.
 
 The first full gate passes 2,476 native laws, 1,570 guest/client checks and 37
 harness checks. Its release is `8a8cfb7c…`. A later negative control found that
@@ -174,8 +175,24 @@ changes.
 A further row-3 screen confirms a remaining cutoff gap: an unchanged, unused
 public contract before the opaque type makes a private insertion recheck both
 callers (0/0 reuse, versus 1/1 without that contract). Fresh bytes and executed
-results remain correct. Task 053 stays open; a separate source copy is preparing
-owned public-contract catalog correspondence after this qualified slice.
+results remain correct on that baseline. The follow-up now integrates owned
+public-contract catalog and qualification-origin correspondence after passing
+eight helper laws, full native allocation-failure sweeps and both-tier
+source/archive/checkpoint/failed-edit controls for used and unused contracts.
+Changed public predicates still revoke reuse. The complete gate now passes
+**2,489 executed native laws, 1,578 guest/client checks and 37 harness checks**,
+with zero native skips, failures, leaks or logged errors. Release `832ea709…`
+also passes all 96 exact wrapper contexts and five operation comparisons. Its
+first seven-pair CPU comparison failed (paired median 1.187, limit 1.05),
+despite identical Wasm. The independent seven-pair identity control passes
+(median 0.983), as does the preselected expanded 15-pair comparison on CPU 2
+(median 1.021, limit 1.05). Individual ratios remain broad; the first failed run
+is preserved and no speedup is claimed. All 162 strict compile-parity samples
+and the separate fresh-edited controls pass, including restart and shared
+sessions, without output waivers or hash changes. This public-contract slice is
+qualified. Task 053 stays open: the bounded used/unused implementation-catalog
+probe still rechecks both callers (0/0 reuse); an associated-method probe fails
+at its initial artifact publication and needs diagnosis.
 
 The standalone allocation campaign passes 68 observations: both tiers,
 fresh/retained work, source-byte parity and zero live requested bytes after
@@ -200,8 +217,9 @@ the CPU guard.
    - The all-width cursor comparison is byte-exact but still exposes the
      performance gap; Window and broader generic state remain open.
    - Task 053's storage, wrapper and declaration-relocation slice passes the
-     full qualification above. Finish the remaining public-contract
-     correspondence and fixed acceptance cases, then qualify that final source.
+     full qualification above. Finish the remaining public-contract cases in
+     bounded implementation catalogs and associated methods, then qualify that
+     final source.
    - Keep 086's measured constant-work gate, 093's edit attribution and tasks
      100–104's targets open until their actual requirements pass.
 2. **Follow-ups recorded under their hills:**

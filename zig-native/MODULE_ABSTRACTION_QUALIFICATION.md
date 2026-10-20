@@ -468,7 +468,129 @@ disabled. Results are
 prototype is adding complete public contract recipes and owned catalog maps; it
 is not integrated or qualified by the current gate.
 
-### Final release erasure screen, 20 October 2026
+### Public-contract follow-up, focused qualification
+
+The local `709237c` milestone and separate `ed3b0af` hash record preserve the
+qualified source above. A later continuation fixes the catalog screen in an
+isolated source copy and integrates only the reviewed files after focused
+checks. The complete gate and exact release wrapper comparisons now pass this
+continuation; the remaining CPU and compile-parity status is recorded below.
+
+The correspondence owns injective public-contract catalog maps, including valid
+catalog slot zero. It compares every public header, parameter/pattern graph, row
+parameter, predicate and member recipe; private slots must remain redacted. The
+same exact graph comparison admits source-position changes for authored
+qualifications in matched public schemes and contracts. It retains an owned,
+unambiguous old/new span map under the original unit and rewrites only
+unpublished principal/Core copies. Nameless shared schemes retain exact original
+public producer targets, and callee requirements use the complete public binding
+map; private/formal targets decline. Selected implementations,
+generative/rank/usage authority and unsupported graphs retain ordinary checking.
+
+Eight helper laws pass, including complete allocation-failure sweeps, changed
+predicate graphs at identical raw type IDs, ambiguous span mapping, changed
+origin units, omitted origins, owned-copy isolation and typed catalog rewrites.
+The native integration law sweeps every allocation failure over private binding
+insertion, private contract insertion shifting public catalog positions, public
+parameter alpha changes and reverts, with both used and unused contracts.
+
+The four new guest laws cover both codegen tiers, source and archived
+dependencies, forwarded contracts, fresh bytes, failed-edit rollback and
+checkpoint restart. They execute 16,000 boundary-value calls. A valid changed
+public predicate forces both semantic callers to recheck and still matches fresh
+bytes. The earlier wrapper, storage, derived-recipe and relocation guest groups
+also pass on the prototype. No release CPU or full-gate result is inferred from
+these focused runs.
+
+The expanded allocation campaign on the integrated source passes 108
+observations (54 fresh/retained pairs), including used and unused public
+contracts in both tiers. All eight Session groups end at zero requested live
+bytes. In optimized mode, private binding insertion beside an unused contract
+uses 750,398 requested bytes retained versus 796,461 fresh (four versus seven
+elaborations); the used-contract case uses 800,967 versus 874,137 (five versus
+eight). Peaks are higher while both accepted and candidate owners are live. This
+uses the same SMP-backed Session meter and exclusions as the earlier campaign,
+with one worker and persistence disabled; it is not a release CPU measurement.
+The report is `build/bench/task053-public-contract-allocation/results.json`,
+SHA-256 `e277d4194786c306f6abab82274fc5399d849c5c31638adc43da3432cfe253e4`.
+
+### Integrated public-contract qualification, 20 October 2026
+
+The forced full gate `run-accd6926af4e4b24` passes **2,489 native laws executed,
+1,578 guest/client checks and 37 harness checks**. Native shards execute 1,244
+and 1,245 laws with zero skips, failures, leaks or logged errors. The gate wall
+time is 4613.843 seconds. Both analyzers and the uncached local source/fixture
+checks retain zero findings across 510 source files and the fixture module. The
+frozen inventory contains 1,161 source, test and configuration inputs;
+documentation edits are outside that inventory.
+
+- Release SHA-256:
+  `832ea709cab85446a54af9e0ffa6b326bbe19cdd6503e448d758c9994183dadd` (67,652,576
+  bytes).
+- Native executable SHA-256:
+  `6143505f96cf19c4b386542d04d87e71179887c5e50ef2a43ab4015f5ce2134d`.
+- Native source digest:
+  `4311ab23232f4dac1e7fcbf8b5792c574e5066699706c6cae932ca990d976523`.
+- Timing report SHA-256:
+  `721f54d5c02b021c7a6ad93b3b65fd45aab18d48cbda2df01b357b05a5c60f14`.
+- Frozen-input manifest SHA-256:
+  `839f36a62f91356c671f112c1cb761d16005f15b91e332e517152fb02cef4bf0`.
+
+The immutable release in `build/bench/task053-public-contract-release/` passes
+all 96 wrapper contexts and five operation pairs, including exact private and
+exported signatures/bodies, non-custom executable sections and measured
+allocation/ownership traffic. Their result SHA-256 values are
+`ea59b0bc271ed12ae8db723dc52d5c4ced362ecafd1039039f308e84e4a88d6d` and
+`db5c6edc096e1839773d30ed6129f5e3746eb59393064681a2c03fc582fd890e`. Runtime
+timing noise on identical code establishes no speedup.
+
+The first seven-pair fresh game CPU guard against the preceding `3f9c9275…`
+release fails: paired median 1.18684, limit 1.05, with individual ratios
+1.012–2.471 on CPU 0. Fresh Wasm is identical. This failure is preserved in
+`build/bench/task053-public-contract-cpu-guard/results.json`; it is not waived.
+The independently pinned seven-pair identity control on CPU 2 passes with paired
+median 0.98342 (individual ratios 0.901–1.517). The preselected expanded 15-pair
+comparison on that same CPU also passes the unchanged 1.05 guard, with paired
+median 1.02124 (range 0.847–1.460). Both disable persistence and use one codegen
+worker; all fresh Wasm and deterministic work counters agree. The wide identity
+spread and the preserved first failure limit the inference: the expanded
+regression guard passes, with no speedup claim. Identity and expanded report
+SHA-256 values are
+`8058b494d40c93eb2d59f4264064599eaf518281bc8487695d393ed3dd7fedc3` and
+`bdb7971564b6290f9870238b0b5ffa5ec10a6c8f65d7320bb6c164291f568d68`.
+
+Strict fresh/retained/edit/revert/restart/shared parity passes all 162 measured
+samples and the separate fresh-edited controls in three paired rounds. It uses
+the same frozen 583-file snapshot, one worker and restart persistence where
+requested, with no output waiver or hash writes. The report is
+`build/bench/task053-public-contract-parity/results.json`, SHA-256
+`2f804424ec53b06dec85c0828b6ee88e037442c00866b0a76a5f239839ae8c35`. The
+unchanged protocol rejection remains expected; these counts are compiler and
+parity observations, not executed gdev tests. All 1,161 frozen source, test and
+configuration inputs remain exact. This qualifies the public-contract follow-up;
+task 053 remains open for the cases below.
+
+### Next fixed-scope controls, 20 October 2026
+
+The bounded mixed implementation and selected-name form already covered by task
+024 still blocks row 3. With a private insertion immediately before the opaque
+type, both an unused public implementation and one used by the observer recheck
+both callers (0/0 reuse), including revert. All four states preserve fresh Wasm
+and twelve executed boundary witnesses. The exact compiler is `832ea709…`;
+`build/bench/task053-fixed-catalog-screen/results.json` pins the harness and
+source hashes. Its isolated correspondence prototype is unqualified.
+
+The associated-method control fails during its initial build with
+`InvalidArtifact`, before any edit or reuse observation. An explicit method
+signature produces the same failure; the preceding `3f9c9275…` release also
+fails the original inferred-signature probe. The sources and logs remain in
+ignored `build/bench/task053-associated-cutoff-screen/`,
+`build/bench/task053-associated-annotated-cutoff-screen/` and
+`build/bench/task053-associated-inferred-baseline/`. This is an existing
+artifact-publication issue to diagnose; no passing associated cutoff or
+prototype execution is claimed.
+
+### Preceding release erasure screen, 20 October 2026
 
 The new release has SHA-256
 `3f9c9275221aa8d1e8a725e97d9b17a673b9bc7e22bf09978ad346ae4af8e45f` and

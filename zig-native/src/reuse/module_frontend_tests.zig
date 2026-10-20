@@ -1904,3 +1904,37 @@ test "module interface cutoff keeps importers when an edit only moves the produc
         try std.testing.expectEqual(@as(usize, 1), session.last.fallback.validated_modules);
     }
 }
+
+test "module interface cutoff preserves public contract recipes and forwarded catalogs through OOM" {
+    inline for (.{ false, true }) |used_contract| {
+        var fixture = try Fixture.init();
+        defer fixture.deinit();
+        const keep = "const keep: a -> a where {Public a} = fn value => value\n";
+        const payload = if (used_contract) "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token (keep (@u32.add value offset))\nconst read: Token -> U32 = fn (#Token value) => value\n" else opaque_storage_original;
+        const header = "type Public a is contract = {type_rep a}\n" ++ (if (used_contract) keep else "");
+        const alpha = "type Public item is contract = {type_rep item}\n" ++ (if (used_contract) keep else "");
+        try fixture.write("changed.blot", header ++ payload);
+        try fixture.write("left.blot", "import {make, read} from \"./changed\"\nexport {Public} from \"./changed\"\nconst bridge = fn (value: U32) => read (make value)\n");
+        try fixture.write("main.blot", "import {Public, bridge} from \"./left\"\nentry const answer = fn (value: U32) => bridge value\n");
+        var session = try retained.Session.initEmpty(a, .{});
+        defer session.deinit();
+        try initialize(&session, &fixture);
+        for ([_][]const u8{
+            header ++ "private const unrelated = 7\n" ++ payload,
+            "private type Hidden a is contract = {type_rep a}\n" ++ header ++ payload,
+            alpha ++ payload,
+            header ++ payload,
+        }) |text| {
+            try fixture.write("changed.blot", text);
+            var expected = try fresh(&fixture);
+            defer expected.deinit(a);
+            try allocationFailure(a, &fixture, &session, &expected);
+            try @import("../allocation_failures.zig").checkAllAllocationFailures(a, allocationFailure, .{ &fixture, &session, &expected });
+            var actual = try session.revise(io, fixture.path, null, .{});
+            defer actual.deinit(a);
+            try equal(&actual, &expected);
+            try std.testing.expectEqual(@as(usize, 1), session.last.fallback.module_cutoff.reused);
+            try std.testing.expectEqual(@as(usize, 1), session.last.fallback.entry_cutoff.reused);
+        }
+    }
+}

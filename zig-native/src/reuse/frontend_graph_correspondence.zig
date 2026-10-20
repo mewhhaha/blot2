@@ -157,6 +157,11 @@ pub const Match = struct {
             _ = try self.row_variables.enter(from, to);
         }
     }
+    pub fn rowList(self: *Match, left: T.List, right: T.List) Error!void {
+        try self.work(0);
+        if (left.len != right.len) return error.Declined;
+        for (self.left.list(left), self.right.list(right)) |from, to| try self.rowDepth(from, to, 1);
+    }
     fn rowDepth(self: *Match, left: T.Effects.Id, right: T.Effects.Id, depth: usize) Error!void {
         try self.work(depth);
         if (try self.rows.enter(left, right)) return;
