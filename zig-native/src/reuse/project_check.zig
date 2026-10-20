@@ -8,6 +8,9 @@ const symbols = @import("../parse/symbols.zig");
 const Allocator = std.mem.Allocator;
 const PI = @import("principal_interface.zig");
 const entry_cutoff = @import("entry_frontend_cutoff.zig");
+const binding_relocation = @import("frontend_binding_relocation.zig");
+const frozen_dependency = @import("frozen_dependency.zig");
+const reference_relocation = @import("frontend_reference_relocation.zig");
 
 pub const EditorQuery = struct {
     unit: project.UnitId,
@@ -75,6 +78,8 @@ pub const CheckedProject = struct {
     module_cutoff: entry_cutoff.Stats = .{},
     reused_modules: []bool = &.{},
     interface_colors: []entry_cutoff.Color = &.{},
+    binding_maps: []?binding_relocation.Map = &.{},
+    relocated_modules: []?frozen_dependency.Module = &.{},
     /// Set by checkProjectDeferringEntry: every module except the entry is
     /// checked, and these budgets resume its check in checkDeferredEntry.
     deferred_entry: ?Deferred = null,
@@ -82,6 +87,7 @@ pub const CheckedProject = struct {
     pub fn compiledModule(self: *const CheckedProject, source: *const project.Project, id: usize) ?*const @import("frozen_dependency.zig").Module {
         if (source.compiledModule(id)) |value| return value;
         if (id == 0 or id > self.reused_modules.len or !self.reused_modules[id - 1]) return null;
+        if (id <= self.relocated_modules.len) if (self.relocated_modules[id - 1]) |*owned| return owned;
         return &source.compiled_modules[id - 1];
     }
 
@@ -92,6 +98,10 @@ pub const CheckedProject = struct {
         allocator.free(self.modules);
         allocator.free(self.reused_modules);
         allocator.free(self.interface_colors);
+        for (self.binding_maps) |*map| if (map.*) |*owned| owned.deinit(allocator);
+        allocator.free(self.binding_maps);
+        for (self.relocated_modules) |*module_| if (module_.*) |*owned| @import("dependency_format.zig").deinit(allocator, owned);
+        allocator.free(self.relocated_modules);
         for (self.diagnostics) |diagnostic| {
             if (diagnostic.purity) |witness| witness.deinit(allocator);
             if (diagnostic.detail) |detail| allocator.free(detail);
@@ -174,7 +184,7 @@ const Engine = struct {
 
     fn catalogModule(self: *const Engine, unit: project.UnitId) ?CatalogModule {
         if (unit == 0) return null;
-        if (self.result.compiledModule(self.source, unit) != null) return .{ .owner = .{ .frozen = &self.source.compiled_modules[unit - 1].interface }, .exports = self.compiled_catalogs[unit - 1].exports, .valid = true };
+        if (self.result.compiledModule(self.source, unit)) |compiled| return .{ .owner = .{ .frozen = &compiled.interface }, .exports = self.compiled_catalogs[unit - 1].exports, .valid = true };
         if (self.source_validation) {
             if (self.source_modules[unit - 1]) |*module_| return .{ .owner = .{ .source = &module_.validation }, .exports = module_.exports, .valid = module_.valid };
         } else if (self.result.modules[unit - 1]) |*module_| return .{ .owner = .{ .typed = &module_.checked }, .exports = module_.exports, .valid = module_.valid };
@@ -182,7 +192,7 @@ const Engine = struct {
     }
     fn valueImport(self: *const Engine, target: check.ExternalTarget, origin: ast.Id) check.ImportedBinding {
         std.debug.assert(!self.source_validation);
-        const interface = if (self.result.compiledModule(self.source, target.unit) != null) (check.ImportedCatalog{ .frozen = &self.source.compiled_modules[target.unit - 1].interface, .kind = .catalog, .index = 0, .origin = origin }).interface(target.binding) else self.result.interface(target);
+        const interface = if (self.result.compiledModule(self.source, target.unit)) |compiled| (check.ImportedCatalog{ .frozen = &compiled.interface, .kind = .catalog, .index = 0, .origin = origin }).interface(target.binding) else self.result.interface(target);
         return .{ .target = target, .origin = origin, .interface = interface };
     }
     fn headerImport(self: *const Engine, target: check.ExternalTarget, origin: ast.Id) check.SourceHeader {
@@ -216,13 +226,27 @@ const Engine = struct {
         }
     }
 
-    fn recoverModule(self: *Engine, unit: u32) Allocator.Error!void {
-        const previous = &self.source.compiled_modules[unit - 1];
+    fn recoverModule(self: *Engine, unit: u32) Allocator.Error!bool {
+        var previous = &self.source.compiled_modules[unit - 1];
+        var relocated: ?frozen_dependency.Module = null;
+        defer if (relocated) |*owned| @import("dependency_format.zig").deinit(self.allocator, owned);
+        const targets: binding_relocation.Targets = .{ .units = self.result.binding_maps };
+        if (targets.changes()) {
+            const changed = reference_relocation.changes(previous, targets) orelse return false;
+            if (changed) {
+                relocated = try @import("dependency_closure.zig").copyModule(self.allocator, previous);
+                reference_relocation.rewrite(&relocated.?, targets) catch return false;
+                previous = &relocated.?;
+            }
+        }
         const exports = try self.allocator.alloc(Export, previous.exports.len);
         for (previous.exports, exports) |old, *new| new.* = .{ .name = old.name, .target = old.target, .kind = @fromBackingInt(@intCast(@backingInt(old.kind))), .catalog = old.catalog };
         self.compiled_catalogs[unit - 1].exports = exports;
+        self.result.relocated_modules[unit - 1] = relocated;
+        relocated = null;
         self.result.reused_modules[unit - 1] = true;
         self.result.module_cutoff.reused += 1;
+        return true;
     }
 
     /// Body offers stay borrowed from the accepted revision. Filename offers
@@ -264,8 +288,7 @@ const Engine = struct {
         };
         if (unit != source.entry and self.result.reused_modules.len != 0 and self.diagnostics.items.len == 0) if (previous) |old| {
             if (try @import("module_frontend_cutoff.zig").confirm(self.allocator, source, &self.result, old, unit, &self.result.module_cutoff)) {
-                try self.recoverModule(unit);
-                return true;
+                if (try self.recoverModule(unit)) return true;
             }
         };
         try self.checkModule(unit);
@@ -350,6 +373,15 @@ const Engine = struct {
                 return .{ .flow = declaration.capability_flow, .parameters = declaration.capability_parameters };
             },
         }
+    }
+    fn producerStorage(context: *const anyopaque, identity_: check.Identity) ?@import("../backend/opaque_storage.zig").Storage {
+        const self: *const Engine = @ptrCast(@alignCast(context));
+        if (identity_.unit == 0 or identity_.unit > self.source.units.items.len) return null;
+        const module = self.catalogModule(identity_.unit) orelse return null;
+        for (module.catalog().nominals) |nominal| {
+            if (nominal.is_opaque and nominal.identity.unit == identity_.unit and nominal.identity.decl == identity_.decl) return nominal.storage;
+        }
+        return null;
     }
     fn originalBindingCapabilities(context: *const anyopaque, target: check.ExternalTarget) ?@import("body_check_cache.zig").Digest {
         const self: *const Engine = @ptrCast(@alignCast(context));
@@ -605,6 +637,7 @@ const Engine = struct {
         options.body_source = self.source.unit(unit).source;
         options.body_external_names = .{ .context = self, .lookup = originalBindingName, .unit_origin = originalUnitOrigin, .closed_rows = originalBindingClosedRows, .qualification = originalQualification, .capabilities = originalBindingCapabilities };
         options.producer_capabilities = .{ .context = self, .lookup = producerCapability };
+        options.producer_storage = .{ .context = self, .lookup = producerStorage };
         if (self.previous_bodies.get(self.source.filename(unit))) |cached| options.previous_bodies = cached;
         if (self.editor) |query| {
             options.max_inference_transitions = query.budget.remaining;
@@ -815,6 +848,10 @@ fn checkProjectModeDeferring(allocator: Allocator, source: *project.Project, exe
             @memset(engine.result.reused_modules, false);
             engine.result.interface_colors = try allocator.alloc(entry_cutoff.Color, source.compiled_modules.len);
             @memset(engine.result.interface_colors, .unknown);
+            engine.result.binding_maps = try allocator.alloc(?binding_relocation.Map, source.compiled_modules.len);
+            @memset(engine.result.binding_maps, null);
+            engine.result.relocated_modules = try allocator.alloc(?frozen_dependency.Module, source.compiled_modules.len);
+            @memset(engine.result.relocated_modules, null);
         }
         try engine.initCompiledCatalogs();
         const deferrable = defer_entry and source.input_mode == .project and !engine.source_validation and source.order.items.len != 0 and source.order.items[source.order.items.len - 1] == source.entry;

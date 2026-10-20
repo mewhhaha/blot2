@@ -2,6 +2,7 @@
 //! metadata. No ABI recipe can authorize semantic payload access.
 const std = @import("std");
 const PI = @import("principal_interface.zig");
+const D = @import("frozen_dependency.zig");
 const F = @import("../check/frozen_types.zig");
 const core = @import("../check/core.zig");
 const T = @import("../check/types.zig");
@@ -105,7 +106,87 @@ fn requirement(scan: *visibility.Scan, owner: *const PI.Interface, predicate: T.
     inline for (.{ "ty", "result", "other", "signature" }) |field| try allowed(scan, @field(predicate, field));
 }
 
+fn coreGraph(module: *const core.Module) F.Graph {
+    return .{
+        .nodes = module.types.nodes,
+        .extra = module.types.extra,
+        .rows = module.types.effects.rows,
+        .labels = module.types.effects.labels,
+        .operations = module.types.operations,
+        .quantifier_goals = module.types.quantifier_goals,
+        .quantifier_obligations = module.types.quantifier_obligations,
+        .row_variable_count = module.types.effects.variable_count,
+    };
+}
+const StorageAuthorities = struct {
+    units: []const *const core.Module,
+    recipes: ?[]const storage.Storage = null,
+    offsets: []const usize = &.{},
+    fn lookup(context: *const anyopaque, identity: T.NominalIdentity) ?storage.Authority {
+        const self: *const StorageAuthorities = @ptrCast(@alignCast(context));
+        for (self.units, 0..) |module, unit_index| {
+            if (module.unit != identity.unit) continue;
+            for (module.nominals, 0..) |nominal, nominal_index| {
+                if (!std.meta.eql(nominal.identity, identity)) continue;
+                return .{
+                    .graph = coreGraph(module),
+                    .parameters = .{ .start = nominal.parameters.start, .len = nominal.parameters.len },
+                    .storage = if (self.recipes) |recipes| recipes[self.offsets[unit_index] + nominal_index] else nominal.storage,
+                    .is_opaque = nominal.is_opaque,
+                };
+            }
+            return null;
+        }
+        return null;
+    }
+};
+
 pub fn storageContracts(owner: *const PI.Interface, implementation: *const core.Module) Error!void {
+    const authorities: StorageAuthorities = .{ .units = &.{implementation} };
+    return storageContractsResolved(owner, implementation, .{ .context = &authorities, .lookup = StorageAuthorities.lookup });
+}
+
+/// Called only after every Core graph in the closure has passed validation.
+/// A foreign producer's claimed role is not a proof: start with unknown roles
+/// and publish only recipes derived from concrete payloads and already proved
+/// foreign roles. Circular assertions therefore never establish a machine role.
+/// This worklist is iterative across owners; native recursion stays local and
+/// retains inferPayloadAuthoritative's existing depth and work bounds.
+pub fn storageClosure(a: std.mem.Allocator, owners: []const D.Module, units: []const *const core.Module) Error!void {
+    try require(owners.len == units.len);
+    const offsets = try a.alloc(usize, units.len + 1);
+    defer a.free(offsets);
+    offsets[0] = 0;
+    for (units, 0..) |module, index| offsets[index + 1] = std.math.add(usize, offsets[index], module.nominals.len) catch return error.InvalidArtifact;
+    const recipes = try a.alloc(storage.Storage, offsets[units.len]);
+    defer a.free(recipes);
+    @memset(recipes, .{});
+    const authorities: StorageAuthorities = .{ .units = units, .recipes = recipes, .offsets = offsets };
+    const resolver: storage.Resolver = .{ .context = &authorities, .lookup = StorageAuthorities.lookup };
+    var remaining: usize = 1_000_000;
+    var changed = true;
+    while (changed and remaining != 0) {
+        changed = false;
+        for (units, 0..) |module, unit_index| {
+            var graph = coreGraph(module);
+            for (module.nominals, 0..) |nominal, nominal_index| {
+                if (!nominal.is_opaque or nominal.identity.unit != module.unit) continue;
+                const role = &recipes[offsets[unit_index] + nominal_index];
+                if (role.kind != .unknown) continue;
+                try require(nominal.constructors.len == 1);
+                const constructor = module.constructors[module.extra[nominal.constructors.start]];
+                const inferred = storage.inferPayloadAuthoritative(.{ .frozen = &graph }, module.nominals, module.constructors, constructor.payload, .{ .start = nominal.parameters.start, .len = nominal.parameters.len }, module.unit, resolver, &remaining);
+                if (inferred.kind != .unknown) {
+                    role.* = inferred;
+                    changed = true;
+                }
+            }
+        }
+    }
+    for (owners) |*owner| try storageContractsResolved(&owner.interface, &owner.core, resolver);
+}
+
+fn storageContractsResolved(owner: *const PI.Interface, implementation: *const core.Module, resolver: storage.Resolver) Error!void {
     try require(owner.bindings.len <= implementation.bindings.len);
     for (owner.bindings, 0..) |binding, index| {
         try require(binding.private == implementation.bindings[index].private);
@@ -144,13 +225,13 @@ pub fn storageContracts(owner: *const PI.Interface, implementation: *const core.
     for (implementation.projections) |projection| {
         if (projection.nominal.unit != 0 and projection.nominal.decl & T.opaque_name_bit != 0) try require(projection.nominal.unit == implementation.unit);
     }
-    var graph: F.Graph = .{ .nodes = implementation.types.nodes, .extra = implementation.types.extra, .rows = implementation.types.effects.rows, .labels = implementation.types.effects.labels, .operations = implementation.types.operations, .quantifier_goals = implementation.types.quantifier_goals, .quantifier_obligations = implementation.types.quantifier_obligations, .row_variable_count = implementation.types.effects.variable_count };
+    var graph = coreGraph(implementation);
     var remaining: usize = 1_000_000;
     for (implementation.nominals) |nominal| {
         if (!nominal.is_opaque or nominal.identity.unit != implementation.unit) continue;
         try require(nominal.constructors.len == 1);
         const constructor = implementation.constructors[implementation.extra[nominal.constructors.start]];
-        const inferred = storage.inferPayload(.{ .frozen = &graph }, implementation.nominals, implementation.constructors, constructor.payload, nominal.parameters, &remaining);
+        const inferred = storage.inferPayloadAuthoritative(.{ .frozen = &graph }, implementation.nominals, implementation.constructors, constructor.payload, .{ .start = nominal.parameters.start, .len = nominal.parameters.len }, implementation.unit, resolver, &remaining);
         try require(std.meta.eql(nominal.storage, inferred));
     }
     for (owner.nominals) |nominal| {

@@ -556,6 +556,28 @@ test "numeric proof check plans refine false equality and short circuit edges wi
     for (module.nodes, 0..) |node, id| if (node.tag == .array_op and module.arrayOperation(@intCast(id)) == .get) try std.testing.expect(plan.admits(@intCast(id)));
 }
 
+test "numeric proof preserves exact collection identity through opaque reference adapters" {
+    const allocator = std.testing.allocator;
+    var module = try lowerSource(allocator,
+        \\opaque type Token = Array U32
+        \\const make: Array U32 -> Token = fn value => #Token value
+        \\const read: Token -> Array U32 = fn (#Token value) => value
+        \\entry const exact = fn () => (read (make #[42]))[0]
+        \\entry const checked = fn (index: U32) => @array.get (read (make #[42])) index
+    );
+    defer module.deinit(allocator);
+    var plan = try @import("numeric_proof_core.zig").analyze(allocator, &module, &.{}, .{});
+    defer plan.deinit(allocator);
+    var admitted: usize = 0;
+    var retained: usize = 0;
+    for (module.nodes, 0..) |node, id| {
+        if (node.tag != .array_op or module.arrayOperation(@intCast(id)) != .get) continue;
+        if (plan.admits(@intCast(id))) admitted += 1 else retained += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 1), admitted);
+    try std.testing.expectEqual(@as(usize, 1), retained);
+}
+
 fn emittedChecks(allocator: std.mem.Allocator, input: []const u8) !usize {
     var module = try lowerSource(allocator, input);
     defer module.deinit(allocator);

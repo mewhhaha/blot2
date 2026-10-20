@@ -35,6 +35,7 @@ pub fn confirm(a: Allocator, source: *const project.Project, checked: anytype, p
         if (!try entry.interfaceMatches(a, source, checked, prior, stats)) return false;
     }
     if (!found) return false;
+    if (!entry.storageInputsMatch(source, checked, unit, &old.core, stats)) return false;
     // Reject an incomplete or inconsistent dependency-first order instead of
     // obtaining a declaration from an unchecked future source module.
     for (imports) |imported| if (!settled(source, checked, imported.target)) return false;
@@ -45,7 +46,7 @@ pub fn confirm(a: Allocator, source: *const project.Project, checked: anytype, p
 fn settled(source: *const project.Project, checked: anytype, unit: u32) bool {
     if (unit == 0 or unit > source.compiled_modules.len) return false;
     if (checked.compiledModule(source, unit) != null) return true;
-    if (unit > checked.interface_colors.len or checked.interface_colors[unit - 1] != .green) return false;
+    if (unit > checked.interface_colors.len or (checked.interface_colors[unit - 1] != .green and checked.interface_colors[unit - 1] != .green_storage)) return false;
     const current = if (checked.modules[unit - 1]) |*value| value else return false;
     return current.valid and current.checked.diagnostics.len == 0;
 }

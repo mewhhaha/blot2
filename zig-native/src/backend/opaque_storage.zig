@@ -8,6 +8,19 @@ pub const Storage = struct {
     /// Variable occurrence within the public parameter shape, in source order.
     selector: u32 = 0,
 };
+/// An artifact consumer may carry an old or forged copy of a producer's
+/// opaque recipe. Derived storage validation reads the recipe and parameter
+/// shape from the original producer instead.
+pub const Authority = struct {
+    graph: F.Graph,
+    parameters: T.List,
+    storage: Storage,
+    is_opaque: bool,
+};
+pub const Resolver = struct {
+    context: *const anyopaque,
+    lookup: *const fn (context: *const anyopaque, identity: T.NominalIdentity) ?Authority,
+};
 const Context = struct { parameters: []const T.Id, arguments: []const T.Id = &.{}, parent: ?*const Context = null };
 
 pub fn infer(source: F.Source, nominals: anytype, constructors: anytype, nominal_index: u32, remaining: *usize) Storage {
@@ -19,6 +32,76 @@ pub fn infer(source: F.Source, nominals: anytype, constructors: anytype, nominal
 pub fn inferPayload(source: F.Source, nominals: anytype, constructors: anytype, payload: T.Id, parameters: T.List, remaining: *usize) Storage {
     const context: Context = .{ .parameters = source.list(parameters) };
     return expression(source, nominals, constructors, payload, &context, 0, remaining);
+}
+/// Recompute locally owned opaque recipes without trusting their published
+/// values. Foreign opaque recipes and parameter shapes come only from their
+/// original producer. This is used for whole-artifact admission; ordinary
+/// retained callers may legitimately keep stale copied descriptors.
+pub fn inferPayloadAuthoritative(source: F.Source, nominals: anytype, constructors: anytype, payload: T.Id, parameters: T.List, local_unit: u32, resolver: Resolver, remaining: *usize) Storage {
+    const context: Context = .{ .parameters = source.list(parameters) };
+    return authoritativeExpression(source, nominals, constructors, payload, &context, local_unit, resolver, 0, remaining);
+}
+
+fn authoritativeExpression(source: F.Source, nominals: anytype, constructors: anytype, original: T.Id, context: *const Context, local_unit: u32, resolver: Resolver, depth: usize, remaining: *usize) Storage {
+    if (depth >= 256 or remaining.* == 0) return .{};
+    remaining.* -= 1;
+    const ty = source.head(original, 0);
+    const n = source.node(ty);
+    switch (n.tag) {
+        .unit => return .{ .kind = .unit },
+        .boolean => return .{ .kind = .boolean },
+        .u32, .never => return .{ .kind = .u32 },
+        .f32 => return .{ .kind = .f32 },
+        .variable => {
+            for (context.parameters, 0..) |parameter, index| {
+                if (remaining.* == 0) return .{};
+                remaining.* -= 1;
+                var selector: u32 = 0;
+                var actual: T.Id = 0;
+                if (context.parent != null) {
+                    if (index >= context.arguments.len) return .{};
+                    actual = context.arguments[index];
+                }
+                const selected = select(source, parameter, actual, .{ .ty = ty }, &selector, depth + 1, remaining) orelse continue;
+                if (context.parent) |parent| return authoritativeExpression(source, nominals, constructors, selected.actual, parent, local_unit, resolver, depth + 1, remaining);
+                return .{ .kind = .parameter, .parameter = @intCast(index), .selector = selected.selector };
+            }
+            return .{};
+        },
+        .nominal => {
+            const arguments = source.nominalArguments(n);
+            if (n.a != local_unit) {
+                const authority = resolver.lookup(resolver.context, .{ .unit = n.a, .decl = n.b }) orelse return .{};
+                if (!authority.is_opaque) return .{ .kind = .reference };
+                if (authority.storage.kind == .unknown) return .{};
+                if (authority.storage.kind != .parameter) return authority.storage;
+                const parameter_source: F.Source = .{ .frozen = &authority.graph };
+                const declared = parameter_source.list(authority.parameters);
+                if (authority.storage.parameter >= declared.len or authority.storage.parameter >= arguments.len) return .{};
+                var ordinal: u32 = 0;
+                const argument = selectAcross(parameter_source, declared[authority.storage.parameter], source, arguments[authority.storage.parameter], authority.storage.selector, &ordinal, depth + 1, remaining) orelse return .{};
+                return authoritativeExpression(source, nominals, constructors, argument, context, local_unit, resolver, depth + 1, remaining);
+            }
+            for (nominals) |nominal| {
+                if (remaining.* == 0) return .{};
+                remaining.* -= 1;
+                if (nominal.identity.unit != n.a or nominal.identity.decl != n.b) continue;
+                if (!nominal.is_opaque) return .{ .kind = .reference };
+                const ids = source.list(.{ .start = nominal.constructors.start, .len = nominal.constructors.len });
+                if (ids.len != 1) return .{};
+                const nested: Context = .{ .parameters = source.list(.{ .start = nominal.parameters.start, .len = nominal.parameters.len }), .arguments = arguments, .parent = context };
+                return authoritativeExpression(source, nominals, constructors, constructors[ids[0]].payload, &nested, local_unit, resolver, depth + 1, remaining);
+            }
+            return .{};
+        },
+        .array, .list, .cursor, .record, .product, .function, .demand, .provider, .state_provider => return .{ .kind = .reference },
+        .usage => {
+            if (n.b == @backingInt(T.UsageKind.unique) or n.b == @backingInt(T.UsageKind.shared)) return .{ .kind = .reference };
+            return authoritativeExpression(source, nominals, constructors, n.a, context, local_unit, resolver, depth + 1, remaining);
+        },
+        .type_constructor => return .{ .kind = .u32 },
+        else => return .{},
+    }
 }
 fn expression(source: F.Source, nominals: anytype, constructors: anytype, original: T.Id, context: *const Context, depth: usize, remaining: *usize) Storage {
     if (depth >= 256 or remaining.* == 0) return .{};
@@ -124,6 +207,52 @@ fn select(source: F.Source, parameter: T.Id, actual: T.Id, target: Target, ordin
                 if (supplied == 0) return null;
             }
             if (select(source, field.ty, supplied, target, ordinal, depth + 1, remaining)) |found| return found;
+        }
+    }
+    return null;
+}
+fn selectAcross(parameter_source: F.Source, parameter: T.Id, actual_source: F.Source, actual: T.Id, target: u32, ordinal: *u32, depth: usize, remaining: *usize) ?T.Id {
+    if (depth >= 256 or remaining.* == 0) return null;
+    remaining.* -= 1;
+    const node = parameter_source.node(parameter_source.head(parameter, 0));
+    if (node.tag == .variable) {
+        const selected = ordinal.*;
+        ordinal.* += 1;
+        return if (selected == target) actual else null;
+    }
+    if (node.tag == .product) {
+        const children = parameter_source.list(.{ .start = node.a, .len = node.b });
+        const supplied = if (actual == 0) &.{} else blk: {
+            const argument = actual_source.node(actual_source.head(actual, 0));
+            if (argument.tag != .product or argument.b != node.b) return null;
+            break :blk actual_source.list(.{ .start = argument.a, .len = argument.b });
+        };
+        for (children, 0..) |child, index| {
+            const value: T.Id = if (actual == 0) 0 else supplied[index];
+            if (selectAcross(parameter_source, child, actual_source, value, target, ordinal, depth + 1, remaining)) |found| return found;
+        }
+    } else if (node.tag == .record) {
+        var argument: T.Node = undefined;
+        if (actual != 0) {
+            argument = actual_source.node(actual_source.head(actual, 0));
+            if (argument.tag != .record) return null;
+        }
+        for (0..node.b) |index| {
+            const field = parameter_source.recordField(node, index);
+            var supplied: T.Id = 0;
+            if (actual != 0) {
+                for (0..argument.b) |slot| {
+                    if (remaining.* == 0) return null;
+                    remaining.* -= 1;
+                    const candidate = actual_source.recordField(argument, slot);
+                    if (candidate.name == field.name) {
+                        supplied = candidate.ty;
+                        break;
+                    }
+                }
+                if (supplied == 0) return null;
+            }
+            if (selectAcross(parameter_source, field.ty, actual_source, supplied, target, ordinal, depth + 1, remaining)) |found| return found;
         }
     }
     return null;

@@ -75,6 +75,43 @@ fn kind(tag: T.Tag) ?terms.Kind {
         else => null,
     };
 }
+fn opaqueReferenceConstructor(module: *const core.Module, catalog: u32) bool {
+    if (catalog >= module.constructors.len) return false;
+    const constructor = module.constructor(catalog);
+    if (constructor.nominal >= module.nominals.len) return false;
+    const nominal = module.nominal(constructor.nominal);
+    const constructors = module.nominalConstructors(constructor.nominal);
+    return nominal.is_opaque and !nominal.affine and !nominal.has_usage and nominal.storage.kind == .reference and constructors.len == 1 and constructors[0] == catalog;
+}
+fn opaqueReferenceBinding(module: *const core.Module, id: core.PatternId) ?u32 {
+    const pattern = module.pattern(id);
+    if (pattern.tag != .constructor or pattern.b == 0 or !opaqueReferenceConstructor(module, pattern.a)) return null;
+    const payload = module.pattern(pattern.b);
+    return if (payload.tag == .bind and payload.a != 0) payload.a else null;
+}
+fn opaqueReferenceResult(module: *const core.Module, binding: u32, arguments: usize) bool {
+    if (binding == 0 or binding >= module.bindings.len) return false;
+    var ty = module.bindings[binding].ty;
+    for (0..128) |_| {
+        const node = module.types.node(ty);
+        if (node.tag != .forall) break;
+        ty = node.a;
+    } else return false;
+    for (0..arguments) |_| {
+        const node = module.types.node(ty);
+        if (node.tag != .function) return false;
+        ty = node.b;
+    }
+    const result = module.types.node(ty);
+    if (result.tag != .nominal) return false;
+    for (module.nominals, 0..) |nominal, index| {
+        if (nominal.identity.unit == result.a and nominal.identity.decl == result.b) {
+            const constructors = module.nominalConstructors(@intCast(index));
+            return constructors.len == 1 and opaqueReferenceConstructor(module, constructors[0]);
+        }
+    }
+    return false;
+}
 pub fn contract(module: *const core.Module, binding: u32) ?*const headers.Owned {
     for (module.proof_contracts) |*value| if (value.binding == binding) return &value.header;
     return null;
@@ -391,6 +428,7 @@ const Checker = struct {
             const right = try self.summaryOperand(module, inputs, node.b, depth + 1);
             return self.arithmeticIdentity(node.op, left, right);
         }
+        if (node.tag == .construct and node.b != 0 and opaqueReferenceConstructor(module, node.a)) return self.summaryOperand(module, inputs, node.b, depth + 1);
         if (node.tag == .call) return (try self.summaryInvocation(module, inputs, id, depth)).operand;
         if (node.tag == .block) return (try self.summaryBlock(module, inputs, id, &.{}, depth)).operand;
         if (node.tag == .suite and module.children(id).len == 1) return self.summaryOperand(module, inputs, module.children(id)[0], depth + 1);
@@ -484,6 +522,14 @@ const Checker = struct {
                     if (scope.lookup(node.a) != null) return .{};
                     if (locals.items.len >= self.values.limits.terms) return error.ProofAnalysisLimit;
                     try locals.append(self.allocator, .{ .binding = node.a, .value = value });
+                },
+                .pattern_bind => {
+                    if (node.c != 0) return .{};
+                    const binding = opaqueReferenceBinding(module, node.a) orelse return .{};
+                    const value = try self.summaryValue(module, scope, node.b, depth + 1);
+                    if (value.operand == 0 or value.proof != null or value.condition != 0 or scope.lookup(binding) != null) return .{};
+                    if (locals.items.len >= self.values.limits.terms) return error.ProofAnalysisLimit;
+                    try locals.append(self.allocator, .{ .binding = binding, .value = value });
                 },
                 .return_ => {
                     if (node.b != id) return .{};
@@ -585,7 +631,7 @@ const Checker = struct {
         }
         if (self.plan != null) {
             const tag = self.module.types.node(self.module.typeOf(id)).tag;
-            if (tag == .boolean or kind(tag) != null) {
+            if (tag == .boolean or kind(tag) != null or opaqueReferenceResult(selected.module, selected.binding, arguments.len)) {
                 const value = try self.summaryCall(raw, actual, 0);
                 if (value.operand != 0 or value.condition != 0) return value;
             }
@@ -855,7 +901,8 @@ const Checker = struct {
                 return result orelse try self.version(n.ty, 0);
             },
             .pattern_bind => {
-                try ordinary(try self.walk(n.b, depth + 1));
+                const subject = try self.walk(n.b, depth + 1);
+                try ordinary(subject);
                 if (n.c != 0) {
                     const facts = self.facts.items.len;
                     const bindings = self.environment.items.len;
@@ -864,6 +911,10 @@ const Checker = struct {
                     self.environment.shrinkRetainingCapacity(bindings);
                     try require(fallback.exits);
                 }
+                if (n.c == 0) if (opaqueReferenceBinding(module, n.a)) |binding| {
+                    try self.bind(binding, subject);
+                    return .{};
+                };
                 try self.pattern(n.a, depth + 1);
             },
             .array_op => {
@@ -958,7 +1009,11 @@ const Checker = struct {
                 try ordinary(try self.walk(n.a, depth + 1));
                 try ordinary(try self.walk(n.b, depth + 1));
             },
-            .construct => if (n.b != 0) try ordinary(try self.walk(n.b, depth + 1)),
+            .construct => if (n.b != 0) {
+                const payload = try self.walk(n.b, depth + 1);
+                try ordinary(payload);
+                if (opaqueReferenceConstructor(module, n.a)) return payload;
+            },
             .resource_release, .usage_share, .usage_read, .package_pack => try ordinary(try self.walk(n.a, depth + 1)),
             .resource_scope => {
                 try ordinary(try self.walk(n.a, depth + 1));

@@ -2073,7 +2073,11 @@ pub const Owner = struct {
         const facts = try g.planning.facts.get(g.allocator, g.units, key.target);
         borrowed_collections.* = facts.borrowed_collections;
         const in_loop = self.inline_loop or self.loop_targets.items.len != 0;
-        var expose_data = small_result != null or (in_loop and self.inlineDataType(key.result));
+        // Opaque constructors and projections are representation adapters even
+        // outside loops. Expose their bounded source bodies before freezing
+        // RuntimeIR; readInlineBody below retains the exact executable read.
+        var expose_data = small_result != null or (in_loop and self.inlineDataType(key.result)) or self.inlineOpaqueType(key.result);
+        for (key.parameters[0..key.count]) |ty| expose_data = expose_data or self.inlineOpaqueType(ty);
         if (captured == null) for (key.parameters[0..key.count], arguments[0..key.count], 0..) |ty, argument, i| {
             expose_data = expose_data or (g.representations.store.node(ty).tag == .function and self.isCallableTemplate(argument));
             if (i < 16 and facts.borrowed_collections & (@as(u16, 1) << @intCast(i)) != 0 and self.smallCollectionCandidate(argument)) expose_data = true;
@@ -2153,6 +2157,7 @@ pub const Owner = struct {
         emitter.row_mappings = prepared_body.rows;
         emitter.layout_cache = @splat(.{});
         if (remaining.len != 0 and try emitter.saturatedAssociated(body.root, self, remaining, depth)) return true;
+        if (remaining.len == 0 and small_result == null and try emitter.emitOpaqueAdapterBody(body.root, depth + 1)) return true;
         try emitter.expression(body.root, depth + 1);
         var ty = key.result;
         for (remaining) |argument| {
@@ -2173,6 +2178,86 @@ pub const Owner = struct {
         return true;
     }
 
+    // An unpack-only prefix and its final pure projection need no result
+    // block or local copies. Validate the entire path before changing locals;
+    // source bodies and executable dependencies still use the ordinary inliner.
+    fn emitOpaqueAdapterBody(self: *Emitter, root: core.Id, depth: usize) Error!bool {
+        if (self.small_result != null) return false;
+        const source = self.generator.unit(self.unit_id);
+        if (source.node(root).tag != .block) return false;
+        const statements = source.children(root);
+        if (statements.len < 2 or statements.len > 9) return false;
+        const result = source.node(statements[statements.len - 1]);
+        if (result.tag != .return_ or result.b != root) return false;
+        const Alias = struct { binding: core.BindingId, local: u32 };
+        var aliases: [8]Alias = undefined;
+        var count: usize = 0;
+        for (statements[0 .. statements.len - 1]) |statement| {
+            const node = source.node(statement);
+            if (node.tag != .pattern_bind or node.c != 0 or source.node(node.b).tag != .reference) return false;
+            const reference = source.reference(node.b);
+            if ((reference.unit != 0 and reference.unit != self.unit_id) or try self.hasMutableUse(reference.binding)) return false;
+            const local = self.locals.get(reference.binding) orelse local: {
+                for (aliases[0..count]) |alias| if (alias.binding == reference.binding) break :local alias.local;
+                return false;
+            };
+            var pattern_id = node.a;
+            var found_opaque = false;
+            const binding = for (0..32) |_| {
+                const pattern = source.pattern(pattern_id);
+                switch (pattern.tag) {
+                    .constructor => {
+                        const nominal = source.nominal(source.constructor(pattern.a).nominal);
+                        if (!nominal.is_opaque or nominal.storage.kind == .unknown or nominal.affine or nominal.has_usage or pattern.b == 0) return false;
+                        found_opaque = true;
+                        pattern_id = pattern.b;
+                    },
+                    .bind => break pattern.a,
+                    .wildcard => break @as(core.BindingId, 0),
+                    else => return false,
+                }
+            } else return false;
+            if (!found_opaque) return false;
+            if (binding == 0) continue;
+            if (binding >= source.bindings.len or source.types.node(source.binding(binding).ty).tag == .erased_proof or self.locals.contains(binding) or try self.hasMutableUse(binding)) return false;
+            for (aliases[0..count]) |alias| if (alias.binding == binding) return false;
+            aliases[count] = .{ .binding = binding, .local = local };
+            count += 1;
+        }
+        var leaf = result.a;
+        for (0..32) |_| {
+            const node = source.node(leaf);
+            if (node.tag == .project) {
+                // Generic payloads acquire their record shape in this exact
+                // prepared body; the source type can still be a variable.
+                const input = self.generator.representations.store.node(try self.codeLayout(source.typeOf(node.a), source.span(leaf)));
+                const projection = self.resolvedPlan(leaf).projection orelse return false;
+                if (input.tag != .record or projection != .field or projection.field.projection.nominal.decl != 0 or projection.field.variants.items.len != 1) return false;
+                leaf = node.a;
+            } else if (node.tag == .reference) {
+                const reference = source.reference(leaf);
+                if (reference.unit != 0 and reference.unit != self.unit_id) return false;
+                var known = self.locals.contains(reference.binding);
+                for (aliases[0..count]) |alias| known = known or alias.binding == reference.binding;
+                if (!known or try self.hasMutableUse(reference.binding)) return false;
+                break;
+            } else return false;
+        } else return false;
+        for (aliases[0..count]) |alias| try self.locals.put(self.generator.allocator, alias.binding, alias.local);
+        try self.expression(result.a, depth + 1);
+        return true;
+    }
+
+    fn inlineOpaqueType(self: *const Emitter, ty: layout.Id) bool {
+        const g = self.generator;
+        const selected = g.representations.store.node(ty);
+        if (selected.tag != .nominal or selected.a == 0 or selected.a > g.units.len) return false;
+        for (g.unit(selected.a).nominals) |nominal| {
+            if (nominal.identity.unit == selected.a and nominal.identity.decl == selected.b)
+                return nominal.is_opaque and nominal.storage.kind != .unknown;
+        }
+        return false;
+    }
     fn inlineDataType(self: *const Emitter, ty: layout.Id) bool {
         return switch (self.generator.representations.store.node(ty).tag) {
             .record, .product, .nominal, .cursor => true,
@@ -10038,6 +10123,20 @@ pub const Owner = struct {
             else => false,
         };
     }
+    fn irrefutableBindingPattern(source: *const core.Module, id: core.PatternId, depth: usize) bool {
+        if (depth >= 32) return false;
+        const pattern = source.pattern(id);
+        return switch (pattern.tag) {
+            .bind, .wildcard => true,
+            .product => blk: {
+                for (source.patternChildren(id)) |child| if (!irrefutableBindingPattern(source, child, depth + 1)) break :blk false;
+                break :blk true;
+            },
+            .record_payload => irrefutableBindingPattern(source, pattern.b, depth + 1),
+            .constructor => source.nominal(source.constructor(pattern.a).nominal).is_opaque and (pattern.b == 0 or irrefutableBindingPattern(source, pattern.b, depth + 1)),
+            else => false,
+        };
+    }
     /// The row's failure block is shared by every nested test. Binding slots
     /// may be filled before a later test fails; their checked identities are
     /// local to this arm and a successful alternative overwrites every binder.
@@ -10293,6 +10392,13 @@ pub const Owner = struct {
         const local = try g.module.addLocal(self.function_id, (try self.scalar(n.b)).machine());
         try self.expression(n.b, depth + 1);
         try self.emit(.local_set, local);
+        // An opaque constructor contributes no runtime test. Avoid introducing
+        // failure control flow for a fully irrefutable payload: it hides the
+        // ordinary record projection from scalar replacement after inlining.
+        if (irrefutableBindingPattern(unit_, n.a, 0)) {
+            try self.matchPattern(id, n.a, local, self.labels, depth + 1);
+            return;
+        }
         try self.emit(.block, 0);
         const completed = self.labels;
         self.labels += 1;

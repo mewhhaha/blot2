@@ -277,7 +277,7 @@ pub fn prepareProjectWithCheck(a: Allocator, source: *project.Project, entry_pat
 }
 /// The checker's view of an entry offer; prepareProjectMode checks with it.
 pub fn checkPrevious(old: EntryPrevious) entry_cutoff.Previous {
-    return .{ .entry = old.prepared.entry, .prelude = old.prepared.prelude, .implicit_prelude = old.prepared.entry_implicit_prelude, .names = old.prepared.identity.view(), .source = old.source, .imports = old.prepared.entry_imports, .reuse_modules = old.reuse_modules, .reuse_entry = !old.body_only, .bodies = old.prepared.body_caches };
+    return .{ .entry = old.prepared.entry, .prelude = old.prepared.prelude, .implicit_prelude = old.prepared.entry_implicit_prelude, .names = old.prepared.identity.view(), .source = old.source, .imports = old.prepared.entry_imports, .reuse_modules = old.reuse_modules, .reuse_entry = !old.body_only, .bodies = old.prepared.body_caches, .entry_core = &old.prepared.units[old.prepared.entry - 1] };
 }
 fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []const u8, output_identity: ?[]const u8, dependency: *const D.FrozenDependency, kept: ?*?checker.CheckedProject, previous: ?EntryPrevious, retain_bodies: bool, precomputed: ?checker.CheckedProject) !Preparation {
     var owned_check = precomputed;
@@ -313,14 +313,18 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
         return rejection;
     }
     const units = try a.alloc(core.Module, source.units.items.len);
+    var borrowed: []bool = &.{};
     var initialized: usize = 0;
     var transferred = false;
     defer if (!transferred) {
-        for (units[0..initialized], 1..) |*unit, id| if (checked.compiledModule(source, id) == null) {
+        for (units[0..initialized], 0..) |*unit, index| if (borrowed.len == 0 or !borrowed[index]) {
             unit.deinit(a);
         };
+        a.free(borrowed);
         a.free(units);
     };
+    borrowed = try a.alloc(bool, units.len);
+    @memset(borrowed, false);
     const paths = try a.alloc([]u8, units.len);
     var paths_initialized: usize = 0;
     defer if (!transferred) {
@@ -333,13 +337,21 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
     for (source.units.items, units, paths, 1..) |*unit, *ir, *path, id| {
         path.* = try a.dupe(u8, source.filename(@intCast(id)));
         paths_initialized += 1;
-        if (checked.compiledModule(source, id) != null) {
-            ir.* = dependency.modules[id - 1].core;
+        if (checked.compiledModule(source, id)) |module| {
+            if (module == &source.compiled_modules[id - 1]) {
+                ir.* = module.core;
+                borrowed[id - 1] = true;
+            } else ir.* = try @import("dependency_closure.zig").copyCore(a, &module.core);
         } else {
             if (id == source.entry and checked.entry_cutoff.reused != 0) {
                 // The candidate owns this complete copy. Commit may destroy the
                 // previous Prepared and all of its immutable source pins.
                 ir.* = try @import("dependency_closure.zig").copyCore(a, &previous.?.prepared.units[id - 1]);
+                const targets: @import("frontend_binding_relocation.zig").Targets = .{ .units = checked.binding_maps };
+                if (targets.changes()) @import("frontend_reference_relocation.zig").rewrite(ir, targets) catch |err| {
+                    ir.deinit(a);
+                    return err;
+                };
             } else {
                 const timing = @import("../phase_profile.zig").enter(.lower);
                 defer timing.exit();
@@ -376,9 +388,6 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
     const entry_imports = try a.alloc(entry_cutoff.Import, source.unitImports(source.entry).len);
     errdefer a.free(entry_imports);
     for (source.unitImports(source.entry), entry_imports) |from, *to| to.* = .{ .path = from.path, .target = from.target };
-    const borrowed: []bool = if (source.compiled_reuse.len != 0) try a.alloc(bool, units.len) else &.{};
-    errdefer a.free(borrowed);
-    for (borrowed, 1..) |*item, id| item.* = checked.compiledModule(source, id) != null;
     const body_caches = checked.body_caches;
     checked.body_caches = &.{};
     errdefer {

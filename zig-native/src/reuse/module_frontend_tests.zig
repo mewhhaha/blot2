@@ -740,6 +740,426 @@ test "module interface cutoff reuses opaque callers when every dependency is dir
     try std.testing.expectEqual(@as(usize, 1), session.last.fallback.entry_cutoff.reused);
 }
 
+const opaque_storage_original = "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst read: Token -> U32 = fn (#Token value) => value\n";
+const opaque_storage_float = "opaque type Token = F32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token (@u32.to_f32 (@u32.add value offset))\nconst read: Token -> U32 = fn (#Token value) => @f32.to_u32 value\n";
+const opaque_storage_reference = "opaque type Token = Array U32\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token #[@u32.add value offset]\nconst read: Token -> U32 = fn (#Token value) => value[0]\n";
+const opaque_storage_record = "opaque type Token = {word: U32}\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token {word: @u32.add value offset}\nconst read: Token -> U32 = fn (#Token value) => value.word\n";
+const opaque_storage_renamed = "opaque type Token = {renamed: U32}\nprivate const offset = 2\nconst make: U32 -> Token = fn value => #Token {renamed: @u32.add value offset}\nconst read: Token -> U32 = fn (#Token value) => value.renamed\n";
+const opaque_storage_alpha = "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = fn argument => #Token (@u32.add argument offset)\nconst read: Token -> U32 = fn (#Token value) => value\n";
+
+test "module interface cutoff relocates owned caller references after private binding insertion and movement through OOM" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    try fixture.write("changed.blot", opaque_storage_original);
+    try fixture.write("left.blot", "import {make, read} from \"./changed\"\nconst bridge = fn (value: U32) => read (make value)\n");
+    try fixture.write("main.blot", "import {bridge} from \"./left\"\nentry const answer = fn (value: U32) => bridge value\n");
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    try initialize(&session, &fixture);
+    const inserted = "private const unrelated = 7\n" ++ opaque_storage_original;
+    const inserted_type = "private type Spare is data = #Spare U32\n" ++ inserted;
+    const inserted_effect = "private type PrivateRead is effect = Unit -> U32\n" ++ inserted;
+    const inserted_contract = "private type Hidden a is contract = {type_rep a}\n" ++ inserted;
+    const moved = "opaque type Token = U32\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst read: Token -> U32 = fn (#Token value) => value\nprivate const offset = 2\n";
+    for ([_][]const u8{ inserted, inserted_type, inserted_effect, inserted_contract, moved, opaque_storage_original }) |text| {
+        try fixture.write("changed.blot", text);
+        var expected = try fresh(&fixture);
+        defer expected.deinit(a);
+        try allocationFailure(a, &fixture, &session, &expected);
+        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, allocationFailure, .{ &fixture, &session, &expected });
+        var actual = try session.revise(io, fixture.path, null, .{});
+        defer actual.deinit(a);
+        try equal(&actual, &expected);
+        try std.testing.expectEqual(@as(usize, 1), session.last.fallback.module_cutoff.reused);
+        try std.testing.expectEqual(@as(usize, 1), session.last.fallback.entry_cutoff.reused);
+    }
+}
+
+test "module interface cutoff preserves generic parameter alpha correspondence through OOM" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    const original_generic = "opaque type Token element = element\nconst make: a -> Token a = fn value => #Token value\nconst read: Token a -> a = fn (#Token value) => value\n";
+    const renamed_type = "opaque type Token payload = payload\nconst make: a -> Token a = fn value => #Token value\nconst read: Token a -> a = fn (#Token value) => value\n";
+    const renamed_scheme = "opaque type Token payload = payload\nconst make: item -> Token item = fn argument => #Token argument\nconst read: Token item -> item = fn (#Token argument) => argument\n";
+    try fixture.write("changed.blot", original_generic);
+    try fixture.write("left.blot", "import {Token, make, read} from \"./changed\"\nconst bridge = fn (value: U32) => do:\n  let wrapped: Token U32 = make value\n  return @u32.add (read wrapped) 2\n");
+    try fixture.write("main.blot", "import {bridge} from \"./left\"\nentry const answer = fn (value: U32) => bridge value\n");
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    try initialize(&session, &fixture);
+    for ([_][]const u8{ renamed_type, renamed_scheme, original_generic }) |text| {
+        try fixture.write("changed.blot", text);
+        var expected = try fresh(&fixture);
+        defer expected.deinit(a);
+        try allocationFailure(a, &fixture, &session, &expected);
+        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, allocationFailure, .{ &fixture, &session, &expected });
+        var actual = try session.revise(io, fixture.path, null, .{});
+        defer actual.deinit(a);
+        try equal(&actual, &expected);
+        try std.testing.expectEqual(@as(usize, 1), session.last.fallback.module_cutoff.reused);
+        try std.testing.expectEqual(@as(usize, 1), session.last.fallback.entry_cutoff.reused);
+    }
+}
+
+test "module interface cutoff preserves public effect parameter alpha through OOM" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    const effect_original = "type PublicRead element is effect = Unit -> element\n";
+    const effect_alpha = "type PublicRead payload is effect = Unit -> payload\n";
+    const opaque_body = "opaque type Token = U32\nconst make: Unit -> Token = fn () => #Token 42\nconst read: Token -> Unit = fn (#Token value) => ()\n";
+    try fixture.write("changed.blot", effect_original ++ opaque_body);
+    try fixture.write("left.blot", "import {PublicRead, make, read} from \"./changed\"\nconst consume = fn () -> U32 => do (@effect.provider (PublicRead U32) (fn () => 42)):\n  read (make ())\n  return PublicRead U32 ()\n");
+    try fixture.write("main.blot", "import {consume} from \"./left\"\nentry const answer = fn () => consume ()\n");
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    try initialize(&session, &fixture);
+    for ([_][]const u8{ effect_alpha ++ opaque_body, effect_original ++ opaque_body }) |text| {
+        try fixture.write("changed.blot", text);
+        var expected = try fresh(&fixture);
+        defer expected.deinit(a);
+        try allocationFailure(a, &fixture, &session, &expected);
+        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, allocationFailure, .{ &fixture, &session, &expected });
+        var actual = try session.revise(io, fixture.path, null, .{});
+        defer actual.deinit(a);
+        try equal(&actual, &expected);
+        try std.testing.expectEqual(@as(usize, 1), session.last.fallback.module_cutoff.reused);
+        try std.testing.expectEqual(@as(usize, 1), session.last.fallback.entry_cutoff.reused);
+    }
+}
+
+test "opaque storage changes retain semantic callers and rebuild current executable layouts through OOM" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    try fixture.write("changed.blot", opaque_storage_original);
+    try fixture.write("left.blot", "import {make, read} from \"./changed\"\nconst bridge = fn (value: U32) => read (make value)\n");
+    try fixture.write("main.blot", "import {bridge} from \"./left\"\nentry const answer = fn (value: U32) => bridge value\n");
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    try initialize(&session, &fixture);
+    for ([_][]const u8{ opaque_storage_float, opaque_storage_reference, opaque_storage_record, opaque_storage_renamed, opaque_storage_alpha, opaque_storage_original }) |text| {
+        try fixture.write("changed.blot", text);
+        var expected = try fresh(&fixture);
+        defer expected.deinit(a);
+        try allocationFailure(a, &fixture, &session, &expected);
+        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, allocationFailure, .{ &fixture, &session, &expected });
+        var actual = try session.revise(io, fixture.path, null, .{});
+        defer actual.deinit(a);
+        try equal(&actual, &expected);
+        try std.testing.expectEqual(@as(usize, 1), session.last.fallback.module_cutoff.reused);
+        try std.testing.expectEqual(@as(usize, 1), session.last.fallback.entry_cutoff.reused);
+    }
+}
+
+fn derivedStorageFailure(allocator: std.mem.Allocator, fixture: *Fixture, session: *retained.Session, expected: *const partial.Result, entry_storage: bool) !void {
+    const prior_allocator = session.allocator;
+    session.allocator = allocator;
+    defer session.allocator = prior_allocator;
+    const before = artifacts.stamp(session.seed);
+    defer std.debug.assert(std.mem.eql(u8, &before, &artifacts.stamp(session.seed)));
+    var candidate = try session.prepareRevision(io, fixture.path, null, .{});
+    defer candidate.deinit();
+    try std.testing.expect(candidate == .ready);
+    try equal(candidate.ready.result().?, expected);
+    const work = candidate.ready.stats.fallback;
+    try std.testing.expectEqual(@as(usize, if (entry_storage) 1 else 0), work.module_cutoff.reused);
+    try std.testing.expectEqual(@as(usize, if (entry_storage) 0 else 1), work.entry_cutoff.reused);
+    try std.testing.expectEqual(@as(usize, if (entry_storage) 0 else 1), work.module_cutoff.storage_rechecks);
+    try std.testing.expectEqual(@as(usize, if (entry_storage) 1 else 0), work.entry_cutoff.storage_rechecks);
+}
+
+test "opaque derived storage producers refresh their recipes while semantic callers reuse through OOM" {
+    const envelope =
+        \\opaque type Envelope = Token
+        \\const pack = fn value => #Envelope (make value)
+        \\const unpack = fn (#Envelope value) => read value
+        \\const factories = #[pack, fn value => pack value]
+        \\const readers = #[unpack, fn value => unpack value]
+        \\const carry = fn (value: U32) => (readers[@u32.rem value 2]) ((factories[@u32.rem value 2]) value)
+        \\
+    ;
+    const imports = "import {Token, make, read} from \"./changed\"\n";
+    for ([_]bool{ false, true }) |entry_storage| {
+        var fixture = try Fixture.init();
+        defer fixture.deinit();
+        try fixture.write("changed.blot", opaque_storage_original);
+        try fixture.write("left.blot", if (entry_storage) imports ++ "const bridge = fn (value: U32) => read (make value)\n" else imports ++ envelope ++ "const bridge = carry\n");
+        try fixture.write("main.blot", if (entry_storage) "import {bridge} from \"./left\"\n" ++ imports ++ envelope ++ "entry const answer = carry\n" else "import {bridge} from \"./left\"\nentry const answer = fn (value: U32) => bridge value\n");
+        var session = try retained.Session.initEmpty(a, .{});
+        defer session.deinit();
+        try initialize(&session, &fixture);
+        for ([_][]const u8{ opaque_storage_float, opaque_storage_reference, opaque_storage_original }) |text| {
+            try fixture.write("changed.blot", text);
+            var expected = try fresh(&fixture);
+            defer expected.deinit(a);
+            try std.testing.expect(expected.result.diagnostic == null and expected.result.compiled.diagnostic == null);
+            try derivedStorageFailure(a, &fixture, &session, &expected, entry_storage);
+            try @import("../allocation_failures.zig").checkAllAllocationFailures(a, derivedStorageFailure, .{ &fixture, &session, &expected, entry_storage });
+            var actual = try session.revise(io, fixture.path, null, .{});
+            defer actual.deinit(a);
+            try equal(&actual, &expected);
+        }
+    }
+}
+
+test "opaque semantic comparison preserves identities visibility contracts and unknown-storage declines" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    try fixture.write("changed.blot", opaque_storage_original);
+    try fixture.write("left.blot", "import {make, read} from \"./changed\"\nconst bridge = fn (value: U32) => read (make value)\n");
+    try fixture.write("main.blot", "import {bridge} from \"./left\"\nentry const answer = fn (value: U32) => bridge value\n");
+    var before = try producerInterface(&fixture);
+    defer @import("dependency_snapshot.zig").deinit(a, &before);
+    const same = @import("entry_frontend_cutoff.zig").interfaceEqual;
+    const nominals = try a.dupe(@import("principal_interface.zig").Nominal, before.nominals);
+    defer a.free(nominals);
+    var after = before;
+    after.nominals = nominals;
+    const index = for (nominals, 0..) |nominal, index| {
+        if (nominal.is_opaque and !nominal.private) break index;
+    } else return error.MissingOpaque;
+    const original_nominal = nominals[index];
+    nominals[index].storage = .{ .kind = .f32 };
+    try std.testing.expect(same(before, after, 1 << 16, 8));
+    nominals[index].identity.decl +%= 1;
+    try std.testing.expect(!same(before, after, 1 << 16, 8));
+    nominals[index] = original_nominal;
+    nominals[index].private = true;
+    try std.testing.expect(!same(before, after, 1 << 16, 8));
+    nominals[index] = original_nominal;
+    nominals[index].closed_storage = !original_nominal.closed_storage;
+    try std.testing.expect(!same(before, after, 1 << 16, 8));
+    nominals[index] = original_nominal;
+    nominals[index].storage = .{};
+    try std.testing.expect(!same(before, after, 1 << 16, 8));
+    nominals[index] = original_nominal;
+    const constructors = try a.dupe(@import("principal_interface.zig").Constructor, before.constructors);
+    defer a.free(constructors);
+    after.constructors = constructors;
+    const constructor_index = for (constructors, 0..) |constructor, ordinal| {
+        if (constructor.private and constructor.nominal == index) break ordinal;
+    } else return error.MissingOpaqueConstructor;
+    const original_constructor = constructors[constructor_index];
+    constructors[constructor_index].identity.decl +%= 1;
+    try std.testing.expect(same(before, after, 1 << 16, 8));
+    constructors[constructor_index].identity.unit +%= 1;
+    try std.testing.expect(!same(before, after, 1 << 16, 8));
+    constructors[constructor_index] = original_constructor;
+    constructors[constructor_index].private = false;
+    try std.testing.expect(!same(before, after, 1 << 16, 8));
+    constructors[constructor_index] = original_constructor;
+    constructors[constructor_index].tag +%= 1;
+    try std.testing.expect(!same(before, after, 1 << 16, 8));
+}
+
+test "derived opaque recipe validation rejects circular foreign role assertions" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    try fixture.write("changed.blot", "opaque type Token = F32\n");
+    try fixture.write("left.blot", "import {Token} from \"./changed\"\nopaque type Root = F32\nprivate const keep: Token -> Token = fn value => value\n");
+    try fixture.write("right.blot", "import {Root} from \"./left\"\nopaque type Envelope = Root\n");
+    try fixture.write("main.blot", "import {Envelope} from \"./right\"\nentry const answer = fn () => 42\n");
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    try initialize(&session, &fixture);
+    const format = @import("dependency_format.zig");
+    const key: format.Key = .{ .compiler = @splat(0), .settings = @splat(0), .source = @splat(0), .dependencies = @splat(0) };
+    const bytes = try format.encode(a, key, session.seed);
+    defer a.free(bytes);
+    var forged = try format.decode(dependency.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &forged);
+    const validate = @import("dependency_closure.zig").validate;
+    try validate(a, &forged);
+    const Identity = @import("../check/types.zig").NominalIdentity;
+    var token: ?Identity = null;
+    var envelope: ?Identity = null;
+    var envelope_name: u32 = 0;
+    for (forged.modules) |*module| {
+        const name = std.Io.Dir.path.basename(module.identity.normalized_path);
+        for (module.interface.nominals) |nominal| {
+            if (!nominal.is_opaque or nominal.identity.unit != module.core.unit) continue;
+            if (std.mem.eql(u8, name, "changed.blot")) token = nominal.identity;
+            if (std.mem.eql(u8, name, "right.blot")) {
+                envelope = nominal.identity;
+                envelope_name = nominal.name;
+            }
+        }
+    }
+    try std.testing.expect(token != null and envelope != null and envelope_name != 0);
+    var altered = false;
+    for (forged.modules) |*module| {
+        if (!std.mem.eql(u8, std.Io.Dir.path.basename(module.identity.normalized_path), "left.blot")) continue;
+        var descriptor = false;
+        var public_descriptor = false;
+        for (module.core.nominals) |*nominal| if (std.meta.eql(nominal.identity, token.?)) {
+            nominal.identity = envelope.?;
+            descriptor = true;
+        };
+        for (module.interface.nominals) |*nominal| if (std.meta.eql(nominal.identity, token.?)) {
+            nominal.identity = envelope.?;
+            nominal.name = envelope_name;
+            public_descriptor = true;
+        };
+        try std.testing.expect(descriptor and public_descriptor);
+        for (module.core.types.nodes) |*node| switch (node.tag) {
+            .nominal, .type_constructor, .projection => if (node.a == token.?.unit and node.b == token.?.decl) {
+                node.a = envelope.?.unit;
+                node.b = envelope.?.decl;
+            },
+            else => {},
+        };
+        for (module.interface.graph.nodes) |*node| switch (node.tag) {
+            .nominal, .type_constructor, .projection => if (node.a == token.?.unit and node.b == token.?.decl) {
+                node.a = envelope.?.unit;
+                node.b = envelope.?.decl;
+            },
+            else => {},
+        };
+        const payload: u32 = for (module.core.types.nodes, 0..) |node, index| {
+            if (node.tag == .nominal and node.a == envelope.?.unit and node.b == envelope.?.decl) break @intCast(index);
+        } else return error.MissingForeignPayload;
+        const root: u32 = for (module.core.nominals, 0..) |nominal, index| {
+            if (nominal.is_opaque and nominal.identity.unit == module.core.unit) break @intCast(index);
+        } else return error.MissingOwnedRoot;
+        const constructors = module.core.nominalConstructors(root);
+        try std.testing.expectEqual(@as(usize, 1), constructors.len);
+        module.core.constructors[constructors[0]].payload = payload;
+        altered = true;
+    }
+    try std.testing.expect(altered);
+    // Prove that the probe reaches whole-artifact authority admission, rather
+    // than relying on an independently ill-typed body to reject the edit.
+    const core_api = @import("../check/core.zig");
+    const views = try a.alloc(*const core_api.Module, forged.modules.len);
+    defer a.free(views);
+    for (forged.modules, views) |*module, *view| view.* = &module.core;
+    for (forged.modules) |*module| try @import("../check/frozen_core_validation.zig").validate(a, &module.core, .{ .units = views, .symbol_count = forged.symbols.len, .source_length = module.identity.source_bytes });
+    try std.testing.expectError(error.InvalidArtifact, validate(a, &forged));
+}
+
+fn reverseDependencyUnits(value: *dependency.FrozenDependency) !void {
+    const ids = try a.alloc(u32, value.modules.len);
+    defer a.free(ids);
+    for (ids, 0..) |*id, index| id.* = @intCast(ids.len - index);
+    std.mem.reverse(@import("frozen_dependency.zig").Module, value.modules);
+    const relink = @import("dependency_relink.zig");
+    for (value.modules) |*module| {
+        try relink.moduleUnits(&module.core, ids);
+        try relink.interfaceUnits(&module.interface, ids);
+        for (module.exports) |*exported| if (exported.target.unit != 0) {
+            exported.target.unit = ids[exported.target.unit - 1];
+        };
+        for (module.fixities) |*fixity| if (fixity.producer.unit != 0) {
+            fixity.producer.unit = ids[fixity.producer.unit - 1];
+        };
+        for (module.imports) |*unit| unit.* = ids[unit.* - 1];
+        for (module.source_imports) |*request| request.target = ids[request.target - 1];
+    }
+}
+fn validateDependencyUnchanged(allocator: std.mem.Allocator, value: *const dependency.FrozenDependency) !void {
+    const before = artifacts.stamp(value.*);
+    defer {
+        const after = artifacts.stamp(value.*);
+        std.debug.assert(std.mem.eql(u8, &before, &after));
+    }
+    try @import("dependency_closure.zig").validate(allocator, value);
+}
+
+test "derived opaque recipe validation uses the original producer" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    try fixture.write("changed.blot", opaque_storage_float);
+    try fixture.write("left.blot", "import {Token, make, read} from \"./changed\"\n" ++
+        "opaque type Envelope = Token\n" ++
+        "const pack = fn value => #Envelope (make value)\n" ++
+        "const unpack = fn (#Envelope value) => read value\n" ++
+        "const bridge = fn (value: U32) => unpack (pack value)\n");
+    try fixture.write("main.blot", "import {bridge} from \"./left\"\nentry const answer = fn (value: U32) => bridge value\n");
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    try initialize(&session, &fixture);
+    const format = @import("dependency_format.zig");
+    const key: format.Key = .{ .compiler = @splat(0), .settings = @splat(0), .source = @splat(0), .dependencies = @splat(0) };
+    const bytes = try format.encode(a, key, session.seed);
+    defer a.free(bytes);
+    var forged = try format.decode(dependency.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &forged);
+    const validate = @import("dependency_closure.zig").validate;
+    try validate(a, &forged);
+    // Portable ordinals need not be dependency-first. The positive chain must
+    // reach the same roles when a consumer is visited before its producer.
+    try reverseDependencyUnits(&forged);
+    try validateDependencyUnchanged(a, &forged);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, validateDependencyUnchanged, .{&forged});
+    var altered = false;
+    for (forged.modules) |*module| {
+        if (!std.mem.eql(u8, std.Io.Dir.path.basename(module.identity.normalized_path), "left.blot")) continue;
+        for (module.core.nominals) |*nominal| {
+            if (!nominal.is_opaque) continue;
+            try std.testing.expectEqual(.f32, nominal.storage.kind);
+            nominal.storage.kind = .u32;
+            altered = true;
+        }
+        for (module.interface.nominals) |*nominal| if (nominal.is_opaque) {
+            try std.testing.expectEqual(.f32, nominal.storage.kind);
+            nominal.storage.kind = .u32;
+        };
+    }
+    try std.testing.expect(altered);
+    try std.testing.expectError(error.InvalidArtifact, validate(a, &forged));
+}
+
+test "derived opaque recipe validation resolves producer parameter selectors" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    try fixture.write("changed.blot",
+        \\opaque type Token [left, right] = right
+        \\const make = fn value => #Token value
+        \\const read = fn (#Token value) => value
+        \\
+    );
+    try fixture.write("left.blot",
+        \\import {Token, make, read} from "./changed"
+        \\opaque type Envelope = Token [U32, F32]
+        \\const pack = fn (value: F32) => #Envelope (make value)
+        \\const unpack = fn (#Envelope value) => read value
+        \\const bridge = fn (value: F32) => unpack (pack value)
+        \\
+    );
+    try fixture.write("main.blot", "import {bridge} from \"./left\"\nentry const answer = fn (value: F32) => bridge value\n");
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    try initialize(&session, &fixture);
+    const format = @import("dependency_format.zig");
+    const key: format.Key = .{ .compiler = @splat(0), .settings = @splat(0), .source = @splat(0), .dependencies = @splat(0) };
+    const bytes = try format.encode(a, key, session.seed);
+    defer a.free(bytes);
+    var forged = try format.decode(dependency.FrozenDependency, a, bytes, key);
+    defer format.deinit(a, &forged);
+    const validate = @import("dependency_closure.zig").validate;
+    try validate(a, &forged);
+    var local = false;
+    var foreign = false;
+    for (forged.modules) |*module| {
+        if (!std.mem.eql(u8, std.Io.Dir.path.basename(module.identity.normalized_path), "left.blot")) continue;
+        for (module.core.nominals) |*nominal| {
+            if (!nominal.is_opaque) continue;
+            if (nominal.identity.unit == module.core.unit) {
+                try std.testing.expectEqual(.f32, nominal.storage.kind);
+                local = true;
+            } else {
+                try std.testing.expectEqual(.parameter, nominal.storage.kind);
+                foreign = true;
+            }
+            nominal.storage = .{ .kind = .u32 };
+        }
+        for (module.interface.nominals) |*nominal| {
+            if (nominal.is_opaque) nominal.storage = .{ .kind = .u32 };
+        }
+    }
+    try std.testing.expect(local and foreign);
+    try std.testing.expectError(error.InvalidArtifact, validate(a, &forged));
+}
+
 test "inert principal suffixes retain opaque callers through private local edits and OOM" {
     var fixture = try Fixture.init();
     defer fixture.deinit();

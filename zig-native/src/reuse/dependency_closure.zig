@@ -98,6 +98,9 @@ fn plain(comptime T: type) bool {
 pub fn copyCore(a: std.mem.Allocator, value: *const core.Module) std.mem.Allocator.Error!core.Module {
     return copyCoreValue(a, value.*);
 }
+pub fn copyModule(a: std.mem.Allocator, value: *const D.Module) std.mem.Allocator.Error!D.Module {
+    return copyCoreValue(a, value.*);
+}
 fn copyCoreValue(a: std.mem.Allocator, value: anytype) std.mem.Allocator.Error!@TypeOf(value) {
     @setEvalBranchQuota(20000);
     const T = @TypeOf(value);
@@ -324,9 +327,13 @@ pub fn freezeSharedFromMixed(a: std.mem.Allocator, source: *const project.Projec
     for (0..source.compiled_modules.len) |index| {
         const id: u32 = @intCast(index + 1);
         if (checked.compiledModule(source, id)) |module| {
-            try require(module == &previous.value.modules[index]);
-            try result.appendShared(previous, index);
-            stats.shared_modules += 1;
+            if (module == &previous.value.modules[index]) {
+                try result.appendShared(previous, index);
+                stats.shared_modules += 1;
+            } else {
+                try result.appendOwned(try copyModule(a, module));
+                stats.fresh_modules += 1;
+            }
         } else {
             try result.appendOwned(try freezeOne(a, source, checked, id, units, .{ .take = prepared }));
             stats.fresh_modules += 1;
@@ -598,7 +605,6 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
             stats.core_checked += 1;
         }
         try @import("module_abstraction_validation.zig").publicView(a, &m.interface);
-        try @import("module_abstraction_validation.zig").storageContracts(&m.interface, &m.core);
         try @import("../check/associated_admission.zig").publicCoreWithBudget(a, &m.interface, &m.core, &associated_remaining);
         try @import("../eval/implementation_admission.zig").publicCore(a, &m.interface, &m.core, &associated_remaining);
         for (m.core.bodies) |body| try require(!body.exported);
@@ -645,6 +651,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
         }
     }
     try validateImportGraph(a, value);
+    try @import("module_abstraction_validation.zig").storageClosure(a, value.modules, views);
     try @import("../check/associated_admission.zig").originalProducersWithBudget(a, value.modules, &associated_remaining);
     try @import("../eval/implementation_admission.zig").originalProducers(a, value.modules, &associated_remaining);
 }

@@ -75,7 +75,7 @@ fn inferenceBudget(options: ModuleOptions) usize {
     if (@hasDecl(@import("root"), "inferenceBudget")) return @import("root").inferenceBudget();
     return default_inference_budget;
 }
-pub const ModuleOptions = struct { editor: ?EditorMarker = null, purity_origins: ModuleOrigins = .{}, builtin_catalog: bool = false, prelude_unit: u32 = 0, inherited_fixities: []const ImportedFixity = &.{}, max_inference_transitions: ?usize = null, associated_remaining: ?*usize = null, body_source: []const u8 = &.{}, retained_bodies: ?*@import("../reuse/body_check_cache.zig").Cache = null, previous_bodies: ?*const @import("../reuse/body_check_cache.zig").Cache = null, body_external_names: ?@import("../reuse/body_check_cache.zig").ExternalNames = null, producer_capabilities: ?ProducerCapabilities = null };
+pub const ModuleOptions = struct { editor: ?EditorMarker = null, purity_origins: ModuleOrigins = .{}, builtin_catalog: bool = false, prelude_unit: u32 = 0, inherited_fixities: []const ImportedFixity = &.{}, max_inference_transitions: ?usize = null, associated_remaining: ?*usize = null, body_source: []const u8 = &.{}, retained_bodies: ?*@import("../reuse/body_check_cache.zig").Cache = null, previous_bodies: ?*const @import("../reuse/body_check_cache.zig").Cache = null, body_external_names: ?@import("../reuse/body_check_cache.zig").ExternalNames = null, producer_capabilities: ?ProducerCapabilities = null, producer_storage: ?ProducerStorage = null };
 /// Private differential control. This changes execution, never semantic module
 /// options or any retained-artifact key. Ordinary public entrypoints leave it off.
 pub const AliasGlobalStats = struct { attempts: usize = 0, admitted: usize = 0, declined: usize = 0, frames: usize = 0, peak_frames: usize = 0 };
@@ -260,6 +260,12 @@ pub const CapabilitySource = struct { callees: Callees, binding: BindingId };
 pub const ProducerCapabilities = struct {
     context: *const anyopaque,
     lookup: *const fn (context: *const anyopaque, target: ExternalTarget) ?ProducerCapability,
+};
+/// Opaque recipes come from the current original producer. A semantically
+/// reusable forwarding catalog may still carry its previous physical recipe.
+pub const ProducerStorage = struct {
+    context: *const anyopaque,
+    lookup: *const fn (context: *const anyopaque, identity: Identity) ?@import("../backend/opaque_storage.zig").Storage,
 };
 pub fn sourceDeclaration(binding: Binding) SourceDeclaration {
     return .{ .private = binding.private, .name = binding.name, .declaration = binding.declaration, .kind = binding.kind, .capability_flow = binding.capability_flow, .capability_parameters = binding.capability_parameters, .named_function = binding.named_function, .external = binding.external };
@@ -922,6 +928,7 @@ const Engine = struct {
     builtin_catalog: bool = false,
     source_validation: bool = false,
     producer_capabilities: ?ProducerCapabilities = null,
+    producer_storage: ?ProducerStorage = null,
     source_annotation_failed: bool = false,
     source_header_diagnostics: []Diagnostic = &.{},
     prelude_unit: u32 = 0,
@@ -2237,7 +2244,10 @@ const Engine = struct {
         return self.catalogs.nominal_identities.get(identity);
     }
     fn copyNominal(self: *Engine, producer: DeclarationCatalog, source_index: u32) T.Error!u32 {
-        const source = producer.nominals[source_index];
+        var source = producer.nominals[source_index];
+        if (source.is_opaque) if (self.producer_storage) |resolver| {
+            if (resolver.lookup(resolver.context, source.identity)) |storage| source.storage = storage;
+        };
         if (self.nominalIndex(source.identity)) |index| return index;
         const copier_arena = try self.scratch_pool.take(self.allocator);
         defer self.scratch_pool.give(copier_arena);
@@ -15051,6 +15061,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
         .source_validation = source_validation,
         .prelude_unit = options.prelude_unit,
         .producer_capabilities = options.producer_capabilities,
+        .producer_storage = options.producer_storage,
     };
     engine.proof_body.values.account = &engine.proof_visits;
     defer engine.scratch_pool.deinit();

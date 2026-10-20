@@ -99,9 +99,9 @@ unchanged.
   current/pinned ratios stay below 1.5, break writes scale linearly, and all
   60,480 calls preserve witnesses and warmed memory. See the
   [current Array qualification](zig-native/PERSISTENT_ROOTS.md#current-array-throughput-qualification-19-october-2026).
-- Task **108** closes with the owner-approved recreated Ink callback probes:
-  all 1,854 result checks, both codegen tiers and retained/fresh/revert bytes
-  pass. The exact pre-fix parent reports `effect_mismatch` for the pure stored
+- Task **108** closes with the owner-approved recreated Ink callback probes: all
+  1,854 result checks, both codegen tiers and retained/fresh/revert bytes pass.
+  The exact pre-fix parent reports `effect_mismatch` for the pure stored
   callback cases. See [static captures](zig-native/STATIC_CAPTURE_ROWS.md).
 - CT92–CT94 guards pass. The final strict comparison matches fresh, retained,
   restart and shared output for the game, devtools and selected slow tests.
@@ -124,20 +124,90 @@ unchanged.
   analyzer at `9a78ce1` and its compiler backend build with the supported
   `-Duse-llvm=true` host compiler option. Doctor confirms Zig 0.17.0 and a
   compatible backend. Local lint and the uncached final-source checks remain
-  required for task 082. No source changes
-  or benchmark evidence were pushed upstream.
+  required for task 082. No source changes or benchmark evidence were pushed
+  upstream.
+
+### Task 053 qualified continuation, 20 October 2026
+
+The qualified continuation starts from `8ff153a`. Known opaque storage changes
+now retain ordinary semantic callers while derived producers republish their
+physical recipes. The wrapper matrix compares all private and exported machine
+bodies, executable sections and allocation/ownership traffic; all 96 rows pass
+in development and release screens.
+
+The first full gate passes 2,476 native laws, 1,570 guest/client checks and 37
+harness checks. Its release is `8a8cfb7c…`. A later negative control found that
+circular foreign recipe assertions were admitted. The bounded positive-only
+closure proof now rejects that forgery and passes original-producer, parameter
+selector, shuffled-chain and allocation-failure controls. The repaired source
+passes the new full gate and final analyzers below. The stopped pre-repair
+compile campaign is diagnostic; no CPU guard is claimed from it.
+
+The integrated continuation owns binding and nominal/constructor catalog maps,
+rewrites unpublished caller copies and preserves original producer IDs. Private
+binding/type insertion, movement and generic parameter alpha changes pass
+focused native/OOM and both-tier source/archive/checkpoint/failed-edit controls,
+including their combination with the closure-proof repair. Higher-rank,
+usage/proof and complex public authority/catalog correspondence remain
+conservative. Private-only effect/contract insertion and public effect parameter
+alpha changes also pass the expanded focused controls; do not silently treat
+unverified acceptance cases as complete.
+
+Both analyzers and the activated local uncached checks pass 510 source files
+plus the fixture module with zero findings. The first integrated gate stopped in
+a harness startup race before release/native compilation. Its budget test now
+waits for the SIGTERM-resistant descendant's readiness and checks the real timer
+separately; that focused control passes. A later build was intentionally stopped
+to finish the private-catalog and public-effect correspondence work. The
+complete gate on the integrated source, `run-5ff7fbd61da7a31a` on 20 October,
+passes **2,484 executed native laws, 1,574 guest/client checks and 37 harness
+checks**. There are zero skipped native laws, failures, leaks or logged errors.
+The release is `3f9c9275…`; its final 96-row wrapper matrix and five operation
+pairs pass exact executable-section and allocation/ownership comparisons. The
+pinned compile comparison passes fresh/retained/edit/revert/restart/shared
+parity in three paired rounds. The seven-pair CPU guard passes (median ratio
+0.979, limit 1.05; wide spreads, no speedup claim). A causal control that
+restores only the old irrefutable-pattern path reproduces the original
+baseline's bytes for every selected workload, explaining the intended output
+changes.
+
+A further row-3 screen confirms a remaining cutoff gap: an unchanged, unused
+public contract before the opaque type makes a private insertion recheck both
+callers (0/0 reuse, versus 1/1 without that contract). Fresh bytes and executed
+results remain correct. Task 053 stays open; a separate source copy is preparing
+owned public-contract catalog correspondence after this qualified slice.
+
+The standalone allocation campaign passes 68 observations: both tiers,
+fresh/retained work, source-byte parity and zero live requested bytes after
+teardown. Typical scalar work is 6 → 3 elaborations/lowerings; generic alpha is
+7 → 4. Requested revision bytes fall, but retaining the previous accepted owner
+raises the peak during publication. This is measured Session work with the
+production SMP allocator, separate from release CPU qualification. Raw pins and
+scope are in `build/bench/task053-cutoff-allocation/results.json`.
+
+Continue with the
+[053 law map](zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#task-053-continuation-19-october-2026-qualification-in-progress).
+Local execution details and exact logs are in
+`/workspace/.tools/task053-current-progress.md`. Preserve later work, use the
+shared heavy-job runner, and keep this qualification as the next baseline. The
+intended ordinary irrefutable-pattern output changes have a passing causal
+control and separately recorded hashes; never waive unexpected differences or
+the CPU guard.
 
 ### Open work, in suggested order
 
 1. **Task program: 047, then 053 and the next ready tasks.**
    - The all-width cursor comparison is byte-exact but still exposes the
      performance gap; Window and broader generic state remain open.
-   - The current module screen reuses callers after alpha/field renames. Private
-     declaration insertion/movement and opaque storage changes still recheck.
-     Complete the fixed 053 matrix and required implementation.
+   - Task 053's storage, wrapper and declaration-relocation slice passes the
+     full qualification above. Finish the remaining public-contract
+     correspondence and fixed acceptance cases, then qualify that final source.
    - Keep 086's measured constant-work gate, 093's edit attribution and tasks
      100–104's targets open until their actual requirements pass.
 2. **Follow-ups recorded under their hills:**
+   - **CT28 (pen, owner approved):** use the development codegen tier for
+     `pen dev`'s own Blot session. The Blot plugin already forwards that option;
+     keep the generic plugin host's arbitrary settings scoped to its plugin.
    - **CT10:** binding-renumbering cutoff (design only).
    - **CT11:** hash-consed interfaces plus the Core type-table sharing
      difference.
@@ -164,9 +234,6 @@ unchanged.
 
 ### Waiting on the owner
 
-- **pen:** `pen dev` must pass `codegenTier: "development"` for its own session
-  (CT28, in ../pen). CT90 needs no pen change: its workers already keep one
-  session each.
 - **Checkpoint cost:** a restart after an edit still pays about 250 ms for the
   checkpoint and reuses nothing from it. Gating or reshaping it is a design
   call.
@@ -223,8 +290,8 @@ The previous long handoff, with per-task evidence through 17 October, is in git:
 
 - **In progress:** 047 (iterator state and cursor cost), 053 (module cutoff and
   wrapper rows), 081 (final durable documentation), 086 (constant-work
-  decision), 093 (gdev edit gap) and 082 (local analyzer backend and final-source
-  checks).
+  decision), 093 (gdev edit gap) and 082 (local analyzer backend and
+  final-source checks).
 - **Pending:** 084 (complete-program qualification), 100–104 (cold, literal,
   body, largest-region and requested-allocation targets), and 999 (conditional
   removal of tasks and PLAN.md).

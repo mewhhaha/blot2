@@ -172,29 +172,69 @@ Deno.test("phase budget kills descendants and preserves partial logs", async () 
   const directory = await Deno.makeTempDir({ prefix: "blot-gate-budget-" });
   try {
     const escaped = resolve(directory, "escaped");
+    const ready = resolve(directory, "ready");
     const descendant =
-      `Deno.addSignalListener('SIGTERM', () => {}); console.log('descendant started'); await new Promise(r => setTimeout(r, 1000)); await Deno.writeTextFile(${
+      `Deno.addSignalListener('SIGTERM', () => {}); console.log('descendant started'); await Deno.writeTextFile(${
+        JSON.stringify(ready)
+      }, 'ready'); await new Promise(r => setTimeout(r, 1000)); await Deno.writeTextFile(${
         JSON.stringify(escaped)
       }, 'leaked process');`;
     const parent =
       `console.log('parent started'); const child = new Deno.Command(Deno.execPath(), {args: ['eval', ${
         JSON.stringify(descendant)
       }], stdout: 'inherit', stderr: 'inherit'}).spawn(); await child.status;`;
-    const phase = await runPhase(
+    const controller = new AbortController();
+    const running = runPhase(
       "slow",
       [Deno.execPath(), "eval", parent],
       directory,
       Deno.cwd(),
       {},
-      { seconds: 0.3, heartbeat: 0.15 },
+      { seconds: 10, signal: controller.signal },
     );
+    let phase;
+    try {
+      // Exercise group termination only after the SIGTERM-resistant child is
+      // ready. A short startup deadline can kill its parent before it spawns.
+      const deadline = performance.now() + 5000;
+      while (true) {
+        try {
+          await Deno.stat(ready);
+          break;
+        } catch (error) {
+          if (!(error instanceof Deno.errors.NotFound)) throw error;
+        }
+        assert(performance.now() < deadline, "descendant did not become ready");
+        await new Promise((done) => setTimeout(done, 10));
+      }
+      controller.abort("budget");
+      phase = await running;
+    } finally {
+      controller.abort();
+      await running;
+    }
     assert.equal(phase.code, 124);
     assert.equal(phase.stopped, "budget");
     assert.match(await Deno.readTextFile(phase.stdout), /parent started/);
     assert.match(await Deno.readTextFile(phase.stdout), /descendant started/);
-    assert(phase.wall_seconds < 2);
-    await new Promise((done) => setTimeout(done, 650));
+    assert(phase.wall_seconds < 10);
+    await new Promise((done) => setTimeout(done, 1100));
     await assert.rejects(Deno.stat(escaped), Deno.errors.NotFound);
+    // Keep the real elapsed-time deadline independent of process readiness.
+    const timed = await runPhase(
+      "timer",
+      [
+        Deno.execPath(),
+        "eval",
+        "await new Promise(r => setTimeout(r, 10000));",
+      ],
+      directory,
+      Deno.cwd(),
+      {},
+      { seconds: 0.01 },
+    );
+    assert.equal(timed.code, 124);
+    assert.equal(timed.stopped, "budget");
   } finally {
     await Deno.remove(directory, { recursive: true });
   }

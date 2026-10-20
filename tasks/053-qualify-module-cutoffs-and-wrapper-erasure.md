@@ -3,8 +3,10 @@
 ## Status, dependencies, and originating requirements
 
 - **Status:** In progress — scope closed to fixed acceptance rows by owner
-  decision on 17 October 2026. Rows 1, 2, 8, 9 and 13 have evidence; rows 3–7
-  and 10–12 and the durable row-to-law mapping remain. No completion is claimed.
+  decision on 17 October 2026. The 20 October continuation passes the full
+  compiler gate and exact wrapper comparisons. Row 3 still has a confirmed
+  unchanged-public-contract cutoff gap. Compile parity and the seven-pair CPU
+  guard also pass this slice. No completion is claimed.
 - **Dependencies:** [052](052-implement-opaque-types-and-privacy.md),
   [024](024-apply-general-body-interface-cutoff.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 2 / interface
@@ -149,8 +151,9 @@ No new task is added: every row is finite and specified.
 
 - Current state: rows 1, 2, 8, 9 and 13 have evidence in committed source (the
   continuation landed in `23a934f`; the `05401a9` gate passes 2,355 native laws
-  and 1,501 guest tests with zero analyzer findings). No 053-specific milestone
-  commit exists yet.
+  and 1,501 guest tests with zero analyzer findings). The qualified 20 October
+  slice extends this evidence below; the task remains open for its remaining
+  fixed acceptance cases.
 - Prior evidence: task 052's implementation (focused 37 native and 31
   executed-Wasm laws; joint full gate at `f184dde` with 1,400 native laws, 871
   guest/client laws and 343 analyzer files at zero) erases scalar and reference
@@ -166,3 +169,45 @@ No new task is added: every row is finite and specified.
 - Durable record: [module abstraction](../zig-native/MODULE_ABSTRACTION.md),
   [implementation qualification](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md)
   and [body interface cutoff](../zig-native/BODY_CUTOFF.md).
+
+The qualified 20 October cloud continuation covers known storage changes,
+derived opaque producers, value-parameter alpha changes and unrelated opaque
+callers with native/OOM and both-tier executed laws. Scalar and reference/record
+wrappers pass exact executable and allocation controls. The complete compiler
+gate, CI/local analyzers, pinned compile parity and CPU guard pass as recorded
+below. Remaining public-contract correspondence is developed separately.
+
+The
+[continuation law map](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#task-053-continuation-19-october-2026-qualification-in-progress)
+records the focused binding/type relocation and generic alpha laws, while
+keeping unqualified private authority/catalog cases open. The expanded 96-row
+matrix now passes exact exported and private function signatures/bodies and
+allocation/ownership traffic, including traps and ordered host callbacks. The
+earlier extra callback descriptor and reference bounds branch are removed by
+bounded adapter emission and exact operand preservation. All 96 rows also match
+whole non-custom Wasm sections in development and release screens. The first
+full gate passes 2,476 native laws, 1,570 guest/client checks and 37 harness
+checks, but a subsequent circular foreign-recipe control found an
+artifact-validation gap. A bounded positive-only role proof now rejects it in
+focused checks; the repaired source now passes the replacement full gate and
+analyzers. Private binding/type insertion, relocation and generic alpha changes
+now pass focused native/OOM and executed checks together with that repair and
+are integrated. Both analyzers and the activated local uncached checks pass 510
+source files plus the fixture module with zero findings. The final forced full
+gate on 20 October passes 2,484 native laws executed, 1,574 guest/client checks
+and 37 harness checks, with no native skips, failures, leaks or logged errors.
+The final release's 96 context rows and five operation pairs also match exact
+executable sections and allocation traffic. Pinned compile parity and the
+seven-pair CPU guard also pass. Private-only effect/contract insertions and
+public effect alpha now pass the expanded controls. The standalone
+68-observation allocation campaign records lower requested revision bytes but
+higher retained publication peaks, with zero final live bytes. Complex public
+authority/catalog correspondence still needs work.
+
+The additional unchanged-public-contract control confirms a concrete row-3 gap:
+a private insertion reuses neither caller when the producer also has an unused
+public contract, while the same insertion without that contract reuses both.
+Fresh bytes and executed witnesses agree. The
+[durable screen](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#remaining-public-contract-cutoff-20-october-2026)
+records this remaining requirement; an isolated public-catalog prototype is
+being developed separately from the qualified source.
