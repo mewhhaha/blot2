@@ -335,3 +335,26 @@ order or proof admission. Diagnostic paired reports preserve complete and
 rejected graph results. Final common LLVM, boxed/task 002 CPU comparisons and
 the full compiler gate remain pending; focused development results do not close
 Task 047 or Task 035.
+
+## Prior packed-cursor path diagnostic, 20 October 2026
+
+The pinned prior `0f53…` artifact for 16-field U32 records and 16,384 rows has
+Wasm SHA-256 `32e5bade5498225134c5ea27f065553d1bcbec458af9e7dcfd05ba5fde007451`.
+A diagnostic copy adds counters to its existing List address function. After one
+cursor warmup, a cursor pass before any measured fold and another after the fold
+each make **1,093 address calls, all through the directory**, with zero root
+searches or tree edges. The fold makes zero address calls. Every witness is
+2,149,318,656 and agrees with the unmodified original Wasm.
+
+This is a route count for one old artifact, not a current compiler, runtime CPU
+or instruction-count qualification. It rules out repeated root search as the
+explanation for this warmed case; any proposed private traversal path must be
+measured against the actual directory path. Original/instrumented Wasm and WAT
+hashes are in `build/bench/task047-prior-path-counts/results.json`, SHA-256
+`0806c74edf4e413a782dd148f4a9ef829429abd34c5a941f2afb8a8e6d03927f`.
+
+The isolated monotone-path prototype and reconstructed boxed/task-002 references
+still require executed controls and actual comparisons. The earlier 62-case
+task-024/current comparison is not the required boxed/task-002 gate. All-width
+packed cursor cost, Window state and broader generic state therefore remain
+open.

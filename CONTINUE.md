@@ -132,11 +132,12 @@ unchanged.
 
 The qualified continuation is saved in local `709237c`, based on `8ff153a`; its
 measured output hashes are separately saved in `ed3b0af`. The public-contract
-follow-up below is qualified in `04e41ef`. Known opaque storage changes now
-retain ordinary semantic callers while derived producers republish their
-physical recipes. The wrapper matrix compares all private and exported machine
-bodies, executable sections and allocation/ownership traffic; all 96 rows pass
-in development and release screens.
+follow-up below is qualified in `04e41ef`; the final catalog/package slice is
+qualified in `4fda7c2`. Known opaque storage changes now retain ordinary
+semantic callers while derived producers republish their physical recipes. The
+wrapper matrix compares all private and exported machine bodies, executable
+sections and allocation/ownership traffic; all 96 rows pass in development and
+release screens.
 
 The first full gate passes 2,476 native laws, 1,570 guest/client checks and 37
 harness checks. Its release is `8a8cfb7c…`. A later negative control found that
@@ -262,9 +263,14 @@ the CPU guard.
    - **CT56:** solver stores outliving region arenas.
    - **CT44, CT87, CT88:** parallel checking and inference; blockers recorded.
 3. **Runtime:**
-   - **R4:** pipelines into partial applications build a closure per call.
+   - **R4:** the current pure pipeline/helper screen has zero allocation traffic
+     in optimized code. Development code still uses 96 rounded bytes per loop
+     iteration; direct curried calls use zero. Broader/effectful cases remain
+     open. See the
+     [current runtime screen](zig-native/CLOUD_QUALIFICATION.md#runtime-and-measurement-screens-20-october-2026).
    - **Diagnostic:** `fn - F32` reaches emit ("requires concrete representation
-     evidence") instead of a checker type error at the operator.
+     evidence") instead of a checker type error at the operator; this remains
+     reproduced in both tiers at `4fda7c2`.
    - **#12 deferred cases:** a closure bound to a local, generic callees,
      callees with `match`.
    - **Closure calls:** v128 values passed through closure calls still box once.

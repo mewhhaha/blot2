@@ -208,3 +208,46 @@ is explicitly an unweighted stack inventory, which includes idle threads; it
 must not be read as a CPU percentage. This smoke is not task 086's seven-pair
 constant-cost decision. Population and build timing records remain in
 `build/bench/task086-profiler-weighted-smoke/`.
+
+## Runtime and measurement screens, 20 October 2026
+
+These screens use the LLVM release from local `4fda7c2`, SHA-256
+`1b05518e501b001a972a1815379aa433d697807a6084da3358a3464dd342d294`. Its
+[task 053 qualification](MODULE_ABSTRACTION_QUALIFICATION.md#final-task-053-qualification-20-october-2026)
+is complete. The screens below are narrower observations; they do not complete
+R4, task 047, task 086 or the whole program.
+
+The pure partial-application screen compares `value |> (add index)`, an ordinary
+`pass value (add index)` helper and direct `add index value`. Both codegen tiers
+execute counts 0, 1, 256 and 2,048, with 100 measured calls per case (2,400
+measured calls). Witnesses, zero post-call roots/leases, stable warmed memory
+and exact recovery after a rejected edit pass.
+
+| Codegen tier | Pipeline / ordinary helper, rounded bytes per iteration | Direct call, rounded bytes per iteration |
+| ------------ | ------------------------------------------------------: | ---------------------------------------: |
+| Optimized    |                                                   0 / 0 |                                        0 |
+| Development  |                                                 96 / 96 |                                        0 |
+
+Development pipeline/helper traffic also records one retain, three releases and
+two destructions per iteration; committed memory stays at 128 KiB in every case.
+These are rounded allocator traffic and committed pages, not requested payload,
+live bytes, CPU time or a general closure result. The original R4 statement
+needs this tier distinction. Broader/effectful forms remain open.
+
+The invalid expression `transform - value`, with `transform: F32 -> F32` and
+`value: F32`, still rejects at **emit** with `unresolved_type` and "Code
+emission requires concrete representation evidence" in both tiers. Moving that
+diagnostic to the operator's checker remains open. Reinstating the valid source
+restores byte-identical output. Results and script/compiler/input pins:
+`build/bench/runtime-open-screen-v2/results.json`, SHA-256
+`a79852da335b654ddf7413b7dcc2f585d75d3638898d186b2bf174467c1fc128`.
+
+Callgrind 3.24.0 also completes a real synthetic List compilation on this exact
+release with persistence disabled. It records **32,958,570 simulated userspace
+Ir**, exact instrumented/control Wasm and compiler allocation counters, five
+executed witnesses and zero final compiler live bytes. The count includes
+startup, compilation and teardown. It is tool readiness on one small input, not
+hardware retired instructions or pinned-workload CPU/instruction evidence.
+Results: `build/bench/instruction-counter-smoke/results.json`; the Callgrind
+output has SHA-256
+`abaa942baf83c516759247933e17a7163146a349e4e983c0ae31f0bdde945cde`.
