@@ -123,9 +123,7 @@ fn copyCoreValue(a: std.mem.Allocator, value: anytype) std.mem.Allocator.Error!@
         .@"struct" => |structure| {
             var result: T = undefined;
             var initialized: usize = 0;
-            errdefer inline for (structure.field_names, 0..) |name, index| {
-                if (index < initialized) format.deinit(a, &@field(result, name));
-            };
+            errdefer format.deinitFields(a, &result, initialized);
             inline for (structure.field_names) |name| {
                 @field(result, name) = try copyCoreValue(a, @field(value, name));
                 initialized += 1;

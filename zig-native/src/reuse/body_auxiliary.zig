@@ -112,7 +112,8 @@ pub const Owner = struct {
     pub const OperationBinding = struct { binding: u32, operation: u32 };
     pub const Constructor = struct { nominal: T.NominalIdentity, tag: u32 };
     pub const Iterator = struct { node: u32, body: u32 };
-    pub fn deinit(self: *Owner, a: A) void {
+    // Table capture is unrolled; share cleanup across all its failure edges.
+    pub noinline fn deinit(self: *Owner, a: A) void {
         inline for (fields) |field| a.free(@field(self.tables, field));
         a.free(self.extra);
         a.free(self.origins);

@@ -288,9 +288,7 @@ const Decoder = struct {
             .@"struct" => |structure| structure: {
                 var result: T = undefined;
                 var initialized: usize = 0;
-                errdefer inline for (structure.field_names, 0..) |name, i| {
-                    if (i < initialized) deinit(self.allocator, &@field(result, name));
-                };
+                errdefer deinitFields(self.allocator, &result, initialized);
                 inline for (structure.field_names, structure.field_types) |name, Field| {
                     @field(result, name) = try self.value(Field, depth + 1);
                     initialized += 1;
@@ -334,6 +332,15 @@ const Decoder = struct {
         };
     }
 };
+
+/// Release only completed fields. Keep the cleanup outside each unrolled
+/// construction failure edge, avoiding a quadratic set of destruction paths.
+pub noinline fn deinitFields(allocator: Allocator, value: anytype, initialized: usize) void {
+    const T = @typeInfo(@TypeOf(value)).pointer.child;
+    inline for (@typeInfo(T).@"struct".field_names, 0..) |name, index| {
+        if (index < initialized) deinit(allocator, &@field(value.*, name));
+    }
+}
 
 /// Integers wider than a byte, enum tags and slice lengths take at least one
 /// byte each.

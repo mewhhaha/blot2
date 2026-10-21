@@ -96,7 +96,9 @@ test "counts track live storage across array growth and teardown" {
 test "a shared meter counts concurrent jobs exactly once they join" {
     var tracked: TrackedAllocator = .{ .backing = std.testing.allocator, .sharing = .shared };
     const Job = struct {
-        fn run(a: std.mem.Allocator, seed: usize) void {
+        fn run(backing: std.mem.Allocator, seed: usize, counts: *Counts) void {
+            var local: TrackedAllocator = .{ .backing = backing };
+            const a = local.allocator();
             var kept: [64][]u8 = undefined;
             const offset = std.math.mul(usize, seed, 7) catch @panic("seed overflow");
             for (&kept, 0..) |*slot, index| {
@@ -105,17 +107,25 @@ test "a shared meter counts concurrent jobs exactly once they join" {
             }
             for (kept[0..32]) |*slot| slot.* = a.realloc(slot.*, slot.len + 300) catch @panic("out of memory");
             for (kept) |slot| a.free(slot);
+            counts.* = local.counts;
         }
     };
     var threads: [4]std.Thread = undefined;
-    for (&threads, 0..) |*thread, index| thread.* = try std.Thread.spawn(.{}, Job.run, .{ tracked.allocator(), index });
-    Job.run(tracked.allocator(), threads.len);
+    var jobs: [threads.len + 1]Counts = undefined;
+    for (&threads, 0..) |*thread, index| thread.* = try std.Thread.spawn(.{}, Job.run, .{ tracked.allocator(), index, &jobs[index] });
+    Job.run(tracked.allocator(), threads.len, &jobs[threads.len]);
     for (threads) |thread| thread.join();
-    var serial: TrackedAllocator = .{ .backing = std.testing.allocator };
-    for (0..threads.len + 1) |index| Job.run(serial.allocator(), index);
+    // Concurrent allocation order can change whether a remap grows in place.
+    // Sum plain per-job meters over the same operations the shared meter saw.
+    var expected: Counts = .{};
+    for (jobs) |counts| {
+        try std.testing.expectEqual(@as(usize, 0), counts.live_bytes);
+        expected.allocations += counts.allocations;
+        expected.allocated_bytes += counts.allocated_bytes;
+    }
     try std.testing.expectEqual(@as(usize, 0), tracked.counts.live_bytes);
-    try std.testing.expectEqual(serial.counts.allocations, tracked.counts.allocations);
-    try std.testing.expectEqual(serial.counts.allocated_bytes, tracked.counts.allocated_bytes);
+    try std.testing.expectEqual(expected.allocations, tracked.counts.allocations);
+    try std.testing.expectEqual(expected.allocated_bytes, tracked.counts.allocated_bytes);
     try std.testing.expect(tracked.counts.peak_bytes > 0 and tracked.counts.peak_bytes <= tracked.counts.allocated_bytes);
 }
 

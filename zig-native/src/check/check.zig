@@ -15039,6 +15039,186 @@ fn rejectExhaustedBudget(allocator: Allocator, pool: *const symbols.Pool, unit: 
     rejected.unit = unit;
     return rejected;
 }
+// A shared teardown keeps each fallible checker step from cloning all earlier
+// cleanups. Preserve reverse registration order, including scratch-pool lifetime.
+noinline fn deinitEngine(engine: *Engine, published: bool) void {
+    const allocator = engine.allocator;
+    engine.merges.deinit(allocator);
+    engine.obligations.deinit(allocator);
+    {
+        deinitDiagnosticPayloads(allocator, engine.diagnostics.items);
+        engine.diagnostics.deinit(allocator);
+    }
+    engine.bindings.deinit(allocator);
+    engine.computed_rows.deinit(allocator);
+    engine.computed_variables.deinit(allocator);
+    engine.predicate_origins.deinit(allocator);
+    engine.declared_obligations.deinit(allocator);
+    {
+        var staged = engine.staged_global_diagnostics.valueIterator();
+        while (staged.next()) |diagnostics| {
+            deinitDiagnosticPayloads(allocator, diagnostics.*);
+            allocator.free(diagnostics.*);
+        }
+        engine.staged_global_diagnostics.deinit(allocator);
+    }
+    engine.selected_globals.deinit(allocator);
+    engine.forwarded_requirements.deinit(allocator);
+    engine.qualification_uses.deinit(allocator);
+    engine.qualifications.deinit(allocator);
+    {
+        var outcomes = engine.callee_memo.iterator();
+        while (outcomes.next()) |entry| {
+            allocator.free(entry.key_ptr.*);
+            allocator.free(entry.value_ptr.types);
+            allocator.free(entry.value_ptr.rows);
+        }
+        engine.callee_memo.deinit(allocator);
+    }
+    if (engine.pending_arena) |arena| {
+        engine.pending.deinit(arena.allocator());
+        engine.scratch_pool.give(arena);
+    }
+    engine.env.deinit(allocator);
+    engine.active.deinit(allocator);
+    engine.global_states.deinit(allocator);
+    engine.projection_catalog.deinit(allocator);
+    engine.constructors.deinit(allocator);
+    engine.contract_states.deinit(allocator);
+    engine.member_states.deinit(allocator);
+    engine.member_sources.deinit(allocator);
+    engine.active_predicates.deinit(allocator);
+    engine.provisional_equations.deinit(allocator);
+    engine.implementation_order.deinit(allocator);
+    engine.active_evidence.deinit(allocator);
+    engine.implementation_member_states.deinit(allocator);
+    engine.implementation_member_sources.deinit(allocator);
+    engine.implementation_bindings.deinit(allocator);
+    engine.selected_uses.deinit(allocator);
+    engine.selected_edges.deinit(allocator);
+    engine.selected_members.deinit(allocator);
+    engine.selected_proofs.deinit(allocator);
+    engine.member_templates.deinit(allocator);
+    engine.implementation_members.deinit(allocator);
+    engine.implementation_predicates.deinit(allocator);
+    engine.implementations.deinit(allocator);
+    engine.contract_members.deinit(allocator);
+    engine.contract_predicates.deinit(allocator);
+    engine.contracts.deinit(allocator);
+    engine.nominals.deinit(allocator);
+    engine.associated.deinit(allocator);
+    engine.cases.deinit(allocator);
+    engine.computation_annotations.deinit(allocator);
+    engine.row_env.deinit(allocator);
+    engine.type_env.deinit(allocator);
+    engine.storage_frames.deinit(allocator);
+    engine.scope_lifetimes.deinit(allocator);
+    engine.loop_stack.deinit(allocator);
+    engine.statement_arms.deinit(allocator);
+    engine.loop_exits.deinit(allocator);
+    engine.loop_carries.deinit(allocator);
+    engine.resolver_loops.deinit(allocator);
+    engine.resolver_completions.deinit(allocator);
+    engine.resolver_joins.deinit(allocator);
+    engine.resolver_ops.deinit(allocator);
+    engine.resolver_blocks.deinit(allocator);
+    if (!published) {
+        allocator.free(engine.resolver_loop_ids);
+        allocator.free(engine.resolver_join_ids);
+        allocator.free(engine.resolver_op_ids);
+        allocator.free(engine.resolver_block_ids);
+        allocator.free(engine.demand_binary_left);
+        allocator.free(engine.demand_binary_left_types);
+        allocator.free(engine.demand_types);
+        allocator.free(engine.demand_once);
+        allocator.free(engine.demand_calls);
+        allocator.free(engine.iterator_bodies);
+        allocator.free(engine.loop_ranges);
+        allocator.free(engine.rebindings);
+        allocator.free(engine.access_types);
+        allocator.free(engine.access_nodes);
+        allocator.free(engine.access_paths);
+        allocator.free(engine.projection_resolved);
+        allocator.free(engine.projections);
+        allocator.free(engine.constructor_resolved);
+        allocator.free(engine.resolved);
+        allocator.free(engine.expr_types);
+        allocator.free(engine.dispatch_signatures);
+        allocator.free(engine.lambda_closed_rows);
+    }
+    engine.row_sources.deinit(allocator);
+    engine.closed_row_keys.deinit(allocator);
+    engine.annotation_givens.deinit(allocator);
+    engine.dictionary_givens.deinit(allocator);
+    engine.dictionary_uses.deinit(allocator);
+    engine.dictionary_selections.deinit(allocator);
+    engine.rank_implementations.deinit(allocator);
+    engine.covered_requirements.deinit(allocator);
+    engine.body_closed_rows.deinit(allocator);
+    engine.operation_uses.deinit(allocator);
+    engine.effect_templates.deinit(allocator);
+    engine.effect_families.deinit(allocator);
+    if (!published) {
+        allocator.free(engine.operation_refs);
+    }
+    engine.provider_blocks.deinit(allocator);
+    engine.effect_runners.deinit(allocator);
+    if (!published) {
+        allocator.free(engine.effect_runner_ids);
+        allocator.free(engine.provider_block_ids);
+    }
+    engine.effect_scopes.deinit(allocator);
+    if (!published) {
+        allocator.free(engine.effect_scope_ids);
+    }
+    engine.generative_bindings.deinit(allocator);
+    engine.capability_roots.deinit(allocator);
+    engine.capability_store.deinit(allocator);
+    if (!published) {
+        allocator.free(engine.tag_origins);
+    }
+    engine.request_controls.deinit(allocator);
+    engine.request_arms.deinit(allocator);
+    engine.request_loops.deinit(allocator);
+    engine.computations.deinit(allocator);
+    engine.reflections.deinit(allocator);
+    if (!published) {
+        engine.parameter_patterns.deinit(allocator);
+    }
+    {
+        deinitDiagnosticPayloads(allocator, engine.source_header_diagnostics);
+        allocator.free(engine.source_header_diagnostics);
+    }
+    engine.active_aliases.deinit(allocator);
+    if (!published) {
+        if (engine.editor_capture) |capture| {
+            allocator.free(capture.names);
+            if (capture.context) |context| context.deinit(allocator);
+        }
+    }
+    engine.holes.deinit(allocator);
+    {
+        for (engine.proof_contracts.items) |*contract| contract.deinit(allocator);
+        engine.proof_contracts.deinit(allocator);
+    }
+    engine.proof_body.deinit(allocator);
+    if (!published) {
+        engine.types.deinit();
+    }
+    engine.pending_queue.deinit(allocator);
+    engine.usage_loans.deinit(allocator);
+    engine.staging_bindings.deinit(allocator);
+    engine.catalogs.deinit(allocator);
+    engine.scratch_pool.deinit();
+}
+
+fn initializeEngineAccounting(engine: *Engine, options: ModuleOptions) void {
+    // The proof store borrows the final Engine address after construction.
+    engine.proof_body.values.account = &engine.proof_visits;
+    engine.types.projection_limit = @min(1_000_000, inferenceBudget(options));
+    if (options.associated_remaining) |remaining| engine.types.projection_limit = @min(engine.types.projection_limit, remaining.*);
+}
+
 fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool, imports: []const ImportedBinding, headers: []const SourceHeader, catalogs: []const ImportedCatalog, source_catalogs: []const SourceCatalog, unit: u32, allow_imports: bool, options: ModuleOptions, source_validation: bool, execution: PrivateExecution, exhaustion: *BudgetExhaustion) !Checked {
     if (!source_validation and hasNumericFailure(tree)) return rejectNumericSource(allocator, tree, pool, imports, catalogs, unit, options);
     var engine: Engine = .{
@@ -15067,32 +15247,12 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
         .producer_capabilities = options.producer_capabilities,
         .producer_storage = options.producer_storage,
     };
-    engine.proof_body.values.account = &engine.proof_visits;
-    defer engine.scratch_pool.deinit();
-    defer engine.catalogs.deinit(allocator);
-    defer engine.staging_bindings.deinit(allocator);
-    defer engine.usage_loans.deinit(allocator);
-    defer engine.pending_queue.deinit(allocator);
-    errdefer engine.types.deinit();
-    defer engine.proof_body.deinit(allocator);
-    errdefer {
-        for (engine.proof_contracts.items) |*contract| contract.deinit(allocator);
-        engine.proof_contracts.deinit(allocator);
-    }
-    engine.types.projection_limit = @min(1_000_000, inferenceBudget(options));
-    if (options.associated_remaining) |remaining| engine.types.projection_limit = @min(engine.types.projection_limit, remaining.*);
+    // Publication transfers the direct owners to Checked. Drained lists and
+    // temporary state stay with Engine, including during a partial publication.
+    var published = false;
+    defer deinitEngine(&engine, published);
+    initializeEngineAccounting(&engine, options);
 
-    defer engine.holes.deinit(allocator);
-    errdefer if (engine.editor_capture) |capture| {
-        allocator.free(capture.names);
-        if (capture.context) |context| context.deinit(allocator);
-    };
-    defer engine.active_aliases.deinit(allocator);
-    defer {
-        deinitDiagnosticPayloads(allocator, engine.source_header_diagnostics);
-        allocator.free(engine.source_header_diagnostics);
-    }
-    errdefer engine.parameter_patterns.deinit(allocator);
     var tag_count: usize = 0;
     for (tree.nodes.items) |node| {
         if (node.tag == .attribute) tag_count += 1;
@@ -15105,149 +15265,59 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
             index += 1;
         };
     }
-    errdefer engine.reflections.deinit(allocator);
-    defer engine.computations.deinit(allocator);
-    defer engine.request_loops.deinit(allocator);
-    defer engine.request_arms.deinit(allocator);
-    defer engine.request_controls.deinit(allocator);
-    errdefer allocator.free(engine.tag_origins);
 
-    defer engine.capability_store.deinit(allocator);
-    defer engine.capability_roots.deinit(allocator);
-    defer engine.generative_bindings.deinit(allocator);
     engine.effect_scope_ids = try allocator.alloc(u32, tree.nodes.items.len);
-    errdefer allocator.free(engine.effect_scope_ids);
     @memset(engine.effect_scope_ids, 0);
-    errdefer engine.effect_scopes.deinit(allocator);
     engine.provider_block_ids = try allocator.alloc(u32, tree.nodes.items.len);
-    errdefer allocator.free(engine.provider_block_ids);
     @memset(engine.provider_block_ids, 0);
     engine.effect_runner_ids = try allocator.alloc(u32, tree.nodes.items.len);
-    errdefer allocator.free(engine.effect_runner_ids);
     @memset(engine.effect_runner_ids, 0);
-    errdefer engine.effect_runners.deinit(allocator);
-    errdefer engine.provider_blocks.deinit(allocator);
     engine.operation_refs = try allocator.alloc(u32, tree.nodes.items.len);
-    errdefer allocator.free(engine.operation_refs);
     @memset(engine.operation_refs, 0);
-    errdefer engine.effect_families.deinit(allocator);
-    errdefer engine.effect_templates.deinit(allocator);
-    errdefer engine.operation_uses.deinit(allocator);
-    errdefer engine.body_closed_rows.deinit(allocator);
-    errdefer engine.covered_requirements.deinit(allocator);
-    errdefer engine.rank_implementations.deinit(allocator);
-    errdefer engine.dictionary_selections.deinit(allocator);
-    errdefer engine.dictionary_uses.deinit(allocator);
-    defer engine.dictionary_givens.deinit(allocator);
-    defer engine.annotation_givens.deinit(allocator);
-    defer engine.closed_row_keys.deinit(allocator);
-    defer engine.row_sources.deinit(allocator);
     engine.lambda_closed_rows = try allocator.alloc(T.List, tree.nodes.items.len);
-    errdefer allocator.free(engine.lambda_closed_rows);
     @memset(engine.lambda_closed_rows, .{});
     engine.dispatch_signatures = try allocator.alloc(T.Id, tree.nodes.items.len);
-    errdefer allocator.free(engine.dispatch_signatures);
     @memset(engine.dispatch_signatures, 0);
     try engine.effect_families.append(allocator, .{ .identity = .{ .unit = 0, .decl = 0 }, .name = 0 });
     try engine.effect_templates.append(allocator, .{ .identity = .{ .unit = 0, .decl = 0 }, .family = 0, .name = 0, .parameter = 0, .result = 0 });
     engine.expr_types = try allocator.alloc(T.Id, tree.nodes.items.len);
-    errdefer allocator.free(engine.expr_types);
     engine.resolved = try allocator.alloc(BindingId, tree.nodes.items.len);
-    errdefer allocator.free(engine.resolved);
     engine.constructor_resolved = try allocator.alloc(u32, tree.nodes.items.len);
-    errdefer allocator.free(engine.constructor_resolved);
     @memset(engine.constructor_resolved, 0);
     engine.projections = try allocator.alloc(u32, tree.nodes.items.len);
-    errdefer allocator.free(engine.projections);
     @memset(engine.projections, std.math.maxInt(u32));
     engine.projection_resolved = try allocator.alloc(u32, tree.nodes.items.len);
-    errdefer allocator.free(engine.projection_resolved);
     @memset(engine.projection_resolved, 0);
     engine.access_paths = try allocator.alloc(T.List, tree.nodes.items.len);
-    errdefer allocator.free(engine.access_paths);
     @memset(engine.access_paths, .{});
     engine.access_nodes = try allocator.alloc(T.List, tree.nodes.items.len);
-    errdefer allocator.free(engine.access_nodes);
     @memset(engine.access_nodes, .{});
     engine.access_types = try allocator.alloc(T.List, tree.nodes.items.len);
-    errdefer allocator.free(engine.access_types);
     @memset(engine.access_types, .{});
     engine.rebindings = try allocator.alloc(Rebinding, tree.nodes.items.len);
-    errdefer allocator.free(engine.rebindings);
     @memset(engine.rebindings, .{});
     engine.loop_ranges = try allocator.alloc(T.List, tree.nodes.items.len);
-    errdefer allocator.free(engine.loop_ranges);
     @memset(engine.loop_ranges, .{});
     engine.iterator_bodies = try allocator.alloc(ast.Id, tree.nodes.items.len);
-    errdefer allocator.free(engine.iterator_bodies);
     @memset(engine.iterator_bodies, 0);
     engine.demand_calls = try allocator.alloc(bool, tree.nodes.items.len);
-    errdefer allocator.free(engine.demand_calls);
     @memset(engine.demand_calls, false);
     engine.demand_once = try allocator.alloc(bool, tree.nodes.items.len);
-    errdefer allocator.free(engine.demand_once);
     @memset(engine.demand_once, false);
     engine.demand_types = try allocator.alloc(T.Id, tree.nodes.items.len);
-    errdefer allocator.free(engine.demand_types);
     @memset(engine.demand_types, 0);
     engine.demand_binary_left_types = try allocator.alloc(T.Id, tree.nodes.items.len);
-    errdefer allocator.free(engine.demand_binary_left_types);
     @memset(engine.demand_binary_left_types, 0);
     engine.demand_binary_left = try allocator.alloc(bool, tree.nodes.items.len);
-    errdefer allocator.free(engine.demand_binary_left);
     @memset(engine.demand_binary_left, false);
     engine.resolver_block_ids = try allocator.alloc(u32, tree.nodes.items.len);
-    errdefer allocator.free(engine.resolver_block_ids);
     @memset(engine.resolver_block_ids, 0);
     engine.resolver_op_ids = try allocator.alloc(u32, tree.nodes.items.len);
-    errdefer allocator.free(engine.resolver_op_ids);
     @memset(engine.resolver_op_ids, 0);
     engine.resolver_join_ids = try allocator.alloc(u32, tree.nodes.items.len);
-    errdefer allocator.free(engine.resolver_join_ids);
     @memset(engine.resolver_join_ids, 0);
     engine.resolver_loop_ids = try allocator.alloc(u32, tree.nodes.items.len);
-    errdefer allocator.free(engine.resolver_loop_ids);
     @memset(engine.resolver_loop_ids, 0);
-    errdefer engine.resolver_blocks.deinit(allocator);
-    errdefer engine.resolver_ops.deinit(allocator);
-    errdefer engine.resolver_joins.deinit(allocator);
-    errdefer engine.resolver_completions.deinit(allocator);
-    errdefer engine.resolver_loops.deinit(allocator);
-    errdefer engine.loop_carries.deinit(allocator);
-    errdefer engine.loop_exits.deinit(allocator);
-    errdefer engine.statement_arms.deinit(allocator);
-    defer engine.loop_stack.deinit(allocator);
-    defer engine.scope_lifetimes.deinit(allocator);
-    defer engine.storage_frames.deinit(allocator);
-    defer engine.type_env.deinit(allocator);
-    defer engine.row_env.deinit(allocator);
-    defer engine.computation_annotations.deinit(allocator);
-    defer engine.cases.deinit(allocator);
-    errdefer engine.associated.deinit(allocator);
-    errdefer engine.nominals.deinit(allocator);
-    errdefer engine.contracts.deinit(allocator);
-    errdefer engine.contract_predicates.deinit(allocator);
-    errdefer engine.contract_members.deinit(allocator);
-    errdefer engine.implementations.deinit(allocator);
-    errdefer engine.implementation_predicates.deinit(allocator);
-    errdefer engine.implementation_members.deinit(allocator);
-    errdefer engine.member_templates.deinit(allocator);
-    errdefer engine.selected_proofs.deinit(allocator);
-    errdefer engine.selected_members.deinit(allocator);
-    errdefer engine.selected_edges.deinit(allocator);
-    errdefer engine.selected_uses.deinit(allocator);
-    defer engine.implementation_bindings.deinit(allocator);
-    defer engine.implementation_member_sources.deinit(allocator);
-    defer engine.implementation_member_states.deinit(allocator);
-    defer engine.active_evidence.deinit(allocator);
-    defer engine.implementation_order.deinit(allocator);
-    defer engine.provisional_equations.deinit(allocator);
-    defer engine.active_predicates.deinit(allocator);
-    defer engine.member_sources.deinit(allocator);
-    defer engine.member_states.deinit(allocator);
-    defer engine.contract_states.deinit(allocator);
-    errdefer engine.constructors.deinit(allocator);
-    errdefer engine.projection_catalog.deinit(allocator);
     try engine.nominals.append(allocator, .{ .identity = .{ .unit = 0, .decl = 0 }, .name = 0, .parameters = .{}, .variables = .{} });
     try engine.constructors.append(allocator, .{ .identity = .{ .unit = 0, .decl = 0 }, .nominal = 0, .tag = 0, .name = 0 });
     try engine.projection_catalog.append(allocator, .{ .nominal = .{ .unit = 0, .decl = 0 }, .field = 0, .variants = .{} });
@@ -15262,45 +15332,6 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     }
     @memset(engine.expr_types, 0);
     @memset(engine.resolved, 0);
-    defer engine.global_states.deinit(allocator);
-    defer engine.active.deinit(allocator);
-    defer engine.env.deinit(allocator);
-    defer if (engine.pending_arena) |arena| {
-        engine.pending.deinit(arena.allocator());
-        engine.scratch_pool.give(arena);
-    };
-    defer {
-        var outcomes = engine.callee_memo.iterator();
-        while (outcomes.next()) |entry| {
-            allocator.free(entry.key_ptr.*);
-            allocator.free(entry.value_ptr.types);
-            allocator.free(entry.value_ptr.rows);
-        }
-        engine.callee_memo.deinit(allocator);
-    }
-    defer engine.qualifications.deinit(allocator);
-    defer engine.qualification_uses.deinit(allocator);
-    defer engine.forwarded_requirements.deinit(allocator);
-    defer engine.selected_globals.deinit(allocator);
-    defer {
-        var staged = engine.staged_global_diagnostics.valueIterator();
-        while (staged.next()) |diagnostics| {
-            deinitDiagnosticPayloads(allocator, diagnostics.*);
-            allocator.free(diagnostics.*);
-        }
-        engine.staged_global_diagnostics.deinit(allocator);
-    }
-    defer engine.declared_obligations.deinit(allocator);
-    defer engine.predicate_origins.deinit(allocator);
-    defer engine.computed_variables.deinit(allocator);
-    defer engine.computed_rows.deinit(allocator);
-    errdefer engine.bindings.deinit(allocator);
-    errdefer {
-        deinitDiagnosticPayloads(allocator, engine.diagnostics.items);
-        engine.diagnostics.deinit(allocator);
-    }
-    errdefer engine.obligations.deinit(allocator);
-    errdefer engine.merges.deinit(allocator);
     // Principal and body passes know their source binders before allocation.
     // Reserve once; additional imported or synthetic bindings can still grow.
     var binding_capacity: usize = imports.len + headers.len + 1;
@@ -15323,124 +15354,113 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     }
     try engine.collectModuleHeaders(imports, headers, catalogs, source_catalogs, allow_imports, options.inherited_fixities);
     try engine.validateModuleBodies();
-    const computations = try engine.computations.toOwnedSlice(allocator);
-    errdefer allocator.free(computations);
-    const request_loops = try engine.request_loops.toOwnedSlice(allocator);
-    errdefer allocator.free(request_loops);
-    const request_arms = try engine.request_arms.toOwnedSlice(allocator);
-    errdefer allocator.free(request_arms);
-    const request_controls = try engine.request_controls.toOwnedSlice(allocator);
-    errdefer allocator.free(request_controls);
-    const reflections = try engine.reflections.toOwnedSlice(allocator);
-    errdefer allocator.free(reflections);
-    const bindings = try engine.bindings.toOwnedSlice(allocator);
-    errdefer allocator.free(bindings);
-    const diagnostics = try engine.diagnostics.toOwnedSlice(allocator);
-    errdefer {
-        deinitDiagnosticPayloads(allocator, diagnostics);
-        allocator.free(diagnostics);
-    }
-    const obligations = try engine.obligations.toOwnedSlice(allocator);
-    errdefer allocator.free(obligations);
-    const nominals = try engine.nominals.toOwnedSlice(allocator);
-    errdefer allocator.free(nominals);
-    const contracts = try engine.contracts.toOwnedSlice(allocator);
-    errdefer allocator.free(contracts);
-    const contract_predicates = try engine.contract_predicates.toOwnedSlice(allocator);
-    errdefer allocator.free(contract_predicates);
-    const contract_members = try engine.contract_members.toOwnedSlice(allocator);
-    errdefer allocator.free(contract_members);
-    const implementations = try engine.implementations.toOwnedSlice(allocator);
-    errdefer allocator.free(implementations);
-    const implementation_predicates = try engine.implementation_predicates.toOwnedSlice(allocator);
-    errdefer allocator.free(implementation_predicates);
-    const implementation_members = try engine.implementation_members.toOwnedSlice(allocator);
-    errdefer allocator.free(implementation_members);
-    const member_templates = try engine.member_templates.toOwnedSlice(allocator);
-    errdefer allocator.free(member_templates);
-    const selected_proofs = try engine.selected_proofs.toOwnedSlice(allocator);
-    errdefer allocator.free(selected_proofs);
-    const selected_members = try engine.selected_members.toOwnedSlice(allocator);
-    errdefer allocator.free(selected_members);
-    const selected_edges = try engine.selected_edges.toOwnedSlice(allocator);
-    errdefer allocator.free(selected_edges);
-    const selected_uses = try engine.selected_uses.toOwnedSlice(allocator);
-    errdefer allocator.free(selected_uses);
-    const constructors = try engine.constructors.toOwnedSlice(allocator);
-    errdefer allocator.free(constructors);
-    const projection_catalog = try engine.projection_catalog.toOwnedSlice(allocator);
-    errdefer allocator.free(projection_catalog);
-    const associated = try engine.associated.toOwnedSlice(allocator);
-    errdefer allocator.free(associated);
-    const loop_carries = try engine.loop_carries.toOwnedSlice(allocator);
-    errdefer allocator.free(loop_carries);
-    const loop_exits = try engine.loop_exits.toOwnedSlice(allocator);
-    errdefer allocator.free(loop_exits);
-    const statement_arms = try engine.statement_arms.toOwnedSlice(allocator);
-    errdefer allocator.free(statement_arms);
-    const resolver_blocks = try engine.resolver_blocks.toOwnedSlice(allocator);
-    errdefer allocator.free(resolver_blocks);
-    const resolver_ops = try engine.resolver_ops.toOwnedSlice(allocator);
-    errdefer allocator.free(resolver_ops);
-    const resolver_joins = try engine.resolver_joins.toOwnedSlice(allocator);
-    errdefer allocator.free(resolver_joins);
-    const resolver_completions = try engine.resolver_completions.toOwnedSlice(allocator);
-    errdefer allocator.free(resolver_completions);
-    const resolver_loops = try engine.resolver_loops.toOwnedSlice(allocator);
-    errdefer allocator.free(resolver_loops);
-    const effect_families = try engine.effect_families.toOwnedSlice(allocator);
-    errdefer allocator.free(effect_families);
-    const effect_templates = try engine.effect_templates.toOwnedSlice(allocator);
-    errdefer allocator.free(effect_templates);
-    const operation_uses = try engine.operation_uses.toOwnedSlice(allocator);
-    errdefer allocator.free(operation_uses);
-    const effect_scopes = try engine.effect_scopes.toOwnedSlice(allocator);
-    errdefer allocator.free(effect_scopes);
-    const effect_runners = try engine.effect_runners.toOwnedSlice(allocator);
-    errdefer allocator.free(effect_runners);
-    const provider_blocks = try engine.provider_blocks.toOwnedSlice(allocator);
-    errdefer allocator.free(provider_blocks);
-    const dictionary_uses = try engine.dictionary_uses.toOwnedSlice(allocator);
-    errdefer allocator.free(dictionary_uses);
-    const dictionary_selections = try engine.dictionary_selections.toOwnedSlice(allocator);
-    errdefer allocator.free(dictionary_selections);
-    const rank_implementations = try engine.rank_implementations.toOwnedSlice(allocator);
-    errdefer allocator.free(rank_implementations);
-    const body_closed_rows = try engine.body_closed_rows.toOwnedSlice(allocator);
-    errdefer allocator.free(body_closed_rows);
-    const covered_requirements = try engine.covered_requirements.toOwnedSlice(allocator);
-    errdefer allocator.free(covered_requirements);
-    const merges = try engine.merges.toOwnedSlice(allocator);
-    errdefer allocator.free(merges);
+    // Direct owners move together; each following slice publication fills an
+    // initially empty Checked field and leaves its Engine list empty.
+    var checked: Checked = .{
+        .editor = engine.editor_capture,
+        .iterator_bodies = engine.iterator_bodies,
+        .tag_origins = engine.tag_origins,
+        .effect_scope_ids = engine.effect_scope_ids,
+        .effect_runner_ids = engine.effect_runner_ids,
+        .provider_block_ids = engine.provider_block_ids,
+        .lambda_closed_rows = engine.lambda_closed_rows,
+        .dispatch_signatures = engine.dispatch_signatures,
+        .operation_refs = engine.operation_refs,
+        .resolver_loop_ids = engine.resolver_loop_ids,
+        .resolver_block_ids = engine.resolver_block_ids,
+        .resolver_op_ids = engine.resolver_op_ids,
+        .resolver_join_ids = engine.resolver_join_ids,
+        .demand_calls = engine.demand_calls,
+        .demand_once = engine.demand_once,
+        .demand_types = engine.demand_types,
+        .demand_binary_left_types = engine.demand_binary_left_types,
+        .demand_binary_left = engine.demand_binary_left,
+        .loop_ranges = engine.loop_ranges,
+        .unit = unit,
+        .constructor_resolved = engine.constructor_resolved,
+        .projections = engine.projections,
+        .access_paths = engine.access_paths,
+        .access_nodes = engine.access_nodes,
+        .access_types = engine.access_types,
+        .projection_resolved = engine.projection_resolved,
+        .rebindings = engine.rebindings,
+        .types = engine.types,
+        .parameter_patterns = engine.parameter_patterns,
+        .expr_types = engine.expr_types,
+        .resolved = engine.resolved,
+        .bindings = &.{},
+        .merges = &.{},
+        .obligations = &.{},
+        .diagnostics = &.{},
+        .body_elaborations = engine.body_elaborations,
+        .imported_schemes = if (source_validation) 0 else engine.catalogs.external_targets.count(),
+        .counters = counters: {
+            var counters = engine.counters;
+            counters.inference_steps = engine.inference_transitions + engine.types.projection_steps;
+            counters.associated_steps = engine.types.projection_steps;
+            break :counters counters;
+        },
+    };
+    published = true;
+    errdefer checked.deinit(allocator);
+    checked.computations = try engine.computations.toOwnedSlice(allocator);
+    checked.request_loops = try engine.request_loops.toOwnedSlice(allocator);
+    checked.request_arms = try engine.request_arms.toOwnedSlice(allocator);
+    checked.request_controls = try engine.request_controls.toOwnedSlice(allocator);
+    checked.reflections = try engine.reflections.toOwnedSlice(allocator);
+    checked.bindings = try engine.bindings.toOwnedSlice(allocator);
+    checked.diagnostics = try engine.diagnostics.toOwnedSlice(allocator);
+    checked.obligations = try engine.obligations.toOwnedSlice(allocator);
+    checked.nominals = try engine.nominals.toOwnedSlice(allocator);
+    checked.contracts = try engine.contracts.toOwnedSlice(allocator);
+    checked.contract_predicates = try engine.contract_predicates.toOwnedSlice(allocator);
+    checked.contract_members = try engine.contract_members.toOwnedSlice(allocator);
+    checked.implementations = try engine.implementations.toOwnedSlice(allocator);
+    checked.implementation_predicates = try engine.implementation_predicates.toOwnedSlice(allocator);
+    checked.implementation_members = try engine.implementation_members.toOwnedSlice(allocator);
+    checked.member_templates = try engine.member_templates.toOwnedSlice(allocator);
+    checked.selected_proofs = try engine.selected_proofs.toOwnedSlice(allocator);
+    checked.selected_members = try engine.selected_members.toOwnedSlice(allocator);
+    checked.selected_edges = try engine.selected_edges.toOwnedSlice(allocator);
+    checked.selected_uses = try engine.selected_uses.toOwnedSlice(allocator);
+    checked.constructors = try engine.constructors.toOwnedSlice(allocator);
+    checked.projection_catalog = try engine.projection_catalog.toOwnedSlice(allocator);
+    checked.associated = try engine.associated.toOwnedSlice(allocator);
+    checked.loop_carries = try engine.loop_carries.toOwnedSlice(allocator);
+    checked.loop_exits = try engine.loop_exits.toOwnedSlice(allocator);
+    checked.statement_arms = try engine.statement_arms.toOwnedSlice(allocator);
+    checked.resolver_blocks = try engine.resolver_blocks.toOwnedSlice(allocator);
+    checked.resolver_ops = try engine.resolver_ops.toOwnedSlice(allocator);
+    checked.resolver_joins = try engine.resolver_joins.toOwnedSlice(allocator);
+    checked.resolver_completions = try engine.resolver_completions.toOwnedSlice(allocator);
+    checked.resolver_loops = try engine.resolver_loops.toOwnedSlice(allocator);
+    checked.effect_families = try engine.effect_families.toOwnedSlice(allocator);
+    checked.effect_templates = try engine.effect_templates.toOwnedSlice(allocator);
+    checked.operation_uses = try engine.operation_uses.toOwnedSlice(allocator);
+    checked.effect_scopes = try engine.effect_scopes.toOwnedSlice(allocator);
+    checked.effect_runners = try engine.effect_runners.toOwnedSlice(allocator);
+    checked.provider_blocks = try engine.provider_blocks.toOwnedSlice(allocator);
+    checked.dictionary_uses = try engine.dictionary_uses.toOwnedSlice(allocator);
+    checked.dictionary_selections = try engine.dictionary_selections.toOwnedSlice(allocator);
+    checked.rank_implementations = try engine.rank_implementations.toOwnedSlice(allocator);
+    checked.body_closed_rows = try engine.body_closed_rows.toOwnedSlice(allocator);
+    checked.covered_requirements = try engine.covered_requirements.toOwnedSlice(allocator);
+    checked.merges = try engine.merges.toOwnedSlice(allocator);
     std.mem.sortUnstable(@import("capability_contracts.zig").Binding, engine.capability_roots.items, {}, struct {
         fn less(_: void, left: @import("capability_contracts.zig").Binding, right: @import("capability_contracts.zig").Binding) bool {
             return left.binding < right.binding;
         }
     }.less);
-    var capability_contracts: @import("capability_contracts.zig").Collection = .{};
-    errdefer capability_contracts.deinit(allocator);
     if (engine.capability_roots.items.len != 0) {
-        capability_contracts.nodes = try engine.capability_store.nodes.toOwnedSlice(allocator);
-        capability_contracts.words = try engine.capability_store.words.toOwnedSlice(allocator);
-        capability_contracts.bindings = try engine.capability_roots.toOwnedSlice(allocator);
+        checked.capability_contracts.nodes = try engine.capability_store.nodes.toOwnedSlice(allocator);
+        checked.capability_contracts.words = try engine.capability_store.words.toOwnedSlice(allocator);
+        checked.capability_contracts.bindings = try engine.capability_roots.toOwnedSlice(allocator);
     }
-    const proof_contracts = try engine.proof_contracts.toOwnedSlice(allocator);
-    errdefer {
-        for (proof_contracts) |*contract| contract.deinit(allocator);
-        allocator.free(proof_contracts);
-    }
-    var owned_proof_body = try engine.proof_body.take(allocator);
-    errdefer owned_proof_body.deinit(allocator);
-    const usage_loans = try engine.usage_loans.toOwnedSlice(allocator);
-    errdefer allocator.free(usage_loans);
-    const generative_bindings = try allocator.dupe(@import("generative_schemes.zig").Binder, engine.generative_bindings.items);
-    errdefer allocator.free(generative_bindings);
-    var checked: Checked = .{ .generative_bindings = generative_bindings, .dictionary_uses = dictionary_uses, .dictionary_selections = dictionary_selections, .usage_loans = usage_loans, .capability_contracts = capability_contracts, .rank_implementations = rank_implementations, .proof_contracts = proof_contracts, .proof_bodies = owned_proof_body, .editor = engine.editor_capture, .iterator_bodies = engine.iterator_bodies, .computations = computations, .request_loops = request_loops, .request_arms = request_arms, .request_controls = request_controls, .reflections = reflections, .tag_origins = engine.tag_origins, .effect_scopes = effect_scopes, .effect_scope_ids = engine.effect_scope_ids, .effect_runners = effect_runners, .effect_runner_ids = engine.effect_runner_ids, .provider_blocks = provider_blocks, .provider_block_ids = engine.provider_block_ids, .body_closed_rows = body_closed_rows, .lambda_closed_rows = engine.lambda_closed_rows, .dispatch_signatures = engine.dispatch_signatures, .covered_requirements = covered_requirements, .effect_families = effect_families, .effect_templates = effect_templates, .operation_uses = operation_uses, .operation_refs = engine.operation_refs, .resolver_completions = resolver_completions, .resolver_loops = resolver_loops, .resolver_loop_ids = engine.resolver_loop_ids, .resolver_blocks = resolver_blocks, .resolver_ops = resolver_ops, .resolver_joins = resolver_joins, .resolver_block_ids = engine.resolver_block_ids, .resolver_op_ids = engine.resolver_op_ids, .resolver_join_ids = engine.resolver_join_ids, .demand_calls = engine.demand_calls, .demand_once = engine.demand_once, .demand_types = engine.demand_types, .demand_binary_left_types = engine.demand_binary_left_types, .demand_binary_left = engine.demand_binary_left, .loop_carries = loop_carries, .loop_ranges = engine.loop_ranges, .loop_exits = loop_exits, .statement_arms = statement_arms, .unit = unit, .associated = associated, .nominals = nominals, .contracts = contracts, .contract_predicates = contract_predicates, .contract_members = contract_members, .implementations = implementations, .implementation_predicates = implementation_predicates, .implementation_members = implementation_members, .member_templates = member_templates, .selected_proofs = selected_proofs, .selected_members = selected_members, .selected_edges = selected_edges, .selected_uses = selected_uses, .constructors = constructors, .constructor_resolved = engine.constructor_resolved, .projections = engine.projections, .access_paths = engine.access_paths, .access_nodes = engine.access_nodes, .access_types = engine.access_types, .projection_resolved = engine.projection_resolved, .projection_catalog = projection_catalog, .rebindings = engine.rebindings, .types = engine.types, .parameter_patterns = engine.parameter_patterns, .expr_types = engine.expr_types, .resolved = engine.resolved, .bindings = bindings, .merges = merges, .obligations = obligations, .diagnostics = diagnostics, .body_elaborations = engine.body_elaborations, .imported_schemes = if (source_validation) 0 else engine.catalogs.external_targets.count(), .counters = counters: {
-        var counters = engine.counters;
-        counters.inference_steps = engine.inference_transitions + engine.types.projection_steps;
-        counters.associated_steps = engine.types.projection_steps;
-        break :counters counters;
-    } };
+    checked.proof_contracts = try engine.proof_contracts.toOwnedSlice(allocator);
+    checked.proof_bodies = try engine.proof_body.take(allocator);
+    checked.usage_loans = try engine.usage_loans.toOwnedSlice(allocator);
+    checked.generative_bindings = try allocator.dupe(@import("generative_schemes.zig").Binder, engine.generative_bindings.items);
+
     if (!source_validation and engine.initializer_rejected) {
         var rejected = try rejectedSource(allocator, checked.diagnostics);
         rejected.initializer_rejected = true;

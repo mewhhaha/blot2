@@ -155,16 +155,109 @@ all 2,499 native tests compiled: `syntax` **25.25 s** (9 native/13 guests),
 `type-effects` **25.98 s** (9 native/7 guests), and `body-checking` **17.65 s**
 (8 native/1 guest). Reports are `build/bench/shards-areas-AREA/results.json`.
 The existing `static-sharing` family also passes in **28.51 s**, executing all
-16 native laws and 45 guests through the updated workflow.
-All 51 compiler-tooling tests pass, including the integrated full-gate
+16 native laws and 45 guests through the updated workflow. All 51
+compiler-tooling tests pass, including the integrated full-gate
 failure/repair/resume/native-edit sequence. These are measured development runs,
 not a cold-build or p95 guarantee.
 
-The real complete-inventory execution passes all **2,499 native tests in
-172.81 s**, split into 1,250 and 1,249 tests with a measured peak of two active
-shards. This census uses sampled allocation failures and does not qualify a
-release. Source and executable digests stayed unchanged during the measurement.
-Raw per-shard logs and intervals are retained under
-`build/bench/shards-areas-census`; `results.json` records exact inventory coverage
-and `pins.json` records the before/after identity checks. Full exhaustive-OOM
-timing remains to be measured in the next necessary release qualification.
+The real complete-inventory execution passes all **2,499 native tests in 172.81
+s**, split into 1,250 and 1,249 tests with a measured peak of two active shards.
+This census uses sampled allocation failures and does not qualify a release.
+Source and executable digests stayed unchanged during the measurement. Raw
+per-shard logs and intervals are retained under
+`build/bench/shards-areas-census`; `results.json` records exact inventory
+coverage and `pins.json` records the before/after identity checks. Full
+exhaustive-OOM timing remains to be measured in the next necessary release
+qualification.
+
+## Compiler cleanup and generic expansion
+
+The compiler build-cost repair removes two sources of generated-code growth.
+`package_core` now adapts its public contexts to one concrete internal context,
+so anonymous caller structs no longer instantiate nine recursive walkers.
+`checkEngine` uses one non-inlined teardown for its initialized owner. Direct
+owners move into `Checked` together; subsequent fallible publications fill empty
+fields and drain the corresponding engine lists. A failed publication destroys
+the transferred fields and the remaining engine state once each. Temporary
+owners retain their cleanup order and scratch-pool lifetime.
+
+Dependency decoding and Core cloning now share a non-inlined destructor for the
+initialized field prefix. The body auxiliary owner destructor also stays outside
+its unrolled capture loop. These changes retain field order, wire formats and
+allocation-failure behavior while avoiding repeated cleanup expansion.
+
+The final body-checking development run passes in **116.85 s**, including a
+**33.66 s** compiler rebuild and **70.37 s** compilation of all **2,510** native
+tests with Zig's backend. It executes the eight selected native laws, the guest
+with seven revisions, formatting, type checks and local lint. The full directory
+lint scan also passes with zero findings. All **24** selected checker/completion
+tests pass separately in exhaustive allocation-failure mode in **18.21 s**.
+These are local observations, not p95 claims or full release qualification.
+
+Raw evidence is under `build/bench/compiler-build-cost-body-pass`,
+`build/bench/compiler-build-cost-checker-oom`, and
+`build/bench/compiler-build-cost`. Earlier intermediate development runs failed
+lint and remain recorded as failures. An earlier extended OOM batch passed 53
+tests before its overall five-minute timeout; it remains incomplete.
+
+The complete sampled native run finished in **263.08 s**: 2,509 tests passed,
+and the shared allocation-meter test failed. Repeating that test reproduced
+three failures in 100 runs. Its comparison against an independent serial run
+assumed that the allocator's in-place growth decisions did not depend on
+allocation order. The corrected test sums plain per-job counters over the same
+operations observed by the shared counter; production allocator code is
+unchanged. All three memory tests pass 100 repetitions both standalone and in
+the rebuilt complete native executable. The resulting coverage record combines
+2,507 unchanged passing tests with those three rechecked tests, verifies the
+exact 2,510-name inventory, and preserves the original failed census. This is
+not a fresh whole-suite pass. See
+`build/bench/compiler-build-cost-meter/coverage.json` and
+`build/bench/compiler-build-cost-census/results.json`.
+
+The emitted Zig-backend function sizes confirm that the duplicated work was
+removed. Against the earlier inspected development binary:
+
+| Code                       |                  Earlier bytes |                        Current bytes |
+| -------------------------- | -----------------------------: | -----------------------------------: |
+| `checkEngine`              |                        612,984 | 46,751, plus 9,053 in shared cleanup |
+| All `Walker` methods       | 3,417,823 across nine families |                380,027 in one family |
+| Largest decoder instance   |                        448,364 |                               43,751 |
+| Largest Core-copy instance |                        294,180 |                               19,830 |
+
+These are emitted-code measurements, not whole-build speedup ratios. The older
+binary differs elsewhere in the pending compiler work. The partial-field
+destructors add 81,532 bytes across all their concrete types; their cost is
+shared across failure sites. See `compiler-build-cost/symbol-summary.json`.
+
+The isolated LLVM/Fast release attempt **did not finish within its 600-second
+budget** and was terminated at **600.17 s**. No completed release build or LLVM
+pass timing report was produced, so no end-to-end LLVM speedup is established.
+The earlier 27/37-minute observations also used different sources and concurrent
+build work. The canonical earlier release executable was preserved. The command
+and failed result are in `build/bench/compiler-build-cost-release/results.json`.
+
+The largest remaining Zig-backend function is `body_check_cache.captureBody` at
+**426,073 bytes**: 505 source lines, 18 error cleanups, 21 other cleanups and 77
+fallible calls. `wasm.Module.assemblePrepared` (152,069 bytes),
+`Engine.reuseBody` (125,793), and `code_artifacts.capture` (119,935) follow.
+Shared ownership cleanup in `captureBody` is the next concrete candidate to
+investigate. Static size does not establish which function dominates the
+remaining LLVM time. Release qualification and the full exhaustive-OOM gate
+remain pending.
+
+After the LLVM timeout, all **109** selected guest tests in **37** files pass
+with the Zig-backend compiler in **65.77 s**. They cover package/rank behavior,
+ownership, portable execution, staging, dependency reuse, edits, recovery and
+restart. JUnit coverage and unchanged source pins are recorded in
+`build/bench/compiler-build-cost/qualification-development-guests.json`. They do
+not qualify an LLVM release executable.
+
+For publication, an isolated export of the staged tree excludes the separate
+pending compiler repairs. Its Zig-backend compiler and complete 2,499-test
+native executable build successfully in 28 s and 44 s respectively. All 27
+selected checker, completion and memory tests pass with exhaustive allocation
+failures; all 153 selected guest tests in 41 files pass. The source working tree
+remains unchanged during these checks. Evidence is under
+`build/bench/build-cost-publication/`. This establishes focused validation of
+the published changes independently of the pending repairs; the full exhaustive
+gate and LLVM release qualification remain pending.
