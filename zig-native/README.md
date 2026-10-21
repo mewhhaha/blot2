@@ -35,6 +35,10 @@ supports `--test=EXACT_INVENTORY_NAME`, and records individual durations,
 leaks, logged errors and allocation-failure mode as `BLOT_NATIVE_TEST` JSON.
 `deno task check:dev --area static-sharing` runs a bounded development family
 with sampled allocation faults; full execution remains exhaustive by default.
+`--list-areas` also lists syntax, type/effect and retained body-checking families.
+The full Deno gate compiles once, then directly launches one to four native
+shards, verifies every inventory entry and records their actual overlap. Shard
+logs and completion records participate in verified resume evidence.
 
 For smaller native builds, use `-Dtest-suite=syntax`, `types` or `runtime` with
 `test` or `test-compile`. The default `all` remains the complete production

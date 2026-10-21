@@ -41,7 +41,10 @@ first/middle/last allocation-failure sampling, runs guest/client smoke and local
 static checks. Per-test durations and explicit pending full qualification are
 recorded in `build/bench/check-dev`. It fails rather than reporting an
 incomplete check as passed. See
-[the turnaround plan](DEVELOPMENT_TURNAROUND.md).
+[the turnaround plan](DEVELOPMENT_TURNAROUND.md). List focused areas with
+`deno task check:dev --list-areas`. Besides `static-sharing`, choose `syntax`,
+`type-effects` or `body-checking`; each runs existing positive,
+rejection/recovery and ownership regressions plus guests.
 
 For a smaller development check, run `deno task test:compiler:dev`. It checks
 the project protocol, client and inference-budget recovery against the
@@ -63,7 +66,12 @@ logs are written to `build/bench/iteration`; `--timings-dir PATH` keeps a
 separate record. Cached native results are reported explicitly. `--oom-profile`
 executes every native law and records the ten slowest allocation-failure sweeps;
 `--force-native` reruns native laws without profiling. The full gate is required
-before compiler commits.
+before compiler commits. Native execution launches the installed test binary
+directly in `--native-shards 1` through `--native-shards 4` isolated processes
+(default two). The gate verifies exact inventory coverage and records actual
+overlap and per-shard logs under `build/bench/iteration/native-execution`.
+Failures cancel sibling processes; resume requires unchanged raw evidence as
+well as inputs.
 
 All native unit-test compilation uses Safe/noLLVM, including the full gate. The
 full gate retains exhaustive allocation-failure sweeps. Select `syntax`, `types`

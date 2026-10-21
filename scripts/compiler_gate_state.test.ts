@@ -344,6 +344,8 @@ Deno.test("full runner resumes native qualification after a guest repair and inv
         "compiler_phase.ts",
         "compiler_gate_state.ts",
         "compiler_lease.ts",
+        "run_native_tests.ts",
+        "dev_check_areas.ts",
         "compiler_fixtures.ts",
         "build_compiler.ts",
       ]
@@ -364,6 +366,7 @@ Deno.test("full runner resumes native qualification after a guest repair and inv
         "compiler_fixtures",
         "build_compiler",
         "native_test_runner",
+        "run_native_tests",
         "check_dev",
         "lint_zig",
       ]
@@ -397,6 +400,23 @@ Deno.test("full runner resumes native qualification after a guest repair and inv
       'Deno.test("guest regression", () => { throw new Error("repair me"); });\n',
     );
     const calls = resolve(root, "build/native-calls");
+    const nativeFixture = resolve(root, "bin/native-fixture");
+    await Deno.writeTextFile(
+      nativeFixture,
+      `#!/bin/sh
+if [ "$1" = --list ]; then printf 'first\\nsecond\\n'; exit 0; fi
+printf 'test\\n' >> ${quote(calls)}
+shard=0
+for argument in "$@"; do
+  case "$argument" in --shard=*) shard=\${argument#--shard=};; esac
+done
+name=first
+if [ "$shard" = 1 ]; then name=second; fi
+printf 'BLOT_NATIVE_TEST\\t{"name":"%s","duration_ns":1,"status":"passed","leaks":0,"logged_errors":0,"allocation_failures":"full","sweeps":{"full_sweeps":0,"sampled_sweeps":0,"discovered_allocations":0,"fault_runs":0}}\\n' "$name" >&2
+printf 'BLOT_NATIVE_SHARD\\t{"shard":%s,"shards":2,"selected":1,"start_ns":1,"end_ns":2}\\n' "$shard" >&2
+`,
+    );
+    await Deno.chmod(nativeFixture, 0o755);
     const releaseStarted = resolve(root, "build/release-started");
     const zig = resolve(root, "bin/zig");
     const environment = `.{ .zig_exe = ${JSON.stringify(zig)}, .lib_dir = ${
@@ -422,7 +442,7 @@ if [ "$2" = test-compile ]; then
 fi
 if [ "$2" = test-compile ] || [ "$2" = test ]; then
   /bin/mkdir -p zig-out-native-dev/bin
-  printf 'verified native binary\\n' > zig-out-native-dev/bin/blot-tests
+  /bin/cp ${quote(nativeFixture)} zig-out-native-dev/bin/blot-tests
   printf '%s\\n' "$2" >> ${quote(calls)}
 fi
 `,
@@ -468,7 +488,7 @@ fi
       "guests",
       new TextDecoder().decode(failed.result.stderr),
     );
-    assert.equal(await Deno.readTextFile(calls), "test-compile\ntest\n");
+    assert.equal(await Deno.readTextFile(calls), "test-compile\ntest\ntest\n");
     await Deno.writeTextFile(
       guest,
       'Deno.test("guest regression", () => {});\n',
@@ -489,7 +509,7 @@ fi
         "resumed",
       );
     }
-    assert.equal(await Deno.readTextFile(calls), "test-compile\ntest\n");
+    assert.equal(await Deno.readTextFile(calls), "test-compile\ntest\ntest\n");
     await Deno.writeTextFile(source, "native source after edit");
     const changed = await run();
     assert.equal(
@@ -499,7 +519,7 @@ fi
     );
     assert.equal(
       await Deno.readTextFile(calls),
-      "test-compile\ntest\ntest-compile\ntest\n",
+      "test-compile\ntest\ntest\ntest-compile\ntest\ntest\n",
     );
   } finally {
     await Deno.remove(root, { recursive: true });

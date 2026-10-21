@@ -87,6 +87,8 @@ export async function nativeInputs(root: string): Promise<string[]> {
     "scripts/compiler_phase.ts",
     "scripts/compiler_gate_state.ts",
     "scripts/compiler_lease.ts",
+    "scripts/run_native_tests.ts",
+    "scripts/dev_check_areas.ts",
   ].map((path) => resolve(root, path));
   // Compilation can import ignored files. Parser corpus laws also read sibling
   // gdev source, including their alternative lookup from a native working dir.

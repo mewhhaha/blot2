@@ -30,6 +30,8 @@ type Controls = {
   seconds?: number;
   heartbeat?: number;
   signal?: AbortSignal;
+  // Supervisors must reap shard groups before their own parent terminates them.
+  forceCancel?: boolean;
 };
 
 export async function runPhase(
@@ -92,6 +94,10 @@ export async function runPhase(
     result.stopped = reason;
     console.error(`${name}: ${reason}; stopping process group`);
     cleanup = (async () => {
+      if (controls.forceCancel) {
+        await kill(true);
+        return;
+      }
       await kill(false);
       await new Promise((done) => setTimeout(done, 250));
       await kill(true);

@@ -8,6 +8,7 @@ import {
   nativeInputs,
 } from "./compiler_gate_state.ts";
 import { compilerLease } from "./compiler_lease.ts";
+import { fixturesForGuestFiles } from "./compiler_fixtures.ts";
 import {
   devCheckAreas,
   type NativeTestRecord,
@@ -39,15 +40,23 @@ async function main() {
       "budget-seconds": { type: "string", default: "300" },
       "timings-dir": { type: "string", default: "build/bench/check-dev" },
       help: { type: "boolean", default: false },
+      "list-areas": { type: "boolean", default: false },
     },
   });
-  if (values.help) {
+  if (values.help || values["list-areas"]) {
     console.log(
-      "check:dev [--area static-sharing] [--budget-seconds 300] [--timings-dir PATH]\nZig builds, complete native compilation, selected tests with sampled allocation faults, guest smoke and local static checks. Full qualification stays pending.",
+      "check:dev [--area NAME] [--list-areas] [--budget-seconds 300] [--timings-dir PATH]\nZig builds, complete native compilation, selected tests with sampled allocation faults, guests and local static checks. Full qualification stays pending.",
     );
+    for (const [name, area] of Object.entries(devCheckAreas)) {
+      console.log(
+        `${name}: ${area.description} (${area.native.length} native laws, ${area.guests.length} guest files)`,
+      );
+    }
     return;
   }
-  const area = devCheckAreas[values.area as keyof typeof devCheckAreas];
+  const area = Object.hasOwn(devCheckAreas, values.area)
+    ? devCheckAreas[values.area as keyof typeof devCheckAreas]
+    : undefined;
   if (!area) throw new Error(`Unknown development area: ${values.area}`);
   const budget = Number(values["budget-seconds"]);
   if (!Number.isFinite(budget) || budget <= 0 || budget > 300) {
@@ -62,6 +71,7 @@ async function main() {
   const report = {
     started_at: new Date().toISOString(),
     area: values.area,
+    area_description: area.description,
     backend: "noLLVM",
     deno_runtime: Deno.version,
     allocation_failures: "sampled",
@@ -173,7 +183,7 @@ async function main() {
       "--allow-run=zig",
       "scripts/build_compiler.ts",
       "--dev",
-      "--fixtures=",
+      `--fixtures=${fixturesForGuestFiles(area.guests).join(",")}`,
       "--jobs=2",
     ], (buildDeadline - performance.now()) / 1000);
     await phase(
@@ -258,12 +268,17 @@ async function main() {
         ),
       );
     };
-    await guestPhase(
-      "guest-smoke",
-      area.guests.filter((file) => !area.guestFilters[file]),
+    const unfilteredGuests = area.guests.filter((file) =>
+      !area.guestFilters[file]
     );
-    for (const [file, filter] of Object.entries(area.guestFilters)) {
-      await guestPhase("guest-client", [file], filter);
+    if (unfilteredGuests.length) {
+      await guestPhase("guest-smoke", unfilteredGuests);
+    }
+    for (
+      const [index, [file, filter]] of Object.entries(area.guestFilters)
+        .entries()
+    ) {
+      await guestPhase(`guest-selected-${index}`, [file], filter);
     }
     // Cold analyzer caches may use time saved by focused native/guest checks.
     const analysisDeadline = started + budget * 1000;

@@ -7,6 +7,28 @@ import {
   verifyNativeSelection,
 } from "./dev_check_areas.ts";
 
+Deno.test("development areas are discoverable and unknown names fail before building", async () => {
+  const run = (...args: string[]) =>
+    new Deno.Command(Deno.execPath(), {
+      args: ["run", "scripts/check_dev.ts", ...args],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+  const listed = await run("--list-areas");
+  assert.equal(listed.code, 0, new TextDecoder().decode(listed.stderr));
+  for (const name of Object.keys(devCheckAreas)) {
+    assert(new TextDecoder().decode(listed.stdout).includes(`${name}:`));
+  }
+  for (const name of ["missing-area", "toString"]) {
+    const invalid = await run("--area", name);
+    assert.notEqual(invalid.code, 0);
+    assert.match(
+      new TextDecoder().decode(invalid.stderr),
+      /Unknown development area/,
+    );
+  }
+});
+
 Deno.test("guest evidence rejects zero-test filters, skipped tests and missing files", () => {
   const xml =
     '<testsuites><testsuite><testcase name="selected client" classname="./client.test.ts"></testcase></testsuite></testsuites>';

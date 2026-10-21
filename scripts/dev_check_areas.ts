@@ -1,6 +1,8 @@
 /** Explicit regression families. A development pass never qualifies the full tree. */
 export const devCheckAreas = {
   "static-sharing": {
+    description:
+      "Static aggregate sharing, retained replay, admission and fault-policy laws.",
     native: [
       "backend.aggregate_constant_tests.test.retained callers replay aggregate constants with fresh-identical data through allocation failures",
       "backend.aggregate_constant_tests.test.aggregate constants with changed values aliases or nominal payloads rebuild their callers",
@@ -27,6 +29,67 @@ export const devCheckAreas = {
     guestFilters: {
       "zig-native/tests/zig_project_client.test.ts":
         "Zig project client queues revisions and preserves entry edit/error/missing/correction bytes",
+    } as Record<string, string>,
+  },
+  "syntax": {
+    "description":
+      "Lexer/parser structure, recovery, immutable trees and allocation ownership.",
+    "native": [
+      "parse.lexer_tests.test.flat tokens preserve longest matches and source byte spans",
+      "parse.lexer_tests.test.invalid layout, private markers, strings and Unicode report diagnostics",
+      "parse.lexer_tests.test.all lexer allocation failures release tokens, trivia and scratch",
+      "parse.parser_tests.test.surface syntax preserves nested blocks patterns loops and handlers",
+      "parse.parser_tests.test.malformed syntax reports diagnostics and preserves later declarations",
+      "parse.parser_tests.test.parser allocation failures release trees symbols and scratch stacks",
+      "parse.parser_adjacent_call_tests.test.retained adjacent-call tree stays immutable across another parse and teardown",
+      "parse.syntax_diagnostics_tests.test.UTF16 publication counts supplementary scalars and declines split byte boundaries",
+      "parse.source_operators_tests.test.source fixity validation releases every failed allocation for successful and rejected graphs",
+    ],
+    "guests": [
+      "compiler/syntax.test.ts",
+      "zig-native/tests/annotation_arity_execution.test.ts",
+    ],
+    "guestFilters": {} as Record<string, string>,
+  },
+  "type-effects": {
+    "description":
+      "Type identity, substitution, effect-row rollback and owned evidence.",
+    "native": [
+      "check.types_tests.test.principal scheme substitution creates independent uses",
+      "check.types_tests.test.occurs and mismatch rollback preserve prior constraints",
+      "check.types_tests.test.rejected function effect rows roll back type and row writes and shared chronology",
+      "check.types_tests.test.value and effect quantifiers freshen independently without accidental numeric identity",
+      "check.types_tests.test.aggregate occurs checks and rejected shapes leave the complete region unchanged",
+      "check.types_tests.test.shared type substitution stays linear and releases scratch on allocation failure",
+      "check.types_tests.test.selected identity terms preserve alias edges and reject independent roots transactionally through OOM",
+      "check.types_tests.test.owned higher rank row binders retain alpha scope substitution and independent solving through OOM",
+      "check.effect_unification_tests.test.row views retain source order and multiplicity through wide permutations failures and recovery",
+    ],
+    "guests": [
+      "zig-native/tests/type_identity_execution.test.ts",
+      "zig-native/tests/symbolic_effect_rows.test.ts",
+    ],
+    "guestFilters": {} as Record<string, string>,
+  },
+  "body-checking": {
+    "description":
+      "Retained body reuse, interface invalidation, relocation and failed-revision recovery.",
+    "native": [
+      "reuse.body_check_cache_tests.test.body check cache copied owners survive allocation failures and unchanged revisions",
+      "reuse.body_check_cache_tests.test.body check cache ownership survives all allocation failures",
+      "reuse.body_check_cache_tests.test.body check cache relocates generic principal binders and independently specializes consumers",
+      "reuse.body_check_cache_tests.test.body check cache relocates symbolic callback effects without closing them",
+      "reuse.body_check_cache_tests.test.body check cache consumes selected evidence and revokes candidate interface or presence edits",
+      "reuse.body_check_cache_tests.test.body check cache static operation calls reject retargeted imported aliases through OOM",
+      "reuse.body_check_cache_tests.test.body check cache opaque storage roles revoke scalar to reference consumers",
+      "reuse.body_check_cache_tests.test.body check cache user operation rows reject unknown ambiguous and malformed catalog authority",
+    ],
+    "guests": [
+      "zig-native/tests/body_check_cache.test.ts",
+    ],
+    "guestFilters": {
+      "zig-native/tests/body_check_cache.test.ts":
+        "body checker reuse relocates and follows executable edits through rejected revisions",
     } as Record<string, string>,
   },
 } as const;

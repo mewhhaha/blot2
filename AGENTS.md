@@ -11,6 +11,9 @@
   cycle. It compiles the complete native inventory once, runs an explicit
   regression family with sampled allocation faults, guests and local checks. It
   reports full qualification as pending. An incomplete run is not a pass.
+- Use `deno task check:dev --list-areas` to choose `syntax`, `type-effects`,
+  `body-checking` or `static-sharing`. These are explicit regression families,
+  not whole-subsystem qualification. Add the affected laws when expanding scope.
 - Reserve LLVM (`-Dllvm=true`) for the actual final release compiler and release
   performance measurements. Use `deno task build:compiler` for releases; qualify
   the final candidate with `deno task test:compiler`.
@@ -25,6 +28,10 @@
   `-Dllvm=false --prefix zig-out-native-dev`, catching generic mock/interface
   errors outside focused tests. Full native execution defaults to exhaustive
   allocation-failure sweeps; sampled development checks never replace it.
+- The full gate directly schedules the installed native binary in one to four
+  isolated shards (`--native-shards`, default two). It verifies the exact
+  inventory, shard completion and fault mode, and pins raw shard evidence in the
+  resume journal. Native failures or cancellation terminate sibling groups.
 - The installed test binary supports `--test=EXACT_INVENTORY_NAME` and emits
   `BLOT_NATIVE_TEST` timing records. Prefer runtime selection over creating a
   separate large executable for each filter. Keep correctness boundary cases

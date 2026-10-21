@@ -14,6 +14,7 @@ import {
 } from "./compiler_gate_state.ts";
 import { fixturesForGuestFiles } from "./compiler_fixtures.ts";
 import { compilerLease } from "./compiler_lease.ts";
+import { nativeExecutionArtifacts } from "./run_native_tests.ts";
 export { cacheStatus, runPhase } from "./compiler_phase.ts";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -274,6 +275,7 @@ async function main() {
   const journal = new NativeJournal(
     resolve(directory, "native-successes.json"),
   );
+  const nativeExecutionDirectory = resolve(directory, "native-execution");
   await journal.load();
   const started = performance.now();
   const controller = new AbortController();
@@ -408,11 +410,17 @@ async function main() {
             "Native executable changed during execution; retry qualification",
           );
         }
+        const artifacts = name === "native-run"
+          ? [
+            binary,
+            ...await nativeExecutionArtifacts(nativeExecutionDirectory),
+          ]
+          : [binary];
         if (result.cache !== "resumed") {
-          await journal.record(key, result, [binary]);
+          await journal.record(key, result, artifacts);
         }
         const outputs: Record<string, string> = {};
-        for (const path of [binary, result.stdout, result.stderr]) {
+        for (const path of [...artifacts, result.stdout, result.stderr]) {
           outputs[path] = await fileDigest(path);
         }
         report.native_qualification[name] = { key, outputs };
@@ -542,6 +550,7 @@ async function main() {
           "scripts/compiler_fixtures.test.ts",
           "scripts/build_compiler.test.ts",
           "scripts/native_test_runner.test.ts",
+          "scripts/run_native_tests.test.ts",
           "scripts/check_dev.test.ts",
           "scripts/lint_zig.test.ts",
         ]);
@@ -557,8 +566,25 @@ async function main() {
         const laws = () =>
           phase(
             "native-run",
-            ["zig", "build", "test", ...nativeOptions],
-            native,
+            [
+              Deno.execPath(),
+              "run",
+              "--allow-read",
+              "--allow-write",
+              "--allow-run",
+              "--allow-env",
+              "scripts/run_native_tests.ts",
+              "--binary",
+              resolve(native, "zig-out-native-dev/bin/blot-tests"),
+              "--shards",
+              String(shards),
+              "--allocation-failures",
+              "full",
+              "--budget-seconds",
+              String(phaseBudget),
+              "--timings-dir",
+              nativeExecutionDirectory,
+            ],
           );
         if (values.serial) {
           await compile();
