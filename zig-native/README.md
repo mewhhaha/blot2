@@ -12,25 +12,35 @@ deno task test:compiler
 ```
 
 Without Deno, build in this directory with
-`zig build install compiler-identity -Doptimize=fast`. Run native tests with
-`zig build test -Doptimize=safe`; the runner sets the fixture working directory.
-Use `deno task test:compiler:dev` from the root for incremental Safe/noLLVM
-development and focused laws. `zig build test-compile -Doptimize=safe` builds
-the native test binary separately. Native tests import immutable inputs through
+`zig build install compiler-identity -Doptimize=fast -Dllvm=true` for a final
+release. Development always uses Zig's native backend without LLVM: build with
+`zig build install compiler-identity -Doptimize=safe -Dllvm=false --prefix zig-out-dev`.
+Run development native tests with
+`zig build test -Doptimize=safe -Dllvm=false --prefix zig-out-native-dev`;
+the runner sets the fixture working directory.
+Use `deno task test:compiler:dev` from the root for Safe/noLLVM
+development and focused laws. Add `-Dllvm=false --prefix zig-out-native-dev`
+to a development `zig build test-compile -Doptimize=safe` to build the native
+test binary separately. Native tests import immutable inputs through
 the `fixtures` module rooted at `fixtures/root.zig`; production builds have no
 fixture-module dependency. All 126 Blot fixtures and both frozen oracle files
 live outside `src/`. Their relocation byte manifest and focused discovery checks
 are in `build/bench/finish-rest-20261015/fixture-relocation/`. The full gate
 still qualifies the final combined source.
-`zig build test -Doptimize=safe
--Doom-profile=true -Dtest-force-run=true --summary all`
+For full native qualification, `zig build test -Doptimize=safe -Dllvm=false
+--prefix zig-out-native-dev -Doom-profile=true -Dtest-force-run=true --summary all`
 reports allocation-failure sweep timings while running the full suite.
+Native unit tests always compile with Zig's backend. The installed executable
+supports `--test=EXACT_INVENTORY_NAME`, and records individual durations,
+leaks, logged errors and allocation-failure mode as `BLOT_NATIVE_TEST` JSON.
+`deno task check:dev --area static-sharing` runs a bounded development family
+with sampled allocation faults; full execution remains exhaustive by default.
 
 For smaller native builds, use `-Dtest-suite=syntax`, `types` or `runtime` with
 `test` or `test-compile`. The default `all` remains the complete production
-suite. `deno task test:compiler:dev --native-suite types` selects an incremental
-Safe/noLLVM check; add `--native-llvm` for faster execution of long fault
-sweeps.
+suite. `deno task test:compiler:dev --native-suite types` selects a
+Safe/noLLVM check. Reserve LLVM for the actual final release compiler and release
+performance measurements.
 
 `blotc build ENTRY OUTPUT.wasm --prelude std/prelude.blot --std-root std`
 compiles a project. `dependencies ENTRY OUTPUT.blotdep` produces reusable typed

@@ -3,18 +3,35 @@ import { isAbsolute, relative, resolve } from "node:path";
 import type { Phase } from "./compiler_phase.ts";
 
 export async function fileDigest(path: string): Promise<string> {
+  return bufferedDigest(path, new Uint8Array(1024 * 1024));
+}
+
+async function bufferedDigest(
+  path: string,
+  buffer: Uint8Array,
+): Promise<string> {
   const hash = createHash("sha256");
   const file = await Deno.open(path);
-  for await (const bytes of file.readable) hash.update(bytes);
+  try {
+    let length: number | null;
+    while ((length = await file.read(buffer)) !== null) {
+      hash.update(buffer.subarray(0, length));
+    }
+  } finally {
+    file.close();
+  }
   return hash.digest("hex");
 }
 
 export async function inputDigest(paths: string[]): Promise<string> {
   const hash = createHash("sha256");
+  // Reuse a bounded buffer across source files. Large executable digests use a
+  // larger buffer above to avoid thousands of small stream reads and promises.
+  const buffer = new Uint8Array(64 * 1024);
   for (const path of [...new Set(paths)].sort()) {
     hash.update(JSON.stringify(path));
     try {
-      hash.update(await fileDigest(path));
+      hash.update(await bufferedDigest(path, buffer));
     } catch (error) {
       if (!(error instanceof Deno.errors.NotFound)) throw error;
       hash.update("missing");
@@ -69,6 +86,7 @@ export async function nativeInputs(root: string): Promise<string[]> {
     "scripts/test_compiler.ts",
     "scripts/compiler_phase.ts",
     "scripts/compiler_gate_state.ts",
+    "scripts/compiler_lease.ts",
   ].map((path) => resolve(root, path));
   // Compilation can import ignored files. Parser corpus laws also read sibling
   // gdev source, including their alternative lookup from a native working dir.

@@ -2,6 +2,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const testing = std.testing;
+pub const native_test_policy = @import("native_test_policy.zig");
+const policy = native_test_policy;
 
 pub const std_options: std.Options = .{ .logFn = log };
 var logged_errors: usize = 0;
@@ -13,6 +15,21 @@ pub fn log(comptime level: std.log.Level, comptime scope: @EnumLiteral(), compti
 }
 
 pub fn main(init: std.process.Init) !void {
+    const Outcome = struct {
+        result: anyerror!void = {},
+        fn execute(self: *@This(), started: std.process.Init) void {
+            self.result = run(started);
+        }
+    };
+    var outcome: Outcome = .{};
+    // Match src/main.zig: evaluator recursion limits assume the compiler's
+    // reserved stack, not the host's 8 MiB main stack. Pages commit on demand.
+    const thread = try std.Thread.spawn(.{ .stack_size = 1 << 30 }, Outcome.execute, .{ &outcome, init });
+    thread.join();
+    return outcome.result;
+}
+
+fn run(init: std.process.Init) !void {
     @disableInstrumentation();
     const args = try init.minimal.args.toSlice(init.arena.allocator());
     var shard: usize = 0;
@@ -27,6 +44,14 @@ pub fn main(init: std.process.Init) !void {
             shards = try std.fmt.parseInt(usize, arg[9..], 10);
         } else if (std.mem.startsWith(u8, arg, "--seed=")) {
             testing.random_seed = try std.fmt.parseInt(u32, arg[7..], 0);
+        } else if (std.mem.startsWith(u8, arg, "--test=")) {
+            var found = false;
+            for (builtin.test_functions) |test_fn| {
+                if (std.mem.eql(u8, test_fn.name, arg[7..])) found = true;
+            }
+            if (!found) return error.UnknownNativeTest;
+        } else if (std.mem.startsWith(u8, arg, "--allocation-failures=")) {
+            policy.fault_mode = std.meta.stringToEnum(policy.FaultMode, arg[22..]) orelse return error.InvalidAllocationFailureMode;
         } else return error.InvalidTestRunnerArgument;
     }
     if (shards == 0 or shard >= shards) return error.InvalidTestShard;
@@ -42,40 +67,68 @@ pub fn main(init: std.process.Init) !void {
     var selected: usize = 0;
     for (builtin.test_functions, 0..) |test_fn, index| {
         if (index % shards != shard) continue;
+        var has_selection = false;
+        var matches = false;
+        for (args[1..]) |arg| {
+            if (!std.mem.startsWith(u8, arg, "--test=")) continue;
+            has_selection = true;
+            if (std.mem.eql(u8, test_fn.name, arg[7..])) matches = true;
+        }
+        if (has_selection and !matches) continue;
         selected += 1;
         if (list) {
             try std.Io.File.stdout().writeStreamingAll(init.io, test_fn.name);
             try std.Io.File.stdout().writeStreamingAll(init.io, "\n");
             continue;
         }
-        testing.allocator_instance = .init(std.heap.page_allocator, .{
-            .canary = 0xc3a701ba,
-            .check_write_after_free = true,
-        });
-        testing.io_instance = .init(testing.allocator, .{
-            .argv0 = .init(init.minimal.args),
-            .environ = init.minimal.environ,
-        });
-        testing.environ = init.minimal.environ;
-        testing.log_level = .warn;
-        defer {
-            testing.io_instance.deinit();
-            if (testing.allocator_instance.deinit() != 0) leaks += 1;
-        }
-        std.debug.print("{d}/{d} {s}...", .{ index + 1, builtin.test_functions.len, test_fn.name });
-        if (test_fn.func()) |_| {
-            passed += 1;
-            std.debug.print("OK\n", .{});
-        } else |err| {
-            if (err == error.SkipZigTest) {
-                skipped += 1;
-                std.debug.print("SKIP\n", .{});
-            } else {
-                failed += 1;
-                std.debug.print("FAIL ({t})\n", .{err});
-                if (@errorReturnTrace()) |trace| std.debug.dumpErrorReturnTrace(trace);
+        const test_started = std.Io.Clock.Timestamp.now(init.io, .awake);
+        const errors_before = logged_errors;
+        var test_leaks: usize = 0;
+        var status: enum { passed, skipped, failed } = .passed;
+        policy.counts = .{};
+        {
+            testing.allocator_instance = .init(std.heap.page_allocator, .{
+                .canary = 0xc3a701ba,
+                .check_write_after_free = true,
+            });
+            testing.io_instance = .init(testing.allocator, .{
+                .argv0 = .init(init.minimal.args),
+                .environ = init.minimal.environ,
+            });
+            testing.environ = init.minimal.environ;
+            testing.log_level = .warn;
+            defer {
+                testing.io_instance.deinit();
+                if (testing.allocator_instance.deinit() != 0) test_leaks += 1;
+            }
+            std.debug.print("{d}/{d} {s}...", .{ index + 1, builtin.test_functions.len, test_fn.name });
+            if (test_fn.func()) |_| {
+                passed += 1;
+                std.debug.print("OK\n", .{});
+            } else |err| {
+                if (err == error.SkipZigTest) {
+                    skipped += 1;
+                    status = .skipped;
+                    std.debug.print("SKIP\n", .{});
+                } else {
+                    failed += 1;
+                    status = .failed;
+                    std.debug.print("FAIL ({t})\n", .{err});
+                    if (@errorReturnTrace()) |trace| std.debug.dumpErrorReturnTrace(trace);
+                }
             }
         }
+        leaks += test_leaks;
+        const test_finished = std.Io.Clock.Timestamp.now(init.io, .awake);
+        std.debug.print("BLOT_NATIVE_TEST\t{f}\n", .{std.json.fmt(.{
+            .name = test_fn.name,
+            .duration_ns = test_finished.raw.nanoseconds - test_started.raw.nanoseconds,
+            .status = @tagName(status),
+            .leaks = test_leaks,
+            .logged_errors = logged_errors - errors_before,
+            .allocation_failures = @tagName(policy.fault_mode),
+            .sweeps = policy.counts,
+        }, .{})});
     }
     if (list) return;
     const finished = std.Io.Clock.Timestamp.now(init.io, .awake);

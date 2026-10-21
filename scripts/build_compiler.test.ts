@@ -46,6 +46,7 @@ fi
     assert.equal(selected.length, 1);
     assert.match(selected[0], /arena-fixture shared-rc-fixture/);
     assert.match(selected[0], /-fincremental/);
+    assert.match(selected[0], /-Dllvm=false/);
     assert.match(selected[0], /-j2/);
     assert.doesNotMatch(
       selected[0],
@@ -58,6 +59,7 @@ fi
     assert.doesNotMatch(empty[0], /-fixture/);
     const full = await run();
     assert.equal(full.length, 1);
+    assert.match(full[0], /-Dllvm=true/);
     assert.match(
       full[0],
       /arena-fixture shared-rc-fixture cohort-fixture list-runtime-fixture resource-retire-fixture/,

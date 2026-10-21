@@ -1,12 +1,48 @@
 import { strict as assert } from "node:assert";
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import {
   failedGuestFiles,
+  fileDigest,
   inputDigest,
   nativeInputs,
   NativeJournal,
 } from "./compiler_gate_state.ts";
 import { runPhase, together } from "./compiler_phase.ts";
+
+Deno.test("buffered identities preserve SHA-256 across chunk boundaries and same-size edits", async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-digest-" });
+  try {
+    const path = resolve(directory, "input");
+    for (
+      const length of [0, 1, 65535, 65536, 65537, 1048575, 1048576, 1048577]
+    ) {
+      const bytes = Uint8Array.from({ length }, (_, index) => index % 251);
+      await Deno.writeFile(path, bytes);
+      const expected = createHash("sha256").update(bytes).digest("hex");
+      assert.equal(await fileDigest(path), expected);
+      const missing = resolve(directory, "missing");
+      const aggregate = createHash("sha256");
+      for (const name of [path, missing].sort()) {
+        aggregate.update(JSON.stringify(name));
+        aggregate.update(name === path ? expected : "missing");
+      }
+      assert.equal(
+        await inputDigest([missing, path, path]),
+        aggregate.digest("hex"),
+      );
+    }
+    const before = await inputDigest([path]);
+    const stat = await Deno.stat(path);
+    const changed = await Deno.readFile(path);
+    changed[changed.length - 1] ^= 1;
+    await Deno.writeFile(path, changed);
+    await Deno.utime(path, stat.atime!, stat.mtime!);
+    assert.notEqual(await inputDigest([path]), before);
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
 
 Deno.test("resume requires completed laws and exact binary, logs and input identity", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-gate-resume-" });
@@ -307,6 +343,7 @@ Deno.test("full runner resumes native qualification after a guest repair and inv
         "test_compiler.ts",
         "compiler_phase.ts",
         "compiler_gate_state.ts",
+        "compiler_lease.ts",
         "compiler_fixtures.ts",
         "build_compiler.ts",
       ]
@@ -327,6 +364,7 @@ Deno.test("full runner resumes native qualification after a guest repair and inv
         "compiler_fixtures",
         "build_compiler",
         "native_test_runner",
+        "check_dev",
         "lint_zig",
       ]
     ) {
@@ -383,13 +421,16 @@ if [ "$2" = test-compile ]; then
   done
 fi
 if [ "$2" = test-compile ] || [ "$2" = test ]; then
-  /bin/mkdir -p zig-out/bin
-  printf 'verified native binary\\n' > zig-out/bin/blot-tests
+  /bin/mkdir -p zig-out-native-dev/bin
+  printf 'verified native binary\\n' > zig-out-native-dev/bin/blot-tests
   printf '%s\\n' "$2" >> ${quote(calls)}
 fi
 `,
     );
     await Deno.chmod(zig, 0o755);
+    // This fixture exercises recovery, including cold Deno startup and checks
+    // of its synthetic modules. The short deadline and descendant-kill laws
+    // above test timer behavior independently.
     const run = async () => {
       try {
         await Deno.remove(releaseStarted);
@@ -407,7 +448,7 @@ fi
           "scripts/test_compiler.ts",
           "--resume",
           "--budget-seconds",
-          "30",
+          "120",
         ],
         env: { PATH: `${resolve(root, "bin")}:${Deno.env.get("PATH")}` },
         stdout: "piped",

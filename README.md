@@ -28,20 +28,30 @@ project selects its prelude explicitly; omission means no prelude. See
 [bpm](compiler/packages.md).
 
 Without a manifest, the Deno CLI supplies the standard prelude by default; the
-raw executable requires `--prelude std/prelude.blot --std-root std`.
-`deno task build:compiler:dev` enables Zig's incremental compiler build in
-`zig-native/zig-out-dev` for development. Release measurements use
-`deno task build:compiler`.
+raw executable requires `--prelude std/prelude.blot --std-root std`. Always use
+`deno task build:compiler:dev` for development. It uses Zig's native backend
+without LLVM and writes to `zig-native/zig-out-dev`. Add `--incremental` to
+enable Zig's experimental incremental compilation. Final releases and release
+measurements use LLVM through `deno task build:compiler`.
 
-For a quick development check, run `deno task test:compiler:dev`. It checks the
-project protocol, client and inference-budget recovery against the incremental
+For a five-minute development cycle, run
+`deno task check:dev --area static-sharing`. It compiles the complete native
+inventory with Zig, executes the affected regression family with
+first/middle/last allocation-failure sampling, runs guest/client smoke and local
+static checks. Per-test durations and explicit pending full qualification are
+recorded in `build/bench/check-dev`. It fails rather than reporting an
+incomplete check as passed. See
+[the turnaround plan](DEVELOPMENT_TURNAROUND.md).
+
+For a smaller development check, run `deno task test:compiler:dev`. It checks
+the project protocol, client and inference-budget recovery against the
 Safe/noLLVM compiler. Select guest files and native laws when working on a
 particular area:
 
 ```sh
 deno task test:compiler:dev --native-filter "test name" zig-native/tests/list_runtime.test.ts
 deno task test:compiler:dev --native-suite syntax
-deno task test:compiler:dev --native-suite types --native-llvm
+deno task test:compiler:dev --native-suite types
 deno task test:compiler
 deno task test:compiler --oom-profile
 ```
@@ -55,11 +65,14 @@ executes every native law and records the ten slowest allocation-failure sweeps;
 `--force-native` reruns native laws without profiling. The full gate is required
 before compiler commits.
 
-Focused native checks default to incremental Safe/noLLVM. Select `syntax`,
-`types` or `runtime` with `--native-suite` to compile only that subsystem; `all`
-keeps every native law. For long-running fault sweeps, `--native-llvm` trades
-slower compilation for faster execution. The full gate retains LLVM and the
-complete production suite.
+All native unit-test compilation uses Safe/noLLVM, including the full gate. The
+full gate retains exhaustive allocation-failure sweeps. Select `syntax`, `types`
+or `runtime` with `--native-suite` to compile only that subsystem; `all` keeps
+every native law. `deno task test:native` also uses the Zig backend and installs
+its test executable separately in `zig-native/zig-out-native-dev`. Reserve LLVM
+for the actual release compiler and release measurements. The installed native
+executable accepts `--test=EXACT_INVENTORY_NAME` and emits a `BLOT_NATIVE_TEST`
+JSON timing/result line for each executed law.
 
 Inference-budget rejection and recovery use a small-budget executable fixture.
 `deno task test:compiler:stress` separately checks the production million-step

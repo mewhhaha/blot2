@@ -1,5 +1,11 @@
 import { strict as assert } from "node:assert";
-import { cacheStatus, runPhase, sweepTimings } from "./test_compiler.ts";
+import { compilerLease } from "./compiler_lease.ts";
+import {
+  cacheStatus,
+  nativeBuildOptions,
+  runPhase,
+  sweepTimings,
+} from "./test_compiler.ts";
 
 async function simulatedGate(
   args: string[],
@@ -87,6 +93,14 @@ async function simulatedGate(
   }
 }
 
+Deno.test("full gate rejects busy artifacts before starting its smoke build", async () => {
+  await using lease = await compilerLease(Deno.cwd());
+  const result = await simulatedGate([]);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /busy.*no build was queued/);
+  assert.deepEqual(result.commands, []);
+});
+
 Deno.test("selected development native laws skip compiler builds and guests", async () => {
   const result = await simulatedGate([
     "--dev",
@@ -111,7 +125,6 @@ Deno.test("selected development native laws skip compiler builds and guests", as
     "-j2",
     "-Dtest-shards=2",
     "-Dllvm=false",
-    "-fincremental",
     "--prefix",
     "zig-out-native-dev",
     "-Dtest-suite=types",
@@ -129,22 +142,28 @@ Deno.test("selected development native laws skip compiler builds and guests", as
   );
 });
 
-Deno.test("native development selections preserve LLVM and forced execution options", async () => {
+Deno.test("native development selections force actual execution with Zig's backend", async () => {
   const result = await simulatedGate([
     "--dev",
     "--native-filter",
     "ownership",
-    "--native-llvm",
     "--force-native",
   ]);
   assert.equal(result.code, 0, result.stderr);
-  assert.equal(result.report.native_backend, "LLVM");
+  assert.equal(result.report.native_backend, "noLLVM");
   for (const command of result.commands.slice(1)) {
     assert(command.includes("-Dtest-filter=ownership"));
     assert(command.includes("-Dtest-force-run=true"));
-    assert(!command.includes("-Dllvm=false"));
+    assert(command.includes("-Dllvm=false"));
     assert(!command.includes("-fincremental"));
   }
+});
+
+Deno.test("full and focused native compilation share the Zig backend and installed artifact", () => {
+  const options = nativeBuildOptions(2, 2);
+  assert(options.includes("-Dllvm=false"));
+  assert(!options.includes("-Dllvm=true"));
+  assert.equal(options[options.indexOf("--prefix") + 1], "zig-out-native-dev");
 });
 
 Deno.test("native-only development rejects incompatible Zig before building", async () => {

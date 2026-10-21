@@ -1,5 +1,6 @@
 import { strict as assert } from "node:assert";
 import { fileURLToPath } from "node:url";
+import { nativeTestRecords } from "./dev_check_areas.ts";
 
 Deno.test("native runtime shards partition every test and propagate failures", async () => {
   const zig = Deno.env.get("ZIG") ?? "zig";
@@ -18,6 +19,12 @@ test "skipped" { return error.SkipZigTest; }
 test "allocator law" { if (std.testing.random_seed == 1) _ = try std.testing.allocator.alloc(u8, 8); }
 test "logging law" { if (std.testing.random_seed == 2) std.log.err("deliberate error", .{}); }
 test "panic law" { if (std.testing.random_seed == 3) @panic("deliberate panic"); }
+test "compile stack" {
+    var bytes: [16 * 1024 * 1024]u8 = undefined;
+    @memset(&bytes, 0xa5);
+    std.mem.doNotOptimizeAway(&bytes);
+    try std.testing.expect(bytes[0] == 0xa5 and bytes[bytes.len - 1] == 0xa5);
+}
 `,
     );
     const compileArgs = [
@@ -50,6 +57,21 @@ test "panic law" { if (std.testing.random_seed == 3) @panic("deliberate panic");
         Boolean,
       );
     const all = names(await run("--list"));
+    const selected = await run(
+      `--test=${all[0]}`,
+      "--allocation-failures=sampled",
+    );
+    assert.equal(selected.code, 0, new TextDecoder().decode(selected.stderr));
+    const selectedRecords = nativeTestRecords(
+      new TextDecoder().decode(selected.stderr),
+    );
+    assert.equal(selectedRecords.length, 1);
+    assert.equal(selectedRecords[0].name, all[0]);
+    assert.equal(selectedRecords[0].allocation_failures, "sampled");
+    assert.equal(selectedRecords[0].status, "passed");
+    assert(selectedRecords[0].duration_ns >= 0);
+    assert.notEqual((await run("--test=unknown")).code, 0);
+    assert.notEqual((await run("--allocation-failures=unknown")).code, 0);
     const left = names(await run("--list", "--shard=0", "--shards=2"));
     const right = names(await run("--list", "--shard=1", "--shards=2"));
     assert.deepEqual([...left, ...right].sort(), [...all].sort());
@@ -73,6 +95,10 @@ test "panic law" { if (std.testing.random_seed == 3) @panic("deliberate panic");
     );
     assert.equal(leak.code, 1);
     assert.match(new TextDecoder().decode(leak.stderr), /1 leaks/);
+    assert.equal(
+      nativeTestRecords(new TextDecoder().decode(leak.stderr))[0].leaks,
+      1,
+    );
     const logged = await run(
       `--shard=${loggingIndex}`,
       `--shards=${all.length}`,
@@ -80,6 +106,11 @@ test "panic law" { if (std.testing.random_seed == 3) @panic("deliberate panic");
     );
     assert.equal(logged.code, 1);
     assert.match(new TextDecoder().decode(logged.stderr), /1 logged errors/);
+    assert.equal(
+      nativeTestRecords(new TextDecoder().decode(logged.stderr))[0]
+        .logged_errors,
+      1,
+    );
     assert.notEqual(
       (await run(`--shard=${panicIndex}`, `--shards=${all.length}`, "--seed=3"))
         .code,

@@ -1432,7 +1432,13 @@ test "body check cache declines large local requirement receipts without changin
     try std.testing.expect(before.bodies.find("many") == null);
     const changed = try std.mem.replaceOwned(u8, a, source.items, "const seed = 2", "const seed = 3");
     defer a.free(changed);
-    try parity(source.items, changed, 2);
+    // Keep the 256-local budget boundary, but reuse the baseline already built
+    // above instead of making parity prepare the identical large body again.
+    var fresh = try prepare(a, changed, null);
+    defer fresh.deinit(a);
+    var expected = try compile(a, &fresh);
+    defer expected.deinit(a);
+    try compare(a, &before.bodies, changed, expected.bytes, 2);
 }
 
 test "body check cache local qualification routes require exact bounded source clauses" {

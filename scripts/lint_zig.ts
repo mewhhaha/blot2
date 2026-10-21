@@ -9,6 +9,29 @@ const fixtures = "zig-native/fixtures";
 type Graph = Map<string, string[]>;
 type Cache = { version: 2; tool: string; passed: Record<string, string[]> };
 
+// A shared allocator/test-helper edit can affect nearly every file. Starting
+// hundreds of analyzer processes is slower than the complete directory scan.
+export async function checkSelection(
+  paths: string[],
+  check: (path: string) => Promise<number>,
+): Promise<Map<string, number>> {
+  const results = new Map<string, number>();
+  if (paths.length < 32) {
+    for (const path of paths) results.set(path, await check(path));
+    return results;
+  }
+  for (const directory of [source, fixtures]) {
+    const members = paths.filter((path) => path.startsWith(directory + "/"));
+    if (!members.length) continue;
+    const code = await check(directory);
+    for (const path of members) results.set(path, code);
+  }
+  if (results.size !== paths.length) {
+    throw new Error("Unclassified Zig lint input");
+  }
+  return results;
+}
+
 function embeddedDirectories(text: string): string[] {
   return [...text.matchAll(/@embedFile\s*\(\s*"([^"\n]+\/)"\s*\+\+/g)].map((
     match,
@@ -370,6 +393,7 @@ export async function lint(args: string[]): Promise<number> {
     ),
   );
   const completed = new Map<string, string>();
+  const pending = new Map<string, string>();
   let checked = 0;
   let reused = 0;
   let failure = 0;
@@ -388,8 +412,20 @@ export async function lint(args: string[]): Promise<number> {
       reused++;
       continue;
     }
+    pending.set(path, stamp);
+  }
+  if (pending.size >= 32) {
+    console.log(
+      `Checking ${pending.size} affected files in directory batches.`,
+    );
+  }
+  const results = await checkSelection(
+    [...pending.keys()],
+    (path) => check(path, pending.size < 32),
+  );
+  for (const [path, stamp] of pending) {
     checked++;
-    const code = await check(path, true);
+    const code = results.get(path)!;
     if (code === 0) {
       completed.set(path, stamp);
     } else {

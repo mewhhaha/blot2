@@ -13,6 +13,7 @@ import {
   recentFailures,
 } from "./compiler_gate_state.ts";
 import { fixturesForGuestFiles } from "./compiler_fixtures.ts";
+import { compilerLease } from "./compiler_lease.ts";
 export { cacheStatus, runPhase } from "./compiler_phase.ts";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -22,6 +23,24 @@ const smokeFiles = [
   "zig-native/tests/zig_project_client.test.ts",
   "zig-native/tests/stage_chain_budget.test.ts",
 ];
+
+// Unit-test compilation uses Zig in both development and full qualification.
+// Only scripts/build_compiler.ts selects LLVM for the actual release compiler.
+export function nativeBuildOptions(
+  buildJobs: number,
+  shards: number,
+): string[] {
+  return [
+    "-Doptimize=safe",
+    "--summary",
+    "all",
+    `-j${buildJobs}`,
+    `-Dtest-shards=${shards}`,
+    "-Dllvm=false",
+    "--prefix",
+    "zig-out-native-dev",
+  ];
+}
 
 type Sweep = {
   kind: string;
@@ -103,7 +122,7 @@ async function main() {
   if (values.help) {
     console.log(
       "test:compiler [--resume] [--serial] [--jobs 1..4] [--build-jobs N] [--native-shards 1..4] [--oom-profile] [--force-native]\n" +
-        "test:compiler:dev [--native-suite all|syntax|types|runtime|checker|evaluator|backend|retained] [--native-filter NAME] [--native-llvm] [--filter NAME] [FILES...]\n" +
+        "test:compiler:dev [--native-suite all|syntax|types|runtime|checker|evaluator|backend|retained] [--native-filter NAME] [--filter NAME] [FILES...]\n" +
         "test:guest [--jobs 1..4] [--filter NAME] [FILES...]\n" +
         "All modes: [--budget-seconds N] [--phase-seconds N] [--heartbeat-seconds N] [--timings-dir PATH]\n" +
         "Full gate: [--preflight FILE] repeats recent failed guest files before LLVM builds.\n" +
@@ -160,8 +179,10 @@ async function main() {
     "--heartbeat-seconds",
   );
   if (values.dev && values.guest) throw new Error("Choose --dev or --guest");
-  if (values["native-llvm"] && !values.dev) {
-    throw new Error("--native-llvm applies to development checks");
+  if (values["native-llvm"]) {
+    throw new Error(
+      "Native unit tests use Zig's backend; LLVM is reserved for the release compiler",
+    );
   }
   const suites = [
     "all",
@@ -225,7 +246,7 @@ async function main() {
   const report = {
     mode: "full",
     native_suite: values["native-suite"],
-    native_backend: "LLVM",
+    native_backend: "noLLVM",
     native_shards: shards,
     jobs,
     build_jobs: buildJobs,
@@ -305,7 +326,7 @@ async function main() {
       });
     };
     let result: Phase | undefined;
-    const binary = resolve(native, "zig-out/bin/blot-tests");
+    const binary = resolve(native, "zig-out-native-dev/bin/blot-tests");
     let executedBinary: string | undefined;
     if (cacheable) {
       key = await qualifyKey();
@@ -433,22 +454,7 @@ async function main() {
       { DENO_JOBS: String(jobs) },
     );
   };
-  const nativeOptions = [
-    "-Doptimize=safe",
-    "--summary",
-    "all",
-    `-j${buildJobs}`,
-    `-Dtest-shards=${shards}`,
-  ];
-  if (values.dev && !values["native-llvm"]) {
-    nativeOptions.push(
-      "-Dllvm=false",
-      "-fincremental",
-      "--prefix",
-      "zig-out-native-dev",
-    );
-    report.native_backend = "noLLVM";
-  }
+  const nativeOptions = nativeBuildOptions(buildJobs, shards);
   if (values["native-suite"] !== "all") {
     nativeOptions.push(`-Dtest-suite=${values["native-suite"]}`);
   }
@@ -459,7 +465,9 @@ async function main() {
   for (const filter of values["native-filter"] ?? []) {
     nativeOptions.push(`-Dtest-filter=${filter}`);
   }
+  let lease: Awaited<ReturnType<typeof compilerLease>> | undefined;
   try {
+    if (values.dev || smoke) lease = await compilerLease(root);
     let developmentFiles = positionals;
     if (!developmentFiles.length) developmentFiles = smokeFiles;
     if (smoke || (values.dev && requestedGuests)) {
@@ -515,6 +523,10 @@ async function main() {
         files.sort();
       }
       if (!values.guest) {
+        // Smoke also writes the shared development compiler. Protect it, then
+        // release before the harness invokes its own nested compiler checks.
+        await lease?.[Symbol.asyncDispose]();
+        lease = undefined;
         await phase("harness", [
           Deno.execPath(),
           "test",
@@ -530,8 +542,10 @@ async function main() {
           "scripts/compiler_fixtures.test.ts",
           "scripts/build_compiler.test.ts",
           "scripts/native_test_runner.test.ts",
+          "scripts/check_dev.test.ts",
           "scripts/lint_zig.test.ts",
         ]);
+        lease = await compilerLease(root);
         const compile = () =>
           phase("native-compile", [
             "zig",
@@ -560,6 +574,7 @@ async function main() {
           ], controller);
         }
       }
+      lease ??= await compilerLease(root);
       await phase("pack", [
         Deno.execPath(),
         "run",
@@ -576,6 +591,7 @@ async function main() {
     }
     report.success = true;
   } finally {
+    await lease?.[Symbol.asyncDispose]();
     clearTimeout(deadline);
     Deno.removeSignalListener("SIGINT", abort);
     if (Deno.build.os !== "windows") {

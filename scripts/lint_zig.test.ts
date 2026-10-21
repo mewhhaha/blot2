@@ -2,10 +2,28 @@ import { strict as assert } from "node:assert";
 import {
   affectedFiles,
   changedPaths,
+  checkSelection,
   dependencyInputs,
   hasOpaqueImports,
   importGraph,
 } from "./lint_zig.ts";
+
+Deno.test("broad lint edits batch analyzer processes without dropping files or caching failed roots", async () => {
+  const paths = Array.from(
+    { length: 40 },
+    (_, i) => `zig-native/src/law${i}.zig`,
+  );
+  paths.push("zig-native/fixtures/root.zig");
+  const calls: string[] = [];
+  const results = await checkSelection(paths, async (path) => {
+    calls.push(path);
+    return path === "zig-native/src" ? 1 : 0;
+  });
+  assert.deepEqual(calls, ["zig-native/src", "zig-native/fixtures"]);
+  assert.equal(results.size, paths.length);
+  assert(paths.slice(0, -1).every((path) => results.get(path) === 1));
+  assert.equal(results.get(paths.at(-1)!), 0);
+});
 
 Deno.test("local Zig lint follows import dependents including deleted inputs and cycles", () => {
   const graph = importGraph(

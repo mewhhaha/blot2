@@ -59,7 +59,7 @@ if (development) {
     "zig-out-dev",
   );
 } else {
-  args.push("-Doptimize=fast");
+  args.push("-Doptimize=fast", "-Dllvm=true");
 }
 if (incremental) args.push("-fincremental");
 if (jobs !== undefined) args.push(`-j${jobs}`);
