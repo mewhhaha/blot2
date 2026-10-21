@@ -305,27 +305,83 @@ const Borrows = struct {
     // which drops them.
     until: std.AutoHashMapUnmanaged(core.Id, core.Id) = .empty,
     const Key = struct { unit: u32, binding: core.BindingId, index: u32 };
+    const Call = struct {
+        arguments: [16]core.Id,
+        count: usize,
+        callee: union(enum) { named: known_call.Wrapper, local: struct { unit: u32, binding: core.BindingId, closure: core.Id } },
+    };
     fn deinit(self: *Borrows) void {
         self.cache.deinit(self.allocator);
         self.until.deinit(self.allocator);
+    }
+    fn call(self: *const Borrows, unit_id: u32, id: core.Id) ?Call {
+        if (known_call.resolve(self.units, unit_id, id)) |resolved| {
+            if (known_call.wrapper(self.units, unit_id, resolved)) |callee|
+                return .{ .arguments = resolved.arguments, .count = resolved.count, .callee = .{ .named = callee } };
+        }
+        const module = &self.units[unit_id - 1];
+        var reverse: [16]core.Id = undefined;
+        var count: usize = 0;
+        var root = id;
+        while (module.node(root).tag == .apply) {
+            if (count == reverse.len) return null;
+            reverse[count] = module.node(root).b;
+            count += 1;
+            root = module.node(root).a;
+        }
+        if (count == 0 or module.node(root).tag != .reference) return null;
+        const reference = module.reference(root);
+        if (reference.unit != 0 or reference.binding == 0) return null;
+        const binding = module.binding(reference.binding);
+        if (binding.kind != .local or binding.initializer == 0 or module.node(binding.initializer).tag != .closure) return null;
+        var arguments: [16]core.Id = @splat(0);
+        for (0..count) |index| arguments[index] = reverse[count - index - 1];
+        return .{ .arguments = arguments, .count = count, .callee = .{ .local = .{ .unit = unit_id, .binding = reference.binding, .closure = binding.initializer } } };
+    }
+    fn callParameter(self: *Borrows, call_: Call, index: usize, depth: u32) error{OutOfMemory}!Use {
+        return switch (call_.callee) {
+            .named => |callee| self.parameter(callee, index, depth),
+            .local => |callee| self.localParameter(callee.unit, callee.binding, callee.closure, call_.count, index, depth),
+        };
+    }
+    fn localParameter(self: *Borrows, unit: u32, binding: core.BindingId, closure: core.Id, count: usize, index: usize, depth: u32) error{OutOfMemory}!Use {
+        if (depth >= max_borrow_depth) return .escapes;
+        const module = &self.units[unit - 1];
+        var current = closure;
+        var selected: core.BindingId = 0;
+        for (0..count) |position| {
+            if (module.node(current).tag != .closure) return .escapes;
+            const info = module.closure(current);
+            if (position == index) selected = info.parameter.binding;
+            current = info.body;
+        }
+        // A remaining closure is a partial application whose captured argument
+        // can outlive this call. Only a fully applied local value borrows.
+        if (selected == 0 or module.node(current).tag == .closure) return .escapes;
+        const key: Key = .{ .unit = unit, .binding = binding, .index = @intCast(index) };
+        if (self.cache.get(key)) |use| return if (use == .pending) .escapes else use;
+        try self.cache.put(self.allocator, key, .pending);
+        var walk: Walk = .{ .borrows = self, .unit = unit, .binding = selected, .depth = depth };
+        const use: Use = if (!try walk.visit(current)) .escapes else if (walk.parts) .parts else .scalars;
+        self.cache.getPtr(key).?.* = use;
+        return use;
     }
     /// A saturated direct call borrows each local argument whose parameter
     /// only reads it, and runs a closure argument only before it returns.
     /// Those uses last until the call, after every argument has evaluated.
     fn markArguments(self: *Borrows, unit_id: u32, id: core.Id, states: []State, reads: []core.Id) !void {
         const module = &self.units[unit_id - 1];
-        const call = known_call.resolve(self.units, unit_id, id) orelse return;
-        const callee = known_call.wrapper(self.units, unit_id, call) orelse return;
-        for (call.arguments[0..call.count], 0..) |argument, index| {
+        const call_ = self.call(unit_id, id) orelse return;
+        for (call_.arguments[0..call_.count], 0..) |argument, index| {
             const tag = module.node(argument).tag;
             if (tag == .closure) {
-                if (borrowed(try self.parameter(callee, index, 0))) try self.until.put(self.allocator, argument, id);
+                if (borrowed(try self.callParameter(call_, index, 0))) try self.until.put(self.allocator, argument, id);
                 continue;
             }
             if (tag != .reference) continue;
             const ref = module.reference(argument);
             if (ref.unit != 0 or ref.binding == 0 or module.binding(ref.binding).kind != .local) continue;
-            const use = try self.parameter(callee, index, 0);
+            const use = try self.callParameter(call_, index, 0);
             if (!borrowed(use)) continue;
             if (use == .parts) states[ref.binding].deep = false;
             reads[argument] = id;
@@ -411,6 +467,13 @@ const Walk = struct {
             .bind, .construct => return try self.visit(n.b),
             .pattern_bind => return try self.visit(n.b) and try self.visit(n.c),
             .if_value, .if_stmt => return try self.visit(n.a) and try self.visit(n.b) and try self.visit(n.c),
+            .match => {
+                if (!try self.visitAll(m.matchInputs(id))) return false;
+                for (m.matchArms(id)) |arm| {
+                    if (!try self.visit(arm.guard) or !try self.visit(arm.body)) return false;
+                }
+                return true;
+            },
             .block, .suite, .array, .product, .record, .break_ => return try self.visitAll(m.children(id)),
             .loop => {
                 for (m.loopCarries(id)) |carry| if (carry.incoming == self.binding or carry.iteration == self.binding or carry.backedge == self.binding or carry.outgoing == self.binding) return false;
@@ -441,14 +504,14 @@ const Walk = struct {
             .closure => return !self.captures(id),
             .suspend_ => return std.mem.findScalar(core.BindingId, m.suspensionCaptures(id), self.binding) == null,
             .call, .apply, .project => {
-                if (known_call.resolve(self.borrows.units, self.unit, id)) |call| if (known_call.wrapper(self.borrows.units, self.unit, call)) |callee| {
-                    for (call.arguments[0..call.count], 0..) |argument, index| {
+                if (self.borrows.call(self.unit, id)) |call_| {
+                    for (call_.arguments[0..call_.count], 0..) |argument, index| {
                         const closure = self.captures(argument);
                         if (!closure and !self.direct(argument)) {
                             if (!try self.visit(argument)) return false;
                             continue;
                         }
-                        switch (try self.borrows.parameter(callee, index, self.depth + 1)) {
+                        switch (try self.borrows.callParameter(call_, index, self.depth + 1)) {
                             .scalars => {},
                             .parts => self.parts = true,
                             .pending, .escapes => return false,
@@ -458,7 +521,7 @@ const Walk = struct {
                         } else try self.see(argument);
                     }
                     return true;
-                };
+                }
                 // Unknown callees and partial applications keep their
                 // operands. Calling a callable parameter only runs it.
                 return switch (n.tag) {

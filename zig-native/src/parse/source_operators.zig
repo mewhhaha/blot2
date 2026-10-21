@@ -607,7 +607,7 @@ fn Validator(comptime Context: type) type {
                     try self.walk(binding.fallback, depth + 1);
                     try self.pattern(binding.pattern, depth + 1);
                 },
-                .use_stmt => {
+                .use_stmt, .iterator_bind => {
                     if (comptime @hasDecl(@TypeOf(self.context.*), "sourceExpressionAnnotations")) try self.context.sourceExpressionAnnotations(id);
                     try self.walk(node.b, depth + 1);
                     try self.bind(node.a);

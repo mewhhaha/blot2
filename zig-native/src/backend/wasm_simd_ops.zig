@@ -29,6 +29,8 @@ pub fn code(op: w.Op) ?u32 {
         .f32x4_div => 0xe7,
         .f32x4_convert_i32x4_u => 0xfb,
         .i32x4_trunc_sat_f32x4_u => 0xf9,
+        .f32x4_convert_i32x4_s => 0xfa,
+        .i32x4_trunc_sat_f32x4_s => 0xf8,
         .i8x16_shuffle => 0x0d,
         .i32x4_eq => 0x37,
         .i32x4_ne => 0x38,
@@ -56,6 +58,7 @@ pub fn code(op: w.Op) ?u32 {
         .f32x4_pmax => 0xeb,
         // Relaxed SIMD: https://github.com/WebAssembly/relaxed-simd
         .f32x4_relaxed_madd => 0x105,
+        .f32x4_relaxed_nmadd => 0x106,
         else => null,
     };
 }

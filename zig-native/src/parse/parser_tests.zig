@@ -22,6 +22,22 @@ fn clean(source: []const u8) !void {
     for (tree.spans.items) |span| try std.testing.expect(span.start <= span.end and span.end <= source.len);
 }
 
+test "spread temporaries preserve the surrounding collection type" {
+    const source = "entry const main = fn (n: U32) => #[#[n], ...#[#[1]]]\n";
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(std.testing.allocator);
+    var tree = try parsed(std.testing.allocator, source, &pool);
+    defer tree.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var temporary_count: usize = 0;
+    for (tree.nodes.items) |node| {
+        if (node.tag != .iterator_bind) continue;
+        temporary_count += 1;
+        try std.testing.expect(std.mem.startsWith(u8, pool.get(node.a), "$collection."));
+    }
+    try std.testing.expectEqual(@as(usize, 2), temporary_count);
+}
+
 fn numericProofSyntax(allocator: std.mem.Allocator) !void {
     const source =
         \\const at: (values: Array a) -> (index: U32) -> (@proof.Index values index) -> a = fn values => fn index => fn proof => @array.get values index

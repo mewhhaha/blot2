@@ -76,27 +76,29 @@ pub fn build(b: *std.Build) void {
     const run = b.addRunArtifact(exe);
     run.addPassthruArgs();
     b.step("run", "Run the source compiler").dependOn(&run.step);
-    addRuntimeFixture(b, target, optimize, use_llvm, .arena, "arena-fixture", "Generate the memory/array ABI execution fixture");
-    addRuntimeFixture(b, target, optimize, use_llvm, .shared_rc, "shared-rc-fixture", "Generate checked retain/release execution laws");
-    addRuntimeFixture(b, target, optimize, use_llvm, .cohort, "cohort-fixture", "Generate bounded activation cohort protocol laws");
-    addRuntimeFixture(b, target, optimize, use_llvm, .list, "list-runtime-fixture", "Generate list layout and sharing execution laws");
-    addRuntimeFixture(b, target, optimize, use_llvm, .resource, "resource-retire-fixture", "Generate deferred owning resource retirement laws");
-    addRuntimeFixture(b, target, optimize, use_llvm, .region, "region-owner-publication-fixture", "Generate region owner publication execution laws");
-    addRuntimeFixture(b, target, optimize, use_llvm, .task_context, "task-context-fixture", "Generate suspendable task ownership context laws");
-    addRuntimeFixture(b, target, optimize, use_llvm, .packed_layout, "packed-layout-fixture", "Generate the experimental dense scalar row fixture");
+    addRuntimeFixture(b, target, .arena, "arena-fixture", "Generate the memory/array ABI execution fixture");
+    addRuntimeFixture(b, target, .shared_rc, "shared-rc-fixture", "Generate checked retain/release execution laws");
+    addRuntimeFixture(b, target, .cohort, "cohort-fixture", "Generate bounded activation cohort protocol laws");
+    addRuntimeFixture(b, target, .list, "list-runtime-fixture", "Generate list layout and sharing execution laws");
+    addRuntimeFixture(b, target, .resource, "resource-retire-fixture", "Generate deferred owning resource retirement laws");
+    addRuntimeFixture(b, target, .region, "region-owner-publication-fixture", "Generate region owner publication execution laws");
+    addRuntimeFixture(b, target, .task_context, "task-context-fixture", "Generate suspendable task ownership context laws");
+    addRuntimeFixture(b, target, .packed_layout, "packed-layout-fixture", "Generate the experimental dense scalar row fixture");
 }
 
 const RuntimeFixture = enum { arena, shared_rc, cohort, list, resource, region, task_context, packed_layout };
-fn addRuntimeFixture(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.Optimize, use_llvm: ?bool, kind: RuntimeFixture, name: []const u8, description: []const u8) void {
+fn addRuntimeFixture(b: *std.Build, target: std.Build.ResolvedTarget, kind: RuntimeFixture, name: []const u8, description: []const u8) void {
+    // Fixtures are build-time Wasm generators. Release optimization belongs to
+    // blotc; keeping generators on the development backend also reuses its cache.
     const module = b.createModule(.{
         .root_source_file = b.path("src/fixture_main.zig"),
         .target = target,
-        .optimize = optimize,
+        .optimize = .safe,
     });
     const options = b.addOptions();
     options.addOption(RuntimeFixture, "kind", kind);
     module.addOptions("fixture_options", options);
-    const executable = b.addExecutable(.{ .name = name, .root_module = module, .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
+    const executable = b.addExecutable(.{ .name = name, .root_module = module, .use_llvm = false });
     const generate = b.addRunArtifact(executable);
     const filename = b.fmt("{s}.wasm", .{name});
     const output = generate.addOutputFileArg(filename);

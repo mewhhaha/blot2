@@ -1610,9 +1610,10 @@ fn encodeInstruction(bytes: *Bytes, inst: Instruction, functions: usize, table_s
         .f32x4_div => unreachable,
         .f32x4_convert_i32x4_u => unreachable,
         .i32x4_trunc_sat_f32x4_u => unreachable,
+        .f32x4_convert_i32x4_s, .i32x4_trunc_sat_f32x4_s => unreachable,
         .i8x16_shuffle, .i32x4_shl, .i32x4_shr_s, .i32x4_shr_u, .i32x4_min_u, .i32x4_max_u, .f32x4_pmin, .f32x4_pmax => unreachable,
         .i32x4_eq, .i32x4_ne, .i32x4_lt_u, .i32x4_gt_u, .i32x4_le_u, .i32x4_ge_u, .f32x4_eq, .f32x4_ne, .f32x4_lt, .f32x4_gt, .f32x4_le, .f32x4_ge => unreachable,
-        .v128_not, .v128_andnot, .v128_bitselect, .v128_any_true, .i32x4_all_true, .f32x4_relaxed_madd => unreachable,
+        .v128_not, .v128_andnot, .v128_bitselect, .v128_any_true, .i32x4_all_true, .f32x4_relaxed_madd, .f32x4_relaxed_nmadd => unreachable,
     };
     try bytes.byte(code);
     switch (inst.op) {

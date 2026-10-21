@@ -23,7 +23,7 @@ pub const PrimitiveKind = enum(u8) { scalar, array };
 pub const Primitive = struct { kind: PrimitiveKind, op: Op = .none, array_op: ArrayOp = .length, arity: u8 };
 /// Operations after convert_f32_u32 apply only to four-lane products; see
 /// `backend/simd_intrinsics.zig` for their operand shapes.
-pub const Op = enum(u8) { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right, and_, or_, neg, abs, ceil, floor, trunc, sqrt, convert_u32_f32, convert_f32_u32, shift_right_signed, min, max, bit_not, bit_andnot, any_true, all_true, select, shuffle, swizzle, broadcast, bits, from_bits, relaxed_madd };
+pub const Op = enum(u8) { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right, and_, or_, neg, abs, ceil, floor, trunc, sqrt, convert_u32_f32, convert_f32_u32, shift_right_signed, min, max, bit_not, bit_andnot, any_true, all_true, select, shuffle, swizzle, broadcast, bits, from_bits, relaxed_madd, relaxed_nmadd, convert_i32_f32, convert_f32_i32 };
 /// constant a=bits; reference a=references index; scalar a=left,b=right(0 unary),
 /// c=1 for associated operator dispatch, c=0 for authoritative compiler primitives.
 /// logical a=left,b=right,op=and_/or_; call a=call-info,b=args start,c=args len.

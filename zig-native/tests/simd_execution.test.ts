@@ -578,6 +578,31 @@ Deno.test("SIMD lane movement, dot products and relaxed multiply-add", async () 
   await compileAndRun(`
 import * as simd from "std/simd"
 import { Vec3 } from "std/vector"
+const staged_nmadd = simd.f32_relaxed_nmadd (1.5, 1.0, 2.0, 3.0) (3.0, 0.1, 0.5, 0.25) (1.0, 0.2, -1.0, 0.0)
+const staged_signed = simd.to_u32_signed (simd.f32_from_bits (0xBFF33333, 0xCF000000, 0x7FC00000, 0x4F000000))
+entry const staged_signed_words = fn () -> Array U32 => do:
+  let (a, b, c, d) = staged_signed
+  return #[a, b, c, d]
+entry const staged_negative = fn () -> Array F32 => do:
+  let (a, b, c, d) = staged_nmadd
+  return #[a, b, c, d]
+entry const signed_words = fn () -> Array U32 => do:
+  let left = (0xFFFFFFFF, 0x80000000, 0, 0x7FFFFFFF)
+  let right = (0, 0xFFFFFFFF, 0x80000000, 0)
+  let (a, b, c, d) = simd.u32_lt_signed left right
+  let (e, f, g, h) = simd.u32_min_signed left right
+  let (i, j, k, l) = simd.u32_max_signed left right
+  let (m, n, o, p) = simd.u32_div (9, 10, 11, 12) (2, 3, 4, 5)
+  return #[a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p]
+entry const divide = fn (denominator: U32) -> U32 => do:
+  let (_, quotient, _, _) = simd.u32_div (8, 9, 10, 11) (1, denominator, 2, 3)
+  return quotient
+entry const signed_floats = fn () -> Array F32 => do:
+  let (a, b, c, d) = simd.to_f32_signed (0xFFFFFFFF, 0x80000000, 0, 0x7FFFFFFF)
+  return #[a, b, c, d]
+entry const signed_convert_words = fn () -> Array U32 => do:
+  let (a, b, c, d) = simd.to_u32_signed (simd.f32_from_bits (0xBFF33333, 0xCF000000, 0x7FC00000, 0x4F000000))
+  return #[a, b, c, d]
 entry const moved = fn (seed: F32) -> Array F32 => do:
   let left = (seed, 1.0, 2.0, 3.0)
   let right = (4.0, 5.0, 6.0, 7.0)
@@ -601,9 +626,20 @@ entry const dots = fn (seed: F32) -> Array F32 => do:
 entry const madd = fn (seed: F32) -> Array F32 => do:
   let (a, b, c, d) = simd.f32_relaxed_madd (seed, 1.0, 2.0, 3.0) (3.0, 0.1, 0.5, 0.25) (1.0, 0.2, -1.0, 0.0)
   return #[a, b, c, d]
+entry const nmadd = fn (seed: F32) -> Array F32 => do:
+  let (a, b, c, d) = simd.f32_relaxed_nmadd (seed, 1.0, 2.0, 3.0) (3.0, 0.1, 0.5, 0.25) (1.0, 0.2, -1.0, 0.0)
+  return #[a, b, c, d]
 `, guest => {
     deepStrictEqual(Array.from(guest.call("moved", 9) as Float32Array), [1, 4, 3, 6, 3, 2, 1, 9, 2, 2, 2, 2, 7, 7, 9, 9]);
     deepStrictEqual(Array.from(guest.call("moved_words", 9) as Uint32Array), [9, 5, 2, 7, 1, 1, 3, 9, 9, 9, 9, 9]);
+    deepStrictEqual(Array.from(guest.call("signed_words", null) as Uint32Array), [0xFFFFFFFF, 0xFFFFFFFF, 0, 0, 0xFFFFFFFF, 0x80000000, 0x80000000, 0, 0, 0xFFFFFFFF, 0, 0x7FFFFFFF, 4, 3, 2, 2]);
+    equal(guest.call("divide", 3), 3);
+    let zeroTraps = false;
+    try { guest.call("divide", 0); } catch (error) { zeroTraps = error instanceof WebAssembly.RuntimeError; }
+    equal(zeroTraps, true);
+    deepStrictEqual(Array.from(guest.call("signed_floats", null) as Float32Array), [-1, -2147483648, 0, 2147483648]);
+    deepStrictEqual(Array.from(guest.call("signed_convert_words", null) as Uint32Array), [0xFFFFFFFF, 0x80000000, 0, 0x7FFFFFFF]);
+    deepStrictEqual(Array.from(guest.call("staged_signed_words", null) as Uint32Array), [0xFFFFFFFF, 0x80000000, 0, 0x7FFFFFFF]);
     for (const seed of [0.7, -0, 1e-30]) {
       const [dot3, vector, dot4, scalar] = words(guest.call("dots", seed));
       equal(dot3, vector);
@@ -617,6 +653,14 @@ entry const madd = fn (seed: F32) -> Array F32 => do:
       const separate = Math.fround(Math.fround(a * b) + c);
       if (lanes[index] !== fused && lanes[index] !== separate) throw new Error(`lane ${index}: ${lanes[index]}`);
     });
+    const negative = Array.from(guest.call("nmadd", 1.5) as Float32Array);
+    for (const output of [negative, Array.from(guest.call("staged_negative", null) as Float32Array)]) {
+      inputs.forEach(([a, b, c], index) => {
+        const fused = Math.fround(-a * b + c);
+        const separate = Math.fround(Math.fround(-a * b) + c);
+        if (output[index] !== fused && output[index] !== separate) throw new Error(`negative lane ${index}: ${output[index]}`);
+      });
+    }
   }, { stdRoot });
 });
 

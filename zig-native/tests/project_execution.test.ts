@@ -44,6 +44,24 @@ async function project(
   }
 }
 
+Deno.test("namespace-qualified values retain field projections", async () => {
+  await project({
+    main: `import * as s from "./defaults"
+entry const main = fn () -> F32 => s.defaults.x
+`,
+    defaults: `type Defaults is data = #Defaults { x: F32 }
+const defaults = #Defaults { x: 3.0 }
+`,
+  }, async (bytes) => {
+    const guest = await instantiateGuest(bytes);
+    try {
+      equal(guest.call("main", null), 3);
+    } finally {
+      guest.dispose();
+    }
+  });
+});
+
 Deno.test("project imports preserve quantified written rows at independent effect and result instances", async () => {
   await project({
     main: `import { invoke } from "./library"

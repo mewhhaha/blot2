@@ -1,5 +1,23 @@
 import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.ts";
 
+Deno.test("nested array spreads select inline result-directed conversions", async () => {
+  await compileAndRun(`
+entry const prefix = fn (n: U32) -> F32 => do:
+  let rows: Array (Array F32) = #[#[1.0]]
+  let xs: Array (Array F32) = #[#[from n], ...rows]
+  return xs[0][0]
+entry const suffix = fn (n: U32) -> F32 => do:
+  let rows: Array (Array F32) = #[#[1.0]]
+  let xs: Array (Array F32) = #[...rows, #[from n]]
+  return xs[1][0]
+`, guest => {
+    for (const n of [0, 7, 42]) {
+      equal(guest.call("prefix", n), n);
+      equal(guest.call("suffix", n), n);
+    }
+  });
+});
+
 Deno.test("generated arrays call captured scalar and aggregate callbacks in index order", async () => {
   await compileAndRun(`
 type Item is data = #Item { value: U32 }

@@ -1382,6 +1382,12 @@ const Engine = struct {
         if (self.catalogs.nominal_names.contains(key) or self.catalogs.effect_family_names.contains(key)) return true;
         const text = self.pool.get(name);
         const root = if (std.mem.findScalar(u8, text, '.')) |separator| self.pool.lookup(text[0..separator]) orelse return false else name;
+        if (root != name) {
+            const suffix = text[self.pool.get(root).len + 1 ..];
+            const end = std.mem.findScalar(u8, suffix, '.') orelse suffix.len;
+            if (self.pool.lookup(suffix[0..end])) |member|
+                if (self.catalogs.qualified.contains(.{ .namespace = root, .member = member })) return true;
+        }
         if (root != name and try self.sourceOperatorTargetExists(root)) return true;
         if (self.catalogs.nominal_names.contains(.{ .namespace = 0, .member = root }) or self.catalogs.effect_family_names.contains(.{ .namespace = 0, .member = root })) return true;
         return false;

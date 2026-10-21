@@ -32,23 +32,24 @@ pub const Intrinsic = struct {
 };
 const Entry = struct { []const u8, core.Op, Shape };
 const shared = [_]Entry{
-    .{ "add", .add, .binary },              .{ "sub", .sub, .binary },        .{ "mul", .mul, .binary },
-    .{ "min", .min, .binary },              .{ "max", .max, .binary },        .{ "eq", .equal, .compare },
-    .{ "ne", .not_equal, .compare },        .{ "lt", .less, .compare },       .{ "le", .less_equal, .compare },
-    .{ "gt", .greater, .compare },          .{ "ge", .greater_equal, .compare }, .{ "select", .select, .select },
-    .{ "shuffle", .shuffle, .shuffle },     .{ "swizzle", .swizzle, .swizzle }, .{ "broadcast", .broadcast, .broadcast },
+    .{ "add", .add, .binary },          .{ "sub", .sub, .binary },           .{ "mul", .mul, .binary },
+    .{ "min", .min, .binary },          .{ "max", .max, .binary },           .{ "eq", .equal, .compare },
+    .{ "ne", .not_equal, .compare },    .{ "lt", .less, .compare },          .{ "le", .less_equal, .compare },
+    .{ "gt", .greater, .compare },      .{ "ge", .greater_equal, .compare }, .{ "select", .select, .select },
+    .{ "shuffle", .shuffle, .shuffle }, .{ "swizzle", .swizzle, .swizzle },  .{ "broadcast", .broadcast, .broadcast },
 };
 const floating_only = [_]Entry{
-    .{ "div", .div, .binary },           .{ "abs", .abs, .unary },     .{ "neg", .neg, .unary },
-    .{ "ceil", .ceil, .unary },          .{ "floor", .floor, .unary }, .{ "trunc", .trunc, .unary },
-    .{ "sqrt", .sqrt, .unary },          .{ "to_u32", .convert_f32_u32, .convert }, .{ "bits", .bits, .convert },
-    .{ "relaxed_madd", .relaxed_madd, .madd },
+    .{ "div", .div, .binary },                 .{ "abs", .abs, .unary },                    .{ "neg", .neg, .unary },
+    .{ "ceil", .ceil, .unary },                .{ "floor", .floor, .unary },                .{ "trunc", .trunc, .unary },
+    .{ "sqrt", .sqrt, .unary },                .{ "to_u32", .convert_f32_u32, .convert },   .{ "bits", .bits, .convert },
+    .{ "relaxed_madd", .relaxed_madd, .madd }, .{ "relaxed_nmadd", .relaxed_nmadd, .madd }, .{ "to_u32_signed", .convert_f32_i32, .convert },
 };
 const integer_only = [_]Entry{
-    .{ "bit_and", .bit_and, .binary },         .{ "bit_or", .bit_or, .binary },         .{ "bit_xor", .bit_xor, .binary },
-    .{ "andnot", .bit_andnot, .binary },       .{ "not", .bit_not, .unary },            .{ "to_f32", .convert_u32_f32, .convert },
-    .{ "from_bits", .from_bits, .convert },    .{ "shl", .shift_left, .shift },         .{ "shr", .shift_right, .shift },
-    .{ "sar", .shift_right_signed, .shift },   .{ "any_true", .any_true, .reduce },     .{ "all_true", .all_true, .reduce },
+    .{ "bit_and", .bit_and, .binary },                .{ "bit_or", .bit_or, .binary },     .{ "bit_xor", .bit_xor, .binary },
+    .{ "andnot", .bit_andnot, .binary },              .{ "not", .bit_not, .unary },        .{ "to_f32", .convert_u32_f32, .convert },
+    .{ "from_bits", .from_bits, .convert },           .{ "shl", .shift_left, .shift },     .{ "shr", .shift_right, .shift },
+    .{ "sar", .shift_right_signed, .shift },          .{ "any_true", .any_true, .reduce }, .{ "all_true", .all_true, .reduce },
+    .{ "to_f32_signed", .convert_i32_f32, .convert },
 };
 pub fn lookup(name: []const u8) ?Intrinsic {
     const floating = std.mem.startsWith(u8, name, "@simd.f32x4.");
@@ -68,13 +69,13 @@ pub fn arity(shape: Shape) u8 {
 /// Operations that exist only on four-lane products.
 pub fn vectorOnly(op: core.Op) bool {
     return switch (op) {
-        .shift_right_signed, .min, .max, .bit_not, .bit_andnot, .any_true, .all_true, .select, .shuffle, .swizzle, .broadcast, .bits, .from_bits, .relaxed_madd => true,
+        .shift_right_signed, .min, .max, .bit_not, .bit_andnot, .any_true, .all_true, .select, .shuffle, .swizzle, .broadcast, .bits, .from_bits, .relaxed_madd, .relaxed_nmadd, .convert_i32_f32, .convert_f32_i32 => true,
         else => false,
     };
 }
 /// The second operand pairs two vectors.
 pub fn pairs(op: core.Op) bool {
-    return op == .select or op == .relaxed_madd or op == .shuffle;
+    return op == .select or op == .relaxed_madd or op == .relaxed_nmadd or op == .shuffle;
 }
 /// Lane indices are compile-time literals: the first operand of a shuffle or
 /// swizzle, or the second operand of a broadcast.
@@ -96,4 +97,8 @@ test "every SIMD spelling resolves to one shape and arity" {
     try std.testing.expect(lookup("@simd.u32x4.div") == null);
     try std.testing.expect(lookup("@simd.f32x4.shl") == null);
     try std.testing.expect(lookup("@simd.u32x4.relaxed_madd") == null);
+    try std.testing.expectEqual(Shape.madd, lookup("@simd.f32x4.relaxed_nmadd").?.shape);
+    try std.testing.expect(lookup("@simd.u32x4.relaxed_nmadd") == null);
+    try std.testing.expectEqual(Lane.f32, lookup("@simd.u32x4.to_f32_signed").?.resultLane());
+    try std.testing.expectEqual(Lane.u32, lookup("@simd.f32x4.to_u32_signed").?.resultLane());
 }

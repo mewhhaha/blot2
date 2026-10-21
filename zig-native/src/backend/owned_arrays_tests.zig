@@ -125,6 +125,9 @@ test "read-only callees and dropped generator closures borrow an exclusive array
         \\  return sum
         \\const generate = fn count => fn generator => @array.generate count generator
         \\const map = fn transform => fn (values: Array U32) => generate (size values) (fn index => transform values[index])
+        \\const matched = fn (values: Array U32) => fn (index: U32) => case #True of
+        \\  #True => values[index]
+        \\  #False => 0
         \\
     ;
     const cases = [_][]const u8{
@@ -133,6 +136,8 @@ test "read-only callees and dropped generator closures borrow an exclusive array
         "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  values[0] := total values\n  return values\n",
         "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let doubled = map (fn value => @u32.mul value 2) values\n  values[0] := doubled[0]\n  return values\n",
         "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let doubled = @array.generate count (fn index => @u32.mul values[index] 2)\n  values[0] := doubled[0]\n  return values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let reader = fn (xs: Array U32) => fn (index: U32) => xs[index]\n  values[0] := @u32.add (reader values 0) 1\n  return values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  values[0] := @u32.add (matched values 0) 1\n  return values\n",
     };
     const a = std.testing.allocator;
     for (cases) |case| {
@@ -166,6 +171,9 @@ test "returned stored captured and later-read arguments keep the copy" {
         \\  for index in 0..count:
         \\    values := #[index]
         \\  return values
+        \\const matched_escape = fn (values: Array U32) => case #True of
+        \\  #True => values
+        \\  #False => values
         \\
     ;
     const cases = [_][]const u8{
@@ -181,6 +189,8 @@ test "returned stored captured and later-read arguments keep the copy" {
         "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let size = deep 3 values\n  values[0] := size\n  return values\n",
         "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = merged (@u32.eq count 0) values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
         "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = carried 0 values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let reader = fn (xs: Array U32) => fn (index: U32) => xs[index]\n  let held = reader values\n  values[0] := 9\n  return @u32.add (held 0) values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = matched_escape values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
     };
     const a = std.testing.allocator;
     for (cases) |case| {

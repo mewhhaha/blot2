@@ -33,7 +33,7 @@ pub fn opcode(op: core.Op, scalar: wasm.Scalar) ?wasm.Op {
         .convert_u32_f32 => .f32_convert_i32_u,
         .convert_f32_u32 => .i32_trunc_sat_f32_u,
         // Lane-only operations have no scalar instruction.
-        .none, .and_, .or_, .shift_right_signed, .min, .max, .bit_not, .bit_andnot, .any_true, .all_true, .select, .shuffle, .swizzle, .broadcast, .bits, .from_bits, .relaxed_madd => null,
+        .none, .and_, .or_, .shift_right_signed, .min, .max, .bit_not, .bit_andnot, .any_true, .all_true, .select, .shuffle, .swizzle, .broadcast, .bits, .from_bits, .relaxed_madd, .relaxed_nmadd, .convert_i32_f32, .convert_f32_i32 => null,
     };
 }
 

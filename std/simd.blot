@@ -23,6 +23,10 @@ const f32_floor = fn value => @simd.f32x4.floor value
 const f32_trunc = fn value => @simd.f32x4.trunc value
 const to_f32 = fn value => @simd.u32x4.to_f32 value
 const to_u32 = fn value => @simd.f32x4.to_u32 value
+// Signed conversions use two's-complement U32 lane bits. Float-to-signed
+// truncates toward zero and saturates, including zero for NaN.
+const to_f32_signed = fn value => @simd.u32x4.to_f32_signed value
+const to_u32_signed = fn value => @simd.f32x4.to_u32_signed value
 
 // Shifts take a scalar count, which wraps modulo 32 like the U32 `<<`/`>>`.
 // `u32_sar` shifts in copies of each lane's top bit.
@@ -55,6 +59,21 @@ const u32_ge = fn left => fn right => @simd.u32x4.ge left right
 // Selection is bitwise: a mask bit of one takes `yes`, zero takes `no`.
 const f32_select = fn (mask: U32x4) => fn yes => fn no => @simd.f32x4.select mask (yes, no)
 const u32_select = fn (mask: U32x4) => fn yes => fn no => @simd.u32x4.select mask (yes, no)
+// There is no I32 surface type. Flip the sign bit to compare U32 lanes as
+// two's-complement signed words, then use the same masks and selection.
+const u32_sign_mask = (0x80000000, 0x80000000, 0x80000000, 0x80000000)
+const u32_lt_signed = fn left => fn right => u32_lt (u32_xor left u32_sign_mask) (u32_xor right u32_sign_mask)
+const u32_le_signed = fn left => fn right => u32_le (u32_xor left u32_sign_mask) (u32_xor right u32_sign_mask)
+const u32_gt_signed = fn left => fn right => u32_gt (u32_xor left u32_sign_mask) (u32_xor right u32_sign_mask)
+const u32_ge_signed = fn left => fn right => u32_ge (u32_xor left u32_sign_mask) (u32_xor right u32_sign_mask)
+const u32_min_signed = fn left => fn right => u32_select (u32_lt_signed left right) left right
+const u32_max_signed = fn left => fn right => u32_select (u32_gt_signed left right) left right
+// Wasm SIMD has no integer divide. Keep U32's quotient and divide-by-zero
+// behavior with four scalar lanes until a vector reciprocal is appropriate.
+const u32_div = fn (left: U32x4) => fn (right: U32x4) => do:
+  let (a, b, c, d) = left
+  let (e, f, g, h) = right
+  return (@u32.div a e, @u32.div b f, @u32.div c g, @u32.div d h)
 const u32_not = fn lanes => @simd.u32x4.not lanes
 const u32_andnot = fn left => fn right => @simd.u32x4.andnot left right
 const any_true = fn mask => @simd.u32x4.any_true mask
@@ -73,9 +92,10 @@ const u32_broadcast = fn (lane: U32) => fn value => @simd.u32x4.broadcast value 
 const f32_bits = fn lanes => @simd.f32x4.bits lanes
 const f32_from_bits = fn lanes => @simd.u32x4.from_bits lanes
 
-// Opt-in fused or unfused `a * b + c`. Its rounding depends on the host, so
-// results can differ between machines; nothing else selects it implicitly.
+// Opt-in fused or unfused `a * b + c` and `-(a * b) + c`. Their rounding
+// depends on the host; nothing else selects them implicitly.
 const f32_relaxed_madd = fn a => fn b => fn c => @simd.f32x4.relaxed_madd a (b, c)
+const f32_relaxed_nmadd = fn a => fn b => fn c => @simd.f32x4.relaxed_nmadd a (b, c)
 
 // One range check precedes the index arithmetic, so a wrapping index cannot
 // select unrelated lanes. Loads copy four elements; stores keep the ordinary

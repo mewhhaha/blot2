@@ -1171,7 +1171,10 @@ const Parser = struct {
         defer refs.deinit(self.allocator);
         for (values.items) |value| {
             const name = try self.collectionName(start);
-            try statements.append(self.allocator, try self.collectionBinding(name, value, start));
+            // These names only preserve evaluation order. Keep their type
+            // variables connected to the result of prepend/append so a
+            // result-directed element (such as `from value`) can be selected.
+            try statements.append(self.allocator, try self.add(.iterator_bind, name, value, 0, start));
             try refs.append(self.allocator, try self.add(.name, name, 0, 0, start));
         }
         var result = refs.items[spread_index];

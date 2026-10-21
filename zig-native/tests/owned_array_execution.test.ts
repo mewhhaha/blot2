@@ -142,6 +142,9 @@ const total = fn (values: Array F32) => do:
   for value in values:
     sum := sum + value
   return sum
+const matched = fn (values: Array F32) => fn (index: U32) => case #True of
+  #True => values[index]
+  #False => 0.0
 entry const inlined = fn (n: U32) -> F32 => do:
   let values = @array.generate n (fn i => @u32.to_f32 i)
   for i in 0..n:
@@ -165,6 +168,19 @@ entry const mapped = fn (n: U32) -> F32 => do:
   for i in 0..n:
     values[i] := values[i] + doubled[i]
   return values[n - 1]
+entry const local = fn (n: U32) -> F32 => do:
+  let values = @array.fill n 1.0
+  let read = fn (xs: Array F32) => fn (index: U32) => xs[index]
+  for i in 0..n:
+    let x = read values i
+    values[i] := x + 1.0
+  return values[n - 1]
+entry const match_read = fn (n: U32) -> F32 => do:
+  let values = @array.fill n 1.0
+  for i in 0..n:
+    let x = matched values i
+    values[i] := x + 1.0
+  return values[n - 1]
 `,
     (_guest, bytes) => {
       const run = counted(bytes);
@@ -185,6 +201,8 @@ entry const mapped = fn (n: U32) -> F32 => do:
           ["called", called(n), 1],
           ["generated", 3 * (n - 1), 3],
           ["mapped", 3 * (n - 1), 3],
+          ["local", 2, 1],
+          ["match_read", 2, 1],
         ];
         for (const [name, expected, allocations] of cases) {
           const observed = run(name, n);

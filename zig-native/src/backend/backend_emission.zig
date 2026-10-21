@@ -5136,7 +5136,7 @@ pub const Owner = struct {
         for (fields) |field| if (field != fields[0]) return g.fail(self.unit_id, 0, .unsupported);
         const floating = scalar_type == .f32;
         const expected: usize = switch (op) {
-            .select, .relaxed_madd => 3,
+            .select, .relaxed_madd, .relaxed_nmadd => 3,
             .shuffle, .shift_left, .shift_right, .shift_right_signed, .min, .max, .bit_andnot => 2,
             .swizzle, .broadcast, .bits, .from_bits, .bit_not, .any_true, .all_true => 1,
             else => operands.len,
@@ -5175,10 +5175,15 @@ pub const Owner = struct {
                 try self.simdLoad(operands[0]);
                 try self.emit(.v128_bitselect, 0);
             },
-            .relaxed_madd => {
+            .relaxed_madd, .relaxed_nmadd => {
                 if (!floating) return g.fail(self.unit_id, 0, .unsupported);
                 for (operands) |operand| try self.simdLoad(operand);
-                try self.emit(.f32x4_relaxed_madd, 0);
+                try self.emit(if (op == .relaxed_madd) .f32x4_relaxed_madd else .f32x4_relaxed_nmadd, 0);
+            },
+            .convert_i32_f32, .convert_f32_i32 => {
+                if (floating != (op == .convert_f32_i32)) return g.fail(self.unit_id, 0, .unsupported);
+                try self.simdLoad(operands[0]);
+                try self.emit(if (op == .convert_i32_f32) .f32x4_convert_i32x4_s else .i32x4_trunc_sat_f32x4_s, 0);
             },
             .min, .max => if (floating) {
                 // pmin b a is `a < b ? a : b`, the prelude's `min a b`;

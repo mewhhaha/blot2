@@ -4733,11 +4733,23 @@ pub const Session = struct {
                     } };
                 }
             },
-            .select, .relaxed_madd, .shuffle => {
+            .convert_i32_f32, .convert_f32_i32 => {
+                for (&lanes, a) |*lane, item| {
+                    if (op == .convert_i32_f32) {
+                        lane.* = .{ .scalar = .f32, .bits = @bitCast(@as(f32, @floatFromInt(@as(i32, @bitCast(item.bits))))) };
+                    } else {
+                        const value_: f32 = @bitCast(item.bits);
+                        const signed: i32 = if (std.math.isNan(value_)) 0 else if (value_ <= -2147483648.0) std.math.minInt(i32) else if (value_ >= 2147483648.0) std.math.maxInt(i32) else @intFromFloat(value_);
+                        lane.* = .{ .scalar = .u32, .bits = @bitCast(signed) };
+                    }
+                }
+            },
+            .select, .relaxed_madd, .relaxed_nmadd, .shuffle => {
                 const pair = try self.simdPair(owner, id, right);
                 for (&lanes, a, 0..) |*lane, item, index| lane.* = switch (op) {
                     .select => .{ .scalar = pair[0][index].scalar, .bits = (pair[0][index].bits & item.bits) | (pair[1][index].bits & ~item.bits) },
                     .relaxed_madd => .{ .scalar = .f32, .bits = @bitCast(@mulAdd(f32, @bitCast(item.bits), @bitCast(pair[0][index].bits), @bitCast(pair[1][index].bits))) },
+                    .relaxed_nmadd => .{ .scalar = .f32, .bits = @bitCast(@mulAdd(f32, -@as(f32, @bitCast(item.bits)), @bitCast(pair[0][index].bits), @bitCast(pair[1][index].bits))) },
                     else => blk: {
                         if (item.bits >= simd.laneLimit(op)) return self.failNode(owner, id, .simd_lane_literal);
                         break :blk pair[item.bits / 4][item.bits % 4];
