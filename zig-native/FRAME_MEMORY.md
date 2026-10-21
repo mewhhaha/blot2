@@ -36,27 +36,28 @@ declines in their own size classes, and run trial deletion only over that heap.
 - **Prerequisite:** allocation sites must know the layout's proof result. The
   emitter already computes it for `mark_acyclic`.
 
-## 2. Pointer-identity memoization of pure frame work
+## 2. Measure stable inputs before memoizing pure frame work
 
-Settled bricks have identical inputs every frame, yet their draw records are
-rebuilt 60 times a second. For an immutable value, the same pointer means the
-same value, so a pure function applied to pointer-identical arguments may
-return its previous result.
+Settled stacks are immutable, but the current gdev draw call is
+`stack_draws (rise stack.x stack.z) stack ahead`. `ground` is computed from
+terrain and `ahead` depends on the frame's presentation alpha. A stack pointer
+alone is therefore not a sound cache key, and changing `ahead` may prevent
+hits even when the stack is unchanged.
 
-- **Mechanism:** a compiler-selected memo slot per call site. It holds the
-  previous argument pointers (retained) and the previous result (retained). A
-  hit returns the result with one retain. The slot is replaced on a miss.
-- **Selection:** use effect-free calls whose arguments are reference values from
-  long-lived state, and whose result is large relative to a pointer comparison.
-  Never key on scalar machine words, which would be pointer guessing.
-- **Soundness:** purity comes from the checked effect row, and identity from
-  immutability. Retained slots keep their arguments alive; they hold strong
-  edges, so a slot is a cycle-capable object (see 1).
-- **Gain:** frame cost drops from the number of bricks to the number of changed
-  bricks. This is likely the largest win for #16's integration workload.
-- **Risk:** slot memory, and the policy for when a slot is worth its retain.
-  Measure the hit rate first by instrumenting the draw builders in an isolated
-  copy.
+- **Measurement first:** record how often all arguments repeat for each stack
+  across real frames, including the bit patterns of `ground` and `ahead`.
+  Do not assume the reduced static workload has the same hit rate.
+- **Mechanism if hits justify it:** an effect-free call may reuse its previous
+  result when immutable reference arguments have the same identity and scalar
+  arguments have the same bits. Keep a bounded entry per stack or collection
+  element: one slot for the whole call site would be replaced by every stack
+  in the loop. Retain reference keys and results while the entry is live.
+- **Soundness:** exact scalar-bit comparison is conservative for numerically
+  equivalent values and avoids treating scalar words as pointers. The checked
+  effect row establishes purity. Retained entries hold strong edges and must
+  remain visible to cycle collection (see 1).
+- **Decision:** if frame-dependent `ahead` makes hits rare, prioritize writing
+  frame output at its destination (3) instead of adding a cache.
 
 ## 3. Build frame output at its destination
 
