@@ -185,6 +185,18 @@ Deno.test("allocation cost matrix keeps equivalent results and measures size sca
           );
         }
         if (codegenTier === "optimized") {
+          for (
+            const name of [
+              "generic_callback",
+              "aliased_callback",
+            ]
+          ) {
+            assert.equal(
+              traffic(name, 5).rounded_allocation_bytes,
+              traffic("local_callback", 5).rounded_allocation_bytes,
+              `${name} retained a global callable adapter allocation`,
+            );
+          }
           const changedSource = source.replace(
             "const wrapped_replace = fn index value values => replace index value values",
             "const wrapped_replace = fn index value values => replace index (value + 1) values",

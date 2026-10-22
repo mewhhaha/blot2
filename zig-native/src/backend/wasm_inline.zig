@@ -238,6 +238,7 @@ fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
     var reads_reference = false;
     var writes = false;
     var calls = false;
+    var forwarded_reader = false;
     for (body.instructions.items, 0..) |inst, i| switch (inst.op) {
         .local_get => if (inst.operand >= count or !defined[inst.operand]) {
             // A fresh call zeroes its locals. Do not reuse a loop's old value.
@@ -267,7 +268,19 @@ fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
         .call => {
             calls = true;
             if (inst.operand == arena.mark_acyclic) continue;
-            if (!arena.isAllocation(inst.operand) or i == 0) return false;
+            if (!arena.isAllocation(inst.operand)) {
+                // A global callable can add one direct adapter between a
+                // structural argument and its scalar reader. Admit that
+                // adapter only when the target has the existing leaf-reader
+                // proof; the second bounded inline step exposes its loads.
+                if (forwarded_reader or inst.operand >= module.functions.items.len) return false;
+                const target = &module.functions.items[inst.operand];
+                if (target.result_role != .scalar or target.result != body.result or !admitted(module, target)) return false;
+                for (target.instructions.items) |inner| if (inner.op == .call or inner.op == .call_indirect or inner.op == .call_import) return false;
+                forwarded_reader = true;
+                continue;
+            }
+            if (i == 0) return false;
             const size = body.instructions.items[i - 1];
             if (size.table_reference or size.op != .i32_const or size.operand == 0 or size.operand > 64 or size.operand % 4 != 0) return false;
             allocations += 1;
@@ -286,8 +299,8 @@ fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
     // A small scalar reader of a checked reference parameter can be exposed
     // to caller-local scalar replacement. A freshly constructed record then
     // need not escape merely to pass its fields through this call.
-    return (allocations != 0 and allocations <= 4) or
-        (allocations == 0 and !calls and !body.entry and body.result_role == .scalar and body.parameters.len != 0 and body.parameterRole(0) == .reference and reads_reference and !writes and body.codeLength() <= 48);
+    return (allocations != 0 and allocations <= 4 and !forwarded_reader) or
+        (allocations == 0 and !body.entry and body.result_role == .scalar and body.parameters.len != 0 and body.parameterRole(0) == .reference and (reads_reference or forwarded_reader) and !writes and body.codeLength() <= 48 and (!calls or forwarded_reader));
 }
 
 fn scalarRecordReader(a: A) !void {
@@ -297,12 +310,15 @@ fn scalarRecordReader(a: A) !void {
     const reader = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
     try module.setParameterRoles(reader, ir.packParameterRoles(&.{.reference}));
     try module.emitSlice(reader, &.{ .{ .op = .local_get }, .{ .op = .i32_load }, .{ .op = .local_get }, .{ .op = .i32_load, .operand = 4 }, .{ .op = .i32_add } });
+    const adapter = try module.addTypedFunction(&.{ .i32, .i32 }, .i32, .scalar);
+    try module.setParameterRoles(adapter, ir.packParameterRoles(&.{ .reference, .reference }));
+    try module.emitSlice(adapter, &.{ .{ .op = .local_get, .operand = 1 }, .{ .op = .call, .operand = reader } });
     const caller = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
     const row = try module.addLocal(caller, .i32);
-    try module.emitSlice(caller, &.{ .{ .op = .i32_const, .operand = 8 }, .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = row }, .{ .op = .local_get, .operand = row }, .{ .op = .local_get }, .{ .op = .i32_store }, .{ .op = .local_get, .operand = row }, .{ .op = .i32_const, .operand = 2 }, .{ .op = .i32_store, .operand = 4 }, .{ .op = .local_get, .operand = row }, .{ .op = .call, .operand = reader } });
+    try module.emitSlice(caller, &.{ .{ .op = .i32_const, .operand = 8 }, .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = row }, .{ .op = .local_get, .operand = row }, .{ .op = .local_get }, .{ .op = .i32_store }, .{ .op = .local_get, .operand = row }, .{ .op = .i32_const, .operand = 2 }, .{ .op = .i32_store, .operand = 4 }, .{ .op = .i32_const }, .{ .op = .local_get, .operand = row }, .{ .op = .call, .operand = adapter } });
     var expanded = (try run(a, &module, &module.functions.items[caller])).?;
     defer expanded.deinit(a);
-    for (expanded.instructions.items) |inst| try std.testing.expect(inst.op != .call or inst.operand != reader);
+    for (expanded.instructions.items) |inst| try std.testing.expect(inst.op != .call or (inst.operand != reader and inst.operand != adapter));
     var view = module.functions.items[caller];
     view.locals = expanded.locals;
     view.instructions = expanded.instructions;
@@ -311,9 +327,10 @@ fn scalarRecordReader(a: A) !void {
     for (replaced.instructions.items) |inst| try std.testing.expect(inst.op != .call or inst.operand != arena.allocate);
     module.functions.items[reader].parameter_roles = 0;
     try std.testing.expect(!admitted(&module, &module.functions.items[reader]));
+    try std.testing.expect(!admitted(&module, &module.functions.items[adapter]));
 }
 
-test "small scalar record reader inlining exposes caller allocation to scalar replacement" {
+test "direct callable adapter to scalar record reader exposes caller allocation to scalar replacement" {
     try scalarRecordReader(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, scalarRecordReader, .{});
 }
@@ -501,7 +518,18 @@ pub fn runWithFacts(a: A, module: *const wasm.Module, source: *const ir.Function
     }
     if (try inlineAllocations(a, module, &view, facts)) |result| {
         if (adapters) |*body| body.deinit(a);
-        return result;
+        var expanded = result;
+        errdefer expanded.deinit(a);
+        // The first expansion can expose one proved scalar-reader call from
+        // a callable adapter. Keep the extra step bounded and use the same
+        // immutable callee facts and normal per-body code budget.
+        view.locals = expanded.locals;
+        view.instructions = expanded.instructions;
+        if (try inlineAllocations(a, module, &view, facts)) |next| {
+            expanded.deinit(a);
+            return next;
+        }
+        return expanded;
     }
     return adapters;
 }

@@ -776,9 +776,11 @@ allocations that optimized scalar replacement removes. Use the executed-Wasm
 allocation matrix in `zig-native/tests/allocation_cost_matrix.test.ts` for
 concrete tier and size comparisons; no source spelling alone guarantees those
 record or closure allocations will disappear.
-In the qualified scalar-record fixture, a locally bound callback passed through
-`apply` is optimized away, while a global named callback or its global alias
-still needs a callable adapter and retains one allocation per call.
+In the qualified scalar-record fixture, locally bound, global named, and
+globally aliased callbacks passed through `apply` have zero optimized allocator
+traffic. The global path's direct callable adapter and its scalar reader are
+inlined under bounded proofs before scalar replacement. A dynamically unknown
+callback still keeps the conservative call boundary.
 
 Constant evaluation uses a separate representation. Append/prepend can extend
 the latest collection version into unused buffer slots, with geometric growth;

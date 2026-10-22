@@ -24,8 +24,8 @@ checks results, rounded arena allocation bytes, retains and releases. The
 compiler is the Zig development backend; the `codegenTier` column selects the
 guest Wasm optimization tier. These are allocator size-class traffic figures,
 not live memory or exact payload copies. The current matrix uses compiler
-SHA-256 `a362ba461b9ea108b452689a625d7a160d7d2780444e48a5f2e1617531c1e8a6`,
-source file SHA-256 `93e715f799bb8834cceb40335648472e58b67fa528732501f03e1ba154c83893`,
+SHA-256 `50c8e19291388a008ef51cc4f3793fdaca603080e1c9ebde1dff9123420cb2c7`,
+source file SHA-256 `b2142ab06eb796ed5a909509954221ffe76a442161982d950703676b65cb6cfd`,
 prelude SHA-256 `677ccf723198511a812a5d7539512253197df9842cd07d1da9749d137262006e`
 and `std/array` SHA-256 `1a11c8ef63fc18fec2515889efc8fdf0fa3030db59e061b43f38c8f0ea506be1`.
 Reproduce with `deno test --no-config --allow-read --allow-write --allow-run
@@ -38,20 +38,24 @@ zig-native/zig-out-dev/bin/blotc`.
 | Separate structural helper | 4,800 | 0 |
 | Named callback | 4,800 | 0 |
 | Inline callback | 4,800 | 0 |
-| Generic callback through `apply` | 4,800 | 4,800 |
-| Alias of the global callback through `apply` | 4,800 | 4,800 |
+| Generic callback through `apply` | 4,800 | 0 |
+| Alias of the global callback through `apply` | 4,800 | 0 |
 | Locally bound callback through `apply` | 4,800 | 0 |
 | Nominal `#Box` construction and reader | 9,600 | 9,600 |
 
-The generic and nominal rows are current conservative costs, not promises
-that all such calls allocate. At this fixture's optimized tier the compiler
-eliminates the small structural/callback allocations but retains one rounded
-48-byte allocation per generic callback call and two rounded allocations per
-nominal call. Development tier retains the structural allocation as well.
-The cliff follows a global named callback through `apply`, including a plain
-global alias. The same wrapper with an inline or locally bound callback has
-zero optimized traffic. The generated global path adds a callable adapter
-between `apply` and the reader; this is the remaining specialization work.
+The global named and alias rows previously allocated 4,800 rounded bytes per
+100 calls with development compiler SHA-256
+`a362ba461b9ea108b452689a625d7a160d7d2780444e48a5f2e1617531c1e8a6`
+and source SHA-256
+`93e715f799bb8834cceb40335648472e58b67fa528732501f03e1ba154c83893`.
+The new bounded proof admits one direct callable adapter leading to a proved
+scalar reader. Two inline steps expose its loads to scalar replacement, so the
+same global path now has zero optimized allocator traffic. This is an
+allocator-traffic result, not a measured CPU speedup. Development codegen
+still retains the structural allocation. The nominal `#Box` path retains two
+rounded allocations per call; its constructor storage and aggregate storage
+are both reported as source allocation candidates. Dynamically unknown
+callbacks retain their conservative call boundary.
 
 | Collection form, 100 calls | 32 elements | 128 elements | 512 elements |
 | --- | ---: | ---: | ---: |
@@ -73,15 +77,14 @@ generator as documented construction choices.
 The before/after runtime improvement for forwarded collection edits is pinned
 separately in `COLLECTION_WRAPPER_QUALIFICATION.md`: the baseline and candidate
 compiler hashes, source/prelude hashes, alternating measurements and limitations
-are recorded there. This report and its flag add observability, not a new
-runtime optimization, so no new speedup is claimed.
+are recorded there. The source report remains observational; the adapter
+inlining change above is separately qualified by allocator traffic, with no
+CPU speedup claimed.
 
 The source report was identical across a fresh build and a restarted cached
-build of the same fixture. Final qualification passed the full compiler gate:
-2,506 native tests with
-exhaustive allocation-failure sweeps, the LLVM release build, 1,630 guest
-tests, packaging and the harness. The native run took 603 seconds with four
-shards and a 900-second phase limit. The earlier source-only milestone needed
-a rerun after reaching the harness's 600-second phase limit while one shard
-was still active. Zig lint reported zero findings, and the two TypeScript fixtures
-passed formatting, lint and type checking.
+build of the same fixture. The adapter change passed the full compiler gate:
+2,506 native tests with exhaustive allocation-failure sweeps, the LLVM release
+build, 1,630 guest tests, packaging and the harness. The native run took 625
+seconds with four shards and a 900-second phase limit; the release build took
+280 seconds and guests took 40 seconds. Zig lint reported zero findings. The
+TypeScript matrix passed formatting, lint and type checking.
