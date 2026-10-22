@@ -9214,6 +9214,12 @@ const ClosureRegion = struct {
         const saved = self.defer_members;
         self.defer_members = constraint.deferred_member;
         defer self.defer_members = saved;
+        // Open summaries may be expanded outside attemptConstraint, after the
+        // traversal has restored its previous source location. Carry the
+        // recorded use into the newly collected callee scope.
+        const previous_origin = self.current_origin;
+        self.current_origin = constraint.origin orelse self.scratch.sources.items[constraint.scope].origin orelse previous_origin;
+        defer self.current_origin = previous_origin;
         if (constraint.lexical_key != 0) return self.collect(constraint.scope, constraint.node);
         if (constraint.source_selection) {
             const scope = try self.callableScope(constraint.target);
@@ -11491,11 +11497,28 @@ const ClosureRegion = struct {
         if (right) |identity| if (left == null or !std.meta.eql(left.?, identity)) {
             if (try self.binaryCandidate(constraint, identity)) return true;
         };
-        const left_evidence = try self.project(constraint.left);
-        const right_evidence = try self.project(constraint.right);
+        var left_evidence = try self.project(constraint.left);
+        var right_evidence = try self.project(constraint.right);
+        if (fallback) {
+            // A callable operand can have a known parameter and result while
+            // its latent effect row remains open. That row cannot make the
+            // callable acquire an associated operator, so retain the known
+            // shape for a source diagnostic after both candidates failed.
+            if (left_evidence == 0) left_evidence = try self.diagnosticCallable(constraint.left);
+            if (right_evidence == 0) right_evidence = try self.diagnosticCallable(constraint.right);
+        }
         if (left_evidence == 0 or right_evidence == 0) return false;
         const owner = self.scratch.sources.items[constraint.scope].owner;
         return self.failDispatchConstraint(constraint, if (constraint.member == 0) .ambiguous_operator else .missing_associated, try self.session.rejectedCandidates(owner, constraint.op, constraint.member, left_evidence, right_evidence, true));
+    }
+    fn diagnosticCallable(self: *ClosureRegion, ty: types.Id) RegionError!type_evidence.Id {
+        const node = self.solver.node(try self.solver.resolve(ty, 0));
+        if (node.tag != .function) return 0;
+        const parameter = try self.project(node.a);
+        const result = try self.project(node.b);
+        if (parameter == 0 or result == 0) return 0;
+        // Used only by the diagnostic display, never by dispatch selection.
+        return self.session.storage.evidence.internWithEffects(.function, parameter, result, 0, &.{});
     }
     fn resultConstraint(self: *ClosureRegion, constraint: Constraint) RegionError!bool {
         const identity = try self.identityOf(constraint.result) orelse return false;

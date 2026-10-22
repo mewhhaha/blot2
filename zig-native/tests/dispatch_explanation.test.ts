@@ -64,6 +64,125 @@ Deno.test("operator failures explain prelude dispatch through the CLI", async ()
   }
 });
 
+Deno.test("callable subtraction reports source operands and recovers after correction", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const invalid = `entry const good = fn (value: F32) -> F32 => value - 1.0
+entry const broken = fn (value: F32) -> F32 => do:
+  let transform: F32 -> F32 = fn (x: F32) => x + 1.0
+  return transform - value
+`;
+  const corrected = invalid.replace(
+    "transform - value",
+    "transform value - value",
+  );
+  try {
+    for (const codegenTier of ["development", "optimized"] as const) {
+      const compiler = await createZigProjectCompiler({
+        executable,
+        entry,
+        prelude,
+        codegenTier,
+      });
+      try {
+        const bad = await compiler.build({ sources: { [entry]: invalid } });
+        ok(!bad.success);
+        equal(bad.diagnostics[0].code, "missing_associated");
+        equal(bad.diagnostics[0].filename, entry);
+        const start = invalid.indexOf("transform - value");
+        equal([bad.diagnostics[0].start, bad.diagnostics[0].end], [
+          start,
+          start + "transform - value".length,
+        ]);
+        equal(bad.diagnostics[0].explanation, {
+          operation: "-",
+          member: "sub",
+          candidates: [
+            { side: "left", operand: "(F32 -> F32)", outcome: "no_member" },
+            { side: "right", operand: "F32", outcome: "incompatible" },
+          ],
+          truncated: false,
+        });
+        ok(bad.diagnostics[0].related?.filename.endsWith("prelude.blot"));
+        const fixed = await compiler.build({ sources: { [entry]: corrected } });
+        ok(fixed.success, JSON.stringify(fixed));
+        const guest = await instantiateGuest(fixed.bytes);
+        try {
+          equal(guest.call("good", 2.5), 1.5);
+          equal(guest.call("broken", 2.5), 1);
+        } finally {
+          guest.dispose();
+        }
+        const again = await compiler.build({ sources: { [entry]: invalid } });
+        ok(!again.success);
+        equal(again.diagnostics[0].code, "missing_associated");
+        const recovered = await compiler.build({
+          sources: { [entry]: corrected },
+        });
+        ok(recovered.success, JSON.stringify(recovered));
+        equal(recovered.bytes, fixed.bytes);
+      } finally {
+        await compiler.dispose();
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
+Deno.test("imported generic subtraction points to the mismatched call", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const helper = `${directory}/helper.blot`;
+  const generic = "const difference = fn left => fn right => left - right\n";
+  const invalid = `import { difference } from "./helper"
+entry const broken = fn (value: F32) -> F32 => do:
+  let transform: F32 -> F32 = fn (x: F32) => x + 1.0
+  return difference transform value
+`;
+  const corrected = invalid.replace(
+    "difference transform value",
+    "difference (transform value) value",
+  );
+  const compiler = await createZigProjectCompiler({
+    executable,
+    entry,
+    prelude,
+  });
+  try {
+    const bad = await compiler.build({
+      sources: { [entry]: invalid, [helper]: generic },
+    });
+    ok(!bad.success);
+    equal(bad.diagnostics[0].code, "missing_associated");
+    equal(bad.diagnostics[0].filename, entry);
+    const start = invalid.indexOf("difference transform value");
+    equal([bad.diagnostics[0].start, bad.diagnostics[0].end], [
+      start,
+      start + "difference transform value".length,
+    ]);
+    equal(
+      bad.diagnostics[0].explanation?.candidates.map((candidate) =>
+        candidate.operand
+      ),
+      ["(F32 -> F32)", "F32"],
+    );
+    const fixed = await compiler.build({
+      sources: { [entry]: corrected, [helper]: generic },
+    });
+    ok(fixed.success, JSON.stringify(fixed));
+    const guest = await instantiateGuest(fixed.bytes);
+    try {
+      equal(guest.call("broken", 2.5), 1);
+    } finally {
+      guest.dispose();
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 const library = "type Meters is data=#Meters F32\n" +
   "const meters = fn (value: F32) => #Meters value\n";
 const method = "const Meters.add = fn left => fn right => do:\n" +
