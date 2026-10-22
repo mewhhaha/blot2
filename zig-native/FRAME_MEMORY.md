@@ -104,3 +104,65 @@ foreign matrix, an optional field and an array field, nested comprehension and
 flatten. Report `blot:cycle_*` and `blot:rc_*` per frame, committed memory over
 many frames, and ms per frame at N = 128, 512 and 2048. The existing
 cyclic-reclamation laws must keep passing.
+
+## Current gdev density control (22 October 2026)
+
+The original #16 saved game and its exact 151 positions did not survive. A
+new, reproducible control uses gdev `52fbc5a`, Ink `1a291a1`, Pen `8008d95`
+and blot2 `97e386b`. The [density seeder](../scripts/bench_issue16_source.py)
+changes only gdev's starting `Salt`: 151 settled stacks on the same
+13-column grid with one, four or eight bricks per stack. The zero control has
+no stacks. The console event
+`console=7,0` starts the sandbox with that salt, and no gnorps are hired. Run
+the script on an **isolated gdev checkout**, then run Pen's CPU-only benchmark:
+
+```sh
+python3 scripts/bench_issue16_source.py /path/to/isolated-gdev 8
+pen bench --project /path/to/isolated-gdev --frames 360 \
+  --script 'console=7,0 wait=359' --json
+```
+
+Each case ran 360 frames at fixed 60 Hz, excluding the first 120. These are
+one-run medians on a 5-vCPU AMD EPYC 9V45 cloud instance with Wasmtime 49.0.3;
+the development compiler used Zig 0.17.0 with `-Dllvm=false` (compiler identity
+`d6dcddc9…`). The game and its source remained the same except for the seeded
+stack count. All four builds, frames and periodic snapshots completed.
+
+| Bricks | Stacks | Guest median | Guest p95 |
+| ---: | ---: | ---: | ---: |
+| 0 | 0 | 0.539 ms | 0.599 ms |
+| 151 | 151 | 1.132 ms | 1.260 ms |
+| 604 | 151 | 1.936 ms | 2.064 ms |
+| 1,208 | 151 | 2.916 ms | 3.244 ms |
+
+This measures the real current game and Pen guest path, but uses newly seeded
+positions and a different machine from the issue's capture. It cannot be
+substituted for the old before/after ratio. Pen's CPU-only benchmark does not
+measure rendering, GPU time or whole-frame latency. The reduced executed-Wasm
+law still supplies the before/after cycle result: 68 passes per frame to zero
+and about 10× lower guest cost at 2,048 draw records. The current game density
+control establishes that guest CPU is below the issue's 16.7 ms whole-frame
+budget even at 1,208 bricks; the whole-frame target remains unmeasured here.
+
+A separate run of the same four fixtures used a temporary, Pen-side counter
+probe after each guest frame. It sampled the 240 frames after warm-up and
+excluded periodic snapshots from these counter deltas; its timings are not the
+table above. The exact [probe patch](../scripts/bench_issue16_pen_counters.patch)
+against Pen `8008d95` writes no measurements unless
+`PEN_BENCH_COUNTERS=1` is set.
+
+| Bricks | Cycle passes/frame | Vertices/frame | RC retains/frame | RC releases/frame | Committed memory |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 7.1 | 410 | 17,419 | 24,803 | 0.875 MiB |
+| 151 | 15.5 | 883 | 53,222 | 73,003 | 1.125 MiB |
+| 604 | 23.9 | 974 | 121,311 | 154,710 | 1.938 MiB |
+| 1,208 | 35.7 | 1,105 | 214,874 | 266,594 | 3.375 MiB |
+
+No cycle bytes were reclaimed in any measured window. The full game still has
+cycle passes, unlike the reduced acyclic draw law, but the collector now visits
+roughly 1,105 vertices per heavy frame rather than repeatedly traversing the
+large draw graph. Ordinary RC destruction remains active. A 1,200-frame
+1,208-brick run ended with the same 3.375 MiB committed as the 360-frame run,
+and its guest median was 2.95 ms. Retain/release traffic is still proportional
+to the draw count; it is the next measurement target if whole-frame latency
+remains high on a GPU host.
