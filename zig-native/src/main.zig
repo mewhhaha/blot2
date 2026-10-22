@@ -33,7 +33,7 @@ const usage =
     \\       Project options accept --input-mode project|source (default: project).
     \\       --profile (build, build-project) adds detailed backend clocks to the stats record.
     \\       --explain-demands reports bounded source-site demand lowering decisions.
-    \\       --explain-allocations reports bounded array-edit ownership decisions.
+    \\       --explain-allocations reports bounded emitted allocation sites and array-edit ownership decisions.
     \\       --inference-budget STEPS sets a process-local inference limit (default: 1000000).
     \\       --semantic-workers 1..16 (build, build-project, serve-project) opts into private semantic jobs.
     \\
@@ -491,7 +491,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         var compiled = emitted: {
             const timing = phase_profile.enter(.backend);
             defer timing.exit();
-            break :emitted try backend.compileWithOptions(allocator, units, loaded.entry, .{ .io = io, .policy = policy, .profile_backend = profile_requested, .explain_demands = explain_demands, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null });
+            break :emitted try backend.compileWithOptions(allocator, units, loaded.entry, .{ .io = io, .policy = policy, .profile_backend = profile_requested, .explain_demands = explain_demands, .explain_allocations = explain_allocations, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null });
         };
         defer {
             const result_release_start = now(io);
@@ -518,6 +518,10 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         }
         if (compiled.demand_lowering) |snapshot| {
             try std.json.Stringify.value(.{ .kind = "demand_lowering", .sites = snapshot.sites, .omitted = snapshot.omitted }, .{}, writer);
+            try writer.writeByte('\n');
+        }
+        if (compiled.allocation_emission) |snapshot| {
+            try std.json.Stringify.value(.{ .kind = "allocation_sites", .sites = snapshot.sites, .omitted = snapshot.omitted }, .{}, writer);
             try writer.writeByte('\n');
         }
         if (explain_allocations) {

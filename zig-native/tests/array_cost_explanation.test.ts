@@ -3,6 +3,14 @@ import { observeGuestAllocations } from "../../scripts/bench/guest_heap_observer
 
 const source = `
 import * as array from "std/array"
+type Box is data = #Box { a: U32, b: U32 }
+const boxed = fn value => #Box { a: value, b: value + 1 }
+const read_box = fn (row: Box) => row.a + row.b
+entry const nominal = fn value => read_box (boxed value)
+const choose = fn x => if x > 0 then (fn y => y + x) else (fn y => y + 1)
+entry const selected = fn x => do:
+  let f = choose x
+  break f 2
 entry const direct = fn count => do:
   let values = array.fill count 0
   for index in 0..count:
@@ -16,16 +24,25 @@ entry const snapshot = fn count => do:
   break values[count - 1] + previous[count - 1]
 `;
 
-type ArrayCostSite = {
+type SourceSite = {
   filename: string;
   start: number;
   end: number;
   offset_encoding: string;
+};
+
+type ArrayCostSite = SourceSite & {
   result: string;
   reason: string;
 };
 
-Deno.test("array cost remarks locate exclusive and retained-snapshot edits without changing Wasm", async () => {
+type EmissionSite = SourceSite & {
+  kind: string;
+  requested_bytes: number | null;
+  emissions: number;
+};
+
+Deno.test("allocation remarks locate array edits, nominal storage and closure capture without changing Wasm", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-array-cost-" });
   const entry = `${directory}/main.blot`;
   const wasm = `${directory}/main.wasm`;
@@ -62,6 +79,34 @@ Deno.test("array cost remarks locate exclusive and retained-snapshot edits witho
     assert.equal(
       ordinary.records.filter((record) => record.kind === "array_costs").length,
       0,
+    );
+    assert.equal(
+      ordinary.records.filter((record) => record.kind === "allocation_sites")
+        .length,
+      0,
+    );
+    const emissions = explained.records.filter((record) =>
+      record.kind === "allocation_sites"
+    );
+    assert.equal(emissions.length, 1);
+    const constructor = source.indexOf("#Box { a: value, b: value + 1 }");
+    const nominalSites = (emissions[0].sites as EmissionSite[]).filter((site) =>
+      site.filename === entry && site.start === constructor &&
+      site.end === constructor + "#Box { a: value, b: value + 1 }".length
+    );
+    assert.deepEqual(
+      nominalSites.map((
+        site,
+      ) => [site.kind, site.requested_bytes, site.emissions]),
+      [["aggregate_storage", 8, 1], ["constructor_storage", 8, 1]],
+    );
+    const closure = source.indexOf("fn y => y + x");
+    assert(
+      (emissions[0].sites as EmissionSite[]).some((site) =>
+        site.filename === entry && site.start === closure &&
+        site.end === closure + "fn y => y + x".length &&
+        site.kind === "closure_storage"
+      ),
     );
     const reports = explained.records.filter((record) =>
       record.kind === "array_costs"

@@ -42,6 +42,16 @@ fn backendScenario(allocator: std.mem.Allocator, module: *const core.Module) !vo
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
 }
+fn emissionExplanationScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var result = try backend.compileWithOptions(allocator, &.{module.*}, 1, .{ .explain_allocations = true });
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    const snapshot = result.allocation_emission orelse return error.MissingAllocationExplanation;
+    for (snapshot.sites) |site| {
+        try std.testing.expectEqual(@as(u32, 1), site.unit);
+        try std.testing.expect(site.span.end > site.span.start);
+    }
+}
 test "exclusive owned array survives nested carries and backend allocation failures after frontend teardown" {
     const a = std.testing.allocator;
     var module = try lower(a,
@@ -61,6 +71,8 @@ test "exclusive owned array survives nested carries and backend allocation failu
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, proofScenario, .{&module});
     try backendScenario(a, &module);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, backendScenario, .{&module});
+    try emissionExplanationScenario(a, &module);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emissionExplanationScenario, .{&module});
     try std.testing.expectEqualSlices(core.Node, before_nodes, module.nodes);
     try std.testing.expectEqualSlices(core.Binding, before_bindings, module.bindings);
 }

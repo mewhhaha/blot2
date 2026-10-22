@@ -698,8 +698,18 @@ cannot resolve, or an edit of the same array in a later argument of that call
 keeps the copy. A non-scalar element the callee reads still blocks nested
 in-place edits, as a direct read does.
 
-Pass `--explain-allocations` to `blotc build-project` (or `blotc build`) for a
-bounded JSON-lines `array_costs` record. Each site points to a recognized
+Pass `--explain-allocations` to `blotc build-project` (or `blotc build`) for
+bounded JSON-lines `allocation_sites` and `array_costs` records. An
+`allocation_sites` entry points to a source expression at which an allocator
+call was emitted before Wasm optimization. Its `kind` identifies closure,
+constructor, aggregate, boxed-constant, call, or array storage;
+`requested_bytes` is the immediate request size when known, and `emissions`
+counts emitted sites across code instances, not executions. Later optimization
+can remove these allocations. Allocations inside runtime helpers or without a
+source site are absent, so this record is not a complete runtime count. The
+executed-Wasm allocation tests give measured traffic after optimization.
+
+Each `array_costs` site points to a recognized
 array edit with UTF-8 byte offsets. `reuse_eligible` means the Core ownership
 proof admits updating that local version in place; `copy_required` means it
 cannot prove exclusive ownership. The `reason` names the failed condition:

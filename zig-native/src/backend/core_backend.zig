@@ -52,6 +52,7 @@ pub const Diagnostic = struct {
 pub const ArtifactSummary = struct { demands: usize, jobs: usize, functions: usize, helpers: usize, emission_events: usize, metadata_events: usize, operation_symbols: usize, templates: usize, pinned_modules: usize };
 pub const Result = struct {
     demand_lowering: ?@import("demand_lowering.zig").Snapshot = null,
+    allocation_emission: ?@import("allocation_emission.zig").Snapshot = null,
     timing: @import("backend_timing.zig").Stats = .{},
     /// Deterministic work counters for budgets; unlike timing, always recorded.
     counters: @import("../work_counters.zig").Counters = .{},
@@ -88,6 +89,7 @@ pub const Result = struct {
     startup_observation: ?startup_emission_facts.Snapshot = null,
     pub fn deinit(self: *Result, allocator: Allocator) void {
         if (self.demand_lowering) |*snapshot| snapshot.deinit(allocator);
+        if (self.allocation_emission) |*snapshot| snapshot.deinit(allocator);
         allocator.free(self.bytes);
         allocator.free(self.owned_message);
         if (self.explanation) |explanation| explanation.deinit(allocator);
@@ -2267,6 +2269,7 @@ pub const CompileOptions = struct {
     inline_named: bool = true,
     /// Collect bounded explanations; code is regenerated to observe every site.
     explain_demands: bool = false,
+    explain_allocations: bool = false,
     /// Private differential/qualification controls, never source language limits.
     ragged_builders: bool = true,
     constant_receipts: bool = true,
@@ -2628,6 +2631,7 @@ const CompileRun = struct {
         result.optimization.split_declined = self.generator.evaluator.split_declined;
         result.counters = self.generator.evaluator.counters;
         result.demand_lowering = try self.generator.demand_lowering.take(self.allocator);
+        if (self.options.explain_allocations) result.allocation_emission = try @import("allocation_emission.zig").capture(self.allocator, self.units, self.options.identity, &self.generator.module, self.entry, self.options.diagnostic_prelude_unit);
         if (self.options.observe_startup) result.startup_observation = try self.generator.planning.startup_facts.capture(self.allocator, &self.generator.module);
         result.principal = self.generator.principalStats();
         if (self.query_state) |state| result.completed_queries = state.stats;
