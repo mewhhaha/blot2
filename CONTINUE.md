@@ -1,5 +1,44 @@
 # Continue here
 
+## Issue #25: minimal task/channel/control surface (22 October 2026)
+
+Blot2 main is at `e3e7463`. The only open GitHub issue is #25. The current
+one-result task slice implements `*(call)` and `|handle|` inside a direct
+`@task.scope` callback. An ordinary `const await = fn source => |source|`
+consumes a task handle and returns its exact result through local aliases and
+renamed imports. The compiler freezes and validates that helper's exact join
+body, specializes its erased handle layout, and seals bottom-typed Wasm blocks
+after function exits (which repaired F32 returns). The full gate passed:
+2,510 native laws in four exhaustive shards, 1,633 guest/client checks,
+release build and harness/smoke checks. Zig lint found zero issues.
+
+Issue #25 is **open**. Tuple collect/select, stream channels, scoped nonlocal
+exits, purity proofs, worker transport and their benchmarks are not implemented.
+The next boundary is helper propagation for task regions:
+
+- `parse/parser.zig` binds `*call` to `task_group` and rewrites it immediately
+  to `@task.spawn`; the parser only sets that group for a literal
+  `@task.scope (fn group => ...)` callback. A helper that sparks work outside
+  that literal syntax currently fails before type checking.
+- `check/check.zig::taskApplication` requires a syntactic lambda for
+  `@task.scope`, so `const scope = fn body => @task.scope body` reports
+  `task_escape`. `const spawn = fn group => fn action => @task.spawn group
+  action` also reports `task_escape` when its closure captures the group.
+- The implementation must carry a validated, generative region contract
+  through wrappers/imports and elaborate spark after checking that evidence.
+  Do not recognize prelude names as keywords or weaken the existing escape
+  diagnostics. Start with `scope`/`spawn` helper execution in both tiers and
+  fresh/retained/imported checks, then tuple receive and the later stages in
+  #25's stated order. Use the native Zig backend for development and the LLVM
+  build only for release qualification.
+
+The issue body revised at 19:59 UTC intentionally has only `*` and receiver
+bars as new surface syntax; it excludes `tasks`, `async`, `finish`, `defer` and
+`channel` block keywords. Keep `return` as function exit and `break value`
+as the nearest `do` result. The untouched `/workspace/blot2` checkout is
+dirty; work in the isolated `/workspace/.issue25-next` checkout or a fresh
+worktree without overwriting it.
+
 22 October 2026: the release build-cost follow-up is qualified on main. A
 single non-inlined `CaptureScratch.deinit` owns `captureBody`'s partial lists;
 the transfer and allocation-failure paths remain covered. The compiler-only
