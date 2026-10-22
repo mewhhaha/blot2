@@ -144,41 +144,47 @@ entry const broken = fn (value: F32) -> F32 => do:
     "difference transform value",
     "difference (transform value) value",
   );
-  const compiler = await createZigProjectCompiler({
-    executable,
-    entry,
-    prelude,
-  });
   try {
-    const bad = await compiler.build({
-      sources: { [entry]: invalid, [helper]: generic },
-    });
-    ok(!bad.success);
-    equal(bad.diagnostics[0].code, "missing_associated");
-    equal(bad.diagnostics[0].filename, entry);
-    const start = invalid.indexOf("difference transform value");
-    equal([bad.diagnostics[0].start, bad.diagnostics[0].end], [
-      start,
-      start + "difference transform value".length,
-    ]);
-    equal(
-      bad.diagnostics[0].explanation?.candidates.map((candidate) =>
-        candidate.operand
-      ),
-      ["(F32 -> F32)", "F32"],
-    );
-    const fixed = await compiler.build({
-      sources: { [entry]: corrected, [helper]: generic },
-    });
-    ok(fixed.success, JSON.stringify(fixed));
-    const guest = await instantiateGuest(fixed.bytes);
-    try {
-      equal(guest.call("broken", 2.5), 1);
-    } finally {
-      guest.dispose();
+    for (const codegenTier of ["development", "optimized"] as const) {
+      const compiler = await createZigProjectCompiler({
+        executable,
+        entry,
+        prelude,
+        codegenTier,
+      });
+      try {
+        const bad = await compiler.build({
+          sources: { [entry]: invalid, [helper]: generic },
+        });
+        ok(!bad.success);
+        equal(bad.diagnostics[0].code, "missing_associated");
+        equal(bad.diagnostics[0].filename, entry);
+        const start = invalid.indexOf("difference transform value");
+        equal([bad.diagnostics[0].start, bad.diagnostics[0].end], [
+          start,
+          start + "difference transform value".length,
+        ]);
+        equal(
+          bad.diagnostics[0].explanation?.candidates.map((candidate) =>
+            candidate.operand
+          ),
+          ["(F32 -> F32)", "F32"],
+        );
+        const fixed = await compiler.build({
+          sources: { [entry]: corrected, [helper]: generic },
+        });
+        ok(fixed.success, JSON.stringify(fixed));
+        const guest = await instantiateGuest(fixed.bytes);
+        try {
+          equal(guest.call("broken", 2.5), 1);
+        } finally {
+          guest.dispose();
+        }
+      } finally {
+        await compiler.dispose();
+      }
     }
   } finally {
-    await compiler.dispose();
     await Deno.remove(directory, { recursive: true });
   }
 });

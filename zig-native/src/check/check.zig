@@ -1724,7 +1724,38 @@ const Engine = struct {
             error.InfiniteType => try self.diagnostic(.infinite_type, id),
             error.TypeMismatch => try self.diagnostic(.type_mismatch, id),
             error.InfiniteEffect => try self.diagnostic(.infinite_effect, id),
-            error.EffectMismatch => try self.diagnostic(.effect_mismatch, id),
+            error.EffectMismatch => {
+                try self.diagnostic(.effect_mismatch, id);
+                const display = @import("../reuse/type_display.zig");
+                const application = self.tree.node(id).tag == .apply;
+                const first = self.types.node(self.types.head(left, 0));
+                const second = self.types.node(self.types.head(right, 0));
+                var expected: std.ArrayList(u8) = .empty;
+                defer expected.deinit(self.allocator);
+                var actual: std.ArrayList(u8) = .empty;
+                defer actual.deinit(self.allocator);
+                var arguments = application and first.tag == .function and second.tag == .function;
+                if (arguments) {
+                    try display.append(self, &expected, first.a);
+                    try display.append(self, &actual, second.a);
+                    // A call can also fail in its result or own effect row.
+                    // Only blame the argument when the rendered pair differs.
+                    if (std.mem.eql(u8, expected.items, actual.items)) arguments = false;
+                }
+                if (!arguments) {
+                    expected.clearRetainingCapacity();
+                    actual.clearRetainingCapacity();
+                    try display.append(self, &expected, left);
+                    try display.append(self, &actual, right);
+                }
+                var detail: std.ArrayList(u8) = .empty;
+                defer detail.deinit(self.allocator);
+                try display.text(self, &detail, if (arguments) "Effect rows do not match; expected argument: " else "Effect rows do not match; one side: ");
+                try display.text(self, &detail, expected.items);
+                try display.text(self, &detail, if (arguments) "; actual argument: " else "; other side: ");
+                try display.text(self, &detail, actual.items);
+                self.diagnostics.items[self.diagnostics.items.len - 1].detail = try detail.toOwnedSlice(self.allocator);
+            },
             error.TypeLimit => try self.diagnostic(.nesting_limit, id),
         };
     }
