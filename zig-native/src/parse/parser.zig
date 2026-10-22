@@ -987,10 +987,7 @@ const Parser = struct {
             const call = self.tree.node(grouped);
             if (call.tag != .group or self.tree.node(call.a).tag != .apply) return self.fail(.task_spark_call);
             if (self.task_group == 0) return self.fail(.task_spark_scope);
-            const parameter = try self.add(.parameter, 0, 0, try self.extra(&.{ 2, 0, 0, 0 }), t.start);
-            const thunk = try self.add(.lambda, parameter, grouped, 0, t.start);
-            const group = try self.add(.name, self.task_group, 0, 0, t.start);
-            return self.collectionIntrinsic("@task.spawn", &.{ group, thunk }, t.start);
+            return self.sparkCall(call.a, t.start);
         }
         if (t.tag == .symbol or t.tag == .star or t.tag == .caret) {
             _ = self.advance();
@@ -998,6 +995,41 @@ const Parser = struct {
             return self.add(.unary, op, try self.application(true), 0, t.start);
         }
         return self.application(true);
+    }
+    /// Evaluate the callable and every supplied argument at the spark site.
+    /// Only the invocation is deferred into the child. The generated bindings
+    /// also make an effectful argument subject to the ordinary let rule.
+    fn sparkCall(self: *Parser, call: Id, start: u32) Error!Id {
+        var operands: std.ArrayList(Id) = .empty;
+        defer operands.deinit(self.allocator);
+        var callee = call;
+        while (self.tree.node(callee).tag == .apply) {
+            const node = self.tree.node(callee);
+            try operands.append(self.allocator, node.b);
+            callee = node.a;
+        }
+        var statements: std.ArrayList(Id) = .empty;
+        defer statements.deinit(self.allocator);
+        var invocation = callee;
+        if (self.tree.node(callee).tag != .name and self.tree.node(callee).tag != .intrinsic) {
+            const function_name = try self.collectionName(start);
+            try statements.append(self.allocator, try self.collectionBinding(function_name, callee, start));
+            invocation = try self.add(.name, function_name, 0, 0, start);
+        }
+        var index = operands.items.len;
+        while (index != 0) {
+            index -= 1;
+            const argument_name = try self.collectionName(start);
+            try statements.append(self.allocator, try self.collectionBinding(argument_name, operands.items[index], start));
+            const argument = try self.add(.name, argument_name, 0, 0, start);
+            invocation = try self.add(.apply, invocation, argument, 0, start);
+        }
+        const parameter = try self.add(.parameter, 0, 0, try self.extra(&.{ 2, 0, 0, 0 }), start);
+        const thunk = try self.add(.lambda, parameter, invocation, 0, start);
+        const group = try self.add(.name, self.task_group, 0, 0, start);
+        const spawn = try self.collectionIntrinsic("@task.spawn", &.{ group, thunk }, start);
+        try statements.append(self.allocator, try self.add(.return_stmt, spawn, 0, 0, start));
+        return self.listNode(.block, statements.items, start);
     }
     fn application(self: *Parser, allow_witness: bool) Error!Id {
         const start = self.current().start;

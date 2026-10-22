@@ -1588,7 +1588,10 @@ applies the same capture, region, and ownership rules as `@task.spawn` and
 `@task.join`; these forms introduce no new block keywords. A spark outside a
 statically known scope receives a diagnostic and can use the explicit
 `@task.spawn group thunk` operation. Tuple receive, streams, and propagation of
-inferred groups through helpers are not yet implemented.
+inferred groups through helpers are not yet implemented. The callable and
+supplied argument expressions are evaluated at the spark site; only the
+invocation runs in the child. Effectful arguments must be bound explicitly
+before sparking.
 
 ```blot
 const add22 = fn value => @u32.add value 22

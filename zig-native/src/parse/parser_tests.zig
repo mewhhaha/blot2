@@ -261,6 +261,33 @@ test "spark and receive lower to checked task operations with bounded syntax" {
     }
 }
 
+test "spark binds call arguments before creating the child" {
+    const source =
+        \\entry const answer = fn () => @task.scope (fn group => do:
+        \\  let pending = *(combine (first 1) (second 2))
+        \\  return |pending|)
+    ;
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(std.testing.allocator);
+    var tree = try parsed(std.testing.allocator, source, &pool);
+    defer tree.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var found = false;
+    for (tree.nodes.items) |node| {
+        if (node.tag != .block or node.b != 3) continue;
+        const statements = tree.list(.{ .start = node.a, .len = node.b });
+        if (tree.node(statements[0]).tag != .let_stmt or tree.node(statements[1]).tag != .let_stmt) continue;
+        if (tree.node(statements[2]).tag != .return_stmt) continue;
+        found = true;
+        const first = tree.node(statements[0]);
+        const second = tree.node(statements[1]);
+        try std.testing.expectEqual(ast.Tag.group, tree.node(first.b).tag);
+        try std.testing.expectEqual(ast.Tag.group, tree.node(second.b).tag);
+        try std.testing.expectEqual(ast.Tag.apply, tree.node(tree.node(statements[2]).a).tag);
+    }
+    try std.testing.expect(found);
+}
+
 test "operator reduction retains each subtree span rather than the full chain span" {
     const source = "infixl 60 (+) = add\ninfixl 70 (*) = multiply\nconst value = 1 + 2 * 3 + 4\n";
     var pool: symbols.Pool = .{};
