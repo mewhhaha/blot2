@@ -838,7 +838,7 @@ export interface ExpressionCursor extends RuleCursorBase<"expression"> {
 
 export interface LambdaCursor extends RuleCursorBase<"lambda"> {
   field(name: "body"): ExpressionCursor;
-  field(name: "parameter"): ParameterCursor;
+  field(name: "parameter"): ReadonlyArray<ParameterCursor>;
   field(name: "result"): readonly [TokenCursor<"literal", "->">, TypeExpressionCursor] | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -1256,7 +1256,7 @@ export interface CollectionExpressionCursor extends RuleCursorBase<"collection_e
 
 export interface CollectionLambdaCursor extends RuleCursorBase<"collection_lambda"> {
   field(name: "body"): CollectionExpressionCursor;
-  field(name: "parameter"): ParameterCursor;
+  field(name: "parameter"): ReadonlyArray<ParameterCursor>;
   field(name: "result"): readonly [TokenCursor<"literal", "->">, TypeExpressionCursor] | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];

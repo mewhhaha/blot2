@@ -43,10 +43,39 @@ Scalars: `Unit` (`()`), `Bool` (`#True`, `#False`), `U32` (`42`, `0xFF`,
 arithmetic wraps at 32 bits; F32 rounds to binary32 and can yield infinity or
 NaN. Prefix `-` negates F32; parenthesize negative arguments: `F32.abs (-2.0)`.
 
-Functions take one argument; curry explicitly for several. Calls associate left:
+Functions take one argument at a time. Calls associate left:
 `f a b` means `(f a) b`. Application binds tighter than infix operators. `f(x)`
 also calls a function; `f(a, b)` passes one tuple. Unit thunks defer work until
 called with `()`, without memoization. Recursion is supported.
+
+Write several parameters after one `fn` to abbreviate a curried chain:
+`fn first second => body` means `fn first => fn second => body`, and
+`fn (first: U32) (second: U32) -> U32 => body` places the result annotation on
+the final stage. A call still uses `f first second`; `f first` remains a partial
+application. The same rule applies to associated functions and callbacks.
+Parameter names in this positional form are local names, not part of the
+callable's public type. To run work **between** curried stages, write the
+explicit nested lambdas; the short form introduces no such work or extra
+allocation beyond the equivalent chain.
+
+For many same-typed arguments, use a parameter record as a named-call
+convention. The record type gives names a public interface, so renaming a
+field requires updating callers. Field expressions run once in their written
+order, even when that differs from the record type's order; unknown and
+duplicate supplied fields receive diagnostics at the supplied field.
+
+```blot
+const rectangle = fn (left: U32) (top: U32) (width: U32) (height: U32) =>
+  @u32.add (@u32.add left top) (@u32.mul width height)
+const placed = rectangle 2 3
+const named_rectangle = fn (args: { left: U32, top: U32, width: U32, height: U32 }) =>
+  rectangle args.left args.top args.width args.height
+entry const area = fn () => named_rectangle { height: 4, width: 5, top: 3, left: 2 }
+```
+
+A record parameter gives callers named fields in any order. Small scalar-record
+helpers can be inlined without a record allocation in optimized builds; the
+development tier may allocate a temporary record.
 
 ```blot
 const twice = fn value => value + value

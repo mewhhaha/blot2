@@ -83,13 +83,14 @@ export default grammar({
     function_binding: ($) =>
       prec.dynamic(
         2,
-        seq(
+        prec.right(seq(
           choice($.binding_keyword, $.entry_binding, $.private_binding),
           field("name", choice($.identifier, $.qualified_function_name)),
           optional($.binding_annotation),
           alias("=", $.operator),
           choice($.lambda_header, $.grouped_lambda),
-        ),
+          repeat(field("parameter", $._parameter)),
+        )),
       ),
 
     grouped_lambda: ($) =>
@@ -111,11 +112,11 @@ export default grammar({
       ),
 
     lambda_header: ($) =>
-      prec(
-        1,
+      prec.right(
+        2,
         seq(
           "fn",
-          field("parameter", $._parameter),
+          repeat1(field("parameter", $._parameter)),
         ),
       ),
 

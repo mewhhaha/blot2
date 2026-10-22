@@ -235,6 +235,9 @@ fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
     var defined: [64]bool = @splat(false);
     @memset(defined[0..body.parameters.len], true);
     var allocations: usize = 0;
+    var reads_reference = false;
+    var writes = false;
+    var calls = false;
     for (body.instructions.items, 0..) |inst, i| switch (inst.op) {
         .local_get => if (inst.operand >= count or !defined[inst.operand]) {
             // A fresh call zeroes its locals. Do not reuse a loop's old value.
@@ -262,13 +265,16 @@ fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
             }
         },
         .call => {
+            calls = true;
             if (inst.operand == arena.mark_acyclic) continue;
             if (!arena.isAllocation(inst.operand) or i == 0) return false;
             const size = body.instructions.items[i - 1];
             if (size.table_reference or size.op != .i32_const or size.operand == 0 or size.operand > 64 or size.operand % 4 != 0) return false;
             allocations += 1;
         },
-        .i32_const, .f32_const, .i32_load, .f32_load, .i32_store, .f32_store, .drop => {},
+        .i32_load, .f32_load => reads_reference = true,
+        .i32_store, .f32_store => writes = true,
+        .i32_const, .f32_const, .drop => {},
         else => {
             // Scalar arithmetic/conversions can trap, but execute at exactly
             // the original call position. Control, host and global operations
@@ -277,7 +283,39 @@ fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
             if (contract.effect != .pure) return false;
         },
     };
-    return allocations != 0 and allocations <= 4;
+    // A small scalar reader of a checked reference parameter can be exposed
+    // to caller-local scalar replacement. A freshly constructed record then
+    // need not escape merely to pass its fields through this call.
+    return (allocations != 0 and allocations <= 4) or
+        (allocations == 0 and !calls and !body.entry and body.result_role == .scalar and body.parameters.len != 0 and body.parameterRole(0) == .reference and reads_reference and !writes and body.codeLength() <= 48);
+}
+
+fn scalarRecordReader(a: A) !void {
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    const arena = try module.ensureArena();
+    const reader = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+    try module.setParameterRoles(reader, ir.packParameterRoles(&.{.reference}));
+    try module.emitSlice(reader, &.{ .{ .op = .local_get }, .{ .op = .i32_load }, .{ .op = .local_get }, .{ .op = .i32_load, .operand = 4 }, .{ .op = .i32_add } });
+    const caller = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+    const row = try module.addLocal(caller, .i32);
+    try module.emitSlice(caller, &.{ .{ .op = .i32_const, .operand = 8 }, .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = row }, .{ .op = .local_get, .operand = row }, .{ .op = .local_get }, .{ .op = .i32_store }, .{ .op = .local_get, .operand = row }, .{ .op = .i32_const, .operand = 2 }, .{ .op = .i32_store, .operand = 4 }, .{ .op = .local_get, .operand = row }, .{ .op = .call, .operand = reader } });
+    var expanded = (try run(a, &module, &module.functions.items[caller])).?;
+    defer expanded.deinit(a);
+    for (expanded.instructions.items) |inst| try std.testing.expect(inst.op != .call or inst.operand != reader);
+    var view = module.functions.items[caller];
+    view.locals = expanded.locals;
+    view.instructions = expanded.instructions;
+    var replaced = (try @import("wasm_sroa.zig").run(a, &module, &view)).?;
+    defer replaced.deinit(a);
+    for (replaced.instructions.items) |inst| try std.testing.expect(inst.op != .call or inst.operand != arena.allocate);
+    module.functions.items[reader].parameter_roles = 0;
+    try std.testing.expect(!admitted(&module, &module.functions.items[reader]));
+}
+
+test "small scalar record reader inlining exposes caller allocation to scalar replacement" {
+    try scalarRecordReader(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, scalarRecordReader, .{});
 }
 
 // A bounded private scalar-result source callee may expose an environment

@@ -78,7 +78,7 @@ type_binder = ("(" name:source_identifier ":" annotation:type_expression ")") ;
 type_group = ("(" (value:type_expression ("," value:type_expression)* ","?)? ")") ;
 
 expression = (value:(package_pack | package_unpack | lambda | do_block | case_expression | if_expression | infix_expression)) ;
-lambda = ("fn" parameter:parameter result:("->" type_expression)? "=>" body:expression) ;
+lambda = ("fn" parameter:parameter+ result:("->" type_expression)? "=>" body:expression) ;
 infix_expression = (head:prefix_expression tails:infix_tail*) ;
 // Standalone $, *, and ^ are also reserved by forwarding, imports, and patterns.
 infix_tail = (operator:(SYMBOL | "$" | "*" | "^" | "|" | named_operator) argument:(lambda | do_block | case_expression | if_expression | prefix_expression)) ;
@@ -147,7 +147,7 @@ else_clause = (LAYOUT_NEWLINE? "else" ":" alternative:suite) ;
 // At this nesting level a pipe begins comprehension qualifiers or a cons tail.
 // Parenthesized and nested expressions retain the ordinary operator grammar.
 collection_expression = (value:(collection_lambda | do_block | case_expression | collection_if | collection_infix)) ;
-collection_lambda = ("fn" parameter:parameter result:("->" type_expression)? "=>" body:collection_expression) ;
+collection_lambda = ("fn" parameter:parameter+ result:("->" type_expression)? "=>" body:collection_expression) ;
 collection_if = ("if" condition:collection_infix "then" consequence:collection_expression "else" alternative:collection_expression) ;
 collection_infix = (head:prefix_expression tails:collection_infix_tail*) ;
 collection_infix_tail = (operator:(SYMBOL | "$" | "*" | "^" | named_operator) argument:(collection_lambda | do_block | case_expression | collection_if | prefix_expression)) ;

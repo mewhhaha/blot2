@@ -12101,6 +12101,26 @@ const Engine = struct {
             return err;
         };
         self.exact_argument_types = saved_exact;
+        // A closed parameter record is also the supported named-argument
+        // convention. Diagnose a misspelled supplied name at that field,
+        // before the structural mismatch collapses to the whole call.
+        if (function.tag == .function) {
+            var supplied_source = node.b;
+            while (self.tree.node(supplied_source).tag == .group) supplied_source = self.tree.node(supplied_source).a;
+            const supplied = self.tree.node(supplied_source);
+            const expected = self.types.node(try self.types.resolve(function.a, 0));
+            if (supplied.tag == .record and supplied.a == 0 and expected.tag == .record) {
+                for (self.tree.children(supplied_source)) |field_source| {
+                    const name = self.tree.node(field_source).a;
+                    for (0..expected.b) |field_index| {
+                        if (self.types.recordField(expected, field_index).name == name) break;
+                    } else {
+                        try self.diagnostic(.unknown_field, field_source);
+                        return try self.types.fresh();
+                    }
+                }
+            }
+        }
         if (self.tree.node(leaf).tag == .intrinsic and std.mem.eql(u8, self.pool.get(self.tree.node(leaf).a), "@type.same") and try self.types.containsRigid(argument, 0)) {
             try self.diagnostic(.abstract_representation_access, node.b);
         }

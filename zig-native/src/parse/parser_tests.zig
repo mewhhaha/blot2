@@ -22,6 +22,41 @@ fn clean(source: []const u8) !void {
     for (tree.spans.items) |span| try std.testing.expect(span.start <= span.end and span.end <= source.len);
 }
 
+test "multi-parameter lambda sugar lowers to a curried chain with the result on the final stage" {
+    const source = "const combine = fn (first: U32) (second: U32) -> U32 => @u32.add first second\n";
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(std.testing.allocator);
+    var tree = try parsed(std.testing.allocator, source, &pool);
+    defer tree.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    const outer = tree.node(tree.valueDecl(tree.roots.items[0]).body);
+    try std.testing.expectEqual(ast.Tag.lambda, outer.tag);
+    try std.testing.expectEqual(@as(ast.Id, 0), outer.c);
+    const inner = tree.node(outer.b);
+    try std.testing.expectEqual(ast.Tag.lambda, inner.tag);
+    try std.testing.expect(inner.c != 0);
+    try std.testing.expectEqual(ast.Tag.parameter, tree.node(outer.a).tag);
+    try std.testing.expectEqual(ast.Tag.parameter, tree.node(inner.a).tag);
+}
+
+fn curriedParameterAllocation(allocator: std.mem.Allocator) !void {
+    const source = "const ninth = fn a b c d e f g h i => i\n";
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parsed(allocator, source, &pool);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var body = tree.valueDecl(tree.roots.items[0]).body;
+    for (0..9) |_| {
+        try std.testing.expectEqual(ast.Tag.lambda, tree.node(body).tag);
+        body = tree.node(body).b;
+    }
+}
+
+test "long curried parameter lists release fallback storage through allocation faults" {
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, curriedParameterAllocation, .{});
+}
+
 test "return exits a function while break value finishes a do and bare break exits a loop" {
     const source =
         \\const choose = fn flag => do:

@@ -1,6 +1,17 @@
 import { deepStrictEqual as equal } from "node:assert/strict";
 import { formatSource } from "./format.ts";
 
+Deno.test("formatter preserves grouped curried parameter lists and named record calls", async () => {
+  const source = `const area=fn (width:U32) (height:U32)=>@u32.mul width height
+const named=fn (fields:{width:U32,height:U32})=>area fields.width fields.height
+entry const answer=fn ()=>named {height:3,width:4}
+`;
+  const formatted = await formatSource(source);
+  equal(formatted.includes("fn (width: U32) (height: U32) =>"), true);
+  equal(formatted.includes("named { height: 3, width: 4 }"), true);
+  equal(await formatSource(formatted), formatted);
+});
+
 Deno.test("formatter preserves continue and a flat pattern guard", async () => {
   const source = `type Candidate is data=#Keep U32|#Skip
 entry const kept=fn (values:Array Candidate)=>do:

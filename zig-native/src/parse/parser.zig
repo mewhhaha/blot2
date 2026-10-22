@@ -813,38 +813,62 @@ const Parser = struct {
     }
     fn lambda(self: *Parser) Error!Id {
         const start = (try self.expect(.kw_fn)).start;
-        const item_start = self.current().start;
-        const demanded = self.eat(.tilde);
-        var unit = false;
-        var name: symbols.Symbol = 0;
-        var annotation: Id = 0;
-        var constraints: Where = .{};
-        var pattern_parameter: Id = 0;
-        if (self.eat(.l_paren)) {
-            if (self.eat(.r_paren)) unit = true else if (self.at(.hash)) {
-                if (demanded) return self.fail(.unexpected_token);
-                pattern_parameter = try self.pattern();
-                _ = try self.expect(.r_paren);
-                name = try self.collectionName(item_start);
+        const Parameter = struct { node: Id, pattern: Id, name: symbols.Symbol, start: u32 };
+        var fixed: [8]Parameter = undefined;
+        var overflow: std.ArrayList(Parameter) = .empty;
+        defer overflow.deinit(self.allocator);
+        var count: usize = 0;
+        while (true) {
+            const item_start = self.current().start;
+            const demanded = self.eat(.tilde);
+            var unit = false;
+            var name: symbols.Symbol = 0;
+            var annotation: Id = 0;
+            var constraints: Where = .{};
+            var pattern_parameter: Id = 0;
+            if (self.eat(.l_paren)) {
+                if (self.eat(.r_paren)) unit = true else if (self.at(.hash)) {
+                    if (demanded) return self.fail(.unexpected_token);
+                    pattern_parameter = try self.pattern();
+                    _ = try self.expect(.r_paren);
+                    name = try self.collectionName(item_start);
+                } else {
+                    name = try self.lowerIdentifier();
+                    _ = try self.expect(.colon);
+                    annotation = try self.typeExpression();
+                    constraints = try self.whereClause();
+                    _ = try self.expect(.r_paren);
+                }
+            } else name = try self.lowerIdentifier();
+            const parameter = try self.add(.parameter, name, annotation, try self.extra(&.{ @as(u32, @intFromBool(demanded)) | (@as(u32, @intFromBool(unit)) << 1), constraints.predicates.start, constraints.predicates.len, constraints.node }), item_start);
+            const item: Parameter = .{ .node = parameter, .pattern = pattern_parameter, .name = name, .start = item_start };
+            if (count < fixed.len) {
+                fixed[count] = item;
             } else {
-                name = try self.lowerIdentifier();
-                _ = try self.expect(.colon);
-                annotation = try self.typeExpression();
-                constraints = try self.whereClause();
-                _ = try self.expect(.r_paren);
+                if (count == fixed.len) try overflow.appendSlice(self.allocator, &fixed);
+                try overflow.append(self.allocator, item);
             }
-        } else name = try self.lowerIdentifier();
-        const parameter = try self.add(.parameter, name, annotation, try self.extra(&.{ @as(u32, @intFromBool(demanded)) | (@as(u32, @intFromBool(unit)) << 1), constraints.predicates.start, constraints.predicates.len, constraints.node }), item_start);
+            count += 1;
+            if (!self.at(.tilde) and !self.at(.l_paren) and !self.at(.identifier)) break;
+            if (count >= 256) return self.fail(.nesting_limit);
+        }
         const result = if (self.eat(.arrow)) try self.typeExpression() else 0;
         _ = try self.expect(.fat_arrow);
         var body = try self.expression();
-        if (pattern_parameter != 0) {
-            const argument = try self.add(.name, name, 0, 0, item_start);
-            const binding = try self.add(.let_stmt, pattern_parameter, argument, try self.extra(&.{ 0, 0, 0, 0, 0 }), item_start);
-            const returned = try self.add(.return_stmt, body, 0, 0, start);
-            body = try self.listNode(.block, &.{ binding, returned }, start);
+        const parameters = if (count <= fixed.len) fixed[0..count] else overflow.items;
+        var index = parameters.len;
+        while (index != 0) {
+            index -= 1;
+            const parameter = parameters[index];
+            if (parameter.pattern != 0) {
+                const argument = try self.add(.name, parameter.name, 0, 0, parameter.start);
+                const binding = try self.add(.let_stmt, parameter.pattern, argument, try self.extra(&.{ 0, 0, 0, 0, 0 }), parameter.start);
+                const returned = try self.add(.return_stmt, body, 0, 0, parameter.start);
+                body = try self.listNode(.block, &.{ binding, returned }, parameter.start);
+            }
+            body = try self.add(.lambda, parameter.node, body, if (index == parameters.len - 1) result else 0, if (index == 0) start else parameter.start);
         }
-        return self.add(.lambda, parameter, body, result, start);
+        return body;
     }
     fn doBlock(self: *Parser) Error!Id {
         const start = (try self.expect(.kw_do)).start;
