@@ -9,6 +9,7 @@ const core = @import("check/core.zig");
 const core_builder = @import("check/core_builder.zig");
 const parallel_lowering = @import("check/parallel_lowering.zig");
 const backend = @import("backend/core_backend.zig");
+const array_cost_explanation = @import("backend/array_cost_explanation.zig");
 const memory = @import("runtime/memory.zig");
 const project = @import("reuse/project.zig");
 const project_check = @import("reuse/project_check.zig");
@@ -32,6 +33,7 @@ const usage =
     \\       Project options accept --input-mode project|source (default: project).
     \\       --profile (build, build-project) adds detailed backend clocks to the stats record.
     \\       --explain-demands reports bounded source-site demand lowering decisions.
+    \\       --explain-allocations reports bounded array-edit ownership decisions.
     \\       --inference-budget STEPS sets a process-local inference limit (default: 1000000).
     \\       --semantic-workers 1..16 (build, build-project, serve-project) opts into private semantic jobs.
     \\
@@ -313,7 +315,7 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
     return ok;
 }
 
-fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, profile_requested: bool, explain_demands: bool, output_path: ?[]const u8, cache_root: ?[]const u8, policy: Policy) !bool {
+fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, profile_requested: bool, explain_demands: bool, explain_allocations: bool, output_path: ?[]const u8, cache_root: ?[]const u8, policy: Policy) !bool {
     // --profile clocks every phase of this compilation until its record and
     // counts its allocations per phase below the requested-bytes tracker.
     var profile: ?phase_profile.Profile = if (profile_requested) .init(io) else null;
@@ -518,6 +520,15 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
             try std.json.Stringify.value(.{ .kind = "demand_lowering", .sites = snapshot.sites, .omitted = snapshot.omitted }, .{}, writer);
             try writer.writeByte('\n');
         }
+        if (explain_allocations) {
+            const filenames = try allocator.alloc([]const u8, units.len);
+            defer allocator.free(filenames);
+            for (filenames, 1..) |*path, id| path.* = loaded.filename(@intCast(id));
+            var snapshot = try array_cost_explanation.analyze(allocator, units, filenames, loaded.entry, loaded.prelude_unit);
+            defer snapshot.deinit(allocator);
+            try std.json.Stringify.value(.{ .kind = "array_costs", .sites = snapshot.sites, .omitted = snapshot.omitted }, .{}, writer);
+            try writer.writeByte('\n');
+        }
         wasm_bytes = compiled.bytes.len;
         emit_us = elapsed(emit_start, io);
         const write_start = now(io);
@@ -640,6 +651,7 @@ fn run(init: std.process.Init) !bool {
         var dependency_path: ?[]const u8 = null;
         var profile = false;
         var explain_demands = false;
+        var explain_allocations = false;
         var policy: Policy = .{};
         var at = first_option;
         while (at < args.len) {
@@ -653,6 +665,12 @@ fn run(init: std.process.Init) !bool {
             if (std.mem.eql(u8, args[at], "--explain-demands")) {
                 if (command != .build and command != .build_project) return false;
                 explain_demands = true;
+                at += 1;
+                continue;
+            }
+            if (std.mem.eql(u8, args[at], "--explain-allocations")) {
+                if (command != .build and command != .build_project) return false;
+                explain_allocations = true;
                 at += 1;
                 continue;
             }
@@ -679,7 +697,7 @@ fn run(init: std.process.Init) !bool {
         }
         options.aliases = aliases.items;
         if (command == .dependencies or dependency_path != null) {
-            if (profile or policy.semantic_components) return false;
+            if (profile or policy.semantic_components or explain_allocations) return false;
             const success = try dependency_cli.processWithOptions(init.io, backing, &output.interface, command == .dependencies, args[2], args[3], dependency_path, options, configured_identity, .{ .explain_demands = explain_demands });
             try output.interface.flush();
             return success;
@@ -693,7 +711,7 @@ fn run(init: std.process.Init) !bool {
         const inputs = if (selected == .build_project or project_command) args[2..3] else args[2..first_option];
         var success = true;
         for (inputs) |filename| {
-            const ok = processProject(init.io, backing, &output.interface, selected, filename, options, profile, explain_demands, if (selected == .build_project) args[3] else null, cache_root, policy) catch |err| {
+            const ok = processProject(init.io, backing, &output.interface, selected, filename, options, profile, explain_demands, explain_allocations, if (selected == .build_project) args[3] else null, cache_root, policy) catch |err| {
                 const stage = switch (selected) {
                     .parse_project => "parse-project",
                     .check_project => "check-project",

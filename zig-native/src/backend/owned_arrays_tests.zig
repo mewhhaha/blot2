@@ -24,11 +24,17 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
     return result;
 }
 fn proofScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
-    var proof = try ownership.Proof.init(allocator, &.{module.*}, 1);
+    var proof = try ownership.Proof.initWithDecisions(allocator, &.{module.*}, 1, true);
     defer proof.deinit(allocator);
     var admitted: usize = 0;
     for (proof.updates) |yes| admitted += @intFromBool(yes);
     try std.testing.expectEqual(@as(usize, 1), admitted);
+    var explained: usize = 0;
+    for (proof.decisions) |decision| if (decision != null) {
+        explained += 1;
+        try std.testing.expectEqual(ownership.Proof.Decision.reused, decision.?);
+    };
+    try std.testing.expectEqual(@as(usize, 1), explained);
 }
 fn backendScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
     var result = try backend.compile(allocator, &.{module.*}, 1);

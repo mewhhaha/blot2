@@ -698,6 +698,20 @@ cannot resolve, or an edit of the same array in a later argument of that call
 keeps the copy. A non-scalar element the callee reads still blocks nested
 in-place edits, as a direct read does.
 
+Pass `--explain-allocations` to `blotc build-project` (or `blotc build`) for a
+bounded JSON-lines `array_costs` record. Each site points to a recognized
+array edit with UTF-8 byte offsets. `reuse_eligible` means the Core ownership
+proof admits updating that local version in place; `copy_required` means it
+cannot prove exclusive ownership. The `reason` names the failed condition:
+`escaped`, `multiple_consumers`, `later_read`, `no_fresh_origin`, `unanchored`,
+`nested_alias`, or `nonexclusive_predecessor`. A retained pre-edit snapshot in
+a loop normally appears as `nonexclusive_predecessor`, because that earlier
+version can still be observed. The report covers only edits recognized by this
+proof, including checked edits an entry may never reach. It is a source-level
+decision, not measured allocator traffic: later optimization may remove an
+edit or its copy. `omitted` counts sites beyond the
+256-site limit, and the requested source is listed before imported modules.
+
 For proven local temporaries, the compiler releases storage after the final
 borrowed read or write. This also covers objects larger than the scalar
 replacement limit, branches, early returns and loop exits. Direct calls can
@@ -732,6 +746,26 @@ written order. Arbitrary higher-order wrappers remain conservative. If an old
 array version is still observed after the edit, replacement copies the whole
 array; doing so on every iteration of a growing loop can be quadratic. Keep an
 exclusive loop carry when only the final version is needed.
+
+For collection construction, `@array.generate count (fn index => value)`
+allocates one fixed-size contiguous result, and `@array.fill` does the same
+with one evaluated fill value. A List loop using an exclusive carry and
+`[...self, value]` grows through the List's bounded leaves, then
+`Array.from_list` copies the final contents once if an Array is needed.
+Avoid repeated Array append/prepend: each step copies the contiguous payload.
+If older List versions remain live, path copying preserves them, so the
+exclusive-growth cost bound no longer applies. A comprehension is another
+documented construction form when its result expression fits the generator
+syntax.
+
+Small pure structural helpers and locally named or inline callbacks can be
+allocation-free in optimized code. A generic callback whose callee cannot be
+resolved, a surviving closure capture, an erased argument needing a box, or a
+nominal constructor can still allocate. Development codegen keeps some
+allocations that optimized scalar replacement removes. Use the executed-Wasm
+allocation matrix in `zig-native/tests/allocation_cost_matrix.test.ts` for
+concrete tier and size comparisons; no source spelling alone guarantees those
+record or closure allocations will disappear.
 
 Constant evaluation uses a separate representation. Append/prepend can extend
 the latest collection version into unused buffer slots, with geometric growth;

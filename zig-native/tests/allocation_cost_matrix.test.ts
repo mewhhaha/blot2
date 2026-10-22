@@ -23,6 +23,14 @@ const replace = array.replace
 const wrapped_replace = fn index value values => replace index value values
 const direct_wrapper = fn index value values => array.replace index value values
 const reordered_wrapper = fn values index value => array.replace index value values
+entry const list_build = fn count => do:
+  let values: List U32 = []
+  for index in 0..count:
+    values := [...self, index]
+  break values.length
+entry const array_generate = fn count => do:
+  let values = array.generate count (fn index => index + 1)
+  break values[count - 1]
 entry const update_direct = fn count => do:
   let values = array.fill count 0
   for index in 0..count:
@@ -93,6 +101,8 @@ Deno.test("allocation cost matrix keeps equivalent results and measures size sca
         for (const count of [32, 128, 512]) {
           for (
             const name of [
+              "list_build",
+              "array_generate",
               "update_direct",
               "update_wrapped",
               "update_direct_wrapper",
@@ -139,6 +149,23 @@ Deno.test("allocation cost matrix keeps equivalent results and measures size sca
           assert(
             traffic("update_snapshot", count).rounded_allocation_bytes >
               direct.rounded_allocation_bytes * 10,
+          );
+        }
+        for (const name of ["list_build", "array_generate"]) {
+          const small = traffic(name, 32).rounded_allocation_bytes;
+          const medium = traffic(name, 128).rounded_allocation_bytes;
+          const large = traffic(name, 512).rounded_allocation_bytes;
+          assert(
+            small > 0,
+            `${codegenTier} ${name} has no observed construction cost`,
+          );
+          assert(
+            medium <= small * 8,
+            `${codegenTier} ${name} grew faster than linear allowance at 128`,
+          );
+          assert(
+            large <= medium * 8,
+            `${codegenTier} ${name} grew faster than linear allowance at 512`,
           );
         }
         if (codegenTier === "optimized") {

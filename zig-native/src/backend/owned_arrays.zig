@@ -19,14 +19,20 @@ const State = struct {
 };
 pub const Proof = struct {
     updates: []bool = &.{},
+    decisions: []?Decision = &.{},
+    pub const Decision = enum { reused, escaped, multiple_consumers, later_read, no_fresh_origin, unanchored, nested_alias, nonexclusive_predecessor };
     pub fn deinit(self: *Proof, allocator: std.mem.Allocator) void {
         allocator.free(self.updates);
+        allocator.free(self.decisions);
         self.* = .{};
     }
     pub fn admits(self: *const Proof, id: core.Id) bool {
         return id < self.updates.len and self.updates[id];
     }
     pub fn init(allocator: std.mem.Allocator, units: []const core.Module, unit_id: u32) !Proof {
+        return initWithDecisions(allocator, units, unit_id, false);
+    }
+    pub fn initWithDecisions(allocator: std.mem.Allocator, units: []const core.Module, unit_id: u32, explain: bool) !Proof {
         const module = &units[unit_id - 1];
         var has_candidate = false;
         for (module.nodes, 0..) |node, i| {
@@ -39,6 +45,10 @@ pub const Proof = struct {
         var result: Proof = .{ .updates = try allocator.alloc(bool, module.nodes.len) };
         errdefer result.deinit(allocator);
         @memset(result.updates, false);
+        if (explain) {
+            result.decisions = try allocator.alloc(?Decision, module.nodes.len);
+            @memset(result.decisions, null);
+        }
         const states = try allocator.alloc(State, module.bindings.len);
         defer allocator.free(states);
         @memset(states, .{});
@@ -276,7 +286,9 @@ pub const Proof = struct {
         for (module.nodes, 0..) |node, i| {
             if (node.tag == .update or node.tag == .array_op or (node.tag == .call or node.tag == .apply)) if (receiver(units, unit_id, @intCast(i))) |binding| {
                 const nested = node.tag == .update and (module.updateSelectors(@intCast(i)).len > 1 or module.updateSelectors(@intCast(i)).len == 0 or module.updateSelectors(@intCast(i))[0].kind == .field);
-                result.updates[i] = states[binding].owned and states[binding].anchored and (!nested or states[binding].deep);
+                const state = states[binding];
+                result.updates[i] = state.owned and state.anchored and (!nested or state.deep);
+                if (explain) result.decisions[i] = if (result.updates[i]) .reused else if (state.escaped) .escaped else if (state.consumers > 1) .multiple_consumers else if (state.last_read >= state.consume and state.last_read != 0) .later_read else if (!state.origin and !state.transfer) .no_fresh_origin else if (!state.anchored) .unanchored else if (nested and !state.deep) .nested_alias else .nonexclusive_predecessor;
             };
         }
         return result;
