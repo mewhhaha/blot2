@@ -261,3 +261,59 @@ remains unchanged during these checks. Evidence is under
 `build/bench/build-cost-publication/`. This establishes focused validation of
 the published changes independently of the pending repairs; the full exhaustive
 gate and LLVM release qualification remain pending.
+
+## `captureBody` release build follow-up (22 October 2026)
+
+`body_check_cache.captureBody` now keeps its partial lists in one
+`CaptureScratch` owner with a non-inlined destructor. Early declines and
+allocation failures release the same fields; slices transferred to a `Body`
+still have their individual error cleanups. This removes the repeated list
+cleanup expansion from the many exits of the capture routine. On the current
+Zig-backend binary, `captureBody` emits 190,574 bytes plus a 2,054-byte cleanup
+function. On the current LLVM release binary it emits 57,213 plus 1,090 bytes.
+The earlier inspected binaries reported 426,073 and 201,681 bytes respectively;
+those binaries used different surrounding source, so the sizes are evidence of
+reduced generated code rather than a controlled whole-build speedup ratio.
+
+The compiler-only LLVM time report on the separate pending candidate finishes
+in **206.15 s**, including **205.50 s** for `blotc`. Zig attributes **199.00 s**
+to LLVM emission, **5.73 s** to declaration work and about **0.16 s** to link
+flush. LLVM pass timing totals 187.49 s; its largest entries are loop strength
+reduction (19.45 s), instruction combining (17.84 s), instruction selection
+(14.62 s) and inlining (14.49 s). The earlier 600-s timeout used another source
+state; neither run is a matched before/after build comparison. Raw reports and
+source/binary pins are under
+`/workspace/blot2/build/bench/compiler-build-cost-release-scratch/` in the
+separate pending checkout.
+
+In the isolated main checkout, the complete LLVM release build, including its
+runtime fixtures, takes **255.10 s**. The full compiler gate takes **754.63 s**:
+all **2,500** native laws execute with exhaustive allocation-failure mode in
+**651.22 s** on four concurrent shards, all **1,587** guest/client checks pass
+in **76.50 s**, and 51 harness plus 48 smoke checks pass. Native execution has
+zero skips, failures, leaks or logged errors. All 513 Zig files pass local lint
+with zero findings. The raw gate is in
+`build/bench/capture-scratch-main-gate/` in the isolated checkout.
+
+The four native shard intervals are 478.44, 494.16, 651.16 and 525.57 s. Their
+combined test duration gives a 537.33-s four-core lower bound, leaving at most
+about 114 s for perfect repartitioning of this run. These test names and
+durations are saved with the gate. Rebalancing is a final-gate opportunity;
+the Zig development loop remains the right path for changes in progress.
+
+The recreated 583-file gdev snapshot verifies the recorded Wasm for the game,
+devtools and `tests/goals_game.blot`, and all seven game edit/revert scenarios
+match fresh output. The three-pair game identity control passes its 1.05 CPU
+guard at paired median 0.995. Identity pairs check benchmark noise; they do not
+measure the patch against an unmodified main compiler. Results are under
+`build/bench/capture-scratch-main-{game,other,retained}-identity/`. A separate
+seven-pair comparison on the pending candidate reports median 0.994 against
+the previous qualified compiler, with identical Wasm between those binaries,
+but both differ from the repository's older recorded game hash; it is only a
+diagnostic, saved in the pending checkout's
+`build/bench/compiler-build-cost-release-scratch/game-cpu-diagnostic/`.
+
+The next 20 **real** changed-source development cycles are still needed before
+claiming a five-minute p95. The two focused checks on this main patch took
+25.64 s with a rebuild and 4.57 s cached. Repeating an unchanged check would
+measure cache replay, not another development cycle.

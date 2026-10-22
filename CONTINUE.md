@@ -1,5 +1,19 @@
 # Continue here
 
+22 October 2026: the release build-cost follow-up is qualified on main. A
+single non-inlined `CaptureScratch.deinit` owns `captureBody`'s partial lists;
+the transfer and allocation-failure paths remain covered. The compiler-only
+LLVM profile completes in 206.15 s on the separate pending candidate, with
+199.00 s in LLVM emission. On the isolated main source, the complete LLVM
+release build including fixtures takes 255.10 s. The full gate passes in
+754.63 s: 2,500 exhaustive native laws in four shards, 1,587 guest/client
+checks, 51 harness checks and 48 smoke checks. Full Zig lint has zero findings.
+The recreated gdev snapshot matches recorded Wasm for the game, devtools,
+largest test and all game edit/revert phases. See
+[development feedback](DEVELOPMENT_TURNAROUND.md#capturebody-release-build-follow-up-22-october-2026)
+for exact scope and timing limits. The separate pending compiler candidate in
+`/workspace/blot2` remains uncommitted and needs its own qualification.
+
 ## Compile-time hills and runtime track (handoff, 19 October 2026)
 
 This section covers the compile-time program in

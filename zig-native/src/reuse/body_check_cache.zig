@@ -2383,6 +2383,56 @@ fn unretainedFacts() bool {
     return false;
 }
 
+// Keep the cleanup outside captureBody: every early decline and allocation
+// failure must release the same partially filled lists without expanding that
+// work into each exit of the capture routine.
+const CaptureScratch = struct {
+    facts: std.ArrayList(Fact) = .empty,
+    bindings: std.ArrayList(Binding) = .empty,
+    old_bindings: std.ArrayList(check.BindingId) = .empty,
+    closed_rows: std.ArrayList(u32) = .empty,
+    type_reads: std.ArrayList(TypeRead) = .empty,
+    predicates: std.ArrayList(Predicate) = .empty,
+    members: std.ArrayList([]u8) = .empty,
+    projections: std.ArrayList(Projection) = .empty,
+    signatures: std.ArrayList(Signature) = .empty,
+    merges: std.ArrayList(Merge) = .empty,
+    loop_carries: std.ArrayList(LoopCarry) = .empty,
+    loop_exits: std.ArrayList(LoopExit) = .empty,
+    exit_bindings: std.ArrayList(u32) = .empty,
+    rebindings: std.ArrayList(Rebinding) = .empty,
+    constructors: std.ArrayList(Constructor) = .empty,
+    accesses: std.ArrayList(Access) = .empty,
+    fields: std.ArrayList(FieldProjection) = .empty,
+    field_tags: std.ArrayList(u32) = .empty,
+    local_schemes: std.ArrayList(LocalScheme) = .empty,
+
+    noinline fn deinit(self: *@This(), a: A) void {
+        self.local_schemes.deinit(a);
+        self.field_tags.deinit(a);
+        self.fields.deinit(a);
+        self.accesses.deinit(a);
+        self.constructors.deinit(a);
+        self.rebindings.deinit(a);
+        self.exit_bindings.deinit(a);
+        self.loop_exits.deinit(a);
+        self.loop_carries.deinit(a);
+        self.merges.deinit(a);
+        self.signatures.deinit(a);
+        self.projections.deinit(a);
+        for (self.members.items) |member| a.free(member);
+        self.members.deinit(a);
+        for (self.predicates.items) |predicate| a.free(predicate.name);
+        self.predicates.deinit(a);
+        self.type_reads.deinit(a);
+        self.closed_rows.deinit(a);
+        self.old_bindings.deinit(a);
+        for (self.bindings.items) |binding| a.free(binding.name);
+        self.bindings.deinit(a);
+        self.facts.deinit(a);
+    }
+};
+
 fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []const u8, checked: *const check.Checked, root: ast.Id, shape: Syntax, names: ?ExternalNames, annotations: ?AnnotationLookup) !?Body {
     if (unretainedFacts()) return null;
     const auxiliary_owner = auxiliary.capture(a, checked, shape.ids) catch |err| {
@@ -2433,24 +2483,8 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
         implementation_selection = true;
     }
     if (global == 0 or interfaceDigest(.{ .store = &checked.types }, checked.bindings[global], checked.obligations, catalog) == null) return null;
-    var facts: std.ArrayList(Fact) = .empty;
-    defer facts.deinit(a);
-    var bindings: std.ArrayList(Binding) = .empty;
-    defer {
-        for (bindings.items) |binding| a.free(binding.name);
-        bindings.deinit(a);
-    }
-    var old_bindings: std.ArrayList(check.BindingId) = .empty;
-    defer old_bindings.deinit(a);
-    var closed_rows: std.ArrayList(u32) = .empty;
-    defer closed_rows.deinit(a);
-    var type_reads: std.ArrayList(TypeRead) = .empty;
-    defer type_reads.deinit(a);
-    var predicates: std.ArrayList(Predicate) = .empty;
-    defer {
-        for (predicates.items) |predicate| a.free(predicate.name);
-        predicates.deinit(a);
-    }
+    var scratch: CaptureScratch = .{};
+    defer scratch.deinit(a);
     const principal = checked.bindings[global].scheme;
     for (checked.obligations[principal.obligations.start..][0..principal.obligations.len]) |predicate| {
         if (!supportedPredicate(predicate) and !declaredPredicate(predicate) and !sharedPredicate(predicate, checked.unit) and !contractPredicate(predicate, catalog) and !operationPredicate(predicate, catalog)) return null;
@@ -2465,12 +2499,12 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             continue;
         }
         const source_position = position(shape.ids, predicate.source) orelse return null;
-        try predicates.ensureUnusedCapacity(a, 1);
+        try scratch.predicates.ensureUnusedCapacity(a, 1);
         const name = try a.dupe(u8, pool.get(predicate.name));
         var value = predicate;
         value.name = 0;
         value.source = 0;
-        predicates.appendAssumeCapacity(.{ .value = value, .position = source_position, .name = name });
+        scratch.predicates.appendAssumeCapacity(.{ .value = value, .position = source_position, .name = name });
     }
     // beginGlobal recreates written clauses from syntax, but covering a body
     // requirement can also solve clause-local parts. Replay the covered
@@ -2490,56 +2524,29 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             if (!typeHash(.{ .store = &checked.types }, part, &proof, &budget, 0, true, &.{}, &.{}, catalog)) return null;
             type_work += 4096 - budget;
         }
-        try predicates.ensureUnusedCapacity(a, 1);
+        try scratch.predicates.ensureUnusedCapacity(a, 1);
         const name = try a.dupe(u8, pool.get(predicate.name));
         var value = predicate;
         value.name = 0;
         value.source = 0;
-        predicates.appendAssumeCapacity(.{ .value = value, .position = source_position, .name = name, .covered = true });
+        scratch.predicates.appendAssumeCapacity(.{ .value = value, .position = source_position, .name = name, .covered = true });
     };
-    var members: std.ArrayList([]u8) = .empty;
-    defer {
-        for (members.items) |member| a.free(member);
-        members.deinit(a);
-    }
-    var projections: std.ArrayList(Projection) = .empty;
-    defer projections.deinit(a);
-    var signatures: std.ArrayList(Signature) = .empty;
-    defer signatures.deinit(a);
-    var merges: std.ArrayList(Merge) = .empty;
-    defer merges.deinit(a);
-    var loop_carries: std.ArrayList(LoopCarry) = .empty;
-    defer loop_carries.deinit(a);
-    var loop_exits: std.ArrayList(LoopExit) = .empty;
-    defer loop_exits.deinit(a);
-    var exit_bindings: std.ArrayList(u32) = .empty;
-    defer exit_bindings.deinit(a);
-    var rebindings: std.ArrayList(Rebinding) = .empty;
-    defer rebindings.deinit(a);
-    var constructors: std.ArrayList(Constructor) = .empty;
-    defer constructors.deinit(a);
-    var accesses: std.ArrayList(Access) = .empty;
-    defer accesses.deinit(a);
-    var fields: std.ArrayList(FieldProjection) = .empty;
-    defer fields.deinit(a);
-    var field_tags: std.ArrayList(u32) = .empty;
-    defer field_tags.deinit(a);
     if (auxiliary_owner) |owner| if (owner.selections.len != 0) {
         implementation_selection = true;
     };
     var needs_selection = false;
-    for (predicates.items) |predicate| if (predicate.name.len != 0 and !predicate.covered) {
+    for (scratch.predicates.items) |predicate| if (predicate.name.len != 0 and !predicate.covered) {
         // Unsolved numeric dispatch is reconstructed from the current
         // principal. Concrete selections retain their signatures below.
         if (predicate.value.kind != .dispatch and predicate.value.kind != .result_dispatch) needs_selection = true;
-        try appendMember(a, &members, predicate.name);
+        try appendMember(a, &scratch.members, predicate.name);
     };
     for (shape.ids, 0..) |id, position_| {
         const path = checked.types.list(checked.access_paths[id]);
         if (path.len != 0) {
             // Dotted projections retain each receiver/result type and the
             // complete positive/negative named candidate frontier.
-            if (tree.node(id).tag != .name or checked.access_nodes[id].len != 0 or path.len > 128 or path.len > 4096 - accesses.items.len) return null;
+            if (tree.node(id).tag != .name or checked.access_nodes[id].len != 0 or path.len > 128 or path.len > 4096 - scratch.accesses.items.len) return null;
             const types = checked.types.list(checked.access_types[id]);
             if (types.len != path.len + 1) return null;
             for (types) |ty| {
@@ -2551,15 +2558,15 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
                 if (projection >= checked.projection_catalog.len) return null;
                 const step = checked.projection_catalog[projection];
                 const variants = checked.types.list(step.variants);
-                if (variants.len % 2 != 0 or variants.len / 2 > 4096 - field_tags.items.len or pool.get(step.field).len == 0) return null;
+                if (variants.len % 2 != 0 or variants.len / 2 > 4096 - scratch.field_tags.items.len or pool.get(step.field).len == 0) return null;
                 if (variants.len == 0) {
                     needs_selection = true;
-                    try appendMember(a, &members, pool.get(step.field));
+                    try appendMember(a, &scratch.members, pool.get(step.field));
                 }
-                const start: u32 = @intCast(field_tags.items.len);
+                const start: u32 = @intCast(scratch.field_tags.items.len);
                 var offset: usize = 0;
-                while (offset < variants.len) : (offset += 2) try field_tags.append(a, variants[offset]);
-                try accesses.append(a, .{ .position = @intCast(position_), .ty = types[index], .nominal = step.nominal, .field = step.field, .tags = .{ .start = start, .len = @intCast(variants.len / 2) } });
+                while (offset < variants.len) : (offset += 2) try scratch.field_tags.append(a, variants[offset]);
+                try scratch.accesses.append(a, .{ .position = @intCast(position_), .ty = types[index], .nominal = step.nominal, .field = step.field, .tags = .{ .start = start, .len = @intCast(variants.len / 2) } });
             }
         }
         const field_id = checked.projection_resolved[id];
@@ -2567,32 +2574,32 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             if (tree.node(id).tag != .field_access) return null;
             const field = checked.projection_catalog[field_id];
             const variants = checked.types.list(field.variants);
-            if (variants.len % 2 != 0 or variants.len / 2 > 4096 - field_tags.items.len) return null;
+            if (variants.len % 2 != 0 or variants.len / 2 > 4096 - scratch.field_tags.items.len) return null;
             if (variants.len == 0) {
                 if (field.field != tree.node(id).b) return null;
                 needs_selection = true;
-                try appendMember(a, &members, pool.get(field.field));
+                try appendMember(a, &scratch.members, pool.get(field.field));
             }
-            const start: u32 = @intCast(field_tags.items.len);
+            const start: u32 = @intCast(scratch.field_tags.items.len);
             var offset: usize = 0;
-            while (offset < variants.len) : (offset += 2) try field_tags.append(a, variants[offset]);
-            try fields.append(a, .{ .position = @intCast(position_), .nominal = field.nominal, .tags = .{ .start = start, .len = @intCast(variants.len / 2) } });
+            while (offset < variants.len) : (offset += 2) try scratch.field_tags.append(a, variants[offset]);
+            try scratch.fields.append(a, .{ .position = @intCast(position_), .nominal = field.nominal, .tags = .{ .start = start, .len = @intCast(variants.len / 2) } });
         }
         const constructor_id = checked.constructor_resolved[id];
         if (constructor_id != 0) {
             const constructor = checked.constructors[constructor_id];
             const nominal = checked.nominals[constructor.nominal];
             if (nominalDigest(.{ .store = &checked.types }, catalog, constructor.nominal) == null) return null;
-            try constructors.append(a, .{ .position = @intCast(position_), .nominal = nominal.identity, .tag = constructor.tag });
+            try scratch.constructors.append(a, .{ .position = @intCast(position_), .nominal = nominal.identity, .tag = constructor.tag });
         }
-        if (tree.node(id).tag == .string) try appendMember(a, &members, pool.get(tree.node(id).a));
+        if (tree.node(id).tag == .string) try appendMember(a, &scratch.members, pool.get(tree.node(id).a));
         if (tree.node(id).tag == .constraint and std.mem.eql(u8, pool.get(tree.node(id).a), "associated")) {
             needs_selection = true;
-            try appendMember(a, &members, pool.get(tree.node(id).b));
+            try appendMember(a, &scratch.members, pool.get(tree.node(id).b));
         }
         if (checked.dispatch_signatures[id] != 0) {
             needs_selection = true;
-            try signatures.append(a, .{ .position = @intCast(position_), .ty = checked.dispatch_signatures[id] });
+            try scratch.signatures.append(a, .{ .position = @intCast(position_), .ty = checked.dispatch_signatures[id] });
         }
         if (checked.demand_calls[id]) {
             // Keep the original call classification and its exact suspended
@@ -2603,7 +2610,7 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             const suspended = checked.demand_types[id];
             if (checked.types.node(checked.types.head(suspended, 0)).tag != .demand or !typeHash(.{ .store = &checked.types }, suspended, &proof, &budget, 0, true, &.{}, &.{}, catalog)) return null;
             type_work += 4096 - budget;
-            try signatures.append(a, .{ .position = @intCast(position_), .ty = suspended, .kind = .demand, .once = checked.demand_once[id] });
+            try scratch.signatures.append(a, .{ .position = @intCast(position_), .ty = suspended, .kind = .demand, .once = checked.demand_once[id] });
         }
         if (checked.demand_binary_left[id]) {
             if (tree.node(id).tag != .binary) return null;
@@ -2612,7 +2619,7 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             const suspended = checked.demand_binary_left_types[id];
             if (checked.types.node(checked.types.head(suspended, 0)).tag != .demand or !typeHash(.{ .store = &checked.types }, suspended, &proof, &budget, 0, true, &.{}, &.{}, catalog)) return null;
             type_work += 4096 - budget;
-            try signatures.append(a, .{ .position = @intCast(position_), .ty = suspended, .kind = .demand_left });
+            try scratch.signatures.append(a, .{ .position = @intCast(position_), .ty = suspended, .kind = .demand_left });
         }
         const ty = checked.expr_types[id];
         var proof: std.crypto.hash.Blake3 = .init(.{});
@@ -2621,14 +2628,14 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
         type_work += 4096 - budget;
         if (tree.node(id).tag == .effect_row) {
             const digest = effectAnnotationDigest(.{ .store = &checked.types }, catalog, tree, id) orelse return null;
-            try type_reads.append(a, .{ .position = @intCast(position_), .digest = digest, .effect = true });
+            try scratch.type_reads.append(a, .{ .position = @intCast(position_), .digest = digest, .effect = true });
         }
         if (tree.node(id).tag == .type_name and !effect_heads.isSet(id - source_nodes.start)) {
             const name = pool.get(tree.node(id).a);
             const variable = name.len != 0 and (std.ascii.isLower(name[0]) or name[0] == '_') and std.mem.findScalar(u8, name, '.') == null;
             if (!variable and !std.mem.eql(u8, name, "U32") and !std.mem.eql(u8, name, "F32") and !std.mem.eql(u8, name, "Bool") and !std.mem.eql(u8, name, "Unit") and !std.mem.eql(u8, name, "Array") and !std.mem.eql(u8, name, "List")) {
                 const digest = annotationDigest(.{ .store = &checked.types }, catalog, name) orelse return null;
-                try type_reads.append(a, .{ .position = @intCast(position_), .digest = digest });
+                try scratch.type_reads.append(a, .{ .position = @intCast(position_), .digest = digest });
             }
         }
         if (checked.projections[id] != std.math.maxInt(u32)) {
@@ -2640,38 +2647,38 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
                 };
                 if (owner == 0) return null;
             }
-            try projections.append(a, .{ .position = @intCast(position_), .index = checked.projections[id], .owner = owner });
+            try scratch.projections.append(a, .{ .position = @intCast(position_), .index = checked.projections[id], .owner = owner });
         }
         var fact: Fact = .{ .ty = ty };
         const rows = checked.types.list(checked.lambda_closed_rows[id]);
-        fact.closed_rows = .{ .start = @intCast(closed_rows.items.len), .len = @intCast(rows.len) };
-        try closed_rows.appendSlice(a, rows);
+        fact.closed_rows = .{ .start = @intCast(scratch.closed_rows.items.len), .len = @intCast(rows.len) };
+        try scratch.closed_rows.appendSlice(a, rows);
         const old_id = checked.resolved[id];
         if (old_id != 0 and old_id != global) {
             const old = checked.bindings[old_id];
-            if (old.kind != .local and old.kind != .parameter and std.mem.findScalar(check.BindingId, old_bindings.items, old_id) == null and old.scheme.obligations.len != 0) {
+            if (old.kind != .local and old.kind != .parameter and std.mem.findScalar(check.BindingId, scratch.old_bindings.items, old_id) == null and old.scheme.obligations.len != 0) {
                 needs_selection = true;
                 var member_budget: usize = 64;
-                if (!try appendSchemeMembers(a, &members, old.scheme, checked.obligations, catalog, &member_budget, &implementation_selection)) return null;
+                if (!try appendSchemeMembers(a, &scratch.members, old.scheme, checked.obligations, catalog, &member_budget, &implementation_selection)) return null;
             }
-            fact.binding = try captureRead(a, checked, pool, catalog, shape, old_id, &bindings, &old_bindings) orelse return null;
+            fact.binding = try captureRead(a, checked, pool, catalog, shape, old_id, &scratch.bindings, &scratch.old_bindings) orelse return null;
         } else if (old_id == global and id != root) return null;
-        try facts.append(a, fact);
+        try scratch.facts.append(a, fact);
     }
     // A residual can observe a completed callee without a direct name at
     // its source node. Own that semantic edge through the same read receipt.
-    for (predicates.items) |predicate| if (predicate.value.kind == .callee_use) {
+    for (scratch.predicates.items) |predicate| if (predicate.value.kind == .callee_use) {
         const target = predicate.value.identity.decl;
-        _ = try captureRead(a, checked, pool, catalog, shape, target, &bindings, &old_bindings) orelse return null;
+        _ = try captureRead(a, checked, pool, catalog, shape, target, &scratch.bindings, &scratch.old_bindings) orelse return null;
         needs_selection = true;
         var member_budget: usize = 64;
-        if (!try appendSchemeMembers(a, &members, checked.bindings[target].scheme, checked.obligations, catalog, &member_budget, &implementation_selection)) return null;
+        if (!try appendSchemeMembers(a, &scratch.members, checked.bindings[target].scheme, checked.obligations, catalog, &member_budget, &implementation_selection)) return null;
     };
     for (checked.merges) |merge| if (position(shape.ids, merge.node)) |at| {
-        const result = try captureLocal(a, checked, pool, catalog, shape, merge.result, &bindings, &old_bindings) orelse return null;
-        const yes = try captureLocal(a, checked, pool, catalog, shape, merge.then_binding, &bindings, &old_bindings) orelse return null;
-        const no = try captureLocal(a, checked, pool, catalog, shape, merge.else_binding, &bindings, &old_bindings) orelse return null;
-        try merges.append(a, .{ .position = at, .result = result, .yes = yes, .no = no });
+        const result = try captureLocal(a, checked, pool, catalog, shape, merge.result, &scratch.bindings, &scratch.old_bindings) orelse return null;
+        const yes = try captureLocal(a, checked, pool, catalog, shape, merge.then_binding, &scratch.bindings, &scratch.old_bindings) orelse return null;
+        const no = try captureLocal(a, checked, pool, catalog, shape, merge.else_binding, &scratch.bindings, &scratch.old_bindings) orelse return null;
+        try scratch.merges.append(a, .{ .position = at, .result = result, .yes = yes, .no = no });
     };
     for (shape.ids, 0..) |id, at| {
         switch (tree.node(id).tag) {
@@ -2679,28 +2686,28 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             else => continue,
         }
         const carries = checked.loop_ranges[id];
-        if (carries.len > 4096 - loop_carries.items.len) return null;
+        if (carries.len > 4096 - scratch.loop_carries.items.len) return null;
         for (checked.loop_carries[carries.start..][0..carries.len]) |carry| {
             if (carry.node != id) return null;
-            const incoming = try captureLocal(a, checked, pool, catalog, shape, carry.incoming, &bindings, &old_bindings) orelse return null;
-            const iteration = try captureLocal(a, checked, pool, catalog, shape, carry.iteration, &bindings, &old_bindings) orelse return null;
-            const backedge = try captureLocal(a, checked, pool, catalog, shape, carry.backedge, &bindings, &old_bindings) orelse return null;
-            const outgoing = try captureLocal(a, checked, pool, catalog, shape, carry.outgoing, &bindings, &old_bindings) orelse return null;
-            try loop_carries.append(a, .{ .position = @intCast(at), .incoming = incoming, .iteration = iteration, .backedge = backedge, .outgoing = outgoing });
+            const incoming = try captureLocal(a, checked, pool, catalog, shape, carry.incoming, &scratch.bindings, &scratch.old_bindings) orelse return null;
+            const iteration = try captureLocal(a, checked, pool, catalog, shape, carry.iteration, &scratch.bindings, &scratch.old_bindings) orelse return null;
+            const backedge = try captureLocal(a, checked, pool, catalog, shape, carry.backedge, &scratch.bindings, &scratch.old_bindings) orelse return null;
+            const outgoing = try captureLocal(a, checked, pool, catalog, shape, carry.outgoing, &scratch.bindings, &scratch.old_bindings) orelse return null;
+            try scratch.loop_carries.append(a, .{ .position = @intCast(at), .incoming = incoming, .iteration = iteration, .backedge = backedge, .outgoing = outgoing });
         }
     }
     for (checked.loop_exits) |exit| if (position(shape.ids, exit.node)) |at| {
         const target = position(shape.ids, exit.loop) orelse return null;
         const current = checked.types.list(exit.bindings);
-        if (loop_exits.items.len == 4096 or current.len > 4096 - exit_bindings.items.len) return null;
-        const start: u32 = @intCast(exit_bindings.items.len);
-        for (current) |binding| try exit_bindings.append(a, try captureLocal(a, checked, pool, catalog, shape, binding, &bindings, &old_bindings) orelse return null);
-        try loop_exits.append(a, .{ .position = at, .loop = target, .bindings = .{ .start = start, .len = @intCast(current.len) } });
+        if (scratch.loop_exits.items.len == 4096 or current.len > 4096 - scratch.exit_bindings.items.len) return null;
+        const start: u32 = @intCast(scratch.exit_bindings.items.len);
+        for (current) |binding| try scratch.exit_bindings.append(a, try captureLocal(a, checked, pool, catalog, shape, binding, &scratch.bindings, &scratch.old_bindings) orelse return null);
+        try scratch.loop_exits.append(a, .{ .position = at, .loop = target, .bindings = .{ .start = start, .len = @intCast(current.len) } });
     };
     for (shape.ids, 0..) |id, at| {
         const update = checked.rebindings[id];
         if (update.path.len == 0) continue;
-        if (tree.node(id).tag != .rebind_stmt or update.path.len > 128 or rebindings.items.len == 4096) return null;
+        if (tree.node(id).tag != .rebind_stmt or update.path.len > 128 or scratch.rebindings.items.len == 4096) return null;
         const nodes = checked.types.list(checked.access_nodes[id]);
         const types = checked.types.list(checked.access_types[id]);
         if (nodes.len != update.path.len or types.len != nodes.len + 1) return null;
@@ -2717,12 +2724,12 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             current = selector.a;
         }
         if (tree.node(current).tag != .name or position(shape.ids, current) == null or !try @import("principal_type_graph.zig").sameOpen(a, &checked.types, checked.expr_types[current], types[0], 128, 4096)) return null;
-        const root_binding = try captureLocal(a, checked, pool, catalog, shape, update.root, &bindings, &old_bindings) orelse return null;
-        const self_binding = try captureLocal(a, checked, pool, catalog, shape, update.self_binding, &bindings, &old_bindings) orelse return null;
-        try rebindings.append(a, .{ .position = @intCast(at), .root = root_binding, .self_binding = self_binding });
+        const root_binding = try captureLocal(a, checked, pool, catalog, shape, update.root, &scratch.bindings, &scratch.old_bindings) orelse return null;
+        const self_binding = try captureLocal(a, checked, pool, catalog, shape, update.self_binding, &scratch.bindings, &scratch.old_bindings) orelse return null;
+        try scratch.rebindings.append(a, .{ .position = @intCast(at), .root = root_binding, .self_binding = self_binding });
     }
     if (auxiliary_owner) |owner| {
-        var mapper: AuxiliaryBindings = .{ .allocator = a, .checked = checked, .pool = pool, .catalog = catalog, .shape = shape, .bindings = &bindings, .origins = &old_bindings };
+        var mapper: AuxiliaryBindings = .{ .allocator = a, .checked = checked, .pool = pool, .catalog = catalog, .shape = shape, .bindings = &scratch.bindings, .origins = &scratch.old_bindings };
         owner.transform(&mapper) catch |err| {
             if (err == error.OutOfMemory) return err;
             return null;
@@ -2731,25 +2738,25 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
     if (auxiliary_owner != null) for (checked.types.nodes.items, 0..) |node, id| {
         if (node.tag != .instance_version) continue;
         const version = catalog.private.?.version(@intCast(id)) orelse continue;
-        if (version.kind == .binding) _ = try captureRead(a, checked, pool, catalog, shape, version.operand, &bindings, &old_bindings) orelse return null;
+        if (version.kind == .binding) _ = try captureRead(a, checked, pool, catalog, shape, version.operand, &scratch.bindings, &scratch.old_bindings) orelse return null;
     };
     var semantic_index: usize = 0;
-    while (semantic_index < old_bindings.items.len) : (semantic_index += 1) {
-        const binding = checked.bindings[old_bindings.items[semantic_index]];
+    while (semantic_index < scratch.old_bindings.items.len) : (semantic_index += 1) {
+        const binding = checked.bindings[scratch.old_bindings.items[semantic_index]];
         if (binding.kind != .local) continue;
         for (checked.obligations[binding.scheme.obligations.start..][0..binding.scheme.obligations.len]) |predicate| if (sharedPredicate(predicate, checked.unit)) {
-            _ = try captureRead(a, checked, pool, catalog, shape, predicate.identity.decl, &bindings, &old_bindings) orelse return null;
+            _ = try captureRead(a, checked, pool, catalog, shape, predicate.identity.decl, &scratch.bindings, &scratch.old_bindings) orelse return null;
         };
     }
-    try orderBindings(a, bindings.items, old_bindings.items, facts.items, merges.items, loop_carries.items, exit_bindings.items, rebindings.items);
+    try orderBindings(a, scratch.bindings.items, scratch.old_bindings.items, scratch.facts.items, scratch.merges.items, scratch.loop_carries.items, scratch.exit_bindings.items, scratch.rebindings.items);
     if (auxiliary_owner) |owner| {
-        var mapper: AuxiliaryBindingSlots = .{ .origins = old_bindings.items };
+        var mapper: AuxiliaryBindingSlots = .{ .origins = scratch.old_bindings.items };
         try owner.transform(&mapper);
     }
     if (auxiliary_owner) |owner| {
         var operation_bindings: std.ArrayList(auxiliary.Owner.OperationBinding) = .empty;
         defer operation_bindings.deinit(a);
-        for (old_bindings.items, 0..) |origin, slot| {
+        for (scratch.old_bindings.items, 0..) |origin, slot| {
             const old = checked.bindings[origin];
             if (old.kind != .parameter and old.kind != .local) continue;
             if (old.operation_ref == 0) continue;
@@ -2757,30 +2764,28 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             try operation_bindings.append(a, .{ .binding = @intCast(slot + 1), .operation = operation_ });
         }
         owner.operation_bindings = try operation_bindings.toOwnedSlice(a);
-        owner.binding_origins = try a.dupe(u32, old_bindings.items);
+        owner.binding_origins = try a.dupe(u32, scratch.old_bindings.items);
     }
-    for (old_bindings.items, bindings.items) |old_id, *binding| {
+    for (scratch.old_bindings.items, scratch.bindings.items) |old_id, *binding| {
         const predecessor = checked.bindings[old_id].predecessor;
-        if (predecessor != 0) binding.predecessor = @intCast((std.mem.findScalar(check.BindingId, old_bindings.items, predecessor) orelse return null) + 1);
+        if (predecessor != 0) binding.predecessor = @intCast((std.mem.findScalar(check.BindingId, scratch.old_bindings.items, predecessor) orelse return null) + 1);
     }
-    for (predicates.items) |*predicate| if (predicate.value.kind == .callee_use) {
-        const target = std.mem.findScalar(check.BindingId, old_bindings.items, predicate.value.identity.decl) orelse return null;
+    for (scratch.predicates.items) |*predicate| if (predicate.value.kind == .callee_use) {
+        const target = std.mem.findScalar(check.BindingId, scratch.old_bindings.items, predicate.value.identity.decl) orelse return null;
         predicate.value.identity = .{ .unit = 0, .decl = @intCast(target + 1) };
     };
-    var local_schemes: std.ArrayList(LocalScheme) = .empty;
-    defer local_schemes.deinit(a);
     var local_requirement_budget: usize = 4096;
-    for (old_bindings.items, 0..) |id, index| {
+    for (scratch.old_bindings.items, 0..) |id, index| {
         const old = checked.bindings[id];
         if (old.kind != .local or (old.scheme.variables.len == 0 and old.scheme.row_variables.len == 0 and old.scheme.closed_rows.len == 0 and old.scheme.obligations.len == 0 and old.scheme.generative.len == 0)) continue;
-        if (old.scheme.obligations.len > 4096 - predicates.items.len) return null;
+        if (old.scheme.obligations.len > 4096 - scratch.predicates.items.len) return null;
         if (old.scheme.obligations.len != 0) {
             needs_selection = true;
             var member_budget: usize = 64;
-            if (!try appendSchemeMembers(a, &members, old.scheme, checked.obligations, catalog, &member_budget, &implementation_selection)) return null;
+            if (!try appendSchemeMembers(a, &scratch.members, old.scheme, checked.obligations, catalog, &member_budget, &implementation_selection)) return null;
         }
         var local = old.scheme;
-        local.obligations = .{ .start = @intCast(predicates.items.len), .len = old.scheme.obligations.len };
+        local.obligations = .{ .start = @intCast(scratch.predicates.items.len), .len = old.scheme.obligations.len };
         for (checked.obligations[old.scheme.obligations.start..][0..old.scheme.obligations.len]) |predicate| {
             // Local requirements own flat roots or a completed callee read.
             // Written clauses retain declaration-relative origins.
@@ -2797,12 +2802,12 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             for ([_]T.Id{ predicate.ty, predicate.other, predicate.result, predicate.signature }) |part| if (!typeHash(.{ .store = &checked.types }, part, &proof, &local_requirement_budget, 0, true, &.{}, &.{}, catalog)) return null;
             var identity = predicate.identity;
             if (predicate.kind == .callee_use) {
-                const target = std.mem.findScalar(check.BindingId, old_bindings.items, predicate.identity.decl) orelse return null;
-                if (bindings.items[target].kind != .global and bindings.items[target].kind != .external) return null;
+                const target = std.mem.findScalar(check.BindingId, scratch.old_bindings.items, predicate.identity.decl) orelse return null;
+                if (scratch.bindings.items[target].kind != .global and scratch.bindings.items[target].kind != .external) return null;
                 // This is an owned binding slot, not a nominal identity.
                 identity = .{ .unit = 0, .decl = @intCast(target + 1) };
             }
-            try predicates.ensureUnusedCapacity(a, 1);
+            try scratch.predicates.ensureUnusedCapacity(a, 1);
             const name = try a.dupe(u8, pool.get(predicate.name));
             var value = predicate;
             value.identity = identity;
@@ -2813,74 +2818,74 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
                 origin.end -= tree.span(root).start;
                 value.qualification_unit = 0;
             }
-            predicates.appendAssumeCapacity(.{ .value = value, .position = source_position, .name = name, .local = true });
+            scratch.predicates.appendAssumeCapacity(.{ .value = value, .position = source_position, .name = name, .local = true });
         }
-        try local_schemes.append(a, .{ .binding = @intCast(index + 1), .principal = local });
+        try scratch.local_schemes.append(a, .{ .binding = @intCast(index + 1), .principal = local });
     }
     var selection_digest: ?Digest = null;
     if (implementation_selection) {
         needs_selection = true;
         for ([_][]const T.Obligation{ checked.contract_predicates, checked.implementation_predicates }) |requirements| for (requirements) |predicate| {
-            if (predicate.kind == .dispatch or predicate.kind == .result_dispatch) try appendMember(a, &members, pool.get(predicate.name));
+            if (predicate.kind == .dispatch or predicate.kind == .result_dispatch) try appendMember(a, &scratch.members, pool.get(predicate.name));
         };
     }
-    if (needs_selection) selection_digest = associatedDigest(.{ .store = &checked.types }, catalog, tree, checked.associated, checked.bindings, checked.obligations, names, members.items) orelse return null;
+    if (needs_selection) selection_digest = associatedDigest(.{ .store = &checked.types }, catalog, tree, checked.associated, checked.bindings, checked.obligations, names, scratch.members.items) orelse return null;
     if (implementation_selection) selection_digest = implementationDigest(.{ .store = &checked.types }, catalog, selection_digest.?) orelse return null;
     const name = try a.dupe(u8, pool.get(tree.valueDecl(root).name));
     errdefer a.free(name);
     const source = try a.dupe(u8, text[span.start..span.end]);
     errdefer a.free(source);
-    const owned_facts = try facts.toOwnedSlice(a);
+    const owned_facts = try scratch.facts.toOwnedSlice(a);
     errdefer a.free(owned_facts);
-    const body_row_start: u32 = @intCast(closed_rows.items.len);
+    const body_row_start: u32 = @intCast(scratch.closed_rows.items.len);
     for (checked.body_closed_rows) |row| if (row.owner == global) {
-        try closed_rows.append(a, row.variable);
+        try scratch.closed_rows.append(a, row.variable);
     };
-    const body_rows: T.List = .{ .start = body_row_start, .len = @intCast(closed_rows.items.len - body_row_start) };
-    const owned_rows = try closed_rows.toOwnedSlice(a);
+    const body_rows: T.List = .{ .start = body_row_start, .len = @intCast(scratch.closed_rows.items.len - body_row_start) };
+    const owned_rows = try scratch.closed_rows.toOwnedSlice(a);
     errdefer a.free(owned_rows);
-    const owned_reads = try type_reads.toOwnedSlice(a);
+    const owned_reads = try scratch.type_reads.toOwnedSlice(a);
     errdefer a.free(owned_reads);
-    const owned_projections = try projections.toOwnedSlice(a);
+    const owned_projections = try scratch.projections.toOwnedSlice(a);
     errdefer a.free(owned_projections);
-    const owned_signatures = try signatures.toOwnedSlice(a);
+    const owned_signatures = try scratch.signatures.toOwnedSlice(a);
     errdefer a.free(owned_signatures);
-    const owned_members = try members.toOwnedSlice(a);
+    const owned_members = try scratch.members.toOwnedSlice(a);
     errdefer {
         for (owned_members) |member| a.free(member);
         a.free(owned_members);
     }
-    const owned_accesses = try accesses.toOwnedSlice(a);
+    const owned_accesses = try scratch.accesses.toOwnedSlice(a);
     errdefer a.free(owned_accesses);
-    const owned_fields = try fields.toOwnedSlice(a);
+    const owned_fields = try scratch.fields.toOwnedSlice(a);
     errdefer a.free(owned_fields);
-    const owned_field_tags = try field_tags.toOwnedSlice(a);
+    const owned_field_tags = try scratch.field_tags.toOwnedSlice(a);
     errdefer a.free(owned_field_tags);
-    const owned_local_schemes = try local_schemes.toOwnedSlice(a);
+    const owned_local_schemes = try scratch.local_schemes.toOwnedSlice(a);
     errdefer a.free(owned_local_schemes);
-    const owned_constructors = try constructors.toOwnedSlice(a);
+    const owned_constructors = try scratch.constructors.toOwnedSlice(a);
     errdefer a.free(owned_constructors);
-    const owned_merges = try merges.toOwnedSlice(a);
+    const owned_merges = try scratch.merges.toOwnedSlice(a);
     errdefer a.free(owned_merges);
-    const owned_rebindings = try rebindings.toOwnedSlice(a);
+    const owned_rebindings = try scratch.rebindings.toOwnedSlice(a);
     errdefer a.free(owned_rebindings);
-    const owned_predicates = try predicates.toOwnedSlice(a);
+    const owned_predicates = try scratch.predicates.toOwnedSlice(a);
     errdefer {
         for (owned_predicates) |predicate| a.free(predicate.name);
         a.free(owned_predicates);
     }
     const loops: ?*Loops = blk: {
-        if (loop_carries.items.len == 0 and loop_exits.items.len == 0 and exit_bindings.items.len == 0) break :blk null;
+        if (scratch.loop_carries.items.len == 0 and scratch.loop_exits.items.len == 0 and scratch.exit_bindings.items.len == 0) break :blk null;
         const owned = try a.create(Loops);
         owned.* = .{};
         errdefer owned.deinit(a);
-        owned.carries = try loop_carries.toOwnedSlice(a);
-        owned.exits = try loop_exits.toOwnedSlice(a);
-        owned.bindings = try exit_bindings.toOwnedSlice(a);
+        owned.carries = try scratch.loop_carries.toOwnedSlice(a);
+        owned.exits = try scratch.loop_exits.toOwnedSlice(a);
+        owned.bindings = try scratch.exit_bindings.toOwnedSlice(a);
         break :blk owned;
     };
     errdefer if (loops) |owned| owned.deinit(a);
-    const owned_bindings = try bindings.toOwnedSlice(a);
+    const owned_bindings = try scratch.bindings.toOwnedSlice(a);
     auxiliary_transferred = true;
     return .{ .auxiliary = auxiliary_owner, .owner = undefined, .name = name, .source = source, .syntax = shape.digest, .facts = owned_facts, .bindings = owned_bindings, .closed_rows = owned_rows, .body_closed_rows = body_rows, .type_work = type_work, .type_reads = owned_reads, .predicates = owned_predicates, .signatures = owned_signatures, .projections = owned_projections, .merges = owned_merges, .loops = loops, .rebindings = owned_rebindings, .constructors = owned_constructors, .local_schemes = owned_local_schemes, .fields = owned_fields, .accesses = owned_accesses, .field_tags = owned_field_tags, .members = owned_members, .selection_digest = selection_digest, .implementation_selection = implementation_selection };
 }
