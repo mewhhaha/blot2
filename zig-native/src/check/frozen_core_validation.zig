@@ -38,7 +38,7 @@ fn reusableModules(modules: []const *const core.Module, comptime caller: bool) b
         // Staged calls now inspect exact foreign bodies and schemes. An owner
         // receipt containing only table bounds cannot reuse that authority.
         for (module.nodes) |node| if (node.tag == .staging or node.tag == .effect_scope) return false;
-        for (module.bindings) |binding| if (binding.scheme.generative.len != 0 or binding.capability_parameters.invokes() or binding.capability_flow == .input_shape) return false;
+        for (module.bindings) |binding| if (binding.scheme.generative.len != 0 or binding.capability_parameters.invokes() or binding.capability_flow == .input_shape or binding.capability_flow == .consume_task) return false;
         for (module.types.nodes) |node| {
             if (node.tag == .existential or node.tag == .forall) return false;
             if (node.tag == .instance_version) return false;
@@ -539,6 +539,19 @@ const Bounds = struct {
                 const body = self.m.bodies[value.body_id];
                 if (value.capability_flow == .input_shape) {
                     try require(value.scheme.generative.len == 0 and @import("capability_flow.zig").unaryCoreWithOwners(self.m, body, .input_shape, self.context.units));
+                    continue;
+                }
+                if (value.capability_flow == .consume_task) {
+                    try require(body.is_function and body.parameters.len == 1 and body.root != 0);
+                    try range(self.m.parameters.len, body.parameters.start, 1);
+                    const formal = self.m.parameters[body.parameters.start];
+                    try require(@import("task_types.zig").isHandle(&self.m.types, formal.ty));
+                    const result = self.m.node(body.root);
+                    try require(result.tag == .task and result.c == @backingInt(@import("task_types.zig").Op.join));
+                    const operands = self.m.children(body.root);
+                    try require(operands.len == 1 and self.m.node(operands[0]).tag == .reference);
+                    const reference = self.m.reference(operands[0]);
+                    try require((reference.unit == 0 or reference.unit == self.m.unit) and reference.binding == formal.binding);
                     continue;
                 }
                 const curried = value.capability_flow == .invoke_with_capability;

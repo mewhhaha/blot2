@@ -6481,10 +6481,19 @@ const Engine = struct {
         var contract = self.capabilityFlowContract(source, 0);
         var parameters = self.capabilityParameters(source, 0);
         if (self.tree.node(source).tag == .name) {
-            const binding = self.resolved[source];
-            if (binding != 0) {
-                contract = self.bindings.items[binding].capability_flow;
-                parameters = self.bindings.items[binding].capability_parameters;
+            var binding = self.resolved[source];
+            for (0..128) |_| {
+                if (binding == 0) break;
+                const resolved = self.bindings.items[binding];
+                contract = resolved.capability_flow;
+                parameters = resolved.capability_parameters;
+                if (contract != .unknown or parameters.present() or resolved.kind != .global or resolved.declaration == 0) break;
+                var alias = self.tree.valueDecl(resolved.declaration).body;
+                while (self.tree.node(alias).tag == .group) alias = self.tree.node(alias).a;
+                if (self.tree.node(alias).tag != .name) break;
+                const next = self.resolved[alias];
+                if (next == binding) break;
+                binding = next;
             }
         }
         if (contract != .unknown and parameters.kind == .invoke_unit) parameters = .{};
@@ -6502,6 +6511,7 @@ const Engine = struct {
             .unknown, .input_shape => return false,
             .identity => return supplied == 0,
             .invoke_unit => return supplied == 0 and self.types.node(try self.types.resolve(argument, 0)).tag == .function,
+            .consume_task => return supplied == 0 and @import("task_types.zig").isHandle(&self.types, argument),
             .member_unit => return supplied == 0 and self.types.node(try self.types.resolve(argument, 0)).tag == .scoped,
             .member_first_unit, .member_second_unit => return supplied < 2 and self.types.node(try self.types.resolve(argument, 0)).tag == .scoped,
             .invoke_with_capability => {
@@ -6618,6 +6628,7 @@ const Engine = struct {
         return try self.types.nominal(family.identity, arguments.items);
     }
     fn capabilityFlowContract(self: *const Engine, source: ast.Id, annotation_: ast.Id) CapabilityFlow {
+        if (@import("capability_flow.zig").taskJoinSource(self.tree, self.pool, source)) return .consume_task;
         const basic = @import("capability_flow.zig").source(self.tree, source);
         if (basic != .unknown) return basic;
         const member = @import("capability_flow.zig").memberSource(self.tree, self.pool, source);
@@ -6940,6 +6951,14 @@ const Engine = struct {
             return result;
         }
         if (operation == .join or operation == .cancel) {
+            if (self.types.node(try self.types.resolve(input, 0)).tag == .variable) {
+                const region = try self.types.capabilityParameter(try self.types.nominal(tasks.group, &.{}));
+                const value = try self.types.fresh();
+                const row = try self.types.freshEffects();
+                const action = try self.types.functionWithEffects(T.unit, value, row);
+                const expected = try self.types.usage(try self.types.nominal(tasks.handle, &.{ region, action }), .unique, 0);
+                try self.constrain(input, expected, first);
+            }
             const wrapper = self.types.node(try self.types.resolve(input, 0));
             if (wrapper.tag != .usage or wrapper.b != @backingInt(T.UsageKind.unique)) {
                 try self.diagnostic(.task_handle_consumed, first);

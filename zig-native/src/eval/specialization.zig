@@ -179,7 +179,7 @@ pub const Service = struct {
             reverse -= 1;
             full = try self.internFunction(key.parameters[reverse], full, key.effects[reverse]);
         }
-        if (!key.dictionaries) try self.refineMappings(unit_id, .{ .body = key.target }, full, &mappings, &rows, body.span);
+        if (!key.dictionaries and source.binding(key.target.binding).capability_flow != .consume_task) try self.refineMappings(unit_id, .{ .body = key.target }, full, &mappings, &rows, body.span);
         return .{ .source = key.target, .root = @fromBackingInt(@intCast(body.root)), .mappings = mappings, .rows = rows };
     }
     // A returned callable may be used under a conservative effect superset.
@@ -309,6 +309,14 @@ pub const Service = struct {
             return self.mapTypeDepth(unit_id, mappings, rows, n.a, concrete, span, depth + 1);
         }
         const representation = self.layouts.node(concrete);
+        // Task handles erase their region and result-arrow arguments in the
+        // runtime layout. The checked call signature still supplies the result
+        // type separately; no argument can be recovered from these two words.
+        if (n.tag == .nominal and n.a == @import("../check/task_types.zig").handle.unit and n.b == @import("../check/task_types.zig").handle.decl) {
+            const words = self.layouts.children(concrete);
+            if (representation.tag != .product or words.len != 2 or words[0] != types.u32_type or words[1] != types.u32_type) return self.decline(unit_id, span, .unresolved_type);
+            return;
+        }
         if (n.tag == .forall and representation.tag == .universal) {
             var inherited_rows: []const RowMapping = &.{};
             if (rows) |values| inherited_rows = values.items;

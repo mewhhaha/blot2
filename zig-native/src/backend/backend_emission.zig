@@ -8258,6 +8258,10 @@ pub const Owner = struct {
         self.labels -= 1;
         _ = self.return_targets.pop();
         try self.emit(.end, 0);
+        // An exit from an enclosing function can leave this block without
+        // targeting its end. Wasm still considers code after `end` reachable;
+        // seal a bottom-typed block so its caller need not supply a value.
+        if (unit_.types.node(unit_.typeOf(id)).tag == .never) try self.emit(.unreachable_, 0);
     }
     fn proofGuard(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;

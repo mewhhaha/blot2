@@ -243,7 +243,7 @@ test "scoped effect public flow contracts validate bodies and release failed all
                 invoke_count += 1;
                 binding.capability_flow = .identity;
             },
-            .unknown, .member_unit, .invoke_with_capability, .member_first_unit, .member_second_unit, .input_shape => unreachable,
+            .unknown, .member_unit, .invoke_with_capability, .member_first_unit, .member_second_unit, .input_shape, .consume_task => unreachable,
         }
         try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
         binding.capability_flow = original;
@@ -253,6 +253,35 @@ test "scoped effect public flow contracts validate bodies and release failed all
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerFlowAndRelease, .{});
     try emit(a, &module);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+}
+
+const task_join_wrapper_source =
+    \\const await = fn source => |source|
+    \\entry const answer = fn () => @task.scope (fn group => do:
+    \\  let pending = @task.spawn group (fn () => 42)
+    \\  return await pending)
+;
+test "task join wrapper contract requires the exact checked join body" {
+    var module = try lowerText(a, task_join_wrapper_source);
+    defer module.deinit(a);
+    try validation.validate(a, &module, .{ .units = &.{&module} });
+    var found: usize = 0;
+    for (module.bindings) |*binding| {
+        if (binding.capability_flow != .consume_task) continue;
+        found += 1;
+        const original = binding.capability_flow;
+        binding.capability_flow = .identity;
+        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
+        binding.capability_flow = original;
+        const root = module.bodies[binding.body_id].root;
+        const task = module.nodes[root];
+        module.nodes[root].c = @backingInt(@import("task_types.zig").Op.cancel);
+        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
+        module.nodes[root] = task;
+    }
+    try std.testing.expectEqual(@as(usize, 1), found);
+    try validation.validate(a, &module, .{ .units = &.{&module} });
+    try emit(a, &module);
 }
 
 const parameter_source =

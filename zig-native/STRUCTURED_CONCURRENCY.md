@@ -21,6 +21,11 @@ children in spawn order, discards unused results and closes the group; returning
 a handle, loan or closure containing the group is rejected. No detached tasks or
 implicit spawn.
 
+`const await = fn source => |source|` is an ordinary helper for one-result
+task receivers. Its checked join contract passes through global aliases and
+imports, so it consumes the handle and returns the task's exact result without
+weakening the enclosing group lifetime.
+
 ```blot
 // Pure sibling tasks.
 entry const sum = fn () => @task.scope (fn group => do:

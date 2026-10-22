@@ -4,7 +4,20 @@
 //! members and curried callbacks retain their input identity in effect rows.
 //! Unknown relationships cannot license an authority transfer.
 const ast = @import("../parse/ast.zig");
-pub const Contract = enum(u8) { unknown, identity, invoke_unit, member_unit, invoke_with_capability, member_first_unit, member_second_unit, input_shape };
+pub const Contract = enum(u8) { unknown, identity, invoke_unit, member_unit, invoke_with_capability, member_first_unit, member_second_unit, input_shape, consume_task };
+
+pub fn taskJoinSource(tree: *const ast.Tree, pool: *const @import("../parse/symbols.zig").Pool, initial: ast.Id) bool {
+    const expression = unwrap(tree, initial) orelse return false;
+    const lambda = tree.node(expression);
+    if (lambda.tag != .lambda) return false;
+    const parameter = tree.parameter(lambda.a);
+    if (parameter.name == 0 or parameter.demanded or parameter.is_unit) return false;
+    const body = tree.node(unwrap(tree, lambda.b) orelse return false);
+    if (body.tag != .apply) return false;
+    const callee = tree.node(unwrap(tree, body.a) orelse return false);
+    const argument = tree.node(unwrap(tree, body.b) orelse return false);
+    return callee.tag == .intrinsic and @import("std").mem.eql(u8, pool.get(callee.a), "@task.join") and argument.tag == .name and argument.a == parameter.name;
+}
 
 pub fn source(tree: *const ast.Tree, initial: ast.Id) Contract {
     const expression = unwrap(tree, initial) orelse return .unknown;
