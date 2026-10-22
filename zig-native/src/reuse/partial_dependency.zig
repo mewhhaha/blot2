@@ -421,7 +421,7 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
 ///   fresh load reads exactly these modules and their implementations.
 fn portableRejection(a: Allocator, source: *const project.Project, issue: checker.Diagnostic) Allocator.Error!bool {
     if (source.input_mode != .project or issue.unit == 0 or issue.unit > source.units.items.len or source.compiledModule(issue.unit) != null) return false;
-    if (issue.hole != null or issue.explanation != null or issue.numeric_literal != null or issue.purity != null or issue.detail != null or issue.source != null) return false;
+    if (issue.hole != null or issue.explanation != null or issue.context_len != 0 or issue.numeric_literal != null or issue.purity != null or issue.detail != null or issue.source != null) return false;
     switch (issue.code) {
         .semantic => switch (issue.semantic orelse return false) {
             .task_budget, .proof_analysis_limit, .capability_analysis_limit, .associated_limit, .nesting_limit, .inference_budget, .usage_analysis_limit, .staging_budget => return false,
@@ -449,8 +449,10 @@ fn portableRejection(a: Allocator, source: *const project.Project, issue: checke
 
 fn rejectChecked(a: Allocator, source: *const project.Project, entry_path: []const u8, issue: checker.Diagnostic) !Preparation {
     const unit = source.unit(issue.unit);
+    const contexts = issue.contexts[0..issue.context_len];
     if (issue.hole) |hole| return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .hole = hole }));
-    if (issue.explanation) |explanation| return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .explanation = explanation }));
+    if (issue.explanation) |explanation| return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .explanation = explanation, .contexts = contexts }));
+    if (contexts.len != 0) return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .contexts = contexts }));
     if (issue.numeric_literal) |detail| return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message(), .actual_token = detail.actual_token }, @as([]const ast.NumericFault, &.{detail})));
     if (issue.purity) |witness| {
         if (witness.operation_name == null and !witness.foreign) return error.OperationPurityOriginRequired;

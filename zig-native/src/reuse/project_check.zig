@@ -44,6 +44,11 @@ pub const Diagnostic = struct {
     detail: ?[]const u8 = null,
     hole: ?@import("hole_diagnostics.zig").Snapshot = null,
     explanation: ?@import("dispatch_explanation.zig").Explanation = null,
+    contexts: [2]check.Diagnostic.Context = .{
+        .{ .kind = .callee, .span = .{ .start = 0, .end = 0 } },
+        .{ .kind = .argument, .span = .{ .start = 0, .end = 0 } },
+    },
+    context_len: u8 = 0,
     source: ?project.Diagnostic = null,
 
     pub fn codeName(self: Diagnostic) []const u8 {
@@ -700,6 +705,8 @@ const Engine = struct {
                 .detail = detail,
                 .hole = hole,
                 .explanation = explanation,
+                .contexts = diagnostic_.contexts,
+                .context_len = diagnostic_.context_len,
             });
         }
     }

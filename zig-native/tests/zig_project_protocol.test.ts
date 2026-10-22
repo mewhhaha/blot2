@@ -393,7 +393,14 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
         }
       } else {
         const explanation = diagnostic.details.explanation;
-        equal(explanation, {
+        const first = source.indexOf("#True");
+        const second = source.indexOf("#True", first + 1);
+        equal(explanation.contexts, [
+          { kind: "left_operand", path: peer.entry, span: { start: first, end: first + 5 } },
+          { kind: "right_operand", path: peer.entry, span: { start: second, end: second + 5 } },
+        ]);
+        const { contexts: _contexts, ...withoutContexts } = explanation;
+        equal(withoutContexts, {
           operation: "+",
           member: "add",
           candidates: [{

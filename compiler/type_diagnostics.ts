@@ -274,6 +274,11 @@ export interface ImplementationStep {
   ty: string | null;
   outcome: DispatchOutcome;
 }
+export interface DispatchSourceContext {
+  kind: "left_operand" | "right_operand";
+  path: string | null;
+  span: { start: number; end: number };
+}
 export interface DispatchCandidate {
   side: DispatchSide;
   origin?: ImplementationOrigin;
@@ -289,6 +294,7 @@ export interface DispatchExplanation {
   member: string | null;
   candidates: DispatchCandidate[];
   steps?: ImplementationStep[];
+  contexts?: DispatchSourceContext[];
   truncated: boolean;
 }
 const sides = new Set<DispatchSide>([
@@ -388,8 +394,34 @@ export function readDispatchExplanation(value: unknown): DispatchExplanation {
       });
     }
   }
+  if (explanation.contexts !== undefined) {
+    const contexts = explanation.contexts;
+    if (!Array.isArray(contexts) || contexts.length > 2) fail();
+    const checkedContexts = contexts as unknown[];
+    if (checkedContexts.length !== 0) {
+      result.contexts = checkedContexts.map((item) => {
+        const context = object(item);
+        if (
+          context.kind !== "left_operand" && context.kind !== "right_operand"
+        ) fail();
+        const span = object(context.span);
+        for (const offset of [span.start, span.end]) {
+          if (
+            typeof offset !== "number" || !Number.isInteger(offset) ||
+            offset < 0 || offset > 0xffffffff
+          ) fail();
+        }
+        if ((span.end as number) < (span.start as number)) fail();
+        return {
+          kind: context.kind as DispatchSourceContext["kind"],
+          path: text(context.path),
+          span: { start: span.start as number, end: span.end as number },
+        };
+      });
+    }
+  }
   if (
-    (result.steps ||
+    (result.steps || result.contexts ||
       result.candidates.some((candidate) =>
         candidate.side === "implementation"
       )) && encoder.encode(JSON.stringify(result)).length > 2048

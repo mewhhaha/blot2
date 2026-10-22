@@ -83,7 +83,7 @@ pub fn publishedDiagnostic(allocator: Allocator, unit: u32, stage: []const u8, s
     // Publish the optional payload only after all fallible ownership exists.
     const details_json = try std.json.Stringify.valueAlloc(allocator, details, .{});
     const Details_ = @TypeOf(details);
-    const forwarded = comptime @typeInfo(Details_) == .@"struct" and (@hasField(Details_, "hole") or @hasField(Details_, "explanation"));
+    const forwarded = comptime @typeInfo(Details_) == .@"struct" and (@hasField(Details_, "hole") or @hasField(Details_, "explanation") or @hasField(Details_, "contexts"));
     result.publication = .{ .utf16 = publication.utf16(source), .cause = publication.cause, .expected_token = publication.expected_token, .actual_token = publication.actual_token, .details_json = details_json, .forwarded = forwarded };
     return result;
 }

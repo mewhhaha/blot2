@@ -305,6 +305,10 @@ pub const PurityWitness = @import("../reuse/purity_diagnostics.zig").Witness;
 pub const Diagnostic = struct {
     pub const TypeApplication = enum { missing_array, missing_nominal, extra };
     pub const Terminator = source_operators.Terminator;
+    pub const Context = struct {
+        kind: enum { callee, argument, left_operand, right_operand },
+        span: ast.Span,
+    };
     origin_unit: u32 = 0,
     code: Code,
     span: ast.Span,
@@ -321,6 +325,13 @@ pub const Diagnostic = struct {
     hole: ?@import("../reuse/hole_diagnostics.zig").Snapshot = null,
     /// Owned candidates of a failed operator or associated dispatch.
     explanation: ?dispatch_explanation.Explanation = null,
+    /// At most two source expressions that explain a type/effect/dispatch
+    /// mismatch at an application or binary operator.
+    contexts: [2]Context = .{
+        .{ .kind = .callee, .span = .{ .start = 0, .end = 0 } },
+        .{ .kind = .argument, .span = .{ .start = 0, .end = 0 } },
+    },
+    context_len: u8 = 0,
     pub fn message(self: Diagnostic) []const u8 {
         if (self.detail) |detail| return detail;
         if (self.type_application) |application| return switch (application) {
@@ -1662,6 +1673,27 @@ const Engine = struct {
             span = .{ .start = point, .end = point };
         }
         try self.diagnostics.append(self.allocator, .{ .code = code, .span = span, .node = source });
+        if (origin == 0 and (code == .type_mismatch or code == .effect_mismatch or code == .missing_associated)) {
+            const issue = &self.diagnostics.items[self.diagnostics.items.len - 1];
+            const node = self.tree.node(id);
+            switch (node.tag) {
+                .apply => {
+                    issue.contexts = .{
+                        .{ .kind = .callee, .span = self.tree.span(node.a) },
+                        .{ .kind = .argument, .span = self.tree.span(node.b) },
+                    };
+                    issue.context_len = 2;
+                },
+                .binary => {
+                    issue.contexts = .{
+                        .{ .kind = .left_operand, .span = self.tree.span(node.b) },
+                        .{ .kind = .right_operand, .span = self.tree.span(node.c) },
+                    };
+                    issue.context_len = 2;
+                },
+                else => {},
+            }
+        }
         switch (code) {
             .missing_implementation, .incompatible_implementation, .recursive_evidence, .recursive_associated_type, .associated_limit, .overlapping_implementation, .ambiguous_qualified => try self.explainImplementation(id),
             else => {},

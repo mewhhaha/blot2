@@ -55,6 +55,9 @@ export interface ZigProjectSourceLocation {
   end: number;
   offset_encoding: "utf8_bytes";
 }
+export interface ZigProjectDiagnosticContext extends ZigProjectSourceLocation {
+  kind: "callee" | "argument" | "left_operand" | "right_operand";
+}
 export interface ZigProjectDiagnostic {
   filename: string;
   stage: string;
@@ -70,6 +73,8 @@ export interface ZigProjectDiagnostic {
   explanation?: DispatchExplanation;
   /** Original callee location for a caller-dependent specialization failure. */
   related?: ZigProjectSourceLocation | null;
+  /** Source expressions involved in a type, effect, or dispatch mismatch. */
+  contexts?: ZigProjectDiagnosticContext[];
   origins?: Array<
     ZigProjectSourceLocation & {
       kind: "quote" | "generator" | "splice" | "invocation";
@@ -302,6 +307,7 @@ function diagnostic(value: unknown): ZigProjectDiagnostic {
   // These convenience fields are derived only from the validated wire payload.
   delete object.hole;
   delete object.explanation;
+  delete object.contexts;
   if (object.code === "typed_hole" && object.details != null) {
     try {
       object.hole = readTypedHole(record(object.details, "hole details").hole);
@@ -320,6 +326,41 @@ function diagnostic(value: unknown): ZigProjectDiagnostic {
     } catch {
       throw new ZigProjectProtocolError("Invalid dispatch explanation");
     }
+  }
+  if (
+    object.details != null && typeof object.details === "object" &&
+    "contexts" in object.details
+  ) {
+    const contexts = (object.details as Record<string, unknown>).contexts;
+    if (!Array.isArray(contexts) || contexts.length > 2) {
+      throw new ZigProjectProtocolError("Invalid diagnostic contexts");
+    }
+    object.contexts = contexts.map((item) => {
+      const context = record(item, "diagnostic context");
+      const kind = context.kind;
+      if (
+        kind !== "callee" && kind !== "argument" &&
+        kind !== "left_operand" && kind !== "right_operand"
+      ) throw new ZigProjectProtocolError("Invalid diagnostic context kind");
+      const start = natural(
+        context.span && record(context.span, "context span").start,
+        "context start",
+      );
+      const end = natural(
+        context.span && record(context.span, "context span").end,
+        "context end",
+      );
+      if (start > end) {
+        throw new ZigProjectProtocolError("Invalid diagnostic context offsets");
+      }
+      return {
+        kind,
+        filename: object.filename,
+        start,
+        end,
+        offset_encoding: "utf8_bytes",
+      };
+    });
   }
   return object as unknown as ZigProjectDiagnostic;
 }

@@ -404,6 +404,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         };
         for (checked.diagnostics) |item| {
             const path = if (item.unit == 0) filename else loaded.filename(item.unit);
+            const contexts = item.contexts[0..item.context_len];
             if (item.semantic == .module_loader_required) {
                 const unit_ = loaded.unit(item.unit);
                 const detail = checker.sourceImportDiagnostic(&unit_.tree).?;
@@ -411,7 +412,9 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
             } else if (item.hole) |hole| {
                 try frontendDiagnostic(writer, path, "check-project", loaded.unit(item.unit).source, .{ .cause = .native_detail, .code = item.codeName(), .span = item.span, .message = item.message() }, .{ .hole = hole });
             } else if (item.explanation) |explanation| {
-                try frontendDiagnostic(writer, path, "check-project", loaded.unit(item.unit).source, .{ .cause = .native_detail, .code = item.codeName(), .span = item.span, .message = item.message() }, .{ .explanation = explanation });
+                try frontendDiagnostic(writer, path, "check-project", loaded.unit(item.unit).source, .{ .cause = .native_detail, .code = item.codeName(), .span = item.span, .message = item.message() }, .{ .explanation = explanation, .contexts = contexts });
+            } else if (contexts.len != 0) {
+                try frontendDiagnostic(writer, path, "check-project", loaded.unit(item.unit).source, .{ .cause = .native_detail, .code = item.codeName(), .span = item.span, .message = item.message() }, .{ .contexts = contexts });
             } else if (item.numeric_literal) |detail| {
                 const unit_ = loaded.unit(item.unit);
                 try frontendDiagnostic(writer, path, "check-project", unit_.source, .{ .cause = .native_detail, .code = item.codeName(), .span = item.span, .message = item.message(), .actual_token = detail.actual_token }, @as([]const @import("parse/ast.zig").NumericFault, &.{detail}));

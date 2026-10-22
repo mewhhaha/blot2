@@ -380,7 +380,12 @@ candidate has a `side` (`left`, `builtin`, `right`, `destination` for
 operands), `unsupported_scalar`, or `result_mismatch` (selected, but its result
 conflicts with the expected type, so no later candidate was tried). A right type
 equal to the left is not listed twice. Explanations hold at most four candidates
-and 256 bytes per spelling; `truncated` marks cut detail.
+and 256 bytes per spelling; `truncated` marks cut detail. For an operator
+failure, `explanation.contexts` gives up to two source operand locations, even
+when dispatch is checked inside an imported generic function. For a direct type
+or effect mismatch at a call, `diagnostic.contexts` gives the callee and
+argument locations. These spans use UTF-8 byte offsets, like the primary
+diagnostic.
 
 ```text
 entry const answer = fn () => 1 + 2.5

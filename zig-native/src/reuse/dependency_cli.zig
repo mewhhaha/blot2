@@ -209,12 +209,17 @@ fn workWithOptions(io: Io, a: std.mem.Allocator, writer: *Io.Writer, create: boo
         if (checked.diagnostics.len != 0) {
             const issue = checked.diagnostics[0];
             const filename = if (issue.unit == 0) entry_path else source.filename(issue.unit);
+            const contexts = issue.contexts[0..issue.context_len];
             if (issue.hole) |hole| {
                 try frontend(a, writer, filename, issue.unit, "check-project", source.unit(issue.unit).source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .hole = hole });
                 return false;
             }
             if (issue.explanation) |explanation| {
-                try frontend(a, writer, filename, issue.unit, "check-project", source.unit(issue.unit).source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .explanation = explanation });
+                try frontend(a, writer, filename, issue.unit, "check-project", source.unit(issue.unit).source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .explanation = explanation, .contexts = contexts });
+                return false;
+            }
+            if (contexts.len != 0) {
+                try frontend(a, writer, filename, issue.unit, "check-project", source.unit(issue.unit).source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .contexts = contexts });
                 return false;
             }
             if (issue.numeric_literal) |detail| {

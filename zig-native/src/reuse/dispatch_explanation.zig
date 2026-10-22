@@ -64,6 +64,14 @@ pub const Step = struct {
         if (self.ty) |text| allocator.free(text);
     }
 };
+pub const Context = struct {
+    kind: enum { left_operand, right_operand },
+    path: ?[]const u8,
+    span: @import("../parse/ast.zig").Span,
+    fn deinit(self: Context, allocator: Allocator) void {
+        if (self.path) |path| allocator.free(path);
+    }
+};
 pub const Candidate = struct {
     side: Side,
     origin: ?Origin = null,
@@ -82,11 +90,14 @@ pub const Explanation = struct {
     member: ?[]const u8 = null,
     candidates: []Candidate = &.{},
     steps: []Step = &.{},
+    contexts: []Context = &.{},
     /// A spelling was cut to `max_text` bytes or a candidate was dropped.
     truncated: bool = false,
 
     pub fn jsonStringify(self: Explanation, writer: anytype) !void {
+        if (self.steps.len != 0 and self.contexts.len != 0) return writer.write(.{ .operation = self.operation, .member = self.member, .candidates = self.candidates, .steps = self.steps, .contexts = self.contexts, .truncated = self.truncated });
         if (self.steps.len != 0) return writer.write(.{ .operation = self.operation, .member = self.member, .candidates = self.candidates, .steps = self.steps, .truncated = self.truncated });
+        if (self.contexts.len != 0) return writer.write(.{ .operation = self.operation, .member = self.member, .candidates = self.candidates, .contexts = self.contexts, .truncated = self.truncated });
         try writer.write(.{ .operation = self.operation, .member = self.member, .candidates = self.candidates, .truncated = self.truncated });
     }
 
@@ -96,6 +107,8 @@ pub const Explanation = struct {
             if (candidate.origin) |origin| origin.deinit(allocator);
         }
         for (self.steps) |step| step.deinit(allocator);
+        for (self.contexts) |context| context.deinit(allocator);
+        allocator.free(self.contexts);
         allocator.free(self.steps);
         allocator.free(self.candidates);
         if (self.operation) |text| allocator.free(text);
@@ -121,10 +134,16 @@ pub const Explanation = struct {
             if (old.member) |text| step.member = try allocator.dupe(u8, text);
             if (old.ty) |text| step.ty = try allocator.dupe(u8, text);
         }
+        result.contexts = try allocator.alloc(Context, self.contexts.len);
+        for (result.contexts) |*context| context.* = .{ .kind = .left_operand, .path = null, .span = .{ .start = 0, .end = 0 } };
+        for (self.contexts, result.contexts) |old, *context| {
+            context.* = .{ .kind = old.kind, .path = null, .span = old.span };
+            if (old.path) |path| context.path = try allocator.dupe(u8, path);
+        }
         return result;
     }
-    fn fit(self: *Explanation, allocator: Allocator) Allocator.Error!void {
-        var needs_bound = self.steps.len != 0;
+    pub fn fit(self: *Explanation, allocator: Allocator) Allocator.Error!void {
+        var needs_bound = self.steps.len != 0 or self.contexts.len != 0;
         for (self.candidates) |candidate| if (candidate.side == .implementation) {
             needs_bound = true;
         };
@@ -146,6 +165,15 @@ pub const Explanation = struct {
                 if (step.member) |text| {
                     allocator.free(text);
                     step.member = null;
+                    removed = true;
+                    break;
+                }
+            }
+            if (removed) continue;
+            for (self.contexts) |*context| {
+                if (context.path) |path| {
+                    allocator.free(path);
+                    context.path = null;
                     removed = true;
                     break;
                 }
@@ -354,9 +382,15 @@ test "explanation ownership survives every allocation failure" {
             try bytes.appendSlice(allocator, "main::Box");
             builder.add(.left, try builder.own(&bytes), .no_member);
             builder.add(.builtin, null, .unsupported_scalar);
-            const explanation = try builder.finish("+", "add");
+            var explanation = try builder.finish("+", "add");
             defer explanation.deinit(allocator);
+            explanation.contexts = try allocator.alloc(Context, 1);
+            explanation.contexts[0] = .{ .kind = .left_operand, .path = null, .span = .{ .start = 4, .end = 8 } };
+            explanation.contexts[0].path = try allocator.dupe(u8, "main.blot");
+            try explanation.fit(allocator);
             const copy = try explanation.clone(allocator);
+            try std.testing.expectEqualStrings("main.blot", copy.contexts[0].path.?);
+            try std.testing.expect(copy.contexts[0].path.?.ptr != explanation.contexts[0].path.?.ptr);
             copy.deinit(allocator);
         }
     }.run, .{});

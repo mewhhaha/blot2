@@ -66,6 +66,13 @@ entry const answer: Unit -> U32 = fn unit => consume Read
           start,
           start + "consume Read".length,
         ]);
+        equal(
+          diagnostic.contexts?.map(({ kind, start, end }) => [kind, start, end]),
+          [
+            ["callee", start, start + "consume".length],
+            ["argument", start + "consume ".length, start + "consume Read".length],
+          ],
+        );
         match(diagnostic.message, /expected argument: \(Unit -> U32\)/);
         match(diagnostic.message, /actual argument: \(Unit -> U32 ! \{Read/);
         const good = await compiler.build({ sources: { [entry]: corrected } });
@@ -79,6 +86,7 @@ entry const answer: Unit -> U32 = fn unit => consume Read
         const again = await compiler.build({ sources: { [entry]: invalid } });
         ok(!again.success);
         equal(again.diagnostics[0].message, diagnostic.message);
+        equal(again.diagnostics[0].contexts, diagnostic.contexts);
         const recovered = await compiler.build({
           sources: { [entry]: corrected },
         });

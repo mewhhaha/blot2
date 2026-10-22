@@ -120,6 +120,11 @@ Deno.test("implementation explanations validate owned origins steps and total by
       origin: { name: "Scalar", path: "source.blot", span: null },
     }],
     steps: [{ member: "Item", ty: "U32", outcome: "requires_evidence" }],
+    contexts: [{
+      kind: "left_operand",
+      path: "source.blot",
+      span: { start: 5, end: 10 },
+    }],
     truncated: false,
   };
   equal(readDispatchExplanation(value), value);
@@ -128,6 +133,30 @@ Deno.test("implementation explanations validate owned origins steps and total by
       readDispatchExplanation({
         ...value,
         steps: Array(9).fill(value.steps[0]),
+      }),
+    TypeError,
+  );
+  throws(
+    () =>
+      readDispatchExplanation({
+        ...value,
+        contexts: [{
+          kind: "left_operand",
+          path: "source.blot",
+          span: { start: 10, end: 5 },
+        }],
+      }),
+    TypeError,
+  );
+  throws(
+    () =>
+      readDispatchExplanation({
+        ...value,
+        contexts: [{
+          kind: "left_operand",
+          path: "x".repeat(257),
+          span: { start: 5, end: 10 },
+        }],
       }),
     TypeError,
   );

@@ -52,7 +52,9 @@ Deno.test("operator failures explain prelude dispatch through the CLI", async ()
         ]),
       );
       equal(result.code, "missing_associated");
-      equal(result.explanation, {
+      const { contexts, ...explanation } = result.explanation;
+      equal(contexts?.length, 2);
+      equal(explanation, {
         operation: "+",
         member: "add",
         candidates,
@@ -94,7 +96,14 @@ entry const broken = fn (value: F32) -> F32 => do:
           start,
           start + "transform - value".length,
         ]);
-        equal(bad.diagnostics[0].explanation, {
+        const dispatch = bad.diagnostics[0].explanation;
+        ok(dispatch);
+        equal(dispatch.contexts, [
+          { kind: "left_operand", path: entry, span: { start, end: start + "transform".length } },
+          { kind: "right_operand", path: entry, span: { start: start + "transform - ".length, end: start + "transform - value".length } },
+        ]);
+        const { contexts: _contexts, ...explanation } = dispatch;
+        equal(explanation, {
           operation: "-",
           member: "sub",
           candidates: [
@@ -170,6 +179,10 @@ entry const broken = fn (value: F32) -> F32 => do:
           ),
           ["(F32 -> F32)", "F32"],
         );
+        equal(bad.diagnostics[0].explanation?.contexts, [
+          { kind: "left_operand", path: entry, span: { start: invalid.indexOf("transform value"), end: invalid.indexOf("transform value") + "transform".length } },
+          { kind: "right_operand", path: entry, span: { start: invalid.indexOf("value\n", invalid.indexOf("transform value")), end: invalid.indexOf("value\n", invalid.indexOf("transform value")) + "value".length } },
+        ]);
         const fixed = await compiler.build({
           sources: { [entry]: corrected, [helper]: generic },
         });
@@ -177,6 +190,51 @@ entry const broken = fn (value: F32) -> F32 => do:
         const guest = await instantiateGuest(fixed.bytes);
         try {
           equal(guest.call("broken", 2.5), 1);
+        } finally {
+          guest.dispose();
+        }
+        const again = await compiler.build({
+          sources: { [entry]: invalid, [helper]: generic },
+        });
+        ok(!again.success);
+        equal(again.diagnostics[0].explanation?.contexts, bad.diagnostics[0].explanation?.contexts);
+        const recovered = await compiler.build({
+          sources: { [entry]: corrected, [helper]: generic },
+        });
+        ok(recovered.success, JSON.stringify(recovered));
+        equal(recovered.bytes, fixed.bytes);
+      } finally {
+        await compiler.dispose();
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
+Deno.test("mixed-type associated subtraction remains valid in both tiers", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const source = `type Meters is data = #Meters F32
+const Meters.sub = fn (left: Meters) => fn (right: F32) => do:
+  let #Meters amount = left
+  break amount - right
+entry const distance = fn (value: F32) -> F32 => (#Meters value) - 1.0
+`;
+  try {
+    for (const codegenTier of ["development", "optimized"] as const) {
+      const compiler = await createZigProjectCompiler({
+        executable,
+        entry,
+        prelude,
+        codegenTier,
+      });
+      try {
+        const built = await compiler.build({ sources: { [entry]: source } });
+        ok(built.success, JSON.stringify(built));
+        const guest = await instantiateGuest(built.bytes);
+        try {
+          equal(guest.call("distance", 5.5), 4.5);
         } finally {
           guest.dispose();
         }

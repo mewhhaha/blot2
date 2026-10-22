@@ -506,7 +506,25 @@ pub const Generator = struct {
             builder.add(candidate.side, if (spelled) try builder.own(&display.text) else null, candidate.outcome);
         }
         const named = if (record.member == 0) null else if (self.evaluator.diagnostic_context.identity) |identity| identity.symbol(record.member) else null;
-        return builder.finish(dispatch_explanation.operatorSymbol(record.op), named orelse dispatch_explanation.operatorMember(record.op));
+        var result = try builder.finish(dispatch_explanation.operatorSymbol(record.op), named orelse dispatch_explanation.operatorMember(record.op));
+        errdefer result.deinit(self.allocator);
+        if (record.context_len != 0) {
+            result.contexts = try self.allocator.alloc(dispatch_explanation.Context, record.context_len);
+            for (result.contexts) |*context| context.* = .{ .kind = .left_operand, .path = null, .span = .{ .start = 0, .end = 0 } };
+            for (record.contexts[0..record.context_len], result.contexts) |source, *context| {
+                context.* = .{ .kind = switch (source.kind) {
+                    .left_operand => .left_operand,
+                    .right_operand => .right_operand,
+                }, .path = null, .span = source.span };
+                if (self.evaluator.diagnostic_context.identity) |identity| if (identity.owner(source.unit)) |path| {
+                    if (path.len <= dispatch_explanation.max_text) {
+                        context.path = try self.allocator.dupe(u8, path);
+                    } else result.truncated = true;
+                };
+            }
+            try result.fit(self.allocator);
+        }
+        return result;
     }
     fn explainImplementation(self: *Generator, trace: @import("../eval/implementation_trace.zig").Record) Allocator.Error!dispatch_explanation.Explanation {
         var builder: dispatch_explanation.Builder = .{ .allocator = self.allocator, .truncated = trace.truncated };

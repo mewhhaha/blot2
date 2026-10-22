@@ -217,8 +217,10 @@ fn lowerEntry(a: Allocator, io: std.Io, entry_identity: []const u8, source: []co
     defer checked.deinit(a);
     if (checked.diagnostics.len != 0) {
         const issue = checked.diagnostics[0];
+        const contexts = issue.contexts[0..issue.context_len];
         if (issue.hole) |hole| return publishedRejected(a, entry, "check-project", source, .{ .cause = .native_detail, .code = @tagName(issue.code), .span = issue.span, .message = issue.message() }, .{ .hole = hole });
-        if (issue.explanation) |explanation| return publishedRejected(a, entry, "check-project", source, .{ .cause = .native_detail, .code = @tagName(issue.code), .span = issue.span, .message = issue.message() }, .{ .explanation = explanation });
+        if (issue.explanation) |explanation| return publishedRejected(a, entry, "check-project", source, .{ .cause = .native_detail, .code = @tagName(issue.code), .span = issue.span, .message = issue.message() }, .{ .explanation = explanation, .contexts = contexts });
+        if (contexts.len != 0) return publishedRejected(a, entry, "check-project", source, .{ .cause = .native_detail, .code = @tagName(issue.code), .span = issue.span, .message = issue.message() }, .{ .contexts = contexts });
         if (issue.purity) |witness| {
             const label = if (witness.operation_name != null or witness.foreign)
                 try a.dupe(u8, "")

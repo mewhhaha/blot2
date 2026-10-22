@@ -104,11 +104,21 @@ pub const Code = @import("../check/diagnostic_code.zig").Code;
 /// before that session is released.
 pub const DispatchRecord = struct {
     pub const Candidate = struct { side: dispatch_explanation.Side, operand: type_evidence.Id, outcome: dispatch_explanation.Outcome };
+    pub const Context = struct {
+        kind: enum { left_operand, right_operand },
+        unit: u32,
+        span: core.Span,
+    };
     op: types.Operator = .none,
     member: u32 = 0,
     /// Unused slots stay defined so diagnostics compare and copy as values.
     candidates: [3]Candidate = @splat(.{ .side = .left, .operand = 0, .outcome = .no_member }),
     len: u8 = 0,
+    contexts: [2]Context = .{
+        .{ .kind = .left_operand, .unit = 0, .span = .{ .start = 0, .end = 0 } },
+        .{ .kind = .right_operand, .unit = 0, .span = .{ .start = 0, .end = 0 } },
+    },
+    context_len: u8 = 0,
     pub fn add(self: *DispatchRecord, side: dispatch_explanation.Side, operand: type_evidence.Id, outcome: dispatch_explanation.Outcome) void {
         if (self.len == self.candidates.len) return;
         self.candidates[self.len] = .{ .side = side, .operand = operand, .outcome = outcome };
@@ -2777,8 +2787,40 @@ pub const Session = struct {
     fn failDispatch(self: *Session, owner: usize, id: core.Id, code: Code, record: DispatchRecord) Error {
         const fresh = self.diagnostic == null;
         const result = self.failNode(owner, id, code);
-        if (fresh) self.diagnostic.?.dispatch = record;
+        if (fresh) {
+            var explained = record;
+            self.dispatchContexts(owner, id, self.specialization_origin, &explained);
+            self.diagnostic.?.dispatch = explained;
+        }
         return result;
+    }
+    fn dispatchContexts(self: *Session, owner: usize, id: core.Id, call_origin: ?SourceLocation, record: *DispatchRecord) void {
+        if (id == 0 or record.context_len != 0) return;
+        if (call_origin) |origin| if (origin.unit != 0 and origin.unit <= self.units.len) {
+            const caller = &self.units[origin.unit - 1];
+            for (caller.nodes, 0..) |item, index| {
+                if (item.tag != .call) continue;
+                const span = caller.span(@intCast(index));
+                if (span.start != origin.span.start or span.end != origin.span.end) continue;
+                const arguments = caller.children(@intCast(index));
+                if (arguments.len != 2) continue;
+                record.contexts = .{
+                    .{ .kind = .left_operand, .unit = origin.unit, .span = caller.span(arguments[0]) },
+                    .{ .kind = .right_operand, .unit = origin.unit, .span = caller.span(arguments[1]) },
+                };
+                record.context_len = 2;
+                return;
+            }
+        };
+        const module = &self.units[owner];
+        const node = module.node(id);
+        if (node.tag != .associated or node.a == 0 or node.b == 0) return;
+        const unit = self.unitId(owner);
+        record.contexts = .{
+            .{ .kind = .left_operand, .unit = unit, .span = module.span(node.a) },
+            .{ .kind = .right_operand, .unit = unit, .span = module.span(node.b) },
+        };
+        record.context_len = 2;
     }
     /// Rebuilds, from catalogs alone, why binary candidates were rejected:
     /// the left owner, a built-in scalar operation for an unnamed operator,
@@ -6639,7 +6681,9 @@ const ClosureRegion = struct {
         const fresh = self.session.diagnostic == null;
         const result = self.failConstraint(constraint, code);
         if (fresh) if (self.session.diagnostic) |*diagnostic| {
-            diagnostic.dispatch = record;
+            var explained = record;
+            self.session.dispatchContexts(self.scratch.sources.items[constraint.scope].owner, constraint.node, self.current_origin, &explained);
+            diagnostic.dispatch = explained;
         };
         return result;
     }
