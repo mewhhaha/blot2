@@ -683,6 +683,20 @@ const Builder = struct {
         const range = try self.save(values.items);
         return self.make(source, .{ .tag = tag, .ty = ty, .a = range.start, .b = range.len });
     }
+    fn stringExpression(self: *Builder, source: ast.Id, ty: T.Id) Error!core.Id {
+        const bytes = self.source.names.get(self.source.tree.node(source).a);
+        var buffer: [128]u8 align(@alignOf(usize)) = undefined;
+        var storage: std.heap.BufferFirstAllocator = .init(&buffer, self.allocator);
+        const scratch = storage.allocator();
+        var values: std.ArrayList(core.Id) = .empty;
+        defer values.deinit(scratch);
+        var points = std.unicode.Utf8View.initUnchecked(bytes).iterator();
+        while (points.nextCodepoint()) |point| {
+            try values.append(scratch, try self.make(source, .{ .tag = .constant, .ty = T.u32_type, .a = point }));
+        }
+        const range = try self.save(values.items);
+        return self.make(source, .{ .tag = .array, .ty = ty, .a = range.start, .b = range.len });
+    }
     fn recordExpression(self: *Builder, source: ast.Id, ty: T.Id, depth: usize) Error!core.Id {
         const catalog = if (source < self.source.checked.constructor_resolved.len) self.source.checked.constructor_resolved[source] else 0;
         if (catalog == 0 and self.source.tree.node(source).a != 0) {
@@ -1369,6 +1383,7 @@ const Builder = struct {
                 break :blk try self.make(source, .{ .tag = .package_unpack, .ty = ty, .a = package, .b = self.source.checked.resolved[source], .c = metadata.start });
             },
             .integer, .float, .boolean => try self.make(source, .{ .tag = .constant, .ty = ty, .a = syntax.a }),
+            .string => try self.stringExpression(source, ty),
             .unit => try self.make(source, .{ .tag = .constant, .ty = ty }),
             .name => if (self.tables.type_nodes.items[ty].tag == .type_constructor and self.source.checked.resolved[source] == 0)
                 try self.make(source, .{ .tag = .type_constructor, .ty = ty })

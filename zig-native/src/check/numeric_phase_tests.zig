@@ -113,9 +113,9 @@ const cases = [_]Case{
     .{ .source = "const answer=#Missing {value:4294967296}\n", .code = .unknown_constructor, .point = 14 }, // unknown-record-before-overflow
     .{ .source = "const f=fn value=>value\nconst answer=f {value:4294967296}\n", .code = .integer_range, .point = 46 }, // record-ordinary-callee-before-overflow
     .{ .source = "type Tick a is effect={read:Unit->a}\nconst answer=Tick.missing 4294967296\n", .code = .effect_member, .point = 50 }, // qualified-name-argument-overflow
-    .{ .source = "const first=4294967296\nconst later=\"bad\"\n", .code = .unsupported_expression, .point = 35 }, // string-before-overflow
+    .{ .source = "const first=4294967296\nconst later=\"bad\"\n", .code = .integer_range, .point = 12 }, // text-after-overflow
     .{ .source = "const first=\"bad\"\nconst later=4294967296\n", .code = .integer_range, .point = 30 }, // overflow-before-string
-    .{ .source = "const answer=(\"bad\",4294967296)\n", .code = .unsupported_expression, .point = 14 }, // string-lower-before-overflow
+    .{ .source = "const answer=(\"bad\",4294967296)\n", .code = .integer_range, .point = 20 }, // text-lower-before-overflow
     .{ .source = "const answer=(4294967296,\"bad\")\n", .code = .integer_range, .point = 14 }, // overflow-lower-before-string
     .{ .source = "const first=4294967296\nconst later=@panic \"bad\"\n", .code = .integer_range, .point = 12 }, // string-literal-primitive-before-overflow
     .{ .source = "const answer=@type.call \"add\" 4294967296 42\n", .code = .integer_range, .point = 30 }, // string-literal-descriptor-before-overflow

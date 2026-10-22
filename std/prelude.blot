@@ -43,6 +43,8 @@ type Maybe a is data = #Some a | #Nothing
 type Result [value, error] is data = #Ok value | #Err error
 type Iteration [state, result] is data = #Continue state | #Done result
 type Type witness is data = #Type witness
+// Text stores Unicode scalar values; std/text validates external scalar arrays.
+type Text = Array U32
 
 // The expected result selects its type's ordinary `from` member.
 const from = fn value => @type.result "from" value

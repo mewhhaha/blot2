@@ -92,3 +92,37 @@ test "all array lowering allocation failures release operand lists and frozen ty
     defer fixture.deinit();
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, allocationFailure, .{&fixture});
 }
+
+fn textLowering(allocator: std.mem.Allocator, tree: *const ast.Tree, pool: *const symbols.Pool, checked: *const check.Checked) !void {
+    var module = try core.lower(allocator, tree, pool, checked);
+    defer module.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), module.diagnostics.len);
+    var found_text = false;
+    var found_empty = false;
+    for (module.nodes, 0..) |node, index| {
+        if (node.tag != .array) continue;
+        const elements = module.children(@intCast(index));
+        if (elements.len == 0) {
+            found_empty = true;
+        } else if (elements.len == 2 and module.node(elements[0]).a == 233 and module.node(elements[1]).a == 128578) {
+            found_text = true;
+        }
+    }
+    try std.testing.expect(found_text and found_empty);
+}
+
+test "runtime text lowers UTF8 literals to Unicode scalars through allocation failures" {
+    const text_source = "entry const text = fn () => \"é🙂\"\nentry const empty = fn () => \"\"\n";
+    var lexed = try lexer.lex(a, text_source);
+    defer lexed.deinit(a);
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(a);
+    var tree = try parser.parse(a, text_source, lexed.tokens.items, &pool);
+    defer tree.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var checked = try check.check(a, &tree, &pool);
+    defer checked.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    try textLowering(a, &tree, &pool, &checked);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, textLowering, .{ &tree, &pool, &checked });
+}

@@ -4,7 +4,9 @@
 source compiler sessions. It currently covers generic functions, `Maybe`,
 `Result`, type witnesses, Bool, U32, and F32. Root declarations can shadow
 prelude names; the prelude keeps its own scope and nominal identities. Top-level
-bindings are public to other Blot modules. Only the root module's `entry const`
+bindings are public to other Blot modules. Import [text.blot](text.blot) for
+Unicode-scalar text operations, formatting, validation and a linear builder.
+Only the root module's `entry const`
 and `entry let` declarations become Wasm exports; they must fit the guest ABI,
 and Wasm emission keeps the declarations they reach. Unused source declarations
 are still checked. Use `{ prelude: null }` with `createCompiler` for a
@@ -14,8 +16,8 @@ additional directory aliases through `imports` or `--alias`. General module
 re-exports are not implemented yet.
 
 All examples below use the default prelude. Values/functions use `snake_case`;
-types and constructors use `PascalCase`. Functions are explicitly curried: a
-two-argument function is written `fn left => fn right => ...` and called
+types and constructors use `PascalCase`. Functions are curried: `fn left right
+=> ...` abbreviates `fn left => fn right => ...`, and both are called
 `function left right`.
 
 See the [API and performance audit](PERFORMANCE.md) for measured costs,

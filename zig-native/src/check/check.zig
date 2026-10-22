@@ -12301,7 +12301,7 @@ const Engine = struct {
             .boolean => T.boolean,
             .integer => T.u32_type,
             .float => T.f32_type,
-            .string => try self.types.fresh(),
+            .string => try self.types.sequence(.array, T.u32_type),
             .group => try self.expression(node.a),
             .name => try self.nameExpression(id),
             .selector => try self.selectorFunction(id),
@@ -14555,13 +14555,6 @@ const Engine = struct {
             }
             if (tag == .u32 or (tag == .f32 and pending.value.kind != .integer) or (tag == .boolean and pending.value.kind == .equality)) continue;
             try self.diagnostic(.ambiguous_operator, pending.value.source);
-        }
-        if (self.diagnostics.items.len == 0) {
-            for (self.tree.nodes.items, 0..) |node, index| {
-                // Intrinsic literal arguments are consumed as syntax; only a
-                // string visited as an ordinary expression is unsupported.
-                if (node.tag == .string and self.expr_types[index] != 0) try self.diagnostic(.unsupported_expression, @intCast(index));
-            }
         }
         for (self.expr_types) |*id| if (id.* != 0) {
             id.* = try self.types.resolve(id.*, 0);

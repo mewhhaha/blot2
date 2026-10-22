@@ -796,6 +796,41 @@ entry const total_length = fn () =>
   |> array.fold_left .add 0.0
 ```
 
+## Runtime text
+
+`Text` is an alias for `Array U32` containing Unicode scalar values. A string
+literal such as `"Hi, 世界🙂"` is an ordinary `Text` value. Text length, indexing
+and `std/array.slice` count scalars, rather than UTF-8 bytes or grapheme clusters;
+the example has seven elements. Equality in `std/text` compares scalar sequences
+exactly and does not perform Unicode normalization. Text has no implicit IO.
+
+```blot
+import * as text from "std/text"
+
+entry const greeting = fn () => text.join " " #["Hello,", "世界🙂"]
+entry const label = fn (count: U32) =>
+  text.join "" #["count=", text.format count]
+```
+
+`text.from_scalars` validates an external `Array U32`, returning `Maybe Text`;
+it rejects surrogate values and values above U+10FFFF. Since `Text` is a type
+alias, code can also construct an array without validation. Validate values at
+the host boundary: `encodeText` and `decodeText` from `mod.ts` convert between
+JavaScript strings and the existing `Array U32` guest ABI, rejecting unpaired
+UTF-16 surrogates and invalid scalar values. No numeric ABI change is needed.
+`@panic` still requires a literal; send a dynamic assertion message through an
+explicit `Array U32 -> U32 ! {Foreign}` host callback or return the `Text` to the
+host.
+
+`text.from_u32` formats a decimal integer. `text.from_f32_fixed places value`
+formats 0–6 fractional places and returns `#Nothing` for non-finite values or
+when the scaled result does not fit U32. `text.Format` is an ordinary contract:
+applications can implement its `format` member for their own types. Each
+`text.concat` copies both inputs, so repeatedly appending to a growing `Text`
+can take quadratic time. Build with `text.builder`, `text.push` or `text.append`,
+and `text.finish` to collect scalars in a List and convert once. `text.join`
+uses this path.
+
 ## SIMD
 
 `std/simd` exposes `U32x4` and `F32x4` as ordinary four-element product aliases.
@@ -1304,9 +1339,9 @@ evaluates at compile time under a step budget. `let name = expression`
 initializes once at runtime when the module starts, if an entry reaches it.
 Compile-time expressions can build immutable values, closures, and builders, but
 cannot do foreign IO. `@panic "message"` fails const evaluation or traps in
-Wasm. Strings currently serve literal intrinsic arguments (panic messages/member
-names), not runtime text. There is no general type-valued/comptime reflection
-beyond the intrinsics.
+Wasm. String literals are also ordinary runtime text values; intrinsics that
+require a literal still read their argument as source syntax. There is no
+general type-valued/comptime reflection beyond the intrinsics.
 
 Startup orders `let` initializers by their dependencies and rejects cycles.
 Dependency analysis includes referenced function bodies, even when a function is

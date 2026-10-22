@@ -23,6 +23,7 @@ import {
 
 export { createZigProjectCompiler } from "./compiler/zig_project_client.ts";
 export { jsonAssetParser } from "./compiler/assets.ts";
+export { decodeText, encodeText } from "./compiler/text.ts";
 export type {
   AssetBuildStats,
   AssetContext,

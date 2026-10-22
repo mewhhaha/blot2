@@ -450,7 +450,7 @@ fn Validator(comptime Context: type) type {
             const node = self.tree.node(id);
             switch (node.tag) {
                 .numeric_error => self.numericFailure(id),
-                .string => if (self.validateControls()) self.fail(.unsupported_expression, id, self.tree.span(id).start, 0),
+                .string => {},
                 .name => if (self.validateControls() and !self.local(node.a) and self.context.sourceNonCallableEffect(node.a)) {
                     self.fail(.effect_member, id, self.tree.span(id).start, 0);
                 } else try self.name(node.a, id, self.tree.span(id).start),

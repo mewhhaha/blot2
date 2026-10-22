@@ -4,20 +4,36 @@ import {
   equal,
 } from "./compile_helpers.ts";
 import { resultCases } from "./result_cases.ts";
+import { decodeText } from "../../compiler/text.ts";
 
 Deno.test("staged nested conversions infer their destination from the surrounding operator", async () => {
-  await compileAndRun(`
+  await compileAndRun(
+    `
 const count = 42
 entry const answer = from (ceil (sqrt (from count))) + 2
-`, guest => equal(guest.read("answer"), 9), {
-    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-  });
+`,
+    (guest) => equal(guest.read("answer"), 9),
+    {
+      prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    },
+  );
 });
 
-Deno.test("ordinary strings remain unsupported while intrinsic validation keeps its error order", async () => {
-  await compileExpectedFailure(`const name = "from"\nentry const answer = 42\n`, "unsupported_expression");
-  await compileExpectedFailure(`const name: String = "from"\nentry const answer = 42\n`, "unsupported_type");
-  await compileExpectedFailure(`const name = "from"\nentry const answer = @type.result name 42\n`, "literal_required");
+Deno.test("ordinary text values compile while intrinsic validation keeps its literal rule", async () => {
+  await compileAndRun(
+    `const name = "from"\nentry const answer = fn () => name\n`,
+    (guest) => {
+      equal(decodeText(guest.call("answer", null) as Uint32Array), "from");
+    },
+  );
+  await compileExpectedFailure(
+    `const name: String = "from"\nentry const answer = 42\n`,
+    "unsupported_type",
+  );
+  await compileExpectedFailure(
+    `const name = "from"\nentry const answer = @type.result name 42\n`,
+    "literal_required",
+  );
 });
 
 for (const item of resultCases) {

@@ -1,0 +1,84 @@
+// Text is an Array U32 of Unicode scalar values. Equality compares scalar
+// sequences exactly; it does not normalize Unicode.
+const empty: Text = ""
+const length = fn (value: Text) => value.length
+const is_empty = fn (value: Text) => value.length == 0
+const at = fn index => fn (value: Text) => value[index]
+const concat = fn (left: Text) (right: Text) -> Text => @array.concat left right
+
+const equal = fn (left: Text) (right: Text) -> Bool => do:
+  if left.length != right.length:
+    break #False
+  for index in 0..left.length:
+    if left[index] != right[index]:
+      return #False
+  break #True
+
+const valid_scalar = fn value =>
+  value <= 0x10FFFF && (value < 0xD800 || value > 0xDFFF)
+const from_scalars = fn (values: Array U32) -> Maybe Text => do:
+  for value in values:
+    if Bool.not (valid_scalar value):
+      return #Nothing
+  break #Some values
+const scalars = fn (value: Text) => value
+
+// Append into a persistent List; one conversion produces the final Array.
+type Builder = List U32
+const builder = fn () -> Builder => []
+const push = fn scalar => fn (out: Builder) => [...out, scalar]
+const append = fn (value: Text) (out: Builder) -> Builder => do:
+  let result = out
+  for scalar in value:
+    result := [...self, scalar]
+  break result
+const finish = fn (out: Builder) -> Text => Array.from_list out
+const join = fn (separator: Text) (pieces: Array Text) -> Text => do:
+  let out = builder ()
+  let first = #True
+  for piece in pieces:
+    if Bool.not first:
+      out := append separator self
+    out := append piece self
+    first := #False
+  break finish out
+
+const decimal_digits = fn value => fn collected =>
+  if value < 10 then [value + 48, ...collected]
+  else decimal_digits (value / 10) [value % 10 + 48, ...collected]
+const from_u32 = fn (value: U32) -> Text =>
+  Array.from_list (decimal_digits value [])
+const append_u32 = fn value => fn out => append (from_u32 value) out
+
+// Fixed decimal places (0..6), rounded half away from zero. Return Nothing
+// for NaN, infinities, excessive precision, or a scaled value outside U32.
+const from_f32_fixed = fn (places: U32) (value: F32) -> Maybe Text => do:
+  if places > 6 || Bool.not (F32.is_finite value):
+    return #Nothing
+  let factor = 1
+  for ignored in 0..places:
+    factor := self * 10
+  let scaled = F32.floor (F32.abs value * F32.from factor + 0.5)
+  if scaled >= 4294967296.0:
+    return #Nothing
+  let rounded = F32.to_u32 scaled
+  let out = builder ()
+  if value < 0.0:
+    out := append "-" self
+  out := append (from_u32 (rounded / factor)) self
+  if places > 0:
+    out := push 46 self
+    let divisor = factor / 10
+    for ignored in 0..places:
+      out := push (48 + (rounded / divisor) % 10) self
+      if divisor > 1:
+        divisor := self / 10
+  break #Some (finish out)
+
+// Libraries and applications can provide their own Format implementations.
+type Format a is contract = { const format: a -> Text }
+impl Decimal : Format U32 = { const format = fn value => from_u32 value }
+impl Boolean : Format Bool = {
+  const format = fn value => if value then "true" else "false",
+}
+const format: a -> Text where { Format a } = fn value => Format.format value
