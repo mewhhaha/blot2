@@ -1581,31 +1581,21 @@ entry const answer = fn () => @task.scope (fn group => do:
   break @u32.add (@task.join left) (@task.join right))
 ```
 
-`tasks group:` introduces the same checked scope in block form. `async group:`
-starts a child in that group and returns its affine handle. Within a task group,
-`*(function argument)` sparks a parenthesized call and returns a handle;
-`|handle|` consumes that handle and receives its ordinary result. These
-spellings lower to the checked `@task.spawn` and `@task.join` operations.
-`finish value` completes the enclosing task or child block, including from a
-nested ordinary `do`; `break value` still completes only an explicit `do`.
-Cancel uses the existing task operation. Tuple receive, cold jobs and channel
-endpoints are not yet part of this source surface.
+Within a direct `@task.scope (fn group => ...)` callback, `*(function argument)`
+sparks a parenthesized call in that group and returns its affine task handle.
+`|handle|` consumes one task handle and returns its ordinary result. The checker
+applies the same capture, region, and ownership rules as `@task.spawn` and
+`@task.join`; these forms introduce no new block keywords. A spark outside a
+statically known scope receives a diagnostic and can use the explicit
+`@task.spawn group thunk` operation. Tuple receive, streams, and propagation of
+inferred groups through helpers are not yet implemented.
 
 ```blot
-const compute = fn value => value
-entry const answer = fn () => tasks group:
-  let left = *(compute 20)
-  let right = async group:
-    do:
-      finish 22
-  finish @u32.add (|left|) (|right|)
+const add22 = fn value => @u32.add value 22
+entry const answer = fn () => @task.scope (fn group => do:
+  let pending = *(add22 20)
+  return |pending|)
 ```
-
-`finish` cannot cross a user function boundary. A `return` inside either task
-block currently gets an explicit diagnostic, because that source function would
-need to exit across a generated task callback. Use `finish` to complete the task
-block. A child captures values and capabilities under the same task transfer
-checks as `@task.spawn`.
 
 Unique captures move to one child. Immutable data can be shared. Read loans
 require an owner enclosing the destination group. Mutable state/provider

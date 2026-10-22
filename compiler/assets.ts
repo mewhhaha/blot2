@@ -107,7 +107,7 @@ const encoder = new TextEncoder();
 const limit = 16 * 1024 * 1024;
 const totalLimit = 64 * 1024 * 1024;
 const keywords = new Set(
-  "const let type data effect is fn do tasks async finish use return yield break for ever in case of if then else as import infix infixl infixr self where"
+  "const let type data effect is fn do use return yield break for ever in case of if then else as import infix infixl infixr self where"
     .split(" "),
 );
 function identifier(name: string, upper: boolean): string {

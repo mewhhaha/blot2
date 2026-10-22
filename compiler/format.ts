@@ -38,8 +38,6 @@ function needsGrouping(group: Cst, parents: Map<Cst, Cst>): boolean {
     "if_expression",
     "case_expression",
     "do_block",
-    "task_block",
-    "async_block",
   ].includes(kind);
   if (!compound) return false;
   for (let node = parents.get(group); node; node = parents.get(node)) {

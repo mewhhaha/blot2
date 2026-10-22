@@ -434,7 +434,7 @@ Deno.test("promoted builders serialize a polymorphic callback no use applies", a
 type System [route, start] is data = #Route route | #Start start
 type App [engine, system] is data = #App { engine: engine, systems: Array system }
 const new_with = fn route => #App { engine: empty (), systems: #[#Route route, #Start (fn () => ())] }
-const finalize = fn app => do:
+const finish = fn app => do:
   let #App { engine, systems } = app
   break #App { engine, systems }
 const run_start = fn systems => fn () => do:
@@ -448,7 +448,7 @@ const create = fn app => fn () => do:
   break world
 entry const main = fn (x: U32) => do:
   let builder = new_with (fn (e: u) => e)
-  let application = finalize builder
+  let application = finish builder
   let world = create application ()
   break x
 `);

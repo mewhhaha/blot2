@@ -1,20 +1,13 @@
 import { deepStrictEqual as equal } from "node:assert/strict";
 import { formatSource } from "./format.ts";
 
-Deno.test("formatter preserves task block and finish boundaries", async () => {
-  const source = `entry const answer=fn ()=>tasks group:
-  let child=async group:
-    do:
-      finish 42
-  finish @task.join child
-entry const sparked = fn () => tasks group:
+Deno.test("formatter preserves spark and receive boundaries", async () => {
+  const source = `entry const sparked = fn () => @task.scope (fn group => do:
   let pending = *(work 42)
-  finish |pending|
+  return |pending|)
 `;
   const formatted = await formatSource(source);
-  equal(formatted.includes("tasks group:"), true);
-  equal(formatted.includes("async group:"), true);
-  equal(formatted.includes("      finish 42"), true);
+  equal(formatted.includes("@task.scope (fn group => do:"), true);
   equal(formatted.includes("*(work 42)"), true);
   equal(formatted.includes("|pending|"), true);
   equal(await formatSource(formatted), formatted);

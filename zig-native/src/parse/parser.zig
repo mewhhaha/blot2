@@ -61,10 +61,8 @@ const Parser = struct {
     /// Hygienic collection names are numbered within each top-level
     /// declaration, so edits elsewhere never rename them.
     collection_names: u32 = 0,
-    task_blocks: usize = 0,
-    do_blocks: usize = 0,
-    task_do_base: usize = 0,
     task_group: symbols.Symbol = 0,
+    scope_callback: bool = false,
     fn current(self: *const Parser) token.Token {
         if (self.index >= self.expression_end) return .{ .tag = .eof, .start = self.tokens[self.index].start, .end = self.tokens[self.index].start };
         return if (self.index < self.tokens.len) self.tokens[self.index] else .{ .tag = .eof, .start = @intCast(self.source.len), .end = @intCast(self.source.len) };
@@ -194,18 +192,18 @@ const Parser = struct {
     }
     fn identifier(self: *Parser) Error!symbols.Symbol {
         const t = self.current();
-        if (t.tag != .identifier and t.tag != .type_identifier and t.tag != .kw_finish) return self.fail(.expected_token);
+        if (t.tag != .identifier and t.tag != .type_identifier) return self.fail(.expected_token);
         _ = self.advance();
         return self.intern(self.text(t));
     }
     fn qualified(self: *Parser) Error!symbols.Symbol {
         const first = self.current();
         const name = try self.identifier();
-        if (!self.at(.dot) or (self.peek(1) != .identifier and self.peek(1) != .type_identifier and self.peek(1) != .kw_finish)) return name;
+        if (!self.at(.dot) or (self.peek(1) != .identifier and self.peek(1) != .type_identifier)) return name;
         var bytes: std.ArrayList(u8) = .empty;
         defer bytes.deinit(self.allocator);
         try bytes.appendSlice(self.allocator, self.text(first));
-        while (self.at(.dot) and (self.peek(1) == .identifier or self.peek(1) == .type_identifier or self.peek(1) == .kw_finish)) {
+        while (self.at(.dot) and (self.peek(1) == .identifier or self.peek(1) == .type_identifier)) {
             _ = self.advance();
             const t = self.advance();
             _ = try self.intern(self.text(t));
@@ -810,7 +808,6 @@ const Parser = struct {
         if (self.at(.identifier) and self.word("pack") and self.peek(1) == .l_bracket) return self.packagePack();
         if (self.at(.identifier) and self.word("unpack") and self.packageOpeningAhead()) return self.packageUnpack();
         if (self.at(.kw_fn)) return self.lambda();
-        if (self.taskBlockAhead("tasks") or self.taskBlockAhead("async")) return self.taskBlock();
         if (self.at(.kw_do)) return self.doBlock();
         if (self.at(.kw_if)) return self.ifExpression();
         if (self.at(.kw_case)) return self.caseExpression();
@@ -818,16 +815,13 @@ const Parser = struct {
     }
     fn lambda(self: *Parser) Error!Id {
         const start = (try self.expect(.kw_fn)).start;
-        const enclosing_tasks = self.task_blocks;
-        const enclosing_base = self.task_do_base;
         const enclosing_group = self.task_group;
-        self.task_blocks = 0;
-        self.task_do_base = 0;
+        const scoped = self.scope_callback;
         self.task_group = 0;
+        self.scope_callback = false;
         defer {
-            self.task_blocks = enclosing_tasks;
-            self.task_do_base = enclosing_base;
             self.task_group = enclosing_group;
+            self.scope_callback = scoped;
         }
         const Parameter = struct { node: Id, pattern: Id, name: symbols.Symbol, start: u32 };
         var fixed: [8]Parameter = undefined;
@@ -870,6 +864,7 @@ const Parser = struct {
         }
         const result = if (self.eat(.arrow)) try self.typeExpression() else 0;
         _ = try self.expect(.fat_arrow);
+        if (scoped and count == 1 and fixed[0].pattern == 0 and fixed[0].name != 0) self.task_group = fixed[0].name;
         var body = try self.expression();
         const parameters = if (count <= fixed.len) fixed[0..count] else overflow.items;
         var index = parameters.len;
@@ -890,40 +885,10 @@ const Parser = struct {
         const start = (try self.expect(.kw_do)).start;
         const resolver = if (self.at(.colon)) 0 else try self.application(false);
         _ = try self.expect(.colon);
-        self.do_blocks += 1;
-        defer self.do_blocks -= 1;
         const block = try self.suite();
         self.tree.nodes.items[block].c = resolver;
         self.tree.spans.items[block].start = start;
         return block;
-    }
-    fn taskBlockAhead(self: *const Parser, spelling: []const u8) bool {
-        const tag: Tag = if (std.mem.eql(u8, spelling, "tasks")) .kw_tasks else .kw_async;
-        return self.at(tag) and self.peek(1) == .identifier and self.peek(2) == .colon;
-    }
-    fn taskBlock(self: *Parser) Error!Id {
-        const opener = self.advance();
-        const async_child = std.mem.eql(u8, self.text(opener), "async");
-        const group_start = self.current().start;
-        const group = try self.lowerIdentifier();
-        _ = try self.expect(.colon);
-        const enclosing_tasks = self.task_blocks;
-        const enclosing_base = self.task_do_base;
-        const enclosing_group = self.task_group;
-        self.task_blocks += 1;
-        self.task_do_base = self.do_blocks;
-        self.task_group = group;
-        defer {
-            self.task_blocks = enclosing_tasks;
-            self.task_do_base = enclosing_base;
-            self.task_group = enclosing_group;
-        }
-        const body = try self.suite();
-        const parameter = try self.add(.parameter, if (async_child) 0 else group, 0, try self.extra(&.{ @as(u32, if (async_child) 2 else 0), 0, 0, 0 }), group_start);
-        const callback = try self.add(.lambda, parameter, body, 0, opener.start);
-        if (!async_child) return self.collectionIntrinsic("@task.scope", &.{callback}, opener.start);
-        const group_value = try self.add(.name, group, 0, 0, group_start);
-        return self.collectionIntrinsic("@task.spawn", &.{ group_value, callback }, opener.start);
     }
     fn ifExpression(self: *Parser) Error!Id {
         const start = (try self.expect(.kw_if)).start;
@@ -965,7 +930,7 @@ const Parser = struct {
             const op = try self.readOperator();
             unknown = unknown or !op.known;
             try operators.append(self.allocator, op);
-            const rhs = if (self.at(.kw_fn) or self.at(.kw_do) or self.at(.kw_if) or self.at(.kw_case) or self.taskBlockAhead("tasks") or self.taskBlockAhead("async")) try self.expression() else try self.prefix();
+            const rhs = if (self.at(.kw_fn) or self.at(.kw_do) or self.at(.kw_if) or self.at(.kw_case)) try self.expression() else try self.prefix();
             try operands.append(self.allocator, rhs);
         }
         if (operators.items.len == 0) return head;
@@ -1040,7 +1005,15 @@ const Parser = struct {
         while (true) {
             if (!atomTag(self.current().tag) or (!allow_witness and self.at(.colon))) break;
             if (self.at(.colon) and self.peek(1) == .newline) break;
-            value = try self.add(.apply, value, try self.postfix(), 0, start);
+            const callback = self.tree.node(value).tag == .intrinsic and std.mem.eql(u8, self.pool.get(self.tree.node(value).a), "@task.scope");
+            const before = self.scope_callback;
+            self.scope_callback = callback;
+            const argument = self.postfix() catch |err| {
+                self.scope_callback = before;
+                return err;
+            };
+            self.scope_callback = before;
+            value = try self.add(.apply, value, argument, 0, start);
         }
         return value;
     }
@@ -1407,17 +1380,11 @@ const Parser = struct {
             return self.add(.let_stmt, pat, value, try self.extra(&.{ annotation, constraints.predicates.start, constraints.predicates.len, fallback, constraints.node }), start);
         }
         if (self.eat(.kw_return)) {
-            if (self.task_blocks != 0) return self.fail(.task_return_scope);
-            return self.add(.function_return_stmt, try self.expression(), 0, 0, start);
-        }
-        if (self.eat(.kw_finish)) {
-            if (self.task_blocks == 0) return self.fail(.task_finish_scope);
             return self.add(.function_return_stmt, try self.expression(), 0, 0, start);
         }
         if (self.eat(.kw_yield)) return self.add(.yield_stmt, try self.expression(), 0, 0, start);
         if (self.eat(.kw_break)) {
             if (self.at(.newline) or self.at(.dedent) or self.at(.eof)) return self.add(.break_stmt, 0, 0, 0, start);
-            if (self.task_blocks != 0 and self.do_blocks == self.task_do_base) return self.fail(.task_break_scope);
             const forwarding: u32 = @intFromBool(self.eat(.dollar));
             return self.add(.return_stmt, try self.expression(), forwarding, 0, start);
         }

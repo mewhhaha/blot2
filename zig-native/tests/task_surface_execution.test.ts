@@ -4,23 +4,26 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 
 const source = `
 const add22 = fn value => @u32.add value 22
-entry const answer = fn () => tasks group:
-  let left = async group:
-    finish 20
-  let right = async group:
-    do:
-      finish 22
-  finish @u32.add (@task.join left) (@task.join right)
-entry const branch = fn (choice: Bool) => tasks group:
+entry const answer = fn () => @task.scope (fn group => do:
+  let left = *(add22 20)
+  let right = @task.spawn group (fn () => 0)
+  return @u32.add (|left|) (|right|))
+entry const branch = fn (choice: Bool) => do:
   if choice:
-    finish 42
-  finish 5
-entry const sparked = fn () => tasks group:
+    return 42
+  return 5
+entry const sparked = fn () => @task.scope (fn group => do:
   let pending = *(add22 20)
-  finish |pending|
+  return |pending|)
+entry const nested = fn () => @task.scope (fn outer => do:
+  let first = *(add22 0)
+  let second = @task.scope (fn inner => do:
+    let pending = *(add22 20)
+    return |pending|)
+  return @u32.add (|first|) second)
 `;
 
-Deno.test("task surface blocks preserve function exits and results in both tiers", async () => {
+Deno.test("spark and receive use explicit task scopes in both tiers", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-task-surface-" });
   const entry = `${directory}/main.blot`;
   const executable = Deno.args[0] ??
@@ -45,11 +48,13 @@ Deno.test("task surface blocks preserve function exits and results in both tiers
               assert.equal(await guest.callAsync("branch", true), 42);
               assert.equal(await guest.callAsync("branch", false), 5);
               assert.equal(await guest.callAsync("sparked", null), 42);
+              assert.equal(await guest.callAsync("nested", null), 64);
             } else {
               assert.equal(guest.call("answer", null), 42);
               assert.equal(guest.call("branch", true), 42);
               assert.equal(guest.call("branch", false), 5);
               assert.equal(guest.call("sparked", null), 42);
+              assert.equal(guest.call("nested", null), 64);
             }
           } finally {
             guest.dispose();
