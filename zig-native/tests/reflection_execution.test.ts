@@ -50,7 +50,7 @@ type State a is effect = {get: Unit -> a,set: a -> Unit}
 const read = fn () => do:
   use State.get U32 ()
   use State.get U32 ()
-  return State.get F32 ()
+  break State.get F32 ()
 const effects = @effect.of read
 entry const total = @effect.count effects
 entry const present = @effect.has effects (State.get F32)
@@ -104,14 +104,14 @@ const requirements = @effect.of read
   await compileExpectedFailure(
     base + `entry const answer = do:
   let (_, result) = @state.run #[requirements] (fn () => 42)
-  return result
+  break result
 `,
     "ambiguous_state",
   );
   await compileExpectedFailure(
     base + `entry const answer = do:
   let (_, result) = @state.run (requirements,42) (fn () => 42)
-  return result
+  break result
 `,
     "ambiguous_state",
   );

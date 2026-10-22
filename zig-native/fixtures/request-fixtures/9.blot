@@ -9,7 +9,7 @@ const count = fn computation => do:
         current := @u32.add self 1
         yield current
       complete value =>
-        return value
+        break value
 entry const answer = fn () => @u32.add (count calculation) (count calculation)
 
 entry const checked_answer = answer ()

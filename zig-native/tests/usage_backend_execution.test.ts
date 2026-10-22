@@ -9,7 +9,7 @@ const unit = fn (owner: unique Unit) => @usage.borrow owner (fn loan => @usage.r
 const float = fn (owner: unique F32) => @usage.borrow_mut owner (fn loan => @f32.add (@usage.read loan) (@usage.read loan))
 const captured = fn (callback: once (Unit -> U32 ! {Foreign})) => do:
   let owner = (fn (value: unique U32) => value) 9
-  return @usage.borrow owner (fn loan => @u32.add (@usage.read loan) (callback ()))
+  break @usage.borrow owner (fn loan => @u32.add (@usage.read loan) (callback ()))
 const payload = fn (owner: unique U32) => @usage.borrow owner (fn loan => @array.fill 1024 (@usage.read loan))
 entry const buffer = fn () => payload 9
 entry const empty = fn () => unit ()
@@ -18,8 +18,8 @@ entry const answer = fn (host: Unit -> U32 ! {Foreign}) => captured (fn () => ho
 entry const ordered = fn (host: Unit -> U32 ! {Foreign}) => do:
   let create = fn () => do:
     use ignored <- host ()
-    return (fn (value: unique U32) => value) 9
-  return @usage.borrow (create ()) (fn loan => @u32.add (@usage.read loan) (host ()))
+    break (fn (value: unique U32) => value) 9
+  break @usage.borrow (create ()) (fn loan => @u32.add (@usage.read loan) (host ()))
 `;
 
 for (const codegenTier of ["optimized", "development"] as const) {

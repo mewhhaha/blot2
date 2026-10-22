@@ -338,7 +338,7 @@ const Builder = struct {
                 try self.capture(value.a, environment, captures, count, depth + 1);
                 try self.capture(value.b, environment, captures, count, depth + 1);
             },
-            .field_access, .return_stmt, .yield_stmt => try self.capture(value.a, environment, captures, count, depth + 1),
+            .field_access, .return_stmt, .function_return_stmt, .yield_stmt => try self.capture(value.a, environment, captures, count, depth + 1),
             .field => {
                 if (value.b != 0) try self.capture(value.b, environment, captures, count, depth + 1) else {
                     const known = environment.get(value.a) orelse return error.Unavailable;

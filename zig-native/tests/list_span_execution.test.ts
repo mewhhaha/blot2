@@ -26,7 +26,7 @@ entry const width_${width} = fn count => do:
       result := self + ${sum}
   for row in saved:
     result := self + ${sum}
-  return result
+  break result
 `;
   });
   await compileAndRun(functions.join("\n"), (guest) => {
@@ -73,7 +73,7 @@ entry const width_${width} = fn count => do:
   let result = 0
   for row in mixed:
     result := self + ${sum}
-  return result
+  break result
 `;
   });
   await compileAndRun(functions.join("\n"), (guest) => {

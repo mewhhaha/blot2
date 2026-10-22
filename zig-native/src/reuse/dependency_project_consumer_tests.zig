@@ -111,7 +111,7 @@ test "fresh entry nominal State operation and record order match ordinary concep
         \\  let (_, #EntryCell count) = @state.run (#EntryCell 42) (fn () => @state.get #EntryCell)
         \\  use fraction <- Ask ()
         \\  let record = #EntryRecord { zebra: count, alpha: fraction }
-        \\  return @f32.add (@u32.to_f32 record.zebra) record.alpha
+        \\  break @f32.add (@u32.to_f32 record.zebra) record.alpha
         \\entry const owned: Unit -> F32 = fn () => evaluate ()
         \\entry const folded = evaluate ()
         \\
@@ -263,7 +263,7 @@ test "cached producer canonical effect witnesses outlive all input owners and re
         .{
             "effect ask:Unit->U32\n",
             "import {ask as query} from \"./shared\"\nentry const answer=42\n",
-            "import {ask as query} from \"./shared\"\nlet value=do:\n  use answer<-query ()\n  return answer\nentry const answer=42\n",
+            "import {ask as query} from \"./shared\"\nlet value=do:\n  use answer<-query ()\n  break answer\nentry const answer=42\n",
             "pure evaluation cannot perform shared.blot::ask; sequence an operation with use inside a provider scope",
         },
         .{

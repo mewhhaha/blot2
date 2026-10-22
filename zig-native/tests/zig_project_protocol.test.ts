@@ -627,7 +627,7 @@ Deno.test("wire completion is source-only bounded recoverable and leaves retaine
     equal(first.context.nodes[first.context.expected].kind, "u32");
     fields(first.items[0], ["label", "insertText", "kind", "detail", "match"]);
     const scope = await query(
-      "const work = fn (value: U32) -> U32 => do:\n  let original = value\n  value := #True\n  return @ho<cursor>le",
+      "const work = fn (value: U32) -> U32 => do:\n  let original = value\n  value := #True\n  break @ho<cursor>le",
     );
     equal(
       scope.items.filter((item: Metadata) =>

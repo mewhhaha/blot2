@@ -45,13 +45,13 @@ entry const triangle_array = fn count => do:
   for x in 0..count:
     for y in 0..x:
       values := [...self, x * 10 + y]
-  return @array.from_list values
+  break @array.from_list values
 const list = fn count => do:
   let values: List U32 = []
   for x in 0..count:
     for y in 0..x:
       values := [...self, x * 10 + y]
-  return values
+  break values
 entry const triangle_list = fn count => @list.length (list count)
 entry const filter_none = fn (count: U32) => #[x | x <- inputs, #False]
 entry const filter_half = fn count => #[x | x <- inputs, @u32.lt x (@u32.shr count 1)]
@@ -66,7 +66,7 @@ entry const exhausted = fn (count: U32) => do:
   for x in 0..count:
     if #False:
       result := [...self, x]
-  return @array.from_list result
+  break @array.from_list result
 `;
 }
 async function compile(

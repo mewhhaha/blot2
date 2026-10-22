@@ -255,18 +255,18 @@ const stop = fn computation => do:
   for request in @requests computation:
     case request of
       effect Stop.check value =>
-        return value
+        break value
       complete value =>
-        return value
+        break value
 entry const canceled = fn (value: U32) => stop (@computation (fn () => do:
   let item = nested value
   use Stop.check (read item)
-  return @panic "carrier computation continued after cancellation"
+  break @panic "carrier computation continued after cancellation"
 ))
 type Empty = exists [a] => (Array a, Array a -> U32)
 const empty: U32 -> Empty = fn ignored => pack [Unit] (@array.fill 0 (), fn values => do:
   let first = @array.get values 0
-  return 42
+  break 42
 ) as Empty
 entry const trapped = fn (value: U32) => unpack (empty value) as [a] body in (@product.get body 1) (@product.get body 0)
 `,

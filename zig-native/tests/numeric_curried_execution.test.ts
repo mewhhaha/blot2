@@ -7,15 +7,15 @@ const executable = Deno.args[0] ??
 const library = `type Probe is data = #Probe U32
 const Probe.choose = fn (unused: Probe) => do:
   let copied = 0
-  return fn (index: U32) => @u32.add index copied
+  break fn (index: U32) => @u32.add index copied
 const Probe.within = fn (unused: Probe) => do:
   let limit = 2
-  return fn (index: U32) => @u32.lt index limit
+  break fn (index: U32) => @u32.lt index limit
 const lookup = fn probe => fn (index: U32) => do:
   let values = #[8, 13]
   if @type.call "within" probe index:
-    return @array.get values (@type.call "choose" probe index)
-  return 0
+    break @array.get values (@type.call "choose" probe index)
+  break 0
 const run = fn index => lookup (#Probe 42) index
 `;
 const source = `import {run} from "./logic"
@@ -39,8 +39,8 @@ const Probe.choose = fn (unused: Probe) => fn (index: U32) => fn (delta: U32) =>
 const run = fn (index: U32) => do:
   let copied = 0
   if @u32.lt index 2:
-    return @array.get #[8, 13] ((@type.call "choose" (#Probe 42) index) copied)
-  return 0
+    break @array.get #[8, 13] ((@type.call "choose" (#Probe 42) index) copied)
+  break 0
 `;
 
 async function observe(bytes: Uint8Array<ArrayBuffer>, changed = false) {

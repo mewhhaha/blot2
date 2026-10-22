@@ -17,7 +17,7 @@ const closure = (fn captured => fn value => @u32.add captured value) 2
 entry const answer = fn () => closure 40
 entry const probe = fn () => do:
   let kept = (empty, nested, reference, constructor)
-  return 0
+  break 0
 `,
       async (guest) => {
         const invoke = async (name: string, value: number | boolean | null) =>
@@ -42,14 +42,14 @@ const mark = fn (digit: U32) => do:
   use previous <- @state.get witness
   let #Count old = previous
   use @state.set (#Count (@u32.add (@u32.mul old 10) digit))
-  return @u32.to_f32 digit
+  break @u32.to_f32 digit
 entry const answer = fn () => do:
   let (#Count count, _) = @state.run (#Count 0) (fn () => do:
     let delayed = keep (mark 7)
     use ignored <- (identity, (mark 1, #[mark 2, mark 3], #[mark 4, mark 5, mark 6], delayed (), @array.fill 2 (mark 8), fn () => @panic "unused body ran"))
-    return ()
+    break ()
   )
-  return count
+  break count
 entry const folded = answer ()
 `,
       async (guest) => {
@@ -78,23 +78,23 @@ for (const asynchronous of [false, true]) {
 entry const capture = fn () => do:
   let kept = (40, 2)
   let use_it = fn () => @u32.add (@product.get kept 0) (@product.get kept 1)
-  return use_it ()
+  break use_it ()
 entry const carry = fn () => do:
   let kept = (40, 2)
   for index in 0..2:
     kept := (@u32.add (@product.get kept 0) 1, 0)
-  return @product.get kept 0
+  break @product.get kept 0
 entry const merged = fn (flag: Bool) => do:
   let kept = (0, 0)
   if flag:
     kept := (40, 2)
   else:
     kept := (20, 22)
-  return @u32.add (@product.get kept 0) (@product.get kept 1)
+  break @u32.add (@product.get kept 0) (@product.get kept 1)
 entry const value_pattern = fn () => do:
   let needle = 41
   let unused = (0, 0)
-  return case 41 of
+  break case 41 of
     needle => 42
     _ => 0
 `,
@@ -126,20 +126,20 @@ const mark = fn (digit: U32) => do:
   use previous <- @state.get witness
   let #Count old = previous
   use @state.set (#Count (@u32.add (@u32.mul old 10) digit))
-  return digit
+  break digit
 const handled = fn computation => do:
   for request in @requests computation:
     case request of
       effect Stop.read () =>
-        return 40
+        break 40
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Count count, value) = @state.run (#Count 0) (fn () => handled (@computation (fn () => do:
     use ignored <- (identity, (mark 1, Stop.read (), mark 2))
-    return 0
+    break 0
   )))
-  return @u32.add count value
+  break @u32.add count value
 entry const folded = answer ()
 `,
       async (guest) => {
@@ -167,7 +167,7 @@ for (const asynchronous of [false, true]) {
       `const identity = fn value => value
 entry const answer = fn (length: U32) => do:
   let ignored = (identity, @array.generate length (fn (index: U32) -> U32 => @panic "callback ran"))
-  return 42
+  break 42
 `,
       async (guest) => {
         const invoke = async (name: string, value: number | boolean | null) =>
@@ -194,7 +194,7 @@ for (const asynchronous of [false, true]) {
       `const identity = fn value => value
 entry const answer = fn (value: U32) => do:
   let ignored = (identity, (fn input => @panic "runtime operand") value, @u32.div 1 0)
-  return 0
+  break 0
 `,
       async (guest) => {
         const invoke = async (name: string, value: number | boolean | null) =>
@@ -220,7 +220,7 @@ const identity = fn value => value
 const bad = @panic "constant operand"
 entry const answer = fn () => do:
   let ignored = (identity, bad)
-  return 0
+  break 0
 `,
     "const_panic",
   );
@@ -230,10 +230,10 @@ Deno.test("unused aggregate retains initializer-panic", async () => {
     `const identity = fn value => value
 const failing = do:
   let ignored = (1, 2)
-  return @panic "constant initializer ran"
+  break @panic "constant initializer ran"
 entry const answer = fn () => do:
   let ignored = (identity, failing)
-  return 0
+  break 0
 `,
     "const_panic",
   );
@@ -242,7 +242,7 @@ Deno.test("unused aggregate retains explicit-qualifier", async () => {
   await compileExpectedFailure(
     `entry const answer = fn () => do:
   let ignored: (U32, U32) where { associated "missing" Bool Bool Bool } = (40, 2)
-  return 0
+  break 0
 `,
     "missing_associated",
   );
@@ -253,7 +253,7 @@ Deno.test("unused aggregate retains deferred-body proof rejection", async () => 
 const missing = fn value => value.no_such_member
 entry const answer = fn () => do:
   let unused = (missing, identity, fn input => input.no_such_member)
-  return 42
+  break 42
 entry const folded = answer ()
 `,
     "constant_expression",
@@ -264,7 +264,7 @@ Deno.test("unused aggregate retains deferred-anonymous proof rejection", async (
     `const identity = fn value => value
 entry const answer = fn () => do:
   let unused = (identity, fn value => value.no_such_member)
-  return 42
+  break 42
 `,
     "constant_expression",
   );
@@ -276,7 +276,7 @@ const missing = fn value => value.no_such_member
 const packed = (identity, missing)
 entry const answer = fn () => do:
   let unused = (identity, packed)
-  return 42
+  break 42
 `,
     "unresolved_type",
   );

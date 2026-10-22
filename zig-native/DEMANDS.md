@@ -122,7 +122,7 @@ entry const answer = fn () => do:
   let amount = 20
   let pending = delay (@u32.add amount 1)
   amount := 99
-  return @demand pending
+  break @demand pending
 ```
 
 The result is 21. Inlining must substitute binding identities rather than source
@@ -155,8 +155,9 @@ created outside the loop.
 ### Completion and cancellation
 
 Only normal completion publishes a shared result. A request handler's `yield`
-resumes the same evaluation. Its `return` or `break` cancels an unfinished
-demand: every active force unwound by that cancellation becomes pending again,
+resumes the same evaluation. Its `break value`, `return value`, or bare `break`
+cancels an unfinished demand: every active force unwound by that cancellation
+becomes pending again,
 including nested forces. A later force starts the expression again under the
 current providers. Effects already performed remain observable and may run again
 on a retry; cancellation is not a transaction.
@@ -169,7 +170,7 @@ returning an unfinished result. The native evaluator resets its pending state
 when a failed compile-time evaluation unwinds; a failed compilation publishes no
 successful value or revision.
 
-Executed sync and JSPI laws cover handler `return` and `break`, nested pending
+Executed sync and JSPI laws cover handler exits, nested pending
 demands, retry under a later handler, normal completion after `yield`, repeated
 captured-computation invocation, host exceptions, division traps and recursive
 forcing through State. The constant evaluator also rejects the recursive case.

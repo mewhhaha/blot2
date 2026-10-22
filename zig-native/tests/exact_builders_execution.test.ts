@@ -9,7 +9,7 @@ entry const rectangle = fn count => do:
   for x in 0..count:
     for y in 2..5:
       result := [...self, x * 10 + y]
-  return @array.from_list result
+  break @array.from_list result
 entry const product = fn (values: Array U32) => #[x * 10 + y | x <- values, y <- values]
 const lists = fn (values: Array U32) => [x * 10 + y | x <- values, y <- values]
 entry const list_result = fn values => Array.from_list (lists values)
@@ -17,18 +17,18 @@ entry const reversed = fn count => do:
   let result: List U32 = []
   for x in count..2:
     result := [...self, x]
-  return @array.from_list result
+  break @array.from_list result
 entry const ragged = fn count => do:
   let result: List U32 = []
   for x in 0..count:
     for y in 0..x:
       result := [...self, x * 10 + y]
-  return @array.from_list result
+  break @array.from_list result
 entry const observed = fn count => do:
   let result: List U32 = []
   for x in 0..count:
     result := [...self, result.length]
-  return @array.from_list result
+  break @array.from_list result
 `,
     (guest) => {
       for (const count of [0, 1, 83, 249]) {
@@ -73,7 +73,7 @@ entry const run = fn (send: U32 -> U32 ! {Foreign}) => do:
     for y in 1..3:
       use value <- send (x * 10 + y)
       result := [...self, value]
-  return @array.from_list result
+  break @array.from_list result
 `,
     (guest) => {
       const seen: number[] = [];

@@ -45,7 +45,7 @@ const cases = [
     name: "one_resource",
     builder:
       "ecs.insert_resource #Clock { tick: 0, remainder: 0.25 } (ecs.new ())",
-    body: "  use advance (fn () => ecs.checkpoint engine) delta\n  return ()",
+    body: "  use advance (fn () => ecs.checkpoint engine) delta\n  break ()",
     expected: (x: number, _edited: boolean) => x,
   },
   {
@@ -53,7 +53,7 @@ const cases = [
     builder:
       "ecs.insert_resource (#Counter 7) (ecs.insert_resource (#Clock { tick: 0, remainder: 0.25 }) (ecs.new ()))",
     body:
-      "  use advance (fn () => ecs.checkpoint engine) delta\n  use clock <- ecs.get #Clock\n  let #Clock { remainder } = clock\n  use counter <- ecs.get #Counter\n  let #Counter count = counter\n  return delta + remainder + U32.to_f32 count",
+      "  use advance (fn () => ecs.checkpoint engine) delta\n  use clock <- ecs.get #Clock\n  let #Clock { remainder } = clock\n  use counter <- ecs.get #Counter\n  let #Counter count = counter\n  break delta + remainder + U32.to_f32 count",
     expected: (x: number, edited: boolean) =>
       Math.fround(Math.fround(x + (edited ? .5 : .25)) + 7),
   },
@@ -62,7 +62,7 @@ const cases = [
     builder:
       "ecs.insert_snapshotted_resource #Clock { tick: 0, remainder: 0.25 } (ecs.new ())",
     body:
-      "  use ecs.set #Clock { tick: 1, remainder: delta }\n  use advance (fn () => ecs.checkpoint engine) delta\n  use snapshot <- ecs.previous #Clock\n  let #Clock { remainder } = snapshot\n  return remainder",
+      "  use ecs.set #Clock { tick: 1, remainder: delta }\n  use advance (fn () => ecs.checkpoint engine) delta\n  use snapshot <- ecs.previous #Clock\n  let #Clock { remainder } = snapshot\n  break remainder",
     expected: (x: number, _edited: boolean) => x,
   },
 ];
@@ -91,13 +91,13 @@ type Clock is data = #Clock { tick: U32, remainder: F32 }
 type Counter is data = #Counter U32
 const advance = fn checkpoint => fn (delta: F32) => do:
   use checkpoint ()
-  return ()
+  break ()
 const engine = ecs.build (${c.builder})
 const scoped = fn engine => fn (delta: F32) => do:
 ${c.body}
 entry const main = fn (delta: F32) => do:
   let (_, result) = ecs.create engine (fn () => scoped engine delta)
-  return ${c.name === "one_resource" ? "delta" : "result"}
+  break ${c.name === "one_resource" ? "delta" : "result"}
 `;
   await Deno.writeTextFile(entry, source);
   pins[entry] = await hash(entry);

@@ -5,7 +5,7 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const program = `import * as iter from "std/iter"
 entry const strict = fn count => iter.fold_left (fn total => fn pair => do:
   let (left, right) = pair
-  return total + left + right) 0 (iter.zip_strict (iter.range 0 count) (iter.range 0 count))
+  break total + left + right) 0 (iter.zip_strict (iter.range 0 count) (iter.range 0 count))
 entry const alternatives = fn input => do:
   let mode = input / 8192
   let count = input % 8192
@@ -13,26 +13,26 @@ entry const alternatives = fn input => do:
   for round in 0..count:
     let selected = do:
       if mode % 3 == 0:
-        return case round % 3, round % 2 of
+        break case round % 3, round % 2 of
           0, 0 => #Nothing
           0, _ => #Some (round * 3 + 1, round + 7)
           _, _ => #Some (round * 3 + 1, round + 7)
       else:
         if mode % 3 == 1:
           if round % 2 == 0:
-            return #Some (round * 3 + 1, round + 7)
+            break #Some (round * 3 + 1, round + 7)
           else:
             if round % 5 == 0:
-              return #Some (round * 3 + 1, round + 7)
-            return #Nothing
+              break #Some (round * 3 + 1, round + 7)
+            break #Nothing
         else:
           for inner in 0..3:
             if inner == round % 3:
-              return #Some (round * 3 + 1, round + 7)
-          return #Nothing
+              break #Some (round * 3 + 1, round + 7)
+          break #Nothing
     if let #Some (left, right) = selected:
       total := self + left + right
-  return total
+  break total
 entry const snapshots = fn count => do:
   let previous = {value: 41}
   let total = 0
@@ -41,7 +41,7 @@ entry const snapshots = fn count => do:
     let saved = previous
     previous := current
     total := self + saved.value + current.value
-  return total
+  break total
 `;
 
 Deno.test("private constructor alternatives and outward loop returns preserve snapshots across reentry in both tiers", async () => {

@@ -16,36 +16,36 @@ entry const forks = fn count => do:
   let saved = cursor.next
   let alias = cursor
   let #Some (_, rest) = saved else:
-    return 999
+    break 999
   let total = 0
   for index in 0..count:
     let discarded = @array.generate 4096 (fn value => value + index)
     total := self + first rest.next
-  return first saved + first alias.next + total
+  break first saved + first alias.next + total
 entry const references = fn count => do:
   let values = #[#[7, 8], #[9], #[10, 11, 12]]
   let total = 0
   for value in iter.take count (iter.map identity values):
     let garbage = @array.generate 8192 identity
     total := self + value.length + value[0]
-  return total
+  break total
 type Choice is data = #Present (Array U32, U32) | #Absent
 entry const old_alias = fn seed => do:
   let saved = #Present (#[seed], seed + 1)
   let result = do:
     if seed == 0:
-      return #Absent
-    return saved
+      break #Absent
+    break saved
   let #Present (values, _) = saved else:
-    return 999
+    break 999
   let garbage = @array.generate 8192 identity
-  return case result of
+  break case result of
     #Present (_, value) => values[0] + value
     #Absent => values[0] + 100
 entry const empty = fn count => do:
   let source = iter.range 0 count
   let stored = #[source.next, (iter.range 0 0).next]
-  return first stored[0] + first stored[1]
+  break first stored[0] + first stored[1]
 `,
     (guest) => {
       assert.equal(guest.call("forks", 0), 999);
@@ -72,7 +72,7 @@ entry const run = fn count => do:
   let total = 0
   for value in cursor.make count:
     total := self + value
-  return total
+  break total
 `;
   try {
     for (const codegenTier of ["optimized", "development"] as const) {
@@ -175,39 +175,39 @@ entry const chained = fn count => do:
   let cursor = iter.enumerate (iter.take (count / 2) (iter.map (fn value => value + 7) (iter.filter (fn value => value % 2 == 0) (iter.range 0 count))))
   let saved = cursor.next
   let #Some ((index, first), rest) = saved else:
-    return 999
+    break 999
   let total = 0
   for (_, value) in rest:
     let garbage = @array.generate 8192 identity
     total := self + value
   let #Some ((_, again), _) = cursor.next else:
-    return 999
-  return index + first + again + total
+    break 999
+  break index + first + again + total
 entry const references = fn (seed: U32) => do:
   let values = @array.generate 4 (fn index => #[seed + index, index])
   let cursor = iter.take 3 (iter.filter (fn (value: Array U32) => value.length == 2) (iter.map identity values))
   let saved = cursor.next
   let #Some (first, rest) = saved else:
-    return 999
+    break 999
   let total = 0
   for value in rest:
     let garbage = @array.generate 8192 identity
     total := self + value[0] + value.length
   let #Some (again, _) = cursor.next else:
-    return 999
-  return total + first[0] + first.length + again[0] + again.length
+    break 999
+  break total + first[0] + first.length + again[0] + again.length
 entry const windows = fn count => do:
   let cursor = iter.windows 3 (iter.range 0 count)
   let saved = cursor.next
   let #Some (first, rest) = saved else:
-    return 999
+    break 999
   let total = 0
   for window in rest:
     let garbage = @array.generate 8192 identity
     total := self + head window
   let #Some (second, _) = rest.next else:
-    return head first + total + third first + 100
-  return third first + head second + total
+    break head first + total + third first + 100
+  break third first + head second + total
 `,
     (guest) => {
       for (const count of [0, 1, 2, 3, 4, 17, 65]) {
@@ -235,8 +235,8 @@ import * as iter from "std/iter"
 const sum_pair = fn total => fn pair => do:
   let (index, value) = pair
   if index % 2 == 0:
-    return total + value * 3 + index
-  return total + value
+    break total + value * 3 + index
+  break total + value
 entry const conditional = fn count => iter.fold_left sum_pair 0 (iter.enumerate (iter.range 0 count))
 entry const replay = fn count => do:
   let cursor = iter.enumerate (iter.range 0 count)
@@ -246,10 +246,10 @@ entry const replay = fn count => do:
     total := self + iter.fold_left sum_pair 0 cursor
     let garbage = @array.generate 8192 identity
   let #Some ((index, value), rest) = saved else:
-    return total + 999
+    break total + 999
   let #Some ((again, second), _) = rest.next else:
-    return total + index + value + 100
-  return total + index + value + again + second
+    break total + index + value + 100
+  break total + index + value + again + second
 entry const references = fn (seed: U32) => do:
   let values = @array.generate 4 (fn index => #[seed + index, index])
   let cursor = iter.zip values (iter.range 0 4)
@@ -258,16 +258,16 @@ entry const references = fn (seed: U32) => do:
   for repeat in 0..3:
     total := self + iter.fold_left (fn accumulator => fn pair => do:
       let (values, index) = pair
-      return accumulator + values.length + values[0] + index) 0 cursor
+      break accumulator + values.length + values[0] + index) 0 cursor
     let garbage = @array.generate 8192 identity
   let #Some ((first, index), _) = saved else:
-    return 999
-  return total + first.length + first[0] + index
+    break 999
+  break total + first.length + first[0] + index
 entry const floats = fn seed => iter.fold_left (fn total => fn pair => do:
   let (index, value) = pair
   if index % 2 == 0:
-    return total + value
-  return total - value) seed (iter.enumerate #[1.5, 2.5, 3.5, 4.5])
+    break total + value
+  break total - value) seed (iter.enumerate #[1.5, 2.5, 3.5, 4.5])
 `,
     (guest) => {
       for (const count of [0, 1, 2, 3, 17, 65]) {
@@ -307,8 +307,8 @@ entry const run = fn count => iter.fold_left consumer.sum 0 (iter.enumerate (ite
     [helper]: `const sum = fn total => fn pair => do:
   let (index, value) = pair
   if index % 2 == 0:
-    return total + value * ${factor} + index
-  return total + value * ${factor}
+    break total + value * ${factor} + index
+  break total + value * ${factor}
 `,
   });
   try {

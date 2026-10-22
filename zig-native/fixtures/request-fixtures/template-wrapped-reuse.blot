@@ -4,25 +4,25 @@ const whole = fn computation => do:
   for request in @requests computation:
     case request of
       effect Tick.read () =>
-        return 20
+        break 20
       complete value =>
-        return value
+        break value
 const floating = fn computation => do:
   for request in @requests computation:
     case request of
       effect Tick.read () =>
-        return 22.5
+        break 22.5
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let value = 41
   let computation = make (fn () => do:
     use Tick.read ()
-    return @panic "cancelled generic computation continued"
+    break @panic "cancelled generic computation continued"
   )
   let alias = computation
   value := 99
   let left = whole computation
   let right = floating alias
-  return @f32.add (@u32.to_f32 left) right
+  break @f32.add (@u32.to_f32 left) right
 entry const folded = answer ()

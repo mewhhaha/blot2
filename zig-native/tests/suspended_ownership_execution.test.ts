@@ -6,7 +6,7 @@ const hostSource = `
 entry const run = fn (host: Array U32 -> Array U32 ! {Foreign}) => do:
   let captured = @array.fill 2048 41
   use reply <- host captured
-  return @array.set reply 0 (@u32.add captured[1] reply[1])
+  break @array.set reply 0 (@u32.add captured[1] reply[1])
 entry const ready = 7
 `;
 
@@ -142,7 +142,7 @@ type Tick is effect = { read: Array U32 -> Array U32 }
 const work = @computation (fn () => do:
   use first <- Tick.read #[41, 42]
   use second <- Tick.read first
-  return second
+  break second
 )
 entry const run = fn (host: Array U32 -> Array U32 ! {Foreign}) => do:
   let saved = #[90, 91]
@@ -154,7 +154,7 @@ entry const run = fn (host: Array U32 -> Array U32 ! {Foreign}) => do:
         saved := @array.set self 0 reply[0]
         yield @array.set reply 1 before[1]
       complete value =>
-        return value
+        break value
 `;
 
 Deno.test("counted request payloads snapshots replies and returned children survive repeated sync and JSPI calls", async () => {
@@ -210,7 +210,7 @@ const keep = fn ~(value: U32 -> U32 ! {Foreign}) => value
 const saved = keep (Fetch.read ())
 entry const answer = fn (host: U32 -> U32 ! {Foreign}) => do (@effect.provider Fetch.read (fn () => host)):
   use previous <- @demand saved
-  return previous 41
+  break previous 41
 entry const pure = fn () => 7
 `,
     async (_, bytes) => {
@@ -295,8 +295,8 @@ const abort = fn log => fn computation => do:
         use log 1
         ${cancellation}
       complete value =>
-        return value
-  return 7
+        break value
+  break 7
 const finish = fn log => fn computation => do:
   for request in @requests computation:
     case request of
@@ -304,19 +304,19 @@ const finish = fn log => fn computation => do:
         use log 2
         yield @u32.add value 40
       complete value =>
-        return value
+        break value
 const scenario = fn log => do:
   let payload = @array.fill 128 41
   let inner = delay (Tick.read 1)
   let pending = delay (do:
     use value <- @demand inner
-    return @u32.add payload[1] value
+    break @u32.add payload[1] value
   )
   let work = @computation (fn () => @demand pending)
   use first <- abort log work
   use second <- finish log work
   use third <- finish log work
-  return @u32.add first (@u32.add second third)
+  break @u32.add first (@u32.add second third)
 entry const answer = fn (log: U32 -> U32 ! {Foreign}) => scenario log
 `,
       async (_, bytes) => {
@@ -378,7 +378,7 @@ Deno.test("a scalar host reply borrows its Array argument from the suspended cal
 entry const run = fn (host: Array U32 -> U32 ! {Foreign}) => do:
   let captured = @array.fill 4096 21
   use reply <- host captured
-  return @u32.add captured[2] reply
+  break @u32.add captured[2] reply
 `, async (_, bytes) => {
     const module = admitted(bytes);
     let exports: WebAssembly.Exports;

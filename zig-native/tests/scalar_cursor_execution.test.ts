@@ -14,7 +14,7 @@ entry const snapshots = fn (count: U32) => do:
       break
     cursor := { index: self.index + 1, limit: self.limit }
     total := self + saved.index + cursor.index
-  return #[total, original.index, cursor.index, cursor.limit]
+  break #[total, original.index, cursor.index, cursor.limit]
 entry const nested = fn (count: U32) => do:
   let total = 0
   for outer in 0..count:
@@ -23,12 +23,12 @@ entry const nested = fn (count: U32) => do:
       let old = cursor
       cursor := { index: self.index + inner, limit: self.limit }
       total := self + old.index + cursor.index
-  return total
+  break total
 entry const captured = fn (count: U32) => do:
   let cursor = { index: count, limit: count + 1 }
   let read = fn () => cursor.index
   cursor := { index: 999, limit: self.limit }
-  return read () + cursor.index
+  break read () + cursor.index
 entry const references = fn (seed: U32) => do:
   let cursor = { value: #[seed, seed + 1], index: 0 }
   let saved = cursor
@@ -37,13 +37,13 @@ entry const references = fn (seed: U32) => do:
     let pressure = @array.fill 8192 index
     if pressure[8191] != index:
       @panic "pressure"
-  return #[saved.value[saved.index], cursor.value[cursor.index]]
+  break #[saved.value[saved.index], cursor.value[cursor.index]]
 entry const suspend = fn (host: U32 -> U32 ! {Foreign}) => do:
   let cursor = { index: 41, limit: 99 }
   let saved = cursor
   use next <- host cursor.index
   cursor := { index: next, limit: self.limit }
-  return #[saved.index, cursor.index, saved.limit, cursor.limit]
+  break #[saved.index, cursor.index, saved.limit, cursor.limit]
 `;
 
 Deno.test("scalar cursor locals preserve forks branch exits nested activations and heap fallback", async () => {

@@ -11,7 +11,7 @@ const sum = fn (count: U32) => fn ~(value: U32) => do:
   for i in 0..count:
     use current <- @demand second
     total := @u32.add self current
-  return total
+  break total
 `;
 
 Deno.test("local memo callee loops need no arena or thunk table", async () => {
@@ -21,7 +21,7 @@ entry const run = fn (count: U32) => sum count 21
 entry const zero = fn (divisor: U32) => sum 0 (@u32.div 1 divisor)
 const ignore = fn ~(value: U32) => do:
   let alias = value
-  return 42
+  break 42
 entry const skipped = fn (divisor: U32) => ignore (@u32.div 1 divisor)
 `,
     (guest, bytes) => {
@@ -73,7 +73,7 @@ const selected = fn (count: U32) => fn ~(value: U32) => do:
     else:
       use current <- @demand alias
       total := @u32.add self current
-  return total
+  break total
 const early = fn (count: U32) => fn ~(value: U32) => do:
   let total = 0
   for i in 0..count:
@@ -81,12 +81,12 @@ const early = fn (count: U32) => fn ~(value: U32) => do:
       break
     use current <- @demand value
     total := @u32.add self current
-  return total
+  break total
 const exclusive = fn (left: Bool) => fn ~(value: U32) => do:
   if left:
-    return @demand value
+    break @demand value
   else:
-    return @demand value
+    break @demand value
 entry const outside = fn (host: U32 -> U32 ! {Foreign}) => sum 8 (host 21)
 entry const once = fn (host: U32 -> U32 ! {Foreign}) => exclusive #False (host 7)
 entry const inside = fn (host: U32 -> U32 ! {Foreign}) => do:
@@ -95,17 +95,17 @@ entry const inside = fn (host: U32 -> U32 ! {Foreign}) => do:
     for j in 0..3:
       use current <- sum j (host (@u32.add (@u32.mul i 10) j))
       total := @u32.add self current
-  return total
+  break total
 entry const conditional = fn (host: U32 -> U32 ! {Foreign}) => do:
   use skipped <- selected 1 (host 99)
   use read <- selected 4 (host 7)
-  return @u32.add skipped read
+  break @u32.add skipped read
 entry const stopped = fn (host: U32 -> U32 ! {Foreign}) => early 100 (host 9)
 entry const captured = fn (host: U32 -> U32 ! {Foreign}) => do:
   let before = 21
   use answer <- sum 2 (host before)
   before := 99
-  return answer
+  break answer
 entry const folded = sum 8 21
 `,
       async (guest) => {
@@ -167,7 +167,7 @@ const walk = fn (rows: List {a: U32, b: U32}) => fn ~(value: U32) => do:
   for row in rows:
     use current <- @demand value
     total := @u32.add self (@u32.add row.a current)
-  return total
+  break total
 const work = @computation (fn () => walk rows (Tick.read 1))
 const abort = fn (log: U32 -> U32 ! {Foreign}) => do:
   for request in @requests work:
@@ -176,12 +176,12 @@ const abort = fn (log: U32 -> U32 ! {Foreign}) => do:
         use log value
         ${exit}
       complete value =>
-        return value
-  return 7
+        break value
+  break 7
 entry const aborted = fn (log: U32 -> U32 ! {Foreign}) => do:
   for i in 0..2048:
     use ignored <- abort log
-  return 7
+  break 7
 entry const resumed = fn (log: U32 -> U32 ! {Foreign}) => do:
   for request in @requests work:
     case request of
@@ -189,10 +189,10 @@ entry const resumed = fn (log: U32 -> U32 ! {Foreign}) => do:
         use next <- log value
         yield next
       complete value =>
-        return value
-  return 0
+        break value
+  break 0
 const scoped = fn ~(value: U32) => do (@effect.provider Tick.read (fn value => 7)):
-  return @u32.add (@demand value) (@demand value)
+  break @u32.add (@demand value) (@demand value)
 entry const provided = fn (ignored: U32) => scoped (Tick.read ignored)
 `,
         async (guest) => {
@@ -251,7 +251,7 @@ const run = fn (count: U32) => fn ~(value: Array U32) => do:
     total := @u32.add self (@array.get pressure 0)
     i := @u32.add self 1
     if @u32.eq i count:
-      return cached
+      break cached
 const forward = fn (count: U32) => fn ~(value: Array U32) => run count (@demand value)
 entry const answer = fn (count: U32) => forward count #[21, 22, 23]
 `,
@@ -274,13 +274,13 @@ const floating = fn (count: U32) => fn ~(value: F32) => do:
   let total = 0.0
   for i in 0..count:
     total := @f32.add self (@demand value)
-  return total
+  break total
 entry const divide = fn (count: U32) => sum count (@u32.div 100 0)
 entry const failed = fn (host: U32 -> U32 ! {Foreign}) => sum 4 (host 21)
 entry const floats = fn (count: U32) => floating count 1.5
 const drop = fn (divisor: U32) => fn ~(_: U32) => do:
   use @u32.div 100 divisor
-  return 42
+  break 42
 entry const discarded = fn (divisor: U32) => drop divisor (@u32.div 1 0)
 `,
     (guest) => {
@@ -395,8 +395,8 @@ const run = fn (count: U32) => fn ~(value: Array U32) => do:
     index := @u32.add self 1
     if @u32.eq index count:
       if @u32.eq total (@u32.mul count (@u32.sub count 1)):
-        return cached
-      return @panic "the pressure loop lost its values"
+        break cached
+      break @panic "the pressure loop lost its values"
 const forward = fn (count: U32) => fn ~(value: Array U32) => run count (@demand value)
 entry const answer = fn (count: U32) => forward count #[21, 22, 23]
 `,

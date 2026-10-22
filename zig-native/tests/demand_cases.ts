@@ -34,7 +34,7 @@ entry const answer=fn ()=>do:
   let pending=delay (@u32.add amount 1)
   let thunk=capture (@u32.add (@force pending) 21)
   amount:=99
-  return @u32.add (thunk ()) (thunk ())
+  break @u32.add (thunk ()) (thunk ())
 `,
     expected: {"answer": 84},
   },
@@ -98,7 +98,7 @@ entry const answer=fn()=>do:
     use ignore (do:
       break
     )
-  return 42
+  break 42
 `,
     error: "invalid_return",
   },
@@ -122,14 +122,14 @@ const alias = saved
 entry const read = fn () => do:
   let first = saved ()
   let second = alias ()
-  return @u32.add first[0] second[1]
+  break @u32.add first[0] second[1]
 entry const changed = fn () => do:
   let first = saved ()
   first[0] := 0
-  return @u32.add first[0] (alias ())[0]
+  break @u32.add first[0] (alias ())[0]
 entry const allocate = fn () => do:
   let values = @array.generate 128 (fn index => index)
-  return values[42]
+  break values[42]
 `,
     expected: {"read": 42, "changed": 40, "allocate": 42},
     repetitions: 16,

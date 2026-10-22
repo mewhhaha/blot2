@@ -15,20 +15,20 @@ const inner = fn computation => do:
         use value <- Outer.check 0
         yield value
       complete value =>
-        return value
+        break value
 const outer = fn computation => do:
   for request in @requests computation:
     case request of
       effect Outer.check value =>
-        return ${answer}
+        break ${answer}
       complete value =>
-        return value
+        break value
 entry const answer = fn () => outer (@computation (fn () => do:
   use inner (make (fn () => do:
     use Inner.read ()
-    return @panic "inner suffix"
+    break @panic "inner suffix"
   ))
-  return @panic "outer suffix"
+  break @panic "outer suffix"
 ))
 entry const folded = answer ()
 `;

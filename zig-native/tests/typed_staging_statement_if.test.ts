@@ -26,7 +26,7 @@ entry const answer = fn () => do:
   let value = 100
   let first = (@code.emit generated) 0
   let second = (@code.emit generated) 1
-  return @u32.add value (@u32.add first second)
+  break @u32.add value (@u32.add first second)
 `;
   const library = (base: number) => {
     if (recipe === "provider callbacks") {
@@ -34,7 +34,7 @@ entry const answer = fn () => do:
 const callback = fn () => ${base}
 const helper = fn (value: U32) => do (@effect.provider Read callback):
   use initial <- Read ()
-  return @u32.add initial value
+  break @u32.add initial value
 const generated = @code.quote (fn (value: U32) => helper value)
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;
@@ -43,7 +43,7 @@ const evaluated: U32 = @code.run (@code.quote (helper 2))
       return `effect Read: Unit -> U32
 const apply: (Unit -> U32 ! {| e}) -> U32 ! {| e} = fn callback => callback ()
 const helper = fn (value: U32) => do (@effect.provider Read (fn () => @u32.add value ${base})):
-  return apply (fn () => Read ())
+  break apply (fn () => Read ())
 const generated = @code.quote (fn (value: U32) => helper value)
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;
@@ -55,9 +55,9 @@ const helper = fn (value: U32) => @effect.scope (fn (state: State U32) => do:
   let pair = do (@effect.state state.get state.set ${base}):
     use previous <- read ()
     use state.set (@u32.add previous value)
-    return read ()
+    break read ()
   let (final, result) = pair
-  return result)
+  break result)
 const generated = @code.quote (fn (value: U32) => helper value)
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;
@@ -72,7 +72,7 @@ const evaluated: U32 = @code.run (@code.quote (helper 2))
       total := @u32.add total part
     else:
       total := @u32.add part total
-  return total
+  break total
 const generated = @code.quote (fn (value: U32) => helper value)
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;
@@ -97,10 +97,10 @@ const evaluated: U32 = @code.run (@code.quote (helper 2))
       return `const helper = fn (flag: Bool) => fn (value: U32) => case flag of
   #True => do:
     let flag = value
-    return @u32.add flag ${base}
+    break @u32.add flag ${base}
   #False => do:
     let value = @u32.add value ${base}
-    return value
+    break value
 const generated = @code.quote (fn (value: U32) => helper (@u32.eq value 0) value)
 const evaluated: U32 = @code.run (@code.quote (helper #False 2))
 `;
@@ -109,13 +109,13 @@ const evaluated: U32 = @code.run (@code.quote (helper #False 2))
   let kept = @u32.add value ${base}
   if @u32.eq value 0:
     let value = kept
-    return value
+    break value
   if @u32.eq value 1:
     if @u32.eq value 1:
-      return kept
+      break kept
     else:
-      return 0
-  return @u32.add value ${base}
+      break 0
+  break @u32.add value ${base}
 const generated = @code.quote (fn (value: U32) => helper value)
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;

@@ -84,7 +84,7 @@ Deno.test("native references publish deterministic handles and independent binar
   const directory = await Deno.makeTempDir();
   const entry = directory + "/main.blot";
   const source =
-    'import * as a from "./a.bin"\nimport * as b from "./b.bin"\nentry const answer = fn () => do:\n  let #a.Content handle = a.content\n  return handle\n';
+    'import * as a from "./a.bin"\nimport * as b from "./b.bin"\nentry const answer = fn () => do:\n  let #a.Content handle = a.content\n  break handle\n';
   const compiler = await createCompiler({
     executable,
     entry,

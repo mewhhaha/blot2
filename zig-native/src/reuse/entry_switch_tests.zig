@@ -71,7 +71,7 @@ const entries = [_][]const u8{
     \\entry const answer: U32 = dep.read ()
     \\entry const kept = fn (value: F32) -> F32 => do:
     \\  let #Box held = dep.keep value
-    \\  return held.left
+    \\  break held.left
     ,
     // rejected in the entry's own check
     \\import * as extra from "./extra"

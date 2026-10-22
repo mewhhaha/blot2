@@ -16,12 +16,12 @@ const left = fn count => do:
   let total = 0
   for value in 0..count:
     total := self + leaf value
-  return total
+  break total
 const right = fn count => do:
   let total = 0
   for value in 0..count:
     total := self + value * 7
-  return total
+  break total
 `,
   });
   try {

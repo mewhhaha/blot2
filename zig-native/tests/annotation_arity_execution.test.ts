@@ -8,7 +8,7 @@ const shaped: Shaped [U32,F32] = #Shaped (22,2.5)
 entry const answer = fn () => do:
   let #Curried (left,_) = curried
   let #Shaped (right,_) = shaped
-  return @u32.add left right
+  break @u32.add left right
 entry const folded = answer ()
 entry const scalar = fn (values: Array U32) => @array.get values 0
 entry const floating = fn (values: Array F32) => @array.get values 0

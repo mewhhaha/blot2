@@ -10,14 +10,14 @@ const cases = [_]Case{
     .{ .source =
     \\entry const x = do:
     \\  let X = 0
-    \\  return 0
+    \\  break 0
     \\
     , .valid = false, .start = 0, .end = 5 },
     // local_lower
     .{ .source =
     \\entry const x = do:
     \\  let x = 0
-    \\  return 0
+    \\  break 0
     \\
     , .valid = true },
     // const_upper
@@ -37,22 +37,22 @@ const cases = [_]Case{
     \\entry const x = do:
     \\  let nested = do:
     \\    let X = 0
-    \\    return 0
-    \\  return nested
+    \\    break 0
+    \\  break nested
     \\
     , .valid = false, .start = 0, .end = 5 },
     // tuple_upper
     .{ .source =
     \\entry const x = do:
     \\  let (X, y) = (0, 1)
-    \\  return y
+    \\  break y
     \\
     , .valid = false, .start = 0, .end = 5 },
     // record_upper
     .{ .source =
     \\entry const x = do:
     \\  let {X} = {x: 0}
-    \\  return 0
+    \\  break 0
     \\
     , .valid = false, .start = 0, .end = 5 },
     // lambda_upper
@@ -65,7 +65,7 @@ const cases = [_]Case{
     \\entry const x = do:
     \\  for X in 0 .. 1:
     \\    0
-    \\  return 0
+    \\  break 0
     \\
     , .valid = false, .start = 0, .end = 5 },
     // request_upper
@@ -74,7 +74,7 @@ const cases = [_]Case{
     \\  for Request in @requests (@computation (fn () => 0)):
     \\    case request of
     \\      complete value =>
-    \\        return value
+    \\        break value
     \\
     , .valid = false, .start = 0, .end = 5 },
     // effect_payload_upper
@@ -86,7 +86,7 @@ const cases = [_]Case{
     \\      effect tick X =>
     \\        yield 0
     \\      complete value =>
-    \\        return value
+    \\        break value
     \\
     , .valid = false, .start = 25, .end = 30 },
     // complete_payload_upper
@@ -95,14 +95,14 @@ const cases = [_]Case{
     \\  for request in @requests (@computation (fn () => 0)):
     \\    case request of
     \\      complete X =>
-    \\        return 0
+    \\        break 0
     \\
     , .valid = false, .start = 0, .end = 5 },
     // uppercase_value_pattern
     .{ .source =
     \\entry const x = do:
     \\  let ^X = 0
-    \\  return 0
+    \\  break 0
     \\
     , .valid = true },
     // uppercase_constructor_pattern
@@ -110,7 +110,7 @@ const cases = [_]Case{
     \\type T is data = #X U32
     \\entry const x = do:
     \\  let #X value = #X 0
-    \\  return value
+    \\  break value
     \\
     , .valid = true },
     // attribute_upper
@@ -118,7 +118,7 @@ const cases = [_]Case{
     \\@[fn value => value]
     \\entry const x = do:
     \\  let X = 0
-    \\  return 0
+    \\  break 0
     \\
     , .valid = false, .start = 0, .end = 1 },
     // lambda_annotated_upper
@@ -135,14 +135,14 @@ const cases = [_]Case{
     .{ .source =
     \\entry const x = do:
     \\  let {x: X} = {x: 0}
-    \\  return 0
+    \\  break 0
     \\
     , .valid = false, .start = 0, .end = 5 },
     // boolean_name_upper
     .{ .source =
     \\entry const x = do:
     \\  let True = 0
-    \\  return 0
+    \\  break 0
     \\
     , .valid = false, .start = 0, .end = 5 },
     // lambda_boolean_upper
@@ -164,7 +164,7 @@ const cases = [_]Case{
     .{ .source =
     \\entry const x = do:
     \\  let #True = #True
-    \\  return 0
+    \\  break 0
     \\
     , .valid = true },
 };

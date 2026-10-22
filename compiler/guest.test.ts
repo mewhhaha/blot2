@@ -19,10 +19,10 @@ const source = `
 effect Number.advance: U32 -> U32
 const tick = fn value => do:
   use next <- Number.advance value
-  return next
+  break next
 entry const main = fn (advance: U32 -> U32 ! {Foreign}) => do (@effect.provider Number.advance advance):
   use next <- tick 41
-  return next
+  break next
 entry const pure = fn () => 7
 entry const count = 12
 `;
@@ -102,7 +102,7 @@ Deno.test("all sixteen scalar callback signatures use checked canonical values",
     types.map((result) =>
       `entry const invoke_${parameter.toLowerCase()}_${result.toLowerCase()} = fn (io: ${parameter} -> ${result} ! {Foreign}) => do:
   use result <- io ${literals[parameter]}
-  return result`
+  break result`
     )
   ).join("\n");
   const guest = await instantiateGuest((await compiled(definitions)).bytes);

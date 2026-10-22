@@ -6,28 +6,28 @@ const stop=fn value=>@panic "first-body"
 const ignore=fn ~(value:U32)=>42
 entry const direct:Unit->U32=fn()=>do:
   let value=(@panic "callee") 1
-  return 42
+  break 42
 entry const strict:Unit->U32=fn()=>stop 1 (@panic "later-arg")
 entry const product=fn(flag:Bool)=>do:
   let #Some value=if flag then #Some 42 else #None else:
     let stop=(@panic "product",0)
-  return value
+  break value
 entry const array=fn(flag:Bool)=>do:
   let #Some value=if flag then #Some 42 else #None else:
     let stop=#[0,@panic "array"]
-  return value
+  break value
 entry const merge=fn(flag:Bool)=>do:
   let value=42
   if flag:
     value:=@panic "merge"
-  return value
+  break value
 entry const changing=fn(flag:Bool)=>do:
   let value=42
   if flag:
     value:=@panic "merge"
   else:
     value:=1.5
-  return value
+  break value
 entry const demand=fn()=>ignore (@panic "suspended")
 entry const empty=fn()=>@array.length (@array.generate 0 (fn(index:U32)->U32=>@panic "callback"))
 entry const ordered: (U32->U32 ! {Foreign}) -> U32 ! {Foreign}=fn io=>do:
@@ -36,9 +36,9 @@ entry const ordered: (U32->U32 ! {Foreign}) -> U32 ! {Foreign}=fn io=>do:
     @panic "callee"
   ) (do:
     use second<-io 2
-    return 0
+    break 0
   )
-  return 42
+  break 42
 `;
 
 for(const asynchronous of [false,true])Deno.test(`bottom values preserve eager order and suspended callbacks (${asynchronous?'JSPI':'sync'})`,async()=>{
@@ -70,10 +70,10 @@ for(const asynchronous of [false,true])Deno.test(`bottom values preserve eager o
 
 Deno.test('bottom prefixes keep static suffix errors and exact guard boundaries',async()=>{
  for(const[source,code]of[
-  ['entry const answer:Unit->U32=fn()=>do:\n  let stop=(@panic "stop",0)\n  let bad:U32=#True\n  return 42\n','type_mismatch'],
+  ['entry const answer:Unit->U32=fn()=>do:\n  let stop=(@panic "stop",0)\n  let bad:U32=#True\n  break 42\n','type_mismatch'],
   ['entry const answer:Unit->U32=fn()=>@u32.add (@panic "stop") #True\n','type_mismatch'],
-  ['entry const answer=fn()=>do:\n  let value=42 else:\n    let stop=@array.generate 0 (fn(index:U32)->U32=>@panic "callback")\n  return value\n','guard_fallthrough'],
-  ['const ignore=fn ~(value:U32)=>42\nentry const answer=fn()=>do:\n  let value=42 else:\n    let stop=ignore (@panic "suspended")\n  return value\n','guard_fallthrough'],
-  ['entry const answer=fn(flag:Bool)=>do:\n  let value=42\n  if flag:\n    value:=@panic "stop"\n  else:\n    value:=@panic "stop"\n  return 42\n','entry_type'],
+  ['entry const answer=fn()=>do:\n  let value=42 else:\n    let stop=@array.generate 0 (fn(index:U32)->U32=>@panic "callback")\n  break value\n','guard_fallthrough'],
+  ['const ignore=fn ~(value:U32)=>42\nentry const answer=fn()=>do:\n  let value=42 else:\n    let stop=ignore (@panic "suspended")\n  break value\n','guard_fallthrough'],
+  ['entry const answer=fn(flag:Bool)=>do:\n  let value=42\n  if flag:\n    value:=@panic "stop"\n  else:\n    value:=@panic "stop"\n  break 42\n','entry_type'],
  ]as const)await compileExpectedFailure(source,code,undefined,{prelude:'none'});
 });

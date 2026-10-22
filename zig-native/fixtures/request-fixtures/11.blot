@@ -8,8 +8,8 @@ const checked = fn computation => do:
         use reply <- Validate.check value
         yield reply
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do outer:
-  return checked (@computation (fn () => Validate.check 40))
+  break checked (@computation (fn () => Validate.check 40))
 
 entry const checked_answer = answer ()

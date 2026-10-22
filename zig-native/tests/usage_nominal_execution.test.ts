@@ -19,19 +19,19 @@ const source =
 entry const run = fn () => do:
   use owner <- @resource.acquire (fn () => 42) (fn value => ())
   let box = make_box owner
-  return read_box box
+  break read_box box
 entry const secret = fn () => do:
   use owner <- @resource.acquire (fn () => 42) (fn value => ())
   let box = make_secret owner
-  return read_secret box
+  break read_secret box
 entry const shared = fn () => do:
   use owner <- @resource.acquire (fn () => 21) (fn value => ())
   let box = make_shared owner
-  return repeat_shared box
+  break repeat_shared box
 entry const shared_cleanup = fn (release: cleanup ((unique U32) -> Unit ! {Foreign})) => do:
   use owner <- @resource.acquire (fn () => 21) release
   let box = make_shared owner
-  return repeat_shared box
+  break repeat_shared box
 `;
 for (const codegenTier of ["development", "optimized"] as const) {
   Deno.test(`nominal and opaque affinity preserve source archive and restart owner flow (${codegenTier})`, async () => {

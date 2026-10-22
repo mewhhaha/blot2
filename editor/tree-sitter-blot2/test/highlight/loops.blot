@@ -11,5 +11,5 @@ entry const main = fn host => do:
   for ever:
 //^ keyword.control.repeat
 //    ^ keyword.control.repeat
-    return ever
+    break ever
 //         ^ variable

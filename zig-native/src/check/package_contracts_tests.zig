@@ -396,8 +396,8 @@ fn selectedScopeOwners(allocator: std.mem.Allocator) !void {
         \\  let alias = chosen
         \\  let (_, result) = do (@effect.state chosen.get chosen.set 1):
         \\    use alias.set 42
-        \\    return alias.get ()
-        \\  return result
+        \\    break alias.get ()
+        \\  break result
         \\))
         \\entry const answer = fn (flag: Bool) => identity (selected flag)
     );
@@ -451,9 +451,9 @@ const qualified_package_source =
     \\const make = fn (owner: unique U32) => pack [U32] (owner, read) as Item
     \\entry const answer = fn () => do:
     \\  use owner <- @resource.acquire (fn () => 42) (fn released => ())
-    \\  return unpack (make owner) as [a] value in do:
+    \\  break unpack (make owner) as [a] value in do:
     \\    let (hidden, operation) = value
-    \\    return operation hidden
+    \\    break operation hidden
 ;
 fn qualifiedPackage(a: std.mem.Allocator) !void {
     var module = try lowerSource(a, qualified_package_source);
@@ -495,9 +495,9 @@ test "package immutable result footprint sees hidden closure references despite 
         \\type Item = exists [a] => a
         \\const identity: Item -> (U32 -> U32) = fn item => unpack item as [a] hidden in do:
         \\  let observed = hidden
-        \\  return fn (value: U32) => do:
+        \\  break fn (value: U32) => do:
         \\    let ignored = 42
-        \\    return value
+        \\    break value
     );
     defer module.deinit(a);
     const context = .{ .units = &[_]*const core.Module{&module} };
@@ -554,9 +554,9 @@ test "package sealing proves latent captured identity even when result types are
         \\type Callback = exists [b] => U32 -> U32
         \\const hide: Item -> Callback = fn item => unpack item as [a] hidden in do:
         \\  let observed = hidden
-        \\  return pack [U32] (fn (value: U32) => do:
+        \\  break pack [U32] (fn (value: U32) => do:
         \\    let ignored = 42
-        \\    return value) as Callback
+        \\    break value) as Callback
     );
     defer module.deinit(a);
     const context = .{ .units = &[_]*const core.Module{&module} };
@@ -1106,7 +1106,7 @@ fn inferredSchemeModule(allocator: std.mem.Allocator) !void {
         \\const identity = fn value => value
         \\const apply = fn callback => fn value => callback value
         \\const forget = fn value => do:
-        \\  return fn (unit: Unit) => @u32.add 40 2
+        \\  break fn (unit: Unit) => @u32.add 40 2
         \\const annotated: forall [a] => a -> a = identity
         \\const through: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = fn pair => apply (@product.get pair 0) (@product.get pair 1)
         \\type Item = exists [a] => (a, a -> U32)
@@ -1968,7 +1968,7 @@ test "rank interfaces retain handlers for effectful typed code through complete 
         \\entry const answer = fn () => do provider:
         \\  let deferred = fn () => Read ()
         \\  use value <- @code.emit future
-        \\  return value
+        \\  break value
     ;
     try rankCoexistenceScenario(std.testing.allocator, source);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, rankCoexistenceScenario, .{source});
@@ -1983,7 +1983,7 @@ test "rank call views preserve separately evaluated operation arguments through 
         \\const provider = @effect.provider Read (fn () => 42)
         \\entry const answer = fn () => do provider:
         \\  use value <- @code.emit future
-        \\  return value
+        \\  break value
     ;
     try rankCoexistenceScenario(std.testing.allocator, source);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, rankCoexistenceScenario, .{source});
@@ -2209,10 +2209,10 @@ const named_ordinary_owner_source =
     \\const same = fn left => fn right => @type.same left right
     \\const inspect = fn (candidate: Maybe U32) => do:
     \\  let #Some value = candidate else:
-    \\    return 0
+    \\    break 0
     \\  if let #Some extra = candidate:
     \\    use same value extra
-    \\  return value
+    \\  break value
     \\const helper = fn (value: U32) => inspect (#Some value)
     \\const generated = @code.quote (fn (value: U32) => helper value)
     \\entry const run = fn (value: U32) => @task.scope (fn group => @task.join (@task.spawn group (fn () => helper value)))
@@ -2283,7 +2283,7 @@ test "ordinary type witnesses reject opened abstract representation through OOM"
         \\type Item = exists [a] => a
         \\const inspect = fn (item: Item) => unpack item as [a] value in do:
         \\  let ignored = value
-        \\  return @type.same 0 (fn () => 1)
+        \\  break @type.same 0 (fn () => 1)
     );
     defer module.deinit(allocator);
     try packageWorkspace(allocator, &module);

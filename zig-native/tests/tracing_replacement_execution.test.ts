@@ -30,7 +30,7 @@ entry const run = fn (count: U32) => do:
       checksum := self + discarded[8191]
       round := self + 1
     checksum := self + row[0] + row[1]
-  return #[checksum, rows[89][0], rows[89][1]]
+  break #[checksum, rows[89][0], rows[89][1]]
 `,
       },
     });
@@ -105,13 +105,13 @@ entry const alias = fn (value: U32) => do:
     let pressure = @array.fill 8192 index
     if pressure[0] != index:
       @panic "lost pressure"
-  return case mapped of
+  break case mapped of
     #Ok _ => @panic "changed the variant"
     #Err same => #[same[0], child[1]]
 const adapter = monad Maybe
 const resolve = fn () => do adapter:
   use value <- #Some 42
-  return value
+  break value
 entry const resolver = fn () => Maybe.unwrap_or 0 (resolve ())
 `,
       },
@@ -172,7 +172,7 @@ entry const run = fn (count: U32) => do:
     let pressure = @array.fill 8192 index
     if pressure[8191] != index:
       @panic "lost pressure"
-  return #[direct[1], field[0], field[1], rows[0][0], fresh[0]]
+  break #[direct[1], field[0], field[1], rows[0][0], fresh[0]]
 `,
       },
     });
@@ -233,7 +233,7 @@ type Shape is data = #Small {child: Array U32, value: U32} | #Large {alpha: F32,
 const replace = fn (shape: Shape) => do:
   shape.child := #[self[0] + 1 + ${offset}]
   shape.value := self + 2
-  return shape
+  break shape
 entry const run = fn (mode: U32) => do:
   let original = if mode == 0 then #Small {child: #[40], value: 7} else #Large {alpha: -0.0, child: #[40], value: 7, tail: 3}
   let captured = fn () => original.child[0]
@@ -241,8 +241,8 @@ entry const run = fn (mode: U32) => do:
   for index in 0..32:
     let pressure = @array.fill 8192 index
     if pressure[8191] != index:
-      return #[0]
-  return #[original.child[0], changed.child[0], captured (), original.value, changed.value]
+      break #[0]
+  break #[original.child[0], changed.child[0], captured (), original.value, changed.value]
 entry const packed = fn (value: U32) => do:
   let rows = [{x: value, y: value + 1}]
   let original = rows
@@ -250,13 +250,13 @@ entry const packed = fn (value: U32) => do:
   let items = @array.from_list rows
   let before = items
   items[0] := {x: self.x + 1, y: self.y + 2}
-  return #[(@array.from_list original)[0].x, (@array.from_list rows)[0].x, before[0].x, items[0].x, items[0].y]
+  break #[(@array.from_list original)[0].x, (@array.from_list rows)[0].x, before[0].x, items[0].x, items[0].y]
 entry const floating = fn (value: F32) => do:
   let original = #Large {alpha: value, child: #[40], value: 7, tail: 3}
   let changed = replace original
   let #Large {alpha, child: _, value: _, tail: _} = changed else:
-    return 0.0
-  return alpha
+    break 0.0
+  break alpha
 `,
           };
           const result = await retained.build({ sources });
@@ -324,7 +324,7 @@ entry const run = fn (count: U32) => do:
   for index in 0..count:
     let pressure = @array.fill 8192 index
     total := self + pressure[8191]
-  return total + kept[0] + kept[1]
+  break total + kept[0] + kept[1]
 entry const memory = fn (value: U32) => #[value]
 `,
           },
@@ -402,8 +402,8 @@ entry const run = fn (value: U32) => do:
   for index in 0..32:
     let pressure = @array.fill 8192 index
     if pressure[8191] != index:
-      return #[0]
-  return #[before[243][0], changed[243][0], before[244][0], changed[244][0], read (), child[0]]
+      break #[0]
+  break #[before[243][0], changed[243][0], before[244][0], changed[244][0], read (), child[0]]
 entry const floating = fn (value: F32) => @array.from_list [value, -0.0]
 `,
           },

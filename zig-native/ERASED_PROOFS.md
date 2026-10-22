@@ -73,7 +73,7 @@ evaluating its guard. They never supply a witness to a reachable successor.
 ```blot
 entry const checked = fn (values: Array U32) => fn (index: U32) => do:
   let valid = @proof.index values index
-  return at values index valid
+  break at values index valid
 ```
 
 This performs one bounds check at construction. The helper's access consumes the
@@ -162,8 +162,8 @@ removes its redundant bounds comparison:
 ```blot
 entry const guarded = fn (values: Array U32) => fn (index: U32) => do:
   if index < @array.length values:
-    return @array.get values index
-  return 0
+    break @array.get values index
+  break 0
 ```
 
 With an empty array, only the fallback runs. At length one, index zero reaches
@@ -177,8 +177,8 @@ A new index version keeps its own check:
 entry const next = fn (values: Array U32) => fn (index: U32) => do:
   if index < @array.length values:
     index := index + 1
-    return @array.get values index
-  return 0
+    break @array.get values index
+  break 0
 ```
 
 The original comparison alone does not prove the rebound access. A one-element

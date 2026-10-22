@@ -53,7 +53,7 @@ entry const answer = fn () => do:
   let left = ${staged ? "@code.emit generated" : "generated"}
   let right = ${staged ? "@code.emit first" : "first"}
   let again = ${staged ? "@code.emit first" : "first"}
-  return #[value, left, right, again]
+  break #[value, left, right, again]
 `;
         const library = (value: number, step: number) =>
           `opaque type Token = U32

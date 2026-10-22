@@ -14,13 +14,13 @@ entry const run = fn (host: U32 -> Array U32 ! {Foreign}) => do:
     let local = #[value, value + 1]
     let pressure = @array.fill 8192 value
     if value % 2 == 0:
-      return seed + reply[0] + local[0] + pressure[0] - value
-    return seed + reply[1] + local[1] + pressure[0] - value
+      break seed + reply[0] + local[0] + pressure[0] - value
+    break seed + reply[1] + local[1] + pressure[0] - value
   let sum = 0
   for index in 0..count:
     use produced <- worker index
     sum := self + produced
-  return sum
+  break sum
 entry const floating = fn (host: F32 -> Array F32 ! {Foreign}) => do:
   use initial <- host 0.0
   let seed = initial[0]
@@ -28,10 +28,10 @@ entry const floating = fn (host: F32 -> Array F32 ! {Foreign}) => do:
     use reply <- host value
     let local = #[value]
     if value == 0.0:
-      return seed
-    return local[0] + reply[0]
+      break seed
+    break local[0] + reply[0]
   use answer <- worker (-0.0)
-  return answer
+  break answer
 `;
 
 Deno.test("private scalar captures preserve early exits loop reentry host suspension and failed producer edits", async () => {
@@ -49,8 +49,8 @@ Deno.test("private scalar captures preserve early exits loop reentry host suspen
       });
       try {
         const edited = source.replace(
-          "return seed + reply[1]",
-          "return seed + 1 + reply[1]",
+          "break seed + reply[1]",
+          "break seed + 1 + reply[1]",
         );
         for (const [revision, text] of [source, edited, source].entries()) {
           const built = await compiler.build({ sources: { [entry]: text } });
@@ -58,7 +58,7 @@ Deno.test("private scalar captures preserve early exits loop reentry host suspen
           if (revision === 0) {
             const failed = await compiler.build({
               sources: {
-                [entry]: text.replace("return sum", "return missing"),
+                [entry]: text.replace("break sum", "break missing"),
               },
             });
             assert(!failed.success);

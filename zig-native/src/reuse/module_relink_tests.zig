@@ -41,10 +41,10 @@ const application =
     \\entry const array: Unit -> U32 = fn () => @array.get (duplicate 42) 0
     \\entry const handled: Unit -> U32 = fn () => do reader:
     \\  use value <- Read.get U32 ()
-    \\  return @u32.add value 1
+    \\  break @u32.add value 1
     \\entry const shaped: Unit -> F32 = fn () => do mapper:
     \\  use value <- Mapper.map { input: U32, output: F32 } 40
-    \\  return @f32.add value 2.5
+    \\  break @f32.add value 2.5
 ;
 
 fn artifact(a: Allocator) ![]u8 {

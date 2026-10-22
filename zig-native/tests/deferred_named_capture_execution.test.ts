@@ -7,7 +7,7 @@ const library = `type Maybe a is data = #Nothing | #Some a
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 const scope_feature = fn () => @effect.scope (fn (s: State U32) => do:
   let ignored = s
-  return 0
+  break 0
 )
 const generate = fn count => fn generator => @array.generate count generator
 const migrate = fn (version: U32) => case version of

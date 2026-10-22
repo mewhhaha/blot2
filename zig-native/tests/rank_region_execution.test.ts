@@ -13,7 +13,7 @@ entry const answer = fn () => inspect 42
 entry const another = fn () => inspect 7
 entry const ordered = fn (host: Unit -> U32 ! {Foreign}) => (fn (owner: unique U32) => @usage.borrow owner (fn loan => do:
   use offset <- host ()
-  return @u32.add (read loan) offset
+  break @u32.add (read loan) offset
 )) 9
 `;
 async function observe(bytes: Uint8Array<ArrayBuffer>, delta = 0) {

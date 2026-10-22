@@ -29,7 +29,7 @@ Deno.test("source solved structural graphs preserve imported instances through c
       "type Signal a is effect = { get: Unit -> a }",
       "const read_seven: Unit -> U32 = fn () => @u32.add 0 7",
       invalid === "row"
-        ? "const Box.read: Box a -> a ! {Tick} = fn box => do:\n  use Tick ()\n  return box.left"
+        ? "const Box.read: Box a -> a ! {Tick} = fn box => do:\n  use Tick ()\n  break box.left"
         : `const Box.read: Box a -> a${
           invalid === "header" ? ' where { associated "missing" a a a }' : ""
         } = fn box => box.${changed ? "keep" : "left"}`,
@@ -42,13 +42,13 @@ Deno.test("source solved structural graphs preserve imported instances through c
       "const update_0 = fn value => do:",
       "  let record = {left: 0, keep: value}",
       "  record.left := value",
-      "  return record.left",
+      "  break record.left",
       "const nominal_0 = fn value => (#Box {left: value, keep: value}).left",
       "const member_0 = fn value => (#Box {left: value, keep: value}).read",
       'const revealed_seed = fn value => @type.call "build" value #Seed',
       "const revealed_0 = fn value => (revealed_seed value).read",
       'const known_0 = fn value => @type.call "add" value (@u32.add 0 1)',
-      "const handler_0: a -> a = fn value => do (@effect.provider (Signal.get U32) read_seven):\n  use ignored <- (Signal.get U32) ()\n  return value",
+      "const handler_0: a -> a = fn value => do (@effect.provider (Signal.get U32) read_seven):\n  use ignored <- (Signal.get U32) ()\n  break value",
       `const compare_0 = fn ignored => @type.same #Count #${
         changed ? "Count" : "Other"
       }`,
@@ -74,10 +74,10 @@ Deno.test("source solved structural graphs preserve imported instances through c
               ? "use ignored <-"
               : "let ignored ="
           } ${kind}_${i - 1} value`,
-          `  return ${kind}_${i - 1} value`,
+          `  break ${kind}_${i - 1} value`,
         );
       }
-      lines.push(`const ${kind}_factory = do:`, `  return ${kind}_12`);
+      lines.push(`const ${kind}_factory = do:`, `  break ${kind}_12`);
     }
     return lines.join("\n") + "\n";
   };
@@ -235,18 +235,18 @@ Deno.test("source closed State witness diamonds retain unrelated argument instan
     lines.push(
       `const f_${i} = fn witness => do:`,
       `  use ignored <- f_${i - 1} witness`,
-      `  return f_${i - 1} witness`,
+      `  break f_${i - 1} witness`,
     );
   }
   lines.push(
     "const factory = do:",
-    "  return f_12",
+    "  break f_12",
     "entry const integer = fn (value: U32) -> U32 => do:",
     "  let (_, #Cell result) = @state.run (#Cell value) (fn () => factory value)",
-    "  return result",
+    "  break result",
     "entry const floating = fn (value: F32) -> U32 => do:",
     "  let (_, #Cell result) = @state.run (#Cell 42) (fn () => factory value)",
-    "  return result",
+    "  break result",
   );
   await compileAndRun(lines.join("\n") + "\n", (guest) => {
     for (const value of [0, 37, 0xffff_ffff]) {
@@ -267,18 +267,18 @@ Deno.test("source parametric State witness heads preserve independent nominal ar
     lines.push(
       `const f_${i} = fn witness => do:`,
       `  use ignored <- f_${i - 1} witness`,
-      `  return f_${i - 1} witness`,
+      `  break f_${i - 1} witness`,
     );
   }
   lines.push(
     "const factory = do:",
-    "  return f_12",
+    "  break f_12",
     "entry const integer = fn (value: U32) -> U32 => do:",
     "  let (_, #Cell result) = @state.run (#Cell value) (fn () => factory (#Cell 0))",
-    "  return result",
+    "  break result",
     "entry const floating = fn (value: F32) -> F32 => do:",
     "  let (_, #Cell result) = @state.run (#Cell value) (fn () => factory (#Cell 0.0))",
-    "  return result",
+    "  break result",
   );
   await compileAndRun(lines.join("\n") + "\n", (guest) => {
     for (const value of [0, 37, 0xffff_ffff]) {
@@ -309,10 +309,10 @@ Deno.test("witness principal graphs preserve imported nominal state heads and co
       lines.push(
         `const head_${i} = fn witness => do:`,
         `  use ignored <- head_${i - 1} witness`,
-        `  return head_${i - 1} witness`,
+        `  break head_${i - 1} witness`,
         `const same_${i} = fn left => fn right => do:`,
         `  let ignored = same_${i - 1} left right`,
-        `  return same_${i - 1} left right`,
+        `  break same_${i - 1} left right`,
       );
     }
     return lines.join("\n") + "\n";
@@ -325,10 +325,10 @@ Deno.test("witness principal graphs preserve imported nominal state heads and co
       `import * as library from "./library"
 entry const integer = fn (value: U32) -> U32 => do:
   let (_, #library.Cell result) = @state.run (#library.Cell value) (fn () => library.head_12 (#library.Cell 0))
-  return result
+  break result
 entry const floating = fn (value: F32) -> F32 => do:
   let (_, #library.Cell result) = @state.run (#library.Cell value) (fn () => library.head_12 (#library.Cell 0.0))
-  return result
+  break result
 entry const same_integer = fn (value: U32) -> Bool => library.same_12 value 1
 entry const same_floating = fn (value: F32) -> Bool => library.same_12 value 1.0
 entry const different = fn (value: U32) -> Bool => library.same_12 value 1.0
@@ -446,15 +446,15 @@ Deno.test("structured residual graphs preserve imported array record nominal and
         lines.push(
           `const ${shape}_${i} = fn value => do:`,
           `  let ignored = ${shape}_${i - 1} value`,
-          `  return ${shape}_${i - 1} value`,
+          `  break ${shape}_${i - 1} value`,
         );
       }
       lines.push(
         `const operation_${i} = fn token => do:`,
         `  use result <- operation_${i - 1} token`,
         repeatedOperation
-          ? `  return operation_${i - 1} token`
-          : "  return result",
+          ? `  break operation_${i - 1} token`
+          : "  break result",
       );
     }
     for (let i = 1; i <= 12; i++) {
@@ -466,10 +466,10 @@ Deno.test("structured residual graphs preserve imported array record nominal and
     }
     lines.push(
       "const representation_factory = do:",
-      "  return representation_12",
+      "  break representation_12",
     );
     for (const shape of ["array", "record", "nominal", "operation"]) {
-      lines.push(`const ${shape}_factory = do:`, `  return ${shape}_8`);
+      lines.push(`const ${shape}_factory = do:`, `  break ${shape}_8`);
     }
     return lines.join("\n") + "\n";
   };
@@ -484,17 +484,17 @@ entry const integer = fn (value: U32) -> U32 => do:
   let record = library.record_factory {first: array[0]}
   let #library.Box result = library.nominal_factory {first: record.result}
   let #library.Box represented = library.representation_factory (#library.Box result)
-  return represented
+  break represented
 entry const floating = fn (value: F32) -> F32 => do:
   let array = library.array_factory {first: value}
   let record = library.record_factory {first: array[0]}
   let #library.Box result = library.nominal_factory {first: record.result}
   let #library.Box represented = library.representation_factory (#library.Box result)
-  return represented
+  break represented
 entry const requested = fn (value: U32) -> U32 => do (@effect.provider (library.Signal.get U32) (fn () => value)):
-  return library.operation_factory value
+  break library.operation_factory value
 entry const floating_requested = fn (value: F32) -> F32 => do (@effect.provider (library.Signal.get F32) (fn () => value)):
-  return library.operation_factory value
+  break library.operation_factory value
 `,
     );
     const packed = await new Deno.Command(executable, {
@@ -598,7 +598,7 @@ Deno.test("result principal graphs preserve deep nominal instances through impor
     for (let i = 1; i <= 8; i++) {
       lines.push(`const f_${i} = fn value => f_${i - 1} (f_${i - 1} value)`);
     }
-    lines.push("const factory = do:", "  return f_8");
+    lines.push("const factory = do:", "  break f_8");
     return lines.join("\n") + "\n";
   };
   const options = { executable, entry, prelude };
@@ -609,10 +609,10 @@ Deno.test("result principal graphs preserve deep nominal instances through impor
       `import * as library from "./library"
 entry const integer = fn (value: U32) -> U32 => do:
   let #library.Box result: library.Box U32 = library.factory (#library.Box value)
-  return result
+  break result
 entry const floating = fn (value: F32) -> F32 => do:
   let #library.Box result: library.Box F32 = library.factory (#library.Box value)
-  return result
+  break result
 `,
     );
     const packed = await new Deno.Command(executable, {
@@ -706,7 +706,7 @@ Deno.test("inferred graph edges preserve result witnesses through diamonds, impo
 const first = fn value => value.first
 type Box a is data = #Box a
 const factory = do:
-  return f_4
+  break f_4
 const Box.from = fn value => #Box (factory value)
 `;
   };
@@ -720,10 +720,10 @@ import * as library from "./library"
 const from = fn value => @type.result "from" value
 entry const integer = fn (value: U32) => do:
   let #library.Box result: library.Box U32 = from (library.first ({first: value}))
-  return result
+  break result
 entry const floating = fn (value: F32) => do:
   let #library.Box result: library.Box F32 = from (library.first ({first: value}))
-  return result
+  break result
 `,
     );
     const retained = await createZigProjectCompiler(options);
@@ -796,7 +796,7 @@ entry const integer = fn (value: U32) => apply (compose (plus 2) (plus 3)) value
 entry const floating = fn (value: F32) => apply (fn item => @f32.add item 0.5) value
 entry const answer = fn (value: U32) => do @effect.provider Read (fn () => value):
   use result <- reading ()
-  return @u32.add result 5
+  break @u32.add result 5
 `,
       async (guest) => {
         const call = asynchronous ? guest.callAsync : guest.call;
@@ -983,9 +983,9 @@ const Box.add: Box a -> Box a -> Box a where { associated "add" a a a } = fn lef
   #Box value, #Box other => #Box (f_128 value)
 const Box.from: a -> Box a where { associated "add" a a a } = fn value => #Box (f_128 value)
 const integer_factory: U32 -> U32 = do:
-  return f_128
+  break f_128
 const floating_factory: F32 -> F32 = do:
-  return f_128
+  break f_128
 `;
   const program = (invalid: boolean) =>
     'import * as library from "./library"\n' +
@@ -1000,7 +1000,7 @@ entry const associated = fn (value: U32) => case add (#library.Box value) (#libr
   #library.Box result => result
 entry const constructed = fn (value: F32) => do:
   let #library.Box result: library.Box F32 = from value
-  return result
+  break result
 entry const integer_factory = fn (value: U32) => library.integer_factory value
 entry const floating_factory = fn (value: F32) => library.floating_factory value
 `;

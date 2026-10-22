@@ -14,12 +14,12 @@ const source = `const progress = fn count => fn values => do:
       break
     cursor := rest
     index := self + 1
-  return (original, cursor, index)
+  break (original, cursor, index)
 const inspect = fn count => fn values => do:
   let (original, rest, index) = progress count values
   if @cursor.has rest:
-    return #[index, @cursor.value original, @cursor.value rest]
-  return #[index, 999, 999]
+    break #[index, @cursor.value original, @cursor.value rest]
+  break #[index, 999, 999]
 entry const arrays = fn (count: U32) => inspect count (@array.generate 700 identity)
 entry const lists = fn (count: U32) => inspect count (@list.generate 700 identity)
 entry const redirected = fn (count: U32) => do:
@@ -34,7 +34,7 @@ entry const redirected = fn (count: U32) => do:
       break
     cursor := rest
     index := self + 1
-  return #[index, @cursor.value cursor]
+  break #[index, @cursor.value cursor]
 entry const references = fn (count: U32) => do:
   let values = @list.generate 700 (fn index => #[index, index + 1])
   let original = values.iter
@@ -54,7 +54,7 @@ entry const references = fn (count: U32) => do:
     if pressure[8191] != index:
       @panic "pressure"
   let again = @cursor.value original
-  return #[index, saved[0], again[0], again[1]]
+  break #[index, saved[0], again[0], again[1]]
 entry const captured = fn (count: U32) => do:
   let original = (@list.generate 700 identity).iter
   let read = fn () => @cursor.value original
@@ -68,7 +68,7 @@ entry const captured = fn (count: U32) => do:
       break
     cursor := rest
     index := self + 1
-  return read () + @cursor.value cursor
+  break read () + @cursor.value cursor
 const observe = fn (cursor: Cursor (List U32)) => @cursor.value cursor
 entry const unknown = fn (count: U32) => do:
   let cursor = (@list.generate 700 identity).iter
@@ -83,7 +83,7 @@ entry const unknown = fn (count: U32) => do:
     total := self + observe cursor + value
     cursor := rest
     index := self + 1
-  return total
+  break total
 entry const suspend = fn (host: U32 -> U32 ! {Foreign}) => do:
   let original = (@list.generate 700 identity).iter
   let cursor = original
@@ -92,11 +92,11 @@ entry const suspend = fn (host: U32 -> U32 ! {Foreign}) => do:
   for index in 0..300:
     use step <- cursor.next
     let #Some (value, rest) = step else:
-      return 999
+      break 999
     use actual <- host value
     total := self + actual
     cursor := rest
-  return total + @cursor.value cursor + @cursor.value original
+  break total + @cursor.value cursor + @cursor.value original
 `;
 
 Deno.test("private pure cursor successors preserve break snapshots returned headers forks references and fallback", async () => {

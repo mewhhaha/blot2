@@ -21,7 +21,7 @@ const second = #Pack { unused: identity, selected: fn (value: U32) => value + 10
 const invoke = fn callback => callback 2
 const capture = fn packed => fn (value: U32) => invoke (fn extra => do:
   let #Pack { selected } = packed
-  return selected (value + extra))
+  break selected (value + extra))
 `;
   const main = `import { first, second, capture } from "./library"
 entry const answer = fn (value: U32) => capture first value * 1000 + capture second value + 0

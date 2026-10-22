@@ -20,20 +20,20 @@ entry const exact_list = fn (values: Array F32) => @array.from_list (floating_li
 entry const kept = fn (value: U32) => do:
   let result = array id (@array.fill 256 value)
   let pressure = @array.fill 8192 99
-  return if @u32.eq pressure[0] 99 then result else @panic "pressure"
+  break if @u32.eq pressure[0] 99 then result else @panic "pressure"
 entry const floating_kept = fn (value: U32) => do:
   let identity: forall [a] => a -> a = id
   let result = floating identity (@array.fill 256 (@f32.add (@u32.to_f32 value) 0.25))
   let pressure = @array.fill 8192 99
-  return if @u32.eq pressure[0] 99 then result else @panic "pressure"
+  break if @u32.eq pressure[0] 99 then result else @panic "pressure"
 entry const listed_kept = fn (value: U32) => do:
   let result = list id (@list.from_array (@array.fill 256 value))
   let pressure = @array.fill 8192 99
-  return if @u32.eq pressure[0] 99 then @array.from_list result else @panic "pressure"
+  break if @u32.eq pressure[0] 99 then @array.from_list result else @panic "pressure"
 entry const floating_list_kept = fn (value: U32) => do:
   let result = floating_list (fn item => item) (@list.from_array (@array.fill 256 (@f32.add (@u32.to_f32 value) 0.25)))
   let pressure = @array.fill 8192 99
-  return if @u32.eq pressure[0] 99 then @array.from_list result else @panic "pressure"
+  break if @u32.eq pressure[0] 99 then @array.from_list result else @panic "pressure"
 entry const anonymous = fn (value: U32) => array (fn item => item) #[value, 42]
 `;
 

@@ -8,15 +8,15 @@ entry const empty=fn()=>case #Empty {} of
   #Empty {}=>42
 entry const selected=fn (value:U32)=>do:
   let #Some chosen=#Some value else:
-    return 0
-  return chosen
+    break 0
+  break chosen
 entry const reordered=fn (value:U32)=>case #Pair {y:2,x:value} of
   #Pair {x}=>x
 entry const generic=fn()=>do:
   let identity=fn value=>value
   let first=identity 42
   let second=identity 1.5
-  return first
+  break first
 `,async guest=>{
   equal(asynchronous?await guest.callAsync('empty',null):guest.call('empty',null),42);
   equal(asynchronous?await guest.callAsync('generic',null):guest.call('generic',null),42);
@@ -30,8 +30,8 @@ Deno.test('record and guarded-pattern errors retain their actual source context'
   ['data Box=#Box U32\nentry const answer=#Box {x:missing}\n','record_constructor','named fields require a declared record constructor'],
   ['data Empty=#Empty\nentry const answer=#Empty {}\n','record_constructor','named fields require a declared record constructor'],
   ['pub const answer=missing\n','unknown_modifier','only `entry` may precede `const` or `let`'],
-  ['entry const answer=fn()=>do:\n  let (#True,value)=(#True,42)\n  return value\n','non_exhaustive_match',undefined],
-  ['entry const answer=fn()=>do:\n  let value=42 else:\n    0\n  return value\n','guard_fallthrough','let-else fallback must exit its enclosing do block'],
-  ['entry const answer=fn()=>do:\n  let (x,y,z)=(1,2)\n  return x\n','product_arity','cannot unify products with different element counts'],
+  ['entry const answer=fn()=>do:\n  let (#True,value)=(#True,42)\n  break value\n','non_exhaustive_match',undefined],
+  ['entry const answer=fn()=>do:\n  let value=42 else:\n    0\n  break value\n','guard_fallthrough','let-else fallback must exit its enclosing do block'],
+  ['entry const answer=fn()=>do:\n  let (x,y,z)=(1,2)\n  break x\n','product_arity','cannot unify products with different element counts'],
  ]as const)await compileExpectedFailure(source,code,message,{prelude:'none'});
 });

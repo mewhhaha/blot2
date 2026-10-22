@@ -9,12 +9,12 @@ entry const pure = fn (limit: U32) => do:
     if row.value == limit:
       break
     total := self + row.value
-  return total
+  break total
 entry const trap = fn (divisor: U32) => do:
   let total = 0
   for row in rows:
     total := self + row.value / divisor
-  return total
+  break total
 entry const effects = fn (host: U32 -> U32 ! {Foreign}) => do:
   let owner = #[40, 2]
   let total = 0
@@ -22,7 +22,7 @@ entry const effects = fn (host: U32 -> U32 ! {Foreign}) => do:
     use value <- host row.value
     let pressure = @array.fill 4096 value
     total := self + pressure[4095]
-  return total + owner[0] + owner[1]
+  break total + owner[0] + owner[1]
 `;
 
 Deno.test("empty lexical frames preserve packed folds traps foreign allocation and suspension fallback", async () => {

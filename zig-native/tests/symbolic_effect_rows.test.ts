@@ -136,9 +136,9 @@ const number: Unit -> Number ! {Signal.get Number} = fn () => Signal.get Number 
   const main = `
 import {Number, Identity, Signal, Read, read, number} from "./read"
 entry const answer = fn () -> U32 => do (@effect.provider (Signal.get (Identity Number)) (fn () => 21)):
-  return @u32.add (read ()) (number ())
+  break @u32.add (read ()) (number ())
 entry const fraction = fn () -> F32 => do (@effect.provider (Signal.get (Identity F32)) (fn () => 1.5)):
-  return read ()
+  break read ()
 `;
   try {
     await Deno.writeTextFile(entry, main);

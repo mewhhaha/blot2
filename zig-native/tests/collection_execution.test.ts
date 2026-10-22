@@ -15,7 +15,7 @@ const copied = fn xs => [x | x <- xs]
 const replace_first = fn xs => fn value => do:
   let result = xs
   result[0] := value
-  return result
+  break result
 entry const generic = fn (x: U32) =>
   #[first (Array.from_list [x]), first #[x + 1], first (Array.from_list (copied [x + 2])), first (Array.from_list (copied #[x + 3]))]
 entry const generic_update = fn (x: F32) =>
@@ -53,7 +53,7 @@ entry const empty = fn () -> Array U32 => #[b | a <- [], b <- [1 / 0]]
 entry const skip = fn () -> Array U32 => #[y | x <- [1, 2], #False, let y = 1 / 0]
 entry const shadow = fn (x: U32) => do:
   let ys = #[x | x <- [x, x + 1], let x = x + 10]
-  return #[x, ys[0], ys[1]]
+  break #[x, ys[0], ys[1]]
 entry const captured = fn (xs: Array U32) =>
   #[xs[0] + x | x <- List.from_array xs]
 `, guest => {
@@ -74,19 +74,19 @@ entry const grow = fn (count: U32) => do:
   let xs: List U32 = []
   for i in 0..count:
     xs := [i, ...self, i + count]
-  return Array.from_list xs
+  break Array.from_list xs
 entry const snapshot = fn (count: U32) => do:
   let original = @list.generate count (fn i => i)
   let changed = Array.from_list [9, ...original, 8]
   let before = Array.from_list original
   changed[count / 2] := 42
-  return #[before[0], before[count / 2], before[count - 1], changed[0], changed[count / 2], changed[count + 1]]
+  break #[before[0], before[count / 2], before[count - 1], changed[0], changed[count / 2], changed[count + 1]]
 entry const array_spread = fn (x: U32) => #[x, ...#[2, 3], 4]
 entry const legacy_cons = fn (x: U32) => Array.from_list [x | [2, 3]]
 entry const aggregate = fn (x: U32) => do:
   let xs = Array.from_list [#Item { value: x }, #Item { value: 2 }]
   xs[0].value := 42
-  return xs[0].value
+  break xs[0].value
 `, guest => {
     for (const count of [0, 1, 127, 128, 129, 255, 256, 257, 1025]) {
       const actual = guest.call("grow", count) as Uint32Array;
@@ -115,7 +115,7 @@ entry const frozen_item = fn (index: U32) => (Array.from_list stored)[index].val
 entry const frozen_edit = fn (value: U32) => do:
   let xs = Array.from_list stored
   xs[8192].value := value
-  return #[(Array.from_list stored)[8192].value, xs[8192].value]
+  break #[(Array.from_list stored)[8192].value, xs[8192].value]
 entry const answer = (Array.from_list staged)[1]
 entry const frozen_chunks = fn (index: U32) => (Array.from_list large)[index]
 entry const floats = fn (count: U32) =>
@@ -124,7 +124,7 @@ entry const float_update = fn (x: F32) => do:
   let xs = Array.from_list [x, 2.5]
   let before = xs
   xs[0] := 4.5
-  return #[before[0], xs[0], #[3.5, ...xs, 5.5][3]]
+  break #[before[0], xs[0], #[3.5, ...xs, 5.5][3]]
 @[fn value => value + 1]
 entry const tagged = 41
 `, guest => {
@@ -145,7 +145,7 @@ entry const build = fn (count: U32) => do:
   let xs: List U32 = []
   for index in 0..count:
     xs := [...self, index]
-  return Array.from_list xs
+  break Array.from_list xs
 entry const compact = fn (count: U32) =>
   #[i + 1 | i <- @array.generate count (fn i => i), i % 2 == 0]
 `, guest => {
@@ -169,7 +169,7 @@ entry const run = fn (value: U32) => do:
   let values = list.map (fn x => x + 1) (list.prepend value [1, 2, 3])
   let selected = list.filter (fn x => x > 2) values
   let total = list.fold_left U32.add 0 selected
-  return #[total, (Array.from_list values)[0], values.length]
+  break #[total, (Array.from_list values)[0], values.length]
 `, guest => {
     equal([...(guest.call("run", 40) as Uint32Array)].join(","), "48,41,4");
   });
@@ -179,8 +179,8 @@ Deno.test("lists reject indexed reads updates and public indexing intrinsics", a
   const rejected = [
     "entry const run = [1, 2][0]",
     "const first = fn xs => xs[0]\nentry const run = first [1, 2]",
-    "entry const run = fn () => do:\n  let xs = [1, 2]\n  xs[0] := 3\n  return xs.length",
-    "type Item is data = #Item { value: U32 }\nentry const run = fn () => do:\n  let xs = [#Item { value: 1 }]\n  xs[0].value := 3\n  return xs.length",
+    "entry const run = fn () => do:\n  let xs = [1, 2]\n  xs[0] := 3\n  break xs.length",
+    "type Item is data = #Item { value: U32 }\nentry const run = fn () => do:\n  let xs = [#Item { value: 1 }]\n  xs[0].value := 3\n  break xs.length",
   ];
   for (const source of rejected) await compileExpectedFailure(source + "\n", "type_mismatch");
   for (const source of ["@list.get [1] 0", "@list.set [1] 0 2"]) {
@@ -198,7 +198,7 @@ const sum = fn (values: List Item) => do:
   let result = 0
   for item in values:
     result := self + item.value
-  return result
+  break result
 entry const run = fn (limit: U32) => do:
   let older = @list.generate 513 (fn i => #Item { value: i })
   let read = fn () => sum older
@@ -206,7 +206,7 @@ entry const run = fn (limit: U32) => do:
   let index = 0
   for ever:
     if index == limit:
-      return #[read (), sum values, values.length]
+      break #[read (), sum values, values.length]
     let discarded = @list.fill 8192 index
     values := [#Item { value: index }, ...older, #Item { value: index + 1 }]
     index := self + 1

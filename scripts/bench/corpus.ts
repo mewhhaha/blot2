@@ -80,8 +80,8 @@ export function fanout(size: number): SyntheticProgram {
     rows.push(`  fraction := self + g_${i} 1.0`);
   }
   rows.push("  if fraction > 1.0:");
-  rows.push("    return whole + 1");
-  rows.push("  return whole");
+  rows.push("    break whole + 1");
+  rows.push("  break whole");
   return {
     name: "fanout",
     size,
@@ -136,7 +136,7 @@ export const editSuite: SyntheticProject = {
       "const walk = fn (phase: F32) => floor phase + 1.0",
       "const carried = fn (x: F32) => do:",
       "  let #Carry { depth, width } = step (#Carry { depth: x, width: 1.0 })",
-      "  return depth + width",
+      "  break depth + width",
     ]),
     "hud.blot": lines([
       'import * as math from "./math"',

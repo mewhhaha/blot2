@@ -13,7 +13,7 @@ entry const effects = fn (host: U32 -> U32 ! {Foreign}) =>
 entry const references = fn count => do:
   let initial = #[8192]
   let answer = iter.fold_left (fn total => fn value => #[total[0] + value]) initial (iter.range 0 count)
-  return #[initial[0], answer[0]]
+  break #[initial[0], answer[0]]
 `;
 
 Deno.test("private table projection keeps scalar folds reference publication and suspended effect order", async () => {

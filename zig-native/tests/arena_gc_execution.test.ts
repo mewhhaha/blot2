@@ -14,21 +14,21 @@ const cycle = fn (seed: U32) => do:
     use first <- delayed ()
     use State.set #End
     use cached <- delayed ()
-    return case cached of
+    break case cached of
       #End => @panic "the demand lost its memoized cycle"
       #Next same => do:
         use again <- same ()
-        return case again of
+        break case again of
           #End => @panic "the retained closure lost its memo"
           #Next _ => seed
   )
-  return result
+  break result
 entry const run = fn (count: U32) => do:
   let index = 0
   let sum = 0
   for ever:
     if index == count:
-      return sum
+      break sum
     sum := self + cycle index
     index := self + 1
 entry const memory = fn () -> Array U32 => #[]
@@ -51,7 +51,7 @@ entry const run = fn (limit: U32) -> U32 => do:
   let index = 0
   for ever:
     if @u32.eq index limit:
-      return @u32.add (@array.get values 0) (read 4095)
+      break @u32.add (@array.get values 0) (read 4095)
     let discarded = @array.fill 8192 index
     values[0] := @u32.add self 1
     index := @u32.add self 1
@@ -60,7 +60,7 @@ entry const floating = fn (limit: U32) -> F32 => do:
   let index = 0
   for ever:
     if @u32.eq index limit:
-      return total
+      break total
     let discarded = @array.fill 8192 index
     total := @f32.add self 0.5
     index := @u32.add self 1
@@ -88,11 +88,11 @@ entry const run = fn (limit: U32) -> U32 => do:
     for ever:
       if @u32.eq index limit:
         use values <- State.get (Array U32) ()
-        return @array.get values 0
+        break @array.get values 0
       index := @u32.add self 1
       use State.set (Array U32) #[index]
       let discarded = @array.fill 8192 index
-  return @u32.add (@array.get state 0) result
+  break @u32.add (@array.get state 0) result
 entry const memory = fn () -> Array U32 => #[]
 `,
     (guest) => {
@@ -121,7 +121,7 @@ entry const main = fn (host: Array F32 -> Array F32 ! {Foreign}) -> Unit => do:
   let pending = #[0.0, 1.0]
   for ever:
     if @f32.eq (@array.get pending 1) 0.0:
-      return ()
+      break ()
     let discarded = @array.fill 1280 0
     use next <- host pending
     pending := next

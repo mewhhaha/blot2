@@ -5,12 +5,12 @@ const reader = @effect.provider Local (fn () => 0.75)
 data Cell = #Cell U32
 const evaluate = fn () => do:
   let first = do alpha.reader:
-    return alpha.Lib ()
+    break alpha.Lib ()
   let second = do beta.reader:
-    return beta.Lib ()
+    break beta.Lib ()
   let third = do reader:
-    return Local ()
+    break Local ()
   let (_, #Cell count) = @state.run (#Cell 1) (fn () => @state.get #Cell)
-  return @f32.add (@f32.add (@f32.add first second) third) (@u32.to_f32 count)
+  break @f32.add (@f32.add (@f32.add first second) third) (@u32.to_f32 count)
 entry const answer = fn () => evaluate ()
 entry const folded = evaluate ()

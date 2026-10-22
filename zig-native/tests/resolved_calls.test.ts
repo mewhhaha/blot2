@@ -18,29 +18,29 @@ const program = (offset: number) => `
 type Vec is data = #Vec U32
 const Vec.add = fn (left: Vec) => do:
   let #Vec x = left
-  return fn (right: Vec) -> Vec => do:
+  break fn (right: Vec) -> Vec => do:
     let #Vec y = right
-    return #Vec (x + y + ${offset})
+    break #Vec (x + y + ${offset})
 const adder = fn (x: U32) => do:
-  return fn (y: U32) -> U32 => x + y + ${offset}
+  break fn (y: U32) -> U32 => x + y + ${offset}
 const twice = fn (f: U32 -> U32) => fn (x: U32) -> U32 => f (f x)
 const shift = (fn (k: U32) => fn (y: U32) -> U32 => y + k) ${offset + 3}
 const try = monad Maybe
 const both = fn left => fn right => do try:
   use first <- left
   use second <- right
-  return first + second
+  break first + second
 entry const named_over = fn (v: U32) -> U32 => adder v 2
 entry const indirect = fn (v: U32) -> U32 => twice (fn (y: U32) => y + 3) v
 entry const closure_constant = fn (v: U32) -> U32 => twice shift v
 entry const operator = fn (v: U32) -> U32 => do:
   let #Vec total = #Vec v + #Vec 5
-  return total
+  break total
 entry const resolver = fn (v: U32) -> U32 => Maybe.unwrap_or 0 (both (#Some v) (#Some 1))
 entry const captured = fn (v: U32) -> U32 => do:
   let step = fn (y: U32) => y * 2
   let apply = fn (g: U32 -> U32) => g v
-  return apply step + adder 1 1
+  break apply step + adder 1 1
 `;
 Deno.test("prepared calls of every shape execute and follow edits", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-resolved-calls-" });

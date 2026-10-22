@@ -19,7 +19,7 @@ const cases = [
     opaque:
       "opaque type Token = F32\nconst make: F32 -> Token = fn value => #Token value\nconst read: Token -> F32 = fn (#Token value) => value\n",
     body:
-      "entry const run = fn (count: U32) => do:\n  let sum = 0.0\n  for index in 0..count:\n    sum := @f32.add self (read (make (@u32.to_f32 index)))\n  return sum\n",
+      "entry const run = fn (count: U32) => do:\n  let sum = 0.0\n  for index in 0..count:\n    sum := @f32.add self (read (make (@u32.to_f32 index)))\n  break sum\n",
     expected: Math.fround(4999890432),
   },
   {
@@ -30,7 +30,7 @@ const cases = [
     opaque:
       "opaque type Token = Array U32\nconst make: Array U32 -> Token = fn value => #Token value\nconst read: Token -> Array U32 = fn (#Token value) => value\n",
     body:
-      "entry const run = fn (count: U32) => do:\n  let original = @array.generate count (fn index => index)\n  let alias = read (make original)\n  return @u32.add (@array.length alias) (@array.get original (@u32.sub count 1))\n",
+      "entry const run = fn (count: U32) => do:\n  let original = @array.generate count (fn index => index)\n  let alias = read (make original)\n  break @u32.add (@array.length alias) (@array.get original (@u32.sub count 1))\n",
     expected: 32767,
   },
   {
@@ -41,7 +41,7 @@ const cases = [
     opaque:
       "opaque type Box a = { value: a }\nconst make: a -> Box a = fn value => #Box { value }\nconst read: Box a -> a = fn (#Box box) => box.value\n",
     body:
-      "entry const run = fn (count: U32) => do:\n  let original = @array.generate count (fn index => index)\n  let alias = read (make original)\n  original[0] := count\n  return @u32.add (@u32.add (@array.length alias) alias[0]) (@array.get original (@u32.sub count 1))\n",
+      "entry const run = fn (count: U32) => do:\n  let original = @array.generate count (fn index => index)\n  let alias = read (make original)\n  original[0] := count\n  break @u32.add (@u32.add (@array.length alias) alias[0]) (@array.get original (@u32.sub count 1))\n",
     expected: 32767,
   },
   {

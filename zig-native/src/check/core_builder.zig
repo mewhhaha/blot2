@@ -161,6 +161,7 @@ const Scratch = struct {
     reference_epochs: []u32 = &.{},
     capture_epoch: u32 = 0,
     return_target: core.Id = 0,
+    function_target: core.Id = 0,
     variable_count: u32 = 0,
     effect_variable_count: u32 = 0,
     body_lowerings: usize = 0,
@@ -1098,12 +1099,26 @@ const Builder = struct {
         const syntax = self.source.tree.node(source);
         const parameter: core.Parameter = .{ .binding = self.source.checked.resolved[syntax.a], .ty = try self.typeOf(syntax.a), .span = self.source.checked.diagnosticSpan(self.source.tree, syntax.a), .inferred = self.source.tree.parameter(syntax.a).annotation == 0 and !self.source.tree.parameter(syntax.a).is_unit };
         const previous = self.scratch.return_target;
+        const previous_function = self.scratch.function_target;
+        const function_block = if (std.mem.findScalar(ast.Id, self.source.checked.function_exit_lambdas, source) != null) try self.reserve(syntax.b) else 0;
         self.scratch.return_target = 0;
-        const body = self.expression(syntax.b, depth + 1) catch |err| {
+        self.scratch.function_target = function_block;
+        const body_value = self.expression(syntax.b, depth + 1) catch |err| {
             self.scratch.return_target = previous;
+            self.scratch.function_target = previous_function;
             return err;
         };
         self.scratch.return_target = previous;
+        self.scratch.function_target = previous_function;
+        var body = body_value;
+        if (function_block != 0) {
+            const signature = try self.callableType(ty);
+            if (signature.tag != .function) return error.CoreLimit;
+            const completion = try self.make(syntax.b, .{ .tag = .return_, .ty = T.never, .a = body_value, .b = function_block });
+            const children = try self.save(&.{completion});
+            self.tables.nodes.items[function_block] = .{ .tag = .block, .ty = signature.b, .a = children.start, .b = children.len };
+            body = function_block;
+        }
         const index = try self.captureClosure(body, parameter, ty, source);
         if (source < self.source.checked.lambda_closed_rows.len)
             self.tables.closures.items[index].closed_rows = try self.projectedRowVariables(self.source.checked.lambda_closed_rows[source]);
@@ -2546,6 +2561,13 @@ const Builder = struct {
                 }
                 return self.make(source, .{ .tag = .return_, .ty = T.never, .a = try self.expression(syntax.a, depth + 1), .b = self.scratch.return_target });
             },
+            .function_return_stmt => {
+                if (self.scratch.function_target == 0) {
+                    try self.diagnostic(.unsupported, source);
+                    return 0;
+                }
+                return self.make(source, .{ .tag = .return_, .ty = T.never, .a = try self.expression(syntax.a, depth + 1), .b = self.scratch.function_target });
+            },
             .if_stmt => {
                 const id = try self.make(source, .{ .tag = .if_stmt, .ty = T.unit, .a = try self.expression(syntax.a, depth + 1), .b = try self.suite(syntax.b, depth + 1), .c = try self.suite(syntax.c, depth + 1) });
                 try self.copyMerges(source, id);
@@ -2923,14 +2945,34 @@ const Builder = struct {
             var source = self.unwrap(declaration.body);
             const introduction = source;
             var function = declaration.attributes.len == 0 and self.source.tree.node(source).tag == .lambda;
+            var innermost_lambda: ast.Id = 0;
             while (declaration.attributes.len == 0 and self.source.tree.node(source).tag == .lambda) {
                 const boundary = self.source.checked.types.node(self.source.checked.types.head(self.source.checked.expr_types[source], 0)).tag;
                 if (self.tables.parameters.items.len != start and (boundary == .usage or boundary == .forall)) break;
                 const lambda = self.source.tree.node(source);
+                innermost_lambda = source;
                 try self.tables.parameters.append(self.allocator, .{ .binding = self.source.checked.resolved[lambda.a], .ty = try self.typeOf(lambda.a), .span = self.source.tree.span(lambda.a), .inferred = self.source.tree.parameter(lambda.a).annotation == 0 and !self.source.tree.parameter(lambda.a).is_unit });
                 source = self.unwrap(lambda.b);
             }
-            var root = try self.taggedExpression(self.source.tree.list(declaration.attributes), source, 0);
+            const function_block = if (function and std.mem.findScalar(ast.Id, self.source.checked.function_exit_lambdas, innermost_lambda) != null) try self.reserve(source) else 0;
+            var root = blk: {
+                const previous_function = self.scratch.function_target;
+                self.scratch.function_target = function_block;
+                defer self.scratch.function_target = previous_function;
+                break :blk try self.taggedExpression(self.source.tree.list(declaration.attributes), source, 0);
+            };
+            if (function_block != 0) {
+                var result_type = self.tables.bindings.items[index].ty;
+                for (self.tables.parameters.items[start..]) |_| {
+                    const arrow = try self.callableType(result_type);
+                    if (arrow.tag != .function) return error.CoreLimit;
+                    result_type = arrow.b;
+                }
+                const completion = try self.make(source, .{ .tag = .return_, .ty = T.never, .a = root, .b = function_block });
+                const children = try self.save(&.{completion});
+                self.tables.nodes.items[function_block] = .{ .tag = .block, .ty = result_type, .a = children.start, .b = children.len };
+                root = function_block;
+            }
             if (!function and !declaration.runtime and declaration.attributes.len == 0) {
                 if (try self.memberAlias(source, @intCast(index), root)) |alias_root| {
                     root = alias_root;

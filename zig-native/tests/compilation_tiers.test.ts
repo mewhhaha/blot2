@@ -14,7 +14,7 @@ const make = fn (offset: U32) => fn (value: U32) => @u32.add offset (@u32.mul va
 entry const direct = fn value => @u32.add (left value) (right value)
 entry const indirect = fn (value: U32) => do:
   let selected = if @u32.eq value 8 then left else right
-  return selected value
+  break selected value
 entry const captured = fn value => (make 1) value
 entry const other = fn value => (make 7) value
 entry const trap = fn value => @u32.div 10 value

@@ -56,7 +56,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
         body;
       const bridge = 'import {PublicRead, make, read} from "./tokens"\n' +
         "const consume = fn () -> U32 => do (@effect.provider (PublicRead U32) (fn () => 42)):\n  read (make ())\n" +
-        "  return PublicRead U32 ()\n";
+        "  break PublicRead U32 ()\n";
       try {
         await Deno.writeTextFile(
           entry,
@@ -163,7 +163,7 @@ const factories = #[make, fn value => make value]
 const readers = #[read, fn value => read value]
 const transform = fn (value: U32) => do:
   let token: Token U32 = (factories[@u32.rem value 2]) (adjust value)
-  return (readers[@u32.rem value 2]) token
+  break (readers[@u32.rem value 2]) token
 `;
 const main = `import {transform} from "./bridge"
 entry const answer = fn (value: U32) => transform value

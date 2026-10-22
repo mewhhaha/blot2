@@ -211,7 +211,7 @@ fn callableDescriptors(allocator: std.mem.Allocator) !void {
         \\const make = fn (step: U32) => @code.quote (fn (value: U32) => do:
         \\  let step = @u32.add value (@code.lift step)
         \\  let value = 1
-        \\  return @u32.add step value)
+        \\  break @u32.add step value)
         \\const first = make 1
         \\const second = make 2
         \\const same = @descriptor.same (@code.describe first).result (@code.describe second).result
@@ -238,10 +238,10 @@ fn ambientStagingRows(allocator: std.mem.Allocator) !void {
         \\const generated: code [U32, row {}] = @code.quote 42
         \\const spliced = @code.quote (do:
         \\  use @array.length #[1]
-        \\  return @code.splice generated)
+        \\  break @code.splice generated)
         \\entry const answer = fn (host: Unit -> Unit ! {Foreign}) => do:
         \\  use host ()
-        \\  return @code.emit spliced
+        \\  break @code.emit spliced
     , null);
     try law(allocator,
         \\effect Read: Unit -> U32
@@ -249,11 +249,11 @@ fn ambientStagingRows(allocator: std.mem.Allocator) !void {
         \\const broader: Unit -> U32 ! {Read, Foreign} = fn () => Read ()
         \\const composed: code [U32, row {Read, Foreign}] = @code.quote (do:
         \\  use ignored <- broader ()
-        \\  return @code.splice generated)
+        \\  break @code.splice generated)
         \\entry const answer = fn (host: Unit -> U32 ! {Foreign}) => do:
         \\  let provider = @effect.provider Read host
-        \\  return do provider:
-        \\    return @code.emit generated
+        \\  break do provider:
+        \\    break @code.emit generated
     , null);
 }
 test "typed staging contributes latent rows without closing the surrounding ambient through OOM" {

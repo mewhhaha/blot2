@@ -10,10 +10,10 @@ const program = (seed: number) =>
   `const seed = ${seed}
 const callback = do:
   let cost = ${cost}
-  return fn (value: U32) => @u32.add value cost
+  break fn (value: U32) => @u32.add value cost
 const cursor = do:
   let cost = ${cost}
-  return @array.cursor #[cost, 2]
+  break @array.cursor #[cost, 2]
 entry const run = fn (value: U32) => @u32.add (callback value) (@cursor.value cursor)
 entry const unrelated = seed
 `;

@@ -9,13 +9,13 @@ const share: unique (Array U32) -> shared (Array U32) = fn owner => @usage.share
 const size: shared (Array U32) -> U32 = fn values => @u32.add (@usage.length values) (@usage.length values)
 const integer = fn (owner: unique U32) => do:
   let shared = @usage.share owner
-  return @u32.add (@usage.read shared) (@usage.read shared)
+  break @u32.add (@usage.read shared) (@usage.read shared)
 const float = fn (owner: unique F32) => do:
   let shared = @usage.share owner
-  return @f32.add (@usage.read shared) (@usage.read shared)
+  break @f32.add (@usage.read shared) (@usage.read shared)
 const list = fn (owner: unique (List U32)) => do:
   let shared = @usage.share owner
-  return @u32.add (@usage.length shared) (@usage.length shared)
+  break @u32.add (@usage.length shared) (@usage.length shared)
 `;
 const consumer = `
 import {share, size, integer, float, list} from "./share"
@@ -25,12 +25,12 @@ entry const floating = fn (value: F32) => float 1.5
 entry const listed = fn (value: U32) => list [value, @u32.add value 1, @u32.add value 2]
 entry const surviving = fn (value: U32) => do:
   let values = share #[value, @u32.add value 1]
-  return #[value, @u32.add value (@u32.sub (@usage.length values) 1)]
+  break #[value, @u32.add value (@u32.sub (@usage.length values) 1)]
 entry const captured = fn (value: U32) => do:
   let owner: unique (Array U32) = #[value, @u32.add value 1]
   let transfer: once (Unit -> shared (Array U32)) = fn () => @usage.share owner
   let shared = transfer ()
-  return size shared
+  break size shared
 `;
 
 async function execute(bytes: Uint8Array<ArrayBuffer>) {

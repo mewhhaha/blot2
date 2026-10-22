@@ -13,30 +13,30 @@ entry const answer = fn (host: Unit -> U32 ! {Foreign}) => @effect.scope (fn (s:
   use boxed <- do (@effect.state Box.get Box.set (fn () => 0)):
     let original = fn () => do:
       let (state, value) = do (@effect.state s.get s.set 7):
-        return s.get ()
-      return value
+        break s.get ()
+      break value
     let version = identity original
     let bundle = {callback: version, nested: #[version]}
     use Box.set bundle.callback
     use adjust <- host ()
     use callback <- Box.get ()
-    return @u32.add (callback ()) adjust
+    break @u32.add (callback ()) adjust
   let (stored, result) = boxed
-  return result
+  break result
 )
 `;
 const older = `import {State, Box, identity} from "./state"
 entry const invalid = fn () => do:
   let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
-    return @effect.scope (fn (s: State U32) => do:
+    break @effect.scope (fn (s: State U32) => do:
       use Box.set (fn () => do:
         let (state, value) = do (@effect.state s.get s.set 7):
-          return s.get ()
-        return value
+          break s.get ()
+        break value
       )
-      return 42
+      break 42
     )
-  return result
+  break result
 `;
 
 for (const codegenTier of ["optimized", "development"] as const) {
@@ -121,7 +121,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
           for (
             const invalid of [
               older,
-              main.replace("return result\n)", "return stored\n)"),
+              main.replace("break result\n)", "break stored\n)"),
               main.replace(
                 "@effect.state Box.get Box.set (fn () => 0)",
                 "@effect.provider Box.set (fn callback => ())",

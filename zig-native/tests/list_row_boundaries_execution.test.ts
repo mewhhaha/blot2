@@ -40,7 +40,7 @@ const fold_${name} = fn values => do:
   let total = 0.0
   for ${binding} in values:
     total := self + ${names.join(" + ")}
-  return total
+  break total
 entry const ${name} = fn (input: Array F32) => do:
   let original = @list.generate 600 (fn i => ${row})
   let saved = original
@@ -65,7 +65,7 @@ entry const ${name} = fn (input: Array F32) => do:
       }
   let result = #[fold_${name} mixed, fold_${name} before, fold_${name} saved, fold_${name} restored, fold_${name} short, fold_${name} empty, fold_${name} short, fold_${name} prefix248, fold_${name} prefix244]
   ${savedFirst}
-  return #[...result, first]
+  break #[...result, first]
 `);
     }
   }
@@ -130,7 +130,7 @@ entry const fold = fn (repeat: U32) => do:
   for pass in 0..repeat:
     for row in rows:
       total := self + row.a + row.b + row.c + row.d
-  return total
+  break total
 entry const unused = fn (seed: U32) => #[seed]
 `;
   await compileAndRun(source, (guest) => {
@@ -183,7 +183,7 @@ entry const ${name} = fn (seed: F32) => do:
   let total = seed
   for ${binding} in rows_${name}:
     total := self + ${fields.join(" + ")}
-  return total
+  break total
 `);
     }
   }
@@ -227,11 +227,11 @@ const read = fn (seed: F32) => do:
   let total = seed
   for row in rows:
     total := self + row.a + row.b + row.c + row.d
-  return total
+  break total
 entry const pressure = fn (count: U32) => do:
   let unrelated = @array.generate count (fn i => i)
   let total = read (@u32.to_f32 count)
-  return total + @u32.to_f32 unrelated[count - 1]
+  break total + @u32.to_f32 unrelated[count - 1]
 entry const witness_length = fn () => witness.length
 entry const memory_probe = fn (seed: U32) => #[seed]
 `;
@@ -283,17 +283,17 @@ const read = fn (seed: F32) => do:
   let total = seed
   for row in rows:
     total := self + row.a + row.b + row.c + row.d
-  return total
+  break total
 entry const rows_length = fn () => rows.length
 entry const cursor_probe = fn (repeat: U32) => do:
   let cursor = rows.iter
   for i in 0..repeat:
     cursor := @cursor.advance self
-  return (@cursor.value cursor).a
+  break (@cursor.value cursor).a
 entry const pressure = fn (count: U32) => do:
   let unrelated = @array.generate count (fn i => i)
   let total = read (@u32.to_f32 count)
-  return total + @u32.to_f32 unrelated[count - 1]
+  break total + @u32.to_f32 unrelated[count - 1]
 entry const memory_probe = fn (seed: U32) => #[seed]
 `;
     await compileAndRun(source, async (_guest, bytes) => {

@@ -7,12 +7,12 @@ const checked = fn computation => do:
       effect Validate.check value =>
         yield value
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do (@effect.provider Input.read (fn () => 2)):
-  return checked (@computation (fn () => do:
+  break checked (@computation (fn () => do:
     use left <- Validate.check 40
     use right <- Input.read ()
-    return @u32.add left right
+    break @u32.add left right
   ))
 
 entry const checked_answer = answer ()

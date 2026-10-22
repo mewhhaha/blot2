@@ -6,7 +6,7 @@ const executable = Deno.args[0] ??
 const producer = `const identity = fn value => value
 const apply = fn callback => fn value => callback value
 const forget = fn value => do:
-  return fn (unit: Unit) => @u32.add 40 2
+  break fn (unit: Unit) => @u32.add 40 2
 const annotated: forall [a] => a -> a = identity
 const through: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = fn pair => apply (@product.get pair 0) (@product.get pair 1)
 type Item = exists [a] => (a, a -> U32)

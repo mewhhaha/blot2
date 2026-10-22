@@ -30,7 +30,7 @@ const scoped = @code.quote (fn (host: Unit -> U32 ! {Foreign}) => @resource.scop
 const released = @code.quote (fn () => do:
   use owner <- @resource.acquire (fn () => ${value}) (fn value => ())
   use @resource.release owner
-  return ${value})
+  break ${value})
 const failed = @code.quote (fn () => @resource.scope (fn () => ${value}) (fn owner => @panic "quoted cleanup") (fn loan => @usage.read loan))
 const handled = @code.quote (fn (host: Unit -> U32 ! {Foreign}) => do:
   let calculation = @computation (fn () => @u32.add (Read ()) ${value})
@@ -39,7 +39,7 @@ const handled = @code.quote (fn (host: Unit -> U32 ! {Foreign}) => do:
       effect Read () =>
         yield host ()
       complete value =>
-        return value)
+        break value)
 const unused = @code.quote (fn (host: Unit -> U32 ! {Foreign}) => do:
   let calculation = @computation (fn () => ${value})
   for request in @requests calculation:
@@ -47,21 +47,21 @@ const unused = @code.quote (fn (host: Unit -> U32 ! {Foreign}) => do:
       effect Read () =>
         yield host ()
       complete value =>
-        return value)
+        break value)
 const consume = fn (value: unique U32) => @usage.borrow value (fn loan => @usage.read loan)
 const make = fn (value: unique U32) => @code.quote (@code.lift (consume value))
 const make_nested = fn (value: unique U32) => @code.quote (@code.quote (@code.lift (@code.lift (consume value))))
 const make_spliced = fn (value: unique U32) => @code.quote (@code.splice (make value))
 const make_once = fn (value: unique U32) => do:
   let build: once (Unit -> code [U32, row {}]) = fn () => @code.quote (@code.lift (consume value))
-  return build ()
+  break build ()
 const owned = make ${value}
 const nested = @code.run (make_nested ${value})
 const spliced = make_spliced ${value}
 const owned_once = make_once ${value}
 const captured = @code.quote (fn (value: unique U32) => @usage.borrow value (fn loan => do:
   let read = fn () => @usage.read loan
-  return read ()))
+  break read ()))
 `;
   const observe = async (bytes: Uint8Array<ArrayBuffer>, value: number) => {
     for (const asynchronous of [false, true]) {

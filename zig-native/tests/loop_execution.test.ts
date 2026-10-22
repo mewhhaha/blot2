@@ -42,7 +42,7 @@ entry const run = fn (limit: U32) -> U32 => do:
   let total = 0
   for index in 0..limit:
     total := @u32.add self index
-  return total
+  break total
 `,
     (guest) => {
       equal(guest.call("run", 0), 0);

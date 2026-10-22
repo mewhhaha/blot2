@@ -15,10 +15,10 @@ impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
 const choose: forall [a] => a -> a = fn value => ${chosen}
 const make: U32 -> (forall [a] => a -> a) = fn captured => fn item => do:
   let ignored = @u32.add captured 1
-  return item
+  break item
 const trace: U32 -> (forall [a] => ((U32 -> U32 ! {Foreign}), a) -> a ! {Foreign}) = fn captured => fn pair => do:
   (@product.get pair 0) captured
-  return @product.get pair 1
+  break @product.get pair 1
 const show: forall [a] where { Render a } => a -> U32 = fn value => Render.show value
 const wrap: forall [a] => a -> Maybe a = #Some
 const apply: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = fn pair => (@product.get pair 0) (@product.get pair 1)
@@ -26,7 +26,7 @@ const packet = do:
   let cost = 35
   for index in 0..256:
     cost := @u32.add self 1
-  return {choose, other: make ${captured}, traced: trace ${captured}, show, wrap, apply, cost}
+  break {choose, other: make ${captured}, traced: trace ${captured}, show, wrap, apply, cost}
 `;
 };
 const consumer = (seed = "2") =>

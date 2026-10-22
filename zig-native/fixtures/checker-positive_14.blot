@@ -5,8 +5,8 @@ const checked = fn computation => do:
     case request of
       effect Validate.check value =>
         let local = do:
-          return @u32.add value 1
+          break @u32.add value 1
         yield local
       complete value =>
-        return @u32.add value 1
+        break @u32.add value 1
 entry const answer = fn () => checked (@computation (fn () => Validate.check 40))

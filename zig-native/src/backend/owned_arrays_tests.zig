@@ -44,7 +44,7 @@ test "exclusive owned array survives nested carries and backend allocation failu
         \\  for outer in 0 .. count:
         \\    for inner in 0 .. 2:
         \\      values[@u32.add (@u32.mul outer 2) inner] := outer
-        \\  return values
+        \\  break values
     );
     defer module.deinit(a);
     const before_nodes = try a.dupe(core.Node, module.nodes);
@@ -60,11 +60,11 @@ test "exclusive owned array survives nested carries and backend allocation failu
 }
 test "array versions with aliases captures iterator borrows and parameters are copied" {
     const cases = [_][]const u8{
-        "entry const run = fn (values: Array U32) => do:\n  values[0] := 9\n  return values\n",
-        "entry const run = fn () => do:\n  let values = #[1, 2]\n  let before = values\n  values[1] := 9\n  return @u32.add before[1] values[1]\n",
-        "entry const run = fn () => do:\n  let values = #[1, 2]\n  let read = fn () => values[1]\n  values[1] := 9\n  return @u32.add (read ()) values[1]\n",
-        "entry const run = fn () => do:\n  let values = #[1, 2]\n  let sum = 0\n  for value in values:\n    values[1] := 9\n    sum := @u32.add sum value\n  return sum\n",
-        "entry const run = fn () => do:\n  let leaf = #[1]\n  let values = #[leaf, leaf]\n  values[0][0] := 9\n  return values[0][0]\n",
+        "entry const run = fn (values: Array U32) => do:\n  values[0] := 9\n  break values\n",
+        "entry const run = fn () => do:\n  let values = #[1, 2]\n  let before = values\n  values[1] := 9\n  break @u32.add before[1] values[1]\n",
+        "entry const run = fn () => do:\n  let values = #[1, 2]\n  let read = fn () => values[1]\n  values[1] := 9\n  break @u32.add (read ()) values[1]\n",
+        "entry const run = fn () => do:\n  let values = #[1, 2]\n  let sum = 0\n  for value in values:\n    values[1] := 9\n    sum := @u32.add sum value\n  break sum\n",
+        "entry const run = fn () => do:\n  let leaf = #[1]\n  let values = #[leaf, leaf]\n  values[0][0] := 9\n  break values[0][0]\n",
     };
     const a = std.testing.allocator;
     for (cases) |source| {
@@ -89,7 +89,7 @@ test "pattern-conditional append transfers ownership only without surviving alia
             \\    if let #Some value = candidate:
             \\      values := [...self, value]
             \\    {s}
-            \\  return @array.from_list values
+            \\  break @array.from_list values
             \\
         , .{ if (aliased) "let before = values" else "", if (aliased) "use @list.length before" else "" });
         defer a.free(source);
@@ -122,7 +122,7 @@ test "read-only callees and dropped generator closures borrow an exclusive array
         \\  let sum = 0
         \\  for value in values:
         \\    sum := @u32.add sum value
-        \\  return sum
+        \\  break sum
         \\const generate = fn count => fn generator => @array.generate count generator
         \\const map = fn transform => fn (values: Array U32) => generate (size values) (fn index => transform values[index])
         \\const matched = fn (values: Array U32) => fn (index: U32) => case #True of
@@ -131,13 +131,13 @@ test "read-only callees and dropped generator closures borrow an exclusive array
         \\
     ;
     const cases = [_][]const u8{
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  for index in 0..count:\n    values[index] := @u32.add (get1 index values) 1\n  return values\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  for index in 0..count:\n    values[index] := nested index values\n  return values\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  values[0] := total values\n  return values\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let doubled = map (fn value => @u32.mul value 2) values\n  values[0] := doubled[0]\n  return values\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let doubled = @array.generate count (fn index => @u32.mul values[index] 2)\n  values[0] := doubled[0]\n  return values\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let reader = fn (xs: Array U32) => fn (index: U32) => xs[index]\n  values[0] := @u32.add (reader values 0) 1\n  return values\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  values[0] := @u32.add (matched values 0) 1\n  return values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  for index in 0..count:\n    values[index] := @u32.add (get1 index values) 1\n  break values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  for index in 0..count:\n    values[index] := nested index values\n  break values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  values[0] := total values\n  break values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let doubled = map (fn value => @u32.mul value 2) values\n  values[0] := doubled[0]\n  break values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let doubled = @array.generate count (fn index => @u32.mul values[index] 2)\n  values[0] := doubled[0]\n  break values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let reader = fn (xs: Array U32) => fn (index: U32) => xs[index]\n  values[0] := @u32.add (reader values 0) 1\n  break values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  values[0] := @u32.add (matched values 0) 1\n  break values\n",
     };
     const a = std.testing.allocator;
     for (cases) |case| {
@@ -166,31 +166,31 @@ test "returned stored captured and later-read arguments keep the copy" {
         \\const merged = fn (flag: Bool) => fn (values: Array U32) => do:
         \\  if flag:
         \\    values := #[7]
-        \\  return values
+        \\  break values
         \\const carried = fn (count: U32) => fn (values: Array U32) => do:
         \\  for index in 0..count:
         \\    values := #[index]
-        \\  return values
+        \\  break values
         \\const matched_escape = fn (values: Array U32) => case #True of
         \\  #True => values
         \\  #False => values
         \\
     ;
     const cases = [_][]const u8{
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = pass values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let #Cell before = wrap values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let (before, _) = pair values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let read = reader values\n  values[0] := 9\n  return @u32.add (read 0) values[0]\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let read = fn index => values[index]\n  let doubled = @array.generate count read\n  values[0] := 9\n  return @u32.add (read 0) doubled[0]\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = keep values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let readers = @array.generate count (fn index => fn (unit: Unit) => values[index])\n  values[0] := 9\n  return @u32.add (readers[0] ()) values[0]\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  return left values (@array.set values 0 9)\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  return values[@u32.sub (@array.set values 0 5)[1] 1]\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let size = deep 3 values\n  values[0] := size\n  return values\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = merged (@u32.eq count 0) values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = carried 0 values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let reader = fn (xs: Array U32) => fn (index: U32) => xs[index]\n  let held = reader values\n  values[0] := 9\n  return @u32.add (held 0) values[0]\n",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = matched_escape values\n  values[0] := 9\n  return @u32.add before[0] values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = pass values\n  values[0] := 9\n  break @u32.add before[0] values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let #Cell before = wrap values\n  values[0] := 9\n  break @u32.add before[0] values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let (before, _) = pair values\n  values[0] := 9\n  break @u32.add before[0] values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let read = reader values\n  values[0] := 9\n  break @u32.add (read 0) values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let read = fn index => values[index]\n  let doubled = @array.generate count read\n  values[0] := 9\n  break @u32.add (read 0) doubled[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = keep values\n  values[0] := 9\n  break @u32.add before[0] values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let readers = @array.generate count (fn index => fn (unit: Unit) => values[index])\n  values[0] := 9\n  break @u32.add (readers[0] ()) values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  break left values (@array.set values 0 9)\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  break values[@u32.sub (@array.set values 0 5)[1] 1]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let size = deep 3 values\n  values[0] := size\n  break values\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = merged (@u32.eq count 0) values\n  values[0] := 9\n  break @u32.add before[0] values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = carried 0 values\n  values[0] := 9\n  break @u32.add before[0] values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let reader = fn (xs: Array U32) => fn (index: U32) => xs[index]\n  let held = reader values\n  values[0] := 9\n  break @u32.add (held 0) values[0]\n",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.fill count 1\n  let before = matched_escape values\n  values[0] := 9\n  break @u32.add before[0] values[0]\n",
     };
     const a = std.testing.allocator;
     for (cases) |case| {
@@ -208,7 +208,7 @@ test "a borrowed element read keeps nested containers shared" {
         \\  let values = @array.generate count (fn index => @array.fill 2 index)
         \\  let inner = first values
         \\  values[0][0] := 9
-        \\  return @u32.add inner[0] values[0][0]
+        \\  break @u32.add inner[0] values[0][0]
         \\
     ));
     try std.testing.expectEqual(@as(usize, 1), try admittedUpdates(a,
@@ -217,7 +217,7 @@ test "a borrowed element read keeps nested containers shared" {
         \\  let values = @array.generate count (fn index => @array.fill 2 index)
         \\  let inner = first values
         \\  values[1] := inner
-        \\  return values
+        \\  break values
         \\
     ));
 }

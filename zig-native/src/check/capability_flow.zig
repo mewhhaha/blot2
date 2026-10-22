@@ -668,7 +668,7 @@ fn sourceCaptures(tree: *const ast.Tree, pool: *const @import("../parse/symbols.
             nested[locals.len] = tree.parameter(value.a).name;
             return sourceCaptures(tree, pool, value.b, bindings, nested[0 .. locals.len + 1], remaining, depth + 1);
         },
-        .field_access, .return_stmt, .yield_stmt => return sourceCaptures(tree, pool, value.a, bindings, locals, remaining, depth + 1),
+        .field_access, .return_stmt, .function_return_stmt, .yield_stmt => return sourceCaptures(tree, pool, value.a, bindings, locals, remaining, depth + 1),
         .apply => {
             const argument = tree.node(unwrap(tree, value.b) orelse return null);
             if (argument.tag != .unit and !pureCallee(tree, pool, value.a)) return null;

@@ -8,7 +8,7 @@ const apply = fn callable => fn value => callable value
 entry const run = fn (value: U32) -> U32 => add (apply plus_one value) 1
 entry const convert = fn (value: U32) -> F32 => do:
   let conversion = fn (input: U32) -> F32 => @u32.to_f32 input
-  return conversion value
+  break conversion value
 `, guest => {
     equal(guest.call("run", 40), 42);
     equal(guest.call("run", 0xffffffff), 1);

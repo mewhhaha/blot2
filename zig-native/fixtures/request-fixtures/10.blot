@@ -8,11 +8,11 @@ const handled = fn computation => do:
       effect Inputs.right () =>
         yield 2
       complete value =>
-        return value
+        break value
 entry const answer = fn () => handled (@computation (fn () => do:
   use left <- Inputs.left ()
   use right <- Inputs.right ()
-  return @u32.add left right
+  break @u32.add left right
 ))
 
 entry const checked_answer = answer ()

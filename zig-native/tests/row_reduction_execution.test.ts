@@ -21,7 +21,7 @@ entry const ${collection}_${width} = fn (input: Array U32) => do:
   let total = initial
   for row in rows:
     total := self + ${sum}
-  return total
+  break total
 `);
     }
   }
@@ -88,7 +88,7 @@ entry const ${collection}_${width} = fn (input: Array F32) => do:
   let rows = @${collection}.generate count (fn index => {${fields.join(", ")}})
   for row in rows:
     total := self + ${sum}
-  return total
+  break total
 `);
     }
   }

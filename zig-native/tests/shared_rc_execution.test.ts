@@ -426,30 +426,30 @@ entry const array_group = fn (value: U32) => do:
   let child = #[value, value, value, value, value, value, value, value, value, value, value, value, value, value, value, value, value, value + 1]
   let left = #[child, child]
   let right = #[child, child]
-  return left[0][17] + right[1][0]
+  break left[0][17] + right[1][0]
 entry const arrays = fn (value: U32) => do:
   if value == 0:
-    return 0
+    break 0
   let child = #[value, value + 1]
   let values = @array.fill 4 child
   let before = values
   values[0] := #[value + 10, value + 20]
-  return before[0][1] + values[0][1] + values[1][0]
+  break before[0][1] + values[0][1] + values[1][0]
 entry const lists = fn (value: U32) => do:
   if value == 0:
-    return 0
+    break 0
   let child = #[value, value + 1]
   let values = @list.fill 500 child
   let before = values
   values := [#[value + 10, value + 20], ...self]
   let copied = @array.from_list values
   let old = @array.from_list before
-  return old[0][1] + copied[0][1] + copied[500][0]
+  break old[0][1] + copied[0][1] + copied[500][0]
 entry const clear = fn () => 0
 entry const trapped = fn (value: U32) => do:
   let values = @list.fill 500 #[value]
   let copied = @array.from_list values
-  return copied[501][0]
+  break copied[501][0]
 `;
 Deno.test("source reference Arrays and persistent Lists preserve versions and retire typed invocation roots", async () => {
   const directory = await Deno.makeTempDir();

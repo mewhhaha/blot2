@@ -67,7 +67,7 @@ test "implementation orphan anchor ownership and graph coherence use original pr
     try files(&.{
         .{ .name = "main.blot", .text = "import { Source } from \"./source\"\nimport { read } from \"./token\"\nentry const answer: U32 = read ()\n" },
         .{ .name = "source.blot", .text = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\n" },
-        .{ .name = "token.blot", .text = "import { Source } from \"./source\"\nopaque type Token = U32\nimpl TokenSource : Source Token = { type Item = U32, const first = fn value => do:\n  let #Token number = value\n  return number }\nconst read: Unit -> U32 = fn () => Source.first (#Token 42)\n" },
+        .{ .name = "token.blot", .text = "import { Source } from \"./source\"\nopaque type Token = U32\nimpl TokenSource : Source Token = { type Item = U32, const first = fn value => do:\n  let #Token number = value\n  break number }\nconst read: Unit -> U32 = fn () => Source.first (#Token 42)\n" },
     }, null, false);
     try files(&.{
         .{ .name = "main.blot", .text = "import { Source } from \"./left\"\nimport { marker } from \"./right\"\nentry const answer: U32 = Source.first #[42]\n" },

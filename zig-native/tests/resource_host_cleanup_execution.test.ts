@@ -10,10 +10,10 @@ entry const run = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => @reso
 entry const wrapped = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => @resource.scope (fn () => 42) (fn owner => do:
   for index in 0..3:
     let value = index
-  return drop owner) (fn loan => @usage.read loan)
+  break drop owner) (fn loan => @usage.read loan)
 entry const acquired = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => do:
   use owner <- @resource.acquire (fn () => 42) drop
-  return @usage.borrow owner (fn loan => @usage.read loan)
+  break @usage.borrow owner (fn loan => @usage.read loan)
 entry const nested = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => @resource.scope (fn () => 7) drop (fn outer => @resource.scope (fn () => 9) drop (fn inner => @u32.add (@usage.read outer) (@usage.read inner)))
 entry const trapped = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => @resource.scope (fn () => 11) drop (fn loan => @u32.div (@usage.read loan) 0)
 `;

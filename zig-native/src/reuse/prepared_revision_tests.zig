@@ -431,7 +431,7 @@ const retained_first =
     \\import * as beta from "./b"
     \\entry const answer: F32 -> F32 = fn value => do:
     \\  let add = factory value
-    \\  return identity (add 1.25)
+    \\  break identity (add 1.25)
     \\entry const folded = identity 11
 ;
 const retained_second =
@@ -439,7 +439,7 @@ const retained_second =
     \\import * as beta from "./b"
     \\entry const answer: F32 -> F32 = fn value => do:
     \\  let add = factory value
-    \\  return identity (add 2.25)
+    \\  break identity (add 2.25)
     \\entry const folded = identity 12
 ;
 fn retainedFixture() !Fixture {
@@ -560,7 +560,7 @@ test "retained history keeps prior ownership through error correction revert and
         \\data Extra = #Extra U32
         \\entry const answer: F32 -> F32 = fn value => do:
         \\  let add = factory value
-        \\  return identity (add 1.25)
+        \\  break identity (add 1.25)
         \\entry const folded = identity 11
     ;
     try fixture.dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = changed_catalog });

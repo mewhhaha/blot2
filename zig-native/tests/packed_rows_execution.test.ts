@@ -10,17 +10,17 @@ const total_array = fn () => do:
   let sum = 0
   for row in arrays:
     sum := self + row.x + row.y + row.z
-  return sum
+  break sum
 const total_list = fn () => do:
   let sum = 0
   for row in lists:
     sum := self + row.x + row.y + row.z
-  return sum
+  break sum
 entry const run = fn count => do:
   let sum = 0
   for i in 0..count:
     sum := self + total_array () + total_list ()
-  return sum
+  break sum
 entry const memory = fn () -> Array U32 => #[]
 `,
     (guest) => {
@@ -41,11 +41,11 @@ const sum = fn values => do:
   let total = 0
   for row in values:
     total := self + row.a + row.b + row.z
-  return total
+  break total
 const skip = fn count => fn cursor => do:
   for i in 0..count:
     cursor := @cursor.advance self
-  return cursor
+  break cursor
 entry const run = fn count => do:
   let rows = @list.generate count (fn i => {z: i * 3, a: i, b: i + 1})
   let before = rows
@@ -56,18 +56,18 @@ entry const run = fn count => do:
   let joined = @list.concat middle saved
   let copied = @array.from_list joined
   let distant = skip (count - 1) origin
-  return #[sum rows, sum before, sum middle, sum joined, copied.length, rows.length, (@cursor.value origin).a, (@cursor.value distant).z]
+  break #[sum rows, sum before, sum middle, sum joined, copied.length, rows.length, (@cursor.value origin).a, (@cursor.value distant).z]
 entry const build = fn count => do:
   let rows = [{z: i * 3, b: i + 1, a: i} | i <- @array.generate count (fn i => i)]
-  return #[sum rows, rows.length, (@array.from_list rows).length]
+  break #[sum rows, rows.length, (@array.from_list rows).length]
 entry const rectangular = fn count => do:
   let rows = [{a: x, b: y, z: 1} | x <- #[1, 2], y <- @array.fill count 3]
-  return #[sum rows, rows.length]
+  break #[sum rows, rows.length]
 entry const empty = fn count => do:
   let rows = @list.fill count {a: 1, b: 2, z: 3}
   let empty = @list.slice rows count 0
   let joined = @list.concat empty saved
-  return #[empty.length, sum joined, (@array.from_list empty).length]
+  break #[empty.length, sum joined, (@array.from_list empty).length]
 entry const single = fn count => (@list.fill count {value: 7}).length
 `,
     (guest) => {
@@ -112,7 +112,7 @@ const sum = fn values => do:
   let total = 0
   for row in values:
     total := self + row.a * 10 + row.z
-  return total
+  break total
 entry const operations = fn count => do:
   let values = rows count
   let before = values
@@ -124,7 +124,7 @@ entry const operations = fn count => do:
   let joined = @array.concat copied literal
   let extended = #[{a: 2, z: 4}, ...joined, {z: 9, a: 8}]
   let roundtrip = @array.from_list (@list.from_array extended)
-  return #[sum roundtrip, sum before, extracted.a, read (), (second (identity after)).a]
+  break #[sum roundtrip, sum before, extracted.a, read (), (second (identity after)).a]
 entry const generated = fn count => sum (#[{z: y + 1, a: x} | x <- #[1, 2], y <- @array.generate count (fn i => i)])
 entry const filled = fn count => sum (@array.fill count {a: 4, z: 6})
 entry const empty = fn count => sum (#[{a: i, z: i} | i <- @array.generate count (fn i => i), i > count])
@@ -133,7 +133,7 @@ entry const reference_rows = fn count => do:
   let values = @array.generate count (fn i => {items: #[i, i + 1], value: i})
   let before = values
   values[0].items[0] := 99
-  return #[before[0].items[0], values[0].items[0], values[count - 1].value]
+  break #[before[0].items[0], values[0].items[0], values[count - 1].value]
 `,
     (guest) => {
       for (const n of [2, 3, 17, 249, 1000]) {
@@ -164,7 +164,7 @@ Deno.test("packed tuple cursors preserve independent positions, escaped values a
 const constant = #[(1, -0.0), (2, 3.5)]
 const first_field = fn row => do:
   let (value, _, _) = row
-  return value
+  break value
 entry const floating = fn (input: Array F32) => do:
   let rows = #[(i, value) | value <- input, let i = 9]
   let original = rows
@@ -177,20 +177,20 @@ entry const floating = fn (input: Array F32) => do:
   let (_, second) = @cursor.value cursor
   let (_, saved) = selected
   let (_, zero) = constant[0]
-  return #[first, second, saved, zero]
+  break #[first, second, saved, zero]
 entry const conversions = fn (input: Array F32) => do:
   let rows = #[(value, #True, ()) | value <- input]
   let listed = @list.from_array rows
   let copied = @array.from_list listed
-  return #[first_field row | row <- copied]
+  break #[first_field row | row <- copied]
 entry const fields = fn (input: Array F32) => do:
   let rows = #[{value: value, count: 9} | value <- input]
-  return #[rows[i].value | i <- @array.generate input.length (fn i => i)]
+  break #[rows[i].value | i <- @array.generate input.length (fn i => i)]
 entry const boundaries = fn count => do:
   let values = @array.generate count (fn i => (i, i + 1))
   let selected = @array.slice values count 0
   let cursor = selected.iter
-  return @cursor.has cursor
+  break @cursor.has cursor
 `,
     (guest) => {
       deepStrictEqual(
@@ -244,10 +244,10 @@ entry const order = fn (visit: U32 -> U32 ! {Foreign}) => do:
   use last <- visit 2
   let rows = #[{z: first, a: last}]
   use result <- visit (rows[0].a * 10 + rows[0].z)
-  return result
+  break result
 entry const eager = fn divisor => do:
   let rows = #[(i, 10 / divisor) | i <- #[1, 2]]
-  return rows.length
+  break rows.length
 entry const too_large = fn count => (@array.fill count (1, 2, 3)).length
 `,
     (guest) => {
@@ -284,7 +284,7 @@ entry const run = fn count => do:
   let index = 0
   for ever:
     if index == count:
-      return read () + (@cursor.value saved_cursor).y + rows[1].x
+      break read () + (@cursor.value saved_cursor).y + rows[1].x
     rows[1].x := self + 1
     let discarded = @array.fill 8192 index
     cursor := @cursor.advance rows.iter

@@ -9,7 +9,7 @@ const work = @computation (fn () => do:
   for row in rows:
     use value <- Tick.read row.a
     total := self + row.b + value + row.c
-  return total)
+  break total)
 entry const resumed = fn (host: U32 -> U32 ! {Foreign}) => do:
   for request in @requests work:
     case request of
@@ -17,19 +17,19 @@ entry const resumed = fn (host: U32 -> U32 ! {Foreign}) => do:
         use next <- host value
         yield next
       complete value =>
-        return value
-  return 0
+        break value
+  break 0
 entry const returned = fn (host: U32 -> U32 ! {Foreign}) => do:
   for request in @requests work:
     case request of
       effect Tick.read value =>
         use next <- host value
         if value == 83:
-          return value
+          break value
         yield next
       complete value =>
-        return value
-  return 7
+        break value
+  break 7
 entry const broken = fn (host: U32 -> U32 ! {Foreign}) => do:
   for request in @requests work:
     case request of
@@ -39,8 +39,8 @@ entry const broken = fn (host: U32 -> U32 ! {Foreign}) => do:
           break
         yield next
       complete value =>
-        return value
-  return 7
+        break value
+  break 7
 `;
 for (const asynchronous of [false, true]) {
   Deno.test(`List row views survive resumed and cancelled effects (${asynchronous ? "JSPI" : "sync"})`, async () => {

@@ -79,7 +79,7 @@ test "known callback type and row specialization releases every allocation failu
         \\  let callback = fn () => identity (@demand value)
         \\  use first <- callback ()
         \\  use callback ()
-        \\  return first
+        \\  break first
         \\entry const integer = fn (value: U32) => read value
         \\entry const floating = fn (value: F32) => read value
     );
@@ -102,7 +102,7 @@ test "known local callbacks preserve one creation memo through aliases and loops
         \\    use left <- alias i
         \\    use right <- second i
         \\    total := @u32.add self (@u32.add left right)
-        \\  return total
+        \\  break total
         \\entry const run = fn (count: U32) => repeat count 21
     );
     defer module.deinit(a);
@@ -131,7 +131,7 @@ test "local memo proof admits structured loops and aliases without mutating Core
         \\      total := @u32.add self (@demand second)
         \\    else:
         \\      total := @u32.add self (@demand first)
-        \\  return total
+        \\  break total
         \\entry const run = fn (count: U32) => sum count 21
     );
     defer module.deinit(a);
@@ -150,9 +150,9 @@ test "local memo proof admits structured loops and aliases without mutating Core
 test "local memo structured proof retains conservative escape and provider fallback" {
     const a = std.testing.allocator;
     for ([_][]const u8{
-        "const delay = fn ~(value: U32) => do:\n  return value\nentry const run = 42\n",
+        "const delay = fn ~(value: U32) => do:\n  break value\nentry const run = 42\n",
         "const keep = fn ~(value: U32) => { callback: fn () => @demand value }\nentry const run = 42\n",
-        "type Tick is effect = { read: Unit -> U32 }\nconst scoped = fn ~(value: U32) => do (@effect.provider Tick.read (fn () => 1)):\n  return @demand value\nentry const run = 42\n",
+        "type Tick is effect = { read: Unit -> U32 }\nconst scoped = fn ~(value: U32) => do (@effect.provider Tick.read (fn () => 1)):\n  break @demand value\nentry const run = 42\n",
     }) |source| {
         var module = try lower(a, source);
         defer module.deinit(a);
@@ -169,7 +169,7 @@ test "local memo structured proof exhaustion preserves ordinary emission" {
     defer text.deinit(a);
     try text.appendSlice(a, "const many = fn ~(value: U32) => do:\n  let total = @demand value\n");
     for (0..100) |_| try text.appendSlice(a, "  total := @u32.add self 1\n");
-    try text.appendSlice(a, "  return total\nentry const run = fn (value: U32) => many value\n");
+    try text.appendSlice(a, "  break total\nentry const run = fn (value: U32) => many value\n");
     var module = try lower(a, text.items);
     defer module.deinit(a);
     for (module.bodies) |*body| try std.testing.expect(demand.Plan.init(&module, body) == null);
@@ -185,7 +185,7 @@ test "local memo List cleanup snapshots and managed loop roots release every all
         \\  let total = 0
         \\  for row in rows:
         \\    total := @u32.add self (@u32.add row (@demand value))
-        \\  return total
+        \\  break total
         \\const cache = fn (count: U32) => fn ~(value: Array U32) => do:
         \\  let i = 0
         \\  for ever:
@@ -193,7 +193,7 @@ test "local memo List cleanup snapshots and managed loop roots release every all
         \\    let cached = @demand value
         \\    i := @u32.add (@array.get pressure 0) 1
         \\    if @u32.eq i count:
-        \\      return cached
+        \\      break cached
         \\entry const lists = fn (count: U32) => walk (@list.fill count 42) 21
         \\entry const arrays = fn (count: U32) => cache count #[21, 22, 23]
     );

@@ -17,16 +17,16 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (lef
       use next <- host a
       use left.set next
       use c <- read_written left
-      return @u32.add (@u32.add a b) c
+      break @u32.add (@u32.add a b) c
     let (state, result) = inner
-    return result
+    break result
   let (state, result) = outer
-  return result
+  break result
 ))
 entry const floating = fn () => @effect.scope (fn (s: State F32) => do:
   let (state, result) = do (@effect.state s.get s.set 1.5):
-    return read_written s
-  return result
+    break read_written s
+  break result
 )
 `;
 for (const codegenTier of ["optimized", "development"] as const) {
@@ -150,7 +150,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
                   "s.get ()",
                   `do:
   let operation = s.get
-  return operation ()`,
+  break operation ()`,
                 ),
               },
             });

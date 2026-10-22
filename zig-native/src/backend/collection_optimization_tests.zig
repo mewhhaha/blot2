@@ -42,7 +42,7 @@ test "source function facts distinguish primitive behavior, size, borrowing and 
         \\  let sum = 0
         \\  for value in values:
         \\    sum := @u32.add sum value
-        \\  return sum
+        \\  break sum
         \\const escaped = fn (values: List U32) => values
         \\const opaque = fn (call: U32 -> U32) => call 1
     );
@@ -63,14 +63,14 @@ test "source function facts distinguish primitive behavior, size, borrowing and 
 }
 test "exact builder proof admits rectangular loops and rejects observations guards and ragged bounds" {
     const cases = [_]struct { source: []const u8, admitted: bool }{
-        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..count:\n      result := [...self, @u32.add x y]\n  return @array.from_list result\n", .admitted = true },
-        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    result := [...self, @list.length result]\n  return result\n", .admitted = false },
-        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..count:\n      result := @list.append result (@u32.add x y)\n  return @array.from_list result\n", .admitted = true },
+        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..count:\n      result := [...self, @u32.add x y]\n  break @array.from_list result\n", .admitted = true },
+        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    result := [...self, @list.length result]\n  break result\n", .admitted = false },
+        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..count:\n      result := @list.append result (@u32.add x y)\n  break @array.from_list result\n", .admitted = true },
         .{ .source = "entry const run = fn (values: Array U32) => #[@u32.add x y | x <- values, y <- values]\n", .admitted = true },
-        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..x:\n      result := @list.append result y\n  return result\n", .admitted = false },
-        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    result := @list.append result (@list.length result)\n  return result\n", .admitted = false },
+        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..x:\n      result := @list.append result y\n  break result\n", .admitted = false },
+        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    result := @list.append result (@list.length result)\n  break result\n", .admitted = false },
         .{ .source = "entry const run = fn (values: Array U32) => [x | x <- values, @u32.lt x 3]\n", .admitted = false },
-        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..(@u32.div 1 count):\n      result := @list.append result y\n  return result\n", .admitted = false },
+        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..(@u32.div 1 count):\n      result := @list.append result y\n  break result\n", .admitted = false },
     };
     for (cases) |case| {
         var m = try lower(case.source);

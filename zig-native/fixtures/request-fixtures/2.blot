@@ -4,12 +4,12 @@ const checked = fn computation => do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
-        return 21
+        break 21
       complete value =>
-        return value
+        break value
 const make_generator = fn () => do:
   use Validate.check 0
-  return @panic "generator construction continued"
+  break @panic "generator construction continued"
 entry const answer = fn () => do:
   let count = checked (@computation (fn () =>
     @array.length (@array.generate (Validate.check 0) (@panic "generator evaluated"))
@@ -17,6 +17,6 @@ entry const answer = fn () => do:
   let generator = checked (@computation (fn () =>
     @array.length (@array.generate 2 (make_generator ()))
   ))
-  return @u32.add count generator
+  break @u32.add count generator
 
 entry const checked_answer = answer ()

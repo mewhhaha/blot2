@@ -12,7 +12,7 @@ const source = `const scan = fn values => do:
       break
     total := self + value
     cursor := rest
-  return total
+  break total
 entry const arrays = fn (count: U32) => scan (@array.generate count identity)
 entry const lists = fn (count: U32) => scan (@list.generate count identity)
 `;

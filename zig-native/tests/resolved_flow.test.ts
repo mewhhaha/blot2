@@ -34,7 +34,7 @@ entry const joins = fn (v: U32) -> U32 => do:
     bonus := self + 2
   else:
     bonus := self + 1
-  return total + bonus + area (#Circle v) + area (#Square 2)
+  break total + bonus + area (#Circle v) + area (#Square 2)
 
 entry const loops = fn (end: U32) -> U32 => do:
   let total = 0
@@ -45,25 +45,25 @@ entry const loops = fn (end: U32) -> U32 => do:
     total := self + index
     for inner in 0..index:
       steps := self + 2
-  return total * 1000 + steps
+  break total * 1000 + steps
 
 entry const early = fn (end: U32) -> U32 => do:
   let total = 0
   for index in 0..end:
     if total > 50:
-      return total + 1000
+      break total + 1000
     total := self + index
-  return total
+  break total
 
 const checked = fn computation => do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
         if value == 0:
-          return 0
+          break 0
         yield value
       complete value =>
-        return value
+        break value
 
 const count_until_zero = fn computation => do:
   let count = 0
@@ -76,19 +76,19 @@ const count_until_zero = fn computation => do:
         yield value
       complete _ =>
         break
-  return count
+  break count
 
 entry const requested = fn (v: U32) -> U32 => checked (@computation (fn () => do:
   use left <- Validate.check v
   use right <- Validate.check 2
-  return left + right
+  break left + right
 ))
 
 entry const counted = fn (v: U32) -> U32 => count_until_zero (@computation (fn () => do:
   use Validate.check v
   use Validate.check 2
   use Validate.check 0
-  return @panic "the handler broke before this statement"
+  break @panic "the handler broke before this statement"
 ))
 `;
 Deno.test("prepared structured flow executes and follows edits", async () => {

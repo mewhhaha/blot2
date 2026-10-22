@@ -12,7 +12,7 @@ entry const reference = fn (seed: U32) => do:
   let kept = rows[1]
   rows[1] := @array.fill 256 99
   let pressure = @array.fill 8192 42
-  return if @u32.eq pressure[0] 42 then kept else @panic "pressure changed"
+  break if @u32.eq pressure[0] 42 then kept else @panic "pressure changed"
 `;
 for (const codegenTier of ["optimized", "development"] as const) {
   Deno.test(`checked collection stores retain scalar widths zero-width rows and owning elements (${codegenTier})`, async () => {

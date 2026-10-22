@@ -18,7 +18,7 @@ const source =
     \\entry const pick = fn (i: U32) => table[i]
     \\entry const first = fn () => do:
     \\  let #Pair { left, right } = pair
-    \\  return @u32.add left right
+    \\  break @u32.add left right
     \\entry const unrelated = fn () => other
 ;
 const Fixture = struct {
@@ -123,7 +123,7 @@ const interleaved =
     \\entry const three = fn (i: U32) => do:
     \\  let #Pair { left, right } = pair
     \\  let low = @u32.add table[i] left
-    \\  return @u32.add low (@u32.add second[i] right)
+    \\  break @u32.add low (@u32.add second[i] right)
     \\entry const unrelated = fn () => other
 ;
 test "admission skips every aggregate child range of one caller and keeps the records between them" {

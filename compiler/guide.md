@@ -53,8 +53,8 @@ const twice = fn value => value + value
 const apply_twice = fn transform => fn value => transform (transform value)
 entry const factorial = fn (value: U32) -> U32 => do:
   if value <= 1:
-    return 1
-  return value * factorial (value - 1)
+    break 1
+  break value * factorial (value - 1)
 
 entry const offset = fn value => value + 1.0
 entry const answer = fn (value: F32) -> F32 => apply_twice offset (twice value)
@@ -102,17 +102,48 @@ different type and is visible in the remaining suite. An outer `self` is
 restored after the RHS. Rebinding requires purity, like `let`; record and array
 paths such as `world.camera.position := self + offset` are supported.
 
-`return` exits the nearest `do` block in the current function. Falling through
-returns Unit; a last expression statement is discarded. Branch-local bindings do
-not escape. Rebinding an existing outer name flows out of `if`, `if let`, and
-the `do:` arms of a `case` used as a statement; a branch or arm that leaves it
-alone carries its previous value. Outcomes that reach the join must have the
-same type; a branch that returns, or a branch or arm that panics or breaks,
-contributes nothing. A `return` written directly in such an arm still exits only
-the arm's `do:`: its value is discarded and the arm's rebindings carry out. A
-`return` nested in an `if` or loop inside an arm that rebinds an outer name is
-rejected with `case_arm_return`. For a value, use
+`break value` finishes the nearest `do` block with that value, even from inside
+a loop. Bare `break` exits the nearest loop; `return value` exits the innermost
+function. Falling through a `do` produces Unit; a last expression statement is
+discarded. Branch-local bindings do not escape. Rebinding an existing outer name
+flows out of `if`, `if let`, and the `do:` arms of a `case` used as a statement;
+a branch or arm that leaves it alone carries its previous value. Outcomes that
+reach the join must have the same type; a branch that exits, panics, or breaks
+contributes nothing. A `break value` written directly in such an arm still exits
+only the arm's `do:`: its value is discarded and the arm's rebindings carry out.
+A `break value` nested in an `if` or loop inside an arm that rebinds an outer
+name is rejected with `case_arm_return`. For a value, use
 `if condition then value else alternative`.
+
+A `return` cannot cross a monadic continuation: a resolver may skip or repeat
+that continuation, so the compiler reports `return_across_continuation` at the
+source. Use `break value` to finish the monadic block, then return from the
+enclosing function. An effect clause can return from a request loop in the
+function body's `do`; this cancels the captured computation. A request callback
+inside a nested `do` has the same diagnostic. Its `break value` exits that inner
+block.
+
+When migrating older code, change a `return value` that supplied a `do` result
+to `break value`, and change monadic `return $ wrapped` to `break $ wrapped`.
+Keep `return value` where the intent is to leave the whole function, including
+from a nested match arm. A bare `break` still leaves only the nearest loop.
+
+```blot
+entry const choose = fn (flag: Bool) -> U32 => do:
+  let inner = do:
+    if flag:
+      return 7
+    break 3
+  break inner + 1
+
+entry const from_case = fn (flag: Bool) -> U32 => do:
+  case flag of
+    #True => do:
+      return 42
+    #False => do:
+      let ignored = ()
+  break 0
+```
 
 ```blot
 type Beat is data = #Up | #Down
@@ -124,7 +155,7 @@ entry const count = fn (up: Bool) -> U32 => do:
       total := 7
     #Down => do:
       total := 3
-  return total
+  break total
 ```
 
 ```blot
@@ -134,13 +165,13 @@ const add_step = fn amount => fn builder => case builder of
 const plugin = fn builder => do:
   builder := add_step 10 self
   builder := add_step 20 self
-  return builder
+  break builder
 
 const application = do:
   let builder = #Builder 0
   builder := plugin self
   builder := add_step 12 self
-  return builder
+  break builder
 
 entry const answer = fn () => case application of
   #Builder value => value
@@ -157,8 +188,8 @@ Reversed/equal bounds run zero iterations. `for pattern in values:` iterates an
 array with an irrefutable pattern. Bounds/the array evaluate once.
 `for let value in values:` spells the binding explicitly. `for start..end:`
 discards the range index. `for ever:` repeats without a bound; the body must
-eventually suspend through a host callback, return from its enclosing `do`, or
-continue running.
+eventually suspend through a host callback, finish its enclosing `do` with
+`break value`, or continue running.
 
 An outer local rebound directly in the loop with `:=` carries its new value to
 the next iteration and after the loop. Its type must stay the same across
@@ -168,29 +199,30 @@ branches and statement `case` arms also carry outward. Any other nested `do:`,
 such as a statement-level `do:` or an arm of a `case` whose value is used, keeps
 its own scope: a `:=` of an outer local there that is never read inside that
 block is rejected with `dead_rebinding`. Rebind with `if`/`else` or a statement
-`case`, or assign the value of a `case` expression. `return` exits the enclosing
-`do`; a loop creates no new return boundary. `break` exits the nearest loop and
-carries its latest local values into the statements after it. In a request loop
-it also cancels the captured computation. There is no `continue` statement yet.
+`case`, or assign the value of a `case` expression. `break value` exits the
+enclosing `do`; a loop creates no new `do` boundary. Bare `break` exits the
+nearest loop and carries its latest local values into the statements after it.
+In a request loop it also cancels the captured computation. There is no
+`continue` statement yet.
 
 ```blot
 entry const sum_to = fn (end: U32) => do:
   let total = 0
   for index in 0..end:
     total := self + index
-  return total
+  break total
 
 entry const weighted = fn () => do:
   let total = 0
   for (value, weight) in [(2, 3), (4, 5)]:
     total := self + value * weight
-  return total
+  break total
 
 entry const first_five = fn () => do:
   let count = 0
   for 0..5:
     count := self + 1
-  return count
+  break count
 ```
 
 ## Data, records, tuples, patterns
@@ -213,10 +245,10 @@ type Pair [left, right] is data = #Pair (left, right)
 type Curried left => type right is data = #Curried (left, right)
 const first = fn (entry: Entry { head: U32, tail: a }) -> U32 => do:
   let #Entry { head } = entry
-  return head
+  break head
 const number = fn (pair: (Curried U32) Bool) => do:
   let #Curried (value, flag) = pair
-  return value
+  break value
 entry const answer = fn () => first (#Entry { head: 42, tail: #True })
 ```
 
@@ -298,11 +330,11 @@ type Vec2 is data = #Vec2 { x: F32, y: F32 }
 entry const selected = 7
 const length = fn position => do:
   let #Vec2 { x, y } = position
-  return F32.sqrt (x * x + y * y)
+  break F32.sqrt (x * x + y * y)
 const unpack = fn candidate => do:
   let #Some value = candidate else:
-    return 0
-  return value
+    break 0
+  break value
 
 entry const distance = fn () => length (#Vec2 { y: 4.0, x: 3.0 })
 entry const classify = fn (key: U32) => case key, #True of
@@ -310,8 +342,8 @@ entry const classify = fn (key: U32) => case key, #True of
   _, _ => 0
 entry const conditional = fn () => do:
   if let #Some (number, #True) = #Some (42, #True):
-    return number
-  return 0
+    break number
+  break 0
 ```
 
 ## Operators and compile-time associated dispatch
@@ -388,7 +420,7 @@ const position_x = path.compose position x
 entry const answer = fn () => do:
   let original = { position: { x: 40, y: 7 }, health: 2 }
   let changed = path.set position_x 2.5 original
-  return @f32.add (path.get position_x changed) (@u32.to_f32 original.health)
+  break @f32.add (path.get position_x changed) (@u32.to_f32 original.health)
 ```
 
 Generic functions depending on dispatch monomorphize at their uses before const
@@ -424,7 +456,7 @@ entry const different = #Type #Count != #Type #Other
 entry const compare = fn () => do:
   let head = #Type #Count
   let witness = #Type (#Count 0)
-  return head == witness
+  break head == witness
 ```
 
 ```blot
@@ -510,14 +542,14 @@ type Countdown is data = #Countdown U32
 const Countdown.iter = fn (cursor: Countdown) => cursor
 const Countdown.next = fn (cursor: Countdown) => do:
   let #Countdown remaining = cursor
-  return if remaining == 0 then #Nothing
+  break if remaining == 0 then #Nothing
     else #Some (remaining, #Countdown (remaining - 1))
 
 entry const sum = fn count => do:
   let total = 0
   for value in #Countdown count:
     total := self + value
-  return total
+  break total
 ```
 
 Both operations may have effects. Each pull happens before the corresponding
@@ -657,7 +689,7 @@ entry const snapshot = fn () => do:
   let values = #[1, 2]
   let original = values
   values[0] := self + 40
-  return original[0] + values[0]
+  break original[0] + values[0]
 const checked = fn index => squares.get(index)
 ```
 
@@ -794,16 +826,16 @@ type Reader a is effect = { ask: Unit -> a }
 const read_twice = fn () => do:
   use first <- Reader.ask U32 ()
   use second <- Reader.ask U32 ()
-  return first + second
+  break first + second
 
 const reader = @effect.provider (Reader.ask U32) (fn () => 21)
 entry const mocked = fn () => do reader:
   use answer <- read_twice ()
-  return answer
+  break answer
 
 entry const main = fn (read: Unit -> U32 ! {Foreign}) => do (@effect.provider (Reader.ask U32) read):
   use answer <- read_twice ()
-  return answer
+  break answer
 
 entry const uses_host = @effect.has (@effect.of main) Foreign
 ```
@@ -828,24 +860,25 @@ const checked = fn computation => do:
     case request of
       effect Validate.check value =>
         if value == 0:
-          return 0
+          break 0
         yield value
       complete value =>
-        return value
+        break value
 
 entry const answer = fn () => checked (@computation (fn () => do:
   use first <- Validate.check 40
   use second <- Validate.check 2
-  return first + second
+  break first + second
 ))
 ```
 
 Indent each clause suite after `=>`. `yield value` supplies the operation result
-and ends the clause. `return value` cancels the computation and exits the
-nearest enclosing `do`. `break` cancels the computation, exits the request loop,
-and runs the following statements. A `complete` clause receives the thunk's
-final result and must return or break; it cannot yield. Every operation clause
-must reply or exit on each path. There are no prelude constructors to import.
+and ends the clause. `break value` cancels the computation and exits the nearest
+enclosing `do`. Bare `break` cancels the computation, exits the request loop,
+and runs the following statements. `return value` exits the handler function. A
+`complete` clause receives the thunk's final result and must exit; it cannot
+yield. Every operation clause must reply or exit on each path. There are no
+prelude constructors to import.
 
 Outer locals rebound with `:=` carry handler state between requests and after
 `break`. A captured computation can run again with fresh handler state. Calls
@@ -874,16 +907,16 @@ type Get a is effect = Unit -> a
 const increment = fn () => do:
   use count <- State.get U32 ()
   use State.set U32 (count + 1)
-  return count
+  break count
 
 entry const counted = fn () => do:
   let (next, previous) = do (@effect.state (State.get U32) (State.set U32) 41):
-    return increment ()
-  return next + previous
+    break increment ()
+  break next + previous
 
 const fixed = @effect.provider (Get U32) (fn () => 7)
 entry const read_fixed = fn () => do fixed:
-  return Get U32 ()
+  break Get U32 ()
 ```
 
 Effect declarations name operations; providers supply their behavior in a `do`
@@ -912,11 +945,11 @@ const set = fn value => State.set value
 const increment = fn () => do:
   use counter <- get #Counter
   let #Counter value = counter
-  return set (#Counter (value + 1))
+  break set (#Counter (value + 1))
 
 entry const answer = fn () => do:
   let (#Counter next, _) = @effect.run State.get State.set (#Counter 41) increment
-  return next
+  break next
 ```
 
 `State.set value` infers the family argument from `value`. `State.get ()` infers
@@ -1226,22 +1259,23 @@ Monadic blocks use an ordinary prelude adapter:
 const try = monad Maybe
 const sequence = fn candidate => do try:
   use value <- candidate
-  return value + 1
+  break value + 1
 entry const answer = fn () => Maybe.unwrap_or 0 (sequence (#Some 41))
 ```
 
 `use` calls the selected type's `bind` with the remaining block as a function.
-`return` calls `pure`; `return $` forwards an existing wrapped result. A failed
-`Maybe` or `Result` bind skips subsequent effects and loop iterations. The
-resolver expression runs once, nested `do` blocks have independent rules, and
-unrelated effects remain visible. The same adapter accepts imported types and
-user-defined data types with `pure` and `bind` members. Type-constructor values
-can be aliased or passed through ordinary functions.
+`break value` calls `pure`; `break $ expression` forwards an existing wrapped
+result. A failed `Maybe` or `Result` bind skips subsequent effects and loop
+iterations. The resolver expression runs once, nested `do` blocks have
+independent rules, and unrelated effects remain visible. The same adapter
+accepts imported types and user-defined data types with `pure` and `bind`
+members. Type-constructor values can be aliased or passed through ordinary
+functions.
 
 Monadic loops use the selected type's `iterate initial step` member. Each step
 returns a wrapped `#Continue state` or `#Done result` using the prelude's
 `Iteration state result` type. `Maybe.iterate` and `Result.iterate` use constant
-call stack; failure skips later steps, and `return` still exits the nearest
+call stack; failure skips later steps, and `break value` still exits the nearest
 `do`. Custom monads need an `iterate` member only for blocks containing loops.
 
 ```blot
@@ -1284,7 +1318,7 @@ conversions. There is no default target when the context leaves it ambiguous.
 entry const normalized = fn (first: U32) => from first / 6555.0
 entry const explicit = fn (value: U32) => do:
   let converted: F32 = from value
-  return converted
+  break converted
 entry const different = if :1 == :2.0 then #False else #True
 ```
 
@@ -1328,13 +1362,13 @@ scope when forced. Capturing a fresh capability or operation still retains that
 authority, even when the expression returns a scalar or its memo is already
 ready.
 
-A request handler's `return` or `break` cancels an unfinished demand and makes
-it pending again. Its next demand starts the expression again under the then
-active providers. Effects already performed are not rolled back. A handler's
-`yield` resumes evaluation; only normal completion publishes the shared result.
-Recursive forcing fails. If a Wasm trap or host exception interrupts a demand,
-that demand remains terminal: later attempts fail without running its expression
-again. Other entry calls remain usable.
+A request handler's `break value`, `return value`, or bare `break` cancels an
+unfinished demand and makes it pending again. Its next demand starts the
+expression again under the then active providers. Effects already performed are
+not rolled back. A handler's `yield` resumes evaluation; only normal completion
+publishes the shared result. Recursive forcing fails. If a Wasm trap or host
+exception interrupts a demand, that demand remains terminal: later attempts fail
+without running its expression again. Other entry calls remain usable.
 
 Known, fully applied small functions can use branches and local values without a
 heap cell. Admitted bodies include primitive scalar and collection operations,
@@ -1388,7 +1422,7 @@ releasing the group. Groups, handles and views cannot escape their region.
 entry const answer = fn () => @task.scope (fn group => do:
   let left = @task.spawn group (fn () => 20)
   let right = @task.spawn group (fn () => 22)
-  return @u32.add (@task.join left) (@task.join right))
+  break @u32.add (@task.join left) (@task.join right))
 ```
 
 Unique captures move to one child. Immutable data can be shared. Read loans

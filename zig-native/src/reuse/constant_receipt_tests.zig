@@ -23,7 +23,7 @@ fn callableConstantSource(sibling: []const u8, changed: bool, cursor: bool) ![]u
         output = "@array.cursor #[cost, 2]";
         entry = "entry const run = fn (value: U32) => @u32.add value (@cursor.value expensive)";
     }
-    return a.print("const seed = {s}\nconst expensive = do:\n  let cost = {s}\n  return {s}\n{s}\nentry const unrelated = seed\n", .{ sibling, expression, output, entry });
+    return a.print("const seed = {s}\nconst expensive = do:\n  let cost = {s}\n  break {s}\n{s}\nentry const unrelated = seed\n", .{ sibling, expression, output, entry });
 }
 
 test "constant receipts retain standalone callable and cursor values with exact changed source and OOM" {
@@ -214,7 +214,7 @@ fn growingSource(sibling: []const u8) ![]u8 {
         \\  let values = []
         \\  for index in 0..32:
         \\    values := if @u32.lt index 16 then @list.append values index else @list.prepend values index
-        \\  return values
+        \\  break values
         \\const later = @list.prepend (@list.append grown 99) 100
         \\entry const first = fn () => @array.from_list grown
         \\entry const following = fn () => @array.from_list later
@@ -295,7 +295,7 @@ test "constant receipts omit inaccessible growth frontiers from old versions and
             \\const value = do:
             \\  let first = @list.append [] ({s})
             \\  let later = @list.append first 7
-            \\  return {s}
+            \\  break {s}
             \\const following = {s}
             \\entry const run = fn () => {s}
             \\entry const sibling = 1
@@ -476,7 +476,7 @@ test "constant receipts invalidate executed closed callees and retain ordinary c
 test "constant receipts retain value work after the ordinary principal prepass" {
     const plain = try makeSource("2", "1");
     defer a.free(plain);
-    const qualified = try std.mem.replaceOwned(u8, a, plain, "const expensive =", "const expensive: U32 where { type_rep U32 } = do:\n  let local = fn value => value\n  return");
+    const qualified = try std.mem.replaceOwned(u8, a, plain, "const expensive =", "const expensive: U32 where { type_rep U32 } = do:\n  let local = fn value => value\n  break");
     defer a.free(qualified);
     var before = try Fixture.init(qualified);
     defer before.deinit();
@@ -680,7 +680,7 @@ fn enclosingSource(sibling: []const u8, seed: []const u8, delta: []const u8, rec
         a.free(expression);
         expression = next;
     }
-    const loop_method = try a.print("do:\n  let total = ({s})\n  for index in 0..128:\n    total := @u32.add self 1\n  return total", .{method});
+    const loop_method = try a.print("do:\n  let total = ({s})\n  for index in 0..128:\n    total := @u32.add self 1\n  break total", .{method});
     a.free(method);
     method = loop_method;
     if (second) {
@@ -901,7 +901,7 @@ fn compoundAliasesSource(sibling: []const u8, seed: []const u8, delta: []const u
         \\entry const warmed = fn () => ready.value
         \\const compound = do:
         \\  let cost = {s}
-        \\  return {{ first: ready, second: ready, values: #[ready, ready], answer: cost, callback: fn (value: U32) => @u32.add value (@u32.add cost {s}) }}
+        \\  break {{ first: ready, second: ready, values: #[ready, ready], answer: cost, callback: fn (value: U32) => @u32.add value (@u32.add cost {s}) }}
         \\entry const run = fn (value: U32) => compound.callback value
         \\entry const answer = fn () => compound.first.value
         \\entry const count = fn () => @array.length compound.values
@@ -979,7 +979,7 @@ fn compoundGrowthSource(sibling: []const u8, seed: []const u8) ![]u8 {
         \\    values := if @u32.lt index 16 then @list.append values index else @list.prepend values index
         \\    other := @list.append other (@u32.add index 100)
         \\    earlier := if @u32.eq index 30 then values else earlier
-        \\  return #Bundle {{ earlier: earlier, current: values, alias: values, other: other, answer: seed }}
+        \\  break #Bundle {{ earlier: earlier, current: values, alias: values, other: other, answer: seed }}
         \\const later = @list.prepend (@list.append grown.current 99) 100
         \\const branched = @list.append grown.earlier 200
         \\entry const first = fn () => @array.from_list grown.current
@@ -1113,7 +1113,7 @@ test "compound demand receipts retain cumulative limits retry rollback and sourc
 }
 
 fn queryBarrierSource(seed: []const u8, increment: []const u8) ![]u8 {
-    return a.print("const Array.count = fn values => @u32.add (@array.length values) {s}\nconst seed = {s}\nconst bundle = do:\n  let first = #[].count\n  let second = #[].count\n  let cost = 1\n  for index in 0..256:\n    cost := @u32.add self 1\n  return {{first, second, cost}}\nentry const run = fn () => @u32.add bundle.first (@u32.add bundle.second bundle.cost)\nentry const unrelated = seed\n", .{ increment, seed });
+    return a.print("const Array.count = fn values => @u32.add (@array.length values) {s}\nconst seed = {s}\nconst bundle = do:\n  let first = #[].count\n  let second = #[].count\n  let cost = 1\n  for index in 0..256:\n    cost := @u32.add self 1\n  break {{first, second, cost}}\nentry const run = fn () => @u32.add bundle.first (@u32.add bundle.second bundle.cost)\nentry const unrelated = seed\n", .{ increment, seed });
 }
 fn replayQueryBarriers(allocator: std.mem.Allocator, fixture: *const Fixture, previous: *const backend.Result, expected: *const backend.Result) !void {
     var result = try fixture.compile(allocator, previous, true);
@@ -1182,7 +1182,7 @@ fn frameJudgmentSource(seed: []const u8, value: []const u8) ![]u8 {
         \\  let cost = 0
         \\  for index in 0..256:
         \\    cost := @u32.add self 1
-        \\  return {{selected, cost, value: nested.value}}
+        \\  break {{selected, cost, value: nested.value}}
         \\entry const run = fn () => @u32.add answer.selected (@u32.add answer.cost answer.value)
         \\entry const unrelated = seed
         \\
@@ -1310,7 +1310,7 @@ fn immutableTemporarySource(seed: []const u8, bound: []const u8) ![]u8 {
         \\  let selected = unpack resealed as [b] value in 7
         \\  let valid = @proof.lt 0 limit
         \\  let cost = {s}
-        \\  return @u32.add cost selected
+        \\  break @u32.add cost selected
         \\entry const run = fn () => answer
         \\entry const unrelated = seed
         \\
@@ -1527,7 +1527,7 @@ fn quantifiedFieldSource(seed: []const u8) ![]u8 {
         \\const choose: forall [a] => a -> a = fn value => value
         \\const make: U32 -> (forall [a] => a -> a) = fn captured => fn item => do:
         \\  let ignored = @u32.add captured 1
-        \\  return item
+        \\  break item
         \\const show: forall [a] where {{ Render a }} => a -> U32 = fn value => Render.show value
         \\const wrap: forall [a] => a -> Maybe a = #Some
         \\const apply: forall [a, row e] => ((a -> a ! {{|e}}), a) -> a ! {{|e}} = fn pair => (@product.get pair 0) (@product.get pair 1)
@@ -1537,7 +1537,7 @@ fn quantifiedFieldSource(seed: []const u8) ![]u8 {
         \\  let cost = 35
         \\  for index in 0..256:
         \\    cost := @u32.add self 1
-        \\  return {{choose, other: make 35, show, wrap, apply, cost}}
+        \\  break {{choose, other: make 35, show, wrap, apply, cost}}
         \\entry const run = fn () => packet.choose packet.cost
         \\entry const fraction = fn () => packet.other 3.5
         \\entry const shown = fn () => @u32.add (packet.show 35) (packet.show #True)
@@ -1579,7 +1579,7 @@ const temporary_programs = [_]struct { body: []const u8, hits: usize, changed_hi
     , .hits = 1 },
     .{ .body =
     \\  let cost = do (@effect.provider Read (fn () => base)):
-    \\    return base
+    \\    break base
     , .hits = 1 },
     .{ .body =
     \\  let cost = base
@@ -1593,7 +1593,7 @@ const temporary_programs = [_]struct { body: []const u8, hits: usize, changed_hi
     , .hits = 1 },
     .{ .body =
     \\  let wrapped = do (@do.monad Box):
-    \\    return base
+    \\    break base
     \\  let cost = case wrapped of
     \\    #Box value => value
     , .hits = 1 },
@@ -1603,7 +1603,7 @@ const temporary_programs = [_]struct { body: []const u8, hits: usize, changed_hi
     .{ .body =
     \\  let cost = do (@effect.provider Read (fn () => base)):
     \\    use result <- Read ()
-    \\    return result
+    \\    break result
     , .hits = 0 },
     .{ .body =
     \\  let pending = delayed base
@@ -1630,7 +1630,7 @@ fn temporarySource(seed: []const u8, base: []const u8, body: []const u8) ![]u8 {
         \\{s}
         \\  for index in 0..256:
         \\    cost := @u32.add self 1
-        \\  return cost
+        \\  break cost
         \\entry const answer = fn () => expensive
         \\entry const sibling = {s}
         \\

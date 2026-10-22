@@ -9,37 +9,37 @@ const sum = fn (values: List U32) => do:
   let result = 0
   for value in values:
     result := self + value
-  return result
+  break result
 entry const run = fn count => do:
   let result = 0
   for index in 0..count:
     result := self + sum (pair index)
-  return result
+  break result
 entry const local = fn count => do:
   let result = 0
   for index in 0..count:
     let values = pair index
     for value in values:
       result := self + value
-  return result
+  break result
 entry const floats = fn seed => do:
   let total = seed
   for value in [1.0e20, 0.0 - 1.0e20, 1.0]:
     total := self + value
-  return total
+  break total
 entry const escape = fn value => Array.from_list (pair value)
 entry const alias = fn seed => do:
   let values = pair seed
   let old = values
   values := [...self, 90]
-  return #[sum old, sum values]
+  break #[sum old, sum values]
 const changed = fn (values: List U32) => fn flag => do:
   if flag == 0:
     values := [9]
   let result = 0
   for value in values:
     result := self + value
-  return result
+  break result
 entry const merged = fn seed => changed [seed, seed + 1] seed
 `,
     (guest) => {
@@ -66,21 +66,21 @@ const mark = fn number => do:
   use previous <- @state.get #Trace
   let #Trace before = previous
   use @state.set (#Trace (before * 10 + number))
-  return number
+  break number
 const first = fn (values: List U32) => do:
   for value in values:
-    return value
-  return 0
+    break value
+  break 0
 entry const ordered = fn () => do:
   let (#Trace trace, answer) = @state.run (#Trace 0) (fn () => first [mark 1, mark 2, mark 3])
-  return trace * 10 + answer
+  break trace * 10 + answer
 entry const trapped = fn denominator => first [7, @u32.div 1 denominator]
 entry const empty = fn (seed: U32) => do:
   let result = seed
   let values: List U32 = []
   for value in values:
     result := self + value
-  return result
+  break result
 `,
     (guest) => {
       equal(guest.call("ordered", null), 1231);

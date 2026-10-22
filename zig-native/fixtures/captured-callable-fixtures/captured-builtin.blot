@@ -6,5 +6,5 @@ entry const answer = fn () => do:
   let value = 999
   let increment = make_adder 1
   let result = compose increment add_forty
-  return result 1
+  break result 1
 entry const folded = answer ()

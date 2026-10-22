@@ -40,7 +40,7 @@ Deno.test("task children cannot return group scoped callbacks or packages and re
       code: "task_escape",
       source: `const bad = fn () => @task.scope (fn group => do:
   let child = @task.spawn group (fn () => fn () => @task.join (@task.spawn group (fn () => 42)))
-  return @task.join child)
+  break @task.join child)
 `,
     },
     {
@@ -48,7 +48,7 @@ Deno.test("task children cannot return group scoped callbacks or packages and re
       source: `type Package = exists [a] => {value: a, apply: a -> U32}
 const bad = fn () => @task.scope (fn group => do:
   let child = @task.spawn group (fn () => pack [U32] {value: 0, apply: fn (value: U32) => @task.join (@task.spawn group (fn () => value))} as Package)
-  return @task.join child)
+  break @task.join child)
 `,
     },
   ];

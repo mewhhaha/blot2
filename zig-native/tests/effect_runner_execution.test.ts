@@ -8,8 +8,8 @@ entry const answer = fn () => do:
   let (next,previous) = run 41 (fn () => do:
     use previous <- State.get ()
     use State.set (@u32.add previous 1)
-    return previous)
-  return @u32.add next previous
+    break previous)
+  break @u32.add next previous
 `,
     (guest) => {
       for (let i = 0; i < 100; i++) equal(guest.call("answer", null), 83);
@@ -35,8 +35,8 @@ entry const answer = fn () => do:
   let (next,result) = @effect.run State.get State.set 0 (fn () =>
     @effect.writer State.set (fn () -> U32 => @panic "witness called") (fn value => State.set value) (fn () => do:
       use State.set 42
-      return 42))
-  return @u32.add next result
+      break 42))
+  break @u32.add next result
 `,
     (guest) => {
       for (let i = 0; i < 100; i++) equal(guest.call("answer", null), 84);
@@ -51,8 +51,8 @@ entry const answer = fn () => do:
   let (next,result) = @effect.run State.get State.set 41 (fn () =>
     @effect.reader State.get 0 (fn () => 99) (do:
       use before <- State.get ()
-      return (fn () -> U32 => before)))
-  return @u32.add next result
+      break (fn () -> U32 => before)))
+  break @u32.add next result
 `,
     (guest) => {
       for (let i = 0; i < 100; i++) equal(guest.call("answer", null), 82);

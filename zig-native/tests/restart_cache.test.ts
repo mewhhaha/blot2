@@ -8,7 +8,7 @@ const source = (offset: string) => `
 const offset = ${offset}
 entry const folded: U32 where { type_rep U32 } = do:
   let local = fn value => value
-  return local offset
+  break local offset
 entry const answer = fn (value: U32) => @u32.add value offset
 `;
 

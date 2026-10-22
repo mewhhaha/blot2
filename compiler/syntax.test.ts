@@ -285,9 +285,9 @@ Deno.test("layout line indexing preserves CST origins across LF, CRLF, CR and mi
     "const answer = fn (condition: Bool) => do:",
     "  let value = do:",
     "    if condition:",
-    "      return 40",
-    "    return 41",
-    "  return @u32.add value 1",
+    "      break 40",
+    "    break 41",
+    "  break @u32.add value 1",
     "",
   ];
   try {
@@ -307,8 +307,8 @@ Deno.test("layout line indexing preserves CST origins across LF, CRLF, CR and mi
         ]]
       ) {
         const invalid = source.replace(
-          "  return @u32.add",
-          `${indentation}return @u32.add`,
+          "  break @u32.add",
+          `${indentation}break @u32.add`,
         );
         throws(() => frontend.parse(invalid), (error) => {
           ok(error instanceof SourceError);
@@ -316,7 +316,7 @@ Deno.test("layout line indexing preserves CST origins across LF, CRLF, CR and mi
           equal(
             error.start,
             invalid.indexOf(
-              code === "layout_tab" ? "\treturn @u32.add" : "return @u32.add",
+              code === "layout_tab" ? "\tbreak @u32.add" : "break @u32.add",
             ),
           );
           return true;

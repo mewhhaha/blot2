@@ -50,7 +50,7 @@ const catalog_consumer =
     \\const arrayed = factory #[43]
     \\entry const answer = fn () => do:
     \\  let #Box value = boxed ()
-    \\  return value
+    \\  break value
     \\entry const list_value = fn () => (@array.from_list (listed ()))[0]
     \\entry const array_value = fn () => (arrayed ())[0]
     \\entry const runtime = fn (value: U32) => changed value
@@ -134,7 +134,7 @@ test "catalog queries decline unrepresented imported effect operations and prese
         \\const callback = factory (fn () => Read.get ())
         \\entry const answer = fn () -> U32 => do:
         \\  let payload = @effect.reader Read.get (#Payload { value: 0 }) (fn () => #Payload { value: 42 }) callback
-        \\  return payload.value
+        \\  break payload.value
         \\entry const staged = changed 1
         \\const evaluated: U32 = answer ()
     ;
@@ -279,7 +279,7 @@ test "unaffected query revisions keep List Array and nominal closure evidence di
         \\entry const array_value = fn () => first_array (arrayed ())
         \\entry const nominal_value = fn () => do:
         \\  let #Box value = boxed ()
-        \\  return value
+        \\  break value
         \\entry const staged_list = first_list (listed ())
         \\entry const staged_array = first_array (arrayed ())
     ;
@@ -332,19 +332,19 @@ test "refinement receipt preserves generic collection record State and captured 
         \\const pair = fn value => (value, fixed)
         \\entry const integer = fn (value: U32) => do:
         \\  let (x, n) = pair value
-        \\  return @u32.add x n
+        \\  break @u32.add x n
         \\entry const floating = fn (value: F32) => do:
         \\  let (x, n) = pair value
-        \\  return @f32.add x (@u32.to_f32 n)
+        \\  break @f32.add x (@u32.to_f32 n)
         \\entry const listed = fn (value: U32) => do:
         \\  let (x, n) = pair [value]
-        \\  return @u32.add (@array.from_list x)[0] n
+        \\  break @u32.add (@array.from_list x)[0] n
         \\entry const arrayed = fn (value: U32) => do:
         \\  let (x, n) = pair #[value]
-        \\  return @u32.add x[0] n
+        \\  break @u32.add x[0] n
         \\entry const physical = fn (value: U32) => do:
         \\  let (x, n) = pair (#Point { y: 2, x: value })
-        \\  return @u32.add (@u32.add x.x x.y) n
+        \\  break @u32.add (@u32.add x.x x.y) n
     ;
     const cases = [_][]const u8{
         generic,
@@ -474,7 +474,7 @@ test "List and Array prelude members retain code across real entry edits and cat
         \\  let result = 0
         \\  for i in 0..1:
         \\    result := @u32.add (List.first [value]) (Array.first #[value])
-        \\  return result
+        \\  break result
     ;
     const main_before = "entry const answer = fn (value: U32) => @u32.add (fixed value) 8\n";
     const main_after = "entry const answer = fn (value: U32) => @u32.add (fixed value) 9\n";

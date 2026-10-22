@@ -8,18 +8,18 @@ const library = `type State a is effect = {get: Unit -> a, set: a -> Unit}
 type Application is data = #Application {reset: Unit -> U32}
 const reset_scoped = fn application => fn () => do:
   let #Application {reset} = application
-  return reset ()
+  break reset ()
 const choose = fn flag => fn (left: State a) => fn (right: State a) => if flag then left else right
 const forward = fn flag => fn (left: State a) => fn (right: State a) => choose flag left right
 const staged = fn (left: State a) => fn (middle: State a) => do:
   let first = if #True then left else middle
-  return fn () => {first: first, second: if #False then left else middle}
+  break fn () => {first: first, second: if #False then left else middle}
 const partial = fn (left: State a) => fn (middle: State a) => fn () => {first: left, second: if #False then left else middle}
 const twice = fn (left: State a) => fn (right: State a) => fn () => {first: if #True then left else right, second: if #False then left else right}
 const returned_forward = fn (left: State a) => fn (right: State a) => staged left right
 const bury_input = fn value => do:
   let kept = [value]
-  return #True
+  break #True
 const input_identity = fn value => value
 const input_first = fn (pair: (a, b)) => @product.get pair 0
 const input_box = fn value => {cell: value}
@@ -32,7 +32,7 @@ const wide = fn unused0 => fn unused1 => fn unused2 => fn unused3 => fn unused4 
 const freeze = fn value => fn () => value
 const bundle = fn flag => fn (left: State a) => fn (right: State a) => fn initial => do:
   let selected = forward flag left right
-  return {cell: selected, read: fn () => selected.get (), provider: @effect.state selected.get selected.set initial}
+  break {cell: selected, read: fn () => selected.get (), provider: @effect.state selected.get selected.set initial}
 `;
 const main =
   `import {State, choose, forward, freeze, bundle, staged, returned_forward, Application, reset_scoped, call, call_second, partial, wide, wide16, twice, invoke_input, bury_input, input_identity, input_first, input_box, input_project} from "./generation"
@@ -47,11 +47,11 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (lef
       use x <- alias.get ()
       use y <- first.read ()
       use z <- second.read ()
-      return host (@u32.add x (@u32.add y z))
+      break host (@u32.add x (@u32.add y z))
     let (state, value) = b
-    return value
+    break value
   let (state, value) = a
-  return value
+  break value
 ))
 entry const aliases = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let selected = choose #True left right
@@ -60,13 +60,13 @@ entry const aliases = fn () => @effect.scope (fn (left: State U32) => @effect.sc
       use picked <- do (@effect.state selected.get selected.set 7):
         use a <- selected.get ()
         use b <- left.get ()
-        return @u32.add a b
+        break @u32.add a b
       let (state, value) = picked
-      return value
+      break value
     let (state, value) = inner
-    return value
+    break value
   let (state, value) = outer
-  return value
+  break value
 ))
 entry const returned = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let maker = returned_forward left right
@@ -75,11 +75,11 @@ entry const returned = fn () => @effect.scope (fn (left: State U32) => @effect.s
     use inner <- do (@effect.state selected.second.get selected.second.set 11):
       use first <- selected.first.get ()
       use second <- selected.second.get ()
-      return @u32.add first second
+      break @u32.add first second
     let (state, value) = inner
-    return value
+    break value
   let (state, value) = handled
-  return value
+  break value
 ))
 entry const higher_order = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let maker = returned_forward left right
@@ -88,11 +88,11 @@ entry const higher_order = fn () => @effect.scope (fn (left: State U32) => @effe
     use inner <- do (@effect.state selected.second.get selected.second.set 11):
       use first <- selected.first.get ()
       use second <- selected.second.get ()
-      return @u32.add first second
+      break @u32.add first second
     let (state, value) = inner
-    return value
+    break value
   let (state, value) = handled
-  return value
+  break value
 ))
 entry const projected_callback = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let maker = returned_forward left right
@@ -103,11 +103,11 @@ entry const projected_callback = fn () => @effect.scope (fn (left: State U32) =>
     use inner <- do (@effect.state selected.second.get selected.second.set 11):
       use first <- selected.first.get ()
       use second <- selected.second.get ()
-      return @u32.add first second
+      break @u32.add first second
     let (state, value) = inner
-    return value
+    break value
   let (state, value) = handled
-  return value
+  break value
 ))
 entry const product_callback = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let maker = returned_forward left right
@@ -118,11 +118,11 @@ entry const product_callback = fn () => @effect.scope (fn (left: State U32) => @
     use inner <- do (@effect.state selected.second.get selected.second.set 11):
       use first <- selected.first.get ()
       use second <- selected.second.get ()
-      return @u32.add first second
+      break @u32.add first second
     let (state, value) = inner
-    return value
+    break value
   let (state, value) = handled
-  return value
+  break value
 ))
 entry const capture_only_invocation = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let maker = returned_forward left right
@@ -133,11 +133,11 @@ entry const capture_only_invocation = fn () => @effect.scope (fn (left: State U3
     use inner <- do (@effect.state selected.second.get selected.second.set 11):
       use first <- selected.first.get ()
       use second <- selected.second.get ()
-      return @u32.add first second
+      break @u32.add first second
     let (state, value) = inner
-    return value
+    break value
   let (state, value) = handled
-  return value
+  break value
 ))
 entry const higher_order_twice = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let maker = twice left right
@@ -146,11 +146,11 @@ entry const higher_order_twice = fn () => @effect.scope (fn (left: State U32) =>
     use inner <- do (@effect.state selected.second.get selected.second.set 11):
       use first <- selected.first.get ()
       use second <- selected.second.get ()
-      return @u32.add first second
+      break @u32.add first second
     let (state, value) = inner
-    return value
+    break value
   let (state, value) = handled
-  return value
+  break value
 ))
 entry const higher_order_partial = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let maker = partial left right
@@ -159,11 +159,11 @@ entry const higher_order_partial = fn () => @effect.scope (fn (left: State U32) 
     use inner <- do (@effect.state selected.second.get selected.second.set 11):
       use first <- selected.first.get ()
       use second <- selected.second.get ()
-      return @u32.add first second
+      break @u32.add first second
     let (state, value) = inner
-    return value
+    break value
   let (state, value) = handled
-  return value
+  break value
 ))
 entry const higher_order_inline = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let maker = fn () => {first: left, second: if #False then left else right}
@@ -172,11 +172,11 @@ entry const higher_order_inline = fn () => @effect.scope (fn (left: State U32) =
     use inner <- do (@effect.state selected.second.get selected.second.set 11):
       use first <- selected.first.get ()
       use second <- selected.second.get ()
-      return @u32.add first second
+      break @u32.add first second
     let (state, value) = inner
-    return value
+    break value
   let (state, value) = handled
-  return value
+  break value
 ))
 entry const higher_order_multi = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let maker = returned_forward left right
@@ -185,48 +185,48 @@ entry const higher_order_multi = fn () => @effect.scope (fn (left: State U32) =>
     use inner <- do (@effect.state selected.second.get selected.second.set 11):
       use first <- selected.first.get ()
       use second <- selected.second.get ()
-      return @u32.add first second
+      break @u32.add first second
     let (state, value) = inner
-    return value
+    break value
   let (state, value) = handled
-  return value
+  break value
 ))
 entry const typed_input = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let selected = invoke_input left (fn (unused: State U32) => if #True then left else right)
   let alias = invoke_input selected input_identity
   use handled <- do (@effect.state selected.get selected.set 42):
-    return invoke_input alias (fn (actual: State U32) => actual.get ())
+    break invoke_input alias (fn (actual: State U32) => actual.get ())
   let (state, value) = handled
-  return value
+  break value
 ))
 entry const typed_input_named = fn () => @effect.scope (fn (older: State U32) => do:
   let selected = @effect.scope (fn (younger: State U32) => invoke_input (older, younger) input_first)
   let wrapped = invoke_input selected input_box
   let alias = invoke_input wrapped input_project
   use handled <- do (@effect.state alias.get alias.set 44):
-    return alias.get ()
+    break alias.get ()
   let (answer, final) = handled
-  return answer
+  break answer
 )
 entry const typed_input_inline = fn () => @effect.scope (fn (left: State U32) => do:
   use handled <- do (@effect.state left.get left.set 43):
-    return invoke_input left (fn (actual: State U32) => if #True then actual.get () else 0)
+    break invoke_input left (fn (actual: State U32) => if #True then actual.get () else 0)
   let (state, value) = handled
-  return value
+  break value
 )
 entry const ordinary_wide = fn () => wide16 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 (fn () => 42)
 entry const discarded_generation = fn flag => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let later = fn () => if flag then left else right
-  return 42
+  break 42
 ))
 entry const nested = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let selected = choose #False left (do:
-    return choose #True left right
+    break choose #True left right
   )
   use handled <- do (@effect.state selected.get selected.set 9):
-    return selected.get ()
+    break selected.get ()
   let (state, value) = handled
-  return value
+  break value
 ))
 `;
 for (const codegenTier of ["optimized", "development"] as const) {
@@ -354,13 +354,13 @@ for (const codegenTier of ["optimized", "development"] as const) {
 
           for (
             const body of [
-              "do:\n  let mixed = #[choose #True left right, choose #True left right]\n  return 1",
-              "do:\n  let maker = returned_forward left right\n  let mixed = #[maker (), maker ()]\n  return 1",
-              "do:\n  let maker = returned_forward left right\n  let mixed = #[call maker, call maker]\n  return 1",
-              "do:\n  let maker = returned_forward left right\n  let mixed = #[call_second 0 maker, call_second 0 maker]\n  return 1",
+              "do:\n  let mixed = #[choose #True left right, choose #True left right]\n  break 1",
+              "do:\n  let maker = returned_forward left right\n  let mixed = #[maker (), maker ()]\n  break 1",
+              "do:\n  let maker = returned_forward left right\n  let mixed = #[call maker, call maker]\n  break 1",
+              "do:\n  let maker = returned_forward left right\n  let mixed = #[call_second 0 maker, call_second 0 maker]\n  break 1",
               "@effect.scope (fn (younger: State U32) => call (fn () => choose #True left younger))",
-              "do:\n  let maker = fn () => if #True then left else right\n  let mixed = #[call maker, call maker]\n  return 1",
-              "do:\n  let maker = returned_forward left right\n  let mixed = #[wide 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 maker, wide 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 maker]\n  return 1",
+              "do:\n  let maker = fn () => if #True then left else right\n  let mixed = #[call maker, call maker]\n  break 1",
+              "do:\n  let maker = returned_forward left right\n  let mixed = #[wide 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 maker, wide 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 maker]\n  break 1",
               "invoke_input left bury_input",
               "@effect.scope (fn (younger: State U32) => invoke_input (younger, left) input_first)",
               "invoke_input left (fn actual => [actual])",
@@ -368,9 +368,9 @@ for (const codegenTier of ["optimized", "development"] as const) {
               "invoke_input left (fn (actual: State U32) => @effect.state actual.get actual.set 0)",
               "invoke_input left (fn (actual: State U32) => fn () => actual.get ())",
               "invoke_input left (fn (actual: State U32) => if bury_input actual then 0 else 0)",
-              "invoke_input left (fn (actual: State U32) => do:\n  let retained = fn () => actual.get ()\n  return 0)",
+              "invoke_input left (fn (actual: State U32) => do:\n  let retained = fn () => actual.get ()\n  break 0)",
               "invoke_input left (fn (actual: State U32) => (fn () => actual.get ()) ())",
-              "invoke_input left (fn (actual: State U32) => do (@effect.provider actual.get (fn () => actual.get ())):\n  return actual.get ())",
+              "invoke_input left (fn (actual: State U32) => do (@effect.provider actual.get (fn () => actual.get ())):\n  break actual.get ())",
               "@effect.scope (fn (younger: State U32) => invoke_input left (fn (unused: State U32) => if #True then left else younger))",
               "@effect.scope (fn (younger: State U32) => forward #True left younger)",
               "@effect.scope (fn (younger: State U32) => bundle #False left younger 7)",

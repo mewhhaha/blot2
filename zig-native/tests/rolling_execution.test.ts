@@ -87,7 +87,7 @@ const inverse = fn (p: {a: U32, b: U32, c: U32}) => do:
       b := index
     if @u32.eq value 2:
       c := index
-  return {a, b, c}
+  break {a, b, c}
 const permutation = fn (index: U32) => case @u32.rem index 6 of
   0 => {a: 0, b: 1, c: 2}
   1 => {a: 1, b: 0, c: 2}
@@ -102,23 +102,23 @@ entry const forks = fn (width: U32) => do:
   let original = rolling.monoid add 0 width (@array.generate 32 (fn index => index))
   use first <- original.next
   let #Some (a, rest) = first else:
-    return #[]
+    break #[]
   let saved = rest
   use second <- rest.next
   let #Some (b, next) = second else:
-    return #[]
+    break #[]
   let pressure = @array.fill 8192 99
   use repeated <- saved.next
   let #Some (again, _) = repeated else:
-    return #[]
+    break #[]
   use third <- next.next
   let #Some (c, _) = third else:
-    return #[]
-  return #[a, b, again, c]
+    break #[]
+  break #[a, b, again, c]
 entry const references = fn (count: U32) => do:
   let values = @array.generate count (fn index => #[index])
   let windows = rolling.monoid (fn (left: Array U32) => fn (right: Array U32) => @array.concat left right) #[] 3 values
-  return #[@u32.add (@u32.add window[0] window[1]) window[2] | window <- windows]
+  break #[@u32.add (@u32.add window[0] window[1]) window[2] | window <- windows]
 `,
     (guest) => {
       const permutations = [[0, 1, 2], [1, 0, 2], [2, 1, 0], [0, 2, 1], [
@@ -223,20 +223,20 @@ import * as iter from "std/iter"
 type Input is data = #Input {index: U32, count: U32, pull: U32 -> U32 ! {Foreign}}
 const Input.iter = fn (cursor: Input) => do:
   use cursor.pull 777
-  return cursor
+  break cursor
 const Input.next = fn (cursor: Input) => do:
   use value <- cursor.pull cursor.index
   if @u32.eq cursor.index cursor.count:
-    return #Nothing
-  return #Some (value, #Input {index: @u32.add cursor.index 1, count: cursor.count, pull: cursor.pull})
+    break #Nothing
+  break #Some (value, #Input {index: @u32.add cursor.index 1, count: cursor.count, pull: cursor.pull})
 const add = fn (left: U32) => fn (right: U32) => @u32.add left right
 const inverse = fn (value: U32) => @u32.sub 0 value
 const sequential = fn (host: U32 -> U32 ! {Foreign}) => fn (width: U32) => fn (count: U32) => fn (limit: U32) => do:
   let values = #Input {index: 0, count, pull: host}
   let step = fn total => fn value => do:
     use observed <- host (@u32.add value 100)
-    return @u32.add total (@u32.sub observed 100)
-  return iter.collect_array (iter.take limit (rolling.fold step 0 width values))
+    break @u32.add total (@u32.sub observed 100)
+  break iter.collect_array (iter.take limit (rolling.fold step 0 width values))
 const monoid = fn (host: U32 -> U32 ! {Foreign}) => fn (width: U32) => fn (count: U32) => fn (limit: U32) => iter.collect_array (iter.take limit (rolling.monoid add 0 width (#Input {index: 0, count, pull: host})))
 const group = fn (host: U32 -> U32 ! {Foreign}) => fn (width: U32) => fn (count: U32) => fn (limit: U32) => iter.collect_array (iter.take limit (rolling.group add inverse 0 width (#Input {index: 0, count, pull: host})))
 ` + ["sequential", "monoid", "group"].flatMap((name) => [
@@ -310,11 +310,11 @@ type Input is data = #Input {index: U32, pull: U32 -> U32 ! {Foreign}}
 const Input.iter = fn (cursor: Input) => cursor
 const Input.next = fn (cursor: Input) => do:
   use value <- cursor.pull cursor.index
-  return #Some (#[value], #Input {index: @u32.add cursor.index 1, pull: cursor.pull})
+  break #Some (#[value], #Input {index: @u32.add cursor.index 1, pull: cursor.pull})
 const combine = fn (left: Array U32) => fn (right: Array U32) => @array.concat left right
 entry const run = fn (host: U32 -> U32 ! {Foreign}) => do:
   let windows = rolling.monoid combine #[] 3 (#Input {index: 0, pull: host})
-  return iter.collect_array (iter.map (fn window => @u32.add (@u32.add window[0] window[1]) window[2]) (iter.take 2 windows))
+  break iter.collect_array (iter.map (fn window => @u32.add (@u32.add window[0] window[1]) window[2]) (iter.take 2 windows))
 `;
 
 for (const asynchronous of [false, true]) {
@@ -395,24 +395,24 @@ type Input is data = #Input U32
 const Input.iter = fn cursor => cursor
 const Input.next = fn (#Input index) => do:
   use value <- Tick.read index
-  return #Some (#[value], #Input (@u32.add index 1))
+  break #Some (#[value], #Input (@u32.add index 1))
 const combine = fn (left: Array U32) => fn (right: Array U32) => @array.concat left right
 const cancel = fn computation => do:
   for request in @requests computation:
     case request of
       effect Tick.read value =>
         if @u32.eq value 4:
-          return 7
+          break 7
         yield value
       complete value =>
-        return value
-  return 7
+        break value
+  break 7
 entry const run = fn (count: U32) => do:
   let total = 0
   for index in 0..count:
     let work = @computation (fn () => iter.fold_left (fn sum => fn value => @u32.add sum value[0]) 0 (rolling.monoid combine #[] 3 (#Input 0)))
     total := @u32.add self (cancel work)
-  return total
+  break total
 entry const memory = fn () -> Array U32 => #[]
 `;
   await compileAndRun(definitions, (_, bytes) => {

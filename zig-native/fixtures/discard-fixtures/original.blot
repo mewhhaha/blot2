@@ -9,4 +9,4 @@ const closure = (fn captured => fn value => @u32.add captured value) 2
 entry const answer = fn () => closure 40
 entry const probe = fn () => do:
   let kept = (empty, nested, reference, constructor)
-  return 0
+  break 0

@@ -13,10 +13,10 @@ entry const answer = fn () => @effect.scope (fn (left: State U32) =>
         use b <- right.get ()
         use left.set (@u32.add a 1)
         use right.set (@u32.add b 2)
-        return #[a, b]
+        break #[a, b]
       let (inner, reads) = nested
-      return @array.concat #[inner] reads
-    return @array.concat #[outer] result
+      break @array.concat #[inner] reads
+    break @array.concat #[outer] result
   )
 )
 `;
@@ -28,28 +28,28 @@ entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
   let write = capability.set
   let local = fn () => read ()
   let (state, result) = do (@effect.state read write 7):
-    return local ()
-  return result
+    break local ()
+  break result
 )
 `;
 const forwarding = header + `
 entry const answer = fn () => @effect.scope (fn (left: State U32) =>
   @effect.scope (fn (right: State U32) => do (@effect.provider left.get (fn () => 20)):
-    return do (@effect.provider right.get (fn () => left.get ())):
-      return do (@effect.provider left.get (fn () => 99)):
+    break do (@effect.provider right.get (fn () => left.get ())):
+      break do (@effect.provider left.get (fn () => 99)):
         use direct <- left.get ()
         use forwarded <- right.get ()
-        return @u32.add direct forwarded
+        break @u32.add direct forwarded
   )
 )
 entry const shadow = fn () => @effect.scope (fn (s: State U32) => do:
   let (outer, result) = do (@effect.state s.get s.set 10):
     use nested <- do (@effect.state s.get s.set 100):
-      return s.get ()
+      break s.get ()
     let (inner, read) = nested
     use current <- s.get ()
-    return @u32.add current read
-  return result
+    break @u32.add current read
+  break result
 )
 `;
 
@@ -81,15 +81,15 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (s: 
     use previous <- s.get ()
     use next <- host previous
     use s.set next
-    return s.get ()
+    break s.get ()
   let (state, result) = nested
-  return result
+  break result
 )
 entry const trapped = fn (divisor: U32) => @effect.scope (fn (s: State U32) => do:
   let (state, result) = do (@effect.state s.get s.set 10):
     use previous <- s.get ()
-    return @u32.div previous divisor
-  return result
+    break @u32.div previous divisor
+  break result
 )
 `;
 for (const codegenTier of ["optimized", "development"] as const) {

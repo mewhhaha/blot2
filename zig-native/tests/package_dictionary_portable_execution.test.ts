@@ -16,7 +16,7 @@ entry const answer = fn (flag: Bool) => read (make flag)
 entry const combined = fn (flag: Bool) => both (make flag) (make #False)
 entry const collection = fn (flag: Bool) => do:
   let items = #[make flag, make #False]
-  return @u32.add (read (@array.get items 0)) (read (@array.get items 1))
+  break @u32.add (read (@array.get items 0)) (read (@array.get items 1))
 `;
 async function run(bytes: Uint8Array<ArrayBuffer>) {
   for (const asynchronous of [false, true]) {

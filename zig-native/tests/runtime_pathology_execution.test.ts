@@ -21,7 +21,7 @@ entry const fold = fn (count: U32) => do:
       sum := self + alias.a + right.child.r + left.q + right.q
     else:
       sum := self + right.child.a + left.child.r + left.q + right.q
-  return sum
+  break sum
 `, guest => {
     for (const count of [0, 1, 2, 100000, 100000]) {
       equal(guest.call("fold", count), (2 * count * count + count) >>> 0);
@@ -47,7 +47,7 @@ entry const fold = fn (count: U32) => do:
       sum := self + read record
     else:
       sum := self + read record + 1
-  return sum
+  break sum
 `, guest => {
     for (const count of [0, 1, 2, 100000, 100000]) {
       equal(guest.call("fold", count), (9 * count * (count - 1) + count + Math.floor(count / 2)) >>> 0);
@@ -67,7 +67,7 @@ entry const fold = fn (count: U32) => do:
       m: value, n: value, o: value, p: value, q: value, r: value + 1 }
     let alias = record
     sum := self + alias.a + record.r
-  return sum
+  break sum
 `, guest => {
     for (let repetition = 0; repetition < 5; repetition++) {
       equal(guest.call("fold", 100000), (100000 * 100000) >>> 0);
@@ -85,22 +85,22 @@ entry const wrapped = fn (count: U32) => do:
   let values = array.fill count 0
   for i in 0..count:
     values := replace i (i + 1) values
-  return values
+  break values
 entry const direct = fn (count: U32) => do:
   let values = array.fill count 0.0
   for i in 0..count:
     values := @array.set values i (F32.from i)
-  return values
+  break values
 entry const snapshots = fn () => do:
   let original = #[1, 2, 3]
   let values = original
   let saved = fn () => values[0]
   values := replace 0 99 values
-  return #[original[0], saved (), values[0]]
+  break #[original[0], saved (), values[0]]
 entry const nested = fn () => do:
   let original = #[#[1], #[2]]
   let changed = replace 0 99 original[0]
-  return #[original[0][0], changed[0]]
+  break #[original[0][0], changed[0]]
 `,
     (guest) => {
       const count = 2049;
@@ -132,18 +132,18 @@ import * as array from "../../std/array"
 entry const order = fn (host: U32 -> U32 ! {Foreign}) =>
   array.replace (host 0) (host 1) (do:
     use value <- host 2
-    return #[value])
+    break #[value])
 entry const bounds = fn (host: U32 -> U32 ! {Foreign}) => do:
   let values = #[1]
   use changed <- array.replace 1 (host 42) values
-  return changed
+  break changed
 entry const borrowed = fn () => do:
   let values = #[1, 2, 3]
   let sum = 0
   for item in values:
     sum := sum + item
     values := array.replace 2 99 values
-  return #[sum, values[2]]
+  break #[sum, values[2]]
 `,
     (guest) => {
       const calls: number[] = [];
@@ -178,11 +178,11 @@ const build = fn count => do:
     forward := list.append i self
     backward := list.prepend i self
     packed := array.push i self
-  return (Array.from_list forward, Array.from_list backward, packed)
+  break (Array.from_list forward, Array.from_list backward, packed)
 const grown = build 8193
 entry const ends = do:
   let (forward, backward, packed) = grown
-  return forward[8192] + backward[0] + packed[8192]
+  break forward[8192] + backward[0] + packed[8192]
 const selected = array.filter_map (fn x => if x % 2 == 0 then #Some x else #Nothing) (array.generate 4097 identity)
 entry const selected_last = selected[2048]
 const branches = do:
@@ -191,7 +191,7 @@ const branches = do:
   let old = values
   values := [...self, 22]
   let other = [10, ...old]
-  return #[Array.from_list values, Array.from_list other, Array.from_list (saved ())]
+  break #[Array.from_list values, Array.from_list other, Array.from_list (saved ())]
 entry const branching = branches[0][1] + branches[1][0] + branches[2][0]
 `,
     (guest) => {
@@ -211,21 +211,21 @@ entry const stop = fn (host: U32 -> Bool ! {Foreign}) => do:
   use outcome <- Result.iterate 0 (fn i => do:
     use failed <- host i
     if failed:
-      return #Err i
+      break #Err i
     if i == 10:
-      return #Ok (#Done #[42.0])
-    return #Ok (#Continue (i + 1)))
-  return case outcome of
+      break #Ok (#Done #[42.0])
+    break #Ok (#Continue (i + 1)))
+  break case outcome of
     #Ok value => value[0]
     #Err error => F32.from error
 const keep = fn host => fn candidate => case candidate of
   #Ok value => do:
     use observed <- host value
-    return #Ok value
+    break #Ok value
   #Err error => #Err error
 entry const prefix = fn (host: U32 -> Bool ! {Foreign}) => do:
   use candidate <- keep host (#Ok 7)
-  return Result.unwrap_or 0 candidate
+  break Result.unwrap_or 0 candidate
 `,
     (guest) => {
       equal(guest.call("run", 100000), 100000);

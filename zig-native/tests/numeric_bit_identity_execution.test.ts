@@ -9,7 +9,7 @@ const library = `const identity = fn (index: U32) => do:
   let masked = @u32.bit_and multiplied 0xffffffff
   let shifted = @u32.shl masked 32
   let zero = @u32.bit_xor index index
-  return @u32.div (@u32.bit_or shifted zero) 1
+  break @u32.div (@u32.bit_or shifted zero) 1
 const lookup = fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] (identity index) else 0
 const guarded = fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] (@u32.div index 0) else 0
 `;

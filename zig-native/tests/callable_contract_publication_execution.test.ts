@@ -10,7 +10,7 @@ entry const run = fn (seed: U32) => do:
   let alias = callable
   let published = {callback: callable}
   let pressure = @array.fill 8192 0
-  return library.read (alias ()) + library.read (published.callback ()) + pressure[8191]
+  break library.read (alias ()) + library.read (published.callback ()) + pressure[8191]
 `;
 const record = `const make = fn (seed: U32) => fn () => {saved: seed}
 const read = fn value => value.saved

@@ -36,21 +36,21 @@ const declarations =
     \\const empty = fn () => do:
     \\  let scope = fn world => fn action => do:
     \\    use result <- action ()
-    \\    return (world, result)
-    \\  return #B { initial: (), s: scope }
+    \\    break (world, result)
+    \\  break #B { initial: (), s: scope }
     \\const run = fn b => fn action => do:
     \\  let #B { initial, s } = b
-    \\  return s initial action
+    \\  break s initial action
     \\const counter = fn () => do:
     \\  use value <- State.get ()
     \\  State.set (@u32.add value 1)
-    \\  return value
+    \\  break value
     \\entry const main = fn (x: U32) => do:
     \\  let b = empty ()
     \\  let (_, r) = run b (fn () => x)
     \\  let boxed = #[b, b]
     \\  let systems = #[#Route (fn (e: u) => e), #Start (fn () => ())]
-    \\  return @u32.add (@u32.add r (render x)) (@u32.add (@array.length boxed) (@array.length systems))
+    \\  break @u32.add (@u32.add r (render x)) (@u32.add (@array.length boxed) (@array.length systems))
 ;
 
 /// The scan `Quantified` replaces: every declaration table of the unit.
@@ -132,7 +132,7 @@ const flows =
     \\      break
     \\    total := @u32.add self value
     \\    cursor := rest
-    \\  return cursor
+    \\  break cursor
     \\const sum = fn (count: U32) => do:
     \\  let total = 0
     \\  let last = 0
@@ -141,7 +141,7 @@ const flows =
     \\      last := index
     \\    total := @u32.add self index
     \\  let read = fn (bias: U32) => @u32.add (@u32.add total last) bias
-    \\  return read 1
+    \\  break read 1
     \\entry const run = fn (values: Array U32) => @u32.add (sum (@array.length values)) (if @cursor.has (progress values) then 1 else 0)
 ;
 

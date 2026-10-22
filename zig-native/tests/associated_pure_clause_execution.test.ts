@@ -8,7 +8,7 @@ const library = (offset: number, effect = "") =>
   `const identity: forall [a] => a -> a = fn value => value
 type Number is data = #Number U32
 const Number.add = fn (#Number left) => fn (#Number right) => do:
-${effect}  return #Number (@u32.add (@u32.add left right) ${offset})
+${effect}  break #Number (@u32.add (@u32.add left right) ${offset})
 const twice: a -> a where {associated "add" a a a} = fn value => @type.call "add" value value
 const alias = twice
 const generic = fn value => alias value

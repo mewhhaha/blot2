@@ -8,11 +8,11 @@ const checked = fn computation => do:
         count := @u32.add self 1
         yield @u32.add value count
       complete value =>
-        return @u32.add value count
+        break @u32.add value count
 const calculation = @computation (fn () => do:
   use first <- Validate.check 20
   use second <- Validate.check 20
-  return @u32.add first second
+  break @u32.add first second
 )
 entry const answer = fn () => checked calculation
 

@@ -867,7 +867,7 @@ arm k and otherwise binds every input once to a fresh Core local for level k+1;
 the last level tests the last two arms, and a lone arm falls back to its
 incoming versions. `Checked.statement_arms` names the arm blocks whose
 statements lower inline as their level's suite, like an if branch, with a direct
-`return` reduced to its discarded value. Exiting arms join no merge. Consumers
+`break value` reduced to its discarded value. Exiting arms join no merge. Consumers
 therefore never see a merge with more than two arms.
 
 Typed-hole snapshots own a bounded flat diagnostic graph and the strings inside

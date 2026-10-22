@@ -10,7 +10,7 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 Deno.test("quoted affine parameters keep move ownership in sync and JSPI guests", async () => {
   const source = `const generated = @code.quote (fn (value: unique U32) => do:
   let first = value
-  return first)
+  break first)
 const borrowed = @code.quote (fn (value: unique U32) => @usage.borrow value (fn loan => @usage.read loan))
 const identity: unique U32 -> unique U32 = @code.emit generated
 const read: unique U32 -> U32 = @code.emit borrowed
@@ -47,7 +47,7 @@ entry const inspect_again = fn (value: unique U32) => read_again value
     }, { asynchronous });
   }
   await compileExpectedFailure(
-    source.replace("return first)", "return value)"),
+    source.replace("break first)", "break value)"),
     "use_after_move",
   );
   await compileExpectedFailure(
@@ -82,13 +82,13 @@ Deno.test("repeated typed-code emissions preserve independent locals beside call
   await compileAndRun(
     `const generated = @code.quote (do:
   let value = 19
-  return @u32.add value 2)
+  break @u32.add value 2)
 entry const answer = fn () => do:
   let value = 100
   let local = @code.quote 1
   let first = @code.emit generated
   let second = @code.emit generated
-  return @u32.add value (@u32.add first (@u32.add second (@code.emit local)))
+  break @u32.add value (@u32.add first (@u32.add second (@code.emit local)))
 `,
     (guest) => equal(guest.call("answer", null), 143),
     { prelude: "none" },
@@ -252,7 +252,7 @@ Deno.test("imported staging tracks fixed-type inputs and future bodies across in
     `const make = fn (step: U32) => @code.quote (fn (value: U32) => do:
   let step = @u32.add value (@code.lift step)
   let value = 1
-  return @u32.add step value)
+  break @u32.add step value)
 `;
   const source = `import {make} from "./generator"
 import {left, right} from "./inputs"
@@ -265,7 +265,7 @@ entry const answer = fn (argument: U32) => do:
   let a = (@code.emit first) argument
   let b = (@code.emit second) argument
   let again = (@code.emit first) argument
-  return @u32.add (@u32.add value step) (@u32.add a (@u32.add b again))
+  break @u32.add (@u32.add value step) (@u32.add a (@u32.add b again))
 `;
   const compiler = await createZigProjectCompiler(cached);
   const observe = async (bytes: Uint8Array<ArrayBuffer>, expected: number) => {
@@ -286,7 +286,7 @@ entry const answer = fn (argument: U32) => do:
     { left: 5, library, expected: 1237 },
     {
       left: 5,
-      library: library.replace("return @u32.add", "return @u32.sub"),
+      library: library.replace("break @u32.add", "break @u32.sub"),
       expected: 1231,
     },
     {
@@ -399,7 +399,7 @@ entry const run = fn (seed: U32) => do:
   let value = 100
   let first = @code.emit generated
   let second = @code.emit generated
-  return @u32.add value (@u32.add first (@u32.add second ((@code.emit callable) seed)))
+  break @u32.add value (@u32.add first (@u32.add second ((@code.emit callable) seed)))
 `;
     if (generic) {
       library = `const identity = fn value => value
@@ -425,7 +425,7 @@ const floating = @code.quote (choose #True (identity 1.5) (identity 2.5))
     if (helper === "locals") {
       library = library.replace(
         "=> @u32.add value 2",
-        "=> do:\n  let incremented = @u32.add value 2\n  let value = incremented\n  return value",
+        "=> do:\n  let incremented = @u32.add value 2\n  let value = incremented\n  break value",
       );
     }
     if (helper === "nominal") {
@@ -456,7 +456,7 @@ const float_callable = @code.quote (fn (value: F32) => read (#Packet {shadow: 9.
   let items = @array.concat #[0] #[2]
   let window = @array.slice items 0 2
   let restored = @array.from_list (@list.from_array window)
-  return @u32.add value (@array.get restored (@u32.sub (@list.length (@list.from_array window)) 1))`,
+  break @u32.add value (@array.get restored (@u32.sub (@list.length (@list.from_array window)) 1))`,
       );
     }
     const compiler = await createZigProjectCompiler(cached);

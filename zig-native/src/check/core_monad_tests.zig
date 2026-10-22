@@ -16,10 +16,10 @@ const source =
     \\  let total = 20
     \\  use value <- #Box 22
     \\  total := @u32.add self value
-    \\  return total
+    \\  break total
     \\entry const answer = fn () => do:
     \\  let #Box value = sequence ()
-    \\  return value
+    \\  break value
 ;
 const Fixture = struct {
     tree: ast.Tree,
@@ -122,9 +122,9 @@ const iteration_source =
     \\  for ever:
     \\    use candidate <- step state
     \\    if let #Some (#Done result) = candidate:
-    \\      return #Some result
+    \\      break #Some result
     \\    let #Some (#Continue next) = candidate else:
-    \\      return #Nothing
+    \\      break #Nothing
     \\    state := next
     \\const sequence = fn forwarded => do (monad Maybe):
     \\  let total = 20
@@ -133,11 +133,11 @@ const iteration_source =
     \\      use value <- #Some 1
     \\      total := @u32.add self value
     \\      if forwarded:
-    \\        return $ #Some (@u32.add total 21)
+    \\        break $ #Some (@u32.add total 21)
     \\      if @u32.eq inner 1:
-    \\        return @u32.add total 20
+    \\        break @u32.add total 20
     \\      break
-    \\  return total
+    \\  break total
     \\entry const answer = fn () => case sequence #True of
     \\  #Some value => value
     \\  #Nothing => 0
@@ -229,10 +229,10 @@ test "flat monadic statement sequences do not consume the nested expression dept
     try text.append(a, '\n');
     for (0..1536) |_| try text.appendSlice(a, "  total := @u32.add self 1\n");
     try text.appendSlice(a,
-        \\  return total
+        \\  break total
         \\entry const answer = fn () => do:
         \\  let #Box value = sequence ()
-        \\  return value
+        \\  break value
     );
     var fixture = try IterationFixture.initSource(text.items);
     defer fixture.deinit();

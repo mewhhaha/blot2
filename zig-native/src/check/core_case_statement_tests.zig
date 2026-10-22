@@ -20,7 +20,7 @@ const source =
     \\      let unused = 1
     \\    #Still => do:
     \\      count := @u32.add self 11
-    \\  return count
+    \\  break count
 ;
 
 const Fixture = struct {
@@ -129,17 +129,17 @@ test "statement case arms reject a nested return but end at a direct one" {
         \\    #Up => do:
         \\      count := 7
         \\      if @u32.lt 4 n:
-        \\        return ()
+        \\        break ()
         \\    #Down => do:
         \\      count := 3
-        \\      return ()
-        \\  return count
+        \\      break ()
+        \\  break count
     ;
     var fixture = try Fixture.init(nested);
     defer fixture.deinit();
     try std.testing.expectEqual(@as(usize, 1), fixture.checked.diagnostics.len);
     try std.testing.expectEqual(check.Code.case_arm_return, fixture.checked.diagnostics[0].code);
-    const inner = std.mem.find(u8, nested, "return ()").?;
+    const inner = std.mem.find(u8, nested, "break ()").?;
     try std.testing.expectEqual(@as(u32, @intCast(inner)), fixture.checked.diagnostics[0].span.start);
 }
 
@@ -149,7 +149,7 @@ test "a plain nested do keeps its scope and an arm local stays dead" {
         \\  let count = n
         \\  do:
         \\    count := @u32.add self 1
-        \\  return count
+        \\  break count
         ,
         \\type Maybe a is data = #None | #Some a
         \\entry const run = fn (n: U32) -> U32 => do:
@@ -159,7 +159,7 @@ test "a plain nested do keeps its scope and an arm local stays dead" {
         \\      value := @u32.add self 1
         \\    #None => do:
         \\      count := 3
-        \\  return count
+        \\  break count
     }) |text| {
         var fixture = try Fixture.init(text);
         defer fixture.deinit();

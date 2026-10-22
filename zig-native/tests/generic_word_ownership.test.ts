@@ -21,9 +21,9 @@ for (const codegenTier of ["optimized", "development"] as const) {
 type Choice [a, b] is data = #Left a | #Right b
 const reconstruct = fn candidate => case candidate of
   #Left value => do:
-    return #Left value
+    break #Left value
   #Right error => do:
-    return #Right error
+    break #Right error
 entry const phantom = fn (value: U32) => case reconstruct (#Left value) of
   #Left result => result
   #Right _ => 0
@@ -32,17 +32,17 @@ entry const changed = fn (value: U32) => do:
   let changed = case candidate of
     #Left missing => #Left missing
     #Right values => do:
-      return #Right #[@u32.add values[0] 1]
-  return case changed of
+      break #Right #[@u32.add values[0] 1]
+  break case changed of
     #Left _ => 0
     #Right values => values[0]
 entry const retagged = fn (value: U32) => do:
   let candidate = #Left value
   let changed = case candidate of
     #Left payload => do:
-      return #Right payload
+      break #Right payload
     #Right payload => #Right payload
-  return case changed of
+  break case changed of
     #Left payload => payload
     #Right payload => @u32.add payload 100
 const holder = fn () => #{ identity: fn x => x, unseen: fn x => x, g: 4 }
@@ -58,12 +58,12 @@ entry const alias = fn (seed: U32) => do:
     let aliased = forward original
     kept := forward aliased
   let final = forward kept
-  return @array.get final 1023
+  break @array.get final 1023
 entry const captured = fn (seed: U32) => do:
   let original = @array.fill 1024 seed
   let alias = forward original
   let read = fn () => @array.get alias 1023
-  return read ()
+  break read ()
 `;
       let original: Uint8Array<ArrayBuffer> | undefined;
       for (let revision = 0; revision < 2; revision++) {

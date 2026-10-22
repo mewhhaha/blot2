@@ -7,4 +7,4 @@ entry const run = fn (count: U32) => do:
   for index in 0..count:
     let result = @product.get (@effect.run State.get State.set index (fn () => apply (capture read))) 1
     total := @u32.add total result
-  return total
+  break total

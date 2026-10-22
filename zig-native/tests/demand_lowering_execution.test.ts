@@ -50,7 +50,7 @@ entry const loop = fn (value: U32) => do:
   let total = 0
   for index in 0..8:
     total := @u32.add total (if (@u32.eq value 10) && (@u32.eq (@u32.div 100 value) 10) then 1 else 0)
-  return total
+  break total
 `;
     try {
       await Deno.writeTextFile(entry, source);
@@ -222,7 +222,7 @@ entry const loop = fn (value: U32) => do:
   let total = 0
   for index in 0..8:
     total := @u32.add total (if ${and} then 1 else 0)
-  return total
+  break total
 `;
           const result = await compiler.build({ sources: { [entry]: source } });
           assert(result.success, `${count}: ${JSON.stringify(result)}`);

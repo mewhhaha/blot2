@@ -29,7 +29,7 @@ const table = (count: number, shared: boolean) => {
   return `${make}
 entry const answer: U32 = do:
 ${capture}  let table = #[${items}]
-  return table.capture_count
+  break table.capture_count
 `;
 };
 Deno.test("lexical capture keys project only reachable scopes in wide closure tables", async () => {

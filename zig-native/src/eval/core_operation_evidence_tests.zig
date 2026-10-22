@@ -17,10 +17,10 @@ const source =
     \\    for ever:
     \\      if @u32.eq index limit:
     \\        use values <- State.get ()
-    \\        return @array.get values 0
+    \\        break @array.get values 0
     \\      index := @u32.add self 1
     \\      use State.set #[index])
-    \\  return @u32.add (@array.get state 0) result
+    \\  break @u32.add (@array.get state 0) result
 ;
 
 fn lower(text: []const u8) !core.Module {
@@ -110,8 +110,8 @@ test "closed operation rows cannot choose between two compatible generic instanc
         \\entry const run = fn () -> Unit => do:
         \\  let (state,result) = @effect.run State.get State.set #[0] (fn () => do:
         \\    use values <- State.get ()
-        \\    return ())
-        \\  return ()
+        \\    break ())
+        \\  break ()
     );
     defer module.deinit(a);
     // This semantic-core counterexample adds a second valid operation instance

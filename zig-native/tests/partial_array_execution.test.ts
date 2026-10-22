@@ -25,7 +25,7 @@ entry const answer = fn () => do:
   let mapped = array.filter_map choose numbers
   let flat = array.flatten #[#[], selected, #[], #[6]]
   let (left, right) = array.unzip (array.zip flat mapped)
-  return left[0] + right[1]
+  break left[0] + right[1]
 entry const empties = array.length (array.flatten #[#[], #[]])
 entry const last = array.fold_left add 0 (array.push 6 (array.slice 1 2 numbers))
 `,

@@ -45,10 +45,10 @@ const generic_alias =
     \\const resolver = identity (monad (identity Box))
     \\const sequence = fn selected => fn candidate => do selected:
     \\  use value <- candidate
-    \\  return @u32.add value 2
+    \\  break @u32.add value 2
     \\entry const answer = fn () => do:
     \\  let #Box value = sequence resolver (#Box 40)
-    \\  return value
+    \\  break value
     \\entry const folded = answer ()
 ;
 const lift_forward_unit =
@@ -58,28 +58,28 @@ const lift_forward_unit =
     \\  #Box value => next value
     \\const monad = fn constructor => @do.monad constructor
     \\const present = do (monad Box):
-    \\  return 40
+    \\  break 40
     \\const forwarded = do (monad Box):
-    \\  return $ #Box 2
+    \\  break $ #Box 2
     \\const finished = do (monad Box):
     \\  #Box 99
     \\entry const answer = fn () => do:
     \\  let #Box left = present
     \\  let #Box right = forwarded
     \\  let #Box () = finished
-    \\  return @u32.add left right
+    \\  break @u32.add left right
 ;
 const pure_ignores_mixed_returns =
     \\type Box value is data = #Box value
     \\const Box.pure = fn ignored => #Box 42
     \\const sequence = fn enabled => do (@do.monad Box):
     \\  if enabled:
-    \\    return #True
-    \\  return 40
+    \\    break #True
+    \\  break 40
     \\entry const answer = fn () => do:
     \\  let #Box first = sequence #True
     \\  let #Box second = sequence #False
-    \\  return @u32.add first second
+    \\  break @u32.add first second
 ;
 const scalar_bind_input =
     \\type Box value is data = #Box value
@@ -87,10 +87,10 @@ const scalar_bind_input =
     \\const Box.bind = fn (candidate:U32) => fn next => next candidate
     \\const sequence = fn () => do (@do.monad Box):
     \\  use value <- 40
-    \\  return @u32.add value 2
+    \\  break @u32.add value 2
     \\entry const answer = fn () => do:
     \\  let #Box value = sequence ()
-    \\  return value
+    \\  break value
 ;
 const continuation_multiplicity =
     \\type Twice value is data = #Twice value
@@ -99,15 +99,15 @@ const continuation_multiplicity =
     \\  #Twice value => do:
     \\    let #Twice first = next value
     \\    let #Twice second = next (@u32.add value 1)
-    \\    return #Twice (@u32.add first second)
+    \\    break #Twice (@u32.add first second)
     \\const sequence = fn () => do (@do.monad Twice):
     \\  let total = 0
     \\  use value <- #Twice 20
     \\  total := @u32.add self value
-    \\  return total
+    \\  break total
     \\entry const answer = fn () => do:
     \\  let #Twice value = sequence ()
-    \\  return value
+    \\  break value
 ;
 const bind_failure =
     \\type Option value is data = #Present value | #Absent
@@ -117,7 +117,7 @@ const bind_failure =
     \\  #Absent => #Absent
     \\const sequence = fn () => do (@do.monad Option):
     \\  use value <- #Absent
-    \\  return @panic "continuation must not execute"
+    \\  break @panic "continuation must not execute"
     \\entry const answer = fn () => case sequence () of
     \\  #Present value => value
     \\  #Absent => 42
@@ -145,11 +145,11 @@ test "ordinary monad methods infer generic aliases arbitrary bind inputs and ign
 test "resolver protocol rejects invalid factories providers and incompatible selected source methods" {
     const cases = [_]struct { text: []const u8, code: check.Code }{
         .{ .text = "entry const answer=@do.monad 42\n", .code = .type_constructor_required },
-        .{ .text = "entry const answer=do 42:\n  return 42\n", .code = .invalid_provider },
-        .{ .text = "type Box value is data = #Box value\nentry const answer=do (@do.monad Box):\n  return 42\n", .code = .missing_member },
-        .{ .text = "type Box value is data = #Box value\nconst Box.pure=fn(value:U32)=>#Box value\nentry const answer=do (@do.monad Box):\n  return #True\n", .code = .type_mismatch },
-        .{ .text = "entry const answer=do:\n  return $ 42\n", .code = .resolver_required },
-        .{ .text = "type Box value is data = #Box value\nconst Box.pure=fn value=>value\nentry const answer=do (@do.monad Box):\n  return 42\n", .code = .type_mismatch },
+        .{ .text = "entry const answer=do 42:\n  break 42\n", .code = .invalid_provider },
+        .{ .text = "type Box value is data = #Box value\nentry const answer=do (@do.monad Box):\n  break 42\n", .code = .missing_member },
+        .{ .text = "type Box value is data = #Box value\nconst Box.pure=fn(value:U32)=>#Box value\nentry const answer=do (@do.monad Box):\n  break #True\n", .code = .type_mismatch },
+        .{ .text = "entry const answer=do:\n  break $ 42\n", .code = .resolver_required },
+        .{ .text = "type Box value is data = #Box value\nconst Box.pure=fn value=>value\nentry const answer=do (@do.monad Box):\n  break 42\n", .code = .type_mismatch },
     };
     for (cases) |item| {
         var f = try Fixture.init(a, item.text);
@@ -186,9 +186,9 @@ const iteration_prelude =
     \\  for ever:
     \\    use candidate <- step state
     \\    if let #Some (#Done result) = candidate:
-    \\      return #Some result
+    \\      break #Some result
     \\    let #Some (#Continue next) = candidate else:
-    \\      return #Nothing
+    \\      break #Nothing
     \\    state := next
     \\const Maybe.unwrap_or = fn fallback => fn candidate => case candidate of
     \\  #Some value => value
@@ -206,7 +206,7 @@ const nested_loop_break =
     \\    total := @u32.add self 10
     \\    if @u32.eq outer 1:
     \\      break
-    \\  return @u32.add total 18
+    \\  break @u32.add total 18
     \\entry const answer = fn () => Maybe.unwrap_or 0 (sequence ())
 ;
 const bounded_stack =
@@ -215,14 +215,14 @@ const bounded_stack =
     \\  for index in 0..count:
     \\    use value <- #Some 1
     \\    total := @u32.add self value
-    \\  return total
+    \\  break total
     \\const forever = fn count => do (monad Maybe):
     \\  let total = 0
     \\  for ever:
     \\    use value <- #Some 1
     \\    total := @u32.add self value
     \\    if @u32.eq total count:
-    \\      return $ #Some total
+    \\      break $ #Some total
     \\entry const answer = fn () => @u32.add (Maybe.unwrap_or 0 (range 100000)) (Maybe.unwrap_or 0 (forever 100000))
 ;
 test "monadic iteration freezes actual source methods progress constructors and completion signatures" {
@@ -266,7 +266,7 @@ test "two parameter resolver families preserve hidden failure evidence in forwar
         \\  #Err _=>fallback
         \\const checked=fn candidate=>do (@do.monad Result):
         \\  use value <- candidate
-        \\  return $ #Ok (@u32.add value 2)
+        \\  break $ #Ok (@u32.add value 2)
         \\entry const result=fn()=>Result.unwrap_or 0 (checked (#Ok 40))
     );
     defer f.deinit(a);
@@ -278,13 +278,13 @@ test "nested monadic returns retain every progress layer and forwarding continua
         \\const direct=fn()=>do (monad Maybe):
         \\  for outer in 0..2:
         \\    for inner in 0..2:
-        \\      return 42
-        \\  return 0
+        \\      break 42
+        \\  break 0
         \\const forward=fn()=>do (monad Maybe):
         \\  for outer in 0..2:
         \\    for inner in 0..2:
-        \\      return $ #Some 42
-        \\  return 0
+        \\      break $ #Some 42
+        \\  break 0
         \\entry const answer=fn()=>@u32.add (Maybe.unwrap_or 0 (direct())) (Maybe.unwrap_or 0 (forward()))
     , .{ .prelude_unit = 1 });
     defer f.deinit(a);
@@ -309,7 +309,7 @@ test "monadic loops require source iterate and designated progress rather than s
         \\entry const answer=fn()=>do (@do.monad Box):
         \\  for index in 0..1:
         \\    use #Box ()
-        \\  return 42
+        \\  break 42
     ;
     var missing = try Fixture.initOptions(a, iteration_prelude ++ "\n" ++ box, .{ .prelude_unit = 1 });
     defer missing.deinit(a);
@@ -331,7 +331,7 @@ test "nested resolver break completes lexical state: nested_resolver_break" {
         \\    total := @u32.add self 1
         \\    let ignored = do (monad Maybe):
         \\      break
-        \\  return total
+        \\  break total
         \\entry const answer = fn () => Maybe.unwrap_or 0 (sequence ())
     , .{ .prelude_unit = 1 });
     defer f.deinit(a);
@@ -354,7 +354,7 @@ test "nested resolver break completes lexical state: nested_monad_in_plain_loop_
         \\    total := @u32.add self 1
         \\    let ignored = do (monad Maybe):
         \\      break
-        \\  return total
+        \\  break total
     , .{ .prelude_unit = 1 });
     defer f.deinit(a);
     try f.valid();
@@ -377,7 +377,7 @@ test "ordinary nested do cannot break a monadic progress boundary" {
         \\    total := @u32.add self value
         \\    let ignored = do:
         \\      break
-        \\  return @u32.add total 41
+        \\  break @u32.add total 41
         \\entry const answer = fn () => Maybe.unwrap_or 0 (sequence ())
     , .{ .prelude_unit = 1 });
     defer f.deinit(a);
@@ -389,10 +389,10 @@ test "definitely panicking resolver return invokes no missing pure method" {
     var f = try Fixture.init(a,
         \\type Box value is data = #Box value
         \\const sequence = fn () => do (@do.monad Box):
-        \\  return @panic "body panic"
+        \\  break @panic "body panic"
         \\entry const answer: U32 = do:
         \\  let #Box value = sequence ()
-        \\  return value
+        \\  break value
     );
     defer f.deinit(a);
     try f.valid();

@@ -19,12 +19,12 @@ const source =
     \\  let #Box point = #Box (identity source)
     \\  point.x := @u32.add self 2
     \\  let { x } = point
-    \\  return x
+    \\  break x
     \\entry const runtime = fn (value: U32) => do:
     \\  let point = identity { y: 2.0, x: value }
     \\  point.x := #True
     \\  let { y, x } = point
-    \\  return if x then y else 0.0
+    \\  break if x then y else 0.0
 ;
 
 fn lower(allocator: std.mem.Allocator) !core.Module {
@@ -93,7 +93,7 @@ test "constant record merge interns shapes across repeated updates" {
         \\  let record = { x: 0, kept: 42 }
         \\  for index in 0 .. 1024:
         \\    record := @record.merge record { x: @u32.add record.x 1 }
-        \\  return record.kept
+        \\  break record.kept
     );
     defer module.deinit(allocator);
     var session = try eval.Session.init(allocator, &.{module});
@@ -130,24 +130,24 @@ const path_source = path_accessors ++ "\n" ++
     \\entry const composed = fn (value: U32) => do:
     \\  let initial = { position: { x: value, y: 7 }, kept: 2, callback: fn argument => @u32.add argument value }
     \\  let changed = set position_x 2.5 initial
-    \\  return get position_x changed
+    \\  break get position_x changed
     \\entry const effects = fn (send: U32 -> U32 ! {Foreign}) => do:
     \\  let initial = { position: { x: 40, y: 7 }, callback: fn value => send value }
     \\  let changed = set position_x 2.5 initial
     \\  let focus = get position_x changed
-    \\  return @f32.add focus (@u32.to_f32 (changed.callback 2))
+    \\  break @f32.add focus (@u32.to_f32 (changed.callback 2))
     \\entry const callback = fn () => changed.callback 2
 ++ "\n" ++ deep_accessors ++ "\n" ++
     \\entry const deep = fn (value: U32) => do:
     \\  let callback = fn argument => @u32.add argument value
     \\  let initial = { inner: { inner: { inner: { inner: { x: value, callback }, callback }, callback }, callback }, callback }
     \\  let changed = set deep_x 2.5 initial
-    \\  return get deep_x changed
+    \\  break get deep_x changed
     \\entry const deep_effects = fn (send: U32 -> U32 ! {Foreign}) => do:
     \\  let callback = fn argument => send argument
     \\  let initial = { inner: { inner: { inner: { inner: { x: 40, callback }, callback }, callback }, callback }, callback }
     \\  let changed = set deep_x 2.5 initial
-    \\  return @f32.add (get deep_x changed) (@u32.to_f32 (changed.callback 2))
+    \\  break @f32.add (get deep_x changed) (@u32.to_f32 (changed.callback 2))
     \\entry const deep_closed = fn (value: U32) => get deep_x { inner: { inner: { inner: { inner: { x: value, callback: #False }, callback: #False }, callback: #False }, callback: #False }, callback: #False }
 ;
 
@@ -163,7 +163,7 @@ const shallow_path_fault_source = path_accessors ++ "\n" ++
     \\entry const composed = fn (value: U32) => do:
     \\  let initial = { position: { x: value, y: 7 }, callback: fn argument => @u32.add argument value }
     \\  let changed = set position_x 2.5 initial
-    \\  return get position_x changed
+    \\  break get position_x changed
 ;
 
 const deep_path_fault_source = x_accessor ++ "\n" ++ deep_accessors ++ "\n" ++
@@ -171,7 +171,7 @@ const deep_path_fault_source = x_accessor ++ "\n" ++ deep_accessors ++ "\n" ++
     \\  let callback = fn argument => @u32.add argument value
     \\  let initial = { inner: { inner: { inner: { inner: { x: value, callback }, callback }, callback }, callback }, callback }
     \\  let changed = set deep_x 2.5 initial
-    \\  return get deep_x changed
+    \\  break get deep_x changed
 ;
 
 const deep_effect_path_fault_source = x_accessor ++ "\n" ++ deep_accessors ++ "\n" ++
@@ -179,7 +179,7 @@ const deep_effect_path_fault_source = x_accessor ++ "\n" ++ deep_accessors ++ "\
     \\  let callback = fn argument => send argument
     \\  let initial = { inner: { inner: { inner: { inner: { x: 40, callback }, callback }, callback }, callback }, callback }
     \\  let changed = set deep_x 2.5 initial
-    \\  return @f32.add (get deep_x changed) (@u32.to_f32 (changed.callback 2))
+    \\  break @f32.add (get deep_x changed) (@u32.to_f32 (changed.callback 2))
 ;
 
 fn pathFrontend(allocator: std.mem.Allocator, input: []const u8) !void {

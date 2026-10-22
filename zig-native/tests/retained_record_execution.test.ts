@@ -9,13 +9,13 @@ const packed = #Pack { unused: identity, selected: fn (value: U32) => value + 1 
 const invoke = fn callback => callback 1
 const sum = fn packed => fn (left: U32) => fn (right: U32) => do:
   let #Pack { selected } = packed
-  return selected (left + right)
+  break selected (left + right)
 const run = fn packed => fn (value: U32) => do:
   let #Pack { selected } = packed
-  return selected value
+  break selected value
 const capture = fn packed => fn (value: U32) => invoke (fn extra => do:
   let #Pack { selected } = packed
-  return selected (value + extra))
+  break selected (value + extra))
 `;
 
 Deno.test("constant records retain unused generic fields across calls and mixed static/dynamic captures", async () => {
@@ -27,7 +27,7 @@ entry const partial = fn (value: U32) => invoke (run packed)
 entry const partial_pair = fn (value: U32) => invoke (sum packed value)
 entry const partial_chain = fn (value: U32) => do:
   let callback = sum packed
-  return invoke (callback value)
+  break invoke (callback value)
 entry const effectful = fn (host: U32 -> U32 ! {Foreign}) => capture packed (host 40)
 `,
     (guest) => {
@@ -60,19 +60,19 @@ type Clock is effect = { tick: Unit -> U32 }
 type Pack callback is data = #Pack { callback: callback, marker: U32 }
 const prepare = fn (amount: U32) => fn (value: U32) => do:
   use current <- Clock.tick ()
-  return current + value + amount
+  break current + value + amount
 const packed = #Pack { callback: prepare, marker: 42 }
 const read = fn pack => do:
   let #Pack { marker } = pack
-  return marker
+  break marker
 const invoke = fn pack => do:
   let #Pack { callback } = pack
-  return callback 1 2
+  break callback 1 2
 entry const marker = fn () => read packed
 entry const answer = fn (value: U32) => do:
   let clock = @effect.provider Clock.tick (fn () => value)
-  return do clock:
-    return invoke packed
+  break do clock:
+    break invoke packed
 `,
     (guest) => {
       equal(guest.call("marker", null), 42);
@@ -88,7 +88,7 @@ Deno.test("constant collections infer concrete callbacks in variants the consume
 type Action value is data = #Ignored (value -> Unit) | #Chosen (Unit -> U32)
 const unused = fn value => do:
   let next = value * 0.25
-  return ()
+  break ()
 const actions = #[#Ignored unused, #Chosen (fn () => 42)]
 entry const answer = fn () => do:
   let total = 0
@@ -96,7 +96,7 @@ entry const answer = fn () => do:
     total := total + (case action of
       #Ignored _ => 0
       #Chosen run => run ())
-  return total
+  break total
 `,
     (guest) => equal(guest.call("answer", null), 42),
   );

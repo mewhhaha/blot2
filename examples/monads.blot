@@ -4,20 +4,20 @@ const try = monad Maybe
 const add_present = fn left => fn right => do try:
   use first <- left
   use second <- right
-  return first + second
+  break first + second
 
 entry const present = fn () =>
   Maybe.unwrap_or 0 (add_present (#Some 40) (#Some 2))
 
 const stop = fn () => do monad Maybe:
   use #Nothing
-  return @panic "a failed bind skips this continuation"
+  break @panic "a failed bind skips this continuation"
 
 entry const absent = fn () => Maybe.unwrap_or 42 (stop ())
 
 const checked = fn candidate => do monad Result:
   use value <- candidate
-  return $ #Ok (value + 2)
+  break $ #Ok (value + 2)
 
 entry const result = fn () => Result.unwrap_or 0 (checked (#Ok 40))
 
@@ -27,7 +27,7 @@ const sum_present = fn count => do try:
   for index in 0 .. count:
     use value <- #Some 1
     total := self + value
-  return total
+  break total
 
 entry const large_loop = fn () => Maybe.unwrap_or 0 (sum_present 100000)
 

@@ -252,7 +252,7 @@ fn emitSourceKind(allocator: std.mem.Allocator, source: []const u8, required: ?@
     try std.testing.expect(compiled.diagnostic == null and compiled.bytes.len > 8);
 }
 test "implementation Foreign callback method preserves its declared inner arrow" {
-    try emitSource(a, "type Callable f is contract = { type Run, const run: f -> (Unit -> (Callable.Run f) ! {Foreign}) }\nimpl Callback a : Callable (Unit -> a ! {Foreign}) = { type Run = a, const run = fn callback => fn () => do:\n  use value <- callback ()\n  return value }\nentry const answer = fn (callback: Unit -> U32 ! {Foreign}) => do:\n  use first <- Callable.run callback ()\n  use second <- Callable.run callback ()\n  return @u32.add first second\n");
+    try emitSource(a, "type Callable f is contract = { type Run, const run: f -> (Unit -> (Callable.Run f) ! {Foreign}) }\nimpl Callback a : Callable (Unit -> a ! {Foreign}) = { type Run = a, const run = fn callback => fn () => do:\n  use value <- callback ()\n  break value }\nentry const answer = fn (callback: Unit -> U32 ! {Foreign}) => do:\n  use first <- Callable.run callback ()\n  use second <- Callable.run callback ()\n  break @u32.add first second\n");
 }
 
 test "implementation prerequisites retain ordinary associated method evidence" {
@@ -403,13 +403,13 @@ test "implementation data field and update prerequisites derive closed construct
     try scenario(a, "type Box is data = #Box { x: U32 }\nconst Box.x = fn (value: Box) => 42\ntype Source s is contract = { field \"x\" Box U32, type Item }\nimpl Scalar : Source U32 = { type Item = U32 }\nentry const answer: (Source.Item U32) = 42\n", .incompatible_implementation);
 }
 test "implementation operation prerequisites establish only their own typed row without invocation" {
-    const source = "type State a is effect = { set: a -> Unit }\ntype Callable f is contract = { operation State.set U32, type Item, const run: f -> Unit ! {State.set U32} }\nimpl Callback : Callable (Unit -> Unit ! {State.set U32}) = { type Item = U32, const run = fn callback => do:\n  use State.set 42\n  return () }\nentry const answer: (Callable.Item (Unit -> Unit ! {State.set U32})) = 42\n";
+    const source = "type State a is effect = { set: a -> Unit }\ntype Callable f is contract = { operation State.set U32, type Item, const run: f -> Unit ! {State.set U32} }\nimpl Callback : Callable (Unit -> Unit ! {State.set U32}) = { type Item = U32, const run = fn callback => do:\n  use State.set 42\n  break () }\nentry const answer: (Callable.Item (Unit -> Unit ! {State.set U32})) = 42\n";
     try emitSourceKind(a, source, .effect_operation);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitSourceKind, .{ source, @as(?@import("../check/types.zig").ObligationKind, .effect_operation) });
 }
 
 test "implementation selected ordinary operation method retains its established invocation row" {
-    const source = "type State a is effect = { set: a -> Unit }\ntype Token is data = #Token U32\nconst Token.add: Token -> (Token -> Token ! {State.set U32}) = fn left => fn right => do:\n  use State.set 42\n  return left\ntype Source s is contract = { associated \"add\" s s s ! {State.set U32}, type Item }\nimpl TokenSource : Source Token = { type Item = U32 }\nentry const answer: (Source.Item Token) = 42\n";
+    const source = "type State a is effect = { set: a -> Unit }\ntype Token is data = #Token U32\nconst Token.add: Token -> (Token -> Token ! {State.set U32}) = fn left => fn right => do:\n  use State.set 42\n  break left\ntype Source s is contract = { associated \"add\" s s s ! {State.set U32}, type Item }\nimpl TokenSource : Source Token = { type Item = U32 }\nentry const answer: (Source.Item Token) = 42\n";
     try scenario(a, source, null);
     try emitSource(a, source);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitSource, .{source});
@@ -467,13 +467,13 @@ test "implementation ordinary result selected prerequisites retain destination d
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitSourceKind, .{ source, @as(?@import("../check/types.zig").ObligationKind, .result_dispatch) });
 }
 test "implementation ordinary resolver prerequisites retain complete selected protocol evidence" {
-    const source = "type Box a is data = #Box a\nconst Box.pure = fn value => #Box value\ntype Token a is data = #Token a\nconst Token.add = fn (left: Token a) => fn (right: Token a) => case left of\n  #Token constructor => do (@do.monad constructor):\n    return 42\ntype Source s is contract = { associated \"add\" s s (Box U32) ! {}, type Item, const first: s -> (Source.Item s) }\nimpl TokenSource a : Source (Token a) = { type Item = U32, const first = fn value => 42 }\nentry const answer = Source.first (#Token Box)\n";
+    const source = "type Box a is data = #Box a\nconst Box.pure = fn value => #Box value\ntype Token a is data = #Token a\nconst Token.add = fn (left: Token a) => fn (right: Token a) => case left of\n  #Token constructor => do (@do.monad constructor):\n    break 42\ntype Source s is contract = { associated \"add\" s s (Box U32) ! {}, type Item, const first: s -> (Source.Item s) }\nimpl TokenSource a : Source (Token a) = { type Item = U32, const first = fn value => 42 }\nentry const answer = Source.first (#Token Box)\n";
     try scenario(a, source, null);
     try emitSourceKind(a, source, .resolver_dispatch);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitSourceKind, .{ source, @as(?@import("../check/types.zig").ObligationKind, .resolver_dispatch) });
 }
 
-pub const handler_source = "type State state is effect = { get: Unit -> state, set: state -> Unit }\nconst run = fn initial => fn action => @effect.run State.get State.set initial action\ntype Token a is data = #Token a\nconst Token.add = fn (left: Token a) => fn (right: Token a) => case left of\n  #Token initial => do:\n    let (next,previous) = run initial (fn () => do:\n      use State.set initial\n      return initial)\n    return #Token next\ntype Source s is contract = { associated \"add\" s s s ! {}, type Item, const first: s -> (Source.Item s) }\nimpl TokenSource a : Source (Token a) = { type Item = U32, const first = fn value => 42 }\n";
+pub const handler_source = "type State state is effect = { get: Unit -> state, set: state -> Unit }\nconst run = fn initial => fn action => @effect.run State.get State.set initial action\ntype Token a is data = #Token a\nconst Token.add = fn (left: Token a) => fn (right: Token a) => case left of\n  #Token initial => do:\n    let (next,previous) = run initial (fn () => do:\n      use State.set initial\n      break initial)\n    break #Token next\ntype Source s is contract = { associated \"add\" s s s ! {}, type Item, const first: s -> (Source.Item s) }\nimpl TokenSource a : Source (Token a) = { type Item = U32, const first = fn value => 42 }\n";
 test "implementation ordinary handler prerequisites retain closed removal evidence" {
     const source = handler_source ++ "entry const answer = Source.first (#Token 42)\n";
     try scenario(a, source, null);
@@ -488,7 +488,7 @@ test "implementation ordinary collection prerequisites retain exact collection i
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitSourceKind, .{ source, @as(?@import("../check/types.zig").ObligationKind, .collection) });
 }
 
-pub const witness_source = "type Token a is data = #Token a\nconst Token.add = fn (left: Token a) => fn (right: Token a) => case left of\n  #Token witness => @state.reader witness (fn () => @panic \"proof executed\") (fn () => do:\n    use unused <- @state.get witness\n    return left)\ntype Source s is contract = { associated \"add\" s s s ! {}, type Item, const first: s -> (Source.Item s) }\nimpl TokenSource a : Source (Token a) = { type Item = U32, const first = fn value => 42 }\n";
+pub const witness_source = "type Token a is data = #Token a\nconst Token.add = fn (left: Token a) => fn (right: Token a) => case left of\n  #Token witness => @state.reader witness (fn () => @panic \"proof executed\") (fn () => do:\n    use unused <- @state.get witness\n    break left)\ntype Source s is contract = { associated \"add\" s s s ! {}, type Item, const first: s -> (Source.Item s) }\nimpl TokenSource a : Source (Token a) = { type Item = U32, const first = fn value => 42 }\n";
 test "implementation ordinary witness prerequisites derive internal result variables" {
     const source = witness_source ++ "entry const answer: (Source.Item (Token (Unit -> U32))) = 42\n";
     try scenario(a, source, null);

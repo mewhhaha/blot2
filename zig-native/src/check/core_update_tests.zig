@@ -12,12 +12,12 @@ const source =
     \\type Bucket is data = #Bucket { points: Array Point }
     \\const make = fn (initial: Bucket) => do:
     \\  let bucket = initial
-    \\  return fn (index: U32) => do:
+    \\  break fn (index: U32) => do:
     \\    bucket.points[index].x := do:
     \\      let other = #[40]
     \\      other[0] := @u32.add self 2
-    \\      return other[0]
-    \\    return bucket.points[index].x
+    \\      break other[0]
+    \\    break bucket.points[index].x
     \\entry const run = fn () -> U32 => (make (#Bucket { points: #[#Point { x: 1 }] })) 0
 ;
 

@@ -107,7 +107,7 @@ test "imported value and row quantifiers are copied once then freshened independ
     };
 }
 fn retainedCertificates(allocator: std.mem.Allocator) !void {
-    const text = "const alias = source\nentry const answer = fn () => do:\n  let local = source\n  return 42\n";
+    const text = "const alias = source\nentry const answer = fn () => do:\n  let local = source\n  break 42\n";
     var tokens = try lexer.lex(allocator, text);
     defer tokens.deinit(allocator);
     var pool: symbols.Pool = .{};
@@ -218,7 +218,7 @@ test "ambient and demanded row inference releases every failed allocation" {
 test "pure initializer and callback constraints retain their distinct effect diagnostics" {
     const cases = [_]struct { source: []const u8, code: check.Code }{
         .{ .source = "entry const answer = read ()\n", .code = .const_effect },
-        .{ .source = "entry const answer = fn () => do:\n  let value = read ()\n  return value\n", .code = .let_effect },
+        .{ .source = "entry const answer = fn () => do:\n  let value = read ()\n  break value\n", .code = .let_effect },
         .{ .source = "const run = fn (callback:Unit -> U32) => callback ()\nentry const answer = fn () => run read\n", .code = .effect_mismatch },
     };
     for (cases) |fixture| {
@@ -371,7 +371,7 @@ fn sourceOperationValues(allocator: std.mem.Allocator) !void {
         \\const driver = fn () => do:
         \\  let local = Reader.ask
         \\  use value <- local ()
-        \\  return @u32.add value 1
+        \\  break @u32.add value 1
     ;
     var tokens = try lexer.lex(allocator, text);
     defer tokens.deinit(allocator);
@@ -432,7 +432,7 @@ test "source operation selection and latent predicate publication release every 
 test "operation invocations preserve pure initializer annotation and sealed label diagnostics" {
     const cases = [_]struct { source: []const u8, code: check.Code }{
         .{ .source = "effect Read:Unit -> U32\nconst invalid=Read ()\n", .code = .const_effect },
-        .{ .source = "effect Read:Unit -> U32\nconst invalid=fn () => do:\n  let value=Read ()\n  return value\n", .code = .let_effect },
+        .{ .source = "effect Read:Unit -> U32\nconst invalid=fn () => do:\n  let value=Read ()\n  break value\n", .code = .let_effect },
         .{ .source = "effect Read:Unit -> U32\nconst invalid:Unit -> U32=fn () => Read ()\n", .code = .effect_mismatch },
         .{ .source = "effect Foreign:Unit -> U32\n", .code = .sealed_effect },
         .{ .source = "effect Read:Unit -> U32\nconst Read=fn () => 42\n", .code = .duplicate_name },
@@ -460,11 +460,11 @@ fn providerSource(allocator: std.mem.Allocator) !void {
         \\const force = fn ~value => @force value
         \\const ignore = fn ~value => 42
         \\entry const direct = fn () => do provider:
-        \\  return read ()
+        \\  break read ()
         \\entry const callback = fn () => do provider:
-        \\  return invoke (fn () => Read ())
+        \\  break invoke (fn () => Read ())
         \\entry const delayed = fn () => do provider:
-        \\  return force (Read ())
+        \\  break force (Read ())
         \\entry const ignored = fn () => ignore (Read ())
         \\type State a is effect = { get:Unit -> a, set:a -> Unit }
         \\const state_provider = @effect.state (State.get (Array U32)) (State.set (Array U32)) #[41]
@@ -472,7 +472,7 @@ fn providerSource(allocator: std.mem.Allocator) !void {
         \\  use old <- State.get (Array U32) ()
         \\  let next = @array.set old 0 42
         \\  use State.set (Array U32) next
-        \\  return old
+        \\  break old
     ;
     var tokens = try lexer.lex(allocator, text);
     defer tokens.deinit(allocator);
@@ -611,12 +611,12 @@ fn runnerSource(allocator: std.mem.Allocator) !void {
         \\  let (next,previous) = run 41 (fn () => do:
         \\    use previous <- State.get ()
         \\    use State.set (@u32.add previous 1)
-        \\    return previous)
-        \\  return @u32.add next previous
+        \\    break previous)
+        \\  break @u32.add next previous
         \\entry const reader = fn () -> U32 => @effect.reader State.get (fn () -> U32 => @panic "witness called") (fn () => 42) (fn () -> U32 => State.get ())
         \\entry const writer = fn () => @effect.run State.get State.set 0 (fn () => @effect.writer State.set (fn () -> U32 => @panic "witness called") (fn value => State.set value) (fn () => do:
         \\  use State.set 42
-        \\  return 42))
+        \\  break 42))
     ;
     var tokens = try lexer.lex(allocator, text);
     defer tokens.deinit(allocator);
@@ -735,8 +735,8 @@ test "effect runner template families arity and signatures match frozen negative
         .{ .name = "shaped_binder", .source = "type State [a] is effect = { get: Unit -> a, set: a -> Unit }\nentry const answer = fn () => @effect.run State.get State.set 0 (fn () => 42)\n", .code = .type_arity },
         .{ .name = "multiple_binders", .source = "type State a => type b is effect = { get: Unit -> a, set: a -> Unit }\nentry const answer = fn () => @effect.run State.get State.set 0 (fn () => 42)\n", .code = .type_arity },
         .{ .name = "different_family", .source = "type State a is effect = { get: Unit -> a, set: a -> Unit }\ntype Other a is effect = { get: Unit -> a, set: a -> Unit }\nentry const answer = fn () => @effect.run State.get Other.set 0 (fn () => 42)\n", .code = .effect_family },
-        .{ .name = "swapped_pair", .source = "type State a is effect = { get: Unit -> a, set: a -> Unit }\nentry const answer = fn () => do:\n  let (next,result) = @effect.run State.set State.get 0 (fn () => 42)\n  return @u32.add next result\n", .code = .type_mismatch },
-        .{ .name = "duplicate_operation", .source = "type State a is effect = { get: Unit -> a, set: a -> Unit }\nentry const answer = fn () => do:\n  let (next,result) = @effect.run State.get State.get 0 (fn () => 42)\n  return @u32.add next result\n", .code = .invalid_state_provider },
+        .{ .name = "swapped_pair", .source = "type State a is effect = { get: Unit -> a, set: a -> Unit }\nentry const answer = fn () => do:\n  let (next,result) = @effect.run State.set State.get 0 (fn () => 42)\n  break @u32.add next result\n", .code = .type_mismatch },
+        .{ .name = "duplicate_operation", .source = "type State a is effect = { get: Unit -> a, set: a -> Unit }\nentry const answer = fn () => do:\n  let (next,result) = @effect.run State.get State.get 0 (fn () => 42)\n  break @u32.add next result\n", .code = .invalid_state_provider },
         .{ .name = "wrong_implementation", .source = "type State a is effect = { get: Unit -> a, set: a -> Unit }\nentry const answer = fn () => @effect.reader State.get 0 (fn () => #True) (fn () -> U32 => State.get ())\n", .code = .type_mismatch },
         .{ .name = "wrong_action_parameter", .source = "type State a is effect = { get: Unit -> a, set: a -> Unit }\nentry const answer = fn () => @effect.run State.get State.set 0 (fn (value:U32) => value)\n", .code = .type_mismatch },
         .{ .name = "partial_run", .source = "type State a is effect = { get: Unit -> a, set: a -> Unit }\nentry const answer = fn () => @effect.run State.get State.set 0\n", .code = .call_arity },
@@ -899,7 +899,7 @@ test "sealed Foreign annotations keep exact negative admission and ordinary shad
         .{ .source = "const invalid=fn (io:U32 -> U32 ! {Missing}) => io\n", .code = .unknown_effect },
         .{ .source = "const invalid=fn (io:U32 -> U32 ! {Foreign U32}) => io\n", .code = .type_arity },
         .{ .source = "effect Read:Unit -> U32 ! {Foreign}\n", .code = .operation_signature },
-        .{ .source = "const invalid=fn (io:U32 -> U32 ! {Foreign}) => do:\n  let value=io 1\n  return value\n", .code = .let_effect },
+        .{ .source = "const invalid=fn (io:U32 -> U32 ! {Foreign}) => do:\n  let value=io 1\n  break value\n", .code = .let_effect },
         .{ .source = "const callback:U32 -> U32 ! {Foreign}=fn value=>value\nentry const invalid=callback 1\n", .code = .const_effect },
         .{ .source = "const pure=fn (io:U32 -> U32)=>io 1\nconst invalid=fn (io:U32 -> U32 ! {Foreign})=>pure io\n", .code = .effect_mismatch },
     };
@@ -1032,24 +1032,24 @@ const scoped_nested_source = scoped_state_header ++
     "      use b <- right.get ()\n" ++
     "      use left.set (@u32.add a 1)\n" ++
     "      use right.set (@u32.add b 2)\n" ++
-    "      return #[a, b]\n" ++
+    "      break #[a, b]\n" ++
     "    let (inner, reads) = nested\n" ++
-    "    return @array.concat #[inner] reads\n" ++
-    "  return @array.concat #[outer] result\n" ++
+    "    break @array.concat #[inner] reads\n" ++
+    "  break @array.concat #[outer] result\n" ++
     "))\n";
 test "scoped effect nested same typed capabilities retain independent exact rows" {
     try checkScopedSource(a, scoped_nested_source, null);
 }
 test "scoped effect boundary rejects direct capability and handled closures" {
     try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => s)\n", .capability_escape);
-    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => fn () => do (@effect.state s.get s.set 0):\n  return 42\n)\n", .capability_escape);
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => fn () => do (@effect.state s.get s.set 0):\n  break 42\n)\n", .capability_escape);
 }
 test "scoped effect requires explicit closed family callback and rejects residual identity" {
     try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn s => 42)\n", .effect_identity_scope);
-    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => do:\n  use n <- s.get ()\n  return n\n)\n", .effect_mismatch);
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => do:\n  use n <- s.get ()\n  break n\n)\n", .effect_mismatch);
 }
 test "scoped effect operation aliases and local callbacks remain usable" {
-    try checkScopedSource(a, scoped_state_header ++ "entry const answer = fn () => @effect.scope (fn (s: State U32) => do:\n  let capability = s\n  let read = capability.get\n  let write = capability.set\n  let local = fn () => read ()\n  let (state, result) = do (@effect.state read write 7):\n    return local ()\n  return result\n)\n", null);
+    try checkScopedSource(a, scoped_state_header ++ "entry const answer = fn () => @effect.scope (fn (s: State U32) => do:\n  let capability = s\n  let read = capability.get\n  let write = capability.set\n  let local = fn () => read ()\n  let (state, result) = do (@effect.state read write 7):\n    break local ()\n  break result\n)\n", null);
 }
 
 test "scoped effect rejects operation aggregate demand and generic authority escapes" {
@@ -1057,7 +1057,7 @@ test "scoped effect rejects operation aggregate demand and generic authority esc
         "s.get",
         "#[s]",
         "{saved: s.get}",
-        "@computation (fn () => do (@effect.state s.get s.set 0):\n  return 42\n)",
+        "@computation (fn () => do (@effect.state s.get s.set 0):\n  break 42\n)",
     };
     for (suffixes) |suffix| {
         const text = try a.print("{s}entry const bad = fn () => @effect.scope (fn (s: State U32) => {s})\n", .{ scoped_state_header, suffix });
@@ -1068,7 +1068,7 @@ test "scoped effect rejects operation aggregate demand and generic authority esc
 }
 
 test "scoped effect different instance provider leaves exact requirement visible" {
-    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do (@effect.state right.get right.set 0):\n  use value <- left.get ()\n  return value\n))\n", .effect_mismatch);
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do (@effect.state right.get right.set 0):\n  use value <- left.get ()\n  break value\n))\n", .effect_mismatch);
 }
 
 test "scoped effect reflection cannot publish a fresh descriptor" {
@@ -1076,7 +1076,7 @@ test "scoped effect reflection cannot publish a fresh descriptor" {
 }
 
 fn scopedAllocationLaw(allocator: std.mem.Allocator) !void {
-    try checkScopedSource(allocator, scoped_state_header ++ "entry const answer = fn () => @effect.scope (fn (s: State U32) => do (@effect.state s.get s.set 7):\n  return s.get ()\n)\n", null);
+    try checkScopedSource(allocator, scoped_state_header ++ "entry const answer = fn () => @effect.scope (fn (s: State U32) => do (@effect.state s.get s.set 7):\n  break s.get ()\n)\n", null);
 }
 
 test "scoped effect checker releases every failed allocation" {
@@ -1084,29 +1084,29 @@ test "scoped effect checker releases every failed allocation" {
 }
 
 test "scoped effect longer lived builtin State cannot retain capturing closure" {
-    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @state.run (fn () => 0) (fn () => @effect.scope (fn (s: State U32) => do:\n  use @state.set (fn () => do (@effect.state s.get s.set 0):\n    return 42\n  )\n  return 42\n))\n", .capability_escape);
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @state.run (fn () => 0) (fn () => @effect.scope (fn (s: State U32) => do:\n  use @state.set (fn () => do (@effect.state s.get s.set 0):\n    break 42\n  )\n  break 42\n))\n", .capability_escape);
 }
 
 test "scoped effect request clauses preserve a fresh owner" {
-    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => do:\n  let computation = @computation (fn () => s.get ())\n  for request in @requests computation:\n    case request of\n      effect s.get () =>\n        yield 7\n      complete value =>\n        return value\n)\n", null);
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => do:\n  let computation = @computation (fn () => s.get ())\n  for request in @requests computation:\n    case request of\n      effect s.get () =>\n        yield 7\n      complete value =>\n        break value\n)\n", null);
 }
 
 test "scoped effect State pairing rejects different runtime owners" {
-    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:\n  let provider = @effect.state left.get right.set 0\n  return 42\n))\n", .effect_identity_scope);
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:\n  let provider = @effect.state left.get right.set 0\n  break 42\n))\n", .effect_identity_scope);
 }
 
 test "scoped effect request aliases reject duplicate owner clauses" {
-    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => do:\n  let alias = s.get\n  let computation = @computation (fn () => s.get ())\n  for request in @requests computation:\n    case request of\n      effect s.get () =>\n        yield 7\n      effect alias () =>\n        yield 8\n      complete value =>\n        return value\n)\n", .duplicate_request_handler);
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => do:\n  let alias = s.get\n  let computation = @computation (fn () => s.get ())\n  for request in @requests computation:\n    case request of\n      effect s.get () =>\n        yield 7\n      effect alias () =>\n        yield 8\n      complete value =>\n        break value\n)\n", .duplicate_request_handler);
 }
 test "scoped effect request clause for another owner leaves its requirement" {
-    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:\n  let computation = @computation (fn () => left.get ())\n  for request in @requests computation:\n    case request of\n      effect right.get () =>\n        yield 7\n      complete value =>\n        return value\n))\n", .effect_mismatch);
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:\n  let computation = @computation (fn () => left.get ())\n  for request in @requests computation:\n    case request of\n      effect right.get () =>\n        yield 7\n      complete value =>\n        break value\n))\n", .effect_mismatch);
 }
 
 const scoped_generic_source = scoped_state_header ++
     "const local = fn (value: a) => @effect.scope (fn (s: State a) => do:\n" ++
     "  let (state, result) = do (@effect.state s.get s.set value):\n" ++
-    "    return s.get ()\n" ++
-    "  return result\n" ++
+    "    break s.get ()\n" ++
+    "  break result\n" ++
     ")\n" ++
     "entry const integer = fn () => local 7\n" ++
     "entry const fraction = fn () => local 1.5\n";
@@ -1115,7 +1115,7 @@ test "scoped effect symbolic family arguments preserve inherited payload shapes"
     try checkScopedSource(a, scoped_state_header ++ "const local = fn (value: a) => @effect.scope (fn (s: State a) => {saved: value})\nentry const answer = fn () => local 7\n", null);
 }
 test "scoped effect symbolic payload proof cannot erase a fresh capture" {
-    try checkScopedSource(a, scoped_state_header ++ "const local = fn (value: a) => @effect.scope (fn (s: State a) => fn () => do (@effect.state s.get s.set value):\n  return s.get ()\n)\nentry const bad = fn () => local 7\n", .capability_escape);
+    try checkScopedSource(a, scoped_state_header ++ "const local = fn (value: a) => @effect.scope (fn (s: State a) => fn () => do (@effect.state s.get s.set value):\n  break s.get ()\n)\nentry const bad = fn () => local 7\n", .capability_escape);
     try checkScopedSource(a, scoped_state_header ++ "const local = fn (value: a) => @effect.scope (fn (s: State a) => {saved: s})\nentry const bad = fn () => local 7\n", .capability_escape);
 }
 fn scopedGenericAllocationLaw(allocator: std.mem.Allocator) !void {
@@ -1130,16 +1130,16 @@ const scoped_static_store_source =
     \\type Save a is effect = {keep: (Unit -> a) -> Unit}
     \\entry const bad = fn () => do:
     \\  let (saved, result) = @state.run (fn () => 0) (fn () => do (@effect.provider (Save.keep U32) (fn value => @state.set value)):
-    \\    return @effect.scope (fn (s: State U32) => do:
+    \\    break @effect.scope (fn (s: State U32) => do:
     \\      use Save.keep U32 (fn () => do:
     \\        let (state, result) = do (@effect.state s.get s.set 0):
-    \\          return 42
-    \\        return result
+    \\          break 42
+    \\        break result
     \\      )
-    \\      return 42
+    \\      break 42
     \\    )
     \\  )
-    \\  return saved ()
+    \\  break saved ()
 ;
 fn scopedStaticStoreAllocationLaw(allocator: std.mem.Allocator) !void {
     try checkScopedSource(allocator, scoped_static_store_source, .capability_escape);
@@ -1152,8 +1152,8 @@ test "scoped effect static generic operations cannot transfer authority to longe
 const scoped_callback_source = scoped_state_header ++
     "entry const answer = fn () => @effect.scope (fn (s: State U32) => do:\n" ++
     "  let (state, result) = do (@effect.state s.get s.set 7):\n" ++
-    "    return (fn callback => callback ()) (fn () => s.get ())\n" ++
-    "  return result\n" ++
+    "    break (fn callback => callback ()) (fn () => s.get ())\n" ++
+    "  break result\n" ++
     ")\n";
 fn scopedCallbackAllocationLaw(allocator: std.mem.Allocator) !void {
     try checkScopedSource(allocator, scoped_callback_source, null);
@@ -1164,15 +1164,15 @@ test "scoped effect direct callback adapters can borrow live authority" {
 }
 test "scoped effect direct callback adapter cannot return captured authority" {
     try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => (fn callback => callback ()) (fn () => s.get))\n", .capability_escape);
-    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => (fn callback => fn () => callback ()) (fn () => do (@effect.state s.get s.set 0):\n  return 42\n))\n", .capability_escape);
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => (fn callback => fn () => callback ()) (fn () => do (@effect.state s.get s.set 0):\n  break 42\n))\n", .capability_escape);
 }
 
 const scoped_outer_result_source = scoped_state_header ++
     "entry const answer = fn () => @effect.scope (fn (left: State U32) => do:\n" ++
     "  let longer = @effect.scope (fn (right: State U32) => {saved: left})\n" ++
     "  let (state, result) = do (@effect.state left.get left.set 7):\n" ++
-    "    return longer.saved.get ()\n" ++
-    "  return result\n" ++
+    "    break longer.saved.get ()\n" ++
+    "  break result\n" ++
     ")\n";
 fn scopedOuterResultAllocationLaw(allocator: std.mem.Allocator) !void {
     try checkScopedSource(allocator, scoped_outer_result_source, null);
@@ -1180,20 +1180,20 @@ fn scopedOuterResultAllocationLaw(allocator: std.mem.Allocator) !void {
 test "scoped effect result footprint subtracts only the exiting binder" {
     try scopedOuterResultAllocationLaw(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, scopedOuterResultAllocationLaw, .{});
-    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (left: State U32) => do:\n  let invalid = @effect.scope (fn (right: State U32) => {outer: left, inner: #[right]})\n  return 42\n)\n", .capability_escape);
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (left: State U32) => do:\n  let invalid = @effect.scope (fn (right: State U32) => {outer: left, inner: #[right]})\n  break 42\n)\n", .capability_escape);
 }
 
 const scoped_pure_closure_source = scoped_state_header ++
     "entry const answer = fn () => do:\n" ++
     "  let callback = @effect.scope (fn (s: State U32) => fn () => 42)\n" ++
-    "  return callback ()\n";
+    "  break callback ()\n";
 fn scopedPureClosureAllocationLaw(allocator: std.mem.Allocator) !void {
     try checkScopedSource(allocator, scoped_pure_closure_source, null);
 }
 test "scoped effect closed source closure footprints distinguish captures from effects" {
     try scopedPureClosureAllocationLaw(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, scopedPureClosureAllocationLaw, .{});
-    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => fn () => do (@effect.state s.get s.set 0):\n  return 42\n)\n", .capability_escape);
+    try checkScopedSource(a, scoped_state_header ++ "entry const bad = fn () => @effect.scope (fn (s: State U32) => fn () => do (@effect.state s.get s.set 0):\n  break 42\n)\n", .capability_escape);
 }
 
 const static_alias_regression_source =
@@ -1204,9 +1204,9 @@ const static_alias_regression_source =
     \\const read: Unit -> a ! {| e} where { Read a } = fn () => Signal.get a ()
     \\const number: Unit -> Number ! {Signal.get Number} = fn () => Signal.get Number ()
     \\entry const answer = fn () -> U32 => do (@effect.provider (Signal.get (Identity Number)) (fn () => 21)):
-    \\  return @u32.add (read ()) (number ())
+    \\  break @u32.add (read ()) (number ())
     \\entry const fraction = fn () -> F32 => do (@effect.provider (Signal.get (Identity F32)) (fn () => 1.5)):
-    \\  return read ()
+    \\  break read ()
 ;
 fn abstractReadAliasLaw(allocator: std.mem.Allocator) !void {
     var tokens = try lexer.lex(allocator, static_alias_regression_source);
@@ -1239,8 +1239,8 @@ const parameter_store_source = scoped_state_header ++
     \\type Save a is effect = {keep: (Unit -> a) -> Unit}
     \\const invalid = fn (s: State U32) => Save.keep U32 (fn () => do:
     \\  let (state, result) = do (@effect.state s.get s.set 0):
-    \\    return 42
-    \\  return result
+    \\    break 42
+    \\  break result
     \\)
     \\entry const answer = 42
 ;
@@ -1257,9 +1257,9 @@ test "scoped effect callback rows retain unmatched owner requirements at scope e
         \\const apply = fn (s: State a) => fn (callback: Unit -> a ! {s.get | e}) => callback ()
         \\entry const invalid = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
         \\  use nested <- do (@effect.state left.get left.set 7):
-        \\    return apply left (fn () => right.get ())
+        \\    break apply left (fn () => right.get ())
         \\  let (state, result) = nested
-        \\  return result
+        \\  break result
         \\))
     , .capability_escape);
 }
@@ -1270,7 +1270,7 @@ test "scoped effect partially applied identity cannot hide a storage sink" {
         \\const identity = fn value => value
         \\const save = fn callback => Save.keep U32 callback
         \\entry const invalid = fn () => @effect.scope (fn (s: State U32) => (identity save) (fn () => do (@effect.state s.get s.set 0):
-        \\  return 42
+        \\  break 42
         \\))
     , .capability_escape);
 }
@@ -1281,12 +1281,12 @@ pub const local_store_source = scoped_state_header ++
     \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
     \\    use Box.set (fn () => do:
     \\      let (state, value) = do (@effect.state s.get s.set 7):
-    \\        return s.get ()
-    \\      return value
+    \\        break s.get ()
+    \\      break value
     \\    )
     \\    use callback <- Box.get ()
-    \\    return callback ()
-    \\  return result
+    \\    break callback ()
+    \\  break result
     \\)
 ;
 fn localStateStorageLaw(allocator: std.mem.Allocator) !void {
@@ -1301,15 +1301,15 @@ test "scoped effect older State cells reject younger source captures" {
     try checkScopedSource(a, scoped_state_header ++
         \\entry const invalid = fn () => @effect.scope (fn (cell: State (Unit -> U32)) => do:
         \\  let (stored, result) = do (@effect.state cell.get cell.set (fn () => 0)):
-        \\    return @effect.scope (fn (s: State U32) => do:
+        \\    break @effect.scope (fn (s: State U32) => do:
         \\      use cell.set (fn () => do:
         \\        let (state, value) = do (@effect.state s.get s.set 7):
-        \\          return s.get ()
-        \\        return value
+        \\          break s.get ()
+        \\        break value
         \\      )
-        \\      return 42
+        \\      break 42
         \\    )
-        \\  return result
+        \\  break result
         \\)
     , .capability_escape);
 }
@@ -1319,14 +1319,14 @@ test "scoped effect ordinary provider shadowing cannot license a State storage l
         \\type Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}
         \\entry const invalid = fn () => @effect.scope (fn (s: State U32) => do:
         \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
-        \\    return do (@effect.provider Box.set (fn callback => ())):
+        \\    break do (@effect.provider Box.set (fn callback => ())):
         \\      use Box.set (fn () => do:
         \\        let (state, value) = do (@effect.state s.get s.set 7):
-        \\          return s.get ()
-        \\        return value
+        \\          break s.get ()
+        \\        break value
         \\      )
-        \\      return 42
-        \\  return result
+        \\      break 42
+        \\  break result
         \\)
     , .capability_escape);
 }
@@ -1338,11 +1338,11 @@ test "scoped effect closures do not inherit construction time State handlers" {
         \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
         \\    let later = fn () => Box.set (fn () => do:
         \\      let (state, value) = do (@effect.state s.get s.set 7):
-        \\        return s.get ()
-        \\      return value
+        \\        break s.get ()
+        \\      break value
         \\    )
-        \\    return 42
-        \\  return result
+        \\    break 42
+        \\  break result
         \\)
     , .capability_escape);
 }
@@ -1354,8 +1354,8 @@ pub const dependent_arrow_source = scoped_state_header ++
     \\  let (state, result) = do (@effect.state s.get s.set 7):
     \\    use a <- read s
     \\    use b <- apply s (fn () => s.get ())
-    \\    return @u32.add a b
-    \\  return result
+    \\    break @u32.add a b
+    \\  break result
     \\)
 ;
 fn dependentArrowLaw(allocator: std.mem.Allocator) !void {
@@ -1371,8 +1371,8 @@ test "scoped effect complete arrow inputs cannot hide captures in storage" {
         \\type Save a is effect = {keep: (Unit -> a) -> Unit}
         \\const invalid: (state: State U32) -> Unit ! {Save.keep U32} = fn input => Save.keep U32 (fn () => do:
         \\  let (state, value) = do (@effect.state input.get input.set 7):
-        \\    return input.get ()
-        \\  return value
+        \\    break input.get ()
+        \\  break value
         \\)
         \\entry const answer = 42
     , .capability_escape);
@@ -1405,11 +1405,11 @@ pub const pair_source = scoped_state_header ++
     \\      use b <- second left right
     \\      use c <- first right left
     \\      use d <- second right left
-    \\      return @u32.add (@u32.add a b) (@u32.add c d)
+    \\      break @u32.add (@u32.add a b) (@u32.add c d)
     \\    let (state, result) = inner
-    \\    return result
+    \\    break result
     \\  let (state, result) = outer
-    \\  return result
+    \\  break result
     \\))
 ;
 fn pairLaw(allocator: std.mem.Allocator) !void {
@@ -1426,8 +1426,8 @@ pub const selection_source = scoped_state_header ++
     \\  let alias = selected
     \\  let (state, result) = do (@effect.state selected.get selected.set 41):
     \\    use alias.set 42
-    \\    return alias.get ()
-    \\  return result
+    \\    break alias.get ()
+    \\  break result
     \\))
 ;
 fn selectionLaw(allocator: std.mem.Allocator) !void {
@@ -1447,18 +1447,18 @@ test "scoped effect selection cannot discharge independent roots or expose eithe
         \\  let selected = if flag then left else right
         \\  let independent = if flag then left else right
         \\  use nested <- do (@effect.state selected.get selected.set 7):
-        \\    return independent.get ()
+        \\    break independent.get ()
         \\  let (state, result) = nested
-        \\  return result
+        \\  break result
         \\))
     , .capability_escape);
     try checkScopedSource(a, scoped_state_header ++
         \\entry const bad = fn flag => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
         \\  let selected = if flag then left else right
-        \\  return fn () => do:
+        \\  break fn () => do:
         \\    let (state, result) = do (@effect.state selected.get selected.set 7):
-        \\      return selected.get ()
-        \\    return result
+        \\      break selected.get ()
+        \\    break result
         \\))
     , .capability_escape);
 }
@@ -1467,19 +1467,19 @@ test "scoped effect selection keeps loop rejection and permits uninvoked local f
         \\entry const bad = fn flag => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
         \\  for index in 0..2:
         \\    let selected = if flag then left else right
-        \\  return 42
+        \\  break 42
         \\))
     , .effect_identity_scope);
     try checkScopedSource(a, scoped_state_header ++
         \\entry const bad = fn flag => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
         \\  let later = fn () => if flag then left else right
-        \\  return 42
+        \\  break 42
         \\))
     , null);
     try checkScopedSource(a, scoped_state_header ++
         \\entry const bad = fn flag => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
         \\  let later = fn () => if flag then left else right
-        \\  return later
+        \\  break later
         \\))
     , .capability_escape);
 }
@@ -1490,8 +1490,8 @@ pub const symbolic_selection_source = scoped_state_header ++
     \\  let selected = if #True then left else right
     \\  let (state, result) = do (@effect.state selected.get selected.set initial):
     \\    use selected.set 7
-    \\    return read selected
-    \\  return result
+    \\    break read selected
+    \\  break result
     \\))
 ;
 fn symbolicSelectionLaw(allocator: std.mem.Allocator) !void {
@@ -1512,11 +1512,11 @@ pub const parameter_footprint_source = scoped_state_header ++
     \\      use b <- first.get ()
     \\      use c <- second.get ()
     \\      use d <- repeated.get ()
-    \\      return @u32.add (@u32.add a b) (@u32.add c d)
+    \\      break @u32.add (@u32.add a b) (@u32.add c d)
     \\    let (state, result) = inner
-    \\    return result
+    \\    break result
     \\  let (state, result) = outer
-    \\  return result
+    \\  break result
     \\))
 ;
 fn parameterFootprintLaw(allocator: std.mem.Allocator) !void {
@@ -1532,19 +1532,19 @@ test "scoped effect pure product helpers retain every exact input footprint" {
     try checkScopedSource(a, scoped_state_header ++
         \\const pack = fn first => fn second => do:
         \\  let saved = first
-        \\  return (second, saved)
+        \\  break (second, saved)
         \\entry const answer = fn () => @effect.scope (fn (state: State U32) => do:
         \\  let borrowed = pack state 42
-        \\  return 42
+        \\  break 42
         \\)
     , null);
     try checkScopedSource(a, scoped_state_header ++
         \\const pack = fn first => fn second => do:
         \\  let saved = first
-        \\  return (second, saved)
+        \\  break (second, saved)
         \\entry const bad = fn () => @effect.scope (fn (state: State U32) => do:
         \\  let borrowed = pack state 42
-        \\  return borrowed
+        \\  break borrowed
         \\)
     , .capability_escape);
 }
@@ -1556,9 +1556,9 @@ test "scoped effect product summaries omit unused younger owners precisely" {
         \\  let (borrowed, count) = @effect.scope (fn (younger: State U32) => keep younger older)
         \\  use handled <- do (@effect.state borrowed.get borrowed.set 7):
         \\    use value <- borrowed.get ()
-        \\    return @u32.add value count
+        \\    break @u32.add value count
         \\  let (state, result) = handled
-        \\  return result
+        \\  break result
         \\)
     , null);
 }
@@ -1568,15 +1568,15 @@ pub const parameter_invocation_source = scoped_state_header ++
     \\entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
     \\  use outer <- do (@effect.state left.get left.set 7):
     \\    use inner <- do (@effect.state right.get right.set 100):
-    \\      return invoke left right (fn () => do:
+    \\      break invoke left right (fn () => do:
     \\        use a <- left.get ()
     \\        use b <- right.get ()
-    \\        return @u32.add a b
+    \\        break @u32.add a b
     \\      )
     \\    let (state, result) = inner
-    \\    return result
+    \\    break result
     \\  let (state, result) = outer
-    \\  return result
+    \\  break result
     \\))
 ;
 fn parameterInvocationLaw(allocator: std.mem.Allocator) !void {
@@ -1596,11 +1596,11 @@ pub const record_footprint_source = scoped_state_header ++
     \\      use a <- borrowed.selected.get ()
     \\      use b <- borrowed.nested.first.get ()
     \\      use c <- borrowed.repeated.get ()
-    \\      return @u32.add a (@u32.add b c)
+    \\      break @u32.add a (@u32.add b c)
     \\    let (state, result) = inner
-    \\    return result
+    \\    break result
     \\  let (state, result) = outer
-    \\  return result
+    \\  break result
     \\))
 ;
 fn recordFootprintLaw(allocator: std.mem.Allocator) !void {
@@ -1619,9 +1619,9 @@ test "scoped effect record constructors retain exact named input footprints" {
         \\  let borrowed = @effect.scope (fn (younger: State U32) => keep younger older)
         \\  use handled <- do (@effect.state borrowed.retained.get borrowed.retained.set 7):
         \\    use value <- borrowed.retained.get ()
-        \\    return @u32.add value borrowed.count
+        \\    break @u32.add value borrowed.count
         \\  let (state, result) = handled
-        \\  return result
+        \\  break result
         \\)
     , null);
 }
@@ -1631,8 +1631,8 @@ pub const member_closure_source = scoped_state_header ++
     \\entry const answer = fn () => @effect.scope (fn (older: State U32) => do:
     \\  let callback = @effect.scope (fn (younger: State F32) => reader younger older)
     \\  let (state, result) = do (@effect.state older.get older.set 7):
-    \\    return callback ()
-    \\  return result
+    \\    break callback ()
+    \\  break result
     \\)
 ;
 pub const too_many_member_closure_source = scoped_state_header ++
@@ -1640,8 +1640,8 @@ pub const too_many_member_closure_source = scoped_state_header ++
     \\entry const answer = fn () => @effect.scope (fn (older: State U32) => do:
     \\  let callback = @effect.scope (fn (younger: State F32) => read younger younger younger younger younger younger younger younger younger younger younger younger younger younger younger older)
     \\  let (state, result) = do (@effect.state older.get older.set 7):
-    \\    return callback ()
-    \\  return result
+    \\    break callback ()
+    \\  break result
     \\)
 ;
 pub const maximum_member_closure_source = scoped_state_header ++
@@ -1649,8 +1649,8 @@ pub const maximum_member_closure_source = scoped_state_header ++
     \\entry const answer = fn () => @effect.scope (fn (older: State U32) => do:
     \\  let callback = @effect.scope (fn (younger: State F32) => read younger younger younger younger younger younger younger younger younger younger younger younger younger younger older)
     \\  let (state, result) = do (@effect.state older.get older.set 7):
-    \\    return callback ()
-    \\  return result
+    \\    break callback ()
+    \\  break result
     \\)
 ;
 fn memberClosureLaw(allocator: std.mem.Allocator) !void {
@@ -1670,8 +1670,8 @@ test "scoped effect member closure factories preserve exact captured formal life
         \\entry const answer = fn () => @effect.scope (fn (older: State U32) => do:
         \\  let callback = @effect.scope (fn (younger: State F32) => reader older)
         \\  let (state, result) = do (@effect.state older.get older.set 7):
-        \\    return callback ()
-        \\  return result
+        \\    break callback ()
+        \\  break result
         \\)
     , null);
     try checkScopedSource(a, scoped_state_header ++
@@ -1679,8 +1679,8 @@ test "scoped effect member closure factories preserve exact captured formal life
         \\entry const bad = fn () => @effect.scope (fn (older: State U32) => do:
         \\  let callback = @effect.scope (fn (younger: State U32) => reader (fn () => younger.get ()) older)
         \\  let (state, result) = do (@effect.state older.get older.set 7):
-        \\    return callback ()
-        \\  return result
+        \\    break callback ()
+        \\  break result
         \\)
     , .capability_escape);
 }
@@ -1692,11 +1692,11 @@ const general_value_source = scoped_state_header ++
     \\  let callbacks = @effect.scope (fn (younger: State F32) => do:
     \\    let alias = fn () => older.get ()
     \\    let version = identity alias
-    \\    return {callbacks: pack younger older, nested: (version, #[version])}
+    \\    break {callbacks: pack younger older, nested: (version, #[version])}
     \\  )
     \\  let (state, result) = do (@effect.state older.get older.set 7):
-    \\    return (@array.get callbacks.callbacks 0) ()
-    \\  return result
+    \\    break (@array.get callbacks.callbacks 0) ()
+    \\  break result
     \\)
 ;
 test "scoped value footprints preserve aliases nested callable containers and retained formal contracts" {
@@ -1708,7 +1708,7 @@ test "scoped value footprints preserve aliases nested callable containers and re
     try checkScopedSource(a, scoped_state_header ++
         \\entry const bad = fn () => @effect.scope (fn (state: State U32) => do:
         \\  let hidden = fn () => state.get ()
-        \\  return {nested: #[(hidden, 42)]}
+        \\  break {nested: #[(hidden, 42)]}
         \\)
     , .capability_escape);
 }
@@ -1724,7 +1724,7 @@ test "scoped value origins distinguish enclosing inputs from the fresh scope par
     try checkScopedSource(a, scoped_state_header ++
         \\const through = fn callback => @effect.scope (fn (state: State U32) => do:
         \\  let alias = callback
-        \\  return {callback: alias}
+        \\  break {callback: alias}
         \\)
         \\entry const answer = fn () => (through (fn () => 7)).callback ()
     , null);
@@ -1735,7 +1735,7 @@ test "scoped value origins distinguish enclosing inputs from the fresh scope par
         \\const defer = fn sink => fn value => #[(fn () => sink value)]
         \\entry const bad = fn () => @effect.scope (fn (state: State U32) => do:
         \\  let hidden = defer (fn value => value) state
-        \\  return 42
+        \\  break 42
         \\)
     , .capability_escape);
 }
@@ -1749,11 +1749,11 @@ const precise_path_source = scoped_state_header ++
     \\entry const answer = fn () => @effect.scope (fn (older: State U32) => do:
     \\  let callback = @effect.scope (fn (younger: State U32) => do:
     \\    let fields = bundle younger older
-    \\    return select (unwrap (#Wrapper fields))
+    \\    break select (unwrap (#Wrapper fields))
     \\  )
     \\  let (state, result) = do (@effect.state older.get older.set 7):
-    \\    return callback ()
-    \\  return result
+    \\    break callback ()
+    \\  break result
     \\)
 ;
 fn preciseResultLaw(allocator: std.mem.Allocator) !void {
@@ -1770,7 +1770,7 @@ test "scoped owned result paths discard unrelated hidden closure authority" {
         \\entry const bad = fn () => @effect.scope (fn (older: State U32) => @effect.scope (fn (younger: State U32) => do:
         \\  let fields = {discarded: fn () => younger.get (), retained: fn () => older.get ()}
         \\  let thunk = fn () => fields.retained ()
-        \\  return thunk
+        \\  break thunk
         \\))
     , .capability_escape);
 }
@@ -1782,13 +1782,13 @@ test "scoped owned projections retain pure hidden captures independently of late
         \\  let callback = @effect.scope (fn (younger: State U32) => do:
         \\    let discarded = fn () => do:
         \\      let ignored = younger
-        \\      return 1
+        \\      break 1
         \\    let retained = fn () => do:
         \\      let ignored = older
-        \\      return 7
-        \\    return take_array #[discarded, retained]
+        \\      break 7
+        \\    break take_array #[discarded, retained]
         \\  )
-        \\  return callback ()
+        \\  break callback ()
         \\)
     , null);
     try checkScopedSource(a, scoped_state_header ++
@@ -1796,11 +1796,11 @@ test "scoped owned projections retain pure hidden captures independently of late
         \\entry const bad = fn () => @effect.scope (fn (older: State U32) => @effect.scope (fn (younger: State U32) => do:
         \\  let discarded = fn () => do:
         \\    let ignored = younger
-        \\    return 1
+        \\    break 1
         \\  let retained = fn () => do:
         \\    let ignored = older
-        \\    return 7
-        \\  return take_array #[discarded, retained]
+        \\    break 7
+        \\  break take_array #[discarded, retained]
         \\))
     , .capability_escape);
     try checkScopedSource(a, scoped_state_header ++
@@ -1808,11 +1808,11 @@ test "scoped owned projections retain pure hidden captures independently of late
         \\entry const bad = fn (index: U32) => @effect.scope (fn (older: State U32) => @effect.scope (fn (younger: State U32) => do:
         \\  let discarded = fn () => do:
         \\    let ignored = younger
-        \\    return 1
+        \\    break 1
         \\  let retained = fn () => do:
         \\    let ignored = older
-        \\    return 7
-        \\  return @array.get (take_at #[#[retained, discarded], #[retained, retained]] index) 1
+        \\    break 7
+        \\  break @array.get (take_at #[#[retained, discarded], #[retained, retained]] index) 1
         \\))
     , .capability_escape);
 }
@@ -1822,12 +1822,12 @@ fn directScopeOlderStateLaw(allocator: std.mem.Allocator) !void {
         \\type Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}
         \\entry const answer = fn () => do:
         \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
-        \\    return @effect.scope (fn (s: State U32) => do:
+        \\    break @effect.scope (fn (s: State U32) => do:
         \\      use previous <- Box.get ()
         \\      use Box.set (fn () => 0)
-        \\      return previous ()
+        \\      break previous ()
         \\    )
-        \\  return result
+        \\  break result
     ;
     try checkScopedSource(allocator, text, null);
 }
@@ -1843,11 +1843,11 @@ fn demandedConstructionLaw(allocator: std.mem.Allocator) !void {
         \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
         \\  let ignored = s
         \\  let pending = delay (@effect.scope (fn (local: State U32) => do (@effect.state local.get local.set 42):
-        \\    return local.get ()
+        \\    break local.get ()
         \\  ))
         \\  use result <- @demand pending
         \\  let (state, value) = result
-        \\  return value
+        \\  break value
         \\)
     , null);
     try checkScopedSource(allocator, prefix ++
@@ -1855,30 +1855,30 @@ fn demandedConstructionLaw(allocator: std.mem.Allocator) !void {
         \\  let ignored = s
         \\  let pending = delay (do:
         \\    let local = 42
-        \\    return local
+        \\    break local
         \\  )
         \\  use finished <- @demand pending
-        \\  return finished
+        \\  break finished
         \\)
     , null);
     try checkScopedSource(allocator, prefix ++
         \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
         \\  let pending = delay (do:
         \\    let captured = s
-        \\    return 42
+        \\    break 42
         \\  )
         \\  use finished <- @demand pending
-        \\  return finished
+        \\  break finished
         \\)
     , .capability_escape);
     try checkScopedSource(allocator, prefix ++
         \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
         \\  let pending = delay (do:
         \\    let captured = s.get
-        \\    return 42
+        \\    break 42
         \\  )
         \\  use finished <- @demand pending
-        \\  return finished
+        \\  break finished
         \\)
     , .capability_escape);
 }
@@ -1894,12 +1894,12 @@ const generic_local_state_source = scoped_state_header ++
     \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
     \\    use store Box.set (fn () => do:
     \\      let (state, value) = do (@effect.state s.get s.set 42):
-    \\        return s.get ()
-    \\      return value
+    \\        break s.get ()
+    \\      break value
     \\    )
     \\    use callback <- Box.get ()
-    \\    return callback ()
-    \\  return result
+    \\    break callback ()
+    \\  break result
     \\)
 ;
 const generic_older_state =
@@ -1908,15 +1908,15 @@ const generic_older_state =
     \\const store = fn setter => fn value => setter value
     \\entry const answer = fn () => do:
     \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
-    \\    return @effect.scope (fn (s: State U32) => do:
+    \\    break @effect.scope (fn (s: State U32) => do:
     \\      use store Box.set (fn () => do:
     \\        let (state, value) = do (@effect.state s.get s.set 42):
-    \\          return s.get ()
-    \\        return value
+    \\          break s.get ()
+    \\        break value
     \\      )
-    \\      return 0
+    \\      break 0
     \\    )
-    \\  return result
+    \\  break result
 ;
 const generic_ordinary_provider =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
@@ -1926,12 +1926,12 @@ const generic_ordinary_provider =
     \\  let result = do (@effect.provider Box.set (fn value => ())):
     \\    use store Box.set (fn () => do:
     \\      let (state, value) = do (@effect.state s.get s.set 42):
-    \\        return s.get ()
-    \\      return value
+    \\        break s.get ()
+    \\      break value
     \\    )
     \\    use callback <- Box.get ()
-    \\    return callback ()
-    \\  return result
+    \\    break callback ()
+    \\  break result
     \\)
 ;
 const generic_foreign_sink =
@@ -1940,10 +1940,10 @@ const generic_foreign_sink =
     \\const transfer = fn (foreign: (Unit -> U32) -> Unit ! {Foreign}) => @effect.scope (fn (s: State U32) => do:
     \\  use store foreign (fn () => do:
     \\    let (state, value) = do (@effect.state s.get s.set 42):
-    \\      return s.get ()
-    \\    return value
+    \\      break s.get ()
+    \\    break value
     \\  )
-    \\  return 0
+    \\  break 0
     \\)
     \\entry const answer = fn () => 42
 ;
@@ -1962,7 +1962,7 @@ fn noStoreConditionLaw(allocator: std.mem.Allocator) !void {
     try checkScopedSource(allocator, scoped_state_header ++
         \\const bury = fn value => do:
         \\  let retained = [value]
-        \\  return #True
+        \\  break #True
         \\const invoke = fn value => fn callback => callback value
         \\entry const bad = fn () => @effect.scope (fn (state: State U32) => invoke state (fn actual => if bury actual then 0 else 0))
     , .capability_escape);
@@ -1973,8 +1973,8 @@ fn noStoreConditionLaw(allocator: std.mem.Allocator) !void {
         \\entry const answer = fn () => @effect.scope (fn (state: State U32) => do:
         \\  let alias = invoke state (fn actual => forward actual)
         \\  let (stored, result) = do (@effect.state alias.get alias.set 7):
-        \\    return alias.get ()
-        \\  return result
+        \\    break alias.get ()
+        \\  break result
         \\)
     , null);
 }

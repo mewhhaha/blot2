@@ -12,7 +12,7 @@ const source =
     \\type Tick is effect = { read: Array U32 -> Array U32 }
     \\const work = @computation (fn () => do:
     \\  use value <- Tick.read #[41, 42]
-    \\  return value
+    \\  break value
     \\)
     \\entry const run = fn (host: Array U32 -> Array U32 ! {Foreign}) => do:
     \\  let saved = #[90, 91]
@@ -23,7 +23,7 @@ const source =
     \\        saved := reply
     \\        yield saved
     \\      complete value =>
-    \\        return value
+    \\        break value
 ;
 const Fixture = struct {
     units: [1]core.Module,

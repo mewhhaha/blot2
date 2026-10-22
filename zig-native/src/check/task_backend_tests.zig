@@ -33,7 +33,7 @@ test "structured task backend owns replay retained helpers and every failed allo
     var module = try lower(
         \\entry const answer = fn (owner: unique U32) => do:
         \\  let result = @task.scope (fn group => @task.join (@task.spawn group (fn () => owner)))
-        \\  return @usage.borrow result (fn loan => @usage.read loan)
+        \\  break @usage.borrow result (fn loan => @usage.read loan)
     );
     defer module.deinit(a);
     const before = @import("core_snapshot_tests.zig").stamp(module);
@@ -71,7 +71,7 @@ test "portable task capture authority encloses the destination rather than only 
     var module = try lower(
         \\entry const answer = fn () => @task.scope (fn outer => do:
         \\  let unused = @task.spawn outer (fn () => 1)
-        \\  return @task.scope (fn inner => @task.join (@task.spawn inner (fn () => @task.join (@task.spawn inner (fn () => 42))))))
+        \\  break @task.scope (fn inner => @task.join (@task.spawn inner (fn () => @task.join (@task.spawn inner (fn () => 42))))))
     );
     defer module.deinit(a);
     var outer: core.Id = 0;
@@ -102,7 +102,7 @@ test "portable task partitions reject overlapping ranges and a forged moved owne
     var module = try lower(
         \\const partition = fn (owner: unique (Array U32)) => @task.split owner ((0, 2), (2, 4)) (fn views => do:
         \\  let (left, right) = views
-        \\  return @task.scope (fn group => @task.join (@task.spawn group (fn () => @task.read left 0))))
+        \\  break @task.scope (fn group => @task.join (@task.spawn group (fn () => @task.read left 0))))
     );
     defer module.deinit(a);
     var split: core.Id = 0;

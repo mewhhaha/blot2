@@ -15,7 +15,7 @@ const source =
     \\  let saved = start
     \\  let read = keep saved
     \\  saved := 0
-    \\  return read ()
+    \\  break read ()
     \\entry const skipped = ignore (@panic "unused demand")
 ;
 

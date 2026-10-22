@@ -27,17 +27,17 @@ Deno.test("higher order summaries preserve callback captures rows and returned s
       `const ${kind}_0 = fn callback => fn value => do:`,
       "  let compared = @type.same #Count #Other",
       `  use result <- ${invocation}`,
-      "  return result",
+      "  break result",
     );
     for (let i = 1; i <= depth; i++) {
       lib.push(
         `const ${kind}_${i} = fn callback => fn value => do:`,
         `  use first <- ${kind}_${i - 1} callback value`,
         `  use second <- ${kind}_${i - 1} callback first`,
-        "  return second",
+        "  break second",
       );
     }
-    lib.push(`const ${kind}_factory = do:`, `  return ${kind}_${depth}`);
+    lib.push(`const ${kind}_factory = do:`, `  break ${kind}_${depth}`);
   }
   lib.push("const unused = fn callback => fn value => value");
   const program = (
@@ -50,7 +50,7 @@ Deno.test("higher order summaries preserve callback captures rows and returned s
       "type Other is effect = Unit -> U32",
       "const tick: U32 -> U32 ! {Tick} = fn value => do:",
       "  use extra <- Tick ()",
-      `  return @u32.add value ${invalid === "body" ? "#True" : "extra"}`,
+      `  break @u32.add value ${invalid === "body" ? "#True" : "extra"}`,
       "entry const pure = fn (delta: U32) =>",
       "  library.apply_factory (fn current => @u32.add current delta) 7",
       "entry const reducer = fn (delta: U32) =>",
@@ -61,7 +61,7 @@ Deno.test("higher order summaries preserve callback captures rows and returned s
         invalid === "row" ? "Other" : "Tick"
       } (fn () => ${provider})):`,
       "  use result <- library.apply_factory tick value",
-      "  return result",
+      "  break result",
       "entry const unused: U32 -> U32 ! {} = fn value => library.unused tick value",
       invalid === "result"
         ? "entry const incompatible: U32 -> U32 = fn value => library.apply_factory (fn current => #True) value"
@@ -171,12 +171,12 @@ Deno.test("predicate bearing callback witnesses remain mandatory for invoked and
       `const callback: a -> a where { associated "${
         invalid ? "missing" : "add"
       }" a Count a } = fn value => @type.call "add" value (#Count 1)`,
-      'const invoke_0 = fn callback => fn value => do:\n  use next <- callback value\n  return @type.call "add" next (#Count 1)',
+      'const invoke_0 = fn callback => fn value => do:\n  use next <- callback value\n  break @type.call "add" next (#Count 1)',
       ...Array.from({ length: 6 }, (_, i) =>
         `const invoke_${
           i + 1
         } = fn callback => fn value => invoke_${i} callback (invoke_${i} callback value)`),
-      "const factory = do:\n  return invoke_6",
+      "const factory = do:\n  break invoke_6",
       "const unused = fn callback => fn value => value",
       "",
     ].join("\n");
@@ -188,7 +188,7 @@ Deno.test("predicate bearing callback witnesses remain mandatory for invoked and
       `  let #Count result = ${
         unused ? "unused" : "factory"
       } checked (#Count value)`,
-      "  return result",
+      "  break result",
       "",
     ].join("\n");
   const options = { executable, entry, prelude: null };

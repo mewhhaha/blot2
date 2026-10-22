@@ -14,11 +14,11 @@ const at: forall [a] => (values: Array a) -> (index: U32) -> (@proof.Index value
 entry const whole = fn (index: U32) => do:
   let values = #[8, 13]
   let proof = witness values index
-  return at values index proof
+  break at values index proof
 entry const fraction = fn (index: U32) => do:
   let values = #[1.25, 3.5]
   let proof = witness values index
-  return at values index proof
+  break at values index proof
 `;
 
 Deno.test("closed universal numeric contracts preserve erased proof slots across element layouts", async () => {
@@ -69,8 +69,8 @@ Deno.test("closed universal numeric contracts reject forged slots and recover re
         const original = await compiler.build({ sources: { [entry]: universalNumericSource } });
         assert(original.success, JSON.stringify(original));
         for (const [source, code] of [
-          [universalNumericSource.replaceAll("return at values index proof", "return at values index ()"), "proof_mismatch"],
-          [universalNumericSource.replaceAll("return at values index proof", "let stored = #[proof]\n  return at values index proof"), "proof_runtime_use"],
+          [universalNumericSource.replaceAll("break at values index proof", "break at values index ()"), "proof_mismatch"],
+          [universalNumericSource.replaceAll("break at values index proof", "let stored = #[proof]\n  break at values index proof"), "proof_runtime_use"],
           [universalNumericSource.replace("fn index => @proof.index values index", "fn index => @proof.index values (@u32.add index 1)"), "proof_mismatch"],
         ]) {
           const failed = await compiler.build({ sources: { [entry]: source } });

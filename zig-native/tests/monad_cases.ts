@@ -11,7 +11,7 @@ const unwrap = fn candidate => case candidate of
   #Absent => 42
 const sequence = fn candidate => do (@do.monad Option):
   use ignored <- candidate
-  return 42
+  break 42
 entry const empty = fn () => unwrap (sequence #Absent)
 entry const integer = fn () => unwrap (sequence (#Present 99))
 entry const floating = fn () => unwrap (sequence (#Present 1.25))
@@ -30,10 +30,10 @@ const identity = fn value => value
 const resolver = identity (monad (identity Box))
 const sequence = fn selected => fn candidate => do selected:
   use value <- candidate
-  return @u32.add value 2
+  break @u32.add value 2
 entry const answer = fn () => do:
   let #Box value = sequence resolver (#Box 40)
-  return value
+  break value
 entry const folded = answer ()
 `,
     expected: {"answer": 42, "folded": 42},
@@ -46,16 +46,16 @@ const Box.bind = fn candidate => fn next => case candidate of
   #Box value => next value
 const monad = fn constructor => @do.monad constructor
 const present = do (monad Box):
-  return 40
+  break 40
 const forwarded = do (monad Box):
-  return $ #Box 2
+  break $ #Box 2
 const finished = do (monad Box):
   #Box 99
 entry const answer = fn () => do:
   let #Box left = present
   let #Box right = forwarded
   let #Box () = finished
-  return @u32.add left right
+  break @u32.add left right
 `,
     expected: {"answer": 42},
   },
@@ -69,15 +69,15 @@ const monad = fn constructor => @do.monad constructor
 const sequence = fn () => do (monad Box):
   let plain = do:
     use value <- #Box 40
-    return value
+    break value
   use value <- plain
   let extra = do (monad Box):
-    return 2
+    break 2
   let #Box two = extra
-  return @u32.add value two
+  break @u32.add value two
 entry const answer = fn () => do:
   let #Box value = sequence ()
-  return value
+  break value
 `,
     expected: {"answer": 42},
   },
@@ -89,15 +89,15 @@ const Twice.bind = fn candidate => fn next => case candidate of
   #Twice value => do:
     let #Twice first = next value
     let #Twice second = next (@u32.add value 1)
-    return #Twice (@u32.add first second)
+    break #Twice (@u32.add first second)
 const sequence = fn () => do (@do.monad Twice):
   let total = 0
   use value <- #Twice 20
   total := @u32.add self value
-  return total
+  break total
 entry const answer = fn () => do:
   let #Twice value = sequence ()
-  return value
+  break value
 `,
     expected: {"answer": 41},
   },
@@ -107,8 +107,8 @@ entry const answer = fn () => do:
 const Box.pure = fn (value:U32) => #Box (@u32.add value 2)
 entry const answer = fn () => do:
   let #Box value = do (@do.monad Box):
-    return 40
-  return value
+    break 40
+  break value
 `,
     expected: {"answer": 42},
   },
@@ -121,7 +121,7 @@ const Option.bind = fn candidate => fn next => case candidate of
   #Absent => #Absent
 const sequence = fn () => do (@do.monad Option):
   use value <- #Absent
-  return @panic "continuation must not execute"
+  break @panic "continuation must not execute"
 entry const answer = fn () => case sequence () of
   #Present value => value
   #Absent => 42
@@ -132,7 +132,7 @@ entry const answer = fn () => case sequence () of
     name: "missing_pure",
     source: `type Box value is data = #Box value
 entry const answer = do (@do.monad Box):
-  return 42
+  break 42
 `,
     error: "missing_member",
   },
@@ -142,7 +142,7 @@ entry const answer = do (@do.monad Box):
 const Box.pure = fn value => #Box value
 entry const answer = do (@do.monad Box):
   use value <- #Box 40
-  return @u32.add value 2
+  break @u32.add value 2
 `,
     error: "missing_member",
   },
@@ -151,7 +151,7 @@ entry const answer = do (@do.monad Box):
     source: `type Box value is data = #Box value
 const Box.pure = fn value => value
 entry const answer = do (@do.monad Box):
-  return 42
+  break 42
 `,
     error: "type_mismatch",
   },
@@ -164,7 +164,7 @@ entry const answer = do (@do.monad Box):
   {
     name: "invalid_resolver",
     source: `entry const answer = do (42):
-  return 42
+  break 42
 `,
     error: "invalid_provider",
   },
@@ -174,12 +174,12 @@ entry const answer = do (@do.monad Box):
 const Box.pure = fn ignored => #Box 42
 const sequence = fn enabled => do (@do.monad Box):
   if enabled:
-    return #True
-  return 40
+    break #True
+  break 40
 entry const answer = fn () => do:
   let #Box first = sequence #True
   let #Box second = sequence #False
-  return @u32.add first second
+  break @u32.add first second
 `,
     expected: { answer: 84 },
   },
@@ -190,10 +190,10 @@ const Box.pure = fn value => #Box value
 const Box.bind = fn (candidate:U32) => fn next => next candidate
 const sequence = fn () => do (@do.monad Box):
   use value <- 40
-  return @u32.add value 2
+  break @u32.add value 2
 entry const answer = fn () => do:
   let #Box value = sequence ()
-  return value
+  break value
 `,
     expected: { answer: 42 },
   },
@@ -211,11 +211,11 @@ const sequence=fn enabled=>do (@do.monad Box):
     total := @u32.add self value
   else:
     total := @u32.add self 22
-  return total
+  break total
 entry const answer=fn()=>do:
   let #Box first=sequence #True
   let #Box second=sequence #False
-  return @u32.add first second
+  break @u32.add first second
 `,
     expected: { answer: 83 },
   },
@@ -229,13 +229,13 @@ const Option.bind = fn candidate => fn next => case candidate of
 const sequence=fn enabled=>do (@do.monad Option):
   if enabled:
     use #Absent
-  return 42
+  break 42
 entry const answer=fn()=>do:
   let #Absent=sequence #True else:
-    return 0
+    break 0
   let #Present value=sequence #False else:
-    return 0
-  return value
+    break 0
+  break value
 `,
     expected: { answer: 42 },
   },
@@ -248,14 +248,14 @@ const Option.bind = fn candidate => fn next => case candidate of
   #Absent => #Absent
 const sequence=fn candidate=>do (@do.monad Option):
   let #Present value=candidate else:
-    return $ #Absent
-  return @u32.add value 2
+    break $ #Absent
+  break @u32.add value 2
 entry const answer=fn()=>do:
   let #Absent=sequence #Absent else:
-    return 0
+    break 0
   let #Present value=sequence (#Present 40) else:
-    return 0
-  return value
+    break 0
+  break value
 `,
     expected: { answer: 42 },
   },
@@ -266,13 +266,13 @@ const Box.pure=fn value=>#Box value
 const Box.bind=fn candidate=>fn next=>case candidate of
   #Box value=>do:
     let #Box result=next value
-    return #Box (@u32.to_f32 result)
+    break #Box (@u32.to_f32 result)
 const sequence=fn()=>do (@do.monad Box):
   use value <- #Box 40
-  return @u32.add value 2
+  break @u32.add value 2
 entry const answer=fn()=>do:
   let #Box value=sequence ()
-  return value
+  break value
 `,
     expected: { answer: 42 },
   },
@@ -285,8 +285,8 @@ const Box.bind = fn candidate => fn next => case candidate of
 const create=fn()=>if #True then @panic "resolver executes first" else @do.monad Box
 entry const answer:U32=do:
   let #Box value=do (create ()):
-    return @panic "body executes second"
-  return value
+    break @panic "body executes second"
+  break value
 `,
     error: "const_panic",
   },

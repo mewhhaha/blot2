@@ -10,15 +10,15 @@ entry const answer = fn () => @effect.scope (fn (left: State U32) => do:
   let longer = @effect.scope (fn (right: State U32) => {saved: left})
   let read = longer.saved.get
   let (state, result) = do (@effect.state longer.saved.get longer.saved.set 7):
-    return read ()
-  return result
+    break read ()
+  break result
 )
 entry const array = fn () => @effect.scope (fn (left: State U32) => do:
   let longer = @effect.scope (fn (right: State U32) => #[left])
   let selected = @array.get longer 0
   let (state, result) = do (@effect.state selected.get selected.set 9):
-    return selected.get ()
-  return result
+    break selected.get ()
+  break result
 )
 `;
 for (const codegenTier of ["optimized", "development"] as const) {

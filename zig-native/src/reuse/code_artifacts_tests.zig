@@ -412,7 +412,7 @@ const Fixture = struct {
             \\const retained = factory 40.0
             \\const item = #Cell { right: 42.5, left: 1 }
             \\entry const folded = do reader:
-            \\  return Read ()
+            \\  break Read ()
             \\entry const answer = fn () => folded
         ;
         var lexed = try lexer.lex(a, source);

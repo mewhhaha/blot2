@@ -26,13 +26,13 @@ const U32.mul = fn left => fn right => @u32.mul left right
   const main = `entry const run = fn seed => do:
   let values = #[0,1,2,3,4]
   let bound = seed
-  return #[x * x | x <- values, x > bound, x < 4]
+  break #[x * x | x <- values, x > bound, x < 4]
 entry const triangle = fn count => do:
   let values: List U32 = []
   for x in 0..count:
     for y in 0..x:
       values := @list.append self (@u32.add (@u32.mul x 10) y)
-  return @array.from_list values
+  break @array.from_list values
 `;
   const cases = [
     { main, wrappers, selected: [4, 9], triangle: [10, 20, 21] },
@@ -131,7 +131,7 @@ entry const run = fn () => do:
   for x in 0..3:
     if @u32.lt x limit:
       result := [...self, x]
-  return @array.from_list result
+  break @array.from_list result
 const folded = run ()
 entry const staged = fn () => folded
 `;

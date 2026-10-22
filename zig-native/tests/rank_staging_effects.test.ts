@@ -21,15 +21,15 @@ const write = @effect.provider Write (fn () => ())
 entry const answer = fn () => do provider:
   use first <- @code.emit generated
   use second <- @code.emit generated
-  return @u32.add first second
+  break @u32.add first second
 `;
     if (declared === "superset") {
       source = source.replace(
         "  use first <-",
-        "  return do write:\n    use first <-",
+        "  break do write:\n    use first <-",
       ).replace("  use second <-", "    use second <-").replace(
-        "  return @u32.add",
-        "    return @u32.add",
+        "  break @u32.add",
+        "    break @u32.add",
       );
     }
     let operationSource = `effect Read: Unit -> U32
@@ -186,7 +186,7 @@ const generated = @code.quote (invoke ())
 entry const answer = fn (callback: Unit -> U32 ! {Foreign}) => do (@effect.provider Read callback):
   use first <- @code.emit generated
   use second <- @code.emit generated
-  return @u32.add first second
+  break @u32.add first second
 `;
   try {
     for (const codegenTier of ["optimized", "development"] as const) {

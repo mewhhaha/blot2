@@ -19,20 +19,20 @@ entry const status = fn count => do:
   if @cursor.has cursor:
     @panic "late end"
   if @cursor.has old:
-    return total + (@cursor.value old).z
-  return total
+    break total + (@cursor.value old).z
+  break total
 entry const exhausted = fn count => do:
   let cursor = @list.cursor (@list.fill count (1,2,3))
   for 0..count:
     cursor := @cursor.advance self
   let (value, _, _) = @cursor.value cursor
-  return value
+  break value
 entry const beyond = fn count => do:
   let cursor = @list.cursor (@list.fill count (1,2,3))
   for 0..count:
     cursor := @cursor.advance self
   let next = @cursor.advance cursor
-  return @cursor.has next
+  break @cursor.has next
 `,
     (guest) => {
       for (const count of [0, 1, 80, 81, 82, 243, 244, 245, 1000]) {
@@ -61,7 +61,7 @@ entry const run = fn count => do:
       @panic "pressure"
   let old = saved ()
   let last = @cursor.value cursor
-  return #[old.x, old.y, old.z, last.x, last.y, last.z]
+  break #[old.x, old.y, old.z, last.x, last.y, last.z]
 `,
     (guest) => {
       for (const count of [0, 1, 81, 82, 244, 245, 1000]) {

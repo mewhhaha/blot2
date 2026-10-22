@@ -13,8 +13,8 @@ const Counter.next = fn (cursor: Counter) => do:
   use stats <- @state.get #Stats
   use @state.set (#Stats {pulls: stats.pulls + 1, trace: stats.trace * 31 + state.value + 1})
   if state.value == state.end:
-    return #Nothing
-  return #Some (state.value, #Counter {value: state.value + 1, end: state.end})
+    break #Nothing
+  break #Some (state.value, #Counter {value: state.value + 1, end: state.end})
 const sum = fn window => iter.fold_left add 0 window
 entry const effects = fn input => do:
   let mode = input / 16777216
@@ -23,25 +23,25 @@ entry const effects = fn input => do:
   let (stats, answer) = @state.run (#Stats {pulls: 0, trace: 0}) (fn () => do:
     let cursor = iter.windows width (#Counter {value: 0, end: count})
     if mode == 0:
-      return iter.fold_left (fn total => fn window => total + sum window) 0 cursor
+      break iter.fold_left (fn total => fn window => total + sum window) 0 cursor
     if mode == 1:
-      return iter.fold_left (fn total => fn window => total + sum window) 0 (iter.take 0 cursor)
+      break iter.fold_left (fn total => fn window => total + sum window) 0 (iter.take 0 cursor)
     if mode == 2:
-      return iter.fold_left (fn total => fn window => total + sum window) 0 (iter.take 1 cursor)
+      break iter.fold_left (fn total => fn window => total + sum window) 0 (iter.take 1 cursor)
     if mode == 3:
       let total = 0
       for window in cursor:
         total := sum window
         break
-      return total
+      break total
     if mode == 4:
       for window in cursor:
-        return sum window
-      return 999
-    return iter.fold_left (fn total => fn pair => do:
+        break sum window
+      break 999
+    break iter.fold_left (fn total => fn pair => do:
       let (window, _) = pair
-      return total + sum window) 0 (iter.zip cursor (iter.range 0 1)))
-  return #[stats.pulls, stats.trace, answer]
+      break total + sum window) 0 (iter.zip cursor (iter.range 0 1)))
+  break #[stats.pulls, stats.trace, answer]
 entry const snapshots = fn input => do:
   let width = input / 65536 + 1
   let count = input % 65536
@@ -49,15 +49,15 @@ entry const snapshots = fn input => do:
   let cursor = iter.windows width source
   let saved = cursor.next
   let #Some (first, rest) = saved else:
-    return 999
+    break 999
   let sum_rows = fn window => iter.fold_left (fn total => fn (row: Array U32) => total + row[0] + row[1]) 0 window
   let total = 0
   for window in rest:
     let pressure = @array.generate 8192 identity
     total := self + sum_rows window + pressure[0]
   let #Some (again, _) = cursor.next else:
-    return 999
-  return total + sum_rows first + sum_rows again
+    break 999
+  break total + sum_rows first + sum_rows again
 `;
 
 Deno.test("completed window producers preserve all widths snapshots pull order and early exits in both tiers", async () => {

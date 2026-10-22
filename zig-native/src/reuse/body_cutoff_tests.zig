@@ -14,7 +14,7 @@ const source =
     \\entry const apply = fn (x: U32) -> U32 => twice helper x
     \\entry const adder = fn (x: U32) -> U32 => do:
     \\  let add = fn (y: U32) => @u32.add y x
-    \\  return twice add 3
+    \\  break twice add 3
     \\entry const edited = fn (x: U32) -> U32 => @u32.add x 2
 ;
 const Fixture = struct {

@@ -8,18 +8,18 @@ const library = `
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 const local = fn (value: a) => @effect.scope (fn (s: State a) => do:
   let (state, result) = do (@effect.state s.get s.set value):
-    return s.get ()
-  return result
+    break s.get ()
+  break result
 )
 const pair = fn (value: a) => @effect.scope (fn (left: State a) => @effect.scope (fn (right: State a) => do:
   let (outer, result) = do (@effect.state left.get left.set value):
     use nested <- do (@effect.state right.get right.set value):
       use a <- left.get ()
       use b <- right.get ()
-      return #[a, b]
+      break #[a, b]
     let (inner, reads) = nested
-    return reads
-  return result
+    break reads
+  break result
 ))
 `;
 const main = `

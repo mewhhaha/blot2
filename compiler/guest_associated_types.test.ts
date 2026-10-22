@@ -13,11 +13,11 @@ const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a)
 const relay: f -> (Callable.Run f) = fn value => value
 entry const count: U32 -> U32 = fn value => do:
   let record: Alias U32 = {value: keep value, items: #[value]}
-  return @u32.add record.value (@array.length record.items)
+  break @u32.add record.value (@array.length record.items)
 entry const run = fn (callback: Unit -> U32 ! {Foreign}) => do:
   let selected = relay callback
   use value <- selected ()
-  return keep value
+  break keep value
 `);
   const guest = await instantiateGuest(artifact.bytes);
   try {

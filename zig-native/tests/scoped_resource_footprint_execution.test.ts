@@ -8,14 +8,14 @@ const library = `type State a is effect = {get: Unit -> a, set: a -> Unit}
 const run = fn () => @effect.scope (fn (older: State U32) => do:
   use escaped <- @effect.scope (fn (younger: State F32) => @resource.scope (fn () => 9) (fn owner => do:
     let cleanup_capture = younger
-    return ()
+    break ()
   ) (fn loan => do:
     let observed = @usage.read loan
-    return fn () => do:
+    break fn () => do:
       let retained = older
-      return 42
+      break 42
   ))
-  return escaped ()
+  break escaped ()
 )
 const fail = fn () => @effect.scope (fn (state: State U32) => @resource.scope (fn () => 9) (fn owner => @panic "cleanup") (fn loan => @usage.read loan))
 `;
@@ -97,7 +97,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
           }
           const edited = await compiler.build({
             sources: {
-              [dependency]: library.replace("return 42", "return 43"),
+              [dependency]: library.replace("break 42", "break 43"),
             },
           });
           assert(edited.success, JSON.stringify(edited));

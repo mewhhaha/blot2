@@ -71,7 +71,7 @@ if let #Some(x) = y:
 //           ^ variable
 //              ^ operator
 //                ^ variable
-  return x
+  break x
 
 let #Some(x) = y else:
 // <- keyword.storage.type
@@ -81,17 +81,17 @@ let #Some(x) = y else:
 //           ^ operator
 //             ^ variable
 //               ^ keyword.control.conditional
-  return 0
+  break 0
 //^ keyword.control.return
 
 if let #Some x = y:
 // <- keyword.control.conditional
 //      ^ constructor
 //           ^ variable
-  return x
+  break x
 else:
 // <- keyword.control.conditional
-  return 0
+  break 0
 
 if let (number: F64) = value:
 // <- keyword.control.conditional
@@ -102,7 +102,7 @@ if let (number: F64) = value:
 //              ^ type
 //                   ^ operator
 //                     ^ variable
-  return number
+  break number
 
 let (number: F64) = value else:
 // <- keyword.storage.type
@@ -113,7 +113,7 @@ let (number: F64) = value else:
 //                ^ operator
 //                  ^ variable
 //                        ^ keyword.control.conditional
-  return 0.0
+  break 0.0
 
 case value of
 // <- keyword.control.conditional
@@ -194,8 +194,8 @@ const or = fn left => fn ~right => do:
 //                       ^ operator
 //                        ^ variable.parameter
   if left:
-    return #True
-  return @force right
+    break #True
+  break @force right
 //       ^ function.builtin
 
 const force = fn ~value => @force value
@@ -244,7 +244,7 @@ do (monad Maybe):
 // ^ punctuation.bracket
 //  ^ variable
 //        ^ type
-  return value
+  break value
 
 const try = monad Maybe
 // <- keyword.storage.type
@@ -255,18 +255,18 @@ do try:
 // <- keyword.control
 // ^ variable
   use value <- my_maybe
-  return $ my_other_maybe value
+  break $ my_other_maybe value
 //^ keyword.control.return
-//       ^ punctuation.special
-//       ^ !operator
-//         ^ variable
+//      ^ punctuation.special
+//      ^ !operator
+//        ^ variable
 
 infixr 0 ($) = apply
 //        ^ operator
 
-return identity $ value
-//              ^ operator
-//              ^ !punctuation.special
+break identity $ value
+//             ^ operator
+//             ^ !punctuation.special
 
 "return $ result"
 // <- string

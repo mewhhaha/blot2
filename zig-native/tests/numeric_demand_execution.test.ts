@@ -10,27 +10,27 @@ const either = fn (left: Bool) => fn ~(right: Bool) => if left then #True else @
 const below = fn left => fn right => do:
   let copied = left
   let compared = @u32.lt copied right
-  return compared
+  break compared
 const within = fn index => fn values => below index (@array.length values)
 `;
 const source = `import {both, either, within} from "./logic"
 entry const answer = fn (index: U32) => do:
   let values = #[8, 13]
   if both (within index values) (@u32.eq index 0):
-    return @array.get values index
-  return 0
+    break @array.get values index
+  break 0
 entry const complement = fn (index: U32) => do:
   let values = #[8, 13]
   if either (@u32.lt (@array.length values) index) (@u32.eq index (@array.length values)):
-    return 0
-  return @array.get values index
+    break 0
+  break @array.get values index
 entry const skipped = fn () => both #False (@panic "unforced right")
 entry const ordered = fn (index: U32) => both (@u32.lt index 2) (@panic "forced right")
 entry const direct = fn (index: U32) => do:
   let values = #[8, 13]
   if within index values:
-    return @array.get values index
-  return 0
+    break @array.get values index
+  break 0
 `;
 
 for (const codegenTier of ["optimized", "development"] as const) {

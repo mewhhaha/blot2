@@ -54,8 +54,8 @@ entry const run: U32 -> U32 = fn value => parent value
   for (
     const body of [
       "  #Box value => parent (@u32.sub value 1)",
-      "  #Box value => do:\n    let next = @u32.sub value 1\n    return parent next",
-      "  #Box value => do:\n    let next = fn arg => parent arg\n    return next (@u32.sub value 1)",
+      "  #Box value => do:\n    let next = @u32.sub value 1\n    break parent next",
+      "  #Box value => do:\n    let next = fn arg => parent arg\n    break next (@u32.sub value 1)",
     ]
   ) {
     const selected = source.replace(
@@ -80,7 +80,7 @@ Deno.test("unresolved diamonds retain invalid witness diagnostics before budget 
     (_, index) =>
       `const f_${
         index + 1
-      } = fn left => fn right => do:\n  let ignored = f_${index} left right\n  return f_${index} left right`,
+      } = fn left => fn right => do:\n  let ignored = f_${index} left right\n  break f_${index} left right`,
   ).join("\n");
   await compileExpectedFailure(
     `const f_0 = fn left => fn right => @type.same (@panic "uncalled witness") right\n${links}\nentry const run = fn (value: U32) -> Bool => f_12 value value\n`,

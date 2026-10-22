@@ -8,7 +8,7 @@ const update = fn index => do:
   let values = #[10, 20, 30]
   let before = values
   values[index] := @u32.add self 1
-  return @u32.add (@array.get before index) (@array.get values index)
+  break @u32.add (@array.get before index) (@array.get values index)
 entry const folded = update 1
 entry const run = fn (index: U32) -> U32 => update index
 `,
@@ -23,7 +23,7 @@ entry const run = fn () -> U32 => do:
   let bucket = #Bucket { points: #[#Point { y: 1, x: 10 }, #Point { y: 2, x: 20 }] }
   let before = bucket
   bucket.points[1].x := @u32.add self 2
-  return @u32.add before.points[1].x bucket.points[1].x
+  break @u32.add before.points[1].x bucket.points[1].x
 `,
   },
   {
@@ -34,7 +34,7 @@ entry const run = fn () -> U32 => do:
   let values = #[#[1, 2], #[3, 4]]
   let before = values
   values[1][0] := @u32.add self 39
-  return @u32.add before[1][0] values[1][0]
+  break @u32.add before[1][0] values[1][0]
 `,
   },
   {
@@ -44,7 +44,7 @@ entry const run = fn () -> U32 => do:
 entry const run = fn () -> U32 => do:
   let values = #[1, 41]
   values[@u32.sub (@array.length self) 1] := @u32.add self 1
-  return values[1]
+  break values[1]
 `,
   },
   {
@@ -53,7 +53,7 @@ entry const run = fn () -> U32 => do:
     source: `
 const replace = fn values => fn index => fn value => do:
   values[index] := value
-  return values
+  break values
 entry const integer = fn () -> U32 => (replace #[1, 2] 1 42)[1]
 entry const floating = fn () -> F32 => (replace #[1.0, 2.0] 0 4.5)[0]
 `,
@@ -67,8 +67,8 @@ const changed = fn () -> U32 => do:
   values[0] := do:
     let other = #[40]
     other[0] := @u32.add self 2
-    return other[0]
-  return values[0]
+    break other[0]
+  break values[0]
 entry const folded = changed ()
 entry const run = fn () -> U32 => changed ()
 `,
@@ -80,7 +80,7 @@ entry const run = fn () -> U32 => changed ()
 entry const answer: U32 = do:
   let values = #[1]
   values[2] := @panic "rhs must not execute"
-  return 0
+  break 0
 `,
   },
   {
@@ -90,7 +90,7 @@ entry const answer: U32 = do:
 entry const answer: U32 = do:
   let values = #[#[1]]
   values[2][@panic "inner index must not execute"] := 0
-  return 0
+  break 0
 `,
   },
   {
@@ -100,7 +100,7 @@ entry const answer: U32 = do:
 entry const answer: U32 = do:
   let values = #[1]
   values[0] := @panic "rhs executes after selecting leaf"
-  return 0
+  break 0
 `,
   },
 ] as const;

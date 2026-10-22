@@ -7,7 +7,7 @@ const count = `const count = fn xs => do:
   let n = 0
   for x in xs:
     n := self + 1
-  return n
+  break n
 `;
 
 Deno.test("generic array iteration represents empty elements and unused data parameters", async () => {
@@ -35,7 +35,7 @@ Deno.test("generic cursors reconcile nested callback shapes across staged builde
 type Builder system is data = #Builder (Array system)
 const add = fn stage => fn action => fn builder => do:
   let #Builder systems = builder
-  return #Builder #[...systems, stage action]
+  break #Builder #[...systems, stage action]
 const build = fn builder => do:
   let #Builder systems = builder
   let n = 0
@@ -45,15 +45,15 @@ const build = fn builder => do:
       #Update run => run 1.0
       #Render run => do:
         let ignored = run () 1.0
-        return ()
+        break ()
       _ => ()
     n := self + 1
-  return n
+  break n
 entry const create = fn () => do:
   let builder = #Builder #[]
   builder := add #Event (fn (event: U32) => ()) self
   builder := add #Start (fn () => ()) self
-  return build builder
+  break build builder
 `,
     (guest) => {
       equal(guest.call("create", null), 2);

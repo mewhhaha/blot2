@@ -7,12 +7,12 @@ const source = `type State a is effect = {get: Unit -> a, set: a -> Unit}
 type Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}
 entry const answer = fn () => do:
   let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
-    return @effect.scope (fn (s: State U32) => do:
+    break @effect.scope (fn (s: State U32) => do:
       use previous <- Box.get ()
       use Box.set (fn () => 0)
-      return previous ()
+      break previous ()
     )
-  return result
+  break result
 `;
 for (const codegenTier of ["development", "optimized"] as const) {
   Deno.test(`direct scope callback retains older State installation (${codegenTier})`, async () => {
@@ -47,8 +47,8 @@ for (const codegenTier of ["development", "optimized"] as const) {
         }
       }
       const invalid = source.replace(
-        "fn () => 0)\n      return",
-        "fn () => do (@effect.state s.get s.set 7):\n        return s.get ()\n      )\n      return",
+        "fn () => 0)\n      break",
+        "fn () => do (@effect.state s.get s.set 7):\n        break s.get ()\n      )\n      break",
       );
       const rejected = await compiler.build({ sources: { [entry]: invalid } });
       assert(!rejected.success);

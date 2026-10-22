@@ -23,14 +23,14 @@ entry const integer = fn (value: U32) => do:
   let (_, result) = do state:
     use State.set (#Pair { apple: 1.5, zebra: value })
     use current <- get #Pair
-    return current.zebra
-  return result
+    break current.zebra
+  break result
 entry const floating = fn (value: F32) => do:
   let (_, result) = do state:
     use State.set (#Pair { apple: value, zebra: 42 })
     use current <- get #Pair
-    return current.apple
-  return result
+    break current.apple
+  break result
 `, guest => {
     for (const value of [0, 42, 0xffffffff]) equal(guest.call("integer", value), value);
     for (const value of [0, 1.5, -1.25, 1.23456789]) equal(guest.call("floating", value), Math.fround(value));
@@ -46,7 +46,7 @@ const Box.add: Box -> U32 -> U32 = fn box => fn offset => case box of
 const reader = @effect.provider Read (fn () => 2)
 entry const answer = fn () => do reader:
   use offset <- Read ()
-  return (#Box 40).add offset
+  break (#Box 40).add offset
 `, guest => equal(guest.call("answer", null), 42));
 });
 
@@ -57,21 +57,21 @@ type Builder [world,scope] is data = #Builder { initial: world, scope: world -> 
 const empty = fn () => do:
   let scope = fn world => fn action => do:
     use result <- action ()
-    return (world,result)
-  return #Builder { initial: (), scope }
+    break (world,result)
+  break #Builder { initial: (), scope }
 const insert = fn initial => fn builder => do:
   let #Builder { initial: previous_initial, scope: previous_scope } = builder
   let scope = fn world => fn action => do:
     let (current,previous) = world
     use outcome <- @effect.run State.get State.set current (fn () => previous_scope previous action)
     let (next,(previous_next,result)) = outcome
-    return ((next,previous_next),result)
-  return #Builder { initial: (initial,previous_initial), scope }
+    break ((next,previous_next),result)
+  break #Builder { initial: (initial,previous_initial), scope }
 const built = insert 42 (insert 1.5 (empty ()))
 entry const answer = fn () => do:
   let #Builder { initial,scope } = built
   let (_,result) = scope initial (fn () => #[42])
-  return result
+  break result
 `, guest => equal((guest.call("answer", null) as Uint32Array)[0], 42));
 });
 
@@ -107,8 +107,8 @@ const Box.bind = identity (fn candidate => fn next => case candidate of
 entry const monadic = fn () => do:
   let #Box value = do (@do.monad Box):
     use value <- #Box 40
-    return @u32.add value 2
-  return value
+    break @u32.add value 2
+  break value
 `, guest => {
     for (let value = 0; value < 100; value++) {
       equal(guest.call("alias", value), value);
@@ -124,19 +124,19 @@ Deno.test("staged builders retain composed closures and static captures across c
 type Builder callback is data = #Builder { run: callback }
 const add_step = fn (amount: U32) => fn builder => do:
   let #Builder { run: previous } = builder
-  return #Builder { run: fn (value: U32) => @u32.add (previous value) amount }
+  break #Builder { run: fn (value: U32) => @u32.add (previous value) amount }
 const staged = do:
   let builder = #Builder { run: fn value => value }
   builder := add_step 10 self
   builder := add_step 20 self
-  return builder
+  break builder
 const unused = @panic "unreachable constant"
 entry const answer = fn (value: U32) -> U32 => do:
   let #Builder { run } = staged
-  return run value
+  break run value
 const worker = do:
   let base = 40
-  return fn (value: U32) => @u32.add base value
+  break fn (value: U32) => @u32.add base value
 entry const work = fn (value: U32) -> U32 => worker value
 `, guest => {
     for (let i = 0; i < 2000; i++) {
@@ -151,23 +151,23 @@ Deno.test("unannotated staged builders retain independent integer and float evid
 type Builder callback is data = #Builder { run: callback }
 const add_step = fn amount => fn builder => do:
   let #Builder { run: previous } = builder
-  return #Builder { run: fn value => previous value + amount }
+  break #Builder { run: fn value => previous value + amount }
 const staged = do:
   let builder = #Builder { run: fn value => value }
   builder := add_step 10 self
   builder := add_step 20 self
-  return builder
+  break builder
 const floating = do:
   let builder = #Builder { run: fn value => value }
   builder := add_step 1.5 self
   builder := add_step 2.5 self
-  return builder
+  break builder
 entry const answer = fn () => do:
   let #Builder { run } = staged
-  return run 12
+  break run 12
 entry const float = fn () => do:
   let #Builder { run } = floating
-  return run 8.0
+  break run 8.0
 `, guest => {
     equal(guest.call("answer", null), 42);
     equal(guest.call("float", null), 12);
@@ -182,16 +182,16 @@ type Builder [world,scope,checkpoint] is data = #Builder { initial: world, scope
 const empty = fn () => do:
   let scope = fn world => fn action => do:
     use result <- action ()
-    return (world,result)
-  return #Builder { initial: (), scope, checkpoint: fn () => () }
+    break (world,result)
+  break #Builder { initial: (), scope, checkpoint: fn () => () }
 const insert = fn initial => fn builder => do:
   let #Builder { initial: previous_initial, scope: previous_scope, checkpoint } = builder
   let scope = fn world => fn action => do:
     let (current,previous) = world
     use outcome <- @effect.run State.get State.set current (fn () => previous_scope previous action)
     let (next,(previous_next,result)) = outcome
-    return ((next,previous_next),result)
-  return #Builder { initial: (initial,previous_initial), scope, checkpoint }
+    break ((next,previous_next),result)
+  break #Builder { initial: (initial,previous_initial), scope, checkpoint }
 const snapshot = fn initial => fn builder => do:
   let #Builder { checkpoint: previous_checkpoint } = builder
   let #Builder { initial: previous_initial, scope: previous_scope } = insert initial builder
@@ -199,14 +199,14 @@ const snapshot = fn initial => fn builder => do:
     use previous_checkpoint ()
     use current <- State.get ()
     use State.set (@u32.add current 1)
-    return ()
-  return #Builder { initial: previous_initial, scope: previous_scope, checkpoint }
+    break ()
+  break #Builder { initial: previous_initial, scope: previous_scope, checkpoint }
 const built = snapshot 41 (empty ())
 entry const answer = fn () => do:
   let #Builder { initial,scope,checkpoint } = built
   let (world,_) = scope initial checkpoint
   let (current,_) = world
-  return current
+  break current
 `,
 `
 effect Read: Unit -> U32
@@ -216,15 +216,15 @@ const extend = fn previous => fn () => do:
   use previous ()
   use value <- Read ()
   use Touch value
-  return ()
+  break ()
 const checkpoint = extend previous
 const reader = @effect.provider Read (fn () => 42)
 const touch = @effect.provider Touch (fn value => ())
 const run = fn () => do touch:
   use checkpoint ()
-  return 42
+  break 42
 entry const answer = fn () => do reader:
-  return run ()
+  break run ()
 `,
   ];
   for (const source of sources) {
@@ -255,34 +255,34 @@ type Deferred is data = #Deferred F32
 type Scale is data = #Scale F32
 const Box.mix = fn left => fn right => fn weight => do:
   let #Box base = left
-  return @f32.add base (@f32.mul right weight)
+  break @f32.add base (@f32.mul right weight)
 const Deferred.mix = fn left => do:
   let #Deferred base = left
   use offset <- Read ()
-  return fn right => fn weight => @f32.add (@f32.add base offset) (@f32.mul right weight)
+  break fn right => fn weight => @f32.add (@f32.add base offset) (@f32.mul right weight)
 const Scale.mix = fn left => fn right => fn weight => do:
   let #Scale scale = right
-  return @f32.add left (@f32.mul scale weight)
+  break @f32.add left (@f32.mul scale weight)
 const mix = fn left => fn right => @type.call "mix" left right
 const reader = @effect.provider Read (fn () => 2.0)
 entry const nominal = fn (value: F32) => mix (#Box value) 2.0 1.0
 entry const partial = fn (value: F32) => do:
   let blend = mix (#Box value) 4.0
-  return blend 0.5
+  break blend 0.5
 entry const deferred = fn (value: F32) => do reader:
-  return mix (#Deferred value) 4.0 0.5
+  break mix (#Deferred value) 4.0 0.5
 entry const right = fn (value: F32) => mix value (#Scale 2.0) 1.0
 type Live is data = #Live F32
 const Live.mix = fn left => fn right => fn () => do:
   let #Live base = left
   use value <- Read ()
-  return @f32.add base (@f32.add right value)
+  break @f32.add base (@f32.add right value)
 const earlier = @effect.provider Read (fn () => 100.0)
 entry const live = fn (value: F32) => do:
   let callback = do earlier:
-    return mix (#Live value) 0.0
-  return do reader:
-    return callback ()
+    break mix (#Live value) 0.0
+  break do reader:
+    break callback ()
 `, guest => {
     for (let repeat = 0; repeat < 3; repeat++) {
       for (const value of [0, 2, 40, 42, -2, 1.5]) {
@@ -298,7 +298,7 @@ Deno.test("the prelude lerp method returns a callable after binary selection", a
 entry const answer = fn (left: F32) => lerp left 42.0 0.5
 entry const partial = fn () => do:
   let blend = lerp 10.0 30.0
-  return blend 0.75
+  break blend 0.75
 `, guest => {
     for (let repeat = 0; repeat < 3; repeat++) {
       for (const value of [0, 2, 40, 42, -2, 1.5]) equal(guest.call("answer", value), value + (42 - value) * 0.5);

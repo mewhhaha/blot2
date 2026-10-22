@@ -11,72 +11,72 @@ entry const cancel = fn () => do:
     use outer <- @resource.acquire (fn () => 9) (fn resource => ())
     use inner <- @resource.acquire (fn () => 7) (fn resource => ())
     use value <- Ask.ask ()
-    return @usage.borrow outer (fn loan => @u32.add value (@usage.read loan))
+    break @usage.borrow outer (fn loan => @u32.add value (@usage.read loan))
   )
   for request in @requests computation:
     case request of
       effect Ask.ask () =>
-        return 42
+        break 42
       complete value =>
-        return value
+        break value
 entry const scope_cancel = fn () => do:
   let computation = @computation (fn () => @resource.scope (fn () => 11) (fn resource => ()) (fn loan => do:
     use value <- Ask.ask ()
-    return @u32.add value (@usage.read loan)
+    break @u32.add value (@usage.read loan)
   ))
   for request in @requests computation:
     case request of
       effect Ask.ask () =>
-        return 42
+        break 42
       complete value =>
-        return value
+        break value
 entry const resume = fn () => do:
   let computation = @computation (fn () => do:
     use owner <- @resource.acquire (fn () => 9) (fn resource => ())
     use value <- Ask.ask ()
-    return @usage.borrow owner (fn loan => @u32.add value (@usage.read loan))
+    break @usage.borrow owner (fn loan => @u32.add value (@usage.read loan))
   )
   for request in @requests computation:
     case request of
       effect Ask.ask () =>
         yield 33
       complete value =>
-        return value
+        break value
 const keep = fn ~value => fn () => @force value
 entry const retry = fn () => do:
   let delayed = keep (do:
     use owner <- @resource.acquire (fn () => 9) (fn resource => ())
     use value <- Ask.ask ()
-    return @usage.borrow owner (fn loan => @u32.add value (@usage.read loan))
+    break @usage.borrow owner (fn loan => @u32.add value (@usage.read loan))
   )
   let computation = @computation (fn () => delayed ())
   use first <- do:
     for request in @requests computation:
       case request of
         effect Ask.ask () =>
-          return 40
+          break 40
         complete value =>
-          return value
+          break value
   use second <- do:
     for request in @requests computation:
       case request of
         effect Ask.ask () =>
           yield 33
         complete value =>
-          return value
-  return @u32.add first second
+          break value
+  break @u32.add first second
 entry const suspend_cancel = fn (host: Unit -> U32 ! {Foreign}) => do:
   let computation = @computation (fn () => do:
     use owner <- @resource.acquire (fn () => 13) (fn resource => ())
     use value <- Ask.ask ()
-    return @usage.borrow owner (fn loan => @u32.add value (@usage.read loan))
+    break @usage.borrow owner (fn loan => @u32.add value (@usage.read loan))
   )
   for request in @requests computation:
     case request of
       effect Ask.ask () =>
-        return host ()
+        break host ()
       complete value =>
-        return value
+        break value
 `;
 for (const codegenTier of ["development", "optimized"] as const) {
   Deno.test(`resource request cancellation retires owned frames and preserves exact cleanup order (${codegenTier})`, async () => {

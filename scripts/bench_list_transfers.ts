@@ -14,7 +14,7 @@ const fixtures = [
 const skip = fn count => fn cursor => do:
   for index in 0..count:
     cursor := @cursor.advance self
-  return cursor
+  break cursor
 let values = @list.generate 200000 identity
 let origin = values.iter
 let distant = skip 100000 origin
@@ -26,7 +26,7 @@ entry const run = fn count => do:
     total := self + @cursor.value left + @cursor.value right
     left := @cursor.advance self
     right := @cursor.advance self
-  return total
+  break total
 `,
   },
   {
@@ -39,12 +39,12 @@ const sum = fn (values: List U32) => do:
   let result = 0
   for value in values:
     result := self + value
-  return result
+  break result
 entry const run = fn count => do:
   let result = 0
   for index in 0..count:
     result := self + sum (pair index)
-  return result
+  break result
 `,
   },
   {
@@ -57,7 +57,7 @@ const build = fn count => do:
   for x in 0..count:
     for y in 0..count:
       result := [...self, x + y]
-  return @array.from_list result
+  break @array.from_list result
 entry const run = fn count => (build count).length
 `,
   },

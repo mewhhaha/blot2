@@ -134,7 +134,7 @@ test "principal cache imports closed row facts from a qualified local generic bu
         \\entry const schema: U32 = 7
         \\entry const builder: U32 where { type_rep U32 } = do:
         \\  let local = fn value => value
-        \\  return local 42
+        \\  break local 42
     ;
     var before = try Fixture.init(source);
     defer before.deinit();
@@ -379,7 +379,7 @@ const closed_row_source =
     \\entry const schema: U32 = 7
     \\entry const builder: U32 where { type_rep U32 } = do:
     \\  let local = fn value => value
-    \\  return local 42
+    \\  break local 42
 ;
 
 fn editSchema(fixture: *Fixture, value: u32) void {

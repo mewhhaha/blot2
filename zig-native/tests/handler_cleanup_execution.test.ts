@@ -11,8 +11,8 @@ entry const exercise = fn (input: Array U32) => do:
   let (state, value) = do provider:
     use State.set U32 (seed + 1)
     use current <- State.get U32 ()
-    return current
-  return state + value
+    break current
+  break state + value
 entry const memory = fn () -> Array U32 => #[]
 `,
     async (_, bytes) => {
@@ -51,12 +51,12 @@ const make = fn (seed: U32) => do:
   let provider = @effect.state (State.get Thunk) (State.set Thunk) (#Thunk (fn () => seed))
   let (state, result) = do provider:
     use State.set Thunk (#Thunk (fn () => seed + 1))
-    return seed
-  return state
+    break seed
+  break state
 entry const exercise = fn (seed: U32) => do:
   let #Thunk first = make seed
   let #Thunk second = make (seed + 40)
-  return first () + second ()
+  break first () + second ()
 entry const memory = fn () -> Array U32 => #[]
 `,
     (guest) => {

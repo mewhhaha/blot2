@@ -10,7 +10,7 @@ fn expressionLaw(a: std.mem.Allocator) !void {
         \\const unfinished = fn (value: U32) -> F32 => do:
         \\  let original = value
         \\  value := #True
-        \\  return fi
+        \\  break fi
     ;
     const cursor = (try probe.capture(a, source, @intCast(source.len))).?;
     defer cursor.deinit(a);
@@ -107,7 +107,7 @@ test "completion private item scope exceeds the display graph and keeps the late
         defer a.free(line);
         try source.appendSlice(a, line);
     }
-    try source.appendSlice(a, "  match_0 := #True\n  return mat");
+    try source.appendSlice(a, "  match_0 := #True\n  break mat");
     const cursor = (try probe.capture(a, source.items, @intCast(source.items.len))).?;
     defer cursor.deinit(a);
     var tokens = try lexer.lex(a, cursor.source);

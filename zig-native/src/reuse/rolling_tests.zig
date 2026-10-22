@@ -75,14 +75,14 @@ test "ordinary rolling and summary trees preserve Core and deterministic retaine
         \\  let changed = summary.set add 0 99 original
         \\  let joined = summary.concat add original changed
         \\  let selected = summary.query add 0 0 1 joined
-        \\  return @u32.add (@u32.add first second) (@u32.add selected (summary.get 0 original))
+        \\  break @u32.add (@u32.add first second) (@u32.add selected (summary.get 0 original))
         \\entry const references = fn (count: U32) => do:
         \\  let combine = fn (left: Array U32) => fn (right: Array U32) => @array.concat left right
         \\  let values = iter.map (fn index => #[index]) (iter.range 0 count)
         \\  let original = summary.build combine #[] values
         \\  let changed = summary.set combine 0 #[99] original
         \\  let joined = summary.concat combine original changed
-        \\  return summary.query combine #[] 0 (@u32.mul count 2) joined
+        \\  break summary.query combine #[] 0 (@u32.mul count 2) joined
     );
     defer fixture.deinit();
     const before = @import("../check/core_snapshot_tests.zig").stamp(fixture.units.items);
@@ -107,7 +107,7 @@ test "rolling state preserves Core and output through every emission allocation 
         \\entry const run = fn (values: Array U32) => do:
         \\  let state = #State { values, advance: fn width => @u32.add width (@array.length values), width: 1 }
         \\  let #State { values: retained, width } = next state
-        \\  return @array.concat retained #[width]
+        \\  break @array.concat retained #[width]
     , false);
 }
 
@@ -121,7 +121,7 @@ test "summary reference replacement preserves Core and output through every emis
         \\  #Leaf _ => #Leaf value
         \\  #Branch (left, right, _) => do:
         \\    let changed = replace value left
-        \\    return #Branch (changed, right, @array.concat (total changed) (total right))
+        \\    break #Branch (changed, right, @array.concat (total changed) (total right))
         \\const original = #Branch (#Leaf #[1], #Leaf #[2], #[1, 2])
         \\entry const run = fn (values: Array U32) => total (replace values original)
     , true);

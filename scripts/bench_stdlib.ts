@@ -67,25 +67,25 @@ const cases = [
   ]],
   [
     "list_append",
-    "fn (count: U32) => do:\n  let values: List U32 = []\n  for i in 0..count:\n    values := list.append i values\n  return Array.from_list values",
+    "fn (count: U32) => do:\n  let values: List U32 = []\n  for i in 0..count:\n    values := list.append i values\n  break Array.from_list values",
     1025,
     Array.from({ length: 1025 }, (_, i) => i),
   ],
   [
     "array_replace",
-    "fn (count: U32) => do:\n  let values = array.fill count 0\n  for i in 0..count:\n    values := array.replace i (i + 1) values\n  return values",
+    "fn (count: U32) => do:\n  let values = array.fill count 0\n  for i in 0..count:\n    values := array.replace i (i + 1) values\n  break values",
     1025,
     Array.from({ length: 1025 }, (_, i) => i + 1),
   ],
   [
     "vector_lerp",
-    "fn (count: U32) => do:\n  let v = #Vec3 { x: 1.0, y: 2.0, z: 3.0 }\n  for i in 0..count:\n    v := lerp v (#Vec3 { x: 2.0, y: 4.0, z: 6.0 }) 0.5\n  return #[v.x, v.y, v.z]",
+    "fn (count: U32) => do:\n  let v = #Vec3 { x: 1.0, y: 2.0, z: 3.0 }\n  for i in 0..count:\n    v := lerp v (#Vec3 { x: 2.0, y: 4.0, z: 6.0 }) 0.5\n  break #[v.x, v.y, v.z]",
     8193,
     [2, 4, 6],
   ],
   [
     "result_iterate",
-    "fn (count: U32) => do:\n  let result = Result.iterate 0 (fn i => #Ok (if i < count then #Continue (i + 1) else #Done i))\n  return #[Result.unwrap_or 0 result]",
+    "fn (count: U32) => do:\n  let result = Result.iterate 0 (fn i => #Ok (if i < count then #Continue (i + 1) else #Done i))\n  break #[Result.unwrap_or 0 result]",
     8193,
     [8193],
   ],
@@ -224,7 +224,7 @@ for (const length of [256, 1024, 4096, 8193]) {
   let values: List U32 = []
   for i in 0..count:
     values := [...self, i]
-  return values
+  break values
 entry const answer = (Array.from_list (build ${length}))[${length - 1}]
 `,
   );

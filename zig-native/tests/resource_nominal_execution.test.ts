@@ -20,7 +20,7 @@ entry const answer = fn (value: U32) => do:
   use transfer ()
   use first <- inspect value
   use other <- tree value
-  return @u32.add first other
+  break @u32.add first other
 entry const failure = fn (value: U32) => failing value
 `;
 for (const codegenTier of ["development", "optimized"] as const) {
@@ -90,7 +90,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
               [entry]: source,
               [dependency]: library.replace(
                 "(fn owner => ())",
-                "(fn owner => do:\n    for ever:\n      let ignored = 7\n    return ())",
+                "(fn owner => do:\n    for ever:\n      let ignored = 7\n    break ())",
               ),
             },
           });

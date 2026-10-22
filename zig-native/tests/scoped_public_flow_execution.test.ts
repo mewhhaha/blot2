@@ -14,20 +14,20 @@ const main = `import {State, identity, invoke, read, typed_read} from "./flow"
 entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (s: State U32) => do:
   let capability = identity s
   use nested <- do (@effect.state capability.get capability.set 7):
-    return invoke (identity (fn () => do:
+    break invoke (identity (fn () => do:
       use value <- capability.get ()
       use next <- host value
       use capability.set next
-      return capability.get ()
+      break capability.get ()
     ))
   let (state, result) = nested
-  return result
+  break result
 )
 entry const floating = fn () => @effect.scope (fn (s: State F32) => do:
   let capability = identity s
   let (state, result) = do (@effect.state capability.get capability.set 1.5):
-    return invoke (identity capability.get)
-  return result
+    break invoke (identity capability.get)
+  break result
 )
 entry const borrowed = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (older: State U32) => do:
   let callback = @effect.scope (fn (younger: State F32) => read younger older)
@@ -35,15 +35,15 @@ entry const borrowed = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (o
   use handled <- do (@effect.state older.get older.set 7):
     use a <- callback ()
     use b <- typed ()
-    return host (@u32.add a b)
+    break host (@u32.add a b)
   let (state, result) = handled
-  return result
+  break result
 )
 entry const borrowed_float = fn () => @effect.scope (fn (older: State F32) => do:
   let callback = @effect.scope (fn (younger: State U32) => read younger older)
   let (state, result) = do (@effect.state older.get older.set 1.5):
-    return callback ()
-  return result
+    break callback ()
+  break result
 )
 `;
 for (const codegenTier of ["optimized", "development"] as const) {
@@ -175,8 +175,8 @@ for (const codegenTier of ["optimized", "development"] as const) {
               `entry const escaped_deferred = fn () => @effect.scope (fn (older: State U32) => do:
   let callback = @effect.scope (fn (younger: State U32) => read (fn () => younger.get ()) older)
   let (state, result) = do (@effect.state older.get older.set 7):
-    return callback ()
-  return result
+    break callback ()
+  break result
 )\n`,
             ]
           ) {
@@ -195,7 +195,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
             ...sources,
             [dependency]: library.replace(
               "fn () => state.get ()",
-              "fn () => do:\n  let saved = state\n  return saved.get ()",
+              "fn () => do:\n  let saved = state\n  break saved.get ()",
             ),
           };
           const savedCapture = await compiler.build({
@@ -245,7 +245,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
                 "fn value => value",
                 `fn value => do:
   let same = value
-  return same`,
+  break same`,
               ),
             };
             const retained = await compiler.build({ sources: aliases });

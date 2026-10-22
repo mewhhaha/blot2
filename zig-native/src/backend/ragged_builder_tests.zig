@@ -50,7 +50,7 @@ const triangle_source =
     \\  for x in 0..count:
     \\    for y in 0..x:
     \\      result := [...self, @u32.add (@u32.mul x 10) y]
-    \\  return @array.from_list result
+    \\  break @array.from_list result
 ;
 test "ragged proof admits dependent bounds and ordered guard qualifier merges" {
     const sources = [_][]const u8{
@@ -70,7 +70,7 @@ test "ragged proof declines trapping controls payloads and intermediate observat
         "entry const run = fn (values: Array U32) => #[x | x <- values, @u32.lt 0 (@u32.div 1 x)]\n",
         "entry const run = fn (values: Array U32) => #[@u32.div 1 x | x <- values, @u32.lt 0 x]\n",
         "entry const run = fn (values: Array U32) => #[#[x] | x <- values, @u32.lt 0 x]\n",
-        "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..x:\n      result := @list.append result (@list.length result)\n  return result\n",
+        "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..x:\n      result := @list.append result (@list.length result)\n  break result\n",
     };
     for (sources) |source| {
         var module = try lower(a, source);
@@ -112,7 +112,7 @@ const staged_source =
     \\  for x in 0..count:
     \\    for y in 0..x:
     \\      result := [...self, @u32.add (@u32.mul x 10) y]
-    \\  return @array.from_list result
+    \\  break @array.from_list result
     \\entry const values = triangle 4
 ;
 fn stagedOwnership(allocator: std.mem.Allocator, module: *const core.Module) !void {
@@ -299,7 +299,7 @@ test "ragged staged zero and selected outputs preserve successful ordinary value
 }
 test "ragged staged construction publishes only selected children across growth" {
     for ([_]usize{ 0, 1, 8, 32, 128 }) |count| {
-        const source = try a.print("const build = fn count => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..x:\n      result := @list.append self (@u32.add (@u32.mul x 10) y)\n  return @array.from_list result\nentry const values = build {d}\n", .{count});
+        const source = try a.print("const build = fn count => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..x:\n      result := @list.append self (@u32.add (@u32.mul x 10) y)\n  break @array.from_list result\nentry const values = build {d}\n", .{count});
         defer a.free(source);
         var module = try lower(a, source);
         defer module.deinit(a);
@@ -327,9 +327,9 @@ fn retainedRecovery(allocator: std.mem.Allocator, module: *const core.Module, id
 }
 test "ragged runtime preparation admits packed copies four dimensions and established global inputs" {
     const sources = [_][]const u8{
-        "const copied = fn (rows: Array {a: U32, b: U32, z: U32}) => #[row | row <- rows, @u32.lt row.a 249]\nentry const run = fn count => do:\n  let rows = @array.generate count (fn i => {a: i, b: @u32.add i 1, z: @u32.mul i 3})\n  return @array.length (copied rows)\n",
-        "const copied = fn (rows: List {a: U32, b: U32, z: U32}) => [row | row <- rows, @u32.lt row.a 249]\nentry const run = fn count => do:\n  let rows = @list.generate count (fn i => {a: i, b: @u32.add i 1, z: @u32.mul i 3})\n  return @list.length (copied rows)\n",
-        "entry const run = fn count => do:\n  let values: List U32 = []\n  for a in 0..count:\n    for b in 0..a:\n      for c in 0..b:\n        for d in 0..c:\n          values := @list.append self d\n  return @array.from_list values\n",
+        "const copied = fn (rows: Array {a: U32, b: U32, z: U32}) => #[row | row <- rows, @u32.lt row.a 249]\nentry const run = fn count => do:\n  let rows = @array.generate count (fn i => {a: i, b: @u32.add i 1, z: @u32.mul i 3})\n  break @array.length (copied rows)\n",
+        "const copied = fn (rows: List {a: U32, b: U32, z: U32}) => [row | row <- rows, @u32.lt row.a 249]\nentry const run = fn count => do:\n  let rows = @list.generate count (fn i => {a: i, b: @u32.add i 1, z: @u32.mul i 3})\n  break @list.length (copied rows)\n",
+        "entry const run = fn count => do:\n  let values: List U32 = []\n  for a in 0..count:\n    for b in 0..a:\n      for c in 0..b:\n        for d in 0..c:\n          values := @list.append self d\n  break @array.from_list values\n",
         "let inputs = @array.fill 4 7\nentry const run = fn threshold => #[x | x <- inputs, @u32.lt threshold x]\n",
     };
     for (sources) |source| {
@@ -351,14 +351,14 @@ test "ragged speculative facts preserve unreached payloads at the real evidence 
         \\  for x in 0..0:
         \\    let left: Array Deep19 = #[]
         \\    values := @list.append self (ignored left left)
-        \\  return @array.from_list values
+        \\  break @array.from_list values
         \\entry const filtered = do:
         \\  let values: List U32 = []
         \\  for x in 0..1:
         \\    if #False:
         \\      let left: Array Deep19 = #[]
         \\      values := @list.append self (ignored left left)
-        \\  return @array.from_list values
+        \\  break @array.from_list values
         \\
     );
     var module = try lower(a, source.written());
@@ -411,7 +411,7 @@ test "ragged imported controls cannot alias local bindings with the same numeric
         \\  for x in 0..3:
         \\    if @u32.lt x limit:
         \\      result := [...self, x]
-        \\  return @array.from_list result
+        \\  break @array.from_list result
         \\const folded = run ()
         \\entry const staged = fn () => folded
     ;

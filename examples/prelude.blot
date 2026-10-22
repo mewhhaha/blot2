@@ -13,16 +13,16 @@ entry const const_answer = Maybe.unwrap_or 0 $ Maybe.map transform $ #Some 20
 entry const answer = fn () => do:
   let candidate = Maybe.map add_two (#Some 40)
   let #Some value = candidate else:
-    return 0
-  return Result.unwrap_or 0 $ Result.map identity $ #Ok value
+    break 0
+  break Result.unwrap_or 0 $ Result.map identity $ #Ok value
 
 // One generic function and one local lambda each work at distinct types.
 entry const generic_identity = fn () => do:
   let same = fn value => value
   let enabled = same (identity #True)
   if enabled:
-    return same (identity 42)
-  return 0
+    break same (identity 42)
+  break 0
 
 // Backticks call source functions; application binds more tightly.
 const plus = fn left => fn right => left + right
@@ -30,7 +30,7 @@ entry const named_operator = fn () => 20 `plus` 22
 
 entry const inspect = fn (enabled: Bool) => do:
   let candidate = #Some (if enabled then #Some 42 else #Nothing)
-  return case candidate of
+  break case candidate of
     #Some (#Some value) => value
     #Some #Nothing => 0
     #Nothing => 0
@@ -38,5 +38,5 @@ entry const inspect = fn (enabled: Bool) => do:
 entry const recover = fn (enabled: Bool) => do:
   let candidate = if enabled then #Ok 42 else #Err #False
   if let #Ok value = candidate:
-    return value
-  return 0
+    break value
+  break 0

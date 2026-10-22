@@ -9,8 +9,8 @@ const project_check = @import("project_check.zig");
 const a = std.testing.allocator;
 const Case = struct { source: []const u8, code: ?check.Code, point: u32 = 0, exact_span: bool = true };
 const cases = [_]Case{
-    .{ .source = "const invalid = fn value => do:\n  let (#True, selected) = value\n  return selected\n", .code = .non_exhaustive_match, .point = 34 }, // original-151
-    .{ .source = "const invalid = fn () => do:\n  let (first, second, third) = (1, 2)\n  return first\n", .code = .product_arity, .point = 31 }, // original-153
+    .{ .source = "const invalid = fn value => do:\n  let (#True, selected) = value\n  break selected\n", .code = .non_exhaustive_match, .point = 34 }, // original-151
+    .{ .source = "const invalid = fn () => do:\n  let (first, second, third) = (1, 2)\n  break first\n", .code = .product_arity, .point = 31 }, // original-153
     .{ .source = "data Pair = #Pair U32\nconst invalid = fn value => case value of\n  #Pair {} => 0\n", .code = .record_constructor, .point = 67 }, // original-158
     .{ .source = "data Pair = #Pair { x: U32, x: U32 }\n", .code = .duplicate_record_field, .point = 28 }, // original-171
     .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst make = fn () => #Pair { x: 1 }\n", .code = .missing_record_field, .point = 60 }, // original-172
@@ -47,20 +47,20 @@ const cases = [_]Case{
     .{ .source = "pub const invalid=1+2\n", .code = .unknown_modifier, .point = 0 }, // modifier-vs-operator
     .{ .source = "pub const first=42\nconst second=missing\n", .code = .unknown_value, .point = 32 }, // modifier-declarations-order
     .{ .source = "const first=missing\npub const second=42\n", .code = .unknown_modifier, .point = 20 }, // modifier-last
-    .{ .source = "const invalid=fn value=>do:\n  let #True=value\n  return 42\n", .code = .non_exhaustive_match, .point = 30 }, // refutable-bool
-    .{ .source = "data Maybe a=#Some a|#None\nconst invalid=fn()=>do:\n  let #Some value=#Some 42\n  return value\n", .code = .non_exhaustive_match, .point = 53 }, // refutable-constructor
-    .{ .source = "const invalid=fn()=>do:\n  let #True=42\n  return 0\n", .code = .type_mismatch, .point = 26 }, // refutable-type-failure
-    .{ .source = "const invalid=fn()=>do:\n  let value=42 else:\n    0\n  return value\n", .code = .guard_fallthrough, .point = 26 }, // guard-irrefutable
-    .{ .source = "const invalid=fn()=>do:\n  let #True=42 else:\n    0\n  return 0\n", .code = .type_mismatch, .point = 26 }, // guard-type-failure
-    .{ .source = "data Maybe a=#Some a|#None\nentry const answer=fn()=>do:\n  let #Some value=#Some 42 else:\n    return 0\n  return value\n", .code = null, .point = 0 }, // guard-positive
-    .{ .source = "data Maybe a=#Some a|#None\nentry const answer=fn()=>do:\n  let #Some value=#Some 42 else:\n    @panic \"unreachable\"\n  return value\n", .code = null, .point = 0 }, // guard-panic-positive
-    .{ .source = "const invalid=fn()=>do:\n  let (#True, second, third)=(1,2)\n  return second\n", .code = .product_arity, .point = 26 }, // product-count-versus-element
-    .{ .source = "const invalid=fn()=>do:\n  let ((first,second,third),fourth)=((1,2),3)\n  return first\n", .code = .product_arity, .point = 26 }, // product-nested-count
-    .{ .source = "const invalid=fn (value:(U32,U32))=>do:\n  let (first,second,third)=value\n  return first\n", .code = .product_arity, .point = 42 }, // product-annotated-count
-    .{ .source = "const invalid=fn()=>do:\n  let (first,second)=()\n  return first\n", .code = .type_mismatch, .point = 26 }, // product-unit-type-mismatch
-    .{ .source = "entry const answer=fn()=>do:\n  let (first,second)=(20,22)\n  return @u32.add first second\n", .code = null, .point = 0 }, // product-positive
-    .{ .source = "const invalid=fn()=>do:\n  let identity=fn value=>value else:\n    return 0\n  let first=identity 1\n  let second=identity 1.5\n  return 0\n", .code = .type_mismatch, .point = 110, .exact_span = false }, // guard-binder-monomorphic
-    .{ .source = "entry const answer=fn()=>do:\n  let identity=fn value=>value\n  let first=identity 42\n  let second=identity 1.5\n  return first\n", .code = null, .point = 0 }, // plain-binder-polymorphic
+    .{ .source = "const invalid=fn value=>do:\n  let #True=value\n  break 42\n", .code = .non_exhaustive_match, .point = 30 }, // refutable-bool
+    .{ .source = "data Maybe a=#Some a|#None\nconst invalid=fn()=>do:\n  let #Some value=#Some 42\n  break value\n", .code = .non_exhaustive_match, .point = 53 }, // refutable-constructor
+    .{ .source = "const invalid=fn()=>do:\n  let #True=42\n  break 0\n", .code = .type_mismatch, .point = 26 }, // refutable-type-failure
+    .{ .source = "const invalid=fn()=>do:\n  let value=42 else:\n    0\n  break value\n", .code = .guard_fallthrough, .point = 26 }, // guard-irrefutable
+    .{ .source = "const invalid=fn()=>do:\n  let #True=42 else:\n    0\n  break 0\n", .code = .type_mismatch, .point = 26 }, // guard-type-failure
+    .{ .source = "data Maybe a=#Some a|#None\nentry const answer=fn()=>do:\n  let #Some value=#Some 42 else:\n    break 0\n  break value\n", .code = null, .point = 0 }, // guard-positive
+    .{ .source = "data Maybe a=#Some a|#None\nentry const answer=fn()=>do:\n  let #Some value=#Some 42 else:\n    @panic \"unreachable\"\n  break value\n", .code = null, .point = 0 }, // guard-panic-positive
+    .{ .source = "const invalid=fn()=>do:\n  let (#True, second, third)=(1,2)\n  break second\n", .code = .product_arity, .point = 26 }, // product-count-versus-element
+    .{ .source = "const invalid=fn()=>do:\n  let ((first,second,third),fourth)=((1,2),3)\n  break first\n", .code = .product_arity, .point = 26 }, // product-nested-count
+    .{ .source = "const invalid=fn (value:(U32,U32))=>do:\n  let (first,second,third)=value\n  break first\n", .code = .product_arity, .point = 42 }, // product-annotated-count
+    .{ .source = "const invalid=fn()=>do:\n  let (first,second)=()\n  break first\n", .code = .type_mismatch, .point = 26 }, // product-unit-type-mismatch
+    .{ .source = "entry const answer=fn()=>do:\n  let (first,second)=(20,22)\n  break @u32.add first second\n", .code = null, .point = 0 }, // product-positive
+    .{ .source = "const invalid=fn()=>do:\n  let identity=fn value=>value else:\n    break 0\n  let first=identity 1\n  let second=identity 1.5\n  break 0\n", .code = .type_mismatch, .point = 110, .exact_span = false }, // guard-binder-monomorphic
+    .{ .source = "entry const answer=fn()=>do:\n  let identity=fn value=>value\n  let first=identity 42\n  let second=identity 1.5\n  break first\n", .code = null, .point = 0 }, // plain-binder-polymorphic
     .{ .source = "data Pair=#Pair {x:U32,x:U32}\nconst repeated=1\nconst repeated=2\n", .code = .duplicate_name, .point = 30 }, // declaration-duplicate-name-later
     .{ .source = "data Pair=#Pair ({x:U32,x:U32})\n", .code = .duplicate_type_field, .point = 17 }, // grouped-declaration-duplicate
     .{ .source = "data Pair=#Pair {x:U32,y:U32}\nconst invalid=fn()=>#Pair {z}\n", .code = .unknown_record_field, .point = 57 }, // shorthand-missing-field-before-missing-value

@@ -14,7 +14,7 @@ type State a is effect = {get: Unit -> a, set: a -> Unit}
 effect Read: U32 -> U32
 const state = fn (initial: U32) => @effect.run State.get State.set initial (fn () => do:
   use State.set 40
-  return State.get ()
+  break State.get ()
 )
 const scoped = fn () => @effect.scope (fn (state: State U32) => do:
   let capability = state
@@ -22,8 +22,8 @@ const scoped = fn () => @effect.scope (fn (state: State U32) => do:
   let write = capability.set
   let local = fn () => read ()
   let (successor, result) = do (@effect.state read write seed):
-    return local ()
-  return result
+    break local ()
+  break result
 )
 const borrow = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.read loan)
 const resource = fn () => @resource.scope (fn () => #[seed, 40]) (fn owner => ()) (fn loan => @usage.length loan)
@@ -35,7 +35,7 @@ const request = fn (host: U32 -> U32 ! {Foreign}) => do:
         count := @u32.add count 1
         yield host value
       complete value =>
-        return @u32.add count value
+        break @u32.add count value
 const effect_count = fn () => @effect.count (@effect.of scoped)
 const count = effect_count ()
 const rich = fn (host: U32 -> U32 ! {Foreign}) => @u32.add (@product.get (state seed) 1) (@u32.add (scoped ()) (@u32.add (borrow 40) (@u32.add (resource ()) (@u32.add (request host) count))))
@@ -48,15 +48,15 @@ const selected = fn (flag: Bool) => @effect.scope (fn (left: State U32) => @effe
   let alias = chosen
   let (state, result) = do (@effect.state chosen.get chosen.set seed):
     use alias.set 42
-    return alias.get ()
-  return result
+    break alias.get ()
+  break result
 ))
 const witness: (values: Array U32) -> (index: U32) -> @proof.Index values index = fn values => fn index => @proof.index values index
 const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = fn values => fn index => fn proof => @array.get values index
 const lookup = fn (index: U32) => do:
   let values = #[seed, 13]
   let valid = witness values index
-  return at values index valid
+  break at values index valid
 type Render a is contract = {const show: a -> U32}
 impl RenderU32 : Render U32 = {const show = fn value => value}
 type Item = exists [a] where {Render a} => a
@@ -72,18 +72,18 @@ const iterator_total = fn (first: U32) => do:
   let result = seed
   for value in #Counter first:
     result := @u32.add self value
-  return result
+  break result
 const describe = fn (value: U32) => do:
   let record = {value, values: #[value, seed]}
   record.value := @u32.add self 1
-  return @record.merge record {next: (#Number value).next}
+  break @record.merge record {next: (#Number value).next}
 `;
 const main =
   `import {operate, describe, rich, selected, lookup, item, package_read, tagged, iterator_total} from "./logic"
 entry const run = fn (host: U32 -> U32 ! {Foreign}) => operate host
 entry const method = fn (value: U32) => do:
   let record = describe value
-  return @u32.add record.value record.next
+  break @u32.add record.value record.next
 entry const deep = fn (host: U32 -> U32 ! {Foreign}) => rich host
 entry const owned = fn (value: U32) => (describe value).values
 entry const proof = fn (index: U32) => lookup index

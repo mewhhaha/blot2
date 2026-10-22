@@ -19,9 +19,9 @@ const nested = fn callback => fn (value: U32) => callback value
 const delayed = fn ~(value: U32) => fn () => @force value
 const provided: (Unit -> U32 ! {}) -> (Unit -> U32 ! {}) = fn implementation => do:
   let provider = @effect.provider Tick implementation
-  return fn () => do provider:
+  break fn () => do provider:
     use result <- Tick ()
-    return result
+    break result
 `;
   const program = (
     amount: number,
@@ -52,7 +52,7 @@ entry const snapshots = fn (start: U32) => do:
   let before = library.make value
   value := @u32.add self 10
   let after = library.make value
-  return @u32.add (before 1) (after 1)
+  break @u32.add (before 1) (after 1)
 entry const folded = captured 5
 `;
   const options = { executable, entry, prelude: null };

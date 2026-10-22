@@ -18,10 +18,10 @@ type Gauge is data = #Gauge F32
 const Gauge.lerp = fn (a: Gauge) => fn (b: Gauge) => fn (t: F32) => do:
   let #Gauge x = a
   let #Gauge y = b
-  return #Gauge (x + (y - x) * t)
+  break #Gauge (x + (y - x) * t)
 entry const main = fn (x: F32) -> F32 => do:
   let #Gauge v = mix.halfway (#Gauge 0.0) (#Gauge x)
-  return v
+  break v
 `,
         [helper]: "const halfway = fn a => fn b => a.lerp b 0.5\n",
       },

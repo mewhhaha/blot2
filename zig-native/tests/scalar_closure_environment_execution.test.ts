@@ -9,7 +9,7 @@ entry const snapshots = fn (seed: U32) => do:
     let total = value
     for i in 0..index:
       total := @u32.add self i
-    return total
+    break total
   value := @u32.add self 1
   let other = fn (index: U32) => @u32.add value index
   let saved = #[callback, other]
@@ -20,22 +20,22 @@ entry const snapshots = fn (seed: U32) => do:
       let checked = i
     else:
       @panic "pressure"
-  return #[nested (), (saved[1]) 3, value]
+  break #[nested (), (saved[1]) 3, value]
 const bounce = fn action => @computation action
 const completed = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const factory = fn (seed: U32) => completed (bounce (fn () => @u32.add seed 1))
 entry const borrowed = fn (seed: U32) => do:
   let values = #[seed, 8192]
   let callback = fn index => @array.get values index
-  return callback 0
+  break callback 0
 entry const floating = fn (seed: F32) => do:
   let callback = fn value => @f32.add seed value
   let saved = #[callback]
-  return (saved[0]) 1.0
+  break (saved[0]) 1.0
 entry const task = fn (seed: U32) => @task.scope (fn group => @task.join (@task.spawn group (fn () => seed)))
 `;
 Deno.test("scalar closure words preserve pointer-looking snapshots nested captures factories and task moves", async () => {

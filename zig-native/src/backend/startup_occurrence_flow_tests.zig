@@ -231,7 +231,7 @@ test "completed source demand body inference releases every failed allocation" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, nestedDemandProof, .{});
 }
 test "completed demand body cannot erase the returned callback latent effect" {
-    const source = "effect Read:Unit->U32\nconst keep=fn ~value=>value\nconst action=fn ()=>do:\n  use value<-Read ()\n  return value\nconst make=fn action=>fn ()=>keep action\nentry const fetch=make action\n";
+    const source = "effect Read:Unit->U32\nconst keep=fn ~value=>value\nconst action=fn ()=>do:\n  use value<-Read ()\n  break value\nconst make=fn action=>fn ()=>keep action\nentry const fetch=make action\n";
     var module = try lower(a, source);
     defer module.deinit(a);
     var session = try core_eval.Session.init(a, &.{module});

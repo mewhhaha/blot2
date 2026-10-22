@@ -39,7 +39,7 @@ const records_body =
     \\type Vec2 is data = #Vec2 { x: F32, y: F32 }
     \\const sum = fn point => do:
     \\  let #Vec2 { x, y } = point
-    \\  return x + y
+    \\  break x + y
     \\const origin = #Vec2 { y: 2.0, x: 20.0 }
     \\entry const answer = fn () -> F32 => sum origin
     \\entry const projected = fn () -> F32 => origin.x
@@ -176,10 +176,10 @@ test "refutable let and conditional matches preserve the outer return boundary" 
         \\type Choice is data = #Some U32 | #Nothing
         \\const pick = fn candidate => do:
         \\  let #Some value = candidate else:
-        \\    return 0
+        \\    break 0
         \\  if let #Some other = candidate:
-        \\    return other
-        \\  return value
+        \\    break other
+        \\  break value
         \\entry const answer = pick (#Some 42)
     );
     defer fixture.deinit();

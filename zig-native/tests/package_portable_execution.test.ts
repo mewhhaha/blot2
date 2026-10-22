@@ -14,7 +14,7 @@ const consumer = `import {make, read, captured, choose} from "./identity"
 entry const whole: U32 -> U32 = fn value => read (make value)
 entry const selected: Bool -> U32 = fn flag => do:
   let items = (make 42, choose flag)
-  return @u32.add (read (@product.get items 0)) (read (@product.get items 1))
+  break @u32.add (read (@product.get items 0)) (read (@product.get items 1))
 entry const doubled: U32 -> U32 = fn value => read (captured value)
 entry const fraction: U32 -> U32 = fn value => read (make (@u32.add value 1))
 `;

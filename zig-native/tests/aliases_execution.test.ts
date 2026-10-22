@@ -160,9 +160,9 @@ type Read a is contract = { operation Signal.get a, type_rep a, effect_rep ! {} 
 const read: Unit -> a ! {| e} where { Read a } = fn () => Signal.get a ()
 const number: Unit -> Number ! {Signal.get Number} = fn () => Signal.get Number ()
 entry const answer = fn () -> U32 => do (@effect.provider (Signal.get (Identity Number)) (fn () => 21)):
-  return @u32.add (read ()) (number ())
+  break @u32.add (read ()) (number ())
 entry const fraction = fn () -> F32 => do (@effect.provider (Signal.get (Identity F32)) (fn () => 1.5)):
-  return read ()
+  break read ()
 `,
     (guest) => {
       equal(guest.call("answer", null), 42);

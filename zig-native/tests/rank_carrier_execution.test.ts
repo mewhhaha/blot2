@@ -111,7 +111,7 @@ Deno.test("rank two explicit lambda introductions retain runtime captured enviro
     `const two: (forall [a] => a -> a) -> U32 -> (U32, F32) = fn identity => fn value => (identity value, identity (@u32.to_f32 value))
 const make: U32 -> (forall [a] => a -> a) = fn captured => fn item => do:
   let ignored = @u32.add captured 1
-  return item
+  break item
 entry const whole = fn (value: U32) => @product.get (two (make value) value) 0
 entry const fraction = fn (value: U32) => @product.get (two (fn item => item) value) 1
 `,

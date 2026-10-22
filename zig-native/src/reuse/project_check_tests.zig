@@ -18,7 +18,7 @@ const named_function_shadow_source =
     \\const combine = fn left => fn right => @u32.sub left right
     \\entry const run = fn () -> U32 => do:
     \\  let combine = fn left => fn right => @u32.add left right
-    \\  return 20 `combine` 22
+    \\  break 20 `combine` 22
 ;
 const symbolic_captured_target_source =
     \\infixl 60 (+) = subtract
@@ -487,7 +487,7 @@ test "foreign scheme imports scale with distinct targets rather than uses or ali
         defer text.deinit(a);
         try text.appendSlice(a, "import { identity as direct } from \"./library\"\nimport * as lib from \"./library\"\nentry const answer = fn () -> U32 => do:\n");
         for (0..count) |index| try text.appendSlice(a, if (index % 2 == 0) "  direct 42\n" else "  lib.identity 1.5\n");
-        try text.appendSlice(a, "  return 42\n");
+        try text.appendSlice(a, "  break 42\n");
         var fixture = try Fixture.init(&.{
             .{ .name = "main.blot", .text = text.items },
             .{ .name = "library.blot", .text = "const identity = fn value => value\n" },
@@ -566,10 +566,10 @@ test "imported result and demand schemes keep owned quantified relations and num
         \\import { convert as from, delay as suspend } from "./library"
         \\entry const integer=fn()=>do:
         \\  let #lib.Box value:lib.Box U32=from 42
-        \\  return @force (suspend value)
+        \\  break @force (suspend value)
         \\entry const floating=fn()=>do:
         \\  let #lib.Box value:lib.Box F32=lib.convert 1.25
-        \\  return @force (lib.delay value)
+        \\  break @force (lib.delay value)
         },
         .{ .name = "library.blot", .text =
         \\type Box value is data = #Box value
@@ -613,7 +613,7 @@ test "generated monadic progress preserves designated prelude identity through l
         \\  for index in 0..3:
         \\    use value <- #Some 1
         \\    total:=@u32.add self value
-        \\  return total
+        \\  break total
         \\entry const answer=fn()=>case sequence() of
         \\  #Some value=>value
         \\  #Nothing=>42
@@ -631,9 +631,9 @@ test "generated monadic progress preserves designated prelude identity through l
         \\  for ever:
         \\    use candidate <- step state
         \\    if let #Some (#Done result)=candidate:
-        \\      return #Some result
+        \\      break #Some result
         \\    let #Some (#Continue next)=candidate else:
-        \\      return #Nothing
+        \\      break #Nothing
         \\    state:=next
         },
     }, "prelude.blot");
@@ -798,7 +798,7 @@ test "module abstraction forwarding retains data constructors effects and contra
         \\const reader = @effect.provider Read (fn () => 42)
         \\entry const answer = fn () => do reader:
         \\  use number <- Read ()
-        \\  return keep number
+        \\  break keep number
         },
     });
     defer fixture.deinit();

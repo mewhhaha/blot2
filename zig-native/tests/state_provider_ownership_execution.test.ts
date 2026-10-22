@@ -12,31 +12,31 @@ const borrow = fn () => do:
   let (_, old) = do local:
     use value <- selected ()
     use State.set (Array U32) #[90, 91]
-    return value
-  return old
+    break value
+  break old
 entry const run = fn (count: U32) => do:
   use old <- borrow ()
   for index in 0..count:
     let pressure = @array.fill 8192 index
     if pressure[8191] != index:
       @panic "lost pressure"
-  return old
+  break old
 entry const failed = fn (host: Array U32 -> Unit ! {Foreign}) => do:
   use old <- borrow ()
   use host old
-  return old[1]
+  break old[1]
 entry const floating = fn () => do:
   let local = @effect.state (State.get F32) (State.set F32) (-0.0)
   let (_, value) = do local:
-    return State.get F32 ()
-  return value
+    break State.get F32 ()
+  break value
 `;
 const callback = `
 entry const alternate = fn (seed: U32) => do:
   let local = @effect.provider (State.get (Array U32)) (fn () => #[seed + 1, 42])
   let result = do local:
-    return selected ()
-  return result
+    break selected ()
+  break result
 `;
 
 Deno.test("State provider reads keep replaced fields alive across owner destruction cancellation and callback-mode edits", async () => {

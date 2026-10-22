@@ -15,7 +15,7 @@ entry const named_value = fn (value:U32) => case #Pair {y:2.5,x:value} of
   #Pair {y,x} => @f32.add (@u32.to_f32 x) y
 entry const local_value = fn (value:U32) => do:
   let #Pair payload = #Pair {y:2.5,x:value}
-  return @f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 1)
+  break @f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 1)
 entry const one_u32 = fn (value:U32) => unbox (#Box {value})
 entry const one_f32 = fn (value:F32) => unbox (#Box {value})
 entry const wrapped_value = fn (value:F32) => case #Wrapped {value:(40,value)} of

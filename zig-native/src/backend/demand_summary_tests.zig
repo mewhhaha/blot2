@@ -82,11 +82,11 @@ test "demand summary aliases preserve identity and an outside creation repeats i
     var module = try lower(a,
         \\const alias = fn ~(value: U32) => do:
         \\  let second = value
-        \\  return @demand second
+        \\  break @demand second
         \\const looped = fn ~(value: U32) => do:
         \\  for index in 0..3:
         \\    use @demand value
-        \\  return 42
+        \\  break 42
         \\entry const run = fn (x: U32) => alias x
     );
     defer module.deinit(a);
@@ -235,7 +235,7 @@ test "demand summary aggregate escape unknown callbacks and provider barriers st
         \\const stored = fn ~(value: U32) => { item: value }
         \\const callback = fn ~(value: U32) => fn (next: ~U32 -> U32) => next (@demand value)
         \\const guarded = fn ~(value: U32) => do (@effect.provider Tick.read (fn () => 42)):
-        \\  return @demand value
+        \\  break @demand value
         \\entry const run = fn () => guarded (Tick.read ())
     );
     defer module.deinit(a);
@@ -251,7 +251,7 @@ test "demand summary loop fresh creation has one use per dynamic instance" {
         \\  for index in 0..3:
         \\    let pending = value
         \\    use @demand pending
-        \\  return 42
+        \\  break 42
         \\entry const run = fn (x: U32) => looped x
     );
     defer module.deinit(a);

@@ -8,7 +8,7 @@ const identity: forall [a] => a -> a = fn item => item
 const consume = fn (item: unique U32) => @usage.borrow item (fn loan => @usage.read loan)
 const checked = fn (item: U32) => do:
   let witness = @proof.lt 0 item
-  return item
+  break item
 const read: Unit -> U32 = fn () => identity value
 `;
 Deno.test("shared dependency validation owns actual foreign rank usage and proof inputs across archives edits rollback and restart", async () => {

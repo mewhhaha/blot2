@@ -48,7 +48,7 @@ function rowPrograms() {
   let total = input[2]
   for row in values:
     total := @f32.add total (${expression})
-  return total
+  break total
 `);
       }
     }
@@ -60,7 +60,7 @@ entry const shared = fn (input: Array F32) => do:
   let saved = rows
   rows[0].a := 99.0
   let pressure = @array.fill 8192 123
-  return #[consume saved[0], consume rows[0]]
+  break #[consume saved[0], consume rows[0]]
 entry const effectful = fn (host: F32 -> F32 ! {Foreign}) => do:
   let rows = @array.fill 5 {a: 1.0, b: 2.0, c: 3.0, d: 4.0}
   let total = 0.0
@@ -70,7 +70,7 @@ entry const effectful = fn (host: F32 -> F32 ! {Foreign}) => do:
     let third = @f32.mul row.c 1.25
     let fourth = @f32.mul row.d 1.25
     total := @f32.add total (@f32.add (@f32.add (@f32.add first second) third) fourth)
-  return total
+  break total
 `);
   return { source: functions.join("\n"), cases };
 }

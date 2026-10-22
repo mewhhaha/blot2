@@ -25,8 +25,8 @@ const abort = fn log => fn computation => do:
         use log 1
         ${exit === "return" ? "return 7" : "break"}
       complete value =>
-        return value
-  return 7
+        break value
+  break 7
 const finish = fn log => fn computation => do:
   for request in @requests computation:
     case request of
@@ -34,21 +34,21 @@ const finish = fn log => fn computation => do:
         use log 2
         yield @u32.add value 40
       complete value =>
-        return value
+        break value
 const scenario = fn log => do:
   let inner = delay (Tick.read 1)
   let pending = delay (do:
     use value <- ${nested ? "@demand inner" : "Tick.read 1"}
-    return @u32.add value 1
+    break @u32.add value 1
   )
   let work = @computation (fn () => @demand pending)
   use first <- abort log work
   use second <- finish log work
   use third <- finish log work
-  return @u32.add first (@u32.add second third)
+  break @u32.add first (@u32.add second third)
 entry const answer = fn (log: U32 -> U32 ! {Foreign}) => do:
   use result <- scenario log
-  return result
+  break result
 entry const folded = scenario (fn value => value)
 `;
 }
@@ -59,9 +59,9 @@ const keep = fn ~value => fn () => @demand value
 const saved = keep (Tick.read ())
 const divided = keep (@u32.div 1 (Tick.read ()))
 entry const answer = fn (host: Unit -> U32 ! {Foreign}) => do (@effect.provider Tick.read host):
-  return saved ()
+  break saved ()
 entry const divide = fn (host: Unit -> U32 ! {Foreign}) => do (@effect.provider Tick.read host):
-  return divided ()
+  break divided ()
 entry const pure = fn () => 7
 `;
 
@@ -74,14 +74,14 @@ entry const answer = fn () => do:
   let (_, result) = @effect.run State.get State.set #End (fn () => do:
     let delayed = keep (do:
       use link <- get (fn () => #End)
-      return case link of
+      break case link of
         #End => 0
         #Next callback => callback ()
     )
     use State.set (#Next delayed)
-    return delayed ()
+    break delayed ()
   )
-  return result
+  break result
 entry const pure = fn () => 7
 `;
 

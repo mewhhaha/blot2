@@ -32,7 +32,7 @@ export default grammar({
         $.type_header,
         $.curried_type_header,
         $.infix_function,
-        $.forward_return,
+        $.forward_break,
         $.declaration_tag,
         $.constructor_reference,
         $.constructor_marker,
@@ -292,7 +292,7 @@ export default grammar({
         "`",
       ),
 
-    forward_return: (_) => seq("return", "$"),
+    forward_break: (_) => seq("break", "$"),
 
     constructor_marker: (_) => prec(-1, "#"),
     constructor_reference: ($) =>

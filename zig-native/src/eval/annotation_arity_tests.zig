@@ -74,7 +74,7 @@ test "annotation application preserves curried and shaped nominal constructor in
         \\entry const answer = do:
         \\  let #Curried (left,_) = curried
         \\  let #Shaped (right,_) = shaped
-        \\  return @u32.add left right
+        \\  break @u32.add left right
     ;
     var tokens = try lexer.lex(a, source);
     defer tokens.deinit(a);

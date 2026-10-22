@@ -6,22 +6,22 @@ const checked = fn computation => do:
     case request of
       effect Validate.check value =>
         if value == 0:
-          return 0
+          break 0
         yield value
       complete value =>
-        return value
+        break value
 
 const addition = @computation (fn () => do:
   use left <- Validate.check 40
   use right <- Validate.check 2
-  return left + right
+  break left + right
 )
 
 entry const completed = fn () => checked addition
 
 entry const cancelled = fn () => checked (@computation (fn () => do:
   use Validate.check 0
-  return @panic "the handler returned before this statement"
+  break @panic "the handler returned before this statement"
 ))
 
 // Rebindings carry handler state between requests. `break` runs the suffix.
@@ -36,11 +36,11 @@ const count_until_zero = fn computation => do:
         yield value
       complete _ =>
         break
-  return count
+  break count
 
 entry const counted = fn () => count_until_zero (@computation (fn () => do:
   use Validate.check 40
   use Validate.check 2
   use Validate.check 0
-  return @panic "the handler broke before this statement"
+  break @panic "the handler broke before this statement"
 ))

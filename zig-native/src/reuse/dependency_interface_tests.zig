@@ -27,7 +27,7 @@ const producer_source =
 const consumer_source =
     \\entry const answer: Unit -> U32 = fn () => do reader:
     \\  use value <- Cell.get U32 ()
-    \\  return @u32.add (qualified (identity (#Box { value: value }).get)) 1
+    \\  break @u32.add (qualified (identity (#Box { value: value }).get)) 1
 ;
 
 test "frozen principal imports share exact ordinary scheme and catalog rules" {
@@ -398,7 +398,7 @@ test "loaded dependency principal Core and rows remain immutable across distinct
     for ([_][]const u8{
         "entry const answer: Unit -> U32 = fn () => identity (40 + 2)\n",
         "entry const answer: Unit -> F32 = fn () => identity (40.0 + 2.5)\n",
-        "entry const answer: Unit -> U32 = fn () => do:\n  let #Some value = #Some 42 else:\n    return 0\n  return value\n",
+        "entry const answer: Unit -> U32 = fn () => do:\n  let #Some value = #Some 42 else:\n    break 0\n  break value\n",
     }) |source| {
         var compiled = try consumer_api.compile(a, source, &pool, &frozen.modules[0]);
         defer compiled.deinit(a);
@@ -1280,7 +1280,7 @@ const callable_container_producer =
     \\const keep = fn unused => fn (state: State a) => {callbacks: #[(fn () => state.get ())]}
     \\const alias = fn unused => fn retained => do:
     \\  let version = retained
-    \\  return {nested: #[version]}
+    \\  break {nested: #[version]}
     \\opaque type Wrapper a = a
     \\const wrap = fn unused => fn retained => #Wrapper retained
     \\const unwrap = fn unused => fn wrapped => case wrapped of
@@ -1511,12 +1511,12 @@ const deferred_block_producer =
     \\const fields = fn (discarded: State a) => fn (retained: State a) => do:
     \\  let dropped = fn () => do:
     \\    let alias = discarded
-    \\    return alias.get ()
+    \\    break alias.get ()
     \\  let kept = fn () => do:
     \\    let alias = retained
-    \\    return case (alias, 1) of
+    \\    break case (alias, 1) of
     \\      (cell, number) => cell.get ()
-    \\  return {discarded: dropped, retained: kept}
+    \\  break {discarded: dropped, retained: kept}
 ;
 fn deferredBlockArtifactLaw(allocator: std.mem.Allocator) !void {
     const bytes = try artifact(allocator, deferred_block_producer);
@@ -1610,13 +1610,13 @@ const generative_producer =
     \\const freeze = fn value => fn () => value
     \\const bundle = fn flag => fn (left: State a) => fn (right: State a) => fn initial => do:
     \\  let selected = forward flag left right
-    \\  return {cell: selected, read: fn () => selected.get (), provider: @effect.state selected.get selected.set initial}
+    \\  break {cell: selected, read: fn () => selected.get (), provider: @effect.state selected.get selected.set initial}
 ;
 const returned_generative_producer =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\const staged = fn (left: State a) => fn (middle: State a) => do:
     \\  let first = if #True then left else middle
-    \\  return fn () => {first: first, second: if #False then left else middle}
+    \\  break fn () => {first: first, second: if #False then left else middle}
     \\const returned_forward = fn (left: State a) => fn (right: State a) => staged left right
 ;
 fn generativeInvalid(allocator: std.mem.Allocator, frozen: *const D.FrozenDependency, source: []const u8) !void {
@@ -1801,7 +1801,7 @@ const pattern_capture_producer =
     \\type Application is data = #Application {reset: Unit -> U32}
     \\const reset_scoped = fn application => fn () => do:
     \\  let #Application {reset} = application
-    \\  return reset ()
+    \\  break reset ()
 ;
 fn patternCaptureArtifactLaw(allocator: std.mem.Allocator) !void {
     const bytes = try artifact(allocator, pattern_capture_producer);
@@ -1841,7 +1841,7 @@ const formal_generative_producer =
     \\const staged = fn (left: State a) => fn (right: State a) => fn () => if #True then left else right
     \\const exercise = fn (left: State a) => fn (right: State a) => do:
     \\  let maker = staged left right
-    \\  return call maker
+    \\  break call maker
     \\const ordinary = fn () => 42
 ;
 fn formalGenerativeValidation(allocator: std.mem.Allocator, bytes: []const u8) !void {
@@ -1941,12 +1941,12 @@ const projected_generative_producer =
     \\  let maker = staged left right
     \\  let container = {nested: {maker: maker, ordinary: fn () => 42}, unused: 99}
     \\  let alias = container
-    \\  return call alias.nested.maker
+    \\  break call alias.nested.maker
     \\const product = fn (left: State a) => fn (right: State a) => do:
     \\  let maker = staged left right
     \\  let container = (maker, fn () => 42)
     \\  let alias = container
-    \\  return call (@product.get alias 0)
+    \\  break call (@product.get alias 0)
 ;
 fn projectedGenerativeValidation(allocator: std.mem.Allocator, bytes: []const u8) !void {
     var frozen = try format.decode(D.FrozenDependency, allocator, bytes, key);
@@ -2085,9 +2085,9 @@ const input_invocation_producer =
     \\const identity = fn (cell: State a) => invoke cell (fn actual => actual)
     \\const scoped = fn () => @effect.scope (fn (cell: State U32) => do:
     \\  use handled <- do (@effect.state cell.get cell.set 42):
-    \\    return invoke cell (fn (actual: State U32) => if #True then actual.get () else 0)
+    \\    break invoke cell (fn (actual: State U32) => if #True then actual.get () else 0)
     \\  let (state, value) = handled
-    \\  return value
+    \\  break value
     \\)
 ;
 fn inputInvocationValidation(allocator: std.mem.Allocator, bytes: []const u8) !void {

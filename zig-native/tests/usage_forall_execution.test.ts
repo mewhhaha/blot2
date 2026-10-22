@@ -13,14 +13,14 @@ entry const answer = fn () => do:
   let moved = forward owner
   use value <- @usage.borrow moved (fn loan => @usage.read loan)
   use @resource.release moved
-  return value
+  break value
 entry const ordered = fn (host: Unit -> U32 ! {Foreign}) => do:
   use owner <- @resource.acquire (fn () => 9) (fn owner => ())
   let moved = forward owner
   use offset <- host ()
   use value <- @usage.borrow moved (fn loan => @usage.read loan)
   use @resource.release moved
-  return @u32.add value offset
+  break @u32.add value offset
 `;
 async function observe(bytes: Uint8Array<ArrayBuffer>, expected: number) {
   for (const asynchronous of [false, true]) {

@@ -83,7 +83,7 @@ Deno.test("parser span builder preserves integers, Unicode, clauses and declarat
       "const same = fn (value: U32 where { self < 1000 }) => value",
       "entry const result = fn () => do:",
       "  let value = 19",
-      "  return @u32.add value 23",
+      "  break @u32.add value 23",
       "",
     ];
     for (const separator of ["\n", "\r\n", "\r"]) {

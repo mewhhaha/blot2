@@ -17,7 +17,7 @@ const entry = fn entry => entry
 const read = fn value => do:
   let entry = value
 //    ^ variable
-  return entry
+  break entry
 //       ^ variable
 
 entry

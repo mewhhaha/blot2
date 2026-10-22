@@ -39,21 +39,21 @@ const provider_source =
     \\const reader = @effect.provider Read (fn () => 1.75)
     \\const state = @effect.state (State.get F32) (State.set F32) 1.75
     \\entry const folded = do reader:
-    \\  return Read ()
+    \\  break Read ()
     \\entry const callback = fn () => do reader:
-    \\  return Read ()
+    \\  break Read ()
     \\entry const answer = fn (value: F32) => do:
     \\  let dynamic = @effect.provider Read (fn () => value)
     \\  let local = @effect.state (State.get F32) (State.set F32) value
     \\  let (next, old) = do state:
     \\    use old <- State.get F32 ()
     \\    use State.set F32 (@f32.add old value)
-    \\    return old
+    \\    break old
     \\  let (_, selected) = do local:
-    \\    return State.get F32 ()
+    \\    break State.get F32 ()
     \\  let read = do dynamic:
-    \\    return Read ()
-    \\  return @f32.add (@f32.add next old) (@f32.add selected read)
+    \\    break Read ()
+    \\  break @f32.add (@f32.add next old) (@f32.add selected read)
 ;
 
 fn emit(allocator: std.mem.Allocator, module: *const core.Module, noisy: bool) !void {
@@ -143,7 +143,7 @@ test "runtime operation relocation preserves supported semantic reflection membe
         \\const read = fn () => do:
         \\  use Signal.ping U32 ()
         \\  use Signal.ping U32 ()
-        \\  return Signal.ping F32 ()
+        \\  break Signal.ping F32 ()
         \\const effects = @effect.of read
         \\entry const total = @effect.count effects
         \\entry const present = @effect.has effects (Signal.ping F32)
@@ -211,8 +211,8 @@ test "resolved bodies prepare calls fields evidence closures and exits without m
         \\  for index in 0..value:
         \\    count := @u32.add self 1
         \\  if @type.same 0 1:
-        \\    return read ()
-        \\  return count
+        \\    break read ()
+        \\  break count
     ;
     var module = try lower(a, source);
     defer module.deinit(a);
@@ -244,7 +244,7 @@ test "shared RC source collection construction and publication preserve frozen C
         \\  let copied = @array.from_list values
         \\  let old = @array.from_list before
         \\  copied[0] := #[value, value]
-        \\  return @u32.add (@array.get (@array.get old 0) 1) (@array.get (@array.get copied 500) 0)
+        \\  break @u32.add (@array.get (@array.get old 0) 1) (@array.get (@array.get copied 500) 0)
     ;
     var module = try lower(a, source);
     defer module.deinit(a);
@@ -280,13 +280,13 @@ test "packed List directory emission preserves frozen Core through every allocat
         \\    total := @u32.add (@u32.add (@u32.add self row.a) row.b) row.c
         \\  for row in rows:
         \\    total := @u32.add (@u32.add (@u32.add self row.a) row.b) row.c
-        \\  return total
+        \\  break total
         \\entry const float_answer = fn (value: F32) => do:
         \\  let rows = @list.fill 601 { a: value, b: value, c: value, d: value }
         \\  let total = 0.0
         \\  for row in rows:
         \\    total := @f32.add (@f32.add (@f32.add (@f32.add self row.a) row.b) row.c) row.d
-        \\  return total
+        \\  break total
     ;
     var module = try lower(a, source);
     defer module.deinit(a);
@@ -347,7 +347,7 @@ const retained_demand_source =
     \\  let delayed = keep (host 41)
     \\  use first <- delayed ()
     \\  use second <- delayed ()
-    \\  return @u32.add (@array.get first 0) (@array.get second 0)
+    \\  break @u32.add (@array.get first 0) (@array.get second 0)
 ;
 fn retainedDemand(allocator: std.mem.Allocator, module: *const core.Module) !void {
     var result = try backend.compileWithOptions(allocator, &.{module.*}, 1, .{ .inline_named = false, .retain_artifacts = true });
@@ -525,8 +525,8 @@ test "private State provider heads stay outside source Array graphs across direc
         \\entry const run = fn (seed: U32) => do:
         \\  let local = @effect.state (State.get (Array U32)) (State.set (Array U32)) #[seed]
         \\  let (_, result) = do local:
-        \\    return State.get (Array U32) ()
-        \\  return result[0]
+        \\    break State.get (Array U32) ()
+        \\  break result[0]
     );
     defer module.deinit(a);
     try providerConstruction(a, &module, true);
@@ -2490,7 +2490,7 @@ test "selected associated callback annotation retains current concrete method re
         \\impl ArraySource a : Source (Array a) = { type Item = a, const first = fn values => @array.get values 0 }
         \\entry const answer = fn (value: U32) => do:
         \\  let selected: (Array U32) -> U32 = Source.first
-        \\  return selected #[value]
+        \\  break selected #[value]
     );
     defer module.deinit(a);
     try emitInferredDictionary(a, &module);

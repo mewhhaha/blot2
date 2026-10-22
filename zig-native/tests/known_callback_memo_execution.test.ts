@@ -31,7 +31,7 @@ const repeat = fn (count: U32) => fn ~(value: U32) => do:
     use left <- alias i
     use right <- second i
     total := @u32.add self (@u32.add left right)
-  return total
+  break total
 `;
 
 Deno.test("known lexical callbacks share a local memo without heap or table", async () => {
@@ -117,7 +117,7 @@ const read = fn ~(value: U32) => do:
   use a <- first 1
   use b <- saved ()
   use c <- second ()
-  return @u32.add a (@u32.add b c)
+  break @u32.add a (@u32.add b c)
 entry const run = fn (value: U32) => read value
 `,
     (guest, bytes) => {
@@ -151,7 +151,7 @@ const repeat = fn (count: U32) => fn ~(value: Array U32) => do:
     use a <- alias (@u32.rem i 3)
     use b <- second (@u32.rem i 3)
     total := @u32.add self (@u32.add (@u32.add a b) (@u32.add pressure[0] churn[0]))
-  return total
+  break total
 entry const run = fn (count: U32) => repeat count #[21, 22, 23]
 `,
     (guest, bytes) => {
@@ -187,7 +187,7 @@ entry const run = fn (host: U32 -> U32 ! {Foreign}) => do:
   let callbacks = keep (host 21)
   use first <- callbacks.first ()
   use second <- callbacks.second ()
-  return @u32.add first second
+  break @u32.add first second
 `,
     (guest, bytes) => {
       assert(sections(bytes).includes(5));
@@ -294,7 +294,7 @@ const read = fn ~(value: U32) => do:
   let callback = fn () => add (@demand value)
   use first <- callback ()
   use second <- callback ()
-  return @u32.add first second
+  break @u32.add first second
 entry const run = fn (value: U32) => read value
 `,
     (guest, bytes) => {
@@ -314,7 +314,7 @@ const read = fn ~value => do:
   let callback = fn () => identity (@demand value)
   use first <- callback ()
   use callback ()
-  return first
+  break first
 entry const integer = fn (value: U32) => read value
 entry const floating = fn (value: F32) => read value
 `,

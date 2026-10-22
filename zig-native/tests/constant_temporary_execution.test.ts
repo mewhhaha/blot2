@@ -9,7 +9,7 @@ const bodies = [
   `  let provider = @effect.provider Read (fn () => base)
   let cost = base`,
   `  let cost = do (@effect.provider Read (fn () => base)):
-    return base`,
+    break base`,
   `  let cost = base
   for request in @requests (@computation (fn () => base)):
     case request of
@@ -19,13 +19,13 @@ const bodies = [
         cost := result
         break`,
   `  let wrapped = do (@do.monad Box):
-    return base
+    break base
   let cost = case wrapped of
     #Box value => value`,
   `  let (_, cost) = @state.run base (fn () => base)`,
   `  let cost = do (@effect.provider Read (fn () => base)):
     use result <- Read ()
-    return result`,
+    break result`,
   `  let pending = delayed base
   let cost = @force pending
   let again = @force pending`,
@@ -47,7 +47,7 @@ ${
 ${body}
   for index in 0..256:
     cost := @u32.add self 1
-  return cost
+  break cost
 `
     ).join("\n")
   }

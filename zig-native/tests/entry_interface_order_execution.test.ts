@@ -24,7 +24,7 @@ Deno.test("generic value interfaces reject before constant bounds or panic while
   await compileExpectedFailure(
     `entry const answer = do:
   let selected: U32 where {associated "missing" Bool Bool Bool} = 42
-  return @array.get #[] 0
+  break @array.get #[] 0
 `,
     "missing_associated",
   );

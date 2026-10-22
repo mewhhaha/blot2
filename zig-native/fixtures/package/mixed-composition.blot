@@ -7,7 +7,7 @@ type State a is effect = {get: Unit -> a, set: a -> Unit}
 effect Read: U32 -> U32
 const state = fn (initial: U32) => @effect.run State.get State.set initial (fn () => do:
   use State.set 40
-  return State.get ()
+  break State.get ()
 )
 const scoped = fn () => @effect.scope (fn (state: State U32) => do:
   let capability = state
@@ -15,8 +15,8 @@ const scoped = fn () => @effect.scope (fn (state: State U32) => do:
   let write = capability.set
   let local = fn () => read ()
   let (successor, result) = do (@effect.state read write seed):
-    return local ()
-  return result
+    break local ()
+  break result
 )
 const borrow = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.read loan)
 const resource = fn () => @resource.scope (fn () => #[seed, 40]) (fn owner => ()) (fn loan => @usage.length loan)
@@ -28,7 +28,7 @@ const request = fn (host: U32 -> U32 ! {Foreign}) => do:
         count := @u32.add count 1
         yield host value
       complete value =>
-        return @u32.add count value
+        break @u32.add count value
 const effect_count = fn () => @effect.count (@effect.of scoped)
 const count = effect_count ()
 const rich = fn (host: U32 -> U32 ! {Foreign}) => @u32.add (@product.get (state seed) 1) (@u32.add (scoped ()) (@u32.add (borrow 40) (@u32.add (resource ()) (@u32.add (request host) count))))
@@ -38,7 +38,7 @@ const operate = fn (host: U32 -> U32 ! {Foreign}) => @u32.add ((host seed) %% (h
 const describe = fn (value: U32) => do:
   let record = {value, values: #[value, seed]}
   record.value := @u32.add self 1
-  return @record.merge record {next: (#Number value).next}
+  break @record.merge record {next: (#Number value).next}
 type Render a is contract = {const show: a -> U32}
 impl RenderU32 : Render U32 = {const show = fn value => value}
 type Item = exists [a] where {Render a} => a

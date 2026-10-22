@@ -5,12 +5,12 @@ import { compileAndRun } from "./compile_helpers.ts";
 const source = `
 const choose = fn (values: Array U32) => fn (branch: U32) => do:
   if branch == 0:
-    return values
+    break values
   if branch == 1:
     if values[0] == 41:
-      return values
-    return @array.set values 0 77
-  return @array.fill 64 branch
+      break values
+    break @array.set values 0 77
+  break @array.fill 64 branch
 entry const run = fn (branch: U32) => do:
   let values = @array.fill 64 41
   let selected = choose values branch
@@ -18,16 +18,16 @@ entry const run = fn (branch: U32) => do:
     let discarded = @array.fill 8192 index
     if discarded[8191] != index:
       @panic "pressure"
-  return selected
+  break selected
 entry const suspend = fn (host: Array U32 -> Array U32 ! {Foreign}) => do:
   let selected = choose (@array.fill 64 41) 1
   use reply <- host selected
-  return #[selected[0], reply[0]]
+  break #[selected[0], reply[0]]
 entry const trap = fn (branch: U32) => do:
   let selected = choose (@array.fill 64 41) branch
   if selected[0] == 41:
     @panic "selected trap"
-  return selected[0]
+  break selected[0]
 `;
 
 Deno.test("conditional borrowed returns survive nested exits pressure suspension and exceptional cleanup", async () => {

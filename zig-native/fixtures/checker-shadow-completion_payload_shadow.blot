@@ -10,4 +10,4 @@ entry const answer = fn () => do:
       complete count =>
         count := @u32.add self 1
         break
-  return count
+  break count

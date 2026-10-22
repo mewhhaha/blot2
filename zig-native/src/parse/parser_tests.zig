@@ -22,6 +22,36 @@ fn clean(source: []const u8) !void {
     for (tree.spans.items) |span| try std.testing.expect(span.start <= span.end and span.end <= source.len);
 }
 
+test "return exits a function while break value finishes a do and bare break exits a loop" {
+    const source =
+        \\const choose = fn flag => do:
+        \\  let value = do:
+        \\    if flag:
+        \\      return 7
+        \\    break 3
+        \\  for index in 0..1:
+        \\    break
+        \\  break value
+    ;
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(std.testing.allocator);
+    var tree = try parsed(std.testing.allocator, source, &pool);
+    defer tree.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var function_returns: usize = 0;
+    var block_results: usize = 0;
+    var loop_breaks: usize = 0;
+    for (tree.nodes.items) |node| switch (node.tag) {
+        .function_return_stmt => function_returns += 1,
+        .return_stmt => block_results += 1,
+        .break_stmt => loop_breaks += 1,
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 1), function_returns);
+    try std.testing.expectEqual(@as(usize, 2), block_results);
+    try std.testing.expectEqual(@as(usize, 1), loop_breaks);
+}
+
 test "spread temporaries preserve the surrounding collection type" {
     const source = "entry const main = fn (n: U32) => #[#[n], ...#[#[1]]]\n";
     var pool: symbols.Pool = .{};
@@ -185,7 +215,7 @@ test "surface syntax preserves nested blocks patterns loops and handlers" {
         \\type Counter a is effect = { advance: a -> a }
         \\const run = fn (value: Pair [U32, Bool]) -> U32 => do:
         \\  let #Pair (number, flag) = value else:
-        \\    return 0
+        \\    break 0
         \\  if let #Some next = #Some number:
         \\    number := next
         \\  else:
@@ -193,20 +223,20 @@ test "surface syntax preserves nested blocks patterns loops and handlers" {
         \\  for index in 0..number:
         \\    if index > 3:
         \\      break
-        \\  return if flag then number else 0
+        \\  break if flag then number else 0
         \\const handle = fn computation => do:
         \\  for request in computation:
         \\    case request of
         \\      effect (Counter.advance U32) number =>
         \\        yield number + 1
         \\      complete value =>
-        \\        return value
+        \\        break value
         \\
     );
 }
 
 test "type witnesses anonymous constructor records and array arguments remain distinct" {
-    try clean("const witness = function :U32\nconst anonymous = #{ field: 2 }\nconst run = fn () => do:\n  function #[]\n  function #[1, 2]\n  function :U32\n  world.values[1] := self + 2\n  return ()\n");
+    try clean("const witness = function :U32\nconst anonymous = #{ field: 2 }\nconst run = fn () => do:\n  function #[]\n  function #[1, 2]\n  function :U32\n  world.values[1] := self + 2\n  break ()\n");
 }
 
 test "argument projections and adjacent indexes bind before application" {
@@ -296,7 +326,7 @@ test "nested witness atoms stop at a diagnostic rather than overflowing the stac
 fn allocationScenario(allocator: std.mem.Allocator) !void {
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
-    var tree = try parsed(allocator, "import { answer as value } from \"./module.blot\"\ninfixl 60 (++) = combine\nentry const compute = fn (value: U32) => do:\n  let next = value ++ 2 * 3\n  if next > 0:\n    return next\n  return 0\n", &pool);
+    var tree = try parsed(allocator, "import { answer as value } from \"./module.blot\"\ninfixl 60 (++) = combine\nentry const compute = fn (value: U32) => do:\n  let next = value ++ 2 * 3\n  if next > 0:\n    break next\n  break 0\n", &pool);
     defer tree.deinit(allocator);
     try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
 }

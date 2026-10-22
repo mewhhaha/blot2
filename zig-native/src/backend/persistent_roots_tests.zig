@@ -14,7 +14,7 @@ const source =
     \\let saved = @array.fill 3 40
     \\entry const run = fn (index: U32) => do:
     \\  let cached = @force pending
-    \\  return @u32.add saved[index] cached[index]
+    \\  break @u32.add saved[index] cached[index]
 ;
 const Fixture = struct {
     units: [1]core.Module,
@@ -58,7 +58,7 @@ test "single-reference named environments preserve static captures replay change
         \\  let biased = partial 8192
         \\  let choices = #[selected, read values]
         \\  let chosen = choices[@u32.rem seed 2]
-        \\  return @u32.add (biased 1) (chosen 0)
+        \\  break @u32.add (biased 1) (chosen 0)
     );
     defer fixture.deinit();
     const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
@@ -92,7 +92,7 @@ test "single-reference named environments preserve static captures replay change
         \\  let biased = partial 8192
         \\  let choices = #[selected, read seed]
         \\  let chosen = choices[@u32.rem seed 2]
-        \\  return @u32.add (biased 1) (chosen 0)
+        \\  break @u32.add (biased 1) (chosen 0)
     );
     defer changed_fixture.deinit();
     var changed = try changed_fixture.emit(a, &first.capture.?, null);
@@ -114,10 +114,10 @@ test "immutable algebraic shapes keep acyclic claims through replay checkpoint a
         \\  let root: Link U32 = #End
         \\  for index in 0..count:
         \\    root := #Next (self, index)
-        \\  return root
+        \\  break root
         \\entry const run = fn (count: U32) => do:
         \\  let root = grow count
-        \\  return count
+        \\  break count
     );
     defer fixture.deinit();
     const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
@@ -148,10 +148,10 @@ test "immutable algebraic shapes keep acyclic claims through replay checkpoint a
         \\  let root: Link U32 = #End
         \\  for index in 0..count:
         \\    root := #Next (self, index)
-        \\  return root
+        \\  break root
         \\entry const run = fn (count: U32) => do:
         \\  let root = grow count
-        \\  return count
+        \\  break count
     ;
     var changed_fixture = try Fixture.initSource(changed_source);
     defer changed_fixture.deinit();
@@ -177,7 +177,7 @@ test "single-use generic local storage keeps exact private roles through replay 
         \\entry const run = fn (seed: U32) => do:
         \\  let stored = box (fn value => {item: value})
         \\  let #Box mapper = stored
-        \\  return @u32.add (mapper seed).item 1
+        \\  break @u32.add (mapper seed).item 1
     );
     defer fixture.deinit();
     const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
@@ -208,7 +208,7 @@ test "single-use generic local storage keeps exact private roles through replay 
         \\entry const run = fn (seed: Array U32) => do:
         \\  let stored = box (fn value => {item: value})
         \\  let #Box mapper = stored
-        \\  return @array.length (mapper seed).item
+        \\  break @array.length (mapper seed).item
     );
     defer reference_fixture.deinit();
     var changed = try reference_fixture.emit(a, &first.capture.?, null);
@@ -227,7 +227,7 @@ test "dynamic Array copies admit exact owners through replay checkpoint and OOM"
         \\  let left = @array.fill count 41
         \\  let right = @array.fill count 42
         \\  let joined = @array.concat left right
-        \\  return @array.length (@array.slice joined 0 count)
+        \\  break @array.length (@array.slice joined 0 count)
     );
     defer fixture.deinit();
     const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
@@ -260,7 +260,7 @@ test "immutable nullary constructor cells preserve changed tags replay checkpoin
         \\type Token is data = #Left | #Right
         \\entry const run = fn (value: U32) => do:
         \\  let token = if @u32.eq value 0 then #Left else #Right
-        \\  return case token of
+        \\  break case token of
         \\    #Left => 11
         \\    #Right => 22
     );
@@ -290,7 +290,7 @@ test "immutable nullary constructor cells preserve changed tags replay checkpoin
         \\type Token is data = #Right | #Left
         \\entry const run = fn (value: U32) => do:
         \\  let token = if @u32.eq value 0 then #Left else #Right
-        \\  return case token of
+        \\  break case token of
         \\    #Left => 11
         \\    #Right => 22
     );
@@ -343,7 +343,7 @@ test "capture-free descriptor addresses relocate through retained portable repla
         \\const make = fn (value: U32) => { value, apply: fn (input: U32) => @u32.add input 1 }
         \\entry const run = fn (value: U32) => do:
         \\  let holder = make value
-        \\  return holder.apply holder.value
+        \\  break holder.apply holder.value
     );
     defer fixture.deinit();
     const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
@@ -380,21 +380,21 @@ test "changed State value roles preserve retained artifact and checkpoint roots 
     var first = try Fixture.initSource(definitions ++ "\n" ++
         \\const shape = fn (value: U32) => @effect.run State.get State.set #[value] (fn () => do:
         \\  use current <- State.get ()
-        \\  return current[0]
+        \\  break current[0]
         \\)
         \\entry const run = fn (value: U32) => do:
         \\  let (_, result) = shape value
-        \\  return stable result
+        \\  break stable result
     );
     defer first.deinit();
     var changed = try Fixture.initSource(definitions ++ "\n" ++
         \\const shape = fn (value: U32) => @effect.run State.get State.set value (fn () => do:
         \\  use current <- State.get ()
-        \\  return current
+        \\  break current
         \\)
         \\entry const run = fn (value: U32) => do:
         \\  let (_, result) = shape value
-        \\  return stable result
+        \\  break stable result
     );
     defer changed.deinit();
     const nodes = try a.dupe(core.Node, changed.units[0].nodes);
@@ -438,15 +438,15 @@ test "strong cycle source owns full helper bodies across retained checkpoint rep
         \\    use first <- delayed ()
         \\    use State.set #End
         \\    use cached <- delayed ()
-        \\    return case cached of
+        \\    break case cached of
         \\      #End => @panic "the demand lost its memoized cycle"
         \\      #Next same => do:
         \\        use again <- same ()
-        \\        return case again of
+        \\        break case again of
         \\          #End => @panic "the retained closure lost its memo"
         \\          #Next _ => seed
         \\  )
-        \\  return result
+        \\  break result
     );
     defer fixture.deinit();
     const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
@@ -482,12 +482,12 @@ test "persistent List rotations keep borrowed pivots through source preparation 
         \\  let values: List U32 = []
         \\  for index in 0..count:
         \\    values := [...self, index]
-        \\  return @array.from_list values
+        \\  break @array.from_list values
         \\entry const backward = fn (count: U32) => do:
         \\  let values: List U32 = []
         \\  for index in 0..count:
         \\    values := [index, ...self]
-        \\  return @array.from_list values
+        \\  break @array.from_list values
     );
     defer fixture.deinit();
     var first = try fixture.emit(a, null, null);
@@ -515,7 +515,7 @@ const static_capture_source =
     \\const invoke = fn callback => callback 1
     \\const capture = fn packed => fn (value: U32) => invoke (fn extra => do:
     \\  let #Pack {selected} = packed
-    \\  return selected (@u32.add value extra))
+    \\  break selected (@u32.add value extra))
     \\const work = fn (value: U32) => do:
     \\  let total = 0
     \\  let index = 0
@@ -524,7 +524,7 @@ const static_capture_source =
     \\      break
     \\    total := @u32.add self (capture packed index)
     \\    index := @u32.add self 1
-    \\  return total
+    \\  break total
     \\const offset = 10
     \\entry const answer = fn (value: U32) => @u32.add (work value) offset
 ;
@@ -572,7 +572,7 @@ test "promoted generalized local initializers retain fresh code and exact wrappe
         \\entry const run = fn (seed: U32) => do:
         \\  let stored = box (fn value => {item: value})
         \\  let read = fn (value: U32) => (get stored value).item
-        \\  return read seed
+        \\  break read seed
     );
     defer fixture.deinit();
     var result = try fixture.emit(a, null, null);
@@ -606,7 +606,7 @@ test "generalized runtime locals used at different layouts evaluate one checked 
         \\  let (whole, _) = alias seed
         \\  let (_, half) = k 1.5
         \\  let (_, next) = alias (@u32.add seed 1)
-        \\  return @u32.add (@u32.add whole[0] next) (@f32.to_u32 half)
+        \\  break @u32.add (@u32.add whole[0] next) (@f32.to_u32 half)
     );
     defer fixture.deinit();
     const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
@@ -642,32 +642,32 @@ test "promoted generalized builder chains serialize curried callbacks through re
         \\const empty = fn () => do:
         \\  let scope = fn world => fn action => do:
         \\    use outcome <- @effect.run State.get State.set world action
-        \\    return outcome
-        \\  return #App { initial: #Trace #[], scope, render: fn (frame: U32) => frame }
+        \\    break outcome
+        \\  break #App { initial: #Trace #[], scope, render: fn (frame: U32) => frame }
         \\const note = fn (value: U32) => do:
         \\  use current <- State.get ()
         \\  let #Trace values = current
-        \\  return State.set (#Trace #[...values, value])
+        \\  break State.set (#Trace #[...values, value])
         \\const with_render = fn render => fn app => do:
         \\  let #App { initial, scope } = app
-        \\  return #App { initial, scope, render }
+        \\  break #App { initial, scope, render }
         \\const initial = fn app => do:
         \\  let #App { initial } = app
-        \\  return initial
+        \\  break initial
         \\const play = fn app => fn world => fn action => do:
         \\  let #App { scope } = app
-        \\  return scope world action
+        \\  break scope world action
         \\const draw = fn app => fn frame => do:
         \\  let #App { render } = app
-        \\  return render 2 frame
+        \\  break render 2 frame
         \\entry const run = fn (seed: U32) => do:
         \\  let app = empty ()
         \\  app := with_render (fn (scale: U32) => fn (frame: U32) => do:
         \\    use note frame
-        \\    return @u32.mul frame scale) self
+        \\    break @u32.mul frame scale) self
         \\  let (trace, doubled) = play app (initial app) (fn () => draw app seed)
         \\  let #Trace values = trace
-        \\  return @u32.add doubled (@array.length values)
+        \\  break @u32.add doubled (@array.length values)
     );
     defer fixture.deinit();
     const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
@@ -705,16 +705,16 @@ test "ambiguous holes at generalized local uses take word storage through replay
         \\const empty = fn () => do:
         \\  let scope = fn world => fn action => do:
         \\    use result <- action ()
-        \\    return (world, result)
-        \\  return #B { initial: (), s: scope }
+        \\    break (world, result)
+        \\  break #B { initial: (), s: scope }
         \\const enter = fn b => fn action => do:
         \\  let #B { initial, s } = b
-        \\  return s initial action
+        \\  break s initial action
         \\const new_with = fn route => #App { engine: empty (), systems: #[#Route route, #Start (fn () => ())] }
         \\const create = fn app => fn () => do:
         \\  let #App { engine, systems } = app
         \\  let (world, _) = enter engine (fn () => @array.length systems)
-        \\  return world
+        \\  break world
         \\entry const run = fn (seed: U32) => do:
         \\  let b = empty ()
         \\  let (_, first) = enter b (fn () => seed)
@@ -722,7 +722,7 @@ test "ambiguous holes at generalized local uses take word storage through replay
         \\  let (_, values) = enter (@array.get boxed 1) (fn () => @array.fill 2 seed)
         \\  let app = new_with (fn (e: u) => e)
         \\  let world = create app ()
-        \\  return @u32.add (@u32.add first (@array.get values 0)) (@array.length boxed)
+        \\  break @u32.add (@u32.add first (@array.get values 0)) (@array.length boxed)
     );
     defer fixture.deinit();
     const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
@@ -904,11 +904,11 @@ test "unchanged variant descriptors preserve erased types through fresh retained
         \\const map = fn transform => fn candidate => case candidate of
         \\  #Left value => #Left (transform value)
         \\  #Right error => do:
-        \\    return #Right error
+        \\    break #Right error
         \\entry const run = fn (value: U32) => do:
         \\  let candidate = #Left #[value, @u32.add value 1]
         \\  let mapped = map (fn array => array) candidate
-        \\  return case mapped of
+        \\  break case mapped of
         \\    #Left array => array[0]
         \\    #Right _ => 0
     );
@@ -1144,7 +1144,7 @@ test "single-use selected member storage retains private checked fields through 
         \\  let factory = #Factory seed
         \\  let stored = factory.boxed
         \\  let #Box mapper = stored
-        \\  return @u32.add (mapper seed).item 1
+        \\  break @u32.add (mapper seed).item 1
     );
     defer fixture.deinit();
     const stamp = @import("../check/core_snapshot_tests.zig").stamp(fixture.units[0]);
@@ -1183,7 +1183,7 @@ test "private cursor constructor body reads invalidate retained and portable adm
         \\    let row = @cursor.value cursor
         \\    sum := @u32.add self row.x
         \\    cursor := @cursor.advance self
-        \\  return sum
+        \\  break sum
     ;
     var fixture = try Fixture.initSource(input);
     defer fixture.deinit();
@@ -1204,7 +1204,7 @@ test "private cursor constructor body reads invalidate retained and portable adm
     var changed_fixture = try Fixture.initSource(
         \\const make = fn values => do:
         \\  let copy = @array.from_list values
-        \\  return @list.cursor (@list.from_array copy)
+        \\  break @list.cursor (@list.from_array copy)
         \\entry const run = fn (count: U32) => do:
         \\  let values = @list.fill count {x: 41, y: 8192}
         \\  let cursor = make values
@@ -1213,7 +1213,7 @@ test "private cursor constructor body reads invalidate retained and portable adm
         \\    let row = @cursor.value cursor
         \\    sum := @u32.add self row.x
         \\    cursor := @cursor.advance self
-        \\  return sum
+        \\  break sum
     );
     defer changed_fixture.deinit();
     var changed = try changed_fixture.emit(a, &first.capture.?, null);
@@ -1235,10 +1235,10 @@ test "scalar closure environments preserve snapshots physical roles replay check
         \\    let total = value
         \\    for i in 0..index:
         \\      total := @u32.add self i
-        \\    return total
+        \\    break total
         \\  value := @u32.add self 1
         \\  let choices = #[callback, fn (index: U32) => @u32.add value index]
-        \\  return (choices[@u32.rem seed 2]) 3
+        \\  break (choices[@u32.rem seed 2]) 3
     );
     defer fixture.deinit();
     const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
@@ -1299,7 +1299,7 @@ const in_place_sort_source =
     \\      ids[j] := previous_id
     \\      ids[@u32.sub j 1] := current_id
     \\      j := @u32.sub j 1
-    \\  return ids
+    \\  break ids
     \\entry const run = fn (count: U32) => (sort count)[0]
 ;
 const LoopJournal = struct { loops: usize = 0, calls: usize = 0, opens: usize = 0 };
@@ -1393,21 +1393,21 @@ test "shared carries, fresh replacements and owning element stores keep their lo
         \\  let before = values
         \\  for i in 0..count:
         \\    values[i] := i
-        \\  return @u32.add before[0] values[@u32.sub count 1]
+        \\  break @u32.add before[0] values[@u32.sub count 1]
         ,
         // A fresh replacement each iteration is a real new owner.
         \\entry const run = fn (count: U32) => do:
         \\  let values = @array.fill 2 0
         \\  for i in 0..count:
         \\    values := @array.fill 2 i
-        \\  return values[1]
+        \\  break values[1]
         ,
         // Owning element stores publish a counted edge per iteration.
         \\entry const run = fn (count: U32) => do:
         \\  let rows = @array.fill count (@array.fill 1 0)
         \\  for i in 0..count:
         \\    rows[i] := @array.fill 1 i
-        \\  return rows[0][0]
+        \\  break rows[0][0]
         ,
     }) |text| {
         var fixture = try Fixture.initSource(text);

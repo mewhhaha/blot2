@@ -11,11 +11,11 @@ const library = `const marker = 2
 const twice = fn ~(value: U32) => @u32.add (${spine}) (@force value)
 const ignore = fn ~(value: U32) => do:
   let unused = fn () => @force value
-  return 7
+  break 7
 const keep = fn ~(values: Array U32) => do:
   let first = @force values
   let second = @force values
-  return #[@array.get first 0, @array.get second 1]
+  break #[@array.get first 0, @array.get second 1]
 const apply = fn (host: U32 -> U32 ! {Foreign}) => @u32.add (twice (host (${argumentSpine}))) (ignore (host 999))
 `;
 const source = (seed: string, prefix = "") =>

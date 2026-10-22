@@ -13,79 +13,79 @@ const within = fn (index: U32) => fn (values: Array U32) => @u32.lt index (@arra
 entry const lookup = fn (index: U32) => do:
   let values = #[8, 13]
   let valid = witness values index
-  return at values index valid
+  break at values index valid
 entry const partial = fn (index: U32) => do:
   let values = #[8, 13]
   let valid = witness values index
   let ready = later values index valid
-  return invoke ready
+  break invoke ready
 entry const equal = fn (value: U32) => do:
   let valid = @proof.eq value 7
-  return value
+  break value
 entry const less = fn (value: U32) => do:
   let valid = @proof.lt value 8
-  return value
+  break value
 entry const weak = fn (value: U32) => do:
   let valid = @proof.le value 8
-  return value
+  break value
 entry const addition = fn (value: U32) => do:
   let valid = @proof.add_fits value 1
-  return value
+  break value
 entry const subtraction = fn (value: U32) => do:
   let valid = @proof.sub_fits value 1
-  return value
+  break value
 entry const guarded = fn (index: U32) => do:
   let values = #[8, 13]
   if @u32.lt index (@array.length values):
-    return @array.get values index
-  return 0
+    break @array.get values index
+  break 0
 entry const named_guarded = fn (index: U32) => do:
   let values = #[8, 13]
   if within index values:
-    return @array.get values index
-  return 0
+    break @array.get values index
+  break 0
 entry const false_edges = fn (index: U32) => do:
   let values = #[8, 13]
   let length = @array.length values
   if @u32.lt length index:
-    return 0
+    break 0
   if @u32.eq index length:
-    return 0
-  return @array.get values index
+    break 0
+  break @array.get values index
 entry const rebound = fn (index: U32) => do:
   let values = #[8, 13]
   if @u32.lt index (@array.length values):
     index := @u32.add self 1
-    return @array.get values index
-  return 0
+    break @array.get values index
+  break 0
 entry const changed = fn (index: U32) => do:
   let values = #[8, 13]
   let valid = @proof.index values index
   let after = @array.set values index 21
-  return @array.get after index
+  break @array.get after index
 entry const ranges = fn (index: U32) => do:
   let values = #[8, 13]
   let result = index
   for cursor in 0..@array.length values:
     result := @u32.add self (@array.get values cursor)
-  return result
+  break result
 entry const predecessor = fn (index: U32) => do:
   let values = #[8, 13]
   let bounded = @proof.index values index
   let fits = @proof.sub_fits index 1
-  return @array.get values (@u32.sub index 1)
+  break @array.get values (@u32.sub index 1)
 entry const fallback = fn (index: U32) => do:
   let values = #[8]
   let #Some selected = if @u32.eq index 0 then #None else #Some 42 else:
     let valid = @proof.index values index
-    return 0
-  return @array.get values index
+    break 0
+  break @array.get values index
 entry const ordered = fn (host: U32 -> U32 ! {Foreign}) => do:
   use left <- host 1
   use right <- host 2
   let valid = @proof.lt left right
   use result <- host 3
-  return result
+  break result
 `;
 
 for (const codegenTier of ["optimized", "development"] as const) {
@@ -261,18 +261,18 @@ for (const codegenTier of ["optimized", "development"] as const) {
     const archive = `${directory}/index.blotdep`;
     const library = `const selected = fn (unused: U32) => fn (index: U32) => do:
   let copied = index
-  return copied
+  break copied
 const forwarded = fn (index: U32) => selected 42 index
 const count = fn (values: Array U32) => do:
   let copied = values
-  return @array.length copied
+  break @array.length copied
 `;
     const main = `import {forwarded, count} from "./index"
 entry const lookup = fn (index: U32) => do:
   let values = #[8, 13]
   if @u32.lt index (count values):
-    return @array.get values (forwarded index)
-  return 0
+    break @array.get values (forwarded index)
+  break 0
 `;
     const sources = { [entry]: main, [dependency]: library };
     const options = {
@@ -332,7 +332,7 @@ entry const lookup = fn (index: U32) => do:
       const failed = await compiler.build({
         sources: {
           ...sources,
-          [dependency]: library.replace("return copied", "return missing"),
+          [dependency]: library.replace("break copied", "break missing"),
         },
       });
       assert(!failed.success);
@@ -382,13 +382,13 @@ for (const codegenTier of ["optimized", "development"] as const) {
     const library = `type Probe is data = #Probe U32
 const Probe.choose = fn (unused: Probe) => fn (index: U32) => do:
   let copied = index
-  return copied
+  break copied
 const Probe.within = fn (unused: Probe) => fn (index: U32) => @u32.lt index 2
 const access = fn probe => fn (index: U32) => do:
   let values = #[8, 13]
   if @type.call "within" probe index:
-    return @array.get values (@type.call "choose" probe index)
-  return 0
+    break @array.get values (@type.call "choose" probe index)
+  break 0
 `;
     const main = `import {access, Probe} from "./index"
 entry const lookup = fn (index: U32) => access (#Probe 42) index
@@ -396,7 +396,7 @@ entry const ordered = fn (host: U32 -> U32 ! {Foreign}) => do:
   use first <- host 1
   let selected = access (#Probe first) 1
   use final <- host 2
-  return @u32.add selected final
+  break @u32.add selected final
 `;
     const sources = { [entry]: main, [dependency]: library };
     const options = {
@@ -475,7 +475,7 @@ entry const ordered = fn (host: U32 -> U32 ! {Foreign}) => do:
       const failed = await compiler.build({
         sources: {
           ...sources,
-          [dependency]: library.replace("return copied", "return missing"),
+          [dependency]: library.replace("break copied", "break missing"),
         },
       });
       assert(!failed.success);
@@ -526,14 +526,14 @@ for (const codegenTier of ["optimized", "development"] as const) {
 const Probe.choose = fn (unused: Probe) => fn (index: U32) => do:
   let zero = @u32.sub index index
   let copied = @u32.add 0 index
-  return @u32.sub copied zero
+  break @u32.sub copied zero
 const Probe.within = fn (unused: Probe) => fn (index: U32) => @u32.lt (@u32.sub index 0) 2
 const decode = fn probe => fn (index: U32) => @type.call "choose" probe index
 const access = fn probe => fn (index: U32) => do:
   let values = #[8, 13]
   if @type.call "within" probe index:
-    return @array.get values (@type.call "choose" probe index)
-  return 0
+    break @array.get values (@type.call "choose" probe index)
+  break 0
 `;
     const main = `import {access, decode, Probe} from "./index"
 entry const lookup = fn (index: U32) => access (#Probe 42) index
@@ -542,7 +542,7 @@ entry const ordered = fn (host: U32 -> U32 ! {Foreign}) => do:
   use first <- host 1
   let selected = access (#Probe first) 1
   use final <- host 2
-  return @u32.add selected final
+  break @u32.add selected final
 `;
     const sources = { [entry]: main, [dependency]: library };
     const options = {
@@ -626,8 +626,8 @@ entry const ordered = fn (host: U32 -> U32 ! {Foreign}) => do:
         sources: {
           ...sources,
           [dependency]: library.replace(
-            "return @u32.sub copied zero",
-            "return missing",
+            "break @u32.sub copied zero",
+            "break missing",
           ),
         },
       });
@@ -681,8 +681,8 @@ for (const codegenTier of ["optimized", "development"] as const) {
 entry const lookup = fn (index: U32) => do:
   let values = #[8, 13, 21, 34]
   if @u32.lt index (@array.length values):
-    return @array.get values (selected index)
-  return 0
+    break @array.get values (selected index)
+  break 0
 `;
     const options = {
       executable,

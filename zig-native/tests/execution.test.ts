@@ -55,12 +55,12 @@ entry const answer = fn () -> U32 => add (identity 20) (identity 22)
 entry const floating = fn (value: F32) -> F32 => identity value
 entry const capped = fn (value: U32) -> U32 => do:
   if @u32.lt value 42:
-    return value
-  return 42
+    break value
+  break 42
 entry const nested = fn () -> U32 => do:
   let inner = do:
-    return 20
-  return @u32.add inner 22
+    break 20
+  break @u32.add inner 22
 `,
     async (bytes, metrics) => {
       const guest = await instantiateGuest(bytes);
@@ -158,7 +158,7 @@ entry const run = fn (enabled: Bool) -> U32 => do:
   let saved = value
   if enabled:
     value := 40
-  return @u32.add value saved
+  break @u32.add value saved
 `,
     async (bytes) => {
       const guest = await instantiateGuest(bytes);
@@ -252,7 +252,7 @@ const branch = fn (enabled: Bool) -> U32 => do:
   let saved = value
   if enabled:
     value := 40
-  return @u32.add value saved
+  break @u32.add value saved
 entry const answer = identity (factorial 5)
 entry const yes = branch #True
 entry const no = branch #False

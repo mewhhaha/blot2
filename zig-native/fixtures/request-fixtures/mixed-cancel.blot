@@ -5,13 +5,13 @@ const checked = fn computation => do:
     case request of
       effect Validate.check value =>
         if @u32.eq value 0:
-          return 42.0
+          break 42.0
         yield value
       complete () =>
-        return 41.0
+        break 41.0
 const calculation = @computation (fn () => do:
   use Validate.check 0
-  return ()
+  break ()
 )
 entry const answer = fn () => @f32.to_u32 (checked calculation)
 

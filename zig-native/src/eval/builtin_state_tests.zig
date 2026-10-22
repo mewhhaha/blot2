@@ -15,12 +15,12 @@ const source =
     \\const answer = fn () => do:
     \\  let (_, #Cell result) = @state.run (#Cell 42) (fn () =>
     \\    read (fn ignored -> Cell U32 => @panic "witness must never be invoked"))
-    \\  return result
+    \\  break result
     \\entry const unsigned = answer ()
     \\entry const floating = do:
     \\  let (_, #Cell result) = @state.run (#Cell 1.25) (fn () =>
     \\    read (fn ignored -> Cell F32 => @panic "floating witness called"))
-    \\  return result
+    \\  break result
     \\entry const runtime = fn () => answer ()
 ;
 

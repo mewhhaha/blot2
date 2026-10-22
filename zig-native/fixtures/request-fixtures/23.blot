@@ -8,11 +8,11 @@ const count = fn computation => do:
         current := @u32.add self 1
         yield current
       complete () =>
-        return current
+        break current
 entry const answer = fn limit => count (@computation (fn () => do:
   for index in 0 .. limit:
     use Counter.next ()
-  return ()
+  break ()
 ))
 
 entry const checked_answer = answer 1000

@@ -6,18 +6,18 @@ const mark = fn (digit: U32) => do:
   use previous <- @state.get witness
   let #Count old = previous
   use @state.set (#Count (@u32.add (@u32.mul old 10) digit))
-  return digit
+  break digit
 const handled = fn computation => do:
   for request in @requests computation:
     case request of
       effect Stop.read () =>
-        return 40
+        break 40
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Count count, value) = @state.run (#Count 0) (fn () => handled (@computation (fn () => do:
     use ignored <- (identity, (mark 1, Stop.read (), mark 2))
-    return 0
+    break 0
   )))
-  return @u32.add count value
+  break @u32.add count value
 entry const folded = answer ()

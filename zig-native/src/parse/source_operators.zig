@@ -287,7 +287,7 @@ fn Validator(comptime Context: type) type {
             for (children, 0..) |child, index_| {
                 const node = self.tree.node(child);
                 const terminator: Terminator = switch (node.tag) {
-                    .return_stmt => .return_,
+                    .return_stmt, .function_return_stmt => .return_,
                     .break_stmt => .break_,
                     .yield_stmt => .yield_,
                     else => .none,
@@ -468,7 +468,7 @@ fn Validator(comptime Context: type) type {
                     const constructor = self.pool.lookup("Type");
                     if (constructor == null or !try self.context.sourceOperatorTargetExists(constructor.?)) self.issue = .{ .code = .unknown_value, .node = id, .point = self.tree.span(id).start, .symbol = constructor orelse 0, .implicit_type_witness = constructor == null };
                 },
-                .group, .return_stmt => try self.walk(node.a, depth + 1),
+                .group, .return_stmt, .function_return_stmt => try self.walk(node.a, depth + 1),
                 .yield_stmt => if (self.validateControls() and !self.replies) {
                     self.fail(.yield_scope, id, self.tree.span(id).start, 0);
                 } else try self.walk(node.a, depth + 1),

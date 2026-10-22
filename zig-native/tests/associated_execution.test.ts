@@ -45,12 +45,12 @@ entry const floating = fn (input: F32) -> F32 => read (#Box { value: input })
 entry const path = fn (input: U32) -> U32 => nested (#Box { value: #Box { value: input } })
 entry const local = fn (input: U32) -> U32 => do:
   let accessor = .value
-  return accessor (#Box { value: input })
+  break accessor (#Box { value: input })
 entry const mixed = fn () -> U32 => do:
   let accessor = .value
   let integer = accessor (#Box { value: 40 })
   let floating = accessor (#Box { value: 2.5 })
-  return @u32.add integer (@f32.to_u32 floating)
+  break @u32.add integer (@f32.to_u32 floating)
 `, guest => {
     equal(guest.call("integer", 42), 42);
     equal(guest.call("floating", 1.5), 1.5);
@@ -67,7 +67,7 @@ const Box.value = fn self => 99
 entry const answer = fn () -> U32 => do:
   let box = #Box { value: 1 }
   box.value := 42
-  return case box of
+  break case box of
     #Box { value } => value
 `, guest => equal(guest.call("answer", null), 42));
   await compileExpectedFailure(`
@@ -76,7 +76,7 @@ const Box.method = fn self => 99
 entry const answer = fn () -> U32 => do:
   let box = #Box 1
   box.method := 42
-  return 42
+  break 42
 `, "missing_field");
 });
 
@@ -111,7 +111,7 @@ const Left.add = fn (left: Left) => fn (right: U32) => right
 const Right.add = fn (left: Left) => fn (right: Right) => do:
   let #Left first = left
   let #Right second = right
-  return @u32.sub first second
+  break @u32.sub first second
 const combine = fn left => fn right => left + right
 entry const run = fn (value: U32) -> U32 => combine (#Left value) (#Right 2)
 `, guest => {

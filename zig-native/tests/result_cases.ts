@@ -6,7 +6,7 @@ const Box.from = fn value => #Box {value: @u32.add value 1}
 const from = fn value => @type.result "from" value
 entry const answer = fn () => do:
   let box:Box = from 41
-  return box.value
+  break box.value
 `,
     expected: { "answer": 42 },
   },
@@ -20,10 +20,10 @@ const convert = fn value => @type.result "convert" value
 const alias = convert
 entry const integer = fn () => do:
   let #Integer value:Integer = alias 41
-  return value
+  break value
 entry const floating = fn () => do:
   let #Float value:Float = alias 42
-  return value
+  break value
 `,
     expected: { "integer": 42, "floating": 42 },
   },
@@ -34,10 +34,10 @@ const Box.from = fn value => #Box value
 const from = fn value => @type.result "from" value
 entry const integer = fn () => do:
   let #Box value:Box U32 = from 42
-  return value
+  break value
 entry const floating = fn () => do:
   let #Box value:Box F32 = from 1.25
-  return value
+  break value
 `,
     expected: { "integer": 42, "floating": 1.25 },
   },
@@ -48,10 +48,10 @@ type Target is data = #Target U32
 const Source.from = fn value => @panic "input owner was selected"
 const Target.from = fn (source:Source) => do:
   let #Source value=source
-  return #Target (@u32.add value 1)
+  break #Target (@u32.add value 1)
 entry const answer = fn () => do:
   let #Target value:Target = @type.result "from" (#Source 41)
-  return value
+  break value
 `,
     expected: { "answer": 42 },
   },

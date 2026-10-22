@@ -137,7 +137,7 @@ Deno.test("opening callback use rows preserves closed pure callback requirements
       "type Invoke is data = #Invoke {run:(Unit -> F32) -> F32}\nconst invoke=#Invoke {run:fn callback=>callback ()}\n" +
       entry + "invoke.run host\n",
       "entry const answer: (Unit -> F32 ! {Foreign}) -> (Unit -> F32) = fn host=>host\n",
-      entry + "do:\n  let pure:Unit -> F32=host\n  return pure ()\n",
+      entry + "do:\n  let pure:Unit -> F32=host\n  break pure ()\n",
     ]
   ) {
     await compileExpectedFailure(source, "effect_mismatch", undefined, {

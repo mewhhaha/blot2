@@ -44,7 +44,7 @@ const main =
 const library =
   `const helper = fn (value: U32) -> U32 => do:\n  let total = value\n${
     "  total := @u32.add total 1\n".repeat(32)
-  }  return total\n`;
+  }  break total\n`;
 const changedMain = main.replace("const changed = 1", "const changed = 3");
 const changedBody = library.replace("@u32.add total 1", "@u32.add total 2");
 const samples: unknown[] = [];

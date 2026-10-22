@@ -15,7 +15,7 @@ const update = fn values => do:
 //          ^^^^^^^^ variable.other.member
 //                   ^ variable.other.member
 //                        ^^^^ variable.builtin
-  return values.get(0)
+  break values.get(0)
 //       ^^^^^^ variable
 //              ^^^ function.method
 

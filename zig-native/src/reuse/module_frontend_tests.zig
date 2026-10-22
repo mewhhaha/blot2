@@ -314,10 +314,10 @@ test "module interface cutoff keeps nominal collections effects and compile time
         \\type Read a is effect = { get: Unit -> a }
         \\const listed = fn () => do:
         \\  let #Box values = #Box [41]
-        \\  return adjust (@array.from_list values)[0]
+        \\  break adjust (@array.from_list values)[0]
         \\const arrayed = fn () => do:
         \\  let #Box values = #Box #[43]
-        \\  return adjust values[0]
+        \\  break adjust values[0]
         \\const effect_value = fn () -> U32 => @effect.reader Read.get 0 (fn () => adjust 1) (fn () => Read.get ())
     );
     try fixture.write("main.blot",
@@ -438,10 +438,10 @@ test "prepared entry Core retains generic List Array nominal and effect code acr
         \\const callback = fn () => Read.get ()
         \\entry const list_value = fn (index: U32) => do:
         \\  let #Box values = listed ()
-        \\  return changed (@array.from_list values)[index]
+        \\  break changed (@array.from_list values)[index]
         \\entry const array_value = fn (index: U32) => do:
         \\  let #Box values = arrayed ()
-        \\  return @u32.add values[index] fixed
+        \\  break @u32.add values[index] fixed
         \\entry const effect_value = fn () -> U32 => @effect.reader Read.get 0 (fn () => changed 1) callback
         \\entry const staged = changed 2
     ;
@@ -530,7 +530,7 @@ test "prepared entry Core prefix guards reject incompatible ownership before any
         a.free(expression);
         expression = next;
     }
-    const populated = try a.print("{s}const substantial = fn (value: U32) -> U32 => {s}\nconst looping = fn (value: U32) => do:\n  let total = value\n  for index in 0..2:\n    total := @u32.add self ({s})\n  return total\neffect SnapshotRead: Unit -> U32\nconst observed = fn (value: U32) => @u32.add (SnapshotRead ()) ({s})\n", .{ entry, expression, expression, expression });
+    const populated = try a.print("{s}const substantial = fn (value: U32) -> U32 => {s}\nconst looping = fn (value: U32) => do:\n  let total = value\n  for index in 0..2:\n    total := @u32.add self ({s})\n  break total\neffect SnapshotRead: Unit -> U32\nconst observed = fn (value: U32) => @u32.add (SnapshotRead ()) ({s})\n", .{ entry, expression, expression, expression });
     defer a.free(populated);
     try fixture.write("main.blot", populated);
     var session = try retained.Session.initEmpty(a, .{});
@@ -782,7 +782,7 @@ test "module interface cutoff preserves generic parameter alpha correspondence t
     const renamed_type = "opaque type Token payload = payload\nconst make: a -> Token a = fn value => #Token value\nconst read: Token a -> a = fn (#Token value) => value\n";
     const renamed_scheme = "opaque type Token payload = payload\nconst make: item -> Token item = fn argument => #Token argument\nconst read: Token item -> item = fn (#Token argument) => argument\n";
     try fixture.write("changed.blot", original_generic);
-    try fixture.write("left.blot", "import {Token, make, read} from \"./changed\"\nconst bridge = fn (value: U32) => do:\n  let wrapped: Token U32 = make value\n  return @u32.add (read wrapped) 2\n");
+    try fixture.write("left.blot", "import {Token, make, read} from \"./changed\"\nconst bridge = fn (value: U32) => do:\n  let wrapped: Token U32 = make value\n  break @u32.add (read wrapped) 2\n");
     try fixture.write("main.blot", "import {bridge} from \"./left\"\nentry const answer = fn (value: U32) => bridge value\n");
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
@@ -808,7 +808,7 @@ test "module interface cutoff preserves public effect parameter alpha through OO
     const effect_alpha = "type PublicRead payload is effect = Unit -> payload\n";
     const opaque_body = "opaque type Token = U32\nconst make: Unit -> Token = fn () => #Token 42\nconst read: Token -> Unit = fn (#Token value) => ()\n";
     try fixture.write("changed.blot", effect_original ++ opaque_body);
-    try fixture.write("left.blot", "import {PublicRead, make, read} from \"./changed\"\nconst consume = fn () -> U32 => do (@effect.provider (PublicRead U32) (fn () => 42)):\n  read (make ())\n  return PublicRead U32 ()\n");
+    try fixture.write("left.blot", "import {PublicRead, make, read} from \"./changed\"\nconst consume = fn () -> U32 => do (@effect.provider (PublicRead U32) (fn () => 42)):\n  read (make ())\n  break PublicRead U32 ()\n");
     try fixture.write("main.blot", "import {consume} from \"./left\"\nentry const answer = fn () => consume ()\n");
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
@@ -1168,8 +1168,8 @@ test "inert principal suffixes retain opaque callers through private local edits
     try fixture.write("left.blot", "import {make, read} from \"./changed\"\nconst bridge = fn (value: U32) => read (make value)\n");
     try fixture.write("main.blot", "import {bridge} from \"./left\"\nentry const answer = fn (value: U32) => bridge value\n");
     for ([_][]const u8{
-        "opaque type Token = U32\nconst make: U32 -> Token = fn value => #Token (@u32.add value 2)\nconst read: Token -> U32 = fn (#Token value) => do:\n  let fresh_private_adjustment = @u32.add value 1\n  return fresh_private_adjustment\n",
-        "opaque type Token = U32\nconst make: U32 -> Token = fn value => do:\n  let fresh_private_adjustment = @u32.add value 1\n  return #Token (@u32.add fresh_private_adjustment 2)\nconst read: Token -> U32 = fn (#Token value) => value\n",
+        "opaque type Token = U32\nconst make: U32 -> Token = fn value => #Token (@u32.add value 2)\nconst read: Token -> U32 = fn (#Token value) => do:\n  let fresh_private_adjustment = @u32.add value 1\n  break fresh_private_adjustment\n",
+        "opaque type Token = U32\nconst make: U32 -> Token = fn value => do:\n  let fresh_private_adjustment = @u32.add value 1\n  break #Token (@u32.add fresh_private_adjustment 2)\nconst read: Token -> U32 = fn (#Token value) => value\n",
     }) |changed| {
         var session = try retained.Session.initEmpty(a, .{});
         defer session.deinit();
@@ -1707,7 +1707,7 @@ const richOwnerReader =
     \\const consume = fn (item: unique U32) => @usage.borrow item (fn loan => @usage.read loan)
     \\const checked = fn (item: U32) => do:
     \\  let witness = @proof.lt 0 item
-    \\  return item
+    \\  break item
     \\const read: Unit -> U32 = fn () => identity value
     \\
 ;

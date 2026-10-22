@@ -69,6 +69,7 @@ pub const Tag = enum(u32) {
     // Generated iteration setup/step: a=binder symbol,b=expression. Executes
     // normally even inside a monadic do; it is not that monad's bind.
     iterator_bind,
+    function_return_stmt,
     return_stmt,
     yield_stmt,
     break_stmt,

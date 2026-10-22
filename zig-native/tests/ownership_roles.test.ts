@@ -23,41 +23,41 @@ entry const templates = fn (v: U32) -> U32 => do:
   let add = fn (x: U32) => x + v + ${offset}
   let twice = fn (x: U32) => add (add x)
   let thrice = fn (x: U32) => twice (add x)
-  return thrice 1
+  break thrice 1
 
 entry const cells = fn (v: U32) -> U32 => do:
   let shape = #Square { side: v, label: #Circle 2 }
   let pair = (shape, v)
   let (#Square { side, label }, extra) = pair else:
-    return 0
+    break 0
   let inner = case label of
     #Circle r => r
     #Square _ => 0
-  return side + inner + extra
+  break side + inner + extra
 
 entry const arrays = fn (v: U32) -> U32 => do:
   let items = [#Circle v, #Circle 1, #Circle 2]
   let total = 0
   for item in items:
     let #Circle r = item else:
-      return 0
+      break 0
     total := self + r
-  return total
+  break total
 
 const checked = fn computation => do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
         if value == 0:
-          return 0
+          break 0
         yield value
       complete value =>
-        return value
+        break value
 
 entry const requested = fn (v: U32) -> U32 => checked (@computation (fn () => do:
   use left <- Validate.check v
   use right <- Validate.check 2
-  return left + right
+  break left + right
 ))
 `;
 function counter(stats: unknown, key: string): number {

@@ -176,7 +176,7 @@ test "portable principal results own inferred types and effect rows through rest
     const row_source =
         \\entry const builder: U32 where { type_rep U32 } = do:
         \\  let local = fn value => value
-        \\  return local 42
+        \\  break local 42
     ;
     const type_source =
         \\const from = fn value => @type.result "from" value

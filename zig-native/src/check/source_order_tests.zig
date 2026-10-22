@@ -7,23 +7,23 @@ const check = @import("check.zig");
 const a = std.testing.allocator;
 const Case = struct { source: []const u8, code: check.Code, point: u32, message: []const u8 };
 const cases = [_]Case{
-    .{ .source = "entry const answer=do:\n  return missing\n  0\n", .code = .unreachable_statement, .point = 42, .message = "statement after return in the same suite" },
-    .{ .source = "entry const answer=do:\n  return 42\n  missing\n", .code = .unreachable_statement, .point = 37, .message = "statement after return in the same suite" },
-    .{ .source = "entry const answer=do:\n  missing\n  return 42\n  0\n", .code = .unknown_value, .point = 25, .message = "unknown value: missing" },
-    .{ .source = "entry const answer=do:\n  let value=missing\n  return 42\n  0\n", .code = .unknown_value, .point = 35, .message = "unknown value: missing" },
-    .{ .source = "entry const answer=do:\n  return missing\n  let value=missing_too\n  return 42\n", .code = .unreachable_statement, .point = 42, .message = "statement after return in the same suite" },
-    .{ .source = "entry const answer=do:\n  return missing\n  return missing_too\n", .code = .unreachable_statement, .point = 42, .message = "statement after return in the same suite" },
+    .{ .source = "entry const answer=do:\n  break missing\n  0\n", .code = .unreachable_statement, .point = 41, .message = "statement after return in the same suite" },
+    .{ .source = "entry const answer=do:\n  break 42\n  missing\n", .code = .unreachable_statement, .point = 36, .message = "statement after return in the same suite" },
+    .{ .source = "entry const answer=do:\n  missing\n  break 42\n  0\n", .code = .unknown_value, .point = 25, .message = "unknown value: missing" },
+    .{ .source = "entry const answer=do:\n  let value=missing\n  break 42\n  0\n", .code = .unknown_value, .point = 35, .message = "unknown value: missing" },
+    .{ .source = "entry const answer=do:\n  break missing\n  let value=missing_too\n  break 42\n", .code = .unreachable_statement, .point = 41, .message = "statement after return in the same suite" },
+    .{ .source = "entry const answer=do:\n  break missing\n  break missing_too\n", .code = .unreachable_statement, .point = 41, .message = "statement after return in the same suite" },
     .{ .source = "entry const answer=do:\n  break\n  missing\n", .code = .unreachable_statement, .point = 33, .message = "statement after return in the same suite" },
     .{ .source = "entry const answer=do:\n  yield missing\n  0\n", .code = .unreachable_statement, .point = 41, .message = "statement after return in the same suite" },
-    .{ .source = "entry const answer=do:\n  return $ missing\n  0\n", .code = .unreachable_statement, .point = 44, .message = "statement after return in the same suite" },
-    .{ .source = "entry const answer=do:\n  let callback=fn()=>do:\n    return missing\n    0\n  return 42\n", .code = .unreachable_statement, .point = 71, .message = "statement after return in the same suite" },
-    .{ .source = "entry const answer=do:\n  for index in missing..missing_too:\n    break\n    missing_three\n  return 42\n", .code = .unreachable_statement, .point = 74, .message = "statement after return in the same suite" },
-    .{ .source = "entry const answer=fn(flag:Bool)=>do:\n  if missing:\n    return missing_too\n    0\n  else:\n    missing_three\n  return 42\n", .code = .unknown_value, .point = 43, .message = "unknown value: missing" },
-    .{ .source = "entry const answer=do:\n  saved:=missing\n  return 42\n", .code = .unknown_rebinding, .point = 25, .message = ":= requires an existing local binding: saved" },
-    .{ .source = "const saved=42\nentry const answer=do:\n  saved:=missing\n  return 42\n", .code = .unknown_rebinding, .point = 40, .message = ":= requires an existing local binding: saved" },
-    .{ .source = "entry const answer=do:\n  saved.value:=missing\n  return 42\n", .code = .unknown_rebinding, .point = 25, .message = ":= requires an existing local binding: saved" },
-    .{ .source = "entry const answer=do:\n  saved[missing]:=missing_too\n  return 42\n", .code = .unknown_rebinding, .point = 25, .message = ":= requires an existing local binding: saved" },
-    .{ .source = "entry const answer=do:\n  self:=missing\n  return 42\n", .code = .unknown_rebinding, .point = 25, .message = ":= requires an existing local binding: self" },
+    .{ .source = "entry const answer=do:\n  break $ missing\n  0\n", .code = .unreachable_statement, .point = 43, .message = "statement after return in the same suite" },
+    .{ .source = "entry const answer=do:\n  let callback=fn()=>do:\n    break missing\n    0\n  break 42\n", .code = .unreachable_statement, .point = 70, .message = "statement after return in the same suite" },
+    .{ .source = "entry const answer=do:\n  for index in missing..missing_too:\n    break\n    missing_three\n  break 42\n", .code = .unreachable_statement, .point = 74, .message = "statement after return in the same suite" },
+    .{ .source = "entry const answer=fn(flag:Bool)=>do:\n  if missing:\n    break missing_too\n    0\n  else:\n    missing_three\n  break 42\n", .code = .unknown_value, .point = 43, .message = "unknown value: missing" },
+    .{ .source = "entry const answer=do:\n  saved:=missing\n  break 42\n", .code = .unknown_rebinding, .point = 25, .message = ":= requires an existing local binding: saved" },
+    .{ .source = "const saved=42\nentry const answer=do:\n  saved:=missing\n  break 42\n", .code = .unknown_rebinding, .point = 40, .message = ":= requires an existing local binding: saved" },
+    .{ .source = "entry const answer=do:\n  saved.value:=missing\n  break 42\n", .code = .unknown_rebinding, .point = 25, .message = ":= requires an existing local binding: saved" },
+    .{ .source = "entry const answer=do:\n  saved[missing]:=missing_too\n  break 42\n", .code = .unknown_rebinding, .point = 25, .message = ":= requires an existing local binding: saved" },
+    .{ .source = "entry const answer=do:\n  self:=missing\n  break 42\n", .code = .unknown_rebinding, .point = 25, .message = ":= requires an existing local binding: self" },
 };
 fn checking(allocator: std.mem.Allocator, case: Case) !void {
     var names: symbols.Pool = .{};

@@ -6,7 +6,7 @@ const checked = fn computation => do:
       effect Validate.check value =>
         yield value
       complete value =>
-        return value
+        break value
 entry const answer = fn () => checked (@computation (fn () => 42))
 
 entry const checked_answer = answer ()

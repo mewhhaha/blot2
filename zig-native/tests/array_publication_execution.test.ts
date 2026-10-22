@@ -14,7 +14,7 @@ entry const run = fn (count: U32) => do:
     let discarded = @array.concat left right
     if discarded[count][0] != 42:
       @panic "copy"
-  return #[left[0][1], joined[count][0], selected[0][1]]
+  break #[left[0][1], joined[count][0], selected[0][1]]
 `,
     (_, bytes) => {
       const module = new WebAssembly.Module(bytes);

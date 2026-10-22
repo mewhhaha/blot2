@@ -15,7 +15,7 @@ entry const local = fn (count: U32) => do:
     let (right, _) = second
     let pressure = @array.fill 8192 index
     sum := self + left[0] + right[1] + pressure[8191]
-  return sum
+  break sum
 entry const carries = fn (count: U32) => do:
   let current = (#[7, 42], 0)
   let previous = current
@@ -34,7 +34,7 @@ entry const carries = fn (count: U32) => do:
   let (before, _) = previous
   let (after, _) = current
   let (original, _) = saved
-  return #[sum, before[0], after[0], original[1]]
+  break #[sum, before[0], after[0], original[1]]
 entry const suspended = fn (host: Array U32 -> U32 ! {Foreign}) => do:
   let pair = (#[7, 42], 99)
   let first = pair
@@ -43,7 +43,7 @@ entry const suspended = fn (host: Array U32 -> U32 ! {Foreign}) => do:
   let (right, _) = second
   use answer <- host left
   let pressure = @array.fill 8192 answer
-  return #[right[0], right[1], pressure[8191]]
+  break #[right[0], right[1], pressure[8191]]
 `;
 
 Deno.test("single activation owners preserve immutable aliases old carries nested snapshots and suspended failures", async () => {

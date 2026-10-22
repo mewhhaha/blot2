@@ -120,7 +120,7 @@ const Walker = struct {
                 try self.visit(n.a);
             },
             .operator_tail, .unary => try self.visit(n.b),
-            .group, .return_stmt, .yield_stmt => try self.visit(n.a),
+            .group, .return_stmt, .function_return_stmt, .yield_stmt => try self.visit(n.a),
             .forever_stmt => {
                 try self.push(.{ .restore = self.locals.items.len });
                 try self.visit(n.a);

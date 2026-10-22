@@ -30,7 +30,7 @@ test "recursive frontend dependency discovery preserves local and pattern shadow
         \\const run = fn global => global 1
         \\const local = fn value => do:
         \\  let global = fn item => item
-        \\  return global value
+        \\  break global value
         \\const pattern = fn value => case value of
         \\  (global, ignored) => global ignored
         \\entry const result = local (run (fn value => pattern ((fn item => item), value)))
@@ -47,7 +47,7 @@ test "recursive frontend discovery restores names after a forever suite" {
         \\  for ever:
         \\    let f_0 = fn item => item
         \\    break
-        \\  return f_0 value
+        \\  break f_0 value
         \\
     );
     for (0..1000) |index| try source.print(a, "const f_{d} = fn value => f_{d} value\n", .{ index, index + 1 });
@@ -62,7 +62,7 @@ const scheduled_diagnostic_source =
     \\  let first: U32 = 1.5
     \\  let second = broken value
     \\  let last: U32 = 1.5
-    \\  return value
+    \\  break value
     \\const broken: U32 -> F32 = fn value => value
 ;
 
@@ -97,10 +97,10 @@ test "recursive frontend scheduled child diagnostics keep their original referen
         \\  let first: U32 = 1.5
         \\  let selected = (#Box 1).read
         \\  let last: U32 = 1.5
-        \\  return value
+        \\  break value
         \\const Box.read: Box -> U32 = fn box => do:
         \\  let inner: U32 = 1.5
-        \\  return 42
+        \\  break 42
     }) |source| {
         var tokens = try lexer.lex(a, source);
         defer tokens.deinit(a);
@@ -170,8 +170,8 @@ test "recursive frontend queued method preserves declaration and call diagnostic
     ;
     const bodies = [_][]const u8{
         "  #Box value => parent (@u32.sub value 1)\n",
-        "  #Box value => do:\n    let next = @u32.sub value 1\n    return parent next\n",
-        "  #Box value => do:\n    let next = fn arg => parent arg\n    return next (@u32.sub value 1)\n",
+        "  #Box value => do:\n    let next = @u32.sub value 1\n    break parent next\n",
+        "  #Box value => do:\n    let next = fn arg => parent arg\n    break next (@u32.sub value 1)\n",
     };
     for (bodies) |body| {
         const source = try std.mem.concat(a, u8, &.{ prefix, "\n", body, "entry const run: U32 -> U32 = fn value => parent value\n" });
@@ -263,7 +263,7 @@ test "pending effect operations wait for their types instead of rescanning" {
         try text.appendSlice(a, "type Probe a is effect = { ask: Unit -> a }\nconst app = { ");
         for (0..count) |index| try text.print(a, "{s}f{d}: fn () => Probe.ask ()", .{ if (index == 0) "" else ", ", index });
         try text.appendSlice(a, " }\n");
-        for (0..count) |index| try text.print(a, "const use_{d} = fn () => do:\n  let handlers = app\n  use value <- handlers.f{d} ()\n  return value\n", .{ index, index });
+        for (0..count) |index| try text.print(a, "const use_{d} = fn () => do:\n  let handlers = app\n  use value <- handlers.f{d} ()\n  break value\n", .{ index, index });
         var tokens = try lexer.lex(a, text.items);
         defer tokens.deinit(a);
         var pool: symbols.Pool = .{};
@@ -430,7 +430,7 @@ test "inferred operation wrappers retain their written callee latent rows" {
         \\const operation_0: a -> a ! {| e} where { operation Signal.get a } = fn token => Signal.get a ()
         \\const operation_1 = fn token => do:
         \\  use result <- operation_0 token
-        \\  return result
+        \\  break result
     );
     defer fixture.deinit();
     try fixture.valid();
@@ -465,13 +465,13 @@ test "shared written predicates keep computed operands monomorphic and unrelated
     var f = try Fixture.init(
         \\const keep: a -> b -> b where { associated "add" a a a } = fn value => fn other => do:
         \\  let ignored = @type.call "add" value value
-        \\  return other
+        \\  break other
         \\entry const answer = fn () => do:
         \\  let selected = case #True of
         \\    #True => keep
         \\    #False => keep
         \\  let integer = selected 21 7
-        \\  return @f32.add (@u32.to_f32 integer) (selected 21 1.5)
+        \\  break @f32.add (@u32.to_f32 integer) (selected 21 1.5)
     );
     defer f.deinit();
     try f.valid();
@@ -494,7 +494,7 @@ test "shared written requirements retain the local computation reference origin"
     try std.testing.expectEqual(@as(u32, 1), answer.scheme.obligations.len);
     const requirement = f.checked.obligations[answer.scheme.obligations.start];
     try std.testing.expectEqual(@import("types.zig").ObligationKind.callee_use, requirement.kind);
-    try std.testing.expectEqualDeep(ast.Span{ .start = 594, .end = 605 }, f.tree.span(requirement.source));
+    try std.testing.expectEqualDeep(ast.Span{ .start = 592, .end = 603 }, f.tree.span(requirement.source));
 }
 
 test "a conflicting operand reports the same outcome through a shared callee" {
@@ -536,10 +536,10 @@ test "return type polymorphism preserves independent expected results through sh
         \\)
         \\entry const integer = fn () => do:
         \\  let #Box value:Box U32 = wide 21
-        \\  return value
+        \\  break value
         \\entry const floating = fn () => do:
         \\  let #Box value:Box F32 = wide 1.5
-        \\  return value
+        \\  break value
         \\
     );
     var f = try Fixture.init(source.items);
@@ -650,7 +650,7 @@ test "a lexical closure over outer variables expands its shared callee in place"
         \\
         \\entry const main = fn (outer: N) -> N => do:
         \\  let inner = fn value => wide (value + outer)
-        \\  return inner (#N 1)
+        \\  break inner (#N 1)
         \\
     );
     var f = try Fixture.init(source.items);

@@ -13,10 +13,10 @@ entry const run = fn (seed: U32) => do:
     use before <- read ()
     let inspect = @effect.provider Inspect.read (fn () => do:
       use outer <- read ()
-      return outer[0]
+      break outer[0]
     )
     let (inner_final, inner_result) = do inspect:
-      return @effect.run State.get State.set #[77, 78] (fn () => do:
+      break @effect.run State.get State.set #[77, 78] (fn () => do:
         use inspected <- Inspect.read ()
         use inner <- read ()
         use write #[79, 80]
@@ -24,13 +24,13 @@ entry const run = fn (seed: U32) => do:
           let pressure = @array.fill 8192 index
           if pressure[8191] != index:
             @panic "pressure"
-        return #[inspected, inner[0], inner[1]]
+        break #[inspected, inner[0], inner[1]]
       )
     use still_outer <- read ()
     use write #[seed + 2, seed + 3]
-    return #[before[0], before[1], still_outer[0], inner_final[0], inner_result[0], inner_result[1], inner_result[2]]
+    break #[before[0], before[1], still_outer[0], inner_final[0], inner_result[0], inner_result[1], inner_result[2]]
   )
-  return #[...result, final[0]]
+  break #[...result, final[0]]
 `,
     (_, bytes) => {
       const module = new WebAssembly.Module(bytes);
@@ -72,16 +72,16 @@ entry const integer = fn (seed: U32) => do:
   let (final, before) = @effect.run State.get State.set seed (fn () => do:
     use before <- State.get ()
     use State.set (seed + 1)
-    return before
+    break before
   )
-  return #[before, final]
+  break #[before, final]
 entry const fraction = fn (seed: F32) => do:
   let (final, before) = @effect.run State.get State.set seed (fn () => do:
     use before <- State.get ()
     use State.set (seed + 0.5)
-    return before
+    break before
   )
-  return #[before, final]
+  break #[before, final]
 `,
     (guest, bytes) => {
       const module = new WebAssembly.Module(bytes);

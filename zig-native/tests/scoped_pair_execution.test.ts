@@ -28,30 +28,30 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (lef
       use f <- second right right
       use g <- shadow left right
       use next <- host a
-      return @u32.add (@u32.add (@u32.add a b) (@u32.add c d)) (@u32.add (@u32.add (@u32.add e f) g) next)
+      break @u32.add (@u32.add (@u32.add a b) (@u32.add c d)) (@u32.add (@u32.add (@u32.add e f) g) next)
     let (state, result) = inner
-    return result
+    break result
   let (state, result) = outer
-  return result
+  break result
 ))
 entry const floating = fn () => @effect.scope (fn (s: State F32) => @effect.scope (fn (t: State U32) => do:
   use outer <- do (@effect.state s.get s.set 1.5):
     use inner <- do (@effect.state t.get t.set 100):
       use a <- first s t
       use b <- second t s
-      return @f32.add a b
+      break @f32.add a b
     let (state, result) = inner
-    return result
+    break result
   let (state, result) = outer
-  return result
+  break result
 ))
 `;
 const unmatched = `import {State, first} from "./state"
 entry const invalid = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   use nested <- do (@effect.state right.get right.set 7):
-    return first left right
+    break first left right
   let (state, result) = nested
-  return result
+  break result
 ))
 `;
 const cases = Object.entries(libraries).flatMap(([syntax, library]) =>
@@ -196,12 +196,12 @@ for (const { syntax, library, codegenTier } of cases) {
             let proofFragment = "=> left.get ()";
             let replacement = `=> do:
   let operation = left.get
-  return operation ()`;
+  break operation ()`;
             if (syntax === "arrow") {
               proofFragment = "=> x.get ()";
               replacement = `=> do:
   let operation = x.get
-  return operation ()`;
+  break operation ()`;
             }
             const rejected = await compiler.build({
               sources: {

@@ -11,7 +11,7 @@ entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.sco
   let computation = @computation (fn () => do:
     use a <- left.get ()
     use b <- right_read ()
-    return @u32.add a b
+    break @u32.add a b
   )
   for request in @requests computation:
     case request of
@@ -20,32 +20,32 @@ entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.sco
       effect right_read () =>
         yield 102
       complete value =>
-        return value
+        break value
 ))
 entry const forwarded = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do (@effect.provider left.get (fn () => 20)):
   let computation = @computation (fn () => do:
     use a <- left.get ()
     use b <- right.get ()
-    return @u32.add a b
+    break @u32.add a b
   )
   for request in @requests computation:
     case request of
       effect right.get () =>
         yield left.get ()
       complete value =>
-        return value
+        break value
 ))
 entry const cancelled = fn () => @effect.scope (fn (s: State U32) => do:
   let computation = @computation (fn () => do:
     use s.get ()
-    return @panic "cancelled computation continued"
+    break @panic "cancelled computation continued"
   )
   for request in @requests computation:
     case request of
       effect s.get () =>
-        return 42
+        break 42
       complete value =>
-        return value
+        break value
 )
 type Validate is effect = {check: U32 -> U32}
 const keep = fn ~value => fn () => @force value
@@ -55,31 +55,31 @@ entry const retry = fn () => do:
       use previous <- s.get ()
       use reply <- Validate.check previous
       use s.set reply
-      return s.get ()
+      break s.get ()
     let (state, result) = nested
-    return result
+    break result
   ))
   let computation = @computation (fn () => delayed ())
   let first = do:
     for request in @requests computation:
       case request of
         effect Validate.check value =>
-          return 40
+          break 40
         complete value =>
-          return value
+          break value
   let second = do:
     for request in @requests computation:
       case request of
         effect Validate.check value =>
           yield @u32.sub value 5
         complete value =>
-          return value
-  return @u32.add first second
+          break value
+  break @u32.add first second
 entry const host = fn (callback: U32 -> U32 ! {Foreign}) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let computation = @computation (fn () => do:
     use a <- left.get ()
     use b <- right.get ()
-    return @u32.add a b
+    break @u32.add a b
   )
   for request in @requests computation:
     case request of
@@ -88,7 +88,7 @@ entry const host = fn (callback: U32 -> U32 ! {Foreign}) => @effect.scope (fn (l
       effect right.get () =>
         yield 100
       complete value =>
-        return value
+        break value
 ))
 `;
 

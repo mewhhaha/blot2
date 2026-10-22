@@ -15,15 +15,15 @@ const convert = fn value => Convert value
 const explicit = fn (value:a) -> b => Named {output:b,input:a} value
 const curried = Curried
 entry const answer = fn () => do (@effect.provider (Convert [U32,F32]) (fn value => @u32.to_f32 value)):
-  return do (@effect.provider ((Curried U32) F32) (fn value => @u32.to_f32 value)):
-    return do (@effect.provider (Named {output:F32,input:U32}) (fn value => @u32.to_f32 value)):
-      return do (@effect.provider (Ping ()) (fn () => 42)):
+  break do (@effect.provider ((Curried U32) F32) (fn value => @u32.to_f32 value)):
+    break do (@effect.provider (Named {output:F32,input:U32}) (fn value => @u32.to_f32 value)):
+      break do (@effect.provider (Ping ()) (fn () => 42)):
         let token: Token () = #Token
         use first <- convert 20
         use second <- explicit 12
         use third <- ((Curried U32) F32) 10
         use fourth <- Ping () ()
-        return @f32.add first (@f32.add second (@f32.add third (@u32.to_f32 fourth)))
+        break @f32.add first (@f32.add second (@f32.add third (@u32.to_f32 fourth)))
 `,
     (guest) => {
       for (let i = 0; i < 100; i++) equal(guest.call("answer", null), 84);
@@ -38,7 +38,7 @@ type Inspect a is effect = Array a -> a
 entry const answer = fn () => do (@effect.provider (Inspect U32) (fn values => @array.length values)):
   use first <- Inspect #[]
   use second <- Inspect #[1,2,3]
-  return @u32.add first second
+  break @u32.add first second
 `,
     (guest) => {
       for (let i = 0; i < 100; i++) equal(guest.call("answer", null), 3);

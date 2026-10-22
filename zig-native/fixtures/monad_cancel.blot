@@ -8,14 +8,14 @@ const checked = fn computation => do (@do.monad Box):
     case request of
       effect Validate.check value =>
         if @u32.eq value 0:
-          return 42.0
+          break 42.0
         yield value
       complete () =>
-        return 41.0
+        break 41.0
 entry const answer = fn (index: U32) => do:
   let #Box value = checked (@computation (fn () => do:
     use Validate.check index
-    return ()
+    break ()
   ))
-  return @f32.to_u32 value
+  break @f32.to_u32 value
 entry const folded = answer 0

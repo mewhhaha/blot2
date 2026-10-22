@@ -10,10 +10,10 @@ entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
   let ignored = s
   let pending = delay (do:
     let local = 42
-    return local
+    break local
   )
   use finished <- @demand pending
-  return finished
+  break finished
 )
 `;
 async function execute(bytes: Uint8Array) {

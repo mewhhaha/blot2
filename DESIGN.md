@@ -62,23 +62,31 @@ written with `=> do:`; there is no `fn pattern:` block-function form.
 ```blot
 const squared = fn (value: F32) => do:
   let result = value * value
-  return result
+  break result
 
 let initial_position = do:
   let spawn = choose_spawn level
-  return #Vec2 { x: spawn.x, y: spawn.y + 1.0 }
+  break #Vec2 { x: spawn.x, y: spawn.y + 1.0 }
 ```
 
-In plain `do:`, `return` supplies that expression's result and falling through
-produces `Unit`. Evaluating a `do` executes it; placing it inside a function
-delays that execution until the function is called. Statement suites such as
-`if` and `for` do not implicitly introduce another `do` result boundary.
+In plain `do:`, `break value` supplies that expression's result and falling
+through produces `Unit`. Evaluating a `do` executes it; placing it inside a
+function delays that execution until the function is called. Statement suites
+such as `if` and `for` do not implicitly introduce another `do` result boundary.
 
-Consequently, a statement-bodied function needs no trailing `return ()`. This is
+Consequently, a statement-bodied function needs no trailing `break ()`. This is
 already implemented for plain blocks: a final expression statement is discarded,
 not implicitly returned. Expression-bodied `fn x => expression` still returns
 its expression. An explicit non-unit return on one path and unit fallthrough on
 another is a type error; no optional/union result is invented.
+
+`return value` exits the innermost function through ordinary nested blocks,
+conditionals, matches, and loops. A monadic continuation can run zero or many
+times, so `return` inside it is diagnosed; finish the monadic `do` with
+`break value` and return from the surrounding function. An operation clause in a
+request loop directly in the function body's `do` can return and cancel its
+captured computation. A callback inside a nested `do` cannot return across that
+callback boundary and receives the same diagnostic.
 
 ### Pure and effectful bindings
 
@@ -91,7 +99,7 @@ const move = fn () => do:
   use position <- ecs.get #Position
   let next = advance (position, velocity)
   use _ <- ecs.set next
-  return ()
+  break ()
 ```
 
 In plain `do:`, `use` evaluates its RHS once before the remaining statements,
@@ -129,8 +137,8 @@ const try = monad Maybe
 const chain_maybe = fn my_maybe => fn my_other_maybe => do:
   let smth = do try:
     use value <- my_maybe
-    return $ my_other_maybe value
-  return smth
+    break $ my_other_maybe value
+  break smth
 ```
 
 `do monad Maybe:` and `do (monad Maybe):` select the same resolver as `do try:`.
@@ -145,9 +153,10 @@ For `monad Maybe`:
   remainder.
 - `use expression` has the same behavior, discarding the successful payload. In
   particular, `use #Nothing` still short-circuits.
-- `return value` lifts the value with `Maybe.pure`, producing `#Some value`.
-- `return $ expression` forwards an existing `Maybe` result without another
-  wrapper. `$` here is return syntax, not an overloadable application operator.
+- `break value` lifts the value with `Maybe.pure`, producing `#Some value`.
+- `break $ expression` forwards an existing `Maybe` result without another
+  wrapper. `$` here is block-exit syntax, not an overloadable application
+  operator.
 - `let value = expression` stays an ordinary pure binding and does not unwrap
   anything. There is no implicit choice between lifting and binding a value.
 - Falling through lifts Unit, producing `#Some ()`. Ordinary expression
@@ -166,11 +175,11 @@ expression is evaluated once before its block. Its implementation strategy must
 be statically known, but a resolver may carry runtime inputs such as a world and
 entity. `const try` stores the resolver without executing any future block.
 
-The nearest `do` owns its binding/return rules. A nested plain `do:` keeps
-direct binding and return; it does not inherit monadic syntax from an enclosing
-block. `return $` requires an explicit resolver on that nearest block. Calling a
-function does not rewrite its body's binding rules. Scoped effect providers can
-still interpret operations performed through helpers.
+The nearest `do` owns its binding and result rules. A nested plain `do:` keeps
+direct binding and `break value`; it does not inherit monadic syntax from an
+enclosing block. `break $` requires an explicit resolver on that nearest block.
+Calling a function does not rewrite its body's binding rules. Scoped effect
+providers can still interpret operations performed through helpers.
 
 A monad adapter sequences wrapped values; it does not erase unrelated effects.
 An ECS provider instead interprets its registered storage effects, keeping
@@ -193,13 +202,14 @@ must agree with its monad's `pure` and `bind` and provide the same stack
 guarantee. Blocks without loops need only `pure` and `bind`.
 
 Loop completion and `break` run the block suffix; `break` targets the nearest
-loop and preserves its latest carried state. An early `return` exits the nearest
-`do`, including through nested loops. Failed steps and `return $` propagate the
-wrapped result without executing later iterations or the suffix. Ordinary
-provider loops retain their iterative lowering. Arbitrary recursive functions
-and general resumable effect handlers are outside this iteration protocol. The
-prelude defines `monad` using the generic `@do.monad` adapter; neither `Maybe`,
-`Result`, nor resolver aliases have special compiler-recognized names.
+loop and preserves its latest carried state. An early `break value` exits the
+nearest `do`, including through nested loops. Failed steps and `break $`
+propagate the wrapped result without executing later iterations or the suffix.
+Ordinary provider loops retain their iterative lowering. Arbitrary recursive
+functions and general resumable effect handlers are outside this iteration
+protocol. The prelude defines `monad` using the generic `@do.monad` adapter;
+neither `Maybe`, `Result`, nor resolver aliases have special compiler-recognized
+names.
 
 Declared data-type constructors can be passed through ordinary functions and
 stored in bindings, including imported and renamed constructors. General
@@ -218,18 +228,19 @@ const checked = fn computation => do:
     case request of
       effect Validate.check value =>
         if value == 0:
-          return 0
+          break 0
         yield value
       complete value =>
-        return value
+        break value
 ```
 
 An `effect` pattern names a closed nominal operation and binds its argument.
 `yield` replies with the operation's declared result and ends the current
-clause. `return` cancels the computation and exits the nearest enclosing `do`.
-`break` cancels it and runs the statements following the request loop. There
-must be exactly one `complete` clause, receiving the computation's final result;
-it returns or breaks. No clause may fall through, and completion cannot yield.
+clause. `break value` cancels the computation and exits the nearest enclosing
+`do`. Bare `break` cancels it and runs the statements following the request
+loop. There must be exactly one `complete` clause, receiving the computation's
+final result; it returns or breaks. No clause may fall through, and completion
+cannot yield.
 
 Rebindings carry immutable handler state between requests. Captured computations
 are reusable, with fresh state at each installation. Operation calls through
@@ -296,7 +307,7 @@ const identity = fn value => value
 ```
 
 An import is not a value-producing expression. A module does not export its
-final `return` value. Named initialization functions can produce runtime state.
+final block value. Named initialization functions can produce runtime state.
 
 ## Data types
 
@@ -393,14 +404,14 @@ pattern; parentheses group its payload, not a new multi-argument calling form.
 ```blot
 const double_if_present = fn (candidate: Maybe U32) -> U32 => do:
   if let #Some(value) = candidate:
-    return value * 2
+    break value * 2
   else:
-    return 0
+    break 0
 
 const double_or_zero = fn (candidate: Maybe U32) -> U32 => do:
   let #Some(value) = candidate else:
-    return 0
-  return value * 2
+    break 0
+  break value * 2
 ```
 
 Both forms evaluate the RHS once and require it to be pure, like ordinary `let`.
@@ -415,12 +426,12 @@ that exits does not contribute to the facts at the following statement.
 
 For `let pattern = expression else:`, the names are available after the binding,
 but not in its RHS or failure suite. Every path through the `else` suite must
-exit before reaching that continuation: for example, `return` from the enclosing
-`do`, or `break`/`continue` targeting an enclosing loop. Falling through is a
-compile error. Returning from a nested `do` inside `else` is not sufficient.
-This is the same non-fallthrough principle as
+exit before reaching that continuation: for example, `break value` from the
+enclosing `do`, `return value` from the function, or bare `break` targeting an
+enclosing loop. Falling through is a compile error. Returning from a nested `do`
+inside `else` is not sufficient. This is the same non-fallthrough principle as
 [Rust's let-else](https://doc.rust-lang.org/reference/statements.html#let-statements),
-adapted to Blot's nearest-`do` return boundary and its selected resolver.
+adapted to Blot's nearest-`do` result boundary and its selected resolver.
 
 Ordinary `let pattern = expression` requires a pattern that cannot fail for the
 currently known type. Refutable patterns need `else` or a conditional match;
@@ -450,13 +461,13 @@ type Reading = F64 | Text
 
 const read_score = fn (ready: Bool) -> Reading => do:
   if ready:
-    return 42.0
-  return "pending"
+    break 42.0
+  break "pending"
 
 const reading_label = fn (value: Reading) -> Text => do:
   if let (number: F64) = value:
-    return "Score: ${number}"
-  return value
+    break "Score: ${number}"
+  break value
 ```
 
 The typed pattern `(name: Type)` tests a union arm at runtime and binds its
@@ -555,7 +566,7 @@ const scale_twice = fn value => do:
   let next = value
   next := self.scaled factor
   next := self.scaled factor
-  return next
+  break next
 ```
 
 Here the requirement is an operation shaped like `a -> F32 -> a`, not
@@ -633,8 +644,8 @@ may be lambdas, `do:` blocks or `case` expressions without parentheses, e.g.
 `invoke $ fn value => value + 1`. This syntax works for source operators in
 general, not through a special application opcode. Operands remain eager and
 left-to-right, unlike Haskell's evaluation model, and callback effects propagate
-through `apply`. The standalone `return $ value` form is still resolver-return
-forwarding; `return f $ value` returns an ordinary application result.
+through `apply`. The standalone `break $ value` form forwards a resolver result;
+`break f $ value` gives an ordinary application result to the block.
 
 The proposed `@type.of` queries the inferred static type without evaluating its
 argument or constructing a runtime type object. Its `.add` lookup selects an
@@ -653,13 +664,13 @@ infixr 25 (&&) = and
 
 const and = fn (left: Bool) => fn ~right => do:
   if left:
-    return @force right
-  return #False
+    break @force right
+  break #False
 
 const or = fn (left: Bool) => fn ~right => do:
   if left:
-    return #True
-  return @force right
+    break #True
+  break @force right
 ```
 
 `and condition expression` has the same demand behavior as
@@ -671,9 +682,9 @@ because a selected associated operation has a deferred parameter.
 Fixity import/export rules, conflicting declarations, and the prelude-loading
 policy remain open. The showcase colocates library definitions with game code
 for review; it does not authorize foreign extensions of primitive types.
-Punctuation such as `:`, `=>`, `->`, effect binding `<-`, return forwarding
-`return $`, and successor rebinding `:=` remains syntax, not an ordinary
-function-call operator. The separate postfix `?` propagation sketch is
+Punctuation such as `:`, `=>`, `->`, effect binding `<-`, block-result
+forwarding `break $`, and successor rebinding `:=` remains syntax, not an
+ordinary function-call operator. The separate postfix `?` propagation sketch is
 unsettled: its eventual encoding must meet the source-defined rule rather than
 introducing a hardcoded operator exception.
 
@@ -847,12 +858,12 @@ const advance = fn (particle: Particle, dt: F32) => do:
   let next = particle
   next.position.x := self + particle.velocity.x * dt
   next.position.y := self + particle.velocity.y * dt
-  return next
+  break next
 
 const update = fn (world: World, dt: F32) => do:
   let next = world
   next.particles := array.map (fn particle => advance (particle, dt), self)
-  return next
+  break next
 ```
 
 The engine installs the returned world after an update. Hot reload replaces the
@@ -938,7 +949,7 @@ The proposed scoped runner receives that context explicitly:
 ```blot
 const read_velocity = fn () => do:
   use velocity <- ecs.get Velocity
-  return velocity
+  break velocity
 
 const sample_velocity = fn (world, entity) =>
   ecs.run (world, entity, read_velocity)
@@ -1059,7 +1070,7 @@ frontend; see the [Helix setup](README.md#helix).
 | Layout and AST          | Indented continuations, a structure-preserving formatter, native syntax tables; native name resolution and Core lowering.                                                            |
 | Types and effects       | Rank-1 HM with inferred latent effect rows and source-declared operations.                                                                                                           |
 | Bindings                | Pure-RHS `let`, effect-preserving `use … <- …`; `use expression` discards.                                                                                                           |
-| Resolver blocks         | Scoped effect providers, source-defined monad resolvers, and `return $` execute; request loops handle captured computations with reply or cancellation.                              |
+| Resolver blocks         | Scoped effect providers, source-defined monad resolvers, and `break $` execute; request loops handle captured computations with reply or cancellation.                               |
 | Scheduling              | Source-library responsibility; no compiler-generated ECS scheduler.                                                                                                                  |
 | Const evaluation        | Scalars, tuples, arrays, data, closures, and matching with one shared evaluation budget.                                                                                             |
 | Tags and const types    | Expression tags transform `const`/`let` values; closed const effect descriptors; nominal type-constructor values; no declaration-descriptor transforms or general type computations. |

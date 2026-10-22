@@ -10,11 +10,11 @@ const checked = fn computation => do (@do.monad Box):
         yield value
       complete () =>
         break
-  return 42.0
+  break 42.0
 entry const answer = fn (index: U32) => do:
   let #Box value = checked (@computation (fn () => do:
     use Validate.check index
-    return ()
+    break ()
   ))
-  return @f32.to_u32 value
+  break @f32.to_u32 value
 entry const folded = answer 0

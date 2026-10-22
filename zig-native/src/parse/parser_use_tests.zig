@@ -12,7 +12,7 @@ fn mixed(allocator: std.mem.Allocator) !void {
         \\  use next: (U32 -> U32 ! {Foreign}) <- fn item => item
         \\  use answer <- next value
         \\  use discarded: U32 <- answer
-        \\  return discarded
+        \\  break discarded
         \\
     );
     defer allocator.free(source);

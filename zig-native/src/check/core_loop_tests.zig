@@ -10,12 +10,12 @@ const a = std.testing.allocator;
 const source =
     \\const make = fn (start: U32) => do:
     \\  let total = start
-    \\  return fn (limit: U32) => do:
+    \\  break fn (limit: U32) => do:
     \\    for index in 0..limit:
     \\      total := @u32.add self index
     \\      if @u32.lt 2 index:
     \\        break
-    \\    return total
+    \\    break total
     \\entry const run = fn (limit: U32) -> U32 => (make 40) limit
 ;
 

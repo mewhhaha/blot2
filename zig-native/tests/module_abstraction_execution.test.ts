@@ -12,7 +12,7 @@ const box = #Box
 const unbox = fn (#Box value) => value
 const captured = fn () => do:
   let constructor = #Floating
-  return fn value => read_floating (constructor value)
+  break fn value => read_floating (constructor value)
 entry const unsigned = fn (value: U32) => read_count (make_count value)
 entry const floating = fn (value: F32) => read_floating (make_floating value)
 entry const generic_unsigned = fn (value: U32) => unbox (box value)
@@ -63,7 +63,7 @@ entry const answer = fn (value: U32) => @u32.add (read (make value)) (field (mak
 entry const shared = fn (value: U32) => do:
   let original = #[value, 2]
   let copied = unwrap (wrap original)
-  return @u32.add (@array.get original 0) (@array.get copied 1)
+  break @u32.add (@array.get original 0) (@array.get copied 1)
 `,
     (guest) => {
       for (let iteration = 0; iteration < 1000; iteration++) {
@@ -102,7 +102,7 @@ const unwrap = fn (#Callback value) => value
 entry const run = fn (host: U32 -> U32 ! {Foreign}) => do:
   let saved = wrap (fn value => host value)
   use result <- (unwrap saved) 41
-  return @u32.add result 1
+  break @u32.add result 1
 `,
     (guest) => {
       const seen: number[] = [];

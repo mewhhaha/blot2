@@ -341,7 +341,7 @@ fn sourceRecipe(engine: anytype, root: ast.Id, transferred: bool) SourceReceipt 
                     try self.callable(node.a, depth + 1);
                     try self.expression(node.b, depth + 1);
                 },
-                .group, .return_stmt => try self.expression(node.a, depth + 1),
+                .group, .return_stmt, .function_return_stmt => try self.expression(node.a, depth + 1),
                 .field => try self.expression(node.b, depth + 1),
                 .product, .record, .array, .block => {
                     if (node.tag == .block and node.c != 0) return error.UnsafeCleanup;

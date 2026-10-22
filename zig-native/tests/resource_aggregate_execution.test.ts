@@ -9,11 +9,11 @@ const tuple = fn (value: U32) => do:
   use owner <- @resource.acquire (fn () => (value, #[value, 8])) (fn owned => ())
   let transfer: once (Unit -> Unit ! {Foreign}) = fn () => @resource.release owner
   use transfer ()
-  return 42
+  break 42
 const nested = fn (value: U32) => @resource.scope (fn () => #[#[value, 7], #[9]]) (fn owner => ()) (fn loan => @usage.length loan)
 const failing = fn (value: U32) => @resource.scope (fn () => {left: value, right: #[#[value, 7], #[9]]}) (fn owner => do:
   let ignored = @u32.div 1 value
-  return ()) (fn loan => 42)
+  break ()) (fn loan => 42)
 `;
 const source = `import {inspect, tuple, nested, failing} from "./cleanup"
 entry const answer = fn (value: U32) => @u32.add (inspect value) (tuple value)
@@ -89,7 +89,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
               [entry]: source,
               [dependency]: library.replace(
                 "(fn owner => ())",
-                "(fn owner => do:\n    for ever:\n      let ignored = 7\n    return ())",
+                "(fn owner => do:\n    for ever:\n      let ignored = 7\n    break ())",
               ),
             },
           });

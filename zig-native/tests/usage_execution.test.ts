@@ -60,15 +60,15 @@ Deno.test("usage exit and exact loop contracts execute across imports and failed
   const control = `
 const bounded = fn (callback: once (Unit -> U32 ! {Foreign})) => do:
   let initial = do:
-    return 0
+    break 0
   for index in 3..4:
     use callback ()
-  return 7
+  break 7
 const stopped = fn (callback: once (Unit -> U32 ! {Foreign})) => do:
   for ever:
     use callback ()
     break
-  return 7
+  break 7
 const guarded = fn (callback: once (Unit -> Bool ! {Foreign})) => case #True of
   #True if callback () => 7
   #True => 7

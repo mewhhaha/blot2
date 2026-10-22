@@ -145,17 +145,17 @@ const read: ${record ? "Token a -> a" : "Token -> Array U32"} = fn ${
         } => ${record ? "value.value" : "value"}
 const capture = fn value => do:
   let saved = make value
-  return fn () => read saved
+  break fn () => read saved
 entry const run = fn (value: U32) => do:
   let original = #[value, 7]
   let alias = read (make original)
   original[0] := 0
-  return @u32.add alias[0] 2
+  break @u32.add alias[0] 2
 entry const captured = fn (value: U32) => do:
   let original = #[value, 7]
   let saved = capture original
   original[0] := 0
-  return @u32.add (saved ())[0] 2
+  break @u32.add (saved ())[0] 2
 `;
         await inspectBuild(source, codegenTier, async (bytes) => {
           const functions = functionSections(bytes);
@@ -186,11 +186,11 @@ entry const captured = fn (value: U32) => do:
 opaque type Pair = (U32, U32)
 entry const guarded = fn (value: U32) => do:
   let #Token 7 = #Token value else:
-    return 99
-  return 42
+    break 99
+  break 42
 entry const pair = fn (value: U32) => do:
   let #Pair (left, right) = #Pair (value, 2)
-  return @u32.add left right
+  break @u32.add left right
 `,
       codegenTier,
       async (bytes) => {

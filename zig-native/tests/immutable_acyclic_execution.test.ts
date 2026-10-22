@@ -10,14 +10,14 @@ const grow = fn (count: U32) => do:
   let root: Link = #End
   for index in 0..count:
     root := #Next (self, index)
-  return root
+  break root
 entry const run = fn (count: U32) => do:
   let original = grow count
   let changed = #Next (original, 8192)
   let saved = case original of
     #Next (_, value) => value
     _ => 0
-  return case changed of
+  break case changed of
     #Next (tail, value) => case tail of
       #Next (_, latest) => @u32.add value (@u32.add latest saved)
       _ => 0
@@ -142,7 +142,7 @@ entry const run = fn (frames: U32) -> U32 => do:
   for frame in 0..frames:
     let items = #[#Scalar { a: index, b: 1.0 } | index <- array.generate 4000 identity]
     total := self + items[3].a
-  return total
+  break total
 entry const memory = fn () -> Array U32 => #[]
 `,
     (_, bytes) => {
@@ -173,7 +173,7 @@ entry const run = fn (frames: U32) -> U32 => do:
   for frame in 0..frames:
     let items = #[#Plain (#Scalar { a: index, b: 1.0 }) | index <- array.generate 4000 identity]
     total := self + value items[3]
-  return total
+  break total
 entry const memory = fn () -> Array U32 => #[]
 `,
     (_, bytes) => {
@@ -225,13 +225,13 @@ const frame = fn (stacks: Array Stack) => do:
   let sum = 0
   for d in flat:
     sum := self + d.material
-  return sum
+  break sum
 entry const run = fn (frames: U32) -> U32 => do:
   let stacks = array.generate 64 (fn i => #Stack { x: U32.to_f32 i, z: 0.5, count: 2 })
   let total = 0
   for f in 0..frames:
     total := self + frame stacks
-  return total
+  break total
 entry const memory = fn () -> Array U32 => #[]
 `;
 
@@ -273,7 +273,7 @@ entry const run = fn (frames: U32) -> U32 => do:
     let bag = #Bag { items: even, extra: list.to_array middle }
     let back = list.from_array bag.extra
     total := self + sum back + sum bag.items + base.length
-  return total
+  break total
 entry const memory = fn () -> Array U32 => #[]
 `,
     (_, bytes) => {

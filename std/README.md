@@ -43,8 +43,8 @@ entry const answer = fn () => transform 20
 entry const inferred = fn () => do:
   let same = fn value => value
   if same #True:
-    return same 42
-  return 0
+    break same 42
+  break 0
 ```
 
 `answer ()` returns 42. Closures capture immutable values, and pure local
@@ -55,9 +55,10 @@ are evaluated explicitly with `@demand` (`@force` remains an alias). See
 [effects and controlled IO](../compiler/effects-and-io.md).
 
 Plain `do:` blocks already return `()` when they fall through. No trailing
-`return ()` is needed, and their last expression statement is discarded. A
-non-unit result needs an explicit return on every reachable path. Expression
-bodies such as `const answer = fn () => 42` still return their expression.
+`break ()` is needed, and their last expression statement is discarded. A
+non-unit result needs an explicit `break value` on every reachable path.
+Expression bodies such as `const answer = fn () => 42` still return their
+expression.
 
 ## Type equality
 
@@ -76,7 +77,7 @@ entry const different = #Type #Count != #Type #Other       // True
 entry const compare = fn () => do:
   let head = #Type #Count
   let witness = #Type (#Count 0)
-  return head == witness
+  break head == witness
 ```
 
 `Type` and its associated `eq`/`ne` functions are ordinary prelude declarations.
@@ -123,15 +124,15 @@ and `#Some(value)` are equivalent in expressions and patterns.
 ```blot
 const nonzero = fn value => do:
   if value == 0:
-    return #Nothing
-  return #Some value
+    break #Nothing
+  break #Some value
 
 const candidate = Maybe.bind (#Some 40) nonzero
 
 entry const answer = fn () => do:
   let #Some value = Maybe.map (U32.add 2) candidate else:
-    return 0
-  return Result.unwrap_or 0 (Maybe.to_result #False (#Some value))
+    break 0
+  break Result.unwrap_or 0 (Maybe.to_result #False (#Some value))
 
 entry const inspect = fn () => case #Some (#Some 42) of
   #Some (#Some value) => value
@@ -149,11 +150,11 @@ const try = monad Maybe
 const add_present = fn left => fn right => do try:
   use first <- left
   use second <- right
-  return first + second
+  break first + second
 ```
 
 `#Nothing` skips the rest of the block. `monad Result` propagates `#Err` in the
-same way. `return value` lifts with `pure`; `return $ candidate` forwards an
+same way. `break value` lifts with `pure`; `break $ candidate` forwards an
 already wrapped result. `use candidate` binds and discards its successful
 payload, so it still short-circuits. Falling through lifts Unit. Ordinary `let`
 and expression statements do not unwrap values. Nested `do` blocks select their
@@ -222,7 +223,7 @@ type Vec2 is data = #Vec2 { x: F32, y: F32 }
 const Vec2.add = fn (a: Vec2) => fn (b: Vec2) => do:
   let #Vec2 { x: ax, y: ay } = a
   let #Vec2 { x: bx, y: by } = b
-  return #Vec2 { x: ax + bx, y: ay + by }
+  break #Vec2 { x: ax + bx, y: ay + by }
 
 const twice = fn value => value + value
 entry const answer = fn (value: F32) => twice value
@@ -269,7 +270,7 @@ entry const callback_example = fn () => invoke $ fn value => value + 1
 ```
 
 An infix RHS can also be a `do:` block or `case` expression without parentheses.
-`return f $ value` returns the call result; the existing `return $ value`
+`break f $ value` gives the call result to the block; `break $ value`
 resolver-forwarding syntax passes through an already wrapped monadic result.
 
 ## F32 and game math
@@ -402,30 +403,32 @@ describe pull order and snapshot behavior.
 `fold step initial width values` reduces each window in order, including
 effectful reducers and F32 arithmetic. `monoid combine identity width values`
 uses a balanced persistent buffer; `group combine inverse identity width
-values` removes the oldest value on the left before adding the incoming value.
-The fast callbacks must be pure. Callers promise an associative, total combine,
-a two-sided identity and, for groups, a two-sided inverse. These are explicit
+values`
+removes the oldest value on the left before adding the incoming value. The fast
+callbacks must be pure. Callers promise an associative, total combine, a
+two-sided identity and, for groups, a two-sided inverse. These are explicit
 algebra contracts; use `fold` when they do not hold. Width zero traps before
 obtaining the input cursor. Copies of a cursor keep independent windows.
 
 [summary.blot](summary.blot) provides opaque persistent `Summary s` trees.
-`build combine identity values` reads its input once; `length tree`, `get index
-tree`, `query combine identity start count tree`, `set combine index value tree`
-and `concat combine left right` preserve earlier versions. Queries use
-half-open ranges and return the identity for an empty range. Reuse the same
-algebra and immutable captures for every operation. Build is linear; queries,
-updates and concatenation follow logarithmic paths. The
-[full contracts](../zig-native/ROLLING_SUMMARIES.md) specify ordering and bounds.
+`build combine identity values` reads its input once; `length tree`,
+`get index
+tree`, `query combine identity start count tree`,
+`set combine index value tree` and `concat combine left right` preserve earlier
+versions. Queries use half-open ranges and return the identity for an empty
+range. Reuse the same algebra and immutable captures for every operation. Build
+is linear; queries, updates and concatenation follow logarithmic paths. The
+[full contracts](../zig-native/ROLLING_SUMMARIES.md) specify ordering and
+bounds.
 
 [simd.blot](simd.blot) supplies explicit four-lane U32/F32 operations on
 ordinary tuple aliases: arithmetic, shifts, min/max, comparison masks and
 bitwise selection, literal shuffles, dot products, bit reinterpretation, an
-opt-in relaxed multiply-add, checked array load/store, and ordered or
-explicitly pairwise reductions. Each lane matches its scalar kernel bit for
-bit, and private values stay in v128 locals. Eligible independent numeric
-construction also vectorizes automatically.
-[SIMD semantics](../compiler/guide.md#simd) specify the exact arithmetic and
-admission limits.
+opt-in relaxed multiply-add, checked array load/store, and ordered or explicitly
+pairwise reductions. Each lane matches its scalar kernel bit for bit, and
+private values stay in v128 locals. Eligible independent numeric construction
+also vectorizes automatically. [SIMD semantics](../compiler/guide.md#simd)
+specify the exact arithmetic and admission limits.
 
 Ownership analysis removes eligible local allocations and permits safe storage
 reuse. Runtime reclamation additionally uses a tracing collector in Wasm linear

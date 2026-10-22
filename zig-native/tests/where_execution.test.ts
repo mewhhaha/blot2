@@ -18,7 +18,7 @@ entry const answer = fn () => do:
   let local = alias
   let integer = local 20
   let choose: a -> a where { type_rep a } = fn value => value
-  return @u32.add (choose integer) (@f32.to_u32 (local (choose 1.0)))
+  break @u32.add (choose integer) (@f32.to_u32 (local (choose 1.0)))
 `,
     (guest) => equal(guest.call("answer", null), 42),
     { prelude },
@@ -35,11 +35,11 @@ const bind: a -> (U32 -> U32) where { receiver "plus" a Unit (U32 -> U32) } = fn
 const replace: a -> b -> c where { update "value" a b c } = fn box => fn value => do:
   let current = box
   current.value := value
-  return current
+  break current
 entry const answer = fn () => @u32.add (first (#Box { value: 20 })) ((bind (#Box { value: 20 })) 2)
 entry const changed = fn () => do:
   let #Box { value } = replace (#Box { value: 20 }) 42.0
-  return value
+  break value
 `,
     (guest) => {
       equal(guest.call("answer", null), 42);
@@ -55,7 +55,7 @@ type Signal a is effect = { get: Unit -> a }
 const read: Unit -> a ! {| e} where { operation Signal.get a } = fn () => Signal.get a ()
 const invoke: (Unit -> a ! {| e}) -> a ! {| e} where { type_rep a, effect_rep ! {| e} } = fn callback => callback ()
 entry const answer = fn () -> U32 => do (@effect.provider (Signal.get U32) (fn () => 42)):
-  return invoke (fn () => read ())
+  break invoke (fn () => read ())
 `,
     (guest) => equal(guest.call("answer", null), 42),
   );
@@ -68,7 +68,7 @@ const identity: U32 -> U32 where { associated "add" U32 U32 a } = fn value => va
 const unused: a -> a where { associated "missing" a a a } = fn value => value
 entry const answer = fn () => do:
   let increment: U32 -> U32 where { associated "add" F32 F32 F32 ! {} } = fn value => value + 1
-  return identity (increment 41)
+  break identity (increment 41)
 entry const number: U32 where { type_rep U32 } = 42
 entry let runtime: U32 where { effect_rep ! {} } = 7
 `,
@@ -153,13 +153,13 @@ Deno.test("qualified computed values retain one evidence instance", async () => 
     #False => twice
 `;
   await compileAndRun(
-    header + selected + "  return selected 21\n",
+    header + selected + "  break selected 21\n",
     (guest) => equal(guest.call("answer", null), 42),
     { prelude },
   );
   await compileExpectedFailure(
     header + selected +
-      "  return @f32.add (@u32.to_f32 (selected 21)) (selected 1.5)\n",
+      "  break @f32.add (@u32.to_f32 (selected 21)) (selected 1.5)\n",
     "type_mismatch",
     undefined,
     { prelude },
@@ -187,7 +187,7 @@ const pure_callback: Unit -> U32 = fn () => 37
 const read_callback: Unit -> U32 ! {Read} = fn () => Read ()
 entry const pure = fn () => invoke pure_callback
 entry const answer = fn () => do (@effect.provider Read (fn () => 42)):
-  return invoke read_callback
+  break invoke read_callback
 `,
     );
     const result = await new Deno.Command(compiler, {

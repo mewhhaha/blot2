@@ -39,7 +39,7 @@ Deno.test("open operator uses wait for their operand types", async () => {
     return `const late = ${indices.map((i) => `fn p${i} => `).join("")}do:
 ${indices.map((i) => `  let same_${i} = p${i} == p${i}`).join("\n")}
 ${indices.map((i) => `  let used_${i} = p${i} + 1`).join("\n")}
-  return 0
+  break 0
 `;
   };
   const small = await check(late(32));
@@ -60,7 +60,7 @@ Deno.test("pending effect operations wait for their types", async () => {
 const app = { ${indices.map((i) => `f${i}: fn () => Probe.ask ()`).join(", ")} }
 ${
       indices.map((i) =>
-        `const use_${i} = fn () => do:\n  let handlers = app\n  use value <- handlers.f${i} ()\n  return value`
+        `const use_${i} = fn () => do:\n  let handlers = app\n  use value <- handlers.f${i} ()\n  break value`
       ).join("\n")
     }
 `;

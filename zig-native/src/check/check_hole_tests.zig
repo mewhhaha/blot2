@@ -9,7 +9,7 @@ fn law(allocator: std.mem.Allocator) !void {
         \\const unfinished = fn (value: U32) -> F32 => do:
         \\  let original = value
         \\  value := #True
-        \\  return @hole
+        \\  break @hole
         \\entry const answer = 42
     ;
     var tokens = try lexer.lex(allocator, source);
@@ -102,7 +102,7 @@ test "typed hole graphs preserve nominal arguments, effect identities and generi
         \\type Add a is contract = { associated "add" a a a }
         \\const unfinished: a -> a where { Add a } = fn value => do:
         \\  let other = value
-        \\  return @hole
+        \\  break @hole
         \\const callback: Unit -> Box U32 ! {Read U32 | e} = @hole
         \\entry const answer = 42
     ;
@@ -145,7 +145,7 @@ test "typed holes bound lexical capture and prioritize the nearest unshadowed bi
         defer allocator.free(line);
         try source.appendSlice(allocator, line);
     }
-    try source.appendSlice(allocator, "  local_4095 := #True\n  return @hole\n");
+    try source.appendSlice(allocator, "  local_4095 := #True\n  break @hole\n");
     var tokens = try lexer.lex(allocator, source.items);
     defer tokens.deinit(allocator);
     var pool: symbols.Pool = .{};

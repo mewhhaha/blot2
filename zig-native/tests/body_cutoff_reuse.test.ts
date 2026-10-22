@@ -29,18 +29,18 @@ const pick = fn (flag: Bool) => fn ~(value: U32) => ${v.pick}
 const bump = fn () => do:
   use old <- State.get U32 ()
   ${v.bump}
-  return old
+  break old
 entry const via_helper = fn (x: U32) -> U32 => helper (helper x)
 entry const lazy = fn (n: U32) -> U32 => pick (n == 0) (40 + 2)
 entry const effects = fn () -> U32 => do:
   let (final, first) = do state:
     use a <- bump ()
     use b <- bump ()
-    return a + b
-  return final + first
+    break a + b
+  break final + first
 entry const unrelated = fn (x: U32) -> U32 => do:
   let add = fn (y: U32) => y + x
-  return add 3
+  break add 3
 `;
   };
   const twice = "use State.set U32 (old + 1)\n  use State.set U32 (old + 2)";

@@ -14,13 +14,13 @@ entry const run = fn (host: U32 -> Array U32 ! {Foreign}) => do:
   use first <- delayed ()
   let pressure = @array.fill 8192 seed
   use second <- alias ()
-  return first[0] + second[0] + pressure[0]
+  break first[0] + second[0] + pressure[0]
 entry const floating = fn (host: F32 -> F32 ! {Foreign}) => do:
   let delayed = keep (host (-0.0))
   let alias = delayed
   use first <- delayed ()
   use second <- alias ()
-  return second
+  break second
 `;
 
 Deno.test("retained demand producer descriptors preserve memo aliases snapshots signed zero cancellation and producer edits", async () => {

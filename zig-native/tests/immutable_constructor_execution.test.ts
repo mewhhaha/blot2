@@ -15,7 +15,7 @@ entry const run = fn (seed: U32) => do:
     let discarded = @array.fill 8192 index
     if discarded[8191] != index:
       @panic "pressure"
-  return #[read original[1], read changed[1], read original[0], read changed[2]]
+  break #[read original[1], read changed[1], read original[0], read changed[2]]
 `,
     (_, bytes) => {
       const module = new WebAssembly.Module(bytes);

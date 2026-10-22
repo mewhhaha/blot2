@@ -36,7 +36,7 @@ fn importedShapes(allocator: std.mem.Allocator) !void {
         \\const provider = @effect.provider (Read {output:F32,input:[U32,Bool]}) (fn value => @u32.to_f32 value)
         \\entry const answer = fn () => do provider:
         \\  use value <- Read {input:[U32,Bool],output:F32} 42
-        \\  return value
+        \\  break value
     ;
     var consumer = try parsedCheck(allocator, consumer_text, &pool, &.{
         .{ .producer = &producer, .kind = .nominal, .name = pool.lookup("Bundle").?, .index = 1, .origin = 0 },

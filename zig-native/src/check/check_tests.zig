@@ -521,7 +521,7 @@ test "annotated higher rank row callbacks retain fresh instances sorted scopes a
 }
 
 fn resourceResultSourceLaw(allocator: std.mem.Allocator) !void {
-    const source = "type State a is effect = {get: Unit -> a, set: a -> Unit}\nentry const answer = fn () => @effect.scope (fn (older: State U32) => do:\n  use escaped <- @effect.scope (fn (younger: State F32) => @resource.scope (fn () => 9) (fn owner => do:\n    let cleanup_capture = younger\n    return ()\n  ) (fn loan => fn () => do:\n    let retained = older\n    return 42\n  ))\n  return escaped ()\n)\n";
+    const source = "type State a is effect = {get: Unit -> a, set: a -> Unit}\nentry const answer = fn () => @effect.scope (fn (older: State U32) => do:\n  use escaped <- @effect.scope (fn (younger: State F32) => @resource.scope (fn () => 9) (fn owner => do:\n    let cleanup_capture = younger\n    break ()\n  ) (fn loan => fn () => do:\n    let retained = older\n    break 42\n  ))\n  break escaped ()\n)\n";
     try rankSourceExpected(allocator, source, true, null);
     const younger = try std.mem.replaceOwned(u8, allocator, source, "let retained = older", "let retained = younger");
     defer allocator.free(younger);
@@ -532,8 +532,8 @@ fn resourceResultSourceLaw(allocator: std.mem.Allocator) !void {
     const cleanup_store = try std.mem.replaceOwned(u8, allocator, source, "let cleanup_capture = younger", "use younger.set 0.0");
     defer allocator.free(cleanup_store);
     try rankSourceExpected(allocator, cleanup_store, false, .cleanup_not_safe);
-    try rankSourceExpected(allocator, "type State a is effect = {get: Unit -> a, set: a -> Unit}\ntype Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}\nentry const answer = fn () => @effect.scope (fn (older: Box) => do:\n  let (state, result) = do (@effect.state older.get older.set (fn () => 0)):\n    return @effect.scope (fn (younger: State U32) => @resource.scope (fn () => 9) (fn owner => do:\n      use older.set (fn () => do:\n        let retained = younger\n        return 42\n      )\n      return ()\n    ) (fn loan => 42))\n  return result\n)\n", false, .cleanup_not_safe);
-    try rankSourceExpected(allocator, "type State a is effect = {get: Unit -> a, set: a -> Unit}\nentry const answer = fn (sink: (Unit -> U32) -> Unit ! {Foreign}) => @effect.scope (fn (younger: State U32) => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => do:\n  use sink (fn () => do:\n    let retained = younger\n    return 42\n  )\n  return 42\n))\n", false, .capability_escape);
+    try rankSourceExpected(allocator, "type State a is effect = {get: Unit -> a, set: a -> Unit}\ntype Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}\nentry const answer = fn () => @effect.scope (fn (older: Box) => do:\n  let (state, result) = do (@effect.state older.get older.set (fn () => 0)):\n    break @effect.scope (fn (younger: State U32) => @resource.scope (fn () => 9) (fn owner => do:\n      use older.set (fn () => do:\n        let retained = younger\n        break 42\n      )\n      break ()\n    ) (fn loan => 42))\n  break result\n)\n", false, .cleanup_not_safe);
+    try rankSourceExpected(allocator, "type State a is effect = {get: Unit -> a, set: a -> Unit}\nentry const answer = fn (sink: (Unit -> U32) -> Unit ! {Foreign}) => @effect.scope (fn (younger: State U32) => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => do:\n  use sink (fn () => do:\n    let retained = younger\n    break 42\n  )\n  break 42\n))\n", false, .capability_escape);
 }
 test "resource callback result footprints preserve older captures and reject younger loan cleanup and sink escapes through OOM" {
     try resourceResultSourceLaw(a);

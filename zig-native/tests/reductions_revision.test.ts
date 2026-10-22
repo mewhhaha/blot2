@@ -17,7 +17,7 @@ entry const run = fn (count: U32) => do:
   let monoid = iter.fold_left add 0 (rolling.monoid add 0 width values)
   let group = iter.fold_left add 0 (rolling.group add (fn value => @u32.sub 0 value) 0 width values)
   let tree = summary.build add 0 values
-  return #[ordered, monoid, group, summary.query add 0 0 count tree]
+  break #[ordered, monoid, group, summary.query add 0 0 count tree]
 `;
 const dependency =
   "const measure = fn (value: U32) -> U32 => @u32.add value 1\n";

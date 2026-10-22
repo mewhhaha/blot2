@@ -18,7 +18,7 @@ const Vec2.length = fn value => sqrt (Vec2.length_squared value)
 // Zero normalizes to zero. Other inputs follow F32 arithmetic.
 const Vec2.normalized = fn value => do:
   let length = Vec2.length value
-  return if length == 0.0 then value else value / length
+  break if length == 0.0 then value else value / length
 
 const Vec3.add: Vec3 -> Vec3 -> Vec3 = fn a => fn b =>
   #Vec3 { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }
@@ -40,4 +40,4 @@ const Vec3.length_squared = fn value => Vec3.dot value value
 const Vec3.length = fn value => sqrt (Vec3.length_squared value)
 const Vec3.normalized = fn value => do:
   let length = Vec3.length value
-  return if length == 0.0 then value else value / length
+  break if length == 0.0 then value else value / length

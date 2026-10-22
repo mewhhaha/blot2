@@ -6,7 +6,7 @@ This is the implemented host boundary. See
 ```blot
 entry const main = fn (advance: U32 -> U32 ! {Foreign}) => do:
   use next <- advance 41
-  return next
+  break next
 ```
 
 ```ts

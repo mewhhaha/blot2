@@ -48,7 +48,7 @@ test "numeric proof intrinsic type names retain complete capitalized segments" {
 }
 
 test "nested do layout, continuations, delimiter closures and final comments" {
-    const source = "const answer = fn () => do:\n  let value = do:\n    return (\n      @u32.add 20\n      22)\n  return value // trailing";
+    const source = "const answer = fn () => do:\n  let value = do:\n    break (\n      @u32.add 20\n      22)\n  break value // trailing";
     var result = try lex(std.testing.allocator, source);
     defer result.deinit(std.testing.allocator);
     try std.testing.expectEqual(@as(usize, 0), result.diagnostics.items.len);
@@ -65,15 +65,15 @@ test "nested do layout, continuations, delimiter closures and final comments" {
     try std.testing.expectEqual(@as(usize, 2), indents);
     try std.testing.expectEqual(indents, dedents);
     try std.testing.expectEqual(@as(usize, 6), newlines);
-    try expectTags("const x = (do:\n  return 1)\n", &.{
-        .kw_const, .identifier, .equal,     .l_paren, .kw_do,   .colon,
-        .newline,  .indent,     .kw_return, .integer, .newline, .dedent,
+    try expectTags("const x = (do:\n  break 1)\n", &.{
+        .kw_const, .identifier, .equal,    .l_paren, .kw_do,   .colon,
+        .newline,  .indent,     .kw_break, .integer, .newline, .dedent,
         .r_paren,  .newline,    .eof,
     });
 }
 
 test "request clause suites and effect operation line boundaries" {
-    const source = "const h = fn c => do:\n  for let r in c:\n    case r of\n      effect State.get unit =>\n        yield 1\n      complete value =>\n        return value\n";
+    const source = "const h = fn c => do:\n  for let r in c:\n    case r of\n      effect State.get unit =>\n        yield 1\n      complete value =>\n        break value\n";
     var result = try lex(std.testing.allocator, source);
     defer result.deinit(std.testing.allocator);
     try std.testing.expectEqual(@as(usize, 0), result.diagnostics.items.len);
@@ -122,9 +122,9 @@ fn expectDiagnostic(source: []const u8, code: Code) !void {
 test "invalid layout, private markers, strings and Unicode report diagnostics" {
     try expectDiagnostic("const f = fn () => do:\n\treturn 1", .layout_tab);
     try expectDiagnostic("  const f = 1", .layout_indent);
-    try expectDiagnostic("const f = fn () => do:\n  let a = 1\n return a", .layout_dedent);
-    try expectDiagnostic("const f = fn () => do:\nreturn 1", .layout_suite);
-    try expectDiagnostic("const f = fn () =>\n  do:\n  return 1", .layout_suite);
+    try expectDiagnostic("const f = fn () => do:\n  let a = 1\n break a", .layout_dedent);
+    try expectDiagnostic("const f = fn () => do:\nbreak 1", .layout_suite);
+    try expectDiagnostic("const f = fn () =>\n  do:\n  break 1", .layout_suite);
     try expectDiagnostic("// \u{e000}", .reserved_layout);
     try expectDiagnostic("const s = ·name", .reserved_selector_marker);
     try expectDiagnostic("import { a } froM \"a\"", .reserved_import_marker);
@@ -158,11 +158,11 @@ test "numeric validation preserves U32 and exact F32 rounding" {
 }
 
 fn allocationScenario(allocator: Allocator) !void {
-    const source = "// π\nimport { value } from \"mod\"\nconst result: U32 = fn () => do:\n  let x = 1_0.0e-1\n  return value\n";
+    const source = "// π\nimport { value } from \"mod\"\nconst result: U32 = fn () => do:\n  let x = 1_0.0e-1\n  break value\n";
     var result = try lex(allocator, source);
     defer result.deinit(allocator);
     try std.testing.expectEqual(@as(usize, 0), result.diagnostics.items.len);
-    var invalid = try lex(allocator, "const f = fn () => do:\n return \"\\q\"");
+    var invalid = try lex(allocator, "const f = fn () => do:\n break \"\\q\"");
     defer invalid.deinit(allocator);
     try std.testing.expect(invalid.diagnostics.items.len != 0);
 }
@@ -174,7 +174,7 @@ test "all lexer allocation failures release tokens, trivia and scratch" {
 test "mixed line endings preserve layout tags and original byte spans" {
     const lines = [_][]const u8{
         "// leading comment", "const before = 1", "const answer = fn () => do:",
-        "  let value = do:",  "    return 41",    "  return @u32.add value 1",
+        "  let value = do:",  "    break 41",     "  break @u32.add value 1",
         "",
     };
     var expected: std.ArrayList(Tag) = .empty;
@@ -198,7 +198,7 @@ test "mixed line endings preserve layout tags and original byte spans" {
             for (result.tokens.items, expected.items) |current, tag| try std.testing.expectEqual(tag, current.tag);
         };
         for (result.tokens.items) |current| {
-            if (current.tag == .kw_return) try std.testing.expectEqualStrings("return", current.text(source.items));
+            if (current.tag == .kw_break) try std.testing.expectEqualStrings("break", current.text(source.items));
         }
     }
 }

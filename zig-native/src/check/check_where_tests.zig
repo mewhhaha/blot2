@@ -32,7 +32,7 @@ const source =
     \\const replace: a -> b -> c where { update "value" a b c } = fn box => fn value => do:
     \\  let current = box
     \\  current.value := value
-    \\  return current
+    \\  break current
     \\const read: Unit -> a ! {| e} where { operation Signal.get a } = fn () => Signal.get a ()
     \\const identity: a -> a where { type_rep a } = fn value => value
     \\let started: U32 where { effect_rep ! {} } = 7
@@ -42,7 +42,7 @@ const source =
     \\  let represented: U32 where { type_rep U32 } = 42
     \\  let choose: a -> a where { type_rep a } = fn value => value
     \\  let first = choose represented
-    \\  return @u32.add (choose first) (@f32.to_u32 (choose 0.0))
+    \\  break @u32.add (choose first) (@f32.to_u32 (choose 0.0))
     \\const _fixity_add = fn left => fn right => @type.call "add" left right
 ;
 
@@ -139,8 +139,8 @@ fn rejectionLaws(allocator: std.mem.Allocator) !void {
         .{ .source = "type Reader is effect = { get: Unit -> U32 }\nentry const answer: U32 where { operation Reader.get } = 42\n", .code = .invalid_constraint, .marker = "operation" },
         .{ .source = "type Signal a is effect = { get: Unit -> a }\nentry const answer: U32 where { operation (Signal.get) U32 } = 42\n", .code = .invalid_constraint, .marker = "operation" },
         .{ .source = "entry const answer: U32 where { effect_rep ! {Missing} } = 42\n", .code = .unknown_effect, .marker = "effect_rep" },
-        .{ .source = "const replace: a -> b -> c where {} = fn box => fn value => do:\n  let current = box\n  current.value := value\n  return current\nentry const answer = 42\n", .code = .missing_predicate, .marker = ".value" },
-        .{ .source = "infixl 60 (+) = _fixity_add\nconst twice: a -> a where { associated \"add\" a a a } = fn value => value + value\nentry const answer = fn () => do:\n  let selected = case #True of\n    #True => twice\n    #False => twice\n  return @f32.add (@u32.to_f32 (selected 21)) (selected 1.5)\nconst _fixity_add = fn left => fn right => @type.call \"add\" left right\n", .code = .type_mismatch, .marker = "selected 1.5" },
+        .{ .source = "const replace: a -> b -> c where {} = fn box => fn value => do:\n  let current = box\n  current.value := value\n  break current\nentry const answer = 42\n", .code = .missing_predicate, .marker = ".value" },
+        .{ .source = "infixl 60 (+) = _fixity_add\nconst twice: a -> a where { associated \"add\" a a a } = fn value => value + value\nentry const answer = fn () => do:\n  let selected = case #True of\n    #True => twice\n    #False => twice\n  break @f32.add (@u32.to_f32 (selected 21)) (selected 1.5)\nconst _fixity_add = fn left => fn right => @type.call \"add\" left right\n", .code = .type_mismatch, .marker = "selected 1.5" },
     };
     for (cases) |item| {
         var tokens = try lexer.lex(allocator, item.source);
@@ -170,7 +170,7 @@ fn recursiveLaws(allocator: std.mem.Allocator) !void {
             \\infixl 60 (+) = _fixity_add
             \\const first: a -> a = fn value => do:
             \\  let alias: a -> a where {{ {s} }} = second
-            \\  return alias value
+            \\  break alias value
             \\const second: a -> a = fn value => third value
             \\const third: a -> a = fn value => case #True of
             \\  #True => value + value
@@ -242,7 +242,7 @@ fn ownedTemplateLaws(allocator: std.mem.Allocator) !void {
         \\entry const answer = fn () => do:
         \\  let local = alias
         \\  let integer = local 20
-        \\  return @u32.add integer (@f32.to_u32 (local 1.0))
+        \\  break @u32.add integer (@f32.to_u32 (local 1.0))
         \\const _fixity_add = fn left => fn right => @type.call "add" left right
     ;
     var tokens = try lexer.lex(allocator, text);
@@ -279,10 +279,10 @@ fn changingUpdateLaws(allocator: std.mem.Allocator) !void {
         \\const change = fn (box: Box (U32, Bool)) => do:
         \\  let current = box
         \\  current.value := 42.0
-        \\  return current
+        \\  break current
         \\entry const answer = fn () => do:
         \\  let #Box {value, keep} = change (#Box {value: 20, keep: #True})
-        \\  return @f32.to_u32 value
+        \\  break @f32.to_u32 value
     ;
     var tokens = try lexer.lex(allocator, text);
     defer tokens.deinit(allocator);

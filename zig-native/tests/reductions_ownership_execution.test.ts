@@ -17,9 +17,9 @@ const cycle = fn () => do:
     use State.set (#Next delayed)
     use ready <- delayed ()
     use State.set #End
-    return ready
+    break ready
   )
-  return result
+  break result
 const combine = fn (left: {sum: U32, node: Node}) => fn (right: {sum: U32, node: Node}) => {sum: @u32.add left.sum right.sum, node: left.node}
 const inverse = fn (value: {sum: U32, node: Node}) => {sum: @u32.sub 0 value.sum, node: value.node}
 const add = fn (left: U32) => fn (right: U32) => @u32.add left right
@@ -27,19 +27,19 @@ const validate = fn (node: Node) => case node of
   #End => @panic "summary lost its cycle"
   #Next delayed => do:
     let (_, value) = @effect.run State.get State.set #End (fn () => delayed ())
-    return case value of
+    break case value of
       #End => @panic "summary lost its ready memo"
       #Next _ => 0
 entry const monoid = fn (count: U32) => do:
   let node = cycle ()
   let values = iter.map (fn index => {sum: index, node}) (iter.range 0 count)
   let total = iter.fold_left (fn total => fn value => @u32.add total value.sum) 0 (rolling.monoid combine {sum: 0, node} 31 values)
-  return @u32.add total (validate node)
+  break @u32.add total (validate node)
 entry const group = fn (count: U32) => do:
   let node = cycle ()
   let values = iter.map (fn index => {sum: index, node}) (iter.range 0 count)
   let total = iter.fold_left (fn total => fn value => @u32.add total value.sum) 0 (rolling.group combine inverse {sum: 0, node} 31 values)
-  return @u32.add total (validate node)
+  break @u32.add total (validate node)
 entry const update = fn (count: U32) => do:
   let node = cycle ()
   let initial = {sum: 0, node}
@@ -49,7 +49,7 @@ entry const update = fn (count: U32) => do:
     tree := summary.set combine (@u32.rem index 31) {sum: 1, node} self
   let old = summary.query combine initial 0 31 original
   let current = summary.query combine initial 0 31 tree
-  return @u32.add (@u32.add old.sum current.sum) (validate current.node)
+  break @u32.add (@u32.add old.sum current.sum) (validate current.node)
 entry const memory = fn () -> Array U32 => #[]
 `,
     (_, bytes) => {

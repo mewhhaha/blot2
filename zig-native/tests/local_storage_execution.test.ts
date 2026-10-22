@@ -30,7 +30,7 @@ entry const loop = fn (limit: U32) => do:
   for ever:
     let (state, request) = pending
     if @u32.eq index limit:
-      return case state of
+      break case state of
         #Nothing => request[0]
         #Just value => @u32.add value request[0]
     pending := (#Just index, #[@u32.add index 2])
@@ -40,7 +40,7 @@ entry const branch = fn (value: U32) => do:
   if @u32.lt 0 value:
     pending := (#Just value, #[2])
   let (state, request) = pending
-  return case state of
+  break case state of
     #Nothing => request[0]
     #Just item => @u32.add item request[0]
 `;
@@ -86,7 +86,7 @@ Deno.test("single-use local creators preserve selected scalar and reference fiel
 entry const run = fn (seed: ${type}) => do:
   let stored = box (fn value => {item: value})
   let #Box mapper = stored
-  return ${read}
+  break ${read}
 `,
       (guest, bytes) => {
         const module = new WebAssembly.Module(bytes);
@@ -118,7 +118,7 @@ entry const run = fn (seed: U32) => do:
   let stored = box (fn value => {item: value})
   let scalar = (get stored seed).item
   let reference = (get stored #[seed, 8192]).item
-  return @u32.add scalar reference[0]
+  break @u32.add scalar reference[0]
 `,
     (guest, bytes) => {
       const module = new WebAssembly.Module(bytes);
@@ -137,7 +137,7 @@ Deno.test("captured closed generic local storage retains its static value and ch
 entry const run = fn (seed: U32) => do:
   let stored = box (fn value => {item: value})
   let read = fn (value: U32) => (get stored value).item
-  return read seed
+  break read seed
 `,
     (guest, bytes) => {
       const module = new WebAssembly.Module(bytes);
@@ -156,7 +156,7 @@ Deno.test("local storage promotion preserves runtime captures traps and eager ho
 type Phantom value is data = #Phantom
 entry const run = fn () => do:
   let stored: Box (Phantom (unique U32)) = box #Phantom
-  return ()
+  break ()
 `,
     "multiplicity_unknown",
     undefined,
@@ -168,7 +168,7 @@ entry const run = fn () => do:
 entry const run = fn (seed: U32) => do:
   let stored = box (fn value => {item: @u32.add value seed})
   let #Box mapper = stored
-  return (mapper 3).item
+  break (mapper 3).item
 `,
     (guest) => {
       assert.equal(guest.call("run", 10), 13);
@@ -182,7 +182,7 @@ entry const run = fn (seed: U32) => do:
 entry const run = fn (seed: U32) => do:
   let stored = box (fn value => {item: @u32.div value 0})
   let #Box mapper = stored
-  return (mapper seed).item
+  break (mapper seed).item
 `,
     (guest) => {
       assert.throws(() => guest.call("run", 7), WebAssembly.RuntimeError);
@@ -195,7 +195,7 @@ entry const run = fn (seed: U32) => do:
 entry const run = fn (seed: U32) => do:
   let stored = box ((fn value => {item: value}), @u32.div seed 0)
   let #Box (mapper, _) = stored
-  return (mapper 7).item
+  break (mapper 7).item
 `,
     (guest) => {
       assert.throws(() => guest.call("run", 7), WebAssembly.RuntimeError);
@@ -210,7 +210,7 @@ entry const run = fn (host: Unit -> U32 ! {Foreign}) => do:
   use stored <- box ((fn value => {item: value}), host ())
   let #Box (mapper, during) = stored
   use after <- host ()
-  return @u32.add (@u32.mul before 100) (@u32.add (@u32.mul during 10) (@u32.add after (mapper 7).item))
+  break @u32.add (@u32.mul before 100) (@u32.add (@u32.mul during 10) (@u32.add after (mapper 7).item))
 `,
     async (_guest, bytes) => {
       for (const asynchronous of [false, true]) {
@@ -267,7 +267,7 @@ entry const run = fn (seed: U32) => do:
   let stored = box (fn value => {item: value})
   let read = fn (value: U32) => @u32.add (get stored value).item (stamp stored)
   let reference = (get stored #[seed, 8192]).item
-  return @u32.add (read seed) reference[0]
+  break @u32.add (read seed) reference[0]
 `;
   const observe = async (bytes: Uint8Array<ArrayBuffer>, expected: number) => {
     const module = new WebAssembly.Module(bytes);

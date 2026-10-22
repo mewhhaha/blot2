@@ -35,7 +35,7 @@ entry const run = fn (count: U32) => do:
     let ${binding} = @cursor.value cursor
     total := @f32.add self (${sum})
     cursor := @cursor.advance self
-  return total
+  break total
 entry const probe = fn (seed: U32) => #[seed]
 `,
         (guest) => {
@@ -73,7 +73,7 @@ entry const run = fn (count: U32) => do:
   let index = 0
   for ever:
     if @u32.eq index count:
-      return @u32.add total (@cursor.value original).y
+      break @u32.add total (@cursor.value original).y
     let garbage = @array.fill 8192 index
     let row = @cursor.value cursor
     total := @u32.add self (@u32.add row.x (@cursor.value right).x)
@@ -116,7 +116,7 @@ entry const run = fn (count: U32) => do:
       break
     let garbage = @array.fill 8192 index
     index := @u32.add self 1
-  return #[(@cursor.value readers[0]).x, (@cursor.value readers[1]).x,
+  break #[(@cursor.value readers[0]).x, (@cursor.value readers[1]).x,
     (@cursor.value (@cursor.advance first)).x, selected (), (@cursor.value first).bits]
 `,
     (guest) => {
@@ -144,7 +144,7 @@ entry const run = fn (host: U32 -> U32 ! {Foreign}) => do:
     use value <- host row.x
     total := @u32.add self value
     cursor := @cursor.advance self
-  return #[total, (@cursor.value original).y]
+  break #[total, (@cursor.value original).y]
 `,
     async (guest) => {
       let reject = false;

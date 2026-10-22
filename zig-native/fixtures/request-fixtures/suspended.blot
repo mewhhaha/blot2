@@ -6,15 +6,15 @@ const checked = fn stop => fn computation => do:
     case request of
       effect Validate.check value =>
         if @u32.eq stop 1:
-          return 40
+          break 40
         yield 42
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let delayed = keep (Validate.check 0)
   let calculation = @computation (fn () => delayed ())
   let cancelled = checked 1 calculation
   let completed = checked 0 calculation
-  return @u32.add cancelled completed
+  break @u32.add cancelled completed
 
 entry const expected = answer ()

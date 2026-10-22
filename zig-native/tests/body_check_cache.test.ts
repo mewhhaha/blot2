@@ -948,7 +948,7 @@ const helper = fn (value: U32) -> U32 => do:
     count := ${operation} self seed
   else:
     count := @u32.add self 1
-  return case count of
+  break case count of
     0 => seed
     result => @u32.add result seed
 entry const run = fn (value: U32) -> U32 => helper value
@@ -1095,10 +1095,10 @@ const helper = fn callback => fn (value: U32) => do:
   let apply = fn action => fn argument => action ${argument}
   let fraction = identity 3.0
   let owning = identity #[value]
-  return @u32.add (apply callback (${genericSpine("value")})) seed
+  break @u32.add (apply callback (${genericSpine("value")})) seed
 const copy = fn (value: Array U32) -> Array U32 => do:
   let identity = fn item => item
-  return identity (${genericSpine("value")})
+  break identity (${genericSpine("value")})
 entry const run = fn (host: U32 -> U32 ! {Foreign}) => helper host 42
 entry const packed = fn (value: U32) => copy #[value, seed]
 `;
@@ -1448,7 +1448,7 @@ ${extra}const twice = fn value => do:
   let local = fn amount => @type.call "${member}" (${
       genericSpine("amount")
     }) amount
-  return local value
+  break local value
 entry const unsigned = fn (value: U32) => read (twice (make value))
 entry const floating = fn (value: F32) => read_float (twice (make_float value))
 entry const packed = fn (value: U32) => read_numbers (twice (make_numbers #[value, @u32.add value 1]))
@@ -1545,7 +1545,7 @@ const Number.add${annotation} = fn (#Number left) => fn (#Number right) => #Numb
     `import {Number, make, read} from "./numbers"
 ${prefix}const twice = fn value => do:
   let local = fn amount => @type.call "add" (${genericSpine("amount")}) amount
-  return ${name} value
+  break ${name} value
 const require_pure = fn (callback: U32 -> U32) => callback 40
 entry const run = fn (value: U32) => read (twice (make value))
 entry const strict = fn () => require_pure run
@@ -1642,7 +1642,7 @@ const Number.from = fn (value: U32) => #Number (@u32.add value ${increment})
 const read = fn (#Number value) => value
 const convert = fn (value: U32) -> Number => do:
   let local = fn amount => @type.result "${member}" (${genericSpine("amount")})
-  return local value
+  break local value
 entry const run = fn (value: U32) => read (convert value)
 `;
   const retained = await createZigProjectCompiler({
@@ -1715,7 +1715,7 @@ const read = fn (value: Input) => (value).value
 const Input.add = fn (#Input { value: left, callback: invoke }) => fn (#Input { value: right, callback: ignored }) => #Input { value: invoke (${operation} left right), callback: invoke }
 const twice = fn value => do:
   let local = fn amount => @type.call "add" (${genericSpine("amount")}) amount
-  return local value
+  break local value
 entry const run = fn (callback: Host) => read (twice (make callback))
 `;
   const retained = await createZigProjectCompiler({
@@ -1812,7 +1812,7 @@ const twice = fn value => do:
       genericSpine("amount")
     }
   let local: a -> a where { associated "${clause}" a a a } = fn amount => @type.call "add" amount amount
-  return identity (local value)
+  break identity (local value)
 const require_pure = fn (callback: U32 -> U32) => callback 40
 entry const run = fn (value: U32) => read (twice (make value))
 entry const strict = fn () => require_pure run
@@ -1898,7 +1898,7 @@ const read = fn (#Number value) => value
 const Number.add${annotation} = fn (#Number left) => fn (#Number right) => #Number (${operation} left right)
 const factory = fn amount => do:
   let local: a -> a where { associated "${clause}" a a a } = fn value => @type.call "add" value value
-  return local amount
+  break local amount
 `;
   };
   const source = (prefix = "", factory = "factory") =>
@@ -2033,7 +2033,7 @@ const read = fn (#Number value) => value
 const Number.add${annotation} = fn (#Number left) => fn (#Number right) => #Number (${operation} left right)
 const factory = fn amount => do:
   let local: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
-  return local amount
+  break local amount
 type Box is data = #Box {payload: Number, tail: Array U32}
 const make_box = fn value => #Box {payload: make value, tail: #[value, @u32.add value 1]}
 const scalar = fn (value: U32) => @u32.add value 2
@@ -2057,10 +2057,10 @@ entry const strict = fn () => require_pure run
 entry const primitive = fn (value: U32) => exposed (${genericSpine("value")})
 entry const shape = fn (value: U32) => do:
   let chosen = ${genericSpine("(make_box value)")}
-  return read chosen.payload
+  break read chosen.payload
 entry const owned = fn (value: U32) => do:
   let chosen = ${genericSpine("(make_box value)")}
-  return chosen.tail
+  break chosen.tail
 `;
   };
   async function pack(inserted = false, target = "numbers") {
@@ -2219,10 +2219,10 @@ const make = fn value => #Wrapper {value, owning: #[value, @u32.add value 1]}
 const hold = fn (value: ${head} U32) => ${genericSpine("value")}
 entry const run = fn (value: U32) => do:
   let #${constructor} {value: result, owning: items} = hold (${make} value)
-  return @u32.add result (@array.length items)
+  break @u32.add result (@array.length items)
 entry const owned = fn (value: U32) => do:
   let #${constructor} {value: result, owning: items} = hold (${make} value)
-  return items
+  break items
 `;
   };
   async function pack(mode: string, inserted = false) {
@@ -2382,7 +2382,7 @@ const twice = fn amount => ${twice}
     return `${imports(inserted)}const pipeline = fn value => do:
   let local = fn amount => ${target} (${genericSpine("amount")})
   let relay = fn amount => local amount
-  return relay value
+  break relay value
 const require_pure = fn (callback: U32 -> U32) => callback 40
 entry const run = fn (value: U32) => read (pipeline (make value))
 entry const strict = fn () => require_pure run
@@ -2807,7 +2807,7 @@ ${member}`;
 ${prefix}const extract${requirement} = fn value => ${getter}
 ${methodGetter}const scoped = fn value => do:
   let local${requirement} = fn row => ${local}
-  return local value
+  break local value
 const require_pure = fn (callback: U32 -> U32) => callback 40
 entry const selected = fn (value: U32) => ${
       declared ? "method_extract" : "extract"
@@ -3017,25 +3017,25 @@ const choose = fn (value: Maybe U32) => do:
     result := @u32.add (${genericSpine("amount")}) seed
   else:
     result := ${fallback}
-  return result
+  break result
 const pack = fn (value: Maybe (Array U32)) => do:
   let result = #[seed]
   if let #Some amount = value:
     result := @array.identity (${genericSpine("amount")})
-  return result
+  break result
 const negative = fn (value: F32) => -(${genericSpine("value")})
 const matching = fn (value: U32) => do:
   if let ^seed = value:
-    return 1
-  return 0
+    break 1
+  break 0
 const collected = fn (value: U32) => @array.slice (@array.concat (@array.prepend (@array.append #[value] seed) seed) (@array.fill 2 value)) 0 3
 const listed = fn (value: U32) => @list.from_array (@array.from_list (@list.append [value] seed))
 const generated = fn (value: U32) => @array.generate 2 (fn (index: U32) => @u32.add value index)
 const projected = fn (value: U32) => @product.get (3.0, value) 1
 const action = fn callback => fn (value: Maybe U32) => do:
   if let #Some amount = value:
-    return callback (${genericSpine("amount")})
-  return callback seed
+    break callback (${genericSpine("amount")})
+  break callback seed
 entry const fraction = fn (value: F32) => negative value
 entry const matched = fn (value: U32) => matching value
 entry const collection = fn (value: U32) => collected value

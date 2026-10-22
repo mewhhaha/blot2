@@ -8,19 +8,19 @@ const source = `
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 entry const operation = fn () => @effect.scope (fn (s: State U32) => do:
   let (state, result) = do (@effect.state s.get s.set 7):
-    return (fn callback => callback ()) s.get
-  return result
+    break (fn callback => callback ()) s.get
+  break result
 )
 entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (s: State U32) => do:
   use nested <- do (@effect.state s.get s.set 7):
-    return (fn callback => callback ()) (fn () => do:
+    break (fn callback => callback ()) (fn () => do:
       use previous <- s.get ()
       use next <- host previous
       use s.set next
-      return s.get ()
+      break s.get ()
     )
   let (state, result) = nested
-  return result
+  break result
 )
 `;
 for (const codegenTier of ["optimized", "development"] as const) {

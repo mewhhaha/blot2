@@ -28,10 +28,10 @@ const cases = [_]Case{
     .{ .source = "const answer=@u32.add 4294967296\n", .code = .call_arity, .point = 13 }, // primitive-arity-overflow
     .{ .source = "const answer=@u32.add missing 4294967296\n", .code = .unknown_value, .point = 22 }, // primitive-first-name-overflow
     .{ .source = "const answer=@u32.add 4294967296 missing\n", .code = .integer_range, .point = 22 }, // primitive-first-overflow-name
-    .{ .source = "const answer=do:\n  return 42\n  4294967296\n", .code = .unreachable_statement, .point = 31 }, // unreachable-overflow
-    .{ .source = "const answer=do:\n  return missing\n  4294967296\n", .code = .unreachable_statement, .point = 36 }, // unreachable-name-overflow
-    .{ .source = "const answer=do:\n  return 4294967296\n  42\n", .code = .unreachable_statement, .point = 39 }, // return-overflow-unreachable
-    .{ .source = "const answer=do:\n  saved:=4294967296\n  return 42\n", .code = .unknown_rebinding, .point = 19 }, // rebind-overflow
+    .{ .source = "const answer=do:\n  break 42\n  4294967296\n", .code = .unreachable_statement, .point = 30 }, // unreachable-overflow
+    .{ .source = "const answer=do:\n  break missing\n  4294967296\n", .code = .unreachable_statement, .point = 35 }, // unreachable-name-overflow
+    .{ .source = "const answer=do:\n  break 4294967296\n  42\n", .code = .unreachable_statement, .point = 38 }, // return-overflow-unreachable
+    .{ .source = "const answer=do:\n  saved:=4294967296\n  break 42\n", .code = .unknown_rebinding, .point = 19 }, // rebind-overflow
     .{ .source = "const answer=fn value=>case value of\n  4294967296=>42\n  _=>0\n", .code = .integer_range, .point = 39 }, // case-pattern-overflow
     .{ .source = "const answer=fn value=>case value of\n  0=>missing\n  4294967296=>42\n  _=>0\n", .code = .unknown_value, .point = 42 }, // case-first-body-name-later-pattern
     .{ .source = "const answer=case missing of\n  4294967296=>42\n  _=>0\n", .code = .unknown_value, .point = 18 }, // case-subject-name-overflow
@@ -72,7 +72,7 @@ const cases = [_]Case{
     .{ .source = "@[42]\ninfixl 4294967296 (+)=add\nconst add=fn left=>fn right=>@u32.add left right\n", .code = .integer_range, .point = 13 }, // fixity-attribute-overflow
     .{ .source = "@[4294967296]\ninfixl 60 (+)=add\nconst add=fn left=>fn right=>@u32.add left right\n", .code = .unsupported_attribute, .point = 0 }, // fixity-attribute-literal-overflow
     .{ .source = "import * as dependency from \"./missing\"\nconst answer:Missing=4294967296\n", .code = .module_loader_required, .point = 0 }, // explicit-type-import-overflow
-    .{ .source = "const answer=do:\n  let 4294967296=42 else:\n    return 0\n  return 42\n", .code = .integer_range, .point = 23 }, // local-pattern-overflow
+    .{ .source = "const answer=do:\n  let 4294967296=42 else:\n    break 0\n  break 42\n", .code = .integer_range, .point = 23 }, // local-pattern-overflow
     .{ .source = "type Box a is data=#Box a\nconst first=4294967296\nconst later=Box {value:U32}\n", .code = .constructor_marker, .point = 61 }, // nominal-record-known-types
     .{ .source = "type Box {value:a} is data=#Box a\nconst first=4294967296\nconst later=Box {value:U32}\n", .code = .constructor_marker, .point = 69 }, // nominal-record-structured-pattern
     .{ .source = "type Box a is data=#Box a\nconst first=4294967296\nconst later=Box Missing\n", .code = .unknown_value, .point = 65 }, // nominal-bare-argument-unknown

@@ -42,8 +42,8 @@ for (const asynchronous of [false, true]) {
       paths + deepPaths + `
 const long = path.make (fn source => do:
   if @u32.eq source.x 0:
-    return 7
-  return ${longGetter})
+    break 7
+  break ${longGetter})
   (fn replacement => fn source => @record.merge source { x: replacement })
 entry const deep = fn (input: U32) => do:
   let original = ${
@@ -54,10 +54,10 @@ entry const deep = fn (input: U32) => do:
         )
       }
   let changed = path.set p12 2.5 original
-  return @f32.add (path.get p12 changed) (@u32.to_f32 (original.callback 2))
+  break @f32.add (path.get p12 changed) (@u32.to_f32 (original.callback 2))
 entry const large = fn (input: U32) => do:
   let original = { x: input, callback: fn value => @u32.add value input }
-  return @u32.add input (path.get long original)
+  break @u32.add input (path.get long original)
 entry const closed = fn (input: U32) => path.get p12 ${
         nestedSource(12, "{ x: input, callback: #False }", "#False")
       }
@@ -70,7 +70,7 @@ entry const effects = fn (send: U32 -> U32 ! {Foreign}) => do:
         )
       }
   let changed = path.set p12 2.5 original
-  return @f32.add (path.get p12 changed) (@u32.to_f32 (changed.callback 2))
+  break @f32.add (path.get p12 changed) (@u32.to_f32 (changed.callback 2))
 `,
       async (guest) => {
         const call = asynchronous ? guest.callAsync : guest.call;
@@ -112,16 +112,16 @@ entry const answer = fn (input: U32) => do:
   let original: { position: { x: U32, y: U32 }, health: U32, callback: U32 -> U32 } = { position: { x: input, y: 7 }, health: 3, callback: fn value => @u32.add value input }
   let changed = path.set position_x 2.5 original
   let again = path.modify position_x (fn value => @f32.add value 0.5) changed
-  return @f32.add (path.get position_x again) (@u32.to_f32 (@u32.add original.position.x again.health))
+  break @f32.add (path.get position_x again) (@u32.to_f32 (@u32.add original.position.x again.health))
 entry const captured = fn (input: U32) => do:
   let original = { position: { x: input, y: 7 }, callback: fn value => @u32.add value input }
   let changed = path.set position_x #True original
-  return changed.callback 2
+  break changed.callback 2
 entry const associated = fn (input: U32) => do:
   let original = { wrapped: { position: { x: input, y: 7 }, health: 3 }, kept: 9 }
   let a = path.set left 2.5 original
   let b = path.set right 2.5 original
-  return @f32.add (path.get left a) (path.get right b)
+  break @f32.add (path.get left a) (path.get right b)
 entry const whole = fn (input: U32) => path.set path.identity (@u32.add input 2) #False
 entry const empty = fn (input: U32) => path.get path.identity input
 `,
@@ -149,7 +149,7 @@ entry const answer = fn (send: U32 -> U32 ! {Foreign}) => do:
   let original = { position: { x: 40, y: 7 }, callback: fn value => send value }
   let changed = path.set position_x 2.5 original
   let focus = path.get position_x changed
-  return @f32.add focus (@u32.to_f32 (changed.callback 2))
+  break @f32.add focus (@u32.to_f32 (changed.callback 2))
 `,
       async (guest) => {
         const calls: number[] = [];
@@ -176,11 +176,11 @@ entry const answer = fn (send: U32 -> U32 ! {Foreign}) => do:
       paths + `
 entry const answer = fn (send: U32 -> U32 ! {Foreign}) => do:
   use original <- do:
-    return { position: { x: send 1, y: 7 }, health: 3 }
+    break { position: { x: send 1, y: 7 }, health: 3 }
   use changed <- do:
-    return path.set position_x (send 2) original
+    break path.set position_x (send 2) original
   use modified <- path.modify position_x (fn value => send value) changed
-  return @u32.add modified.position.x (@u32.add original.position.x modified.health)
+  break @u32.add modified.position.x (@u32.add original.position.x modified.health)
 `,
       async (guest) => {
         const calls: number[] = [];
@@ -250,13 +250,13 @@ Deno.test("typed path dependencies and checkpoints preserve edited output and fa
     await Deno.writeTextFile(library, librarySource);
     await Deno.writeTextFile(
       entry,
-      `import * as path from "std/path"\nimport { position_x, p4 } from "./library"\nentry const answer = fn (input: U32) => do:\n  let original = { position: { x: input, y: 7 }, health: 3, callback: fn value => @u32.add value input }\n  let changed = path.set position_x 2.5 original\n  return @f32.add (path.get position_x changed) (@u32.to_f32 original.position.x)\nentry const deep = fn (input: U32) => do:\n  let original = ${
+      `import * as path from "std/path"\nimport { position_x, p4 } from "./library"\nentry const answer = fn (input: U32) => do:\n  let original = { position: { x: input, y: 7 }, health: 3, callback: fn value => @u32.add value input }\n  let changed = path.set position_x 2.5 original\n  break @f32.add (path.get position_x changed) (@u32.to_f32 original.position.x)\nentry const deep = fn (input: U32) => do:\n  let original = ${
         nestedSource(
           4,
           "{ x: input, callback: fn value => @u32.add value input }",
           "fn value => @u32.add value input",
         )
-      }\n  let changed = path.set p4 2.5 original\n  return path.get p4 changed\n`,
+      }\n  let changed = path.set p4 2.5 original\n  break path.get p4 changed\n`,
     );
     const packed = await new Deno.Command(executable, {
       args: [

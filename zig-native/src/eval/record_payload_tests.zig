@@ -193,26 +193,26 @@ const generic_record_source =
     \\const invoke = fn callback => callback 1
     \\const sum = fn packed => fn (left: U32) => fn (right: U32) => do:
     \\  let #Pack { selected } = packed
-    \\  return selected (@u32.add left right)
+    \\  break selected (@u32.add left right)
     \\const run = fn packed => fn (value: U32) => invoke (fn extra => do:
     \\  let #Pack { selected } = packed
-    \\  return selected (@u32.add value extra))
+    \\  break selected (@u32.add value extra))
     \\entry const answer = fn (value: U32) => run packed value
     \\entry const partial = fn (value: U32) => invoke (sum packed value)
     \\entry const chain = fn (value: U32) => do:
     \\  let callback = sum packed
-    \\  return invoke (callback value)
+    \\  break invoke (callback value)
 ;
 const curried_record_source =
     \\type Clock is effect = { tick: Unit -> U32 }
     \\type Pack callback is data = #Pack { callback: callback, marker: U32 }
     \\const prepare = fn (amount: U32) => fn (value: U32) => do:
     \\  use current <- Clock.tick ()
-    \\  return @u32.add current (@u32.add value amount)
+    \\  break @u32.add current (@u32.add value amount)
     \\const packed = #Pack { callback: prepare, marker: 42 }
     \\const read = fn pack => do:
     \\  let #Pack { marker } = pack
-    \\  return marker
+    \\  break marker
     \\entry const answer = fn () => read packed
 ;
 fn retainedRecordEmission(allocator: std.mem.Allocator, module: *const core.Module) !void {

@@ -117,7 +117,7 @@ entry const fold = fn count => do:
     if value == count:
       break
     sum := self + value
-  return sum
+  break sum
 entry const generate = fn count => @array.generate count (fn index => index * 3 + 1)
 `;
 const guests: Awaited<ReturnType<typeof instantiateGuest>>[] = [];

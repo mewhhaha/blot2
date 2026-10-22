@@ -72,13 +72,13 @@ for (const codegenTier of ["development", "optimized"] as const) {
             if (index === 2) {
               source = source.replace(
                 "fn (#Token value) => value",
-                "fn (#Token value) => do:\n  let fresh_private_adjustment = @u32.add value 0\n  return fresh_private_adjustment",
+                "fn (#Token value) => do:\n  let fresh_private_adjustment = @u32.add value 0\n  break fresh_private_adjustment",
               );
             }
             if (index === 3) {
               source = source.replace(
                 "fn value => #Token (@u32.add value offset)",
-                "fn value => do:\n  let fresh_private_adjustment = @u32.add value 0\n  return #Token (@u32.add fresh_private_adjustment offset)",
+                "fn value => do:\n  let fresh_private_adjustment = @u32.add value 0\n  break #Token (@u32.add fresh_private_adjustment offset)",
               );
             }
             const sources = { [tokens]: source };

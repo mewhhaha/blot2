@@ -39,7 +39,7 @@ pub const records_source =
     \\type Vec2 is data = #Vec2 { x: F32, y: F32 }
     \\const sum = fn point => do:
     \\  let #Vec2 { x, y } = point
-    \\  return x + y
+    \\  break x + y
     \\const origin = #Vec2 { y: 2.0, x: 20.0 }
     \\entry const answer = fn () -> F32 => sum origin
     \\entry const projected = fn () -> F32 => origin.x
@@ -75,10 +75,10 @@ test "generic nominal payloads and shaped annotations retain principal variables
         \\type Pair [left, right] is data = #Pair (left, right)
         \\const unbox = fn box => do:
         \\  let #Box value = box
-        \\  return value
+        \\  break value
         \\const first = fn (pair: Pair [U32, a]) => do:
         \\  let #Pair (value, _) = pair
-        \\  return value
+        \\  break value
         \\entry const integer = fn () => unbox (#Box 42)
         \\entry const floating = fn () => unbox (#Box 1.25)
         \\entry const paired = fn () => first (#Pair (42, #True))
@@ -224,7 +224,7 @@ fn nominalAllocationScenario(allocator: std.mem.Allocator) !void {
         \\entry const answer = do:
         \\  let point = combine (#Point {x:20}) (#Point {x:21})
         \\  point.x := @u32.add self 1
-        \\  return coordinate point
+        \\  break coordinate point
     ;
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -250,18 +250,18 @@ test "latent staged callback intermediates are fresh per scalar evidence use" {
         \\type Builder callback is data = #Builder {run:callback}
         \\const add_step = fn amount => fn builder => do:
         \\  let #Builder {run:previous} = builder
-        \\  return #Builder {run:fn value => previous value + amount}
+        \\  break #Builder {run:fn value => previous value + amount}
         \\const make = fn amount => do:
         \\  let builder = #Builder {run:fn value => value}
         \\  builder := add_step amount self
         \\  builder := add_step amount self
-        \\  return builder
+        \\  break builder
         \\entry const integer = fn () => do:
         \\  let #Builder {run} = make 10
-        \\  return run 22
+        \\  break run 22
         \\entry const floating = fn () => do:
         \\  let #Builder {run} = make 1.5
-        \\  return run 39.0
+        \\  break run 39.0
         \\const _fixity_add = fn left => fn right => @type.call "add" left right
         \\entry const integer_result: U32 = integer ()
         \\entry const floating_result: F32 = floating ()
@@ -345,7 +345,7 @@ const indexed_update_source =
     \\  let values = #[#Box {x:20}, #Box {x:21}]
     \\  let original = values
     \\  values[@u32.sub (@array.length self) 1].x := @u32.add self 1
-    \\  return @u32.add original[1].x values[1].x
+    \\  break @u32.add original[1].x values[1].x
 ;
 test "mixed array record updates type selectors against root and RHS against old leaf" {
     var f = try Fixture.init(indexed_update_source);

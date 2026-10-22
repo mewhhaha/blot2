@@ -10,10 +10,10 @@ const checked = fn computation => do:
       complete value =>
         total := @u32.add self value
         break
-  return total
+  break total
 entry const answer = fn () => checked (@computation (fn () => do:
   use value <- Validate.check 20
-  return @u32.add value 1
+  break @u32.add value 1
 ))
 
 entry const checked_answer = answer ()

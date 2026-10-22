@@ -211,7 +211,7 @@ const cases = [_]Case{
     \\effect tick: Unit -> U32
     \\entry const answer = fn () => do:
     \\  use Value <- tick ()
-    \\  return 42
+    \\  break 42
     \\
     , .valid = false, .start = 25, .end = 30 },
     // effect_use_binder_lower
@@ -219,7 +219,7 @@ const cases = [_]Case{
     \\effect tick: Unit -> U32
     \\entry const answer = fn () => do (@effect.provider tick (fn () => 42)):
     \\  use value <- tick ()
-    \\  return value
+    \\  break value
     \\
     , .valid = true },
     // effect_use_value_upper
@@ -227,7 +227,7 @@ const cases = [_]Case{
     \\type Tick is effect = Unit -> U32
     \\entry const answer = fn () => do (@effect.provider Tick (fn () => 42)):
     \\  use Tick ()
-    \\  return 42
+    \\  break 42
     \\
     , .valid = true },
     // request_subject_upper
@@ -236,7 +236,7 @@ const cases = [_]Case{
     \\  for request in @requests (@computation (fn () => 42)):
     \\    case Request of
     \\      complete value =>
-    \\        return value
+    \\        break value
     \\
     , .valid = false, .start = 0, .end = 5 },
     // request_subject_qualified
@@ -245,7 +245,7 @@ const cases = [_]Case{
     \\  for request in @requests (@computation (fn () => 42)):
     \\    case ns.request of
     \\      complete value =>
-    \\        return value
+    \\        break value
     \\
     , .valid = false, .start = 0, .end = 5 },
     // request_subject_lower
@@ -254,7 +254,7 @@ const cases = [_]Case{
     \\  for request in @requests (@computation (fn () => 42)):
     \\    case request of
     \\      complete value =>
-    \\        return value
+    \\        break value
     \\
     , .valid = true },
     // rebind_root_upper
@@ -262,7 +262,7 @@ const cases = [_]Case{
     \\entry const answer = fn () => do:
     \\  let value = 42
     \\  Value := 0
-    \\  return value
+    \\  break value
     \\
     , .valid = false, .start = 0, .end = 5 },
     // rebind_root_lower
@@ -270,14 +270,14 @@ const cases = [_]Case{
     \\entry const answer = fn () => do:
     \\  let value = 0
     \\  value := 42
-    \\  return value
+    \\  break value
     \\
     , .valid = true },
     // update_field_upper
     .{ .source =
     \\entry const answer = fn value => do:
     \\  value.Upper := 42
-    \\  return value
+    \\  break value
     \\
     , .valid = true },
     // modifier_upper
@@ -294,7 +294,7 @@ const cases = [_]Case{
     .{ .source =
     \\effect Namespace.Tick: Unit -> U32
     \\entry const answer = fn () => do (@effect.provider Namespace.Tick (fn () => 42)):
-    \\  return Namespace.Tick ()
+    \\  break Namespace.Tick ()
     \\
     , .valid = true },
     // request_record_payload
@@ -306,7 +306,7 @@ const cases = [_]Case{
     \\      effect read { first } =>
     \\        yield first
     \\      complete value =>
-    \\        return value
+    \\        break value
     \\
     , .valid = true },
     // request_grouped_record_payload
@@ -318,7 +318,7 @@ const cases = [_]Case{
     \\      effect (Read U32) { first } =>
     \\        yield first
     \\      complete value =>
-    \\        return value
+    \\        break value
     \\
     , .valid = true },
     // request_operation_selector
@@ -329,14 +329,14 @@ const cases = [_]Case{
     \\      effect .operation () =>
     \\        yield 42
     \\      complete value =>
-    \\        return value
+    \\        break value
     \\
     , .valid = false, .start = 0, .end = 5 },
     // standalone_record_pattern
     .{ .source =
     \\const extract = fn value => do:
     \\  let { first } = value
-    \\  return first
+    \\  break first
     \\entry const answer = 42
     \\
     , .valid = true },
@@ -345,7 +345,7 @@ const cases = [_]Case{
     \\type Box is data = #Box { first: U32 }
     \\entry const answer = fn () => do:
     \\  let #Box { first } = #Box { first: 42 }
-    \\  return first
+    \\  break first
     \\
     , .valid = true },
     // constructor_record_pattern_upper_field
@@ -353,7 +353,7 @@ const cases = [_]Case{
     \\type Box is data = #Box { first: U32 }
     \\entry const answer = fn () => do:
     \\  let #Box { First } = #Box { first: 42 }
-    \\  return 42
+    \\  break 42
     \\
     , .valid = false, .start = 39, .end = 44 },
     // row_tail_builtin_u32

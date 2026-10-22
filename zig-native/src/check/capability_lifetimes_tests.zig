@@ -31,7 +31,7 @@ fn rejected(allocator: std.mem.Allocator, module: *const C.Module) !void {
     return error.ExpectedLifetimeRejection;
 }
 fn directScope(allocator: std.mem.Allocator) !void {
-    var module = try lower(allocator, header ++ "entry const answer = fn () => @effect.scope (fn (s: State U32) => do:\n  let ignored = s\n  return 42\n)\n");
+    var module = try lower(allocator, header ++ "entry const answer = fn () => @effect.scope (fn (s: State U32) => do:\n  let ignored = s\n  break 42\n)\n");
     defer module.deinit(allocator);
     var result = try lifetime.analyze(allocator, &module, &.{}, .{ .binding = try entry(&module) });
     defer result.deinit(allocator);
@@ -68,24 +68,24 @@ const local_state = header ++ box ++
     \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
     \\    use Box.set (fn () => do:
     \\      let (state, value) = do (@effect.state s.get s.set 7):
-    \\        return s.get ()
-    \\      return value
+    \\        break s.get ()
+    \\      break value
     \\    )
     \\    use callback <- Box.get ()
-    \\    return callback ()
-    \\  return result
+    \\    break callback ()
+    \\  break result
     \\)
 ;
 const older_state = header ++ box ++
     \\entry const answer = fn () => do:
     \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
-    \\    return @effect.scope (fn (s: State U32) => do:
+    \\    break @effect.scope (fn (s: State U32) => do:
     \\      let ignored = s
     \\      use previous <- Box.get ()
     \\      use Box.set (fn () => 0)
-    \\      return previous ()
+    \\      break previous ()
     \\    )
-    \\  return result
+    \\  break result
 ;
 fn stateLaw(allocator: std.mem.Allocator) !void {
     var local = try lower(allocator, local_state);
@@ -238,10 +238,10 @@ const memo_source = header ++
     \\  let ignored = s
     \\  let pending = delay (do:
     \\    let discarded = 0
-    \\    return 42
+    \\    break 42
     \\  )
     \\  use finished <- @demand pending
-    \\  return 42
+    \\  break 42
     \\)
 ;
 fn memoCaptureLaw(allocator: std.mem.Allocator) !void {
@@ -304,16 +304,16 @@ const logical_source = control_header ++
     \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
     \\    let captured = fn () => do:
     \\      let discarded = 0
-    \\      return 42
+    \\      break 42
     \\    use Box.set captured
     \\    use if flag then (do:
     \\      use Box.set (fn () => 0)
-    \\      return #True
+    \\      break #True
     \\    ) else #False
     \\    use later <- Box.get ()
-    \\    return later ()
+    \\    break later ()
     \\  let saved = stored
-    \\  return result
+    \\  break result
     \\)
 ;
 const memo_branch_source = control_header ++
@@ -322,15 +322,15 @@ const memo_branch_source = control_header ++
     \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
     \\    let captured = fn () => do:
     \\      let discarded = 0
-    \\      return 42
+    \\      break 42
     \\    let pending = delay (do:
     \\      use Box.set captured
-    \\      return #True
+    \\      break #True
     \\    )
     \\    use if flag then @demand pending else do (@effect.provider Box.set (fn callback => ())):
-    \\      return @demand pending
-    \\    return 42
-    \\  return result
+    \\      break @demand pending
+    \\    break 42
+    \\  break result
     \\)
 ;
 fn addActualCapture(module: *C.Module) !C.Id {
@@ -409,14 +409,14 @@ const witness_source = control_header ++
     \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
     \\    let captured = fn () => do:
     \\      let discarded = 0
-    \\      return 42
+    \\      break 42
     \\    use @type.same flag (do:
     \\      use Box.set captured
-    \\      return #True
+    \\      break #True
     \\    )
-    \\    return 42
+    \\    break 42
     \\  let saved = stored
-    \\  return result
+    \\  break result
     \\)
 ;
 fn witnessLaw(allocator: std.mem.Allocator) !void {
@@ -482,7 +482,7 @@ fn rejectCore(allocator: std.mem.Allocator, module: *const C.Module) !void {
 }
 
 fn coldScopeLaw(allocator: std.mem.Allocator) !void {
-    var module = try lower(allocator, header ++ "const cold = fn () => @effect.scope (fn (s: State U32) => do:\n  let ignored = s\n  return 42\n)\nentry const answer = fn () => 42\n");
+    var module = try lower(allocator, header ++ "const cold = fn () => @effect.scope (fn (s: State U32) => do:\n  let ignored = s\n  break 42\n)\nentry const answer = fn () => 42\n");
     defer module.deinit(allocator);
     try lifetime.rejectSupportedEscapes(allocator, &module, &.{});
     var changed = false;
@@ -509,7 +509,7 @@ test "immutable scope rejection visits cold closure roots through OOM" {
 }
 
 test "immutable scope rejection shares one work budget across repeated scope DAG roots" {
-    var module = try lower(a, header ++ "entry const answer = fn () => @effect.scope (fn (s: State U32) => do:\n  let ignored = s\n  return 42\n)\n");
+    var module = try lower(a, header ++ "entry const answer = fn () => @effect.scope (fn (s: State U32) => do:\n  let ignored = s\n  break 42\n)\n");
     defer module.deinit(a);
     var scope: C.Id = 0;
     for (module.nodes, 0..) |node, id| if (node.tag == .effect_scope) {
@@ -571,12 +571,12 @@ const generic_setter_source =
     \\  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
     \\    use store Box.set (fn () => do:
     \\      let (state, value) = do (@effect.state s.get s.set 42):
-    \\        return s.get ()
-    \\      return value
+    \\        break s.get ()
+    \\      break value
     \\    )
     \\    use callback <- Box.get ()
-    \\    return callback ()
-    \\  return result
+    \\    break callback ()
+    \\  break result
     \\)
 ;
 fn declinedStateProof(allocator: std.mem.Allocator, module: *const C.Module, root: C.Id, call: C.Id, callback: u8, argument: u8) !void {
@@ -644,8 +644,8 @@ test "immutable generic setter invocation proves actual local State cell and rej
 
 fn scopeAdmissionControlLaw(allocator: std.mem.Allocator) !void {
     const sources = [_][]const u8{
-        header ++ "entry const answer = fn (seed: U32) => @effect.scope (fn (s: State U32) => do:\n  let ignored = s\n  return seed\n)\n",
-        header ++ "const stop = fn () -> U32 => @panic \"stop\"\nentry const answer = fn () => @effect.scope (fn (s: State U32) => do:\n  let ignored = s\n  return @u32.add (stop ()) 1\n)\n",
+        header ++ "entry const answer = fn (seed: U32) => @effect.scope (fn (s: State U32) => do:\n  let ignored = s\n  break seed\n)\n",
+        header ++ "const stop = fn () -> U32 => @panic \"stop\"\nentry const answer = fn () => @effect.scope (fn (s: State U32) => do:\n  let ignored = s\n  break @u32.add (stop ()) 1\n)\n",
     };
     for (sources, 0..) |source, index| {
         var module = try lower(allocator, source);
@@ -723,7 +723,7 @@ const deferred_migrate_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\const scope_feature = fn () => @effect.scope (fn (s: State U32) => do:
     \\  let ignored = s
-    \\  return 0
+    \\  break 0
     \\)
     \\const generate = fn count => fn generator => @array.generate count generator
     \\const migrate = fn (version: U32) => case version of
@@ -849,14 +849,14 @@ const resource_scope_return = header ++
     \\entry const answer = fn () => @effect.scope (fn (older: State U32) => do:
     \\  use escaped <- @effect.scope (fn (younger: State F32) => @resource.scope (fn () => 9) (fn owner => do:
     \\    let cleanup_capture = younger
-    \\    return ()
+    \\    break ()
     \\  ) (fn loan => do:
     \\    let observed = @usage.read loan
-    \\    return fn () => do:
+    \\    break fn () => do:
     \\      let retained = older
-    \\      return 42
+    \\      break 42
     \\  ))
-    \\  return escaped ()
+    \\  break escaped ()
     \\)
 ;
 fn resourceScopeFootprintCase(allocator: std.mem.Allocator, source: []const u8, complete: bool) !void {
@@ -984,7 +984,7 @@ fn resourceScopeFootprintLaw(allocator: std.mem.Allocator) !void {
         try std.testing.expectEqual(error.InvalidArtifact, err);
     }
     try rejectCore(allocator, &unknown);
-    const failed_cleanup = try std.mem.replaceOwned(u8, allocator, resource_scope_return, "return ()", "return @panic \"cleanup\"");
+    const failed_cleanup = try std.mem.replaceOwned(u8, allocator, resource_scope_return, "break ()", "break @panic \"cleanup\"");
     defer allocator.free(failed_cleanup);
     // Even an incomplete cleanup path cannot erase the later result graph.
     try resourceScopeFootprintCase(allocator, failed_cleanup, false);
@@ -996,7 +996,7 @@ test "resource scope callback results retain exact older owners and reject young
 
 fn resourceFailureOrderLaw(allocator: std.mem.Allocator) !void {
     const sources = [_][]const u8{
-        header ++ "entry const answer = fn () => @effect.scope (fn (state: State U32) => @resource.scope (fn () => 9) (fn owner => do:\n  let retained = state\n  return ()\n) (fn loan => @panic \"callback\"))\n",
+        header ++ "entry const answer = fn () => @effect.scope (fn (state: State U32) => @resource.scope (fn () => 9) (fn owner => do:\n  let retained = state\n  break ()\n) (fn loan => @panic \"callback\"))\n",
         header ++ "entry const answer = fn () => @effect.scope (fn (state: State U32) => @resource.scope (fn () => 9) (fn owner => @panic \"cleanup\") (fn loan => @usage.read loan))\n",
     };
     for (sources, 0..) |source, ordinal| {
@@ -1043,8 +1043,8 @@ fn scopedPartialResidualLaw(allocator: std.mem.Allocator) !void {
         \\entry const answer = fn () => @effect.scope (fn (older: State U32) => do:
         \\  let callback = @effect.scope (fn (younger: State U32) => reader younger older)
         \\  let (state, result) = do (@effect.state older.get older.set 7):
-        \\    return callback ()
-        \\  return result
+        \\    break callback ()
+        \\  break result
         \\)
     ;
     var module = try lower(allocator, source);
@@ -1084,11 +1084,11 @@ fn discardedUnitContractLaw(allocator: std.mem.Allocator) !void {
         \\entry const answer = fn (value: U32) => do:
         \\  use result: U32 <- increment value
         \\  use ()
-        \\  return result
+        \\  break result
         \\const forward = fn (value: U32) => do:
         \\  use result: U32 <- value
         \\  use ()
-        \\  return result
+        \\  break result
     ;
     var module = try lower(allocator, source);
     defer module.deinit(allocator);

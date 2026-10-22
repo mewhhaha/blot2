@@ -20,27 +20,27 @@ entry const surviving = fn () => do:
   use values <- @resource.scope (fn () => 9) (fn owner => ()) (fn loan => #[@usage.read loan, @u32.add (@usage.read loan) 1, @u32.add (@usage.read loan) 2])
   for index in 0..128:
     use other <- @resource.scope (fn () => 7) (fn owner => ()) (fn loan => @usage.read loan)
-  return values
+  break values
 entry const sequential = fn () => do:
   let count = 0
   for index in 0..10000:
     use value <- @resource.scope (fn () => 7) (fn owner => ()) (fn loan => @usage.read loan)
     count := @u32.add self value
-  return count
+  break count
 entry const finite_cleanup = fn () => @resource.scope (fn () => 9) (fn owner => do:
   for index in 0..3:
     for inner in 1..4:
       let value = @u32.add index inner
-  return ()) (fn loan => @usage.read loan)
+  break ()) (fn loan => @usage.read loan)
 entry const finite_cleanup_trap = fn () => @resource.scope (fn () => 9) (fn owner => do:
   for index in 0..3:
     if @u32.eq index 2:
       let value = @panic "finite cleanup"
-  return ()) (fn loan => @usage.read loan)
+  break ()) (fn loan => @usage.read loan)
 entry const empty_cleanup = fn () => @resource.scope (fn () => 9) (fn owner => do:
   for index in 4..2:
     let value = @panic "empty cleanup must not run"
-  return ()) (fn loan => @usage.read loan)
+  break ()) (fn loan => @usage.read loan)
 entry const memory = fn () -> Array U32 => #[]
 `;
 Deno.test("resource scalar scope executes finite cleanup across sync JSPI failures and retained restart", async () => {
@@ -177,9 +177,9 @@ const recoverySource = `
 entry const normal = fn (host: Unit -> U32 ! {Foreign}) => do:
   let captured = @array.fill 1024 41
   use value <- @resource.scope (fn () => 9) (fn owner => ()) (fn loan => @u32.add (@usage.read loan) (@u32.add captured[0] (host ())))
-  return value
+  break value
 entry const early = fn () => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => do:
-  return @usage.read loan
+  break @usage.read loan
 )
 entry const branch = fn () => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => if @u32.eq (@usage.read loan) 9 then @usage.read loan else 0)
 entry const break_exit = fn () => do:
@@ -188,7 +188,7 @@ entry const break_exit = fn () => do:
     use value <- @resource.scope (fn () => 9) (fn owner => ()) (fn loan => @usage.read loan)
     result := value
     break
-  return result
+  break result
 entry const trapped = fn () => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => @u32.div (@usage.read loan) 0)
 entry const acquire_failed = fn () => @resource.scope (fn () -> unique U32 => @panic "acquire") (fn owner => ()) (fn loan => @usage.read loan)
 entry const cleanup_failed = fn (host: Unit -> U32 ! {Foreign}) => @resource.scope (fn () => 9) (fn owner => ()) (fn outer => @resource.scope (fn () => 7) (fn owner => @panic "cleanup") (fn inner => host ()))

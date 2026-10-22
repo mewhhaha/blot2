@@ -385,8 +385,8 @@ test "principal gate rejects a changed state-provider initial value and its cons
         \\entry const builder = fn (value: U32) -> U32 => value
         \\entry const consumer = fn () => do:
         \\  let (_, old) = do state:
-        \\    return State.get U32 ()
-        \\  return old
+        \\    break State.get U32 ()
+        \\  break old
     ;
     var before = try Fixture.init(a, &.{source});
     defer before.deinit(a);
@@ -1274,10 +1274,10 @@ test "closure roots in an edited module follow their owner's exact projection" {
         \\entry const helper = fn (x: U32) -> U32 => @u32.add x 1
         \\entry const apply = fn (x: U32) -> U32 => do:
         \\  let inner = fn (y: U32) => helper y
-        \\  return inner x
+        \\  break inner x
         \\entry const other = fn (x: U32) -> U32 => do:
         \\  let inner = fn (y: U32) => @u32.add y 3
-        \\  return inner x
+        \\  break inner x
         \\entry const edited = fn (x: U32) -> U32 => @u32.add x 2
     ;
     var before = try Fixture.init(a, &.{source});
@@ -1315,10 +1315,10 @@ test "closure roots in an edited module follow their owner's exact projection" {
     const reordered =
         \\entry const apply = fn (x: U32) -> U32 => do:
         \\  let inner = fn (y: U32) => helper y
-        \\  return inner x
+        \\  break inner x
         \\entry const other = fn (x: U32) -> U32 => do:
         \\  let inner = fn (y: U32) => @u32.add y 3
-        \\  return inner x
+        \\  break inner x
         \\entry const helper = fn (x: U32) -> U32 => @u32.add x 1
     ;
     var first = try Fixture.init(a, &.{reordered});

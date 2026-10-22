@@ -43,7 +43,7 @@ const measured = do:
   let total = 0
   for index in 0..8:
     total := @u32.add total rows.measure
-  return total
+  break total
 entry const answer = measured
 entry const callback = fn (value: U32) => rows[0].callback value
 entry const sibling = ${sibling}

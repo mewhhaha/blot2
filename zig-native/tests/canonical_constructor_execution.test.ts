@@ -17,13 +17,13 @@ const invoke = fn constructor => fn value => unbox (constructor value)
 const ready = invoke #Box
 const retain = fn () => do:
   let constructor = #Box
-  return fn value => unbox (constructor value)
+  break fn value => unbox (constructor value)
 entry const unsigned = fn (value:U32) => ready value
 entry const floating = fn (value:F32) => unbox (box value)
 entry const captured = fn (value:F32) => (retain ()) value
 entry const local = fn (value:F32) => do:
   let constructor = #Box
-  return unbox (constructor value)
+  break unbox (constructor value)
 entry const mixed = fn (value:U32) => total (pair (value,2.5))
 entry const wrapped = fn (value:F32) => case #Wrapped (40,value) of
   #Wrapped payload => @f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 1)
@@ -33,7 +33,7 @@ entry const old_version = fn (value:U32) => do:
   let original = (value,2.5)
   let selected = pair original
   selected.x := 99
-  return @f32.add (@u32.to_f32 (@product.get original 0)) selected.y
+  break @f32.add (@u32.to_f32 (@product.get original 0)) selected.y
 entry const folded = total (#Pair (40,2.5))
 `;
 for (const asynchronous of [false,true]) Deno.test(`callable record constructors preserve canonical arrows and owned storage (${asynchronous?"JSPI":"sync"})`,async()=>{
@@ -62,13 +62,13 @@ const total = fn value => case value of
   #Pair (x,y) => @f32.add (@u32.to_f32 x) y
 const first = fn host => do:
   use host 0
-  return 40
+  break 40
 const second = fn host => do:
   use host 1
-  return 2.5
+  break 2.5
 entry const ordered = fn (host:U32 -> U32 ! {Foreign}) => do:
   use selected <- pair (first host,second host)
-  return total selected
+  break total selected
 entry const boxed = fn (host:Unit -> F32 ! {Foreign}) => case callback host of
   #Callback action => action ()
 entry const pure = fn () => 7
@@ -112,17 +112,17 @@ entry const unsigned_state = fn (value:U32) => do:
     use @state.set (cell (@u32.add value 1))
     use box <- @state.get unsigned_witness
     let #Cell result = box
-    return result
+    break result
   )
-  return @u32.add final selected
+  break @u32.add final selected
 entry const floating_state = fn (value:F32) => do:
   let (#Cell final,selected) = @state.run (cell value) (fn () => do:
     use @state.set (cell (@f32.add value 1.0))
     use box <- @state.get floating_witness
     let #Cell result = box
-    return result
+    break result
   )
-  return @f32.add final selected
+  break @f32.add final selected
 entry const folded_state = @f32.add (@u32.to_f32 (unsigned_state 20)) (floating_state 20.25)
 `;
 Deno.test("canonical generic constructors preserve independent quantified State identities",async()=>{

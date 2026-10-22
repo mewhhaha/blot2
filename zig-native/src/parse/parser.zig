@@ -1296,11 +1296,14 @@ const Parser = struct {
             return self.add(.let_stmt, pat, value, try self.extra(&.{ annotation, constraints.predicates.start, constraints.predicates.len, fallback, constraints.node }), start);
         }
         if (self.eat(.kw_return)) {
+            return self.add(.function_return_stmt, try self.expression(), 0, 0, start);
+        }
+        if (self.eat(.kw_yield)) return self.add(.yield_stmt, try self.expression(), 0, 0, start);
+        if (self.eat(.kw_break)) {
+            if (self.at(.newline) or self.at(.dedent) or self.at(.eof)) return self.add(.break_stmt, 0, 0, 0, start);
             const forwarding: u32 = @intFromBool(self.eat(.dollar));
             return self.add(.return_stmt, try self.expression(), forwarding, 0, start);
         }
-        if (self.eat(.kw_yield)) return self.add(.yield_stmt, try self.expression(), 0, 0, start);
-        if (self.eat(.kw_break)) return self.add(.break_stmt, 0, 0, 0, start);
         if (self.at(.kw_if)) return self.ifStatement();
         if (self.at(.kw_for)) return self.forStatement();
         if (self.eat(.kw_use)) {

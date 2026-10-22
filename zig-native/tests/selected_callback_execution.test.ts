@@ -8,13 +8,13 @@ impl ArraySource a : Source (Array a) = { type Item = a, const first = fn values
 const main = `import {Source} from "./library"
 entry const answer = fn (value: U32) => do:
   let selected: (Array U32) -> U32 = Source.first
-  return selected #[value, @u32.add value 1]
+  break selected #[value, @u32.add value 1]
 entry const floating = fn (value: F32) => do:
   let selected: (Array F32) -> F32 = Source.first
-  return selected #[value, 2.5]
+  break selected #[value, 2.5]
 entry const reference = fn (value: Array U32) => do:
   let selected: (Array (Array U32)) -> Array U32 = Source.first
-  return selected #[value, #[7]]
+  break selected #[value, #[7]]
 `;
 const foreignLibrary =
   `type Callable f is contract = { type Run, const run: f -> (Callable.Run f) ! {Foreign} }
@@ -23,7 +23,7 @@ impl Callback a : Callable (Unit -> a ! {Foreign}) = { type Run = a, const run =
 const foreignMain = `import {Callable} from "./library"
 entry const answer = fn (host: Unit -> U32 ! {Foreign}) => do:
   let selected: (Unit -> U32 ! {Foreign}) -> U32 = Callable.run
-  return selected host
+  break selected host
 `;
 for (const codegenTier of ["development", "optimized"] as const) {
   Deno.test(`selected first class callbacks retain exact associated results and current imported owners (${codegenTier})`, async () => {

@@ -8,19 +8,19 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let computation = make witness32
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let computation = make witnessf
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -36,19 +36,19 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let computation = make witness32
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let computation = make witnessf
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -64,23 +64,23 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let alias = witness32
     let alias_again = alias
     let computation = make alias_again
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let alias = witnessf
     let alias_again = alias
     let computation = make alias_again
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -96,23 +96,23 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let alias = witness32
     let alias_again = alias
     let computation = make alias_again
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let alias = witnessf
     let alias_again = alias
     let computation = make alias_again
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -126,7 +126,7 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let captured = 41
@@ -134,7 +134,7 @@ entry const answer = fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let computation = make witness
     captured := 99
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let captured = 3.5
@@ -142,9 +142,9 @@ entry const answer = fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let computation = make witness
     captured := 199.5
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -158,7 +158,7 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let captured = 41
@@ -166,7 +166,7 @@ entry const answer = fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let computation = make witness
     captured := 99
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let captured = 3.5
@@ -174,9 +174,9 @@ entry const answer = fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let computation = make witness
     captured := 199.5
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -190,7 +190,7 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let captured = 41
@@ -199,11 +199,11 @@ entry const answer = fn () => do:
       use current <- @state.get witness
       let #Cell stored = current
       let #Cell captured = witness ()
-      return #Cell (@u32.add stored captured)
+      break #Cell (@u32.add stored captured)
     )
     let computation = make witness
     captured := 99
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let captured = 3.5
@@ -212,13 +212,13 @@ entry const answer = fn () => do:
       use current <- @state.get witness
       let #Cell stored = current
       let #Cell captured = witness ()
-      return #Cell (@f32.add stored captured)
+      break #Cell (@f32.add stored captured)
     )
     let computation = make witness
     captured := 199.5
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 87);
@@ -232,7 +232,7 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let captured = 41
@@ -241,11 +241,11 @@ entry const answer = fn () => do:
       use current <- @state.get witness
       let #Cell stored = current
       let #Cell captured = witness ()
-      return #Cell (@u32.add stored captured)
+      break #Cell (@u32.add stored captured)
     )
     let computation = make witness
     captured := 99
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let captured = 3.5
@@ -254,13 +254,13 @@ entry const answer = fn () => do:
       use current <- @state.get witness
       let #Cell stored = current
       let #Cell captured = witness ()
-      return #Cell (@f32.add stored captured)
+      break #Cell (@f32.add stored captured)
     )
     let computation = make witness
     captured := 199.5
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 87);
@@ -273,27 +273,27 @@ Deno.test("retained State witnesses latent-never-called sync", async () => {
 type Tick is effect = { read: Unit -> U32 }
 const witness32 = fn ignored -> Cell U32 => do:
   use Tick.read ()
-  return @panic "witness called"
+  break @panic "witness called"
 const witnessf = fn ignored -> Cell F32 => do:
   use Tick.read ()
-  return @panic "witness called"
+  break @panic "witness called"
 const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let computation = make witness32
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let computation = make witnessf
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -306,27 +306,27 @@ Deno.test("retained State witnesses latent-never-called JSPI", async () => {
 type Tick is effect = { read: Unit -> U32 }
 const witness32 = fn ignored -> Cell U32 => do:
   use Tick.read ()
-  return @panic "witness called"
+  break @panic "witness called"
 const witnessf = fn ignored -> Cell F32 => do:
   use Tick.read ()
-  return @panic "witness called"
+  break @panic "witness called"
 const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let computation = make witness32
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let computation = make witnessf
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -343,7 +343,7 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Count count, result) = @state.run (#Count 0) (fn () => do:
     use result32 <- @state.run (#Cell 40) (fn () => do:
@@ -351,9 +351,9 @@ entry const answer = fn () => do:
         use previous_cell <- @state.get #Count
         let #Count previous = previous_cell
         use @state.set (#Count (@u32.add previous 1))
-        return @computation (fn () => @state.get witness)
+        break @computation (fn () => @state.get witness)
       use computation <- make witness32
-      return handled computation
+      break handled computation
     )
     let (#Cell state32, #Cell value32) = result32
     use resultf <- @state.run (#Cell 2.5) (fn () => do:
@@ -361,14 +361,14 @@ entry const answer = fn () => do:
         use previous_cell <- @state.get #Count
         let #Count previous = previous_cell
         use @state.set (#Count (@u32.add previous 1))
-        return @computation (fn () => @state.get witness)
+        break @computation (fn () => @state.get witness)
       use computation <- make witnessf
-      return handled computation
+      break handled computation
     )
     let (#Cell statef, #Cell valuef) = resultf
-    return @f32.add (@u32.to_f32 value32) valuef
+    break @f32.add (@u32.to_f32 value32) valuef
   )
-  return @f32.add result (@u32.to_f32 count)
+  break @f32.add result (@u32.to_f32 count)
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 44.5);
@@ -385,7 +385,7 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Count count, result) = @state.run (#Count 0) (fn () => do:
     use result32 <- @state.run (#Cell 40) (fn () => do:
@@ -393,9 +393,9 @@ entry const answer = fn () => do:
         use previous_cell <- @state.get #Count
         let #Count previous = previous_cell
         use @state.set (#Count (@u32.add previous 1))
-        return @computation (fn () => @state.get witness)
+        break @computation (fn () => @state.get witness)
       use computation <- make witness32
-      return handled computation
+      break handled computation
     )
     let (#Cell state32, #Cell value32) = result32
     use resultf <- @state.run (#Cell 2.5) (fn () => do:
@@ -403,14 +403,14 @@ entry const answer = fn () => do:
         use previous_cell <- @state.get #Count
         let #Count previous = previous_cell
         use @state.set (#Count (@u32.add previous 1))
-        return @computation (fn () => @state.get witness)
+        break @computation (fn () => @state.get witness)
       use computation <- make witnessf
-      return handled computation
+      break handled computation
     )
     let (#Cell statef, #Cell valuef) = resultf
-    return @f32.add (@u32.to_f32 value32) valuef
+    break @f32.add (@u32.to_f32 value32) valuef
   )
-  return @f32.add result (@u32.to_f32 count)
+  break @f32.add result (@u32.to_f32 count)
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 44.5);
@@ -426,18 +426,18 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let make = fn witness => @computation (fn () => @state.get witness)
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let computation = make witness32
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let computation = make witnessf
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, "type_mismatch", undefined, { prelude: "none" });
 });
@@ -450,19 +450,19 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let make = fn witness => @computation (fn () => @state.get witness)
   let alias = (fn factory => factory) make
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let computation = alias witness32
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let computation = alias witnessf
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, "type_mismatch", undefined, { prelude: "none" });
 });
@@ -474,14 +474,14 @@ entry const answer = fn () => do:
   let (#Cell _, #Cell value) = @state.run (#Cell 40) (fn () => do:
     let make = fn witness => @computation (fn () => do:
       use @state.get witness
-      return witness ()
+      break witness ()
     )
     for request in @requests (make witness):
       case request of
         complete result =>
-          return result
+          break result
   )
-  return value
+  break value
 `, "type_mismatch", undefined, { prelude: "none" });
 });
 
@@ -495,9 +495,9 @@ entry const answer: Unit -> U32 ! {} = fn () => do:
     for request in @requests (make witness):
       case request of
         complete result =>
-          return result
+          break result
   )
-  return value
+  break value
 `, "effect_mismatch", undefined, { prelude: "none" });
 });
 
@@ -509,19 +509,19 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let make: a -> b = fn witness => @computation (fn () => @state.get witness)
     let computation = make witness32
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let make: a -> b = fn witness => @computation (fn () => @state.get witness)
     let computation = make witnessf
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -537,19 +537,19 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let make: a -> b = fn witness => @computation (fn () => @state.get witness)
     let computation = make witness32
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let make: a -> b = fn witness => @computation (fn () => @state.get witness)
     let computation = make witnessf
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -565,18 +565,18 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let make: a -> b = fn witness => @computation (fn () => @state.get witness)
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let computation = make witness32
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let computation = make witnessf
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -592,18 +592,18 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let make: a -> b = fn witness => @computation (fn () => @state.get witness)
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let computation = make witness32
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let computation = make witnessf
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -616,12 +616,12 @@ Deno.test("retained State annotation lifetime plain-annotation-scope sync", asyn
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let make: a -> b = fn value => @computation (fn () => value)
   let integer = handled (make 40)
   let fraction = handled (make 2.5)
-  return @f32.add (@u32.to_f32 integer) fraction
+  break @f32.add (@u32.to_f32 integer) fraction
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -634,12 +634,12 @@ Deno.test("retained State annotation lifetime plain-annotation-scope JSPI", asyn
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let make: a -> b = fn value => @computation (fn () => value)
   let integer = handled (make 40)
   let fraction = handled (make 2.5)
-  return @f32.add (@u32.to_f32 integer) fraction
+  break @f32.add (@u32.to_f32 integer) fraction
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -652,12 +652,12 @@ Deno.test("retained State annotation lifetime where-annotation-scope sync", asyn
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let make: a -> b where { type_rep a } = fn value => @computation (fn () => value)
   let integer = handled (make 40)
   let fraction = handled (make 2.5)
-  return @f32.add (@u32.to_f32 integer) fraction
+  break @f32.add (@u32.to_f32 integer) fraction
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -670,12 +670,12 @@ Deno.test("retained State annotation lifetime where-annotation-scope JSPI", asyn
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let make: a -> b where { type_rep a } = fn value => @computation (fn () => value)
   let integer = handled (make 40)
   let fraction = handled (make 2.5)
-  return @f32.add (@u32.to_f32 integer) fraction
+  break @f32.add (@u32.to_f32 integer) fraction
 entry const folded = answer ()
 `, async guest => {
     equal(guest.read("folded"), 42.5);
@@ -688,12 +688,12 @@ Deno.test("retained State selected proof rejects plain-shared-scope", async () =
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let make = fn value => @computation (fn () => value)
   let integer = handled (make 40)
   let fraction = handled (make 2.5)
-  return @f32.add (@u32.to_f32 integer) fraction
+  break @f32.add (@u32.to_f32 integer) fraction
 entry const folded = answer ()
 `, "type_mismatch", undefined, { prelude: "none" });
 });
@@ -706,21 +706,21 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let computation = make witness32
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let make = fn witness => @computation (fn () => @state.get witness)
     let computation = make witnessf
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
-`, "missing_associated", undefined, { prelude: "none", span: [594, 605] });
+`, "missing_associated", undefined, { prelude: "none", span: [592, 603] });
 });
 
 Deno.test("retained State selected proof rejects invoked-missing-member", async () => {
@@ -731,25 +731,25 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let make = fn witness => @computation (fn () => do:
       use @state.get witness
-      return witness ()
+      break witness ()
     )
     let computation = make witness32
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let make = fn witness => @computation (fn () => do:
       use @state.get witness
-      return witness ()
+      break witness ()
     )
     let computation = make witnessf
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, "missing_member", undefined, { prelude: "none" });
 });
@@ -759,33 +759,33 @@ Deno.test("retained State selected proof rejects invoked-extra-effect", async ()
 type Tick is effect = { read: Unit -> U32 }
 const witness32 = fn ignored -> Cell U32 => do:
   use Tick.read ()
-  return @panic "witness called"
+  break @panic "witness called"
 const witnessf = fn ignored -> Cell F32 => do:
   use Tick.read ()
-  return @panic "witness called"
+  break @panic "witness called"
 const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer: Unit -> F32 ! {} = fn () => do:
   let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
     let make = fn witness => @computation (fn () => do:
       use @state.get witness
-      return witness ()
+      break witness ()
     )
     let computation = make witness32
-    return handled computation
+    break handled computation
   )
   let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
     let make = fn witness => @computation (fn () => do:
       use @state.get witness
-      return witness ()
+      break witness ()
     )
     let computation = make witnessf
-    return handled computation
+    break handled computation
   )
-  return @f32.add (@u32.to_f32 value32) valuef
+  break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
 `, "let_effect", undefined, { prelude: "none" });
 });

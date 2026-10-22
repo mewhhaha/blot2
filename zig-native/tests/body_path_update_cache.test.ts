@@ -17,10 +17,10 @@ const update = fn (index: U32) -> Array U32 => do:
   let bucket = #Bucket { points: #[#Point { y: #[10], x: ${spine} }, #Point { y: #[20], x: ${spine} }] }
   let before = bucket
   bucket.points[index].y[0] := @u32.add self seed
-  return #[before.points[index].y[0], bucket.points[index].y[0]]
+  break #[before.points[index].y[0], bucket.points[index].y[0]]
 const replace = fn values => fn index => fn value => do:
   values[index] := value
-  return values
+  break values
 entry const run = fn (index: U32) -> Array U32 => update index
 entry const replaced = fn (value: U32) -> Array U32 => replace #[seed, 41] 1 value
 `;

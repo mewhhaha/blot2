@@ -12,24 +12,24 @@ entry const integer = fn (seed: U32) => do:
   let factory = #Factory seed
   let stored = factory.boxed
   let #Box mapper = stored
-  return @u32.add (mapper seed).item 1
+  break @u32.add (mapper seed).item 1
 entry const floating = fn (seed: F32) => do:
   let factory = #Factory seed
   let stored = factory.boxed
   let #Box mapper = stored
-  return @f32.add (mapper seed).item 0.5
+  break @f32.add (mapper seed).item 0.5
 entry const reference = fn (seed: Array U32) => do:
   let factory = #Factory seed
   let stored = factory.boxed
   let #Box mapper = stored
   let kept = (mapper seed).item
   let pressure = @array.fill 8192 42
-  return if @u32.eq pressure[0] 42 then kept else @panic "pressure changed"
+  break if @u32.eq pressure[0] 42 then kept else @panic "pressure changed"
 entry const zero_width = fn (seed: U32) => do:
   let factory = #Factory seed
   let stored = factory.boxed
   let #Box mapper = stored
-  return (mapper ()).item
+  break (mapper ()).item
 `;
 
 for (const codegenTier of ["optimized", "development"] as const) {

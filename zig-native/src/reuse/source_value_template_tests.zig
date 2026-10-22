@@ -144,7 +144,7 @@ const unsolved_source =
     \\entry const schema: U32 = 7
     \\const bundle = do:
     \\  let read = factory 42
-    \\  return #Bundle { read: read, callbacks: @array.generate 1 (fn (index: U32) => read) }
+    \\  break #Bundle { read: read, callbacks: @array.generate 1 (fn (index: U32) => read) }
     \\entry const answer: U32 = bundle.read ()
 ;
 fn successful(result: *const backend.Result) !void {
@@ -362,13 +362,13 @@ test "source template declines actual provider and State captures instead of pre
         \\const state = @effect.state (State.get F32) (State.set F32) 1.75
         \\entry const schema: U32 = 7
         \\entry const folded = do reader:
-        \\  return Read ()
+        \\  break Read ()
         \\entry const answer = fn (value: F32) => do:
         \\  let (next, old) = do state:
         \\    use old <- State.get F32 ()
         \\    use State.set F32 (@f32.add old value)
-        \\    return old
-        \\  return @f32.add next old
+        \\    break old
+        \\  break @f32.add next old
     ;
     var before = try Fixture.init(provider_source);
     defer before.deinit();
@@ -799,7 +799,7 @@ test "source template local qualified callback follows changed global source dep
         \\entry const schema: U32 = 7
         \\const bundle = do:
         \\  let read = fn extra => schema
-        \\  return #Bundle read
+        \\  break #Bundle read
         \\entry const answer: U32 = @array.length (@array.generate 1 (fn (index: U32) => bundle))
     ;
     var before = try Fixture.init(source);
@@ -834,11 +834,11 @@ fn anchorDir() !std.testing.TmpDir {
         \\  let alias = values.alias
         \\  let twin = values.twin
         \\  let read = fn extra => (items, alias, twin)
-        \\  return #Bundle { read: read }
+        \\  break #Bundle { read: read }
         \\entry const schema: U32 = 7
         \\entry const answer = fn (index: U32) => do:
         \\  let (first, second, third) = bundle.read ()
-        \\  return @u32.add (@array.get first index) (@u32.add (@array.get second index) (@array.get third index))
+        \\  break @u32.add (@array.get first index) (@u32.add (@array.get second index) (@array.get third index))
         \\entry const direct = fn (index: U32) => @array.get values.items index
     ;
     inline for (.{ .{ "prelude.blot", "" }, .{ "values.blot", values }, .{ "main.blot", main } }) |file| try dir.dir.writeFile(std.testing.io, .{ .sub_path = file[0], .data = file[1] });
@@ -941,7 +941,7 @@ test "constant receipt partial semantic import decline preserves ordinary aliase
         a.free(expression);
         expression = next;
     }
-    const source = try a.print("const input = 1\nconst seed = @u32.add input 0\nconst expensive = do:\n  let represented: Array U32 = #[{s}]\n  return represented\nentry const run = fn () => @array.get expensive 0\n", .{expression});
+    const source = try a.print("const input = 1\nconst seed = @u32.add input 0\nconst expensive = do:\n  let represented: Array U32 = #[{s}]\n  break represented\nentry const run = fn () => @array.get expensive 0\n", .{expression});
     defer a.free(source);
     var before = try Fixture.init(source);
     defer before.deinit();
@@ -1535,7 +1535,7 @@ test "semantic catalog imports nominal evidence while executable layout remains 
         \\const boxed = #Box 42
         \\entry const answer = fn (value: U32) => do:
         \\  let #Box fixed = boxed
-        \\  return @u32.add value fixed
+        \\  break @u32.add value fixed
     ;
     var before = try Fixture.init(source);
     defer before.deinit();
@@ -2126,7 +2126,7 @@ test "source declared effect query structurally remaps a nominal operation argum
         \\entry const schema: U32 = 7
         \\entry const answer = fn () -> U32 => do:
         \\  let payload = @effect.reader Read.get (#Payload { value: 0 }) (fn () => #Payload { value: 42 }) callback
-        \\  return payload.value
+        \\  break payload.value
     ;
     var before = try Fixture.init(source);
     defer before.deinit();
@@ -2262,7 +2262,7 @@ const scratch_span_source =
     \\entry const schema: U32 = 7
     \\entry const answer = fn (index: U32) => do:
     \\  let (left, right) = bundle
-    \\  return @u32.add (@array.get left index) (@array.get right index)
+    \\  break @u32.add (@array.get left index) (@array.get right index)
 ;
 fn scratchSharedSpanFailure(allocator: Allocator, fixture: *const Fixture, old: *const capture.Capture, retry_failure: ?*std.testing.FailingAllocator) !void {
     const pools = &old.metadata.pools.?;
@@ -2698,7 +2698,7 @@ test "source callable templates decline generative schemes and erased body ident
         \\const hidden = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
         \\  let picked = choose #True left right
         \\  let deferred = fn () => picked.get ()
-        \\  return 11
+        \\  break 11
         \\))
         \\const ordinary = fn (value: U32) => @u32.add value 1
         \\entry const answer = 3

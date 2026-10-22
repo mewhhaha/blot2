@@ -38,10 +38,10 @@ const shorthand_source =
     \\  let count = 0
     \\  for let value in values:
     \\    count := @u32.add count value
-    \\  return count
+    \\  break count
     \\entry const run = fn () => do:
     \\  let record = bundle seed #[40, 42]
-    \\  return @u32.add record.value (total record.values)
+    \\  break @u32.add record.value (total record.values)
 ;
 
 test "body check cache retains shorthand owning fields and explicit ordinary array binders through OOM" {
@@ -771,7 +771,7 @@ test "body check cache relocates ordinary block locals mutations joins and cases
         \\    count := @u32.add self seed
         \\  else:
         \\    count := @u32.add self 1
-        \\  return count
+        \\  break count
         \\const matched = fn (value: U32) -> U32 => case value of
         \\  0 => seed
         \\  result => @u32.add result seed
@@ -799,7 +799,7 @@ test "body check cache relocates ordinary block locals mutations joins and cases
     var altered_output = try compile(a, &altered);
     defer altered_output.deinit(a);
     try compare(a, &before.bodies, body_edit, altered_output.bytes, 3);
-    const polymorphic = "const local_generic = fn (value: U32) => do:\n  let identity = fn item => item\n  return identity value\nentry const run = fn (value: U32) => local_generic value\n";
+    const polymorphic = "const local_generic = fn (value: U32) => do:\n  let identity = fn item => item\n  break identity value\nentry const run = fn (value: U32) => local_generic value\n";
     var ordinary = try prepare(a, polymorphic, null);
     defer ordinary.deinit(a);
     try std.testing.expect(ordinary.bodies.find("local_generic") != null);
@@ -853,7 +853,7 @@ test "body check cache relocates generic local principals and covariance rows" {
         \\  let apply = fn callback => fn argument => callback argument
         \\  let fraction = identity 3.0
         \\  let whole = apply identity value
-        \\  return @u32.add whole seed
+        \\  break @u32.add whole seed
         \\entry const run = fn (value: U32) -> U32 => helper value
     ;
     var before = try prepare(a, source, null);
@@ -984,7 +984,7 @@ test "body check cache syntax owns parser allocations and preserves shared span 
         \\  let result = 0
         \\  for let value in values:
         \\    result := @u32.add result value
-        \\  return result
+        \\  break result
     ;
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
@@ -1017,7 +1017,7 @@ const provider_source =
     \\const seed = 2
     \\const make = fn () => @effect.provider Read (fn () => seed)
     \\entry const run = fn () => do (make ()):
-    \\  return Read ()
+    \\  break Read ()
 ;
 
 test "body check cache owns complete static provider installations and token recipes through OOM" {
@@ -1040,10 +1040,10 @@ const auxiliary_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\const seed = 2
     \\const read = fn () => do (@effect.provider Read (fn () => seed)):
-    \\  return Read ()
+    \\  break Read ()
     \\const state = fn (initial: U32) => @effect.run State.get State.set initial (fn () => do:
     \\  use State.set 40
-    \\  return State.get ()
+    \\  break State.get ()
     \\)
     \\const describe = fn () => @effect.count (@effect.of read)
     \\const description = describe ()
@@ -1055,7 +1055,7 @@ const auxiliary_source =
     \\        count := @u32.add count 1
     \\        yield 42
     \\      complete value =>
-    \\        return @u32.add count value
+    \\        break @u32.add count value
     \\const request = fn () => checked (@computation (fn () => Read ()))
     \\entry const run = fn () => @u32.add (@product.get (state seed) 1) (@u32.add (read ()) (@u32.add (request ()) description))
 ;
@@ -1092,8 +1092,8 @@ const private_auxiliary_source =
     \\  let write = capability.set
     \\  let local = fn () => read ()
     \\  let (successor, result) = do (@effect.state read write seed):
-    \\    return local ()
-    \\  return result
+    \\    break local ()
+    \\  break result
     \\)
     \\const borrow = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.read loan)
     \\const resource = fn () => @resource.scope (fn () => #[seed, 40]) (fn owner => ()) (fn loan => @usage.length loan)
@@ -1284,12 +1284,12 @@ const residual_source =
     \\const increment = fn record => do:
     \\  let result = record
     \\  result.value := @u32.add self 1
-    \\  return result
+    \\  break result
     \\const merge = fn left => fn right => @record.merge left right
     \\entry const run = fn () => do:
     \\  let first = increment {value: seed, values: #[40, 42]}
     \\  let second = merge first {extra: #[43]}
-    \\  return @u32.add second.value (count second.values)
+    \\  break @u32.add second.value (count second.values)
 ;
 
 test "body check cache owns general record update merge and concrete array method residuals through OOM" {
@@ -1313,7 +1313,7 @@ test "body check cache owns inferred local associated requirements" {
         \\const Array.add = fn (left: Array U32) => fn (right: Array U32) => @array.concat left right
         \\const twice = fn value => do:
         \\  let local = fn amount => @type.call "add" amount amount
-        \\  return local value
+        \\  break local value
         \\entry const unsigned = fn (value: U32) => twice value
         \\entry const floating = fn (value: F32) => twice value
         \\entry const packed = fn (value: U32) => twice #[value, @u32.add value 1]
@@ -1357,7 +1357,7 @@ test "body check cache owns local result directed requirements" {
         \\const read = fn (#Number value) => value
         \\const convert = fn (value: U32) -> Number => do:
         \\  let local = fn amount => @type.result "from" amount
-        \\  return local value
+        \\  break local value
         \\entry const run = fn (value: U32) => read (convert value)
     ;
     var before = try prepare(a, source, null);
@@ -1394,7 +1394,7 @@ test "body check cache relocates declared local qualification origins" {
         \\const twice = fn value => do:
         \\  let identity: a -> a where { type_rep a } = fn amount => amount
         \\  let local: a -> a where { associated "add" a a a } = fn amount => @type.call "add" amount amount
-        \\  return identity (local value)
+        \\  break identity (local value)
         \\entry const unsigned = fn (value: U32) => twice value
         \\entry const floating = fn (value: F32) => twice value
         \\entry const packed = fn (value: U32) => twice #[value, @u32.add value 1]
@@ -1426,7 +1426,7 @@ test "body check cache declines large local requirement receipts without changin
         defer a.free(local);
         try source.appendSlice(a, local);
     }
-    try source.appendSlice(a, "  return @u32.add value seed\nentry const run = fn (value: U32) => many value\n");
+    try source.appendSlice(a, "  break @u32.add value seed\nentry const run = fn (value: U32) => many value\n");
     var before = try prepare(a, source.items, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("many") == null);
@@ -1446,7 +1446,7 @@ test "body check cache local qualification routes require exact bounded source c
         \\const untouched = fn value => value
         \\const wrapper = fn value => do:
         \\  let local: a -> a where { type_rep a } = fn amount => amount
-        \\  return local value
+        \\  break local value
     ;
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
@@ -1582,7 +1582,7 @@ test "body check cache restores shared requirements inside local principals" {
         \\const pipeline = fn value => do:
         \\  let local = fn amount => twice amount
         \\  let relay = fn amount => local amount
-        \\  return relay value
+        \\  break relay value
         \\entry const unsigned = fn (value: U32) => pipeline value
         \\entry const floating = fn (value: F32) => pipeline value
         \\entry const packed = fn (value: U32) => pipeline #[value, @u32.add value 1]
@@ -1690,7 +1690,7 @@ test "body check cache restores generic explicit field templates" {
 }
 
 test "body check cache restores field requirements in local principals" {
-    const source = "const extract = fn value => do:\n  let local = fn amount => (amount).item\n  return local value\nentry const run = fn (value: U32) => extract {tail: 3.0, item: value}\nentry const packed = fn (value: U32) => extract {item: #[value], head: 2}\n";
+    const source = "const extract = fn value => do:\n  let local = fn amount => (amount).item\n  break local value\nentry const run = fn (value: U32) => extract {tail: 3.0, item: value}\nentry const packed = fn (value: U32) => extract {item: #[value], head: 2}\n";
     var before = try prepare(a, source, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("extract") != null);
@@ -1707,7 +1707,7 @@ test "body check cache restores field requirements in local principals" {
 }
 
 test "body check cache restores generic dotted templates through allocation failures" {
-    const source = "const extract = fn value => value.item.count\nconst scoped = fn value => do:\n  let local = fn amount => amount.item.count\n  return local value\nentry const run = fn (value: U32) => extract {tail: 3.0, item: {count: value, ignored: 2}}\nentry const packed = fn (value: U32) => scoped {item: {ignored: 2.0, count: #[value]}, head: 2}\n";
+    const source = "const extract = fn value => value.item.count\nconst scoped = fn value => do:\n  let local = fn amount => amount.item.count\n  break local value\nentry const run = fn (value: U32) => extract {tail: 3.0, item: {count: value, ignored: 2}}\nentry const packed = fn (value: U32) => scoped {item: {ignored: 2.0, count: #[value]}, head: 2}\n";
     var before = try prepare(a, source, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("extract") != null);
@@ -1734,10 +1734,10 @@ test "body check cache owns declared field principals and qualified projected re
         \\const scoped = fn value => do:
         \\  let local: a -> b where { field "first" a b } = fn row => row.first
         \\  let root = local value
-        \\  return root.count
+        \\  break root.count
         \\const inferred = fn value => do:
         \\  let root = value.count
-        \\  return root.count
+        \\  break root.count
         \\entry const run = fn (value: U32) => extract { first: { count: value, tail: 2.0 }, other: 3 }
         \\entry const packed = fn (value: U32) => scoped { other: 2.0, first: { tail: 3, count: #[value] } }
         \\entry const plain = fn (value: U32) => inferred { count: { count: value } }
@@ -1769,12 +1769,12 @@ test "body check cache owns if let pattern scopes and predecessor joins" {
         \\    result := @u32.add amount 1
         \\  else:
         \\    result := 3
-        \\  return result
+        \\  break result
         \\const pack = fn (value: Maybe (Array U32)) => do:
         \\  let result = #[2]
         \\  if let #Some amount = value:
         \\    result := amount
-        \\  return result
+        \\  break result
         \\entry const run = fn (value: U32) => choose (#Some value)
         \\entry const empty = fn () => choose #None
         \\entry const packed = fn (value: U32) => pack (#Some #[value])
@@ -1810,8 +1810,8 @@ test "body check cache owns statement case arm suites and level joins" {
         \\      let unused = 1
         \\    #Still => do:
         \\      count := 9
-        \\      return ()
-        \\  return count
+        \\      break ()
+        \\  break count
         \\const pack = fn (beat: Tri) => do:
         \\  let values = #[2]
         \\  case beat of
@@ -1820,7 +1820,7 @@ test "body check cache owns statement case arm suites and level joins" {
         \\    #Fall => do:
         \\      values[0] := 7
         \\    #Still => ()
-        \\  return values
+        \\  break values
         \\entry const run = fn (value: U32) => choose #Rise
         \\entry const fallen = fn () => choose #Fall
         \\entry const still = fn () => choose #Still
@@ -1853,8 +1853,8 @@ test "body check cache owns pure collection unary and value pattern recipes" {
         \\const negative = fn (value: F32) => -value
         \\const selected = fn (value: U32) => do:
         \\  if let ^marker = value:
-        \\    return 1
-        \\  return 0
+        \\    break 1
+        \\  break 0
         \\entry const run = fn (value: U32) => copied value
         \\entry const scalar = fn (value: U32) => @array.get (generated value) 1
         \\entry const count = fn (value: U32) => @list.length (listed value)
@@ -1989,7 +1989,7 @@ test "body check cache generic contract callers retain residual requirements" {
 }
 
 test "body check cache local contract requirements own current declaration identities" {
-    const source = try std.mem.replaceOwned(u8, a, implementation_mixed, "fn (value: U32) => Source.first value", "fn (value: U32) => do:\n  let forward = fn item => Source.first item\n  return forward value");
+    const source = try std.mem.replaceOwned(u8, a, implementation_mixed, "fn (value: U32) => Source.first value", "fn (value: U32) => do:\n  let forward = fn item => Source.first item\n  break forward value");
     defer a.free(source);
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -2165,7 +2165,7 @@ const loop_source =
     \\    total := @u32.add self 1
     \\    let total = 42
     \\    break
-    \\  return total
+    \\  break total
     \\entry const run = fn (limit: U32) -> U32 => sum limit
 ;
 
@@ -2183,7 +2183,7 @@ test "body check cache relocates ordinary loop carries and lexical break snapsho
     try compare(a, &before.bodies, changed, result.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, result.bytes, @as(usize, 1) });
     // Changed bounds, writes and lexical exits must elaborate normally.
-    const rewritten = "const seed = 2\nconst sum = fn (limit: U32) -> U32 => do:\n  let total = seed\n  for index in 1..limit:\n    total := @u32.add self index\n  return total\nentry const run = fn (limit: U32) -> U32 => sum limit\n";
+    const rewritten = "const seed = 2\nconst sum = fn (limit: U32) -> U32 => do:\n  let total = seed\n  for index in 1..limit:\n    total := @u32.add self index\n  break total\nentry const run = fn (limit: U32) -> U32 => sum limit\n";
     var rewritten_fresh = try prepare(a, rewritten, null);
     defer rewritten_fresh.deinit(a);
     var rewritten_result = try compile(a, &rewritten_fresh);
@@ -2213,7 +2213,7 @@ const used_values =
     \\    use snapshot <- result
     \\    result := @u32.add self index
     \\    use snapshot
-    \\  return result
+    \\  break result
     \\entry const run = fn (value: U32) -> U32 => helper value
 ;
 
@@ -2245,10 +2245,10 @@ const path_update_source =
     \\  let bucket = #Bucket { points: #[#Point { y: 1, x: 10 }, #Point { y: 2, x: 20 }] }
     \\  let before = bucket
     \\  bucket.points[index].x := @u32.add self seed
-    \\  return @u32.add before.points[index].x bucket.points[index].x
+    \\  break @u32.add before.points[index].x bucket.points[index].x
     \\const replace = fn values => fn index => fn value => do:
     \\  values[index] := value
-    \\  return values
+    \\  break values
     \\entry const run = fn (index: U32) -> U32 => update index
 ;
 fn capturePathUpdates(allocator: A) !void {
@@ -2277,7 +2277,7 @@ const demanded_body_source =
     \\const force = fn ~(value: U32) -> U32 => @demand value
     \\const twice = fn (value: U32) => do:
     \\  let delayed = fn ~(input: U32) => @u32.add (@force input) (@force input)
-    \\  return delayed (@u32.add value seed)
+    \\  break delayed (@u32.add value seed)
     \\entry const run = fn (value: U32) => @u32.add (force value) (twice value)
 ;
 test "body check cache demand call reconstruction owns fresh and replayed suspension metadata through OOM" {
@@ -2520,7 +2520,7 @@ const compound_loop_order =
     \\    values := if @u32.lt index 16 then @list.append values index else @list.prepend values index
     \\    other := @list.append other (@u32.add index 100)
     \\    earlier := if @u32.eq index 30 then values else earlier
-    \\  return #Bundle {earlier: earlier, current: values, alias: values, other: other}
+    \\  break #Bundle {earlier: earlier, current: values, alias: values, other: other}
     \\entry const run = fn () => @array.from_list grown.current
     \\entry const sibling = 1
 ;
@@ -2573,10 +2573,10 @@ const numeric_owner_source =
     \\  let values = #[seed, 13]
     \\  let alias = values
     \\  let valid = witness alias index
-    \\  return at values index valid
+    \\  break at values index valid
     \\const late = fn (index: U32) => do:
     \\  let valid = @proof.index globals cursor
-    \\  return at globals cursor valid
+    \\  break at globals cursor valid
     \\entry const run = fn () => @u32.add (checked 0) (late 1)
 ;
 test "body check cache transports erased numeric contract operands and guards through relocation and OOM" {
@@ -2676,8 +2676,8 @@ const selected_scope_owner_source =
     \\  let alias = chosen
     \\  let (state, result) = do (@effect.state chosen.get chosen.set seed):
     \\    use alias.set 42
-    \\    return alias.get ()
-    \\  return result
+    \\    break alias.get ()
+    \\  break result
     \\))
     \\entry const run = fn () => selected #True
 ;
@@ -2712,7 +2712,7 @@ const iterator_owner_source =
     \\  let result = seed
     \\  for value in #Counter first:
     \\    result := @u32.add self value
-    \\  return result
+    \\  break result
     \\entry const run = fn () => total 1
 ;
 test "body check cache transports actual generated iterator owners through relocation and OOM" {
@@ -2751,9 +2751,9 @@ const resolver_owner_source =
     \\  for ever:
     \\    use candidate <- step state
     \\    if let #Some (#Done result) = candidate:
-    \\      return #Some result
+    \\      break #Some result
     \\    let #Some (#Continue next) = candidate else:
-    \\      return #Nothing
+    \\      break #Nothing
     \\    state := next
     \\const sequence = fn forwarded => do (monad Maybe):
     \\  let total = seed
@@ -2762,11 +2762,11 @@ const resolver_owner_source =
     \\      use value <- #Some 1
     \\      total := @u32.add self value
     \\      if forwarded:
-    \\        return $ #Some (@u32.add total 21)
+    \\        break $ #Some (@u32.add total 21)
     \\      if @u32.eq inner 1:
-    \\        return @u32.add total 20
+    \\        break @u32.add total 20
     \\      break
-    \\  return total
+    \\  break total
     \\entry const answer = fn () => case sequence #True of
     \\  #Some value => value
     \\  #Nothing => 0
@@ -2812,8 +2812,8 @@ const local_generation_owner_source =
     \\  let alias = chosen
     \\  let (state, result) = do (@effect.state chosen.get chosen.set seed):
     \\    use alias.set 42
-    \\    return alias.get ()
-    \\  return result
+    \\    break alias.get ()
+    \\  break result
     \\))
     \\entry const run = fn () => selected #True
 ;
@@ -2844,11 +2844,11 @@ const task_view_owner_source =
     \\const partition = fn (owner: unique (Array U32)) => do:
     \\  let (owner, result) = @task.split owner ((0, 2), (2, 4)) (fn views => do:
     \\    let (left, right) = views
-    \\    return @task.scope (fn group => do:
+    \\    break @task.scope (fn group => do:
     \\      let first = @task.spawn group (fn () => @u32.add seed (@task.read left 0))
     \\      let second = @task.spawn group (fn () => @task.read right 0)
-    \\      return @u32.add (@task.join first) (@task.join second)))
-    \\  return result
+    \\      break @u32.add (@task.join first) (@task.join second)))
+    \\  break result
     \\entry const view = fn (owner: unique (Array U32)) => partition owner
 ;
 test "body check cache transports actual task view binding versions through relocation and OOM" {

@@ -64,9 +64,9 @@ test "deferred method concrete instances retain independent generic receiver evi
 
 test "deferred method reached returned closures preserve initializer cycle diagnostics" {
     for ([_]struct { source: []const u8, point: u32 }{
-        .{ .source = "type Left is data = #Left U32\nconst Left.read = fn value => fn () => first ()\nconst pick = fn value => value.read\nlet first: Unit -> U32 = pick (#Left 1)\nentry const answer: Unit -> U32 = fn () => do:\n  let unused = first\n  return 42\n", .point = 118 },
+        .{ .source = "type Left is data = #Left U32\nconst Left.read = fn value => fn () => first ()\nconst pick = fn value => value.read\nlet first: Unit -> U32 = pick (#Left 1)\nentry const answer: Unit -> U32 = fn () => do:\n  let unused = first\n  break 42\n", .point = 118 },
         .{ .source = "type Left is data = #Left U32\ndata Cell = #Cell {value: U32, action: Unit -> U32}\nconst Left.read = fn value => fn () => first.value\nconst pick = fn value => value.read\nlet first = #Cell {value: 42, action: pick (#Left 1)}\nentry const answer: Unit -> U32 = fn () => first.action ()\n", .point = 173 },
-        .{ .source = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Right.read = fn value => @array.length #[first]\nconst Left.read = fn value => fn () => (#Right 1).read\nconst pick = fn value => value.read\nlet first: Unit -> U32 = pick (#Left 1)\nentry const answer: Unit -> U32 = fn () => do:\n  let unused = first\n  return 42\n", .point = 211 },
+        .{ .source = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Right.read = fn value => @array.length #[first]\nconst Left.read = fn value => fn () => (#Right 1).read\nconst pick = fn value => value.read\nlet first: Unit -> U32 = pick (#Left 1)\nentry const answer: Unit -> U32 = fn () => do:\n  let unused = first\n  break 42\n", .point = 211 },
     }) |case_| {
         var module = try lower(a, case_.source);
         defer module.deinit(a);
@@ -122,10 +122,10 @@ test "deferred method source requirements and later evidence release every faile
 }
 
 const qualified_member_cases = [_][]const u8{
-    "type Box is data = #Box U32\nconst Box.read: Box -> a where {field \"read\" Box a} = fn (value: Box) => do:\n  let result = (fn other => other.read) value\n  return result\nentry const answer = 42\n",
+    "type Box is data = #Box U32\nconst Box.read: Box -> a where {field \"read\" Box a} = fn (value: Box) => do:\n  let result = (fn other => other.read) value\n  break result\nentry const answer = 42\n",
     "type Box is data = #Box U32\nconst Box.read: Box -> a where {field \"read\" Box a} = fn value => helper value\nconst helper: Box -> a = fn value => value.read\nentry const answer = 42\n",
-    "type Box is data = #Box U32\nconst Box.read: Box -> a where {field \"read\" Box a} = fn (value: Box) => do:\n  let result = helper value\n  return result\nconst helper: Box -> a = fn value => value.read\nentry const answer = 42\n",
-    "type Box is data = #Box U32\nconst Box.read: Box -> a where {receiver \"read\" Box Unit a} = fn (value: Box) => do:\n  let result = (fn other => other.read) value\n  return result\nentry const answer = 42\n",
+    "type Box is data = #Box U32\nconst Box.read: Box -> a where {field \"read\" Box a} = fn (value: Box) => do:\n  let result = helper value\n  break result\nconst helper: Box -> a = fn value => value.read\nentry const answer = 42\n",
+    "type Box is data = #Box U32\nconst Box.read: Box -> a where {receiver \"read\" Box Unit a} = fn (value: Box) => do:\n  let result = (fn other => other.read) value\n  break result\nentry const answer = 42\n",
     "type Box is data = #Box U32\nconst Box.read: Box -> U32 where {} = fn value => value.read\nentry const answer = 42\n",
 };
 
@@ -149,7 +149,7 @@ test "method source qualification preserves explicit field provenance after fron
 }
 
 fn missingMemberCoverage(allocator: std.mem.Allocator, clause: []const u8) !void {
-    const source = try allocator.print("type Box is data = #Box U32\nconst Box.read: Box -> a where {{{s}}} = fn (value: Box) => do:\n  let result = (fn other => other.read) value\n  return result\nentry const answer = 42\n", .{clause});
+    const source = try allocator.print("type Box is data = #Box U32\nconst Box.read: Box -> a where {{{s}}} = fn (value: Box) => do:\n  let result = (fn other => other.read) value\n  break result\nentry const answer = 42\n", .{clause});
     defer allocator.free(source);
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -183,7 +183,7 @@ test "method source qualification correction remains owned and atomic under ever
 
 fn forwardedMemberCoverage(allocator: std.mem.Allocator, delayed: bool) !void {
     const source = if (delayed)
-        "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = fn (value: Box) => do:\n  let result = helper value\n  return result\nconst helper: Box -> a = fn value => value.read\nentry const answer = 42\n"
+        "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = fn (value: Box) => do:\n  let result = helper value\n  break result\nconst helper: Box -> a = fn value => value.read\nentry const answer = 42\n"
     else
         "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = fn value => helper value\nconst helper: Box -> a = fn value => value.read\nentry const answer = 42\n";
     var tokens = try lexer.lex(allocator, source);
@@ -306,7 +306,7 @@ test "self method source open result cannot prove its own empty clause from an u
 }
 
 test "self method source aliases and nested open result rows retain exact empty clause points" {
-    try selfMissingCoverage(a, "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = fn value => do:\n  let alias = value\n  return alias.read\nentry const answer = 42\n", 115);
+    try selfMissingCoverage(a, "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = fn value => do:\n  let alias = value\n  break alias.read\nentry const answer = 42\n", 114);
     try selfMissingCoverage(a, "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32 ! {|e}) where {} = fn value => value.read\nentry const answer = 42\n", 101);
 }
 

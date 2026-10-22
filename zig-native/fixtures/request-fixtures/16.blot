@@ -14,11 +14,11 @@ const count = fn computation => do:
           first := @u32.add self 1
         yield @u32.add first second
       complete value =>
-        return @u32.add (@u32.add first second) value
+        break @u32.add (@u32.add first second) value
 entry const answer = fn () => count (@computation (fn () => do:
   use Counter.next 0
   use value <- Counter.next 1
-  return value
+  break value
 ))
 
 entry const checked_answer = answer ()

@@ -15,7 +15,7 @@ const iterator =
     \\  let n = 0
     \\  for x in xs:
     \\    n := @u32.add self 1
-    \\  return n
+    \\  break n
     \\
 ;
 const cases = [_][]const u8{

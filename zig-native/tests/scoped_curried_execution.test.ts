@@ -23,24 +23,24 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (lef
       use next <- host a
       use left.set next
       use c <- apply left (fn () => left.get ())
-      return @u32.add (@u32.add a b) c
+      break @u32.add (@u32.add a b) c
     let (state, result) = inner
-    return result
+    break result
   let (state, result) = outer
-  return result
+  break result
 ))
 entry const floating = fn () => @effect.scope (fn (s: State F32) => do:
   let (state, result) = do (@effect.state s.get s.set 1.5):
-    return apply s (fn () => s.get ())
-  return result
+    break apply s (fn () => s.get ())
+  break result
 )
 `;
 const unmatched = `import {State, apply} from "./state"
 entry const invalid = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   use nested <- do (@effect.state left.get left.set 7):
-    return apply left (fn () => right.get ())
+    break apply left (fn () => right.get ())
   let (state, result) = nested
-  return result
+  break result
 ))
 `;
 const cases = Object.entries(libraries).flatMap(([syntax, library]) =>
@@ -189,7 +189,7 @@ for (const { syntax, library, codegenTier } of cases) {
                   "=> callback ()",
                   `=> do:
   let operation = callback
-  return operation ()`,
+  break operation ()`,
                 ),
               },
             });

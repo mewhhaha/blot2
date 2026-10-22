@@ -37,7 +37,7 @@ export const cases = [
   {
     name: "tuple_argument",
     source:
-      "const add = fn pair => do:\n  let (left, right) = pair\n  return @u32.add left right\nentry const answer = add(20, 22)\n",
+      "const add = fn pair => do:\n  let (left, right) = pair\n  break @u32.add left right\nentry const answer = add(20, 22)\n",
     valid: true,
     reads: [["answer", 42]],
   },
@@ -50,7 +50,7 @@ export const cases = [
   {
     name: "record_function",
     source:
-      "type Action is data = #Action { run: U32 -> U32 }\nentry const answer = fn () => do:\n  let action = #Action { run: fn value => @u32.add value 2 }\n  return action.run(40)\n",
+      "type Action is data = #Action { run: U32 -> U32 }\nentry const answer = fn () => do:\n  let action = #Action { run: fn value => @u32.add value 2 }\n  break action.run(40)\n",
     valid: true,
     calls: [["answer", null, 42]],
   },
@@ -64,7 +64,7 @@ export const cases = [
   {
     name: "spaced_index_field",
     source:
-      "type Box is data = #Box { value: U32 }\nconst add = fn left => fn right => @u32.add left right\nentry const answer = fn () => do:\n  let values = #[#Box { value: 40 }]\n  return add values[0].value 2\n",
+      "type Box is data = #Box { value: U32 }\nconst add = fn left => fn right => @u32.add left right\nentry const answer = fn () => do:\n  let values = #[#Box { value: 40 }]\n  break add values[0].value 2\n",
     valid: true,
     calls: [["answer", null, 42]],
   },
@@ -125,7 +125,7 @@ type Box is data = #Box { values: Array U32 }
 const Box.pick = fn receiver => fn index => receiver.values[index]
 const make = fn (probe: U32 -> U32 ! {Foreign}) => do:
   use probe 1
-  return #Box { values: #[40, 42] }
+  break #Box { values: #[40, 42] }
 entry const run = fn (probe: U32 -> U32 ! {Foreign}) => make(probe).pick(probe(2) - 1)
 `;
 

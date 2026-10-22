@@ -23,7 +23,7 @@ Deno.test("product arity shape and literal index errors remain distinct",async()
 Deno.test("projecting Never preserves prior callback effects and traps in sync and JSPI guests",async()=>{
  for(const asynchronous of [false,true])await compileAndRun(`entry const answer: (Unit -> Unit ! {Foreign}) -> U32 ! {Foreign} = fn before => do:
   before ()
-  return @product.get (@panic "projected") 0
+  break @product.get (@panic "projected") 0
 `,async guest=>{
   let count=0;
   const host=asynchronous?guest.capabilityAsync({parameter:"Unit",result:"Unit",call:async()=>{count++;return null;}}):guest.capability({parameter:"Unit",result:"Unit",call:()=>{count++;return null;}});

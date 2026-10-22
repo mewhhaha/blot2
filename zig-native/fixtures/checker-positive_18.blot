@@ -8,4 +8,4 @@ entry const answer = fn () => do:
         let local = do:
           break
         @panic "inner do intercepted the completion break"
-  return result
+  break result

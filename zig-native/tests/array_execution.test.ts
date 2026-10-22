@@ -5,11 +5,11 @@ Deno.test("nested array spreads select inline result-directed conversions", asyn
 entry const prefix = fn (n: U32) -> F32 => do:
   let rows: Array (Array F32) = #[#[1.0]]
   let xs: Array (Array F32) = #[#[from n], ...rows]
-  return xs[0][0]
+  break xs[0][0]
 entry const suffix = fn (n: U32) -> F32 => do:
   let rows: Array (Array F32) = #[#[1.0]]
   let xs: Array (Array F32) = #[...rows, #[from n]]
-  return xs[1][0]
+  break xs[1][0]
 `, guest => {
     for (const n of [0, 7, 42]) {
       equal(guest.call("prefix", n), n);
@@ -27,7 +27,7 @@ entry const generated = fn (offset: U32) -> Array U32 => @array.generate 4 (fn i
 entry const floating = fn (offset: F32) -> Array F32 => @array.generate 3 (fn index => @f32.add (@u32.to_f32 index) offset)
 entry const nested = fn (offset: U32) -> U32 => do:
   let items = @array.generate 3 (fn index => #Item { value: @u32.add index offset })
-  return (@array.get items 2).value
+  break (@array.get items 2).value
 entry const empty = fn () -> Array U32 => @array.generate 0 (fn (index: U32) -> U32 => @panic "uncalled generator")
 `, guest => {
     equal(guest.read("staged"), 42);
@@ -53,7 +53,7 @@ entry const length = fn (values: Array F32) -> U32 => @array.length values
 entry const alias = fn (value: U32) -> U32 => do:
   let before = #[value, 2]
   let after = @array.set before 0 40
-  return @u32.add (@array.get before 0) (@array.get after 0)
+  break @u32.add (@array.get before 0) (@array.get after 0)
 `, guest => {
     for (const count of [0, 1, 32, 16384, 32769, 1]) {
       const filled = guest.call("fill", count) as Uint32Array;
@@ -83,17 +83,17 @@ Deno.test("selected F32 locals survive generated products and captured arrays wi
 const scaled = fn (value: U32) => from value / 65536.0
 const place = fn index => do:
   let x = scaled index + 0.5
-  return (x, x, index)
+  break (x, x, index)
 const generate = fn count => fn make => @array.generate count make
 entry const run = fn (count: U32) -> Bool => do:
   let positions = generate count place
   let flags = generate count (fn index => do:
     let (x, y, _) = positions[index]
-    return @f32.eq (@f32.add x y) 1.0)
-  return flags[0]
+    break @f32.eq (@f32.add x y) 1.0)
+  break flags[0]
 entry const independent = fn () => do:
   let identity = fn value => value
-  return @f32.add (@u32.to_f32 (identity 41)) (identity 1.5)
+  break @f32.add (@u32.to_f32 (identity 41)) (identity 1.5)
 `, guest => {
     for (const count of [1, 2, 4, 32]) equal(guest.call("run", count), true);
     for (let index = 0; index < 100; index++) equal(guest.call("independent", null), 42.5);
@@ -105,7 +105,7 @@ Deno.test("a selected F32 local cannot acquire a U32 type from a later use", asy
 const scaled = fn (value: U32) => from value / 65536.0
 entry const wrong = fn (index: U32) -> U32 => do:
   let x = scaled index + 0.5
-  return @u32.add x 1
+  break @u32.add x 1
 `, "type_mismatch", undefined, { prelude: "std/prelude.blot" });
 });
 
@@ -116,7 +116,7 @@ entry const run = fn (index: U32) => do:
   let pair = (scaled index + 0.5, fn value => value)
   let (x, identity) = pair
   let first = identity 41
-  return @f32.add x (@u32.to_f32 first)
+  break @f32.add x (@u32.to_f32 first)
 `, guest => {
     for (const index of [0, 1, 65536]) equal(guest.call("run", index), Math.fround(index / 65536 + 41.5));
   }, { prelude: "std/prelude.blot" });
@@ -125,6 +125,6 @@ const scaled = fn (value: U32) => from value / 65536.0
 entry const wrong = fn (index: U32) -> U32 => do:
   let pair = (scaled index + 0.5, fn value => value)
   let (value, identity) = pair
-  return @u32.add value (identity 41)
+  break @u32.add value (identity 41)
 `, "type_mismatch", undefined, { prelude: "std/prelude.blot" });
 });

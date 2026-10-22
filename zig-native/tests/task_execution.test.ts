@@ -8,127 +8,127 @@ const source = `
 entry const answer = fn (value: U32) => @task.scope (fn group => do:
   let left = @task.spawn group (fn () => value)
   let right = @task.spawn group (fn () => 22)
-  return @u32.add (@task.join left) (@task.join right))
+  break @u32.add (@task.join left) (@task.join right))
 const nested = fn () => @task.scope (fn inner => @task.join (@task.spawn inner (fn () => 42)))
 entry const nesting = fn () => @task.scope (fn group => @task.join (@task.spawn group (fn () => nested ())))
 entry const mixed_groups = fn () => @task.scope (fn group => do:
   let left = @task.spawn group (fn () => 20)
   let right = @task.spawn group (fn () => @task.scope (fn inner => @task.join (@task.spawn inner (fn () => 22))))
   let second = @task.join right
-  return @u32.add (@task.join left) second)
+  break @u32.add (@task.join left) second)
 entry const grow_group = fn (host: concurrent (U32 -> U32 ! {Foreign})) => @task.scope (fn group => do:
   let parent = @task.spawn group (fn () => do:
     use value <- host 1
     let child = @task.spawn group (fn () => value)
-    return 9)
-  return 42)
+    break 9)
+  break 42)
 entry const grow_failure = fn (host: concurrent (U32 -> U32 ! {Foreign})) => @task.scope (fn group => do:
   let parent = @task.spawn group (fn () => do:
     use value <- host 1
     let child = @task.spawn group (fn () => @panic "descendant failed")
-    return @task.join child)
-  return 42)
+    break @task.join child)
+  break 42)
 entry const cancelled = fn () => @task.scope (fn group => do:
   let child = @task.spawn group (fn () => @panic "unstarted")
   let cancelled = @task.cancel child
-  return 42)
+  break 42)
 entry const ignored = fn () => @task.scope (fn group => do:
   let child = @task.spawn group (fn () => 9)
-  return 42)
+  break 42)
 entry const partition = fn (owner: unique (Array U32)) => do:
   let (owner, result) = @task.split owner ((0, 2), (2, 4)) (fn views => do:
     let (left, right) = views
-    return @task.scope (fn group => do:
+    break @task.scope (fn group => do:
       let first = @task.spawn group (fn () => do:
         let written = @task.write left 0 20
-        return @task.read left 0)
+        break @task.read left 0)
       let second = @task.spawn group (fn () => do:
         let written = @task.write right 0 22
-        return @task.read right 0)
-      return @u32.add (@task.join first) (@task.join second)))
-  return result
+        break @task.read right 0)
+      break @u32.add (@task.join first) (@task.join second)))
+  break result
 entry const host = fn (host: concurrent (U32 -> U32 ! {Foreign})) => @task.scope (fn group => do:
   let left = @task.spawn group (fn () => host 1)
   let right = @task.spawn group (fn () => host 2)
-  return @u32.add (@task.join left) (@task.join right))
+  break @u32.add (@task.join left) (@task.join right))
 entry const host_array = fn (host: concurrent (Array U32 -> Array U32 ! {Foreign})) => @task.scope (fn group => do:
   let left = @task.spawn group (fn () => host #[1])
   let right = @task.spawn group (fn () => host #[2])
   use first <- @task.join left
   use second <- @task.join right
-  return @u32.add (@array.get first 0) (@array.get second 0))
+  break @u32.add (@array.get first 0) (@array.get second 0))
 entry const cancel_suspended = fn (host: concurrent (U32 -> U32 ! {Foreign})) => @task.scope (fn group => do:
   let left = @task.spawn group (fn () => host 1)
   let right = @task.spawn group (fn () => 42)
   let result = @task.join right
   use cancelled <- @task.cancel left
-  return result)
+  break result)
 entry const transfer = fn (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => do:
   use parent <- @resource.acquire (fn () => 5) cleanup
   use moved <- @resource.acquire (fn () => 9) cleanup
-  return @task.scope (fn group => @task.join (@task.spawn group (fn () => @usage.borrow moved (fn loan => @usage.read loan))))
+  break @task.scope (fn group => @task.join (@task.spawn group (fn () => @usage.borrow moved (fn loan => @usage.read loan))))
 entry const returned = fn (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => do:
   use parent <- @resource.acquire (fn () => 5) cleanup
   use moved <- @resource.acquire (fn () => 9) cleanup
   let result = @task.scope (fn group => @task.join (@task.spawn group (fn () => moved)))
-  return @usage.borrow result (fn loan => @usage.read loan)
+  break @usage.borrow result (fn loan => @usage.read loan)
 entry const cancel_owner = fn (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => do:
   use parent <- @resource.acquire (fn () => 5) cleanup
   use moved <- @resource.acquire (fn () => 9) cleanup
-  return @task.scope (fn group => do:
+  break @task.scope (fn group => do:
     let child = @task.spawn group (fn () => @usage.borrow moved (fn loan => @usage.read loan))
     let cancelled = @task.cancel child
-    return 42)
+    break 42)
 entry const lexical_cleanup = fn (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => do:
   use moved <- @resource.acquire (fn () => 9) cleanup
-  return @task.scope (fn group => @resource.scope (fn () => 5) cleanup (fn loan => do:
+  break @task.scope (fn group => @resource.scope (fn () => 5) cleanup (fn loan => do:
     let child = @task.spawn group (fn () => @usage.borrow moved (fn loan => @usage.read loan))
-    return 42))
+    break 42))
 entry const read_loan = fn (owner: unique U32) => @usage.borrow owner (fn loan => @task.scope (fn group => do:
   let left = @task.spawn group (fn () => @usage.read loan)
   let right = @task.spawn group (fn () => @usage.read loan)
-  return @u32.add (@task.join left) (@task.join right)))
+  break @u32.add (@task.join left) (@task.join right)))
 const rows = fn (owner: unique (Array (U32, U32))) => do:
   let (owner, value) = @task.split owner ((0, 1), (1, 2)) (fn views => do:
     let (left, right) = views
-    return @task.scope (fn group => do:
+    break @task.scope (fn group => do:
       let task = @task.spawn group (fn () => do:
         let written = @task.write left 0 (20, 22)
         let (a, b) = @task.read left 0
-        return @u32.add a b)
-      return @task.join task))
-  return value
+        break @u32.add a b)
+      break @task.join task))
+  break value
 entry const packed = fn () => rows #[(1, 2), (3, 4)]
 entry const returned_alias = fn (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => do:
   use moved <- @resource.acquire (fn () => 9) cleanup
   let (owner, extra) = @task.scope (fn group => @task.join (@task.spawn group (fn () => (moved, 33))))
   let alias = owner
-  return @u32.add extra (@usage.borrow alias (fn loan => @usage.read loan))
+  break @u32.add extra (@usage.borrow alias (fn loan => @usage.read loan))
 entry const discard_owner = fn (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => do:
   use moved <- @resource.acquire (fn () => 9) cleanup
-  return @resource.scope (fn () => 5) cleanup (fn loan => @task.scope (fn group => do:
+  break @resource.scope (fn () => 5) cleanup (fn loan => @task.scope (fn group => do:
     let child = @task.spawn group (fn () => moved)
-    return 42))
+    break 42))
 const demand_child = fn ~(value: unique U32) => @task.scope (fn group => @task.join (@task.spawn group (fn () => @demand value)))
 entry const demand_owner = fn (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => do:
   use owner <- @resource.acquire (fn () => 9) cleanup
   let result = demand_child owner
-  return @usage.borrow result (fn loan => @usage.read loan)
+  break @usage.borrow result (fn loan => @usage.read loan)
 entry const named_owner = fn (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => do:
   use owner <- @resource.acquire (fn () => 9) cleanup
   let result = @task.scope (fn group => do:
     let thunk: once (Unit -> unique U32) = fn () => owner
     let alias = thunk
-    return @task.join (@task.spawn group alias))
-  return @usage.borrow result (fn loan => @usage.read loan)
+    break @task.join (@task.spawn group alias))
+  break @usage.borrow result (fn loan => @usage.read loan)
 entry const late_owner = fn (host: concurrent (U32 -> U32 ! {Foreign})) => do:
   use owner <- @resource.acquire (fn () => 9) (fn owner => @panic "cancelled resource cleanup")
-  return @task.scope (fn group => do:
+  break @task.scope (fn group => do:
     let left = @task.spawn group (fn () => do:
       use result <- host 1
-      return owner)
+      break owner)
     let right = @task.spawn group (fn () => host 2)
-    return @task.join right)
+    break @task.join right)
 `;
 Deno.test("structured source tasks execute sync JSPI affine join cancel and nested groups", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-tasks-" });
@@ -420,16 +420,16 @@ Deno.test("structured task archives retained edits failure rollback and restart 
 const sum = fn (value: U32) => @task.scope (fn group => do:
   let left = @task.spawn group (fn () => value)
   let right = @task.spawn group (fn () => 22)
-  return @u32.add (@task.join left) (@task.join right))
+  break @u32.add (@task.join left) (@task.join right))
 const returned = fn (owner: unique U32) => @task.scope (fn group => @task.join (@task.spawn group (fn () => owner)))
 const partition = fn (owner: unique (Array U32)) => do:
   let (owner, result) = @task.split owner ((0, 2), (2, 4)) (fn views => do:
     let (left, right) = views
-    return @task.scope (fn group => do:
+    break @task.scope (fn group => do:
       let first = @task.spawn group (fn () => @task.read left 0)
       let second = @task.spawn group (fn () => @task.read right 0)
-      return @u32.add (@task.join first) (@task.join second)))
-  return result
+      break @u32.add (@task.join first) (@task.join second)))
+  break result
 const apply_quoted = fn (callback: U32 -> U32) => callback 42
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 const hidden = fn (value: U32) => @effect.scope (fn (state: State U32) => value)
@@ -445,7 +445,7 @@ entry const scoped = fn () => @code.emit quoted_scope
 entry const transfer = fn (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => do:
   use owner <- @resource.acquire (fn () => 9) cleanup
   let result = returned owner
-  return @usage.borrow result (fn loan => @usage.read loan)
+  break @usage.borrow result (fn loan => @usage.read loan)
 `;
   try {
     await Deno.writeTextFile(entry, consumer);
@@ -586,16 +586,16 @@ Deno.test("quoted task groups and partitions execute only after emission with fr
 const generated = @code.quote (fn (value: U32) => @task.scope (fn group => do:
   let first = @task.spawn group (fn () => value)
   let second = @task.spawn group (fn () => 22)
-  return @u32.add (@task.join first) (@task.join second)))
+  break @u32.add (@task.join first) (@task.join second)))
 const partitioned = @code.quote (fn () => do:
   let owner: unique (Array U32) = #[20, 0, 22, 0]
   let (owner, result) = @task.split owner ((0, 2), (2, 4)) (fn views => do:
     let (left, right) = views
-    return @task.scope (fn group => do:
+    break @task.scope (fn group => do:
       let first = @task.spawn group (fn () => @task.read left 0)
       let second = @task.spawn group (fn () => @task.read right 0)
-      return @u32.add (@task.join first) (@task.join second)))
-  return result)
+      break @u32.add (@task.join first) (@task.join second)))
+  break result)
 entry const answer = fn (value: U32) => (@code.emit generated) value
 entry const views = fn () => (@code.emit partitioned) ()
 `;
@@ -658,8 +658,8 @@ Deno.test("wide Source task scope and thunk execute with more than 64 direct chi
 ${outer}
   let child = @task.spawn group (fn () => do:
 ${inner}
-    return @u32.add value 22)
-  return @task.join child)
+    break @u32.add value 22)
+  break @task.join child)
 `;
   try {
     const built = await compiler.build({ sources: { [entry]: text } });
@@ -745,32 +745,32 @@ const recur = fn (value: U32) -> U32 => if @u32.eq value 0 then 42 else recur (@
 const apply = fn (f: U32 -> U32) => fn (value: U32) => f value
 entry const group = fn () => @task.scope (fn group => do:
   let alias = identity group
-  return @task.join (@task.spawn alias (fn () => 42)))
+  break @task.join (@task.spawn alias (fn () => 42)))
 entry const loan = fn (owner: unique U32) => @usage.borrow owner (fn loan => @task.scope (fn group => do:
   let first = @task.spawn group (fn () => read loan)
   let second = @task.spawn group (fn () => read loan)
-  return @u32.add (@task.join first) (@task.join second)))
+  break @u32.add (@task.join first) (@task.join second)))
 const partition = fn (owner: unique (Array U32)) => do:
   let (owner, result) = @task.split owner ((0, 1), (1, 2)) (fn views => do:
     let (left, right) = views
     let alias = owned left
-    return @task.scope (fn group => @task.join (@task.spawn group (fn () => @task.read alias 0))))
-  return result
+    break @task.scope (fn group => @task.join (@task.spawn group (fn () => @task.read alias 0))))
+  break result
 entry const view = fn () => partition #[42, 22]
 entry const recursive = fn () => @task.scope (fn group => @task.join (@task.spawn group (fn () => recur 3)))
 const changed = fn (values: Array U32) => @array.set (@array.append values 22) 0 20
 const generated = fn () => @array.generate 2 (fn (index: U32) => @u32.add index 20)
 entry const collection = fn () => @task.scope (fn group => @task.join (@task.spawn group (fn () => do:
   let values = changed #[1]
-  return @u32.add (@array.get values 0) (@array.get values 1))))
+  break @u32.add (@array.get values 0) (@array.get values 1))))
 entry const generate = fn () => @task.scope (fn group => @task.join (@task.spawn group (fn () => @u32.add 1 (@u32.add (@array.get (generated ()) 0) (@array.get (generated ()) 1)))))
 entry const concurrent_helper = fn (host: concurrent (U32 -> U32 ! {Foreign})) => @task.scope (fn group => @task.join (@task.spawn group (fn () => do:
   let alias = identity host
   use value <- alias 20
-  return value)))
+  break value)))
 entry const local_function = fn () => @task.scope (fn group => do:
   let offset: U32 -> U32 = fn (value: U32) => @u32.add value 22
-  return @task.join (@task.spawn group (fn () => apply offset 20)))
+  break @task.join (@task.spawn group (fn () => apply offset 20)))
 `;
   const compiler = await createZigProjectCompiler({
     executable,

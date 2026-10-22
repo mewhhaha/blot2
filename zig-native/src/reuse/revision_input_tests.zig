@@ -493,7 +493,7 @@ test "trivia-only source changes keep tokens and adjacency; layout and adjacency
         \\const helper = fn (x: U32) -> U32 => x
         \\entry const answer = fn () => do:
         \\  let values: Array U32 = #[1, 2]
-        \\  return helper values[0]
+        \\  break helper values[0]
         \\
     ;
     const cases = [_]struct { from: []const u8, to: []const u8, trivia: bool }{
@@ -505,7 +505,7 @@ test "trivia-only source changes keep tokens and adjacency; layout and adjacency
         // Adjacent parentheses call; spaced ones group an argument.
         .{ .from = "helper values[0]", .to = "helper(values[0])", .trivia = false },
         // Moving a statement out of the suite changes layout tokens.
-        .{ .from = "  return helper", .to = "return helper", .trivia = false },
+        .{ .from = "  break helper", .to = "break helper", .trivia = false },
         .{ .from = "#[1, 2]", .to = "#[1, 3]", .trivia = false },
     };
     for (cases) |case| {

@@ -10,37 +10,37 @@ entry const references = fn (seed: U32) => do:
   let original = #[#[seed, seed + 1], #[9, 10]].iter
   use step <- original.next
   let #Some (value, rest) = step else:
-    return #[999]
+    break #[999]
   for index in 0..24:
     let pressure = @array.fill 8192 index
     if pressure[8191] != index:
       @panic "pressure"
   use again <- original.next
   let #Some (saved, _) = again else:
-    return #[998]
+    break #[998]
   use next <- rest.next
   let #Some (second, _) = next else:
-    return #[997]
-  return #[value[0], value[1], saved[0], second[0]]
+    break #[997]
+  break #[value[0], value[1], saved[0], second[0]]
 entry const retained = fn (seed: U32) => do:
   use step <- #[seed, seed + 1].iter.next
   let #Some (first, rest) = step else:
-    return 999
+    break 999
   use next <- rest.next
   let #Some (second, _) = next else:
-    return 998
+    break 998
   let #Some (again, _) = step else:
-    return 997
-  return first + second + again
+    break 997
+  break first + second + again
 const make = fn (host: U32 -> U32 ! {Foreign}) => do:
   use seed <- host 41
-  return (@array.fill 2 seed).iter
+  break (@array.fill 2 seed).iter
 entry const ordered = fn (host: U32 -> U32 ! {Foreign}) => do:
   use step <- (make host).next
   let #Some (value, rest) = step else:
-    return 999
+    break 999
   use result <- host value
-  return result
+  break result
 `;
 
 function directPatterns(text: string) {
@@ -190,8 +190,8 @@ for (const direct of [false, true]) {
     let text = `entry const pull = fn (seed: U32) => do:
   use step <- (@array.fill 1 seed).iter.next
   let #Some (value, _) = step else:
-    return 999
-  return value
+    break 999
+  break value
 `;
     if (direct) text = directPatterns(text);
     try {

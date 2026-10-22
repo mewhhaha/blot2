@@ -6,7 +6,7 @@ const executable = Deno.args[0] ??
 const library = `const drop: cleanup ((unique U32) -> Unit) = fn owner => do:
   for index in 0..3:
     let value = index
-  return ()
+  break ()
 const consume = fn (owner: unique U32) => drop owner
 `;
 const source = `import {consume} from "./cleanup"
@@ -16,7 +16,7 @@ entry const answer = fn () => do:
   let ignored = adapter owner
   use other <- @resource.acquire (fn () => 11) (fn value => ())
   let result = consume other
-  return 42
+  break 42
 `;
 for (const codegenTier of ["development", "optimized"] as const) {
   Deno.test(`standalone pure cleanup literals retain source and portable receipts (${codegenTier})`, async () => {

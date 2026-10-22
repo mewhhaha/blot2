@@ -8,12 +8,12 @@ const packed = #Pack { unused: identity, selected: fn (value: U32) => value + 1 
 const invoke = fn callback => callback 1
 const capture = fn packed => fn (value: U32) => invoke (fn extra => do:
   let #Pack { selected } = packed
-  return selected (value + extra))
+  break selected (value + extra))
 const work = fn (value: U32) => do:
   let total = 0
   for i in 0..value:
     total := total + capture packed i
-  return total
+  break total
 const unrelated = 10
 `;
 const main = `import * as lib from "./lib"
@@ -208,7 +208,7 @@ const work = fn (count: U32) => do:
   let total = 0
   for i in 0..count:
     total := total + select #True i
-  return total
+  break total
 const unrelated = fn (x: U32) => x + 1
 `;
   const main =

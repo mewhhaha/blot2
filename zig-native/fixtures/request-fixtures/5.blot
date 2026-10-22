@@ -10,12 +10,12 @@ const checked = fn computation => do:
           break
         yield value
       complete value =>
-        return value
-  return @u32.add count 30
+        break value
+  break @u32.add count 30
 const calculation = @computation (fn () => do:
   use Validate.check 40
   use Validate.check 0
-  return @panic "break resumed the computation"
+  break @panic "break resumed the computation"
 )
 entry const answer = fn () => checked calculation
 

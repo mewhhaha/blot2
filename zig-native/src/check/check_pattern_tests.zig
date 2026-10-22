@@ -19,7 +19,7 @@ fn patternSchemes(allocator: std.mem.Allocator) !void {
         .{ .binding = "let (x, identity) = (0, selected)", .mixed = false, .generalized = false },
     };
     for (cases) |item| {
-        const source = try allocator.print("type Box a is data = #Box a\ntype Functions a is data = #Functions {{identity: a}}\nconst selected: U32 -> U32 where {{type_rep U32}} = fn value => value\nentry const run = fn () => do:\n  {s}\n  let first = identity 41\n  return {s}\n", .{ item.binding, if (item.mixed) "@f32.add (@u32.to_f32 first) (identity 1.5)" else "first" });
+        const source = try allocator.print("type Box a is data = #Box a\ntype Functions a is data = #Functions {{identity: a}}\nconst selected: U32 -> U32 where {{type_rep U32}} = fn value => value\nentry const run = fn () => do:\n  {s}\n  let first = identity 41\n  break {s}\n", .{ item.binding, if (item.mixed) "@f32.add (@u32.to_f32 first) (identity 1.5)" else "first" });
         defer allocator.free(source);
         var tokens = try lexer.lex(allocator, source);
         defer tokens.deinit(allocator);

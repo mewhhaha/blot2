@@ -12,8 +12,8 @@ const source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
     \\  let (state, result) = do (@effect.state s.get s.set 7):
-    \\    return s.get ()
-    \\  return result
+    \\    break s.get ()
+    \\  break result
     \\)
 ;
 
@@ -98,7 +98,7 @@ const request_source =
     \\  let computation = @computation (fn () => do:
     \\    use a <- left.get ()
     \\    use b <- right_read ()
-    \\    return @u32.add a b
+    \\    break @u32.add a b
     \\  )
     \\  for request in @requests computation:
     \\    case request of
@@ -107,7 +107,7 @@ const request_source =
     \\      effect right_read () =>
     \\        yield 102
     \\      complete value =>
-    \\        return value
+    \\        break value
     \\))
 ;
 fn lowerRequestAndRelease(allocator: std.mem.Allocator) !void {
@@ -142,8 +142,8 @@ const generic_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\const local = fn (value: a) => @effect.scope (fn (s: State a) => do:
     \\  let (state, result) = do (@effect.state s.get s.set value):
-    \\    return s.get ()
-    \\  return result
+    \\    break s.get ()
+    \\  break result
     \\)
     \\entry const integer = fn () => local 7
     \\entry const fraction = fn () => local 1.5
@@ -167,8 +167,8 @@ const outer_result_source =
     \\  let longer = @effect.scope (fn (right: State U32) => {saved: left})
     \\  let read = longer.saved.get
     \\  let (state, result) = do (@effect.state longer.saved.get longer.saved.set 7):
-    \\    return read ()
-    \\  return result
+    \\    break read ()
+    \\  break result
     \\)
 ;
 fn lowerOuterResultAndRelease(allocator: std.mem.Allocator) !void {
@@ -194,7 +194,7 @@ const closure_result_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\entry const answer = fn (value: U32) => do:
     \\  let callback = @effect.scope (fn (s: State U32) => fn () => @u32.add value 1)
-    \\  return callback ()
+    \\  break callback ()
 ;
 fn lowerClosureResultAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, closure_result_source);
@@ -216,8 +216,8 @@ const flow_source =
     \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
     \\  let capability = identity s
     \\  let (state, result) = do (@effect.state capability.get capability.set 7):
-    \\    return invoke (identity capability.get)
-    \\  return result
+    \\    break invoke (identity capability.get)
+    \\  break result
     \\)
 ;
 fn lowerFlowAndRelease(allocator: std.mem.Allocator) !void {
@@ -260,8 +260,8 @@ const parameter_source =
     \\const read = fn (s: State a) -> a ! {s.get} => s.get ()
     \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
     \\  let (state, result) = do (@effect.state s.get s.set 7):
-    \\    return read s
-    \\  return result
+    \\    break read s
+    \\  break result
     \\)
 ;
 fn lowerParameterAndRelease(allocator: std.mem.Allocator) !void {
@@ -309,8 +309,8 @@ const curried_source =
     \\const apply = fn (s: State a) => fn (callback: Unit -> a ! {s.get | e}) => callback ()
     \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
     \\  let (state, result) = do (@effect.state s.get s.set 7):
-    \\    return apply s (fn () => s.get ())
-    \\  return result
+    \\    break apply s (fn () => s.get ())
+    \\  break result
     \\)
 ;
 fn lowerCurriedAndRelease(allocator: std.mem.Allocator) !void {
@@ -506,15 +506,15 @@ const multi_input_source =
     \\const read2 = fn (left: State U32) => fn (right: State U32) => do:
     \\  use x <- left.get ()
     \\  use y <- right.get ()
-    \\  return @u32.add x y
+    \\  break @u32.add x y
     \\entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
     \\  use outer <- do (@effect.state left.get left.set 7):
     \\    use inner <- do (@effect.state right.get right.set 9):
-    \\      return apply2 read2 left right
+    \\      break apply2 read2 left right
     \\    let (state, result) = inner
-    \\    return result
+    \\    break result
     \\  let (state, result) = outer
-    \\  return result
+    \\  break result
     \\))
 ;
 test "multi input invocation reconstructs ordered owners and named callback no store" {
@@ -632,7 +632,7 @@ test "captured scalar call receipts require primitive roles pure rows and owned 
 }
 
 fn forwardingSource(allocator: std.mem.Allocator) ![]u8 {
-    return std.mem.replaceOwned(u8, allocator, "const forward2 = fn callback => fn left => fn right => apply2 callback left right\n" ++ multi_input_source, "return apply2 read2 left right", "return forward2 read2 left right");
+    return std.mem.replaceOwned(u8, allocator, "const forward2 = fn callback => fn left => fn right => apply2 callback left right\n" ++ multi_input_source, "break apply2 read2 left right", "break forward2 read2 left right");
 }
 fn lowerForwarding(allocator: std.mem.Allocator) !void {
     const text = try forwardingSource(allocator);
@@ -690,7 +690,7 @@ test "forwarding invocation reconstructs producer bodies and rejects cycles miss
 fn projectedSource(allocator: std.mem.Allocator) ![]u8 {
     const wrapped = try std.mem.replaceOwned(u8, allocator, multi_input_source, "entry const answer", "const keep = fn callback => {callback}\nconst make = fn () => keep read2\nentry const answer");
     defer allocator.free(wrapped);
-    return std.mem.replaceOwned(u8, allocator, wrapped, "return apply2 read2 left right", "let holder = make ()\n      return apply2 holder.callback left right");
+    return std.mem.replaceOwned(u8, allocator, wrapped, "break apply2 read2 left right", "let holder = make ()\n      break apply2 holder.callback left right");
 }
 fn emitProjected(allocator: std.mem.Allocator, module: *const core.Module) !void {
     var result = try backend.compile(allocator, &.{module.*}, 1);

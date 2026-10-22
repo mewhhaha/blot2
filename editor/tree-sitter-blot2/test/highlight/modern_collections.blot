@@ -37,13 +37,13 @@ const nested = #library.time.Clock { ticks: 42 }
 if let #Some value = candidate:
 //      ^^^^ constructor
 
-  return #Ok value
+  break #Ok value
 //        ^^ constructor
 
 let #Done value = result else:
 //   ^^^^ constructor
 
-  return #Err 0
+  break #Err 0
 //        ^^^ constructor
 
 @[library.decorate 2]

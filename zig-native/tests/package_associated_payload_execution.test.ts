@@ -18,7 +18,7 @@ Deno.test("associated package payloads retain heterogeneous representations acro
         `entry const answer = fn (flag: Bool) => read (reseal (make flag))
 entry const collection = fn (flag: Bool) => do:
   let items = #[reseal (make flag), make #False]
-  return both (@array.get items 0) (@array.get items 1)
+  break both (@array.get items 0) (@array.get items 1)
 `,
       async (guest) => {
         const call = async (name: string, flag: boolean) => {

@@ -13,10 +13,10 @@ test "grammar publication retains local evidence and containing top-level origin
     const symbols = @import("symbols.zig");
     const allocator = std.testing.allocator;
     const cases = [_]struct { source: []const u8, start: u32, end: u32, utf16_start: u32 }{
-        .{ .source = "const bad = fn () => do:\n  use\n  return 0\n", .start = 0, .end = 5, .utf16_start = 0 },
-        .{ .source = "const earlier = 42\nconst bad = fn () => do:\n  use\n  return 0\n", .start = 19, .end = 24, .utf16_start = 19 },
-        .{ .source = "@[42]\nconst bad = fn () => do:\n  use\n  return 0\n", .start = 0, .end = 1, .utf16_start = 0 },
-        .{ .source = "// 雪🙂\nconst bad = fn () => do:\n  use\n  return 0\n", .start = 11, .end = 16, .utf16_start = 7 },
+        .{ .source = "const bad = fn () => do:\n  use\n  break 0\n", .start = 0, .end = 5, .utf16_start = 0 },
+        .{ .source = "const earlier = 42\nconst bad = fn () => do:\n  use\n  break 0\n", .start = 19, .end = 24, .utf16_start = 19 },
+        .{ .source = "@[42]\nconst bad = fn () => do:\n  use\n  break 0\n", .start = 0, .end = 1, .utf16_start = 0 },
+        .{ .source = "// 雪🙂\nconst bad = fn () => do:\n  use\n  break 0\n", .start = 11, .end = 16, .utf16_start = 7 },
     };
     for (cases) |item| {
         var lexed = try lexer.lex(allocator, item.source);
@@ -110,9 +110,9 @@ fn nestedDelimiterAllocationScenario(allocator: std.mem.Allocator) !void {
     const parser = @import("parser.zig");
     const symbols = @import("symbols.zig");
     const cases = [_]struct { source: []const u8, span: ast.Span, expected: token.Tag }{
-        .{ .source = "const bad = fn () => do:\n  return (42\n", .span = .{ .start = 34, .end = 35 }, .expected = .r_paren },
-        .{ .source = "const bad = fn () => do:\n  let values = [42\n  return 0\n", .span = .{ .start = 40, .end = 41 }, .expected = .r_bracket },
-        .{ .source = "const bad = fn () => do:\n  let value = { field: 42\n  return 0\n", .span = .{ .start = 39, .end = 40 }, .expected = .r_brace },
+        .{ .source = "const bad = fn () => do:\n  break (42\n", .span = .{ .start = 33, .end = 34 }, .expected = .r_paren },
+        .{ .source = "const bad = fn () => do:\n  let values = [42\n  break 0\n", .span = .{ .start = 40, .end = 41 }, .expected = .r_bracket },
+        .{ .source = "const bad = fn () => do:\n  let value = { field: 42\n  break 0\n", .span = .{ .start = 39, .end = 40 }, .expected = .r_brace },
     };
     for (cases) |item| {
         var lexed = try lexer.lex(allocator, item.source);

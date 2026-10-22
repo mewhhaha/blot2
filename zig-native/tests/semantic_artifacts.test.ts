@@ -11,7 +11,7 @@ const library = `const try = monad Maybe
 const add_present = fn left => fn right => do try:
   use first <- left
   use second <- right
-  return first + second
+  break first + second
 `;
 const entrySource = (offset: string) =>
   `import * as lib from "./lib"

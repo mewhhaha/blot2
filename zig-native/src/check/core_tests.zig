@@ -149,13 +149,13 @@ test "source providers preserve operation type arguments as metadata" {
         \\const outer = @effect.provider Read.first (fn () => 20)
         \\const second = @effect.provider Read.second (fn () => Read.first ())
         \\entry const answer = do outer:
-        \\  return do second:
-        \\    return Read.second ()
+        \\  break do second:
+        \\    break Read.second ()
         ,
         \\type State a is effect = { get: Unit -> a, set: a -> Unit }
         \\const provider = @effect.state (State.get (Array U32)) (State.set (Array U32)) #[41]
         \\entry const answer = do provider:
-        \\  return State.get (Array U32) ()
+        \\  break State.get (Array U32) ()
         ,
     };
     for (sources) |source| {
@@ -181,8 +181,8 @@ fn runnerFixture() !Fixture {
         \\  let (next, old) = run 41 (fn () => do:
         \\    use old <- State.get ()
         \\    use State.set (@u32.add old 1)
-        \\    return old)
-        \\  return @u32.add next old
+        \\    break old)
+        \\  break @u32.add next old
     );
 }
 fn verifyRunner(module: *const core.Module, source_bindings: usize) !void {
@@ -279,7 +279,7 @@ test "shared written headers retain factory requirements and declaration candida
         \\const twice: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
         \\const alias = fn value => twice value
         \\const factory: U32 -> U32 = do:
-        \\  return alias
+        \\  break alias
         \\entry const answer = fn (value: U32) => factory value
     );
     defer fixture.deinit();
@@ -386,9 +386,9 @@ test "typed core owns export bytes types spans and control after syntax teardown
         \\    value := 3
         \\  let inner = do:
         \\    if flag:
-        \\      return 20
-        \\    return 21
-        \\  return value + inner
+        \\      break 20
+        \\    break 21
+        \\  break value + inner
         \\const _fixity_add = fn left => fn right => @type.call "add" left right
     ;
     var fixture = try Fixture.init(source);
@@ -418,7 +418,7 @@ test "typed core owns export bytes types spans and control after syntax teardown
     try std.testing.expectEqual(inner, module.node(inner_statements[1]).b);
     try std.testing.expectEqual(body.root, module.node(statements[3]).b);
     const span = module.span(statements[3]);
-    try std.testing.expectEqualStrings("return value + inner", source[span.start..span.end]);
+    try std.testing.expectEqualStrings("break value + inner", source[span.start..span.end]);
 }
 
 test "lowering preserves unreachable traps and lazy Boolean control without evaluation" {
@@ -540,7 +540,7 @@ test "every typed core allocation failure releases partial projected artifacts" 
         \\  let value = 1
         \\  if flag:
         \\    value := 2
-        \\  return value
+        \\  break value
         \\const _fixity_add = fn left => fn right => @type.call "add" left right
     );
     defer fixture.deinit();
@@ -552,7 +552,7 @@ test "ordinary calls use bounded scratch rather than two heap allocations per oc
     defer source.deinit(a);
     try source.appendSlice(a, "infixl 60 (+) = _fixity_add\nconst twice = fn x => x + x\nentry const driver = fn () -> U32 => do:\n");
     for (0..1024) |_| try source.appendSlice(a, "  let value = twice 21\n");
-    try source.appendSlice(a, "  return value\nconst _fixity_add = fn left => fn right => @u32.add left right\n");
+    try source.appendSlice(a, "  break value\nconst _fixity_add = fn left => fn right => @u32.add left right\n");
     var fixture = try Fixture.init(source.items);
     defer fixture.deinit();
     var tracked: memory.TrackedAllocator = .{ .backing = a };

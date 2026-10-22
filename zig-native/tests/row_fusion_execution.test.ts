@@ -59,7 +59,7 @@ function pipelineSources() {
   for row in values:
     total := @f32.add total (${consumer} row)
   let first = ${firstRow}
-  return @f32.add total (${consumer} first)
+  break @f32.add total (${consumer} first)
 `);
       }
     }
@@ -82,7 +82,7 @@ entry const run = fn (count: U32) => do:
   for row in lists:
     total := @u32.add total (consume (transform row))
   arrays[0].a := 99
-  return #[total, saved[0].a, arrays[0].a]
+  break #[total, saved[0].a, arrays[0].a]
 entry const stopped = fn (count: U32) => do:
   let rows = @list.generate count (fn index => {a: index, b: 1, c: 2})
   let total = 0
@@ -90,13 +90,13 @@ entry const stopped = fn (count: U32) => do:
     if @u32.eq row.a 83:
       break
     total := @u32.add total (consume row)
-  return total
+  break total
 entry const returned = fn (count: U32) => do:
   let rows = @array.generate count (fn index => {a: index, b: 1, c: 2})
   for row in rows:
     if @u32.eq row.a 83:
-      return consume (transform row)
-  return 0
+      break consume (transform row)
+  break 0
 `,
     (guest) => {
       for (const count of [1, 82, 83, 84, 257, 600]) {
@@ -131,21 +131,21 @@ entry const stored = fn (count: U32) => do:
   for row in rows:
     saved := #[...saved, (store row)[0]]
   let pressure = @array.fill 8192 99
-  return #[consume row | row <- saved]
+  break #[consume row | row <- saved]
 entry const captured = fn (count: U32) => do:
   let rows = @array.generate count (fn index => {a: index, b: @u32.add index 1})
   let saved = #[]
   for row in rows:
     saved := #[...saved, capture row]
   let pressure = @array.fill 8192 99
-  return #[read () | read <- saved]
+  break #[read () | read <- saved]
 entry const deferred = fn (count: U32) => do:
   let rows = @list.generate count (fn index => {a: index, b: @u32.add index 1})
   let saved = #[]
   for row in rows:
     saved := #[...saved, defer_row row]
   let pressure = @array.fill 8192 99
-  return #[read () | read <- saved]
+  break #[read () | read <- saved]
 `,
     (guest) => {
       for (const count of [0, 1, 83, 257]) {
@@ -168,21 +168,21 @@ Deno.test("effectful row consumers preserve call and trap order", async () => {
 const consume = fn host => fn row => do:
   use first <- host row.a
   use second <- host row.b
-  return @u32.add first second
+  break @u32.add first second
 entry const run = fn (host: U32 -> U32 ! {Foreign}) => do:
   let rows = @list.generate 257 (fn index => {a: @u32.mul index 2, b: @u32.add (@u32.mul index 2) 1})
   let total = 0
   for row in rows:
     use value <- consume host row
     total := @u32.add total value
-  return total
+  break total
 entry const trap = fn (host: U32 -> U32 ! {Foreign}) => do:
   let rows = @array.generate 257 (fn index => {a: index, b: @u32.rem index 83})
   let total = 0
   for row in rows:
     use value <- host row.a
     total := @u32.add total (@u32.div value row.b)
-  return total
+  break total
 `,
     (guest) => {
       const seen: number[] = [];
@@ -217,7 +217,7 @@ entry const run = fn (count: U32) => do:
   let total = 0
   for row in rows:
     total := @u32.add total (consume (transform row))
-  return total
+  break total
 `;
   const original = `const transform = fn row => {a: @u32.add row.a 1, b: row.b}
 const consume = fn row => @u32.add row.a row.b

@@ -6,21 +6,21 @@ entry const max_value: U32 = 0xFFFF_FFFF
 
 entry const answer = fn () -> U32 => do:
   let result: U32 = U32.increment base
-  return result
+  break result
 
 // use also accepts pure computations; it does not introduce an effect itself.
 entry const bound_answer = fn () -> U32 => do:
   use result: U32 <- U32.increment base
   use ()
-  return result
+  break result
 
 entry const capped = fn (value: U32) -> U32 => do:
   if @u32.lt value 42:
-    return value
-  return 42
+    break value
+  break 42
 
 entry const choose = fn (condition: Bool) -> U32 => do:
   if condition:
-    return 20
+    break 20
   else:
-    return 22
+    break 22

@@ -1788,6 +1788,7 @@ const Shape = struct {
                 break :blk self.edges(&.{ b.where_node, b.annotation, b.value, b.pattern, b.fallback });
             },
             .rebind_stmt, .yield_stmt => self.edges(&.{ n.a, n.b }),
+            .function_return_stmt => self.edge(n.a),
             .use_stmt => blk: {
                 self.name(n.a);
                 break :blk self.edges(&.{ n.b, n.c });
@@ -2365,7 +2366,7 @@ fn checkedField(comptime name: []const u8) CheckedField {
         .types, .expr_types, .resolved, .bindings, .merges, .obligations, .body_closed_rows, .lambda_closed_rows, .dispatch_signatures, .covered_requirements, .operation_uses, .operation_refs, .constructor_resolved, .projections, .access_paths, .access_nodes, .access_types, .projection_resolved, .projection_catalog, .rebindings, .loop_carries, .loop_ranges, .demand_calls, .demand_once, .demand_types, .demand_binary_left_types, .demand_binary_left, .loop_exits => .facts,
         .proof_contracts, .capability_contracts, .parameter_patterns, .effect_families, .effect_templates, .associated, .nominals, .contracts, .contract_predicates, .contract_members, .implementations, .implementation_predicates, .implementation_members, .member_templates, .selected_proofs, .selected_members, .selected_edges, .selected_uses, .constructors, .tag_origins, .unit => .catalog,
         .editor, .initializer_rejected, .diagnostics, .body_elaborations, .imported_schemes, .counters => .transient,
-        .usage_loans, .dictionary_selections, .dictionary_uses => .source_records,
+        .usage_loans, .dictionary_selections, .dictionary_uses, .function_exit_lambdas => .source_records,
         .rank_implementations, .generative_bindings, .computations, .request_loops, .request_arms, .request_controls, .reflections, .effect_scopes, .effect_runners, .provider_blocks, .resolver_blocks, .resolver_ops, .resolver_joins, .resolver_completions, .resolver_loops, .statement_arms => .node_records,
         .iterator_bodies, .effect_scope_ids, .effect_runner_ids, .provider_block_ids, .resolver_block_ids, .resolver_op_ids, .resolver_join_ids, .resolver_loop_ids => .node_indices,
         .proof_bodies => .proof_bodies,
@@ -2435,6 +2436,8 @@ const CaptureScratch = struct {
 
 fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []const u8, checked: *const check.Checked, root: ast.Id, shape: Syntax, names: ?ExternalNames, annotations: ?AnnotationLookup) !?Body {
     if (unretainedFacts()) return null;
+    // The recipe does not yet retain a function's nonlocal exit boundary.
+    for (shape.ids) |id| if (tree.node(id).tag == .function_return_stmt) return null;
     const auxiliary_owner = auxiliary.capture(a, checked, shape.ids) catch |err| {
         if (err == error.OutOfMemory) return err;
         return null;

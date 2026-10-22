@@ -735,8 +735,8 @@ test "persisted typed staging statement if helper restarts through OOM" {
         \\const choose = fn (value: U32) => do:
         \\  if @u32.eq value 0:
         \\    let value = 40
-        \\    return value
-        \\  return @u32.add value 40
+        \\    break value
+        \\  break @u32.add value 40
         \\const generated = @code.quote (choose 2)
         \\const factory = fn number => fn extra => @u32.add number extra
         \\const callback = factory (@code.run generated)
@@ -759,7 +759,7 @@ test "persisted typed staging Boolean case helper restarts through OOM" {
         \\  #False => 42
         \\  #True => do:
         \\    let flag = 40
-        \\    return flag
+        \\    break flag
         \\const generated = @code.quote (choose #False)
         \\const factory = fn number => fn extra => @u32.add number extra
         \\const callback = factory (@code.run generated)

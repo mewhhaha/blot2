@@ -21,11 +21,11 @@ const slice = fn start => fn count => fn values => @array.slice values start cou
 // evaluation, which cannot reuse an array updated repeatedly in a loop.
 const prefix_sums = fn (values: Array U32) -> Array U32 => do:
   if values.length < 2:
-    return values
+    break values
   let pairs = generate (values.length / 2) (fn index =>
     values[index * 2] + values[index * 2 + 1])
   let ends = prefix_sums pairs
-  return generate values.length (fn index =>
+  break generate values.length (fn index =>
     if index % 2 == 1 then ends[index / 2]
     else if index == 0 then values[0]
     else ends[index / 2 - 1] + values[index])
@@ -36,7 +36,7 @@ const indices = fn (keep: Array Bool) => do:
   for index in 0..keep.length:
     if keep[index]:
       selected := [...self, index]
-  return Array.from_list selected
+  break Array.from_list selected
 
 const filter = fn (predicate: a -> Bool) => fn (values: Array a) =>
   #[value | value <- values, predicate value]
@@ -47,7 +47,7 @@ const filter_map = fn transform => fn (values: Array a) => do:
     let candidate = transform value
     if let #Some result = candidate:
       selected := [...self, result]
-  return Array.from_list selected
+  break Array.from_list selected
 
 const flatten = fn (chunks: Array (Array a)) => do:
   let count = 0
@@ -55,20 +55,20 @@ const flatten = fn (chunks: Array (Array a)) => do:
   for chunk in chunks:
     let next_count = count + chunk.length
     if next_count < count:
-      return @panic "array flatten length overflow"
+      break @panic "array flatten length overflow"
     count := next_count
     if let #Nothing = seed:
       if Bool.not chunk.is_empty:
         seed := #Some chunk[0]
   let #Some first = seed else:
-    return #[]
+    break #[]
   let joined = fill count first
   let start = 0
   for chunk in chunks:
     for offset in 0..chunk.length:
       joined[start + offset] := chunk[offset]
     start := self + chunk.length
-  return joined
+  break joined
 
 const concat = fn left => fn right => @array.concat left right
 
@@ -81,41 +81,41 @@ const zip = fn left => fn right =>
 const unzip = fn values => do:
   let left = map (fn pair => do:
     let (left, _) = pair
-    return left) values
+    break left) values
   let right = map (fn pair => do:
     let (_, right) = pair
-    return right) values
-  return (left, right)
+    break right) values
+  break (left, right)
 
 const unzip3 = fn values => do:
   let first = map (fn triple => do:
     let (value, _, _) = triple
-    return value) values
+    break value) values
   let second = map (fn triple => do:
     let (_, value, _) = triple
-    return value) values
+    break value) values
   let third = map (fn triple => do:
     let (_, _, value) = triple
-    return value) values
-  return (first, second, third)
+    break value) values
+  break (first, second, third)
 
 const fold_left = fn reduce => fn initial => fn (values: Array a) => do:
   let state = initial
   for value in values:
     use next <- reduce state value
     state := next
-  return state
+  break state
 
 const any = fn predicate => fn (values: Array a) => do:
   for value in values:
     use found <- predicate value
     if found:
-      return #True
-  return #False
+      break #True
+  break #False
 
 const all = fn predicate => fn (values: Array a) => do:
   for value in values:
     use accepted <- predicate value
     if Bool.not accepted:
-      return #False
-  return #True
+      break #False
+  break #True

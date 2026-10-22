@@ -16,7 +16,7 @@ entry const run = fn (count: U32) => do:
     let pressure = @array.fill 8192 index
     if pressure[8191] != index:
       @panic "lost pressure"
-  return #[alias[0], alias[1], holder.value[0]]
+  break #[alias[0], alias[1], holder.value[0]]
 entry const bits = fn () => apply (fn holder => holder.bits) { bits: 65568, value: #[99] }
 entry const floating = fn () => apply (fn holder => holder.floating) { floating: -0.0, value: #[99] }
 entry const failed = fn (host: Array U32 -> Unit ! {Foreign}) => do:
@@ -24,7 +24,7 @@ entry const failed = fn (host: Array U32 -> Unit ! {Foreign}) => do:
   let alias = apply read holder
   holder.value := #[90, 91]
   use host alias
-  return alias[1]
+  break alias[1]
 `;
 
 Deno.test("checked getter results survive field replacement suspension failure and producer edits", async () => {

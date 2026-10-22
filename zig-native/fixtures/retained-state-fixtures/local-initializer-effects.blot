@@ -6,7 +6,7 @@ const handled = fn computation => do:
   for request in @requests computation:
     case request of
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let (#Count count, result) = @state.run (#Count 0) (fn () => do:
     use result32 <- @state.run (#Cell 40) (fn () => do:
@@ -14,9 +14,9 @@ entry const answer = fn () => do:
         use previous_cell <- @state.get #Count
         let #Count previous = previous_cell
         use @state.set (#Count (@u32.add previous 1))
-        return @computation (fn () => @state.get witness)
+        break @computation (fn () => @state.get witness)
       use computation <- make witness32
-      return handled computation
+      break handled computation
     )
     let (#Cell state32, #Cell value32) = result32
     use resultf <- @state.run (#Cell 2.5) (fn () => do:
@@ -24,12 +24,12 @@ entry const answer = fn () => do:
         use previous_cell <- @state.get #Count
         let #Count previous = previous_cell
         use @state.set (#Count (@u32.add previous 1))
-        return @computation (fn () => @state.get witness)
+        break @computation (fn () => @state.get witness)
       use computation <- make witnessf
-      return handled computation
+      break handled computation
     )
     let (#Cell statef, #Cell valuef) = resultf
-    return @f32.add (@u32.to_f32 value32) valuef
+    break @f32.add (@u32.to_f32 value32) valuef
   )
-  return @f32.add result (@u32.to_f32 count)
+  break @f32.add result (@u32.to_f32 count)
 entry const folded = answer ()

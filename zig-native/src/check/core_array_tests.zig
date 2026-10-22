@@ -14,7 +14,7 @@ const source =
     \\  let before = #[value, marker value]
     \\  let after = @array.set before 0 (marker value)
     \\  let filled = @array.fill 2 (marker value)
-    \\  return before[0] + after[0] + @array.length filled
+    \\  break before[0] + after[0] + @array.length filled
     \\entry const empty = fn () -> Array F32 => #[]
     \\const _fixity_add = fn left => fn right => @type.call "add" left right
 ;

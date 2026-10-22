@@ -17,20 +17,20 @@ const chooseBody =
         use b <- alias.get ()
         use c <- left.get ()
         use d <- right.get ()
-        return @u32.add (@u32.add b c) d
+        break @u32.add (@u32.add b c) d
       let (state, result) = chosen
-      return result
+      break result
     let (state, result) = inner
-    return result
+    break result
   let (state, result) = outer
-  return result
+  break result
 ))
 const settle = fn initial => @effect.scope (fn (left: State a) => @effect.scope (fn (right: State a) => do:
   let selected = if #True then left else right
   let (state, result) = do (@effect.state selected.get selected.set initial):
     use selected.set 7
-    return read selected
-  return result
+    break read selected
+  break result
 ))
 const floating_choose = fn flag => @effect.scope (fn (left: State F32) => @effect.scope (fn (right: State F32) => do:
   let selected = if flag then left else right
@@ -40,13 +40,13 @@ const floating_choose = fn flag => @effect.scope (fn (left: State F32) => @effec
         use a <- read selected
         use b <- left.get ()
         use c <- right.get ()
-        return @f32.add (@f32.add a b) c
+        break @f32.add (@f32.add a b) c
       let (state, result) = chosen
-      return result
+      break result
     let (state, result) = inner
-    return result
+    break result
   let (state, result) = outer
-  return result
+  break result
 ))
 `;
 const libraries = {
@@ -69,34 +69,34 @@ const unmatched = `import {State} from "./state"
 entry const invalid = fn flag => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let selected = if flag then left else right
   use nested <- do (@effect.state selected.get selected.set 7):
-    return left.get ()
+    break left.get ()
   let (state, result) = nested
-  return result
+  break result
 ))
 `;
 const rejectedSelections = [
-  { code: "capability_escape", body: "return selected" },
-  { code: "capability_escape", body: "return [selected]" },
-  { code: "capability_escape", body: "return selected.get" },
-  { code: "capability_escape", body: "return fn () => selected.get ()" },
+  { code: "capability_escape", body: "break selected" },
+  { code: "capability_escape", body: "break [selected]" },
+  { code: "capability_escape", body: "break selected.get" },
+  { code: "capability_escape", body: "break fn () => selected.get ()" },
   {
     code: "capability_escape",
     body: `let independent = if flag then left else right
   use nested <- do (@effect.state selected.get selected.set 7):
-    return independent.get ()
+    break independent.get ()
   let (state, result) = nested
-  return result`,
+  break result`,
   },
   {
     code: "capability_escape",
     body: `let later = fn () => if flag then left else right
-  return later`,
+  break later`,
   },
   {
     code: "effect_identity_scope",
     body: `for index in 0..2:
     let repeated = if flag then left else right
-  return 42`,
+  break 42`,
   },
 ];
 const cases = Object.entries(libraries).flatMap(([syntax, library]) =>
@@ -272,12 +272,12 @@ entry const invalid = fn flag => @effect.scope (fn (left: State U32) => @effect.
             let fragment = "=> state.get ()";
             let replacement = `=> do:
   let operation = state.get
-  return operation ()`;
+  break operation ()`;
             if (syntax === "arrow") {
               fragment = "=> input.get ()";
               replacement = `=> do:
   let operation = input.get
-  return operation ()`;
+  break operation ()`;
             }
             const rejected = await compiler.build({
               sources: {

@@ -8,7 +8,7 @@ const checked = fn computation => do:
       effect Validate.check value =>
         yield @u32.add value 2
       complete value =>
-        return value
+        break value
 entry const answer = fn () => checked (@computation (fn () => invoke selected))
 
 entry const checked_answer = answer ()

@@ -56,7 +56,7 @@ function typesFamily(count: number): string {
 function rowsFamily(count: number): string {
   const lines: string[] = [];
   for (let i = 0; i < count; i++) {
-    lines.push(`entry const builder${i}: U32 where { type_rep U32 } = do:\n  let local = fn value => value\n  return local ${i}`);
+    lines.push(`entry const builder${i}: U32 where { type_rep U32 } = do:\n  let local = fn value => value\n  break local ${i}`);
   }
   return lines.join("\n") + "\n";
 }

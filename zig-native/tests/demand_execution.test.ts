@@ -14,7 +14,7 @@ entry const local = fn (value: U32) -> U32 => do:
   let before = @force pending
   value := 99
   let after = @force pending
-  return @u32.add (@array.get before 2) (@array.get after 0)
+  break @u32.add (@array.get before 2) (@array.get after 0)
 `, guest => {
     equal(guest.call("read", null), 7);
     for (const size of [32768, 0, 2, 16384]) {

@@ -12,7 +12,7 @@ const stdRoot = `${repo}std`;
 // operation witnesses, keep retained output byte-identical to fresh builds
 // through edit, revert and a failing edit; unaffected bodies stay reusable.
 const edits: [string, string, string][] = [
-  ["scalar", "return 20", "return 21"],
+  ["scalar", "break 20", "break 21"],
   ["scalar", "@u32.add 20 21", "@u32.add 20 22"],
   ["ecs", "x: 10.0", "x: 11.0"],
   ["tags", "entry const answer: U32 = 20", "entry const answer: U32 = 21"],
@@ -85,11 +85,11 @@ entry const stateful = fn (step: U32) => do:
   let (next, old) = do state:
     use old <- State.get U32 ()
     use State.set U32 (@u32.add old step)
-    return old
-  return @u32.add next old
+    break old
+  break @u32.add next old
 entry const ask = fn () => do forty:
   use value <- Reader.ask U32 ()
-  return @u32.add value 1
+  break @u32.add value 1
 entry const plain = fn (x: U32) => @u32.add x 2
 entry const unrelated = fn () => other
 `;

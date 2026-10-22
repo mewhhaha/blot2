@@ -29,7 +29,7 @@ for (
     ],
     [
       "callback",
-      "entry const answer = fn (value: U32) => do:\n  let selected: (Array U32) -> U32 = Source.first\n  return selected #[value]",
+      "entry const answer = fn (value: U32) => do:\n  let selected: (Array U32) -> U32 = Source.first\n  break selected #[value]",
       42,
       42,
     ],
@@ -51,7 +51,7 @@ Deno.test("implementation witness proofs preserve anonymous callback rows withou
 const Token.add = fn (left: Token a) => fn (right: Token a) => case left of
   #Token witness => @state.reader witness (fn () => @panic "proof executed") (fn () => do:
     use unused <- @state.get witness
-    return left)
+    break left)
 type Source s is contract = { associated "add" s s s ! {}, type Item, const first: s -> (Source.Item s) }
 impl TokenSource a : Source (Token a) = { type Item = U32, const first = fn value => 42 }
 entry const answer: Unit -> U32 = fn () => Source.first (#Token (fn () -> U32 => 7))
@@ -138,11 +138,11 @@ for (const asynchronous of [false, true]) {
       `type Callable f is contract = { type Run, const run: f -> (Unit -> (Callable.Run f) ! {Foreign}) }
 impl Callback a : Callable (Unit -> a ! {Foreign}) = { type Run = a, const run = fn callback => fn () => do:
   use value <- callback ()
-  return value }
+  break value }
 entry const answer = fn (callback: Unit -> U32 ! {Foreign}) => do:
   use first <- Callable.run callback ()
   use second <- Callable.run callback ()
-  return @u32.add first second
+  break @u32.add first second
 `,
     );
     const guest = await instantiateGuest(artifact.bytes, { asynchronous });

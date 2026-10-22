@@ -4,17 +4,17 @@ type Pair is data = #Pair (U32,U32)
 type Fields is data = #Fields { first: U32, second: U32 }
 const first = fn actual => do:
   let expected = 7
-  return case actual of
+  break case actual of
     #Pair (expected,^expected) => expected
     _ => 0
 const second = fn actual => do:
   let expected = 7
-  return case actual of
+  break case actual of
     #Pair (^expected,expected) => expected
     _ => 0
 const fields = fn actual => do:
   let expected = 7
-  return case actual of
+  break case actual of
     #Fields { first: expected, second: ^expected } => expected
     _ => 0
 entry const first_value = fn value => first (#Pair (value,7))

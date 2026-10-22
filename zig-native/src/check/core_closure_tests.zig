@@ -53,7 +53,7 @@ const snapshot_source =
     \\  saved := 0
     \\  let partial = add input
     \\  let inner = nested 1
-    \\  return inner (partial 1)
+    \\  break inner (partial 1)
     \\const _fixity_add = fn left => fn right => @type.call "add" left right
 ;
 
@@ -95,7 +95,7 @@ test "closure captures exclude own lexical patterns and include nested pinned re
         \\  let choose = fn input -> U32 => case input of
         \\    (^selected, value) => value
         \\    (_, value) => value + 1
-        \\  return choose (selected, 41)
+        \\  break choose (selected, 41)
         \\const _fixity_add = fn left => fn right => @type.call "add" left right
     );
     defer fixture.deinit();
@@ -115,7 +115,7 @@ test "unary constructor values retain catalog and instantiated function type" {
         \\entry const boxed = fn () -> U32 => do:
         \\  let wrap = #Box
         \\  let result = wrap 42
-        \\  return case result of
+        \\  break case result of
         \\    #Box value => value
     );
     defer fixture.deinit();

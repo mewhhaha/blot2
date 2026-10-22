@@ -6,11 +6,11 @@ const handled = fn computation => do:
       effect Tick.read value =>
         yield value
       complete value =>
-        return value
+        break value
 entry const answer = fn () => do:
   let value = 41
   let computation = make (fn () => Tick.read value)
   value := 99
   let read = fn () => handled computation
-  return @u32.add (read ()) 1
+  break @u32.add (read ()) 1
 entry const folded = answer ()

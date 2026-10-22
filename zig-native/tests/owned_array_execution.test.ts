@@ -8,12 +8,12 @@ entry const build = fn (count: U32) -> Array U32 => do:
   for outer in 0 .. count:
     for inner in 0 .. 2:
       values[@u32.add (@u32.mul outer 2) inner] := outer
-  return values
+  break values
 entry const floating = fn (count: U32) -> Array F32 => do:
   let values = @array.generate count (fn index => @u32.to_f32 index)
   for index in 0 .. count:
     values[index] := @f32.add self 0.5
-  return values
+  break values
 `,
     (guest) => {
       for (const count of [0, 1, 32, 20020]) {
@@ -52,47 +52,47 @@ entry const alias = fn () => do:
   let values = #[1, 2]
   let before = values
   values[1] := 9
-  return @u32.add before[1] values[1]
+  break @u32.add before[1] values[1]
 entry const callback = fn () => do:
   let values = #[1, 2]
   let before = fn () => values[1]
   values[1] := 9
-  return @u32.add (before ()) values[1]
+  break @u32.add (before ()) values[1]
 entry const suspended = fn () => do:
   let values = #[1, 2]
   let before = delay values
   values[1] := 9
-  return @u32.add (@array.get (@force before) 1) values[1]
+  break @u32.add (@array.get (@force before) 1) values[1]
 entry const iterator = fn () => do:
   let values = #[1, 2]
   let sum = 0
   for value in values:
     values[1] := 9
     sum := @u32.add sum value
-  return sum
+  break sum
 entry const parameter = fn (values: Array U32) => do:
   values[1] := 9
-  return values
+  break values
 entry const global = fn () => do:
   let values = stored
   values[1] := 9
-  return @u32.add stored[1] values[1]
+  break @u32.add stored[1] values[1]
 entry const retained = fn () => do:
   let values = #[1, 2]
   let state = #Cell values
   values[1] := 9
   let (#Cell before, _) = @state.run state (fn () => ())
-  return @u32.add before[1] values[1]
+  break @u32.add before[1] values[1]
 entry const calls = fn () => do:
   let values = #[1, 2]
   let before = read values
   values[1] := 9
-  return @u32.add before values[1]
+  break @u32.add before values[1]
 entry const nested = fn () => do:
   let leaf = #[1]
   let values = @array.fill 2 leaf
   values[0][0] := 9
-  return @u32.add values[0][0] values[1][0]
+  break @u32.add values[0][0] values[1][0]
 `,
     (guest) => {
       for (
@@ -141,7 +141,7 @@ const total = fn (values: Array F32) => do:
   let sum = 0.0
   for value in values:
     sum := sum + value
-  return sum
+  break sum
 const matched = fn (values: Array F32) => fn (index: U32) => case #True of
   #True => values[index]
   #False => 0.0
@@ -150,37 +150,37 @@ entry const inlined = fn (n: U32) -> F32 => do:
   for i in 0..n:
     let x = get1 i values
     values[i] := x * 0.5 + 0.25
-  return values[n - 1]
+  break values[n - 1]
 entry const called = fn (n: U32) -> F32 => do:
   let values = @array.fill n 1.0
   for i in 0..n:
     values[i] := total values / @u32.to_f32 n + 1.0
-  return values[n - 1]
+  break values[n - 1]
 entry const generated = fn (n: U32) -> F32 => do:
   let values = @array.generate n (fn i => @u32.to_f32 i)
   let doubled = @array.generate n (fn i => values[i] * 2.0)
   for i in 0..n:
     values[i] := values[i] + doubled[i]
-  return values[n - 1]
+  break values[n - 1]
 entry const mapped = fn (n: U32) -> F32 => do:
   let values = @array.generate n (fn i => @u32.to_f32 i)
   let doubled = array.map (fn value => value * 2.0) values
   for i in 0..n:
     values[i] := values[i] + doubled[i]
-  return values[n - 1]
+  break values[n - 1]
 entry const local = fn (n: U32) -> F32 => do:
   let values = @array.fill n 1.0
   let read = fn (xs: Array F32) => fn (index: U32) => xs[index]
   for i in 0..n:
     let x = read values i
     values[i] := x + 1.0
-  return values[n - 1]
+  break values[n - 1]
 entry const match_read = fn (n: U32) -> F32 => do:
   let values = @array.fill n 1.0
   for i in 0..n:
     let x = matched values i
     values[i] := x + 1.0
-  return values[n - 1]
+  break values[n - 1]
 `,
     (_guest, bytes) => {
       const run = counted(bytes);
@@ -229,11 +229,11 @@ const left = fn a => fn b => a[0] + b[0]
 const merged = fn (flag: Bool) => fn (values: Array U32) => do:
   if flag:
     values := #[7]
-  return values
+  break values
 const carried = fn (count: U32) => fn (values: Array U32) => do:
   for index in 0..count:
     values := #[index]
-  return values
+  break values
 entry const reassigned = fn (n: U32) => do:
   let values = @array.fill n 1
   let sum = 0
@@ -242,7 +242,7 @@ entry const reassigned = fn (n: U32) => do:
     let after = carried 0 values
     values[i] := 9
     sum := sum + before[i] + after[i]
-  return sum
+  break sum
 entry const returned = fn (n: U32) => do:
   let values = @array.fill n 1
   let sum = 0
@@ -250,7 +250,7 @@ entry const returned = fn (n: U32) => do:
     let before = pass values
     values[i] := 9
     sum := sum + before[i]
-  return sum
+  break sum
 entry const stored = fn (n: U32) => do:
   let values = @array.fill n 1
   let sum = 0
@@ -258,7 +258,7 @@ entry const stored = fn (n: U32) => do:
     let #Cell before = wrap values
     values[i] := 9
     sum := sum + before[i]
-  return sum
+  break sum
 entry const paired = fn (n: U32) => do:
   let values = @array.fill n 1
   let sum = 0
@@ -266,7 +266,7 @@ entry const paired = fn (n: U32) => do:
     let (before, _) = pair values
     values[i] := 9
     sum := sum + before[i]
-  return sum
+  break sum
 entry const captured = fn (n: U32) => do:
   let values = @array.fill n 1
   let read = reader values
@@ -274,7 +274,7 @@ entry const captured = fn (n: U32) => do:
   for i in 0..n:
     values[i] := 9
     sum := sum + read i
-  return sum
+  break sum
 entry const kept = fn (n: U32) => do:
   let values = @array.fill n 1
   let read = fn index => values[index]
@@ -283,7 +283,7 @@ entry const kept = fn (n: U32) => do:
   for i in 0..n:
     values[i] := 9
     sum := sum + read i + copied[i]
-  return sum
+  break sum
 entry const nested = fn (n: U32) => do:
   let values = @array.generate n (fn i => @array.fill 2 i)
   let sum = 0
@@ -291,13 +291,13 @@ entry const nested = fn (n: U32) => do:
     let inner = first values
     values[0][0] := 9
     sum := sum + inner[0]
-  return sum
+  break sum
 entry const ordered = fn (n: U32) => do:
   let values = @array.fill n 1
-  return left values (@array.set values 0 9)
+  break left values (@array.set values 0 9)
 entry const indexed = fn (n: U32) => do:
   let values = @array.fill n 1
-  return values[(@array.set values 0 5)[1] - 1]
+  break values[(@array.set values 0 5)[1] - 1]
 `,
     (_guest, bytes) => {
       const run = counted(bytes);

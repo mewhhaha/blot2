@@ -16,13 +16,13 @@ const operate = fn (host: U32 -> U32 ! {Foreign}) => @u32.add ((host seed) %% (h
 const describe = fn (value: U32) => do:
   let record = {value, values: #[value, seed]}
   record.value := @u32.add self 1
-  return @record.merge record {next: (#Number value).next}
+  break @record.merge record {next: (#Number value).next}
 `;
 const main = `import {operate, describe} from "./logic"
 entry const run = fn (host: U32 -> U32 ! {Foreign}) => operate host
 entry const method = fn (value: U32) => do:
   let record = describe value
-  return @u32.add record.value record.next
+  break @u32.add record.value record.next
 entry const owned = fn (value: U32) => (describe value).values
 `;
 async function observe(

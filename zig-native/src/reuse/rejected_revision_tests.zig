@@ -40,7 +40,7 @@ const main =
     \\entry const right = fn (value: F32) -> F32 => (mid.chosen value).right
     \\entry const kept = fn (value: F32) -> F32 => do:
     \\  let #Box held = dep.keep value
-    \\  return held.left
+    \\  break held.left
 ;
 
 const Fixture = struct {

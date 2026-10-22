@@ -31,21 +31,21 @@ const provider_source =
     \\const reader = @effect.provider Read (fn () => 1.75)
     \\const state = @effect.state (State.get F32) (State.set F32) 1.75
     \\entry const folded = do reader:
-    \\  return Read ()
+    \\  break Read ()
     \\entry const callback = fn () => do reader:
-    \\  return Read ()
+    \\  break Read ()
     \\entry const answer = fn (value: F32) => do:
     \\  let dynamic = @effect.provider Read (fn () => value)
     \\  let local = @effect.state (State.get F32) (State.set F32) value
     \\  let (next, old) = do state:
     \\    use old <- State.get F32 ()
     \\    use State.set F32 (@f32.add old value)
-    \\    return old
+    \\    break old
     \\  let (_, selected) = do local:
-    \\    return State.get F32 ()
+    \\    break State.get F32 ()
     \\  let read = do dynamic:
-    \\    return Read ()
-    \\  return @f32.add (@f32.add next old) (@f32.add selected read)
+    \\    break Read ()
+    \\  break @f32.add (@f32.add next old) (@f32.add selected read)
 ;
 
 const collection_source =
@@ -55,7 +55,7 @@ const collection_source =
     \\  xs := [(@array.from_list frozen)[512], ...self, 42]
     \\  let array = @array.from_list xs
     \\  array[0] := 40
-    \\  return array
+    \\  break array
 ;
 
 test "local refinement and closed source sharing preserve exact Wasm staging and effects across fresh and retained builds" {

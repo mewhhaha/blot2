@@ -34,10 +34,10 @@ const owner =
     \\  let root: link.Link U32 = #link.End
     \\  for index in 0..count:
     \\    root := #link.Next (self, index)
-    \\  return root
+    \\  break root
     \\entry const run = fn (count: U32) => do:
     \\  let root = grow count
-    \\  return count
+    \\  break count
     \\
 ;
 

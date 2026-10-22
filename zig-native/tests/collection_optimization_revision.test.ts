@@ -21,7 +21,7 @@ const consume = fn (values: List U32) => do:
   let total = 0
   for value in values:
     total := self + value
-  return total
+  break total
 const build = fn (values: Array U32) => #[x + y | x <- values, y <- values]
 `;
   const main = `import { pair, consume, build } from "./helpers"
@@ -36,7 +36,7 @@ entry const product = fn values => build values
         before,
         before.replace("value + 1", "value + 2"),
         "const invalid = absent\n",
-        before.replace("return total", "return total + values.length"),
+        before.replace("break total", "break total + values.length"),
         before,
       ]
     ) {

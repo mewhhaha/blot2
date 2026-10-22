@@ -22,9 +22,9 @@ Deno.test("qualified primitive associated calls preserve pure implementations th
       const source = `type Tick is effect = Unit -> Unit
 const twice: a -> a ! {Tick} where { associated "add" a a a ! {} } = fn value => do:
   use Tick ()
-  return ${direct ? '@type.call "add" value value' : "value + value"}
+  break ${direct ? '@type.call "add" value value' : "value + value"}
 entry const answer = fn () => do (@effect.provider Tick (fn () => ())):
-  ${local ? "let alias=twice\n  return alias 21" : "return twice 21"}
+  ${local ? "let alias=twice\n  break alias 21" : "break twice 21"}
 entry const folded=answer ()
 `;
       await compileAndRun(source, (guest) => {
@@ -55,11 +55,11 @@ type Box is data = #Box U32
 const Box.twice: Box -> (Unit -> Box ! {Read}) where { associated "add" U32 U32 U32 ! {} } = fn box => fn () => do:
   let #Box value = box
   use offset <- Read ()
-  return #Box (@u32.add (@type.call "add" value value) offset)
+  break #Box (@u32.add (@type.call "add" value value) offset)
 entry const answer = fn (value: U32) => do (@effect.provider Read (fn () => 1)):
   use box <- (#Box value).twice ()
   let #Box result = box
-  return result
+  break result
 `,
     (guest) => {
       for (const value of [0, 21, 0xffff_ffff]) {
@@ -72,7 +72,7 @@ entry const answer = fn (value: U32) => do (@effect.provider Read (fn () => 1)):
 const Box.twice: Box a -> Box a where { associated "add" a a a } = fn box => box
 entry const answer = fn () => do:
   let #Box value = (#Box #True).twice
-  return 42
+  break 42
 `,
     "missing_associated",
   );

@@ -132,7 +132,7 @@ entry const answer=fn ()=>do:
   let point=#Point {x: 1,y:2} // keep this
   let values = array.map (.x) #[point]
   let choose = if :point==:(#Point {x:2,y:3}) then 40 else 0
-  return values[0]+choose + from (-1.0)
+  break values[0]+choose + from (-1.0)
 `;
   const formatted = await formatSource(source);
   equal(await formatSource(formatted), formatted);
@@ -151,13 +151,13 @@ const apply = fn f => fn value => f value
 entry const answer = fn x => do:
     let total = (1 + 2) * x
     let value = apply (fn value => value) (total + 1)
-    return ((value))
+    break ((value))
 `;
   const formatted = await formatSource(source);
   equal(formatted.includes("type Drag is data =\n  | #Idle\n  | #Draw"), true);
   equal(formatted.includes("(1 + 2) * x"), true);
   equal(formatted.includes("(total + 1)"), true);
-  equal(formatted.includes("return value"), true);
+  equal(formatted.includes("break value"), true);
   equal(await formatSource(formatted), formatted);
 });
 
@@ -204,7 +204,7 @@ type Merge [a,b,c] is contract={merge a b c}
 const combine:a->b->c where {Merge [a,b,c]}=fn left=>fn right=>@record.merge left right
 const f=fn (point:Point)=>do:
     let {y,x}=point
-    return combine point {x:y}
+    break combine point {x:y}
 const value=f {y:2.0,x:40}
 `;
   const formatted = await formatSource(source);
@@ -218,7 +218,7 @@ Deno.test("formatter accepts nominal record patterns and spaces named operators"
 const plus=fn left=>fn right=>left+right
 const length=fn value=>do:
     let #Vec2 {x,y:height}=value
-    return x+height
+    break x+height
 const first=fn value=>case value of
     #Some (#Vec2 {x}) => x
     _ => 0.0

@@ -3,4 +3,4 @@ const missing = fn value => value.no_such_member
 const packed = (identity, missing)
 entry const answer = fn () => do:
   let unused = (identity, packed)
-  return 42
+  break 42

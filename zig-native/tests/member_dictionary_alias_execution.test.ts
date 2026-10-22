@@ -25,8 +25,8 @@ Deno.test("operation aliases remain values and execute only when invoked", async
 const alias = Read
 entry const answer = fn (host: Unit -> U32 ! {Foreign}) => do:
   let provider = @effect.provider Read host
-  return do provider:
-    return @u32.add (alias ()) (alias ())
+  break do provider:
+    break @u32.add (alias ()) (alias ())
 `,
     (guest) => {
       let calls = 0;

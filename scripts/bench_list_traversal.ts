@@ -91,7 +91,7 @@ entry const fold = fn repeat => do:
   for pass in 0..repeat:
     for ${binder} in rows:
       total := self + ${sum}
-  return total
+  break total
 entry const cursor = fn repeat => do:
   let total = ${scalar === "f32" ? "0.0" : "0"}
   for pass in 0..repeat:
@@ -100,7 +100,7 @@ entry const cursor = fn repeat => do:
       let ${binder} = @cursor.value cursor
       total := self + ${sum}
       cursor := @cursor.advance self
-  return total
+  break total
 // An aggregate entry exposes the arena to the host memory measurement.
 entry const memory_probe = fn (seed: U32) => #[seed]
 `,

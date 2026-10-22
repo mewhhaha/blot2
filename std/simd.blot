@@ -73,7 +73,7 @@ const u32_max_signed = fn left => fn right => u32_select (u32_gt_signed left rig
 const u32_div = fn (left: U32x4) => fn (right: U32x4) => do:
   let (a, b, c, d) = left
   let (e, f, g, h) = right
-  return (@u32.div a e, @u32.div b f, @u32.div c g, @u32.div d h)
+  break (@u32.div a e, @u32.div b f, @u32.div c g, @u32.div d h)
 const u32_not = fn lanes => @simd.u32x4.not lanes
 const u32_andnot = fn left => fn right => @simd.u32x4.andnot left right
 const any_true = fn mask => @simd.u32x4.any_true mask
@@ -108,18 +108,18 @@ const store = fn index => fn lanes => fn values => @simd.store values index lane
 // choice of grouping and can round differently from the left-to-right version.
 const f32_sum = fn (values: F32x4) => do:
   let (a, b, c, d) = values
-  return ((a + b) + c) + d
+  break ((a + b) + c) + d
 const f32_sum_pairwise = fn (values: F32x4) => do:
   let (a, b, c, d) = values
-  return (a + b) + (c + d)
+  break (a + b) + (c + d)
 const u32_sum = fn (values: U32x4) => do:
   let (a, b, c, d) = values
-  return ((a + b) + c) + d
+  break ((a + b) + c) + d
 // Dot products group exactly like std/vector's `Vec3.dot`, left to right:
 // `((a.x * b.x + a.y * b.y) + a.z * b.z) + a.w * b.w`; `f32_dot3` ignores lane 3.
 const f32_dot = fn (left: F32x4) => fn (right: F32x4) => do:
   let (x, y, z, w) = f32_mul left right
-  return ((x + y) + z) + w
+  break ((x + y) + z) + w
 const f32_dot3 = fn (left: F32x4) => fn (right: F32x4) => do:
   let (x, y, z, _) = f32_mul left right
-  return (x + y) + z
+  break (x + y) + z

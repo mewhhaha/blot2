@@ -11,7 +11,7 @@ const forward2 = fn callback => fn left => fn right => apply2 callback left righ
 const read2 = fn (left: State U32) => fn (right: State U32) => do:
   use x <- left.get ()
   use y <- right.get ()
-  return @u32.sub x y
+  break @u32.sub x y
 const keep = fn callback => {callback}
 const make = fn () => keep read2
 `;
@@ -20,11 +20,11 @@ entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.sco
   use outer <- do (@effect.state left.get left.set 7):
     use inner <- do (@effect.state right.get right.set 9):
       let holder = {callback: read2}
-      return forward2 holder.callback left right
+      break forward2 holder.callback left right
     let (state, result) = inner
-    return result
+    break result
   let (state, result) = outer
-  return result
+  break result
 ))
 `;
 
@@ -64,8 +64,8 @@ const completeMain = main +
       "entry const answer",
       "entry const alias",
     ).replace(
-      "return forward2 holder.callback left right",
-      "let callback = read2\n      return forward2 callback left right",
+      "break forward2 holder.callback left right",
+      "let callback = read2\n      break forward2 callback left right",
     );
 
 async function execute(bytes: Uint8Array, sum = false) {

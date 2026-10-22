@@ -25,7 +25,7 @@ entry const answer = fn () => do:
   let value = 100
   use first <- (@code.emit generated) 0
   use second <- (@code.emit generated) 1
-  return @u32.add value (@u32.add first second)
+  break @u32.add value (@u32.add first second)
 `;
   const library = (base: number) => {
     if (recipe === "resolver iteration") {
@@ -34,7 +34,7 @@ entry const answer = fn () => do:
   for index in 0..value:
     use item <- #Some 1
     total := @u32.add self item
-  return total)
+  break total)
 const generated = @code.quote (fn (value: U32) => helper value)
 const generated_task = @code.quote (fn (value: U32) => @task.scope (fn group => @task.join (@task.spawn group (fn () => helper value))))
 const evaluated: U32 = @code.run (@code.quote (helper 2))
@@ -51,22 +51,22 @@ const helper = fn (value: U32) => do:
         count := @u32.add self value
         yield value
       complete value =>
-        return count
+        break count
 const generated = @code.quote (fn (value: U32) => helper value)
 const generated_task = @code.quote (fn (value: U32) => @task.scope (fn group => @task.join (@task.spawn group (fn () => helper value))))
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;
     }
-    let finish = "return @u32.add number " + base;
+    let finish = "break @u32.add number " + base;
     if (recipe === "resolver forwarding") {
-      finish = "return $ #Box (@u32.add number " + base + ")";
+      finish = "break $ #Box (@u32.add number " + base + ")";
     }
     let pure = "const Box.pure = fn value => #Box value";
     if (recipe === "resolver effects") {
       pure = `const Box.pure = fn value => do:
   use owner <- @resource.acquire (fn () => 1) (fn value => ())
   use @resource.release owner
-  return #Box value`;
+  break #Box value`;
     }
     let generatedTask =
       "@code.quote (fn (value: U32) => @task.scope (fn group => @task.join (@task.spawn group (fn () => helper value))))";

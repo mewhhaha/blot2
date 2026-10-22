@@ -10,7 +10,7 @@ entry const run = fn (amount: U32) -> U32 => do:
   let before = holder
   holder.point.x := @u32.add self amount
   let #Holder { point: #Point { y } } = holder
-  return @u32.add (@u32.mul before.point.x 10) (@u32.add holder.point.x y)
+  break @u32.add (@u32.mul before.point.x 10) (@u32.add holder.point.x y)
 `, guest => {
     for (let i = 0; i < 2000; i++) equal(guest.call("run", i), i + 14);
   });

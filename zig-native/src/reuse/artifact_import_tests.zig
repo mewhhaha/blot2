@@ -38,7 +38,7 @@ const Fixture = struct {
             unit.* = try lower(&pool, @intCast(i + 1), if (i == 2)
                 "entry const answer = fn () => 43\n"
             else
-                "type Cell is data = #Cell { right: F32, left: U32 }\neffect Read: Unit -> F32\nconst factory = fn value => do:\n  return fn extra => @f32.add value extra\nconst read = fn () => Read ()\nentry const answer = fn (value: F32) => @f32.add value 1.0\n");
+                "type Cell is data = #Cell { right: F32, left: U32 }\neffect Read: Unit -> F32\nconst factory = fn value => do:\n  break fn extra => @f32.add value extra\nconst read = fn () => Read ()\nentry const answer = fn (value: F32) => @f32.add value 1.0\n");
             count += 1;
         }
         const names = try runtime_identity.Metadata.capture(a, &pool, &.{

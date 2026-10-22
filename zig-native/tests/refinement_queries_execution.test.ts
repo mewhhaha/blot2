@@ -27,7 +27,7 @@ entry const run = fn (value: U32) => @u32.add (read value) ${changed}
 entry const captured = fn (value: U32) => scalar value
 entry const boxed = fn () => do:
   let #Box value = nominal 0
-  return value
+  break value
 `,
     [dependency]: `${
       reordered ? "const unrelated = fn value => value\n" : ""

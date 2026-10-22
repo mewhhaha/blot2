@@ -7,19 +7,19 @@ const source = `
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 entry const pure = fn () => do:
   let callback = @effect.scope (fn (s: State U32) => fn () => 42)
-  return callback ()
+  break callback ()
 entry const capture = fn (value: U32) => do:
   let callback = @effect.scope (fn (s: State U32) => fn () => @u32.add value 1)
-  return callback ()
+  break callback ()
 entry const outer = fn () => @effect.scope (fn (left: State U32) => do:
   let read = left.get
   let write = left.set
   let callback = @effect.scope (fn (right: State U32) => fn () => do:
     let (state, result) = do (@effect.state read write 7):
-      return read ()
-    return result
+      break read ()
+    break result
   )
-  return callback ()
+  break callback ()
 )
 `;
 for (const codegenTier of ["optimized", "development"] as const) {
@@ -69,8 +69,8 @@ for (const codegenTier of ["optimized", "development"] as const) {
         "fn () => 42)",
         `fn () => do:
     let (state, result) = do (@effect.state s.get s.set 0):
-      return 42
-    return result
+      break 42
+    break result
   )`,
       );
       const rejected = await compiler.build({ sources: { [entry]: captured } });

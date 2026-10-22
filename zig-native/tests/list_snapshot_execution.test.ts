@@ -7,7 +7,7 @@ import * as iter from "std/iter"
 const skip = fn count => fn cursor => do:
   for index in 0..count:
     cursor := @cursor.advance self
-  return cursor
+  break cursor
 entry const scalar = fn (seed: U32) => do:
   let values = @list.generate 800 (fn index => index + seed)
   let left = values.iter
@@ -15,7 +15,7 @@ entry const scalar = fn (seed: U32) => do:
   values := @list.prepend self 9000
   values := @list.append self 9001
   let changed = Array.from_list values
-  return #[@cursor.value left, @cursor.value right, @cursor.value (@cursor.advance right), changed[0], values.length]
+  break #[@cursor.value left, @cursor.value right, @cursor.value (@cursor.advance right), changed[0], values.length]
 entry const references = fn (seed: U32) => do:
   let values = @list.generate 800 (fn index => #[index, seed])
   let left = values.iter
@@ -27,15 +27,15 @@ entry const references = fn (seed: U32) => do:
     let pressure = @array.fill 8192 index
     if pressure[8191] != index:
       @panic "snapshot pressure"
-  return #[(@cursor.value left)[0], (@cursor.value right)[0], (@cursor.value (@cursor.advance right))[0], changed[0][0], values.length]
+  break #[(@cursor.value left)[0], (@cursor.value right)[0], (@cursor.value (@cursor.advance right))[0], changed[0][0], values.length]
 entry const windows = fn (count: U32) => do:
   let stream = iter.windows 3 (iter.range 0 count)
   let #Some (first, next) = stream.next else:
-    return 0
+    break 0
   let saved = first.iter
   let #Some (second, _) = next.next else:
-    return 0
-  return @cursor.value saved + iter.fold_left add 0 first + iter.fold_left add 0 second
+    break 0
+  break @cursor.value saved + iter.fold_left add 0 first + iter.fold_left add 0 second
 entry const constant = fn () => @cursor.value [40, 41, 42].iter
 `;
 Deno.test("List cursor snapshots defer copying across writers forks references windows and checkpoints", async () => {

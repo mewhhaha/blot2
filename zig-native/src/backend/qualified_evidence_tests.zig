@@ -29,7 +29,7 @@ const fixture =
     \\const Increment.add = fn left => fn right => do:
     \\  let #Increment a = left
     \\  let #Increment b = right
-    \\  return #Increment (@u32.add a b)
+    \\  break #Increment (@u32.add a b)
     \\const twice: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
     \\entry const answer = fn () => do:
     \\  let unused: a -> a where { associated "missing" a a a } = fn value => value
@@ -37,7 +37,7 @@ const fixture =
     \\  let (_, #Cell count) = @state.run (#Cell 40) (fn () => read_local (fn ignored -> Cell U32 => @panic "unused"))
     \\  let local = twice
     \\  let #Increment delta = local (#Increment 1)
-    \\  return @u32.add count delta
+    \\  break @u32.add count delta
 ;
 fn backendScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
     var result = try backend.compile(allocator, &.{module.*}, 1);
@@ -60,10 +60,10 @@ test "explicit closed extras and independent rows require proof while unused cal
         .{ .source = "const identity: a -> a where { effect_rep ! {| e} } = fn value => value\nentry const answer = fn () => identity 42\n", .code = .ambiguous_qualified },
         .{ .source = "entry const answer: U32 where { type_rep a } = 42\n", .code = .ambiguous_qualified },
         .{ .source = "entry const answer: U32 where { effect_rep ! {| e} } = 42\n", .code = .ambiguous_qualified },
-        .{ .source = "entry const answer = fn () => do:\n  let unused: U32 where { effect_rep ! {| e} } = 42\n  return 42\n", .code = .ambiguous_qualified },
+        .{ .source = "entry const answer = fn () => do:\n  let unused: U32 where { effect_rep ! {| e} } = 42\n  break 42\n", .code = .ambiguous_qualified },
         .{ .source = "const unused: a -> a where { associated \"missing\" a a a } = fn value => value\nentry const answer = 42\n", .code = null },
-        .{ .source = "entry const answer = fn () => do:\n  let unused: U32 -> U32 where { associated \"missing\" Bool Bool Bool } = fn value => value\n  return 42\n", .code = null },
-        .{ .source = "entry const answer = fn () => do:\n  let unused: U32 where { associated \"missing\" Bool Bool Bool } = 42\n  return 42\n", .code = .missing_associated },
+        .{ .source = "entry const answer = fn () => do:\n  let unused: U32 -> U32 where { associated \"missing\" Bool Bool Bool } = fn value => value\n  break 42\n", .code = null },
+        .{ .source = "entry const answer = fn () => do:\n  let unused: U32 where { associated \"missing\" Bool Bool Bool } = 42\n  break 42\n", .code = .missing_associated },
     };
     const a = std.testing.allocator;
     for (cases) |case| {

@@ -85,12 +85,12 @@ const cases = [_]Case{
     .{ .source = "entry const folded=@type.call \"add\" #True #True\n", .checked = false, .code = "missing_associated", .operation = "+", .member = "add", .candidates = &.{.{ .side = .left, .operand = "Bool", .outcome = .no_member }} },
     .{ .source = box ++ "const Box.add=fn (left: Box)=>fn (right: Box)=>left\nconst Num.add=fn (left: Num)=>fn (right: Num)=>left\nentry const answer=fn()=>@type.call \"add\" (#Box 1) (#Num 2)\n", .checked = false, .code = "missing_associated", .operation = "+", .member = "add", .candidates = &.{ .{ .side = .left, .operand = "main::Box", .outcome = .incompatible }, .{ .side = .right, .operand = "main::Num", .outcome = .incompatible } } },
     // Result dispatch looks only at its destination.
-    .{ .source = box ++ "entry const answer=fn()=>do:\n  let b: Box = @type.result \"from\" 3\n  return 1\n", .checked = false, .code = "missing_associated", .operation = null, .member = "from", .candidates = &.{.{ .side = .destination, .operand = "main::Box", .outcome = .no_member }} },
+    .{ .source = box ++ "entry const answer=fn()=>do:\n  let b: Box = @type.result \"from\" 3\n  break 1\n", .checked = false, .code = "missing_associated", .operation = null, .member = "from", .candidates = &.{.{ .side = .destination, .operand = "main::Box", .outcome = .no_member }} },
     // Operands select the left method; its result then conflicts with the
     // annotation, and the right method that would fit is never tried.
-    .{ .source = box ++ "const Box.add=fn (left: Box)=>fn (right: Num)=>left\nconst Num.add=fn (left: Box)=>fn (right: Num)=>7\nconst sum=fn a=>fn b=>@type.call \"add\" a b\nentry const answer=fn()=>do:\n  let r: U32 = sum (#Box 1) (#Num 2)\n  return r\n", .checked = true, .code = "type_mismatch", .operation = "+", .member = "add", .candidates = &.{.{ .side = .left, .operand = "Box", .outcome = .result_mismatch }} },
+    .{ .source = box ++ "const Box.add=fn (left: Box)=>fn (right: Num)=>left\nconst Num.add=fn (left: Box)=>fn (right: Num)=>7\nconst sum=fn a=>fn b=>@type.call \"add\" a b\nentry const answer=fn()=>do:\n  let r: U32 = sum (#Box 1) (#Num 2)\n  break r\n", .checked = true, .code = "type_mismatch", .operation = "+", .member = "add", .candidates = &.{.{ .side = .left, .operand = "Box", .outcome = .result_mismatch }} },
     // A generic callback's dispatch is explained where it is specialized.
-    .{ .source = "const twice=fn f=>fn x=>f (f x)\nentry const answer=fn()=>do:\n  let r=twice (fn v=>@type.call \"add\" v v) #True\n  return 1\n", .checked = false, .code = "missing_associated", .operation = "+", .member = "add", .candidates = &.{.{ .side = .left, .operand = "Bool", .outcome = .no_member }} },
+    .{ .source = "const twice=fn f=>fn x=>f (f x)\nentry const answer=fn()=>do:\n  let r=twice (fn v=>@type.call \"add\" v v) #True\n  break 1\n", .checked = false, .code = "missing_associated", .operation = "+", .member = "add", .candidates = &.{.{ .side = .left, .operand = "Bool", .outcome = .no_member }} },
 };
 
 test "dispatch diagnostics explain candidates in selection order" {

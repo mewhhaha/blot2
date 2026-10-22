@@ -44,7 +44,7 @@ Deno.test("body checker reuse owns qualified generic dotted roots through reject
             : "";
           return `${prefix}${producer}const extract = fn value => do:
   let root = ${root}
-  return ${spine(path)}
+  break ${spine(path)}
 entry const run = fn (value: U32) => extract ${scalar}
 entry const packed = fn (value: U32) => extract ${owning}
 `;

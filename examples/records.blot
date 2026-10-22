@@ -5,7 +5,7 @@ type Selection is data = #Selected { index: U32 } | #Cleared {}
 const Vec2.add = fn left => fn right => do:
   let #Vec2 { x: left_x, y: left_y } = left
   let #Vec2 { x: right_x, y: right_y } = right
-  return #Vec2 {
+  break #Vec2 {
     x: left_x + right_x,
     y: left_y + right_y,
   }

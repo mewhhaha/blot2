@@ -32,7 +32,7 @@ type Point is data = #Point { x: U32, y: U32 }
 let point = #Point { y: second, x: first }
 entry const run = fn (amount: U32) -> U32 => do:
   let changed = @array.set values 0 amount
-  return @u32.add point.x (@u32.add (@array.get values 0) (@array.get changed 0))
+  break @u32.add point.x (@u32.add (@array.get values 0) (@array.get changed 0))
 `, guest => {
     for (let i = 0; i < 2000; i++) equal(guest.call("run", i), 42 + i);
   });

@@ -371,7 +371,7 @@ fn Walker(comptime Engine: type) type {
             // outer owners matter, so nested lexical parameters cannot alias it.
             switch (node.tag) {
                 .lambda => try self.captures(node.b, owner, once, found, depth + 1),
-                .group, .field_access, .return_stmt, .yield_stmt, .type_witness => try self.captures(node.a, owner, once, found, depth + 1),
+                .group, .field_access, .return_stmt, .function_return_stmt, .yield_stmt, .type_witness => try self.captures(node.a, owner, once, found, depth + 1),
                 .field, .unary, .operator_tail => if (node.b != 0) {
                     try self.captures(node.b, owner, once, found, depth + 1);
                 },
@@ -670,6 +670,10 @@ fn Walker(comptime Engine: type) type {
                 .return_stmt => {
                     if (try self.expression(node.a, depth + 1) == .exit) return .exit;
                     if (self.returns) |frame| self.record(frame);
+                    return .exit;
+                },
+                .function_return_stmt => {
+                    if (try self.expression(node.a, depth + 1) == .exit) return .exit;
                     return .exit;
                 },
                 .break_stmt => {

@@ -6,5 +6,5 @@ const inspected = fn computation => do:
       effect (Inspect U32) value =>
         yield @u32.add value 2
       complete value =>
-        return value
+        break value
 entry const answer = fn () => inspected (@computation (fn () => Inspect U32 40))

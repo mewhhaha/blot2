@@ -14,17 +14,17 @@ entry const flags = fn seed => simd.u32_sum (simd.u32_xor (simd.u32_and (seed, s
 entry const snapshot = fn seed => do:
   let before = #[seed, seed + 1, seed + 2, seed + 3, 99]
   let after = simd.store 1 (simd.u32_add (simd.load 0 before) (10, 20, 30, 40)) before
-  return #[before[1], after[0], after[1], after[2], after[3], after[4]]
+  break #[before[1], after[0], after[1], after[2], after[3], after[4]]
 entry const invalid_load = fn index => simd.u32_sum (simd.load index #[1, 2, 3, 4])
 entry const invalid_store = fn index => simd.store index (1, 2, 3, 4) #[1, 2, 3, 4]
 entry const ordered = fn (value: F32) => simd.f32_sum (16777216.0, value, value, -16777216.0)
 entry const regrouped = fn (value: F32) => simd.f32_sum_pairwise (16777216.0, value, value, -16777216.0)
 entry const converted = fn (value: F32) => do:
   let (a, b, c, d) = simd.to_u32 (value, -1.0, 4294967296.0, 0.0 / 0.0)
-  return #[a, b, c, d]
+  break #[a, b, c, d]
 entry const floating = fn (value: F32) => do:
   let (a, b, c, d) = simd.f32_sqrt (simd.f32_mul (value, 2.0, 3.0, 4.0) (value, 2.0, 3.0, 4.0))
-  return #[a, b, c, d]
+  break #[a, b, c, d]
 `, guest => {
     equal(guest.call("runtime", 9), 304);
     equal(guest.read("staged"), 304);
@@ -50,7 +50,7 @@ entry const division = fn count => @array.generate count (fn index => 12 / (4 - 
 entry const branching = fn count => @array.generate count (fn index => if index < 3 then index else 0)
 entry const captured = fn count => do:
   let values = #[10, 20, 30, 40]
-  return @array.generate count (fn index => values[index])
+  break @array.generate count (fn index => values[index])
 `, guest => {
     for (const count of [0, 1, 2, 3, 4, 5, 7, 8, 9, 31, 65, 4099]) {
       deepStrictEqual(Array.from(guest.call("integers", count) as Uint32Array), Array.from({ length: count }, (_, i) => (17 - i) >>> 0));
@@ -71,12 +71,12 @@ entry const edited = fn (index: U32) -> Array F32 => do:
   let values = #[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
   let before = values
   values := simd.store index (simd.f32_mul (simd.load index values) (2.0, 2.0, 2.0, 2.0)) values
-  return #[before[index], values[0], values[1], values[2], values[3], values[4], values[5]]
+  break #[before[index], values[0], values[1], values[2], values[3], values[4], values[5]]
 entry const flags = fn (index: U32) -> U32 => do:
   let values = #[#True, #False, #True, #True, #False]
   let (a, b, c, d) = simd.load index values
   let flipped = simd.store index (d, c, b, a) values
-  return (if flipped[index] then 1 else 0) + (if flipped[index + 3] then 2 else 0) + (if values[index] then 4 else 0)
+  break (if flipped[index] then 1 else 0) + (if flipped[index + 3] then 2 else 0) + (if values[index] then 4 else 0)
 `, guest => {
     deepStrictEqual(Array.from(guest.call("edited", 0) as Float32Array), [1, 2, 4, 6, 8, 5, 6]);
     deepStrictEqual(Array.from(guest.call("edited", 2) as Float32Array), [3, 1, 2, 6, 8, 10, 12]);
@@ -125,14 +125,14 @@ entry const accumulate = fn (n: U32) -> F32 => do:
   for i in 0..n:
     acc := simd.f32_add (simd.f32_mul acc k) step
   let (a, b, c, d) = acc
-  return ((a + b) + c) + d
+  break ((a + b) + c) + d
 entry const kernel = fn (reps: U32) -> F32 => do:
   let values = @array.generate 64 (fn i => @u32.to_f32 i)
   for r in 0..reps:
     for block in 0..16:
       let i = block * 4
       values := simd.store i (simd.f32_add (simd.f32_mul (simd.load i values) (0.5, 0.5, 0.5, 0.5)) (0.25, 0.25, 0.25, 0.25)) values
-  return values[7]
+  break values[7]
 entry const mixed = fn (n: U32) -> F32 => do:
   let state = (1, 2, 3, 4)
   let acc = simd.f32_splat 0.0
@@ -143,12 +143,12 @@ entry const mixed = fn (n: U32) -> F32 => do:
     let chosen = simd.f32_select (simd.f32_lt floats (simd.f32_splat 0.5)) floats (simd.f32_neg floats)
     let mixed = simd.f32_shuffle (0, 5, 2, 7) chosen (simd.f32_swizzle (3, 2, 1, 0) chosen)
     acc := simd.f32_add (simd.f32_min acc (simd.f32_splat 100.0)) (simd.f32_max mixed (simd.f32_broadcast 1 mixed))
-  return simd.f32_sum acc
+  break simd.f32_sum acc
 const scaled = fn (lanes: simd.F32x4) => fn (n: U32) -> simd.F32x4 => do:
   let acc = lanes
   for i in 0..n:
     acc := simd.f32_mul acc (1.5, 1.5, 1.5, 1.5)
-  return acc
+  break acc
 entry const returned = fn (n: U32) -> F32 => simd.f32_sum (scaled (1.0, 2.0, 3.0, 4.0) n)
 entry const held = fn (n: U32) -> F32 => do:
   let acc = simd.f32_splat 1.0
@@ -160,8 +160,8 @@ entry const held = fn (n: U32) -> F32 => do:
   let sum = fn (offset: F32) => simd.f32_sum (simd.f32_add lanes (offset, offset, offset, offset))
   let rows = #[lanes, acc]
   let #Some kept = maybe else:
-    return sum 0.0
-  return simd.f32_sum kept + sum 1.0 + simd.f32_dot rows[0] rows[1]
+    break sum 0.0
+  break simd.f32_sum kept + sum 1.0 + simd.f32_dot rows[0] rows[1]
 `, (_, bytes) => {
     const guest = counters(bytes);
     const short = guest.run("accumulate", 10);
@@ -188,20 +188,20 @@ import * as simd from "std/simd"
 const pick = fn (h: U32) => fn (x: F32) -> F32 => do:
   let r = simd.f32_select (simd.u32_lt (simd.u32_splat h) (simd.u32_splat 8)) (simd.f32_splat x) (1.0, 2.0, 3.0, 4.0)
   let (a, b, c, d) = r
-  return ((a + b) + c) + d
+  break ((a + b) + c) + d
 const bits = fn (h: U32) -> U32 => do:
   let r = simd.u32_select (simd.u32_splat h) (5, 6, 7, 8) (9, 10, 11, 12)
   let (a, b, c, d) = r
-  return a + b + c + d
+  break a + b + c + d
 const fused = fn (x: F32) -> F32 => do:
   let r = simd.f32_relaxed_madd (simd.f32_splat x) (2.0, 2.0, 2.0, 2.0) (1.0, 1.0, 1.0, 1.0)
   let (a, b, c, d) = r
-  return ((a + b) + c) + d
+  break ((a + b) + c) + d
 entry const run = fn (n: U32) -> F32 => do:
   let total = 0.0
   for i in 0..n:
     total := total + pick (i % 16) 0.5 + @u32.to_f32 (bits (if i % 2 == 0 then 0 else 0xFFFFFFFF)) + fused 0.25
-  return total
+  break total
 `, (_, bytes) => {
     const guest = counters(bytes);
     const short = guest.run("run", 2);
@@ -221,7 +221,7 @@ entry const repro = fn (n: U32) -> F32 => do:
   let total = 0.0
   for i in 0..n:
     total := total + k 0.25
-  return total
+  break total
 // Large enough to stay out of line inside loops as well.
 const step = fn (v: simd.F32x4) -> simd.F32x4 => do:
   let a = simd.f32_add (simd.f32_mul v (0.5, 0.5, 0.5, 0.5)) (1.0, 2.0, 3.0, 4.0)
@@ -232,18 +232,18 @@ const step = fn (v: simd.F32x4) -> simd.F32x4 => do:
   let f = simd.f32_add e (simd.f32_swizzle (3, 2, 1, 0) d)
   let g = simd.f32_max (simd.f32_min f (simd.f32_splat 1000.0)) (simd.f32_splat (0.0 - 1000.0))
   let h = simd.f32_add g (simd.f32_mul g (0.01, 0.02, 0.03, 0.04))
-  return simd.f32_sub h (simd.f32_mul h (0.001, 0.002, 0.003, 0.004))
+  break simd.f32_sub h (simd.f32_mul h (0.001, 0.002, 0.003, 0.004))
 entry const looped = fn (n: U32) -> F32 => do:
   let acc = simd.f32_splat 1.0
   for i in 0..n:
     acc := step acc
-  return simd.f32_sum acc
+  break simd.f32_sum acc
 entry const once = fn (x: F32) -> F32 => simd.f32_sum (step (step (simd.f32_splat x)))
 entry const piped = fn (n: U32) -> F32 => do:
   let acc = simd.f32_splat 1.0
   for i in 0..n:
     acc := acc |> step
-  return simd.f32_sum acc
+  break simd.f32_sum acc
 const halve = fn (v: simd.F32x4) -> simd.F32x4 => if simd.f32_sum v < 1.0 then v else halve (simd.f32_mul v (0.5, 0.5, 0.5, 0.5))
 entry const recursive = fn (n: U32) -> F32 => simd.f32_sum (halve (simd.f32_splat (@u32.to_f32 n)))
 const ping = fn (a: simd.F32x4) => fn (b: simd.F32x4) => fn (n: U32) -> simd.F32x4 => if n == 0 then simd.f32_add a b else pong (step b) a (n - 1)
@@ -254,35 +254,35 @@ const hash = fn (s: simd.U32x4) -> simd.U32x4 => do:
   let b = simd.u32_xor a (simd.u32_shr 17 a)
   let c = simd.u32_add (simd.u32_xor b (simd.u32_shl 5 b)) (0x9E3779B9, 0x9E3779B9, 0x9E3779B9, 0x9E3779B9)
   let d = simd.u32_mul (simd.u32_xor c (simd.u32_shr 16 c)) (0x85EBCA6B, 0x85EBCA6B, 0x85EBCA6B, 0x85EBCA6B)
-  return simd.u32_select (simd.u32_lt d (simd.u32_splat 0x80000000)) d (simd.u32_not d)
+  break simd.u32_select (simd.u32_lt d (simd.u32_splat 0x80000000)) d (simd.u32_not d)
 entry const hashed = fn (n: U32) -> U32 => do:
   let s = (1, 2, 3, 4)
   for i in 0..n:
     s := hash s
   let (a, b, c, d) = s
-  return a ^ b ^ c ^ d
+  break a ^ b ^ c ^ d
 // Closures keep the boxed ABI and box once per call.
 const blend = fn (w: F32) => fn (v: simd.F32x4) -> simd.F32x4 => step (simd.f32_mul v (simd.f32_splat w))
 const apply = fn (f: simd.F32x4 -> simd.F32x4) => fn (n: U32) -> F32 => do:
   let acc = simd.f32_splat 1.0
   for i in 0..n:
     acc := f acc
-  return simd.f32_sum acc
+  break simd.f32_sum acc
 entry const direct = fn (n: U32) -> F32 => do:
   let acc = simd.f32_splat 1.0
   for i in 0..n:
     acc := blend 0.5 acc
-  return simd.f32_sum acc
+  break simd.f32_sum acc
 entry const partial = fn (n: U32) -> F32 => do:
   let half = blend 0.5
   let acc = simd.f32_splat 1.0
   for i in 0..n:
     acc := half acc
-  return simd.f32_sum acc
+  break simd.f32_sum acc
 entry const passed = fn (n: U32) -> F32 => apply (blend 0.5) n
 entry const lanes = fn (x: F32) -> Array F32 => do:
   let (a, b, c, d) = step (step (simd.f32_splat x))
-  return #[a, b, c, d]
+  break #[a, b, c, d]
 `, (guest, bytes) => {
     // Results match the boxed compiler's bits.
     const expected: Record<string, [number, number]> = {
@@ -317,7 +317,7 @@ entry const run = fn (n: U32) -> F32 => do:
   let acc = simd.f32_splat 1.0
   for i in 0..n:
     acc := helper.step acc
-  return simd.f32_sum acc + helper.extra n
+  break simd.f32_sum acc + helper.extra n
 `;
   // An extra helper instance in some revisions moves every worker's index.
   const sources = (bias: number) => ({
@@ -331,7 +331,7 @@ const step = fn (v: simd.F32x4) -> simd.F32x4 => do:
   let e = simd.f32_mul (simd.f32_add d (simd.f32_splat 0.5)) (simd.f32_splat 0.5)
   let f = simd.f32_add e (simd.f32_swizzle (3, 2, 1, 0) d)
   let g = simd.f32_max (simd.f32_min f (simd.f32_splat 1000.0)) (simd.f32_splat (0.0 - 1000.0))
-  return simd.f32_sub g (simd.f32_mul g (0.001, 0.002, 0.003, 0.004))
+  break simd.f32_sub g (simd.f32_mul g (0.001, 0.002, 0.003, 0.004))
 const twice = fn (v: simd.F32x4) -> simd.F32x4 => step (step v)
 const extra = fn (n: U32) -> F32 => simd.f32_sum (${bias === 5 ? "twice" : "step"} (simd.f32_splat (@u32.to_f32 n)))
 `,
@@ -448,49 +448,49 @@ entry const vector_floats = fn (op: U32) -> Array F32 => do:
     for j in 0..floats.length:
       let (a, b, c, d) = float_vector op (float_quad i) (float_quad j)
       out := #[...out, a, b, c, d]
-  return out
+  break out
 entry const scalar_floats = fn (op: U32) -> Array F32 => do:
   let out: Array F32 = #[]
   for i in 0..floats.length:
     for j in 0..floats.length:
       for k in 0..4:
         out := #[...out, float_scalar op (float_at (i + k)) (float_at (j + k))]
-  return out
+  break out
 entry const vector_float_masks = fn (op: U32) -> Array U32 => do:
   let out: Array U32 = #[]
   for i in 0..floats.length:
     for j in 0..floats.length:
       let (a, b, c, d) = float_compare op (float_quad i) (float_quad j)
       out := #[...out, a, b, c, d]
-  return out
+  break out
 entry const scalar_float_masks = fn (op: U32) -> Array U32 => do:
   let out: Array U32 = #[]
   for i in 0..floats.length:
     for j in 0..floats.length:
       for k in 0..4:
         out := #[...out, mask (float_holds op (float_at (i + k)) (float_at (j + k)))]
-  return out
+  break out
 entry const vector_integers = fn (op: U32) -> Array U32 => do:
   let out: Array U32 = #[]
   for i in 0..integers.length:
     for j in 0..integers.length:
       let (a, b, c, d) = integer_vector op (integer_quad i) (integer_quad j)
       out := #[...out, a, b, c, d]
-  return out
+  break out
 entry const scalar_integers = fn (op: U32) -> Array U32 => do:
   let out: Array U32 = #[]
   for i in 0..integers.length:
     for j in 0..integers.length:
       for k in 0..4:
         out := #[...out, integer_scalar op (integer_at (i + k)) (integer_at (j + k))]
-  return out
+  break out
 entry const vector_shifts = fn (op: U32) -> Array U32 => do:
   let out: Array U32 = #[]
   for i in 0..integers.length:
     for j in 0..integers.length:
       let (a, b, c, d) = shifted op (integer_at j) (integer_quad i)
       out := #[...out, a, b, c, d]
-  return out
+  break out
 entry const scalar_shifts = fn (op: U32) -> Array U32 => do:
   let out: Array U32 = #[]
   for i in 0..integers.length:
@@ -499,26 +499,26 @@ entry const scalar_shifts = fn (op: U32) -> Array U32 => do:
         let x = integer_at (i + k)
         let count = integer_at j
         out := #[...out, if op == 0 then x << count else x >> count]
-  return out
+  break out
 entry const float_table = fn (unused: U32) -> Array F32 => floats
 entry const lane_bits = fn (unused: U32) -> Array U32 => do:
   let out: Array U32 = #[]
   for i in 0..floats.length:
     let (a, b, c, d) = simd.f32_bits (float_quad i)
     out := #[...out, a, b, c, d]
-  return out
+  break out
 entry const lane_floats = fn (unused: U32) -> Array F32 => do:
   let out: Array F32 = #[]
   for i in 0..integers.length:
     let (a, b, c, d) = simd.f32_from_bits (integer_quad i)
     out := #[...out, a, b, c, d]
-  return out
+  break out
 entry const reductions = fn (unused: U32) -> Array U32 => do:
   let out: Array U32 = #[]
   for i in 0..integers.length:
     let lanes = integer_quad i
     out := #[...out, if simd.any_true lanes then 1 else 0, if simd.all_true lanes then 1 else 0]
-  return out
+  break out
 const staged_float_table = vector_floats 0
 const staged_mask_table = vector_float_masks 1
 const staged_integer_table = vector_integers 9
@@ -582,10 +582,10 @@ const staged_nmadd = simd.f32_relaxed_nmadd (1.5, 1.0, 2.0, 3.0) (3.0, 0.1, 0.5,
 const staged_signed = simd.to_u32_signed (simd.f32_from_bits (0xBFF33333, 0xCF000000, 0x7FC00000, 0x4F000000))
 entry const staged_signed_words = fn () -> Array U32 => do:
   let (a, b, c, d) = staged_signed
-  return #[a, b, c, d]
+  break #[a, b, c, d]
 entry const staged_negative = fn () -> Array F32 => do:
   let (a, b, c, d) = staged_nmadd
-  return #[a, b, c, d]
+  break #[a, b, c, d]
 entry const signed_words = fn () -> Array U32 => do:
   let left = (0xFFFFFFFF, 0x80000000, 0, 0x7FFFFFFF)
   let right = (0, 0xFFFFFFFF, 0x80000000, 0)
@@ -593,16 +593,16 @@ entry const signed_words = fn () -> Array U32 => do:
   let (e, f, g, h) = simd.u32_min_signed left right
   let (i, j, k, l) = simd.u32_max_signed left right
   let (m, n, o, p) = simd.u32_div (9, 10, 11, 12) (2, 3, 4, 5)
-  return #[a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p]
+  break #[a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p]
 entry const divide = fn (denominator: U32) -> U32 => do:
   let (_, quotient, _, _) = simd.u32_div (8, 9, 10, 11) (1, denominator, 2, 3)
-  return quotient
+  break quotient
 entry const signed_floats = fn () -> Array F32 => do:
   let (a, b, c, d) = simd.to_f32_signed (0xFFFFFFFF, 0x80000000, 0, 0x7FFFFFFF)
-  return #[a, b, c, d]
+  break #[a, b, c, d]
 entry const signed_convert_words = fn () -> Array U32 => do:
   let (a, b, c, d) = simd.to_u32_signed (simd.f32_from_bits (0xBFF33333, 0xCF000000, 0x7FC00000, 0x4F000000))
-  return #[a, b, c, d]
+  break #[a, b, c, d]
 entry const moved = fn (seed: F32) -> Array F32 => do:
   let left = (seed, 1.0, 2.0, 3.0)
   let right = (4.0, 5.0, 6.0, 7.0)
@@ -610,25 +610,25 @@ entry const moved = fn (seed: F32) -> Array F32 => do:
   let (e, f, g, h) = simd.f32_swizzle (3, 2, 1, 0) left
   let (i, j, k, l) = simd.f32_broadcast 2 left
   let (m, n, o, p) = simd.f32_shuffle (7, 7, 0, 0) left right
-  return #[a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p]
+  break #[a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p]
 entry const moved_words = fn (seed: U32) -> Array U32 => do:
   let (a, b, c, d) = simd.u32_shuffle (0, 5, 2, 7) (seed, 1, 2, 3) (4, 5, 6, 7)
   let (e, f, g, h) = simd.u32_swizzle (1, 1, 3, 0) (seed, 1, 2, 3)
   let (i, j, k, l) = simd.u32_broadcast 0 (seed, 1, 2, 3)
-  return #[a, b, c, d, e, f, g, h, i, j, k, l]
+  break #[a, b, c, d, e, f, g, h, i, j, k, l]
 entry const dots = fn (seed: F32) -> Array F32 => do:
   let left = (seed, 0.1, 1e30, -3.5)
   let right = (0.3, seed, -1e30, 2.25)
   let (ax, ay, az, aw) = left
   let (bx, by, bz, bw) = right
   let vector = #Vec3 { x: ax, y: ay, z: az }.dot(#Vec3 { x: bx, y: by, z: bz })
-  return #[simd.f32_dot3 left right, vector, simd.f32_dot left right, ((ax * bx + ay * by) + az * bz) + aw * bw]
+  break #[simd.f32_dot3 left right, vector, simd.f32_dot left right, ((ax * bx + ay * by) + az * bz) + aw * bw]
 entry const madd = fn (seed: F32) -> Array F32 => do:
   let (a, b, c, d) = simd.f32_relaxed_madd (seed, 1.0, 2.0, 3.0) (3.0, 0.1, 0.5, 0.25) (1.0, 0.2, -1.0, 0.0)
-  return #[a, b, c, d]
+  break #[a, b, c, d]
 entry const nmadd = fn (seed: F32) -> Array F32 => do:
   let (a, b, c, d) = simd.f32_relaxed_nmadd (seed, 1.0, 2.0, 3.0) (3.0, 0.1, 0.5, 0.25) (1.0, 0.2, -1.0, 0.0)
-  return #[a, b, c, d]
+  break #[a, b, c, d]
 `, guest => {
     deepStrictEqual(Array.from(guest.call("moved", 9) as Float32Array), [1, 4, 3, 6, 3, 2, 1, 9, 2, 2, 2, 2, 7, 7, 9, 9]);
     deepStrictEqual(Array.from(guest.call("moved_words", 9) as Uint32Array), [9, 5, 2, 7, 1, 1, 3, 9, 9, 9, 9, 9]);

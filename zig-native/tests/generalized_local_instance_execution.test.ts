@@ -8,7 +8,7 @@ const base = fn world => fn action => (world, action ())
 const empty = fn () => #B { initial: (), s: base }
 const run = fn b => fn action => do:
   let #B { initial, s } = b
-  return s initial action
+  break s initial action
 `;
 
 async function returnsArgument(source: string): Promise<void> {
@@ -27,7 +27,7 @@ entry const main = fn (x: U32) => do:
   let b = empty ()
   let c = b
   let (_, result) = run c (fn () => x)
-  return result
+  break result
 `);
 });
 
@@ -37,7 +37,7 @@ entry const main = fn (x: U32) => do:
   let b = empty ()
   let c = b
   let (_, result) = run b (fn () => x)
-  return result
+  break result
 `);
 });
 
@@ -47,7 +47,7 @@ entry const main = fn (x: U32) => do:
   let b = empty ()
   let (_, first) = run b (fn () => x)
   let (_, second) = run b (fn () => x)
-  return second
+  break second
 `);
 });
 
@@ -60,7 +60,7 @@ entry const main = fn (x: U32) => do:
   let twice = wrap (fn p => (p, p))
   let (_, value) = left x
   let (_, same) = twice value
-  return same
+  break same
 `);
 });
 
@@ -73,7 +73,7 @@ type State a is effect = {
 }
 const empty_scope = fn world => fn action => do:
   use result <- action ()
-  return (world, result)
+  break (world, result)
 const empty = fn () => #Builder { initial: (), scope: empty_scope, schema: #End }
 const insert_cell = fn initial => fn builder => do:
   let #Builder { initial: previous_initial, scope: previous_scope, schema } = builder
@@ -81,11 +81,11 @@ const insert_cell = fn initial => fn builder => do:
     let (current, previous) = world
     use outcome <- @effect.run State.get State.set current (fn () => previous_scope previous action)
     let (next, (previous_next, result)) = outcome
-    return ((next, previous_next), result)
-  return #Builder { initial: (initial, previous_initial), scope, schema }
+    break ((next, previous_next), result)
+  break #Builder { initial: (initial, previous_initial), scope, schema }
 const create = fn builder => fn action => do:
   let #Builder { initial, scope } = builder
-  return scope initial action
+  break scope initial action
 `;
 
 Deno.test("rebound generalized builders close every link of the chain", async () => {
@@ -94,7 +94,7 @@ entry const main = fn (x: U32) => do:
   let builder = empty ()
   builder := insert_cell 1 self
   let (_, result) = create builder (fn () => x)
-  return result
+  break result
 `);
 });
 
@@ -105,7 +105,7 @@ const choose = fn () => pair
 entry const main = fn (x: U32) => do:
   let unused = choose ()
   let builder = empty ()
-  return x
+  break x
 `);
 });
 
@@ -118,7 +118,7 @@ entry const main = fn (x: U32) => do:
   let (_, second) = run b (fn () => (x, 1.5))
   let same = twice (fn v => v)
   let fraction = same 2.5
-  return same first
+  break same first
 `);
 });
 
@@ -136,7 +136,7 @@ entry const main = fn (x: U32) => do:
   let later = fn (y: U32) => k y
   let (a, _) = later first
   let (c, _) = k 1.0
-  return a
+  break a
 `, "ownership_unproved");
 });
 
@@ -152,7 +152,7 @@ entry const main = fn (x: U32) => do:
   let k = pair x
   let (a, _) = k x
   let (b, _) = k 1.5
-  return a
+  break a
 `);
 });
 
@@ -163,12 +163,12 @@ entry const main = fn (x: U32) => do:
   let k = pair x
   let (a, _) = k x
   let (b, _) = k 1.5
-  return a
+  break a
 entry const fraction = fn (x: F32) => do:
   let k = pair x
   let (_, count) = k 3
   let (_, b) = k (x * 2.0)
-  return b
+  break b
 `, (guest) => {
     equal(guest.call("main", 7), 7);
     equal(guest.call("fraction", 1.25), 2.5);
@@ -189,7 +189,7 @@ entry const main = fn (x: U32) => do:
   let k = pair (@array.fill 64 x)
   let (first, _) = k x
   let (second, _) = k 1.5
-  return first[3] + second.length - 64
+  break first[3] + second.length - 64
 entry const memory = fn () -> Array U32 => #[]
 `, (guest) => {
     equal(guest.call("main", 7), 7);
@@ -210,7 +210,7 @@ entry const main = fn (x: U32) => do:
   let k = pair (@array.set values 0 (values[0] + 1))
   let (first, _) = k x
   let (second, _) = k 1.5
-  return first[0] * 100 + second[0]
+  break first[0] * 100 + second[0]
 `, "ownership_unproved");
 });
 
@@ -222,7 +222,7 @@ entry const main = fn (x: U32) => do:
   let (_, whole) = k (x + 1)
   let (_, half) = k 1.5
   let (a, same) = k whole
-  return same - 1
+  break same - 1
 `);
 });
 
@@ -238,8 +238,8 @@ entry const main = fn (x: U32) => do:
   let (_, fraction) = k 1.5
   if fraction > 1.0:
     let (c, _) = k 2
-    return total + c
-  return total
+    break total + c
+  break total
 `, (guest) => {
     equal(guest.call("main", 7), 31);
     for (let index = 0; index < 16; index++) guest.call("main", index);
@@ -257,7 +257,7 @@ entry const main = fn (x: U32) => do:
   let g = k
   let (a, _) = g x
   let (b, _) = g 1.5
-  return a
+  break a
 `);
 });
 
@@ -268,7 +268,7 @@ entry const main = fn (x: U32) => do:
   builder := insert_cell x self
   let (_, first) = create builder (fn () => x)
   let (_, (_, fraction)) = create builder (fn () => (x, 1.5))
-  return first
+  break first
 `);
 });
 
@@ -288,21 +288,21 @@ type Trace is data = #Trace (Array U32)
 const empty = fn () => do:
   let scope = fn world => fn action => do:
     use outcome <- @effect.run State.get State.set world action
-    return outcome
-  return #App { initial: #Trace #[], scope, render: fn (frame: U32) => frame }
+    break outcome
+  break #App { initial: #Trace #[], scope, render: fn (frame: U32) => frame }
 const note = fn (value: U32) => do:
   use current <- State.get ()
   let #Trace values = current
-  return State.set (#Trace #[...values, value])
+  break State.set (#Trace #[...values, value])
 const with_render = fn render => fn app => do:
   let #App { initial, scope } = app
-  return #App { initial, scope, render }
+  break #App { initial, scope, render }
 const initial = fn app => do:
   let #App { initial } = app
-  return initial
+  break initial
 const run = fn app => fn world => fn action => do:
   let #App { scope } = app
-  return scope world action
+  break scope world action
 entry const memory = fn () -> Array U32 => #[]
 `;
 
@@ -321,14 +321,14 @@ Deno.test("promoted builders serialize curried callbacks whose rows a use leaves
   await returnsArgumentWithMemory(`${app}
 const render = fn app => fn frame => do:
   let #App { render } = app
-  return render 2 frame
+  break render 2 frame
 entry const main = fn (x: U32) => do:
   let app = with_render (fn (scale: U32) => fn (frame: U32) => do:
     use note frame
-    return frame * scale) (empty ())
+    break frame * scale) (empty ())
   let (trace, doubled) = run app (initial app) (fn () => render app x)
   let #Trace values = trace
-  return doubled - x + values.length - 1
+  break doubled - x + values.length - 1
 `);
 });
 
@@ -339,15 +339,15 @@ Deno.test("rebinding links that read a promoted builder are promoted with it", a
   await returnsArgumentWithMemory(`${app}
 const render = fn app => fn frame => do:
   let #App { render } = app
-  return render frame
+  break render frame
 entry const main = fn (x: U32) => do:
   let app = empty ()
   app := with_render (fn (frame: U32) => do:
     use note frame
-    return frame + 1) self
+    break frame + 1) self
   let (trace, next) = run app (initial app) (fn () => render app x)
   let #Trace values = trace
-  return next + values.length - 2
+  break next + values.length - 2
 `);
 });
 
@@ -361,11 +361,11 @@ type B [w, s] is data = #B { initial: w, s: w -> s }
 const empty = fn () => do:
   let scope = fn world => fn action => do:
     use result <- action ()
-    return (world, result)
-  return #B { initial: (), s: scope }
+    break (world, result)
+  break #B { initial: (), s: scope }
 const run = fn b => fn action => do:
   let #B { initial, s } = b
-  return s initial action
+  break s initial action
 entry const memory = fn () -> Array U32 => #[]
 `;
 
@@ -375,7 +375,7 @@ entry const main = fn (x: U32) => do:
   let b = empty ()
   let (_, r) = run b (fn () => x)
   let boxed = #[b, b]
-  return r + boxed.length - 2
+  break r + boxed.length - 2
 `);
 });
 
@@ -391,7 +391,7 @@ entry const main = fn (x: U32) => do:
   let boxed = #[b, b]
   let (_, fraction) = run boxed[0] (fn () => 1.5)
   let (_, values) = run boxed[1] (fn () => #[x, x + 1])
-  return r + values[1] - values[0] + boxed.length - 3
+  break r + values[1] - values[0] + boxed.length - 3
 `);
 });
 
@@ -406,7 +406,7 @@ entry const main = fn (x: U32) => do:
   let k = pair x
   let (a, _) = k 1.5
   let n = #[k, k].length
-  return a + n - 2
+  break a + n - 2
 `);
 });
 
@@ -421,8 +421,8 @@ entry const main = fn (x: U32) => do:
   let boxed = #[b, b]
   let later = fn (y: U32) => do:
     let (_, values) = run boxed[1] (fn () => #[y, y])
-    return values.length
-  return r + boxed.length + later x - 4
+    break values.length
+  break r + boxed.length + later x - 4
 `, "ownership_unproved");
 });
 
@@ -436,7 +436,7 @@ type App [engine, system] is data = #App { engine: engine, systems: Array system
 const new_with = fn route => #App { engine: empty (), systems: #[#Route route, #Start (fn () => ())] }
 const finish = fn app => do:
   let #App { engine, systems } = app
-  return #App { engine, systems }
+  break #App { engine, systems }
 const run_start = fn systems => fn () => do:
   for system in systems:
     use case system of
@@ -445,12 +445,12 @@ const run_start = fn systems => fn () => do:
 const create = fn app => fn () => do:
   let #App { engine, systems } = app
   let (world, _) = run engine (run_start systems)
-  return world
+  break world
 entry const main = fn (x: U32) => do:
   let builder = new_with (fn (e: u) => e)
   let application = finish builder
   let world = create application ()
-  return x
+  break x
 `);
 });
 
@@ -468,7 +468,7 @@ entry const main = fn (x: U32) => do:
   let b = empty ()
   let (_, r) = run b (fn () => x)
 ${locals}
-  return r + ${lengths} - 40
+  break r + ${lengths} - 40
 `);
 });
 
@@ -483,7 +483,7 @@ entry const main = fn (x: U32) => do:
   let b = empty ()
   let c = b
   let (_, result) = run c (fn () => x)
-  return result
+  break result
 `);
 });
 
@@ -493,6 +493,6 @@ entry const main = fn (x: U32) => do:
   let b = empty ()
   let (_, r) = run b (fn () => x)
   let boxed = #[b, b]
-  return r + boxed.length - 2
+  break r + boxed.length - 2
 `);
 });

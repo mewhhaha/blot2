@@ -7,10 +7,10 @@ Deno.test("native monad lowering handles long flat statement sequences", async (
 const Box.pure = fn value => #Box value
 const sequence = fn () => do (@do.monad Box):
   let total = 0
-${"  total := @u32.add self 1\n".repeat(count)}  return total
+${"  total := @u32.add self 1\n".repeat(count)}  break total
 entry const answer = fn () => do:
   let #Box value = sequence ()
-  return value
+  break value
 `;
   await compileAndRun(source, guest => equal(guest.call("answer", null), count));
 });

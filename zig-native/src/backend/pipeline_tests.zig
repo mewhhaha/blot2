@@ -13,12 +13,12 @@ const scalar_source =
     \\entry const floating = fn (value: F32) -> F32 => identity value
     \\entry const capped = fn (value: U32) -> U32 => do:
     \\  if @u32.lt value 42:
-    \\    return value
-    \\  return 42
+    \\    break value
+    \\  break 42
     \\entry const nested = fn () -> U32 => do:
     \\  let inner = do:
-    \\    return 20
-    \\  return @u32.add inner 22
+    \\    break 20
+    \\  break @u32.add inner 22
 ;
 fn lowerSource(allocator: std.mem.Allocator, source: []const u8) !core.Module {
     var lexed = try lexer.lex(allocator, source);
@@ -76,15 +76,15 @@ const provider_source =
     \\const reader = @effect.provider Read (fn () => 1.75)
     \\const state = @effect.state (State.get F32) (State.set F32) 1.75
     \\entry const folded = do reader:
-    \\  return Read ()
+    \\  break Read ()
     \\entry const callback = fn () => do reader:
-    \\  return Read ()
+    \\  break Read ()
     \\entry const answer = fn (value: F32) => do:
     \\  let (next, old) = do state:
     \\    use old <- State.get F32 ()
     \\    use State.set F32 (@f32.add old value)
-    \\    return old
-    \\  return @f32.add next old
+    \\    break old
+    \\  break @f32.add next old
 ;
 
 fn providerPipelineScenario(allocator: std.mem.Allocator) !void {
@@ -120,8 +120,8 @@ const record_witness_source =
     \\entry const answer = fn () => do:
     \\  let (_, result) = do state:
     \\    use value <- get #Pair
-    \\    return value.zebra
-    \\  return result
+    \\    break value.zebra
+    \\  break result
 ;
 fn recordWitnessScenario(allocator: std.mem.Allocator) !void {
     var result = try compileSource(allocator, record_witness_source);
@@ -140,16 +140,16 @@ const retained_checkpoint_sources = [_][]const u8{
     \\const empty = fn () => do:
     \\  let scope = fn world => fn action => do:
     \\    use result <- action ()
-    \\    return (world,result)
-    \\  return #Builder { initial: (), scope, checkpoint: fn () => () }
+    \\    break (world,result)
+    \\  break #Builder { initial: (), scope, checkpoint: fn () => () }
     \\const insert = fn initial => fn builder => do:
     \\  let #Builder { initial: previous_initial, scope: previous_scope, checkpoint } = builder
     \\  let scope = fn world => fn action => do:
     \\    let (current,previous) = world
     \\    use outcome <- @effect.run State.get State.set current (fn () => previous_scope previous action)
     \\    let (next,(previous_next,result)) = outcome
-    \\    return ((next,previous_next),result)
-    \\  return #Builder { initial: (initial,previous_initial), scope, checkpoint }
+    \\    break ((next,previous_next),result)
+    \\  break #Builder { initial: (initial,previous_initial), scope, checkpoint }
     \\const snapshot = fn initial => fn builder => do:
     \\  let #Builder { checkpoint: previous_checkpoint } = builder
     \\  let #Builder { initial: previous_initial, scope: previous_scope } = insert initial builder
@@ -157,14 +157,14 @@ const retained_checkpoint_sources = [_][]const u8{
     \\    use previous_checkpoint ()
     \\    use current <- State.get ()
     \\    use State.set (@u32.add current 1)
-    \\    return ()
-    \\  return #Builder { initial: previous_initial, scope: previous_scope, checkpoint }
+    \\    break ()
+    \\  break #Builder { initial: previous_initial, scope: previous_scope, checkpoint }
     \\const built = snapshot 41 (empty ())
     \\entry const answer = fn () => do:
     \\  let #Builder { initial,scope,checkpoint } = built
     \\  let (world,_) = scope initial checkpoint
     \\  let (current,_) = world
-    \\  return current
+    \\  break current
     ,
     \\effect Read: Unit -> U32
     \\effect Touch: U32 -> Unit
@@ -173,15 +173,15 @@ const retained_checkpoint_sources = [_][]const u8{
     \\  use previous ()
     \\  use value <- Read ()
     \\  use Touch value
-    \\  return ()
+    \\  break ()
     \\const checkpoint = extend previous
     \\const reader = @effect.provider Read (fn () => 42)
     \\const touch = @effect.provider Touch (fn value => ())
     \\const run = fn () => do touch:
     \\  use checkpoint ()
-    \\  return 42
+    \\  break 42
     \\entry const answer = fn () => do reader:
-    \\  return run ()
+    \\  break run ()
     ,
 };
 fn retainedCallableScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
@@ -207,34 +207,34 @@ const curried_dispatch_source =
     \\type Scale is data = #Scale F32
     \\const Box.mix = fn left => fn right => fn weight => do:
     \\  let #Box base = left
-    \\  return @f32.add base (@f32.mul right weight)
+    \\  break @f32.add base (@f32.mul right weight)
     \\const Deferred.mix = fn left => do:
     \\  let #Deferred base = left
     \\  use offset <- Read ()
-    \\  return fn right => fn weight => @f32.add (@f32.add base offset) (@f32.mul right weight)
+    \\  break fn right => fn weight => @f32.add (@f32.add base offset) (@f32.mul right weight)
     \\const Scale.mix = fn left => fn right => fn weight => do:
     \\  let #Scale scale = right
-    \\  return @f32.add left (@f32.mul scale weight)
+    \\  break @f32.add left (@f32.mul scale weight)
     \\const mix = fn left => fn right => @type.call "mix" left right
     \\const reader = @effect.provider Read (fn () => 2.0)
     \\entry const nominal = fn (value: F32) => mix (#Box value) 2.0 1.0
     \\entry const partial = fn (value: F32) => do:
     \\  let blend = mix (#Box value) 4.0
-    \\  return blend 0.5
+    \\  break blend 0.5
     \\entry const deferred = fn (value: F32) => do reader:
-    \\  return mix (#Deferred value) 4.0 0.5
+    \\  break mix (#Deferred value) 4.0 0.5
     \\entry const right = fn (value: F32) => mix value (#Scale 2.0) 1.0
     \\type Live is data = #Live F32
     \\const Live.mix = fn left => fn right => fn () => do:
     \\  let #Live base = left
     \\  use value <- Read ()
-    \\  return @f32.add base (@f32.add right value)
+    \\  break @f32.add base (@f32.add right value)
     \\const earlier = @effect.provider Read (fn () => 100.0)
     \\entry const live = fn (value: F32) => do:
     \\  let callback = do earlier:
-    \\    return mix (#Live value) 0.0
-    \\  return do reader:
-    \\    return callback ()
+    \\    break mix (#Live value) 0.0
+    \\  break do reader:
+    \\    break callback ()
 ;
 test "curried binary dispatch retains selected invocation rows and releases every failed allocation" {
     const allocator = std.testing.allocator;

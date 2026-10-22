@@ -162,7 +162,7 @@ const read: ${nominal} -> ${input} = fn ${
     } => ${generic ? "value.value" : "value"}
 const capture = fn value => do:
   let saved = make value
-  return fn () => read saved
+  break fn () => read saved
 const bonus: ${type} = ${bonus}${shape === "f32" ? ".0" : ""}
 `;
   const main = `import {make, read, capture, bonus} from "./library"
@@ -171,14 +171,14 @@ entry const run = fn (value: ${type}) => ${
   let original = #[value, 7]
   let alias = read (make original)
   original[0] := 0
-  return @u32.add alias[0] bonus`
+  break @u32.add alias[0] bonus`
   }
 entry const captured = fn (value: ${type}) => ${
     scalar ? `${add} ((capture value) ()) bonus` : `do:
   let original = #[value, 7]
   let saved = capture original
   original[0] := 0
-  return @u32.add (saved ())[0] bonus`
+  break @u32.add (saved ())[0] bonus`
   }
 entry const identity = fn (value: ${type}) => ${
     scalar ? "read (make value)" : "(read (make #[value]))[0]"
@@ -192,7 +192,7 @@ entry const effects = fn (host: ${type} -> ${type} ! {Foreign}) => do:
   use first <- host 40${shape === "f32" ? ".0" : ""}
   let wrapped = make ${scalar ? "first" : "#[first]"}
   use second <- host ${scalar ? "(read wrapped)" : "(read wrapped)[0]"}
-  return second
+  break second
 `;
   for (const tier of ["development", "optimized"] as const) {
     const machine = new Map<string, Uint8Array<ArrayBuffer>[]>();

@@ -11,7 +11,7 @@ const checked = fn computation => do:
             break
         yield @u32.add value count
       complete value =>
-        return value
+        break value
 entry const answer = fn () => checked (@computation (fn () => Validate.check 40))
 
 entry const checked_answer = answer ()

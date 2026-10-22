@@ -3,6 +3,6 @@ data Second = #Second { value: U32 }
 const First.plus = fn box => fn delta => @u32.add box.value delta
 const invoke: a -> U32 where { receiver "plus" a Unit (U32 -> U32) } = fn box => do:
   let bound = box.plus
-  return bound 1
+  break bound 1
 entry const answer = fn () => @u32.add (invoke (#First { value: 40 })) (invoke (#Second { value: 40 }))
 entry const folded = answer ()

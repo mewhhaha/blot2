@@ -51,9 +51,9 @@ test "numeric proof checking rejects contradictions hidden kinds and unavailable
 fn runtimeProofLaw(allocator: A) !void {
     const header = "const f: (x: U32) -> (@proof.U32Le 0 x) -> U32 = fn x => fn proof => ";
     try sourceLaw(allocator, "const identity = fn value => value\n" ++ header ++ "identity proof", .proof_runtime_use);
-    try sourceLaw(allocator, header ++ "do:\n  let stored = (proof, x)\n  return x", .proof_runtime_use);
-    try sourceLaw(allocator, header ++ "do:\n  let stored = #[proof]\n  return x", .proof_runtime_use);
-    try sourceLaw(allocator, header ++ "do:\n  let stored = {value: proof}\n  return x", .proof_runtime_use);
+    try sourceLaw(allocator, header ++ "do:\n  let stored = (proof, x)\n  break x", .proof_runtime_use);
+    try sourceLaw(allocator, header ++ "do:\n  let stored = #[proof]\n  break x", .proof_runtime_use);
+    try sourceLaw(allocator, header ++ "do:\n  let stored = {value: proof}\n  break x", .proof_runtime_use);
 }
 test "numeric proof checking rejects data polymorphism and aggregate storage through OOM" {
     try runtimeProofLaw(std.testing.allocator);
@@ -78,7 +78,7 @@ fn introductions(allocator: A) !void {
         \\  let addition = @proof.add_fits index right
         \\  let subtraction = @proof.sub_fits index right
         \\  let copy = first
-        \\  return 0
+        \\  break 0
     ;
     var checked = try checkedSource(allocator, text);
     defer checked.deinit(allocator);
@@ -111,11 +111,11 @@ test "numeric proof introductions retain exact aliases versions lengths and fals
 
 test "numeric proof introductions reject invalid operands arity storage and inferred results" {
     try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => @proof.le 0 x", .proof_scope_escape);
-    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = @proof.eq #True x\n  return x", .invalid_proof_operand);
-    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = @proof.index x 0\n  return x", .invalid_proof_operand);
-    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = @proof.le x\n  return x", .call_arity);
-    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = @proof.le 0 x x\n  return x", .call_arity);
-    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = #[@proof.le 0 x]\n  return x", .proof_runtime_use);
+    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = @proof.eq #True x\n  break x", .invalid_proof_operand);
+    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = @proof.index x 0\n  break x", .invalid_proof_operand);
+    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = @proof.le x\n  break x", .call_arity);
+    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = @proof.le 0 x x\n  break x", .call_arity);
+    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = #[@proof.le 0 x]\n  break x", .proof_runtime_use);
 }
 
 const at_source = "const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = fn values => fn index => fn proof => @array.get values index\n";
@@ -123,14 +123,14 @@ fn exactProofCalls(allocator: A) !void {
     var checked = try checkedSource(allocator, at_source ++
         \\const forward: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = fn values => fn index => fn proof => do:
         \\  let valid = proof
-        \\  return do:
-        \\    return at values index valid
+        \\  break do:
+        \\    break at values index valid
         \\const inspect = fn (values: Array U32) => fn (index: U32) => do:
         \\  let alias = values
         \\  let valid = @proof.index alias index
-        \\  return do:
+        \\  break do:
         \\    let witness = valid
-        \\    return forward values index witness
+        \\    break forward values index witness
     );
     defer checked.deinit(allocator);
     for (checked.diagnostics) |diagnostic| std.debug.print("unexpected proof call {s} at {}\n", .{ @tagName(diagnostic.code), diagnostic.span.start });
@@ -148,12 +148,12 @@ test "numeric proof calls substitute exact public operands and preserve witness 
 }
 test "numeric proof calls reject other collections rebound indexes mismatched facts and Unit" {
     const caller = at_source ++ "const inspect = fn (values: Array U32) => fn (other: Array U32) => fn (index: U32) => do:\n  let valid = @proof.index values index\n";
-    try sourceLaw(std.testing.allocator, caller ++ "  return at other index valid", .proof_mismatch);
-    try sourceLaw(std.testing.allocator, caller ++ "  index := @u32.add self 1\n  return at values index valid", .proof_mismatch);
-    try sourceLaw(std.testing.allocator, caller ++ "  let different = @proof.le 0 index\n  return at values index different", .proof_mismatch);
-    try sourceLaw(std.testing.allocator, caller ++ "  return at values index ()", .proof_mismatch);
-    try sourceLaw(std.testing.allocator, caller ++ "  let closure = fn () => at values index valid\n  return 0", .proof_scope_escape);
-    try sourceLaw(std.testing.allocator, caller ++ "  let closure = fn () => do:\n    let alias = valid\n    return 0\n  return 0", .proof_scope_escape);
+    try sourceLaw(std.testing.allocator, caller ++ "  break at other index valid", .proof_mismatch);
+    try sourceLaw(std.testing.allocator, caller ++ "  index := @u32.add self 1\n  break at values index valid", .proof_mismatch);
+    try sourceLaw(std.testing.allocator, caller ++ "  let different = @proof.le 0 index\n  break at values index different", .proof_mismatch);
+    try sourceLaw(std.testing.allocator, caller ++ "  break at values index ()", .proof_mismatch);
+    try sourceLaw(std.testing.allocator, caller ++ "  let closure = fn () => at values index valid\n  break 0", .proof_scope_escape);
+    try sourceLaw(std.testing.allocator, caller ++ "  let closure = fn () => do:\n    let alias = valid\n    break 0\n  break 0", .proof_scope_escape);
     try sourceLaw(std.testing.allocator, at_source ++ "const forged: (values: Array U32) -> (index: U32) -> (@proof.U32Eq index 0) -> U32 = at", .proof_runtime_use);
     try sourceLaw(std.testing.allocator, at_source ++ "const forged: (values: Array U32) -> (index: U32) -> (@proof.U32Eq index 0) -> U32 = fn values => at values", .proof_runtime_use);
 }
@@ -163,12 +163,12 @@ fn publicProofResults(allocator: A) !void {
         \\const index: (values: Array U32) -> (at: U32) -> @proof.Index values at = fn values => fn at => @proof.index values at
         \\const forward: (values: Array U32) -> (at: U32) -> (@proof.Index values at) -> @proof.Index values at = fn values => fn at => fn proof => do:
         \\  let alias = proof
-        \\  return do:
-        \\    return alias
+        \\  break do:
+        \\    break alias
         \\const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = fn values => fn index => fn proof => @array.get values index
         \\const lookup = fn (values: Array U32) => fn (i: U32) => do:
         \\  let valid = index values i
-        \\  return at values i (forward values i valid)
+        \\  break at values i (forward values i valid)
     ;
     var checked = try checkedSource(allocator, text);
     defer checked.deinit(allocator);
@@ -182,5 +182,5 @@ test "numeric proof public results bind complete recipes through aliases calls a
 }
 test "numeric proof public results reject changed local operands and a different proposition" {
     try sourceLaw(std.testing.allocator, "const f: (x: U32) -> @proof.U32Le x 0 = fn x => @proof.le x 1", .proof_mismatch);
-    try sourceLaw(std.testing.allocator, "const f: (x: U32) -> @proof.U32Lt x 10 = fn x => do:\n  x := @u32.add self 1\n  return @proof.lt x 10", .proof_mismatch);
+    try sourceLaw(std.testing.allocator, "const f: (x: U32) -> @proof.U32Lt x 10 = fn x => do:\n  x := @u32.add self 1\n  break @proof.lt x 10", .proof_mismatch);
 }

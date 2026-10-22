@@ -17,7 +17,7 @@ entry const run = fn factor => do:
   let result = 0
   for row in rows:
     result := self + row.a + row.b + row.c
-  return result * factor
+  break result * factor
 `,
   },
   {
@@ -30,7 +30,7 @@ entry const run = fn factor => do:
   let result = 0
   for row in rows:
     result := self + row.a + row.b + row.c
-  return result * factor
+  break result * factor
 `,
   },
   {
@@ -46,7 +46,7 @@ entry const run = fn count => do:
     let row = @cursor.value cursor
     result := self + row.a + row.b + row.c
     cursor := @cursor.advance self
-  return result
+  break result
 `,
   },
   {
@@ -59,7 +59,7 @@ const sum = fn values => do:
   let result = 0
   for row in values:
     result := self + row.a + row.b + row.c
-  return result
+  break result
 entry const run = fn count => sum (build count)
 `,
   },
@@ -73,7 +73,7 @@ const sum = fn values => do:
   let result = 0
   for (a, b, c) in values:
     result := self + a + b + c
-  return result
+  break result
 entry const run = fn count => sum (build count)
 `,
   },
@@ -88,7 +88,7 @@ entry const run = fn count => do:
   let result = 0
   for i in 0..count:
     result := self + rows[i].a + rows[i].b + rows[i].c
-  return result
+  break result
 `,
   },
   {
@@ -101,7 +101,7 @@ const sum = fn values => do:
   let result = 0
   for row in values:
     result := self + row.a + row.b
-  return result
+  break result
 entry const run = fn count => sum (@array.from_list (@list.from_array (build count)))
 `,
   },
@@ -115,7 +115,7 @@ entry const run = fn count => do:
   let result = 0
   for row in build count:
     result := self + row.a[0] + row.b
-  return result
+  break result
 `,
   },
 ];

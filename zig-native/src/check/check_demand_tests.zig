@@ -42,7 +42,7 @@ const demand_source =
     \\entry const run=fn(value:U32)=>do:
     \\  let pending=delay value
     \\  let thunk=capture (@force pending)
-    \\  return thunk ()
+    \\  break thunk ()
 ;
 test "demand parameter modes survive aliases higher order annotations and captured references" {
     var f = try Fixture.init(a, demand_source);
@@ -105,7 +105,7 @@ test "demand checking rejects eager force bad argument modes and escaping suspen
         .{ .text = "const force=@force\n", .code = .call_arity },
         .{ .text = "const lazy=fn ~(value:U32)=>@force value\nconst call=fn callback=>callback 42\nentry const answer=call lazy\n", .code = .type_mismatch },
         .{ .text = "const lazy=fn ~(value:U32)=>@force value\nconst forward=fn ~(value:U32)=>lazy value\nentry const answer=forward 42\n", .code = .type_mismatch },
-        .{ .text = "const ignore=fn ~value=>42\nentry const answer=fn()=>do:\n  for index in 0..1:\n    use ignore (do:\n      break\n    )\n  return 42\n", .code = .invalid_return },
+        .{ .text = "const ignore=fn ~value=>42\nentry const answer=fn()=>do:\n  for index in 0..1:\n    use ignore (do:\n      break\n    )\n  break 42\n", .code = .invalid_return },
     };
     for (cases) |item| {
         var f = try Fixture.init(a, item.text);

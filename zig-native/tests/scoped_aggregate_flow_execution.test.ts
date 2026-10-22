@@ -20,11 +20,11 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (lef
       use b <- first.get ()
       use c <- second.get ()
       use d <- repeated.get ()
-      return @u32.add (@u32.add changed b) (@u32.add c d)
+      break @u32.add (@u32.add changed b) (@u32.add c d)
     let (state, result) = inner
-    return result
+    break result
   let (state, result) = outer
-  return result
+  break result
 ))
 entry const mixed = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State F32) => do:
   let (selected, (first, second), repeated) = pack left right right
@@ -32,27 +32,27 @@ entry const mixed = fn () => @effect.scope (fn (left: State U32) => @effect.scop
     use inner <- do (@effect.state right.get right.set 1.5):
       use value <- selected.get ()
       use ignored <- first.get ()
-      return @f32.add value 1.0
+      break @f32.add value 1.0
     let (state, result) = inner
-    return result
+    break result
   let (state, result) = outer
-  return result
+  break result
 ))
 entry const lifetime = fn () => @effect.scope (fn (older: State U32) => do:
   let (borrowed, count) = @effect.scope (fn (younger: State U32) => keep younger older)
   use handled <- do (@effect.state borrowed.get borrowed.set 7):
     use value <- borrowed.get ()
-    return @u32.add value count
+    break @u32.add value count
   let (state, result) = handled
-  return result
+  break result
 )
 entry const shadowed = fn () => @effect.scope (fn (older: State U32) => do:
   let (borrowed, count) = @effect.scope (fn (younger: State U32) => shadow younger older)
   use handled <- do (@effect.state borrowed.get borrowed.set 7):
     use value <- borrowed.get ()
-    return @u32.add value count
+    break @u32.add value count
   let (state, result) = handled
-  return result
+  break result
 )
 `;
 const escaping = `import {State, pack} from "./state"
@@ -65,7 +65,7 @@ const variants = [{
   body: "(third, (first, second), first)",
   changedBody: "(third, (second, first), second)",
   lostBody:
-    "do:\n  let saved = (fn value => value) first\n  return (third, (saved, second), first)",
+    "do:\n  let saved = (fn value => value) first\n  break (third, (saved, second), first)",
 }, {
   shape: "record",
   library: library.replace(
@@ -83,7 +83,7 @@ const variants = [{
   changedBody:
     "{selected: third, nested: {first: second, second: first}, repeated: second}",
   lostBody:
-    "do:\n  let saved = (fn value => value) first\n  return {selected: third, nested: {first: saved, second}, repeated: first}",
+    "do:\n  let saved = (fn value => value) first\n  break {selected: third, nested: {first: saved, second}, repeated: first}",
 }];
 const cases = variants.flatMap((variant) =>
   (["optimized", "development"] as const).map((codegenTier) => ({

@@ -121,7 +121,7 @@ pattern_group = ("(" (value:pattern ("," value:pattern)*)? ")") ;
 record_pattern = ("{" (fields:record_pattern_field ("," fields:record_pattern_field)* ","?)? "}") ;
 record_pattern_field = (name:source_identifier (":" value:pattern)?) ;
 suite = (LAYOUT_NEWLINE LAYOUT_INDENT statements:statement* LAYOUT_DEDENT) ;
-statement = (value:(binding | rebinding | effect_binding | effect_step | result | reply | loop_exit | request_case | pattern_conditional | conditional | ever_statement | range_statement | for_statement | expression) LAYOUT_NEWLINE) ;
+statement = (value:(binding | rebinding | effect_binding | effect_step | function_exit | result | reply | loop_exit | request_case | pattern_conditional | conditional | ever_statement | range_statement | for_statement | expression) LAYOUT_NEWLINE) ;
 binding = ("let" pattern:pattern annotation:(":" type_expression)? where:where_clause? "=" value:expression fallback:binding_else?) ;
 rebinding = (name:source_identifier path:(member_access | index_access)* ":=" value:expression) ;
 index_access = ("[" index:expression "]") ;
@@ -132,7 +132,8 @@ binding_else = ("else" ":" alternative:suite) ;
 // Separate islands avoid Baba's equal-length source_identifier/expression transition tie.
 effect_binding = ("use" name:source_identifier annotation:(":" type_expression)? "<-" value:expression) ;
 effect_step = ("use" value:expression) ;
-result = ("return" forwarding:"$"? value:expression) ;
+function_exit = ("return" value:expression) ;
+result = ("break" forwarding:"$"? value:expression) ;
 reply = ("yield" value:expression) ;
 loop_exit = ("break") ;
 request_case = ("case" request:source_identifier "of" body:request_case_suite) ;

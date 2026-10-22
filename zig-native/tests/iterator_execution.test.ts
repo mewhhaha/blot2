@@ -20,10 +20,10 @@ entry const changed = fn seed => do:
   let saved = original.iter
   let changed = list.splice 1 2 [10, 11, 12] original
   let #Some (first, _) = saved.next else:
-    return #[]
+    break #[]
   let before = Array.from_list original
   let after = Array.from_list changed
-  return #[first, before[1], after[1], after.length, before.length]
+  break #[first, before[1], after[1], after.length, before.length]
 entry const single = fn seed => Array.from_list (list.splice 1 2 [10, 11, 12] [seed, seed + 1, seed + 2, seed + 3])
 entry const noop = fn start => Array.from_list (list.splice start 0 [] [1, 2])
 entry const empty_batch = fn (seed: U32) => Array.from_list (list.splice_many [] [seed])
@@ -57,13 +57,13 @@ entry const comprehension = fn count => #[x + y | x <- iter.range 0 count, y <- 
 entry const windows = fn width => iter.collect_array (iter.map (iter.fold_left add 0) (iter.windows width #[1, 2, 3, 4]))
 entry const zip = fn count => iter.collect_array (iter.map (fn pair => do:
   let (index, value) = pair
-  return index + value) (iter.enumerate (iter.take count #[10, 20, 30])))
+  break index + value) (iter.enumerate (iter.take count #[10, 20, 30])))
 entry const paired = fn count => iter.collect_array (iter.map (fn pair => do:
   let (left, right) = pair
-  return left + right) (iter.zip (iter.range 0 count) [10, 20, 30]))
+  break left + right) (iter.zip (iter.range 0 count) [10, 20, 30]))
 entry const strict = fn count => iter.collect_array (iter.map (fn pair => do:
   let (left, right) = pair
-  return left + right) (iter.zip_strict (iter.range 0 count) [10, 20, 30]))
+  break left + right) (iter.zip_strict (iter.range 0 count) [10, 20, 30]))
 `, guest => {
     equal(guest.read("empty_chunks"), 0);
     equal(guest.read("empty_wrapped"), 0);
@@ -93,11 +93,11 @@ const check = fn (size: U32) => do:
   let values = @list.generate size (fn index => index)
   let cursor = values.iter
   let #Some (_, second) = cursor.next else:
-    return 0
+    break 0
   values := [999, ...self]
   let from_start = iter.collect_list cursor
   let from_second = iter.collect_list second
-  return first cursor + first second + from_start.length + from_second.length + first values.iter
+  break first cursor + first second + from_start.length + from_second.length + first values.iter
 entry const run = fn size => check size
 entry const staged = check 500
 entry const array = fn seed => do:
@@ -105,8 +105,8 @@ entry const array = fn seed => do:
   let cursor = values.iter
   values[0] := 1000
   let #Some (_, second) = cursor.next else:
-    return 0
-  return first cursor + first second + values[0]
+    break 0
+  break first cursor + first second + values[0]
 const frozen_cursor = @cursor.advance [40, 41, 42].iter
 entry const frozen = fn () => first frozen_cursor
 entry const empty = fn () => case [].iter.next of
@@ -132,15 +132,15 @@ const Counter.next = fn (cursor: Counter) => do:
   use count <- @state.get #Count
   let #Count before = count
   use @state.set (#Count (before + 1))
-  return #Some (value, #Counter (value + 1))
+  break #Some (value, #Counter (value + 1))
 const sum = fn limit => do:
   let result = 0
   for value in iter.take limit (#Counter 0):
     result := self + value
-  return result
+  break result
 entry const taken = fn limit => do:
   let (#Count pulls, result) = @state.run (#Count 0) (fn () => sum limit)
-  return pulls * 100 + result
+  break pulls * 100 + result
 entry const broken = fn limit => do:
   let (#Count pulls, result) = @state.run (#Count 0) (fn () => do:
     let total = 0
@@ -148,19 +148,19 @@ entry const broken = fn limit => do:
       total := self + value
       if value == limit:
         break
-    return total)
-  return pulls * 100 + result
+    break total)
+  break pulls * 100 + result
 entry const returned = fn limit => do:
   let (#Count pulls, result) = @state.run (#Count 0) (fn () => do:
     for value in #Counter 0:
       if value == limit:
-        return value
-    return 999)
-  return pulls * 100 + result
+        break value
+    break 999)
+  break pulls * 100 + result
 entry const filtered = fn limit => do:
   let (#Count pulls, result) = @state.run (#Count 0) (fn () =>
     iter.fold_left add 0 (iter.take_while (fn value => value < limit) (iter.map (fn value => value * 2) (#Counter 0))))
-  return pulls * 100 + result
+  break pulls * 100 + result
 `, guest => {
     equal(guest.call("taken", 0), 0);
     equal(guest.call("taken", 3), 303);
@@ -179,7 +179,7 @@ const sequence = fn stop => do (monad Maybe):
     if value == stop:
       use missing <- #Nothing
     sum := self + value
-  return sum
+  break sum
 entry const run = fn stop => case sequence stop of
   #Some value => value
   #Nothing => 999
@@ -190,7 +190,7 @@ entry const nested = fn count => do:
       if inner == 2:
         break
       result := self + outer + inner
-  return result
+  break result
 `, guest => {
     equal(guest.call("run", 2), 999);
     equal(guest.call("run", 10), 10);
@@ -208,10 +208,10 @@ import * as iter from "std/iter"
 const valid = fn values => do:
   for value in values:
     if abs value > 3.402823466e38:
-      return #False
+      break #False
     if value != value:
-      return #False
-  return #True
+      break #False
+  break #True
 entry const array = fn (values: Array F32) => valid values
 entry const list = fn (values: Array F32) => valid (@list.from_array values)
 entry const adapted = fn (values: Array F32) => valid (iter.take 2 values)
@@ -238,7 +238,7 @@ entry const run = fn count => do:
     let #Moved next = move cursor
     total := self + @cursor.value next
     cursor := next
-  return total
+  break total
 `, guest => {
     for (const count of [0, 1, 8193]) equal(guest.call("run", count), count * (count + 1) / 2);
     ok(guest.memoryBytes() <= 192 * 1024, `Local cursor versions still allocate: ${guest.memoryBytes()}`);
@@ -258,7 +258,7 @@ entry const nested = fn count => do:
           break
         prefix := self + probe
       total := self + value + prefix
-  return total
+  break total
 entry const collected = fn count => do:
   let values = @list.generate count (fn index => index)
   let total = 0
@@ -270,7 +270,7 @@ entry const collected = fn count => do:
       let garbage = @array.fill 8192 value
       round := self + 1
     total := self + value
-  return total
+  break total
 `, guest => {
     equal(guest.call("nested", 500), 45_099_500);
     equal(guest.call("nested", 0), 0);

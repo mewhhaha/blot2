@@ -7,7 +7,7 @@ Deno.test("forked list cursors keep independent leaves across boundaries and col
 const skip = fn count => fn cursor => do:
   for index in 0..count:
     cursor := @cursor.advance self
-  return cursor
+  break cursor
 const frozen = skip 243 (@list.generate 800 identity).iter
 entry const run = fn count => do:
   let values = @list.generate 800 identity
@@ -19,10 +19,10 @@ entry const run = fn count => do:
     total := self + @cursor.value left + @cursor.value right
     left := @cursor.advance self
     right := @cursor.advance self
-  return total
+  break total
 entry const static_boundary = fn () => do:
   let next = @cursor.advance frozen
-  return #[@cursor.value frozen, @cursor.value next, @cursor.value (@cursor.advance next)]
+  break #[@cursor.value frozen, @cursor.value next, @cursor.value (@cursor.advance next)]
 entry const collected = fn count => do:
   let left = (@list.generate 800 identity).iter
   let right = skip 300 left
@@ -36,11 +36,11 @@ entry const collected = fn count => do:
     left := @cursor.advance self
     right := @cursor.advance self
     index := self + 1
-  return total
+  break total
 entry const float_array = fn (seed: F32) => do:
   let first = #[seed, 0.0 - 0.0, 1.5].iter
   let second = @cursor.advance first
-  return #[@cursor.value first, @cursor.value second, @cursor.value (@cursor.advance second)]
+  break #[@cursor.value first, @cursor.value second, @cursor.value (@cursor.advance second)]
 entry const past_value = fn count => @cursor.value (skip count [10, 20].iter)
 entry const past_advance = fn count => @cursor.has (@cursor.advance (skip count [10, 20].iter))
 entry const empty = fn (count: U32) => @cursor.has (@list.generate count identity).iter

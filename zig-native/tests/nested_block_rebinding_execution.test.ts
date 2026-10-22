@@ -14,7 +14,7 @@ entry const main = fn (n: U32) -> U32 => do:
       count := 7
     #Down => do:
       count := 3
-  return count
+  break count
 entry const one = fn (n: U32) -> U32 => do:
   let beat = if n > 0 then #Up else #Down
   let count = 1
@@ -23,13 +23,13 @@ entry const one = fn (n: U32) -> U32 => do:
       count := 7
     #Down => do:
       let unused = 2
-  return count
+  break count
 entry const lone = fn (n: U32) -> U32 => do:
   let count = 3
   case (n, n + 1) of
     (low, high) => do:
       count := low + high
-  return count
+  break count
 `, (guest) => {
     equal(guest.call("main", 1), 7);
     equal(guest.call("main", 0), 3);
@@ -51,7 +51,7 @@ entry const fielded = fn (n: U32) -> U32 => do:
       held.node := 0
     #Down => do:
       held.node := self + 1
-  return held.node + held.other
+  break held.node + held.other
 entry const selfish = fn (n: U32) -> U32 => do:
   let beat = if n > 0 then #Up else #Down
   let count = 10
@@ -61,7 +61,7 @@ entry const selfish = fn (n: U32) -> U32 => do:
       count := self * 2
     #Down => do:
       count := self - 1
-  return count
+  break count
 entry const nested = fn (n: U32) -> U32 => do:
   let beat = if n > 0 then #Up else #Down
   let count = 0
@@ -73,7 +73,7 @@ entry const nested = fn (n: U32) -> U32 => do:
         count := 5
     #Down => do:
       count := 1
-  return count
+  break count
 entry const three = fn (n: U32) -> U32 => do:
   let beat = if n == 0 then #Fall else if n == 1 then #Rise else #Still
   let count = 0
@@ -86,7 +86,7 @@ entry const three = fn (n: U32) -> U32 => do:
       other := 200
     #Still => do:
       count := 11
-  return count + other
+  break count + other
 entry const scalar = fn (n: U32) -> U32 => do:
   let beat = if n > 0 then #Up else #Down
   let count = 4
@@ -94,7 +94,7 @@ entry const scalar = fn (n: U32) -> U32 => do:
     #Up => ()
     #Down => do:
       count := 9
-  return count
+  break count
 entry const guarded = fn (n: U32) -> U32 => do:
   let count = 0
   case n of
@@ -104,7 +104,7 @@ entry const guarded = fn (n: U32) -> U32 => do:
       count := m * 2
     _ => do:
       count := 1
-  return count
+  break count
 entry const retyped = fn (n: U32) -> U32 => do:
   let beat = if n > 0 then #Up else #Down
   let ready = 1
@@ -113,7 +113,7 @@ entry const retyped = fn (n: U32) -> U32 => do:
       ready := n == 3
     #Down => do:
       ready := #False
-  return if ready then 1 else 0
+  break if ready then 1 else 0
 `, (guest) => {
     equal(guest.call("fielded", 1), 9);
     equal(guest.call("fielded", 0), 15);
@@ -145,10 +145,10 @@ entry const direct = fn (n: U32) -> U32 => do:
   case beat of
     #Up => do:
       count := self + 5
-      return ()
+      break ()
     #Down => do:
       count := self + 1
-  return count
+  break count
 entry const looped = fn (n: U32) -> U32 => do:
   let total = 0
   for index in 0..n:
@@ -158,7 +158,7 @@ entry const looped = fn (n: U32) -> U32 => do:
         total := self + 10
       #Down => do:
         total := self + 1
-  return total
+  break total
 entry const breaking = fn (n: U32) -> U32 => do:
   let total = 0
   for index in 0..10:
@@ -169,7 +169,7 @@ entry const breaking = fn (n: U32) -> U32 => do:
       #Down => do:
         total := self + 100
         break
-  return total
+  break total
 `, (guest) => {
     equal(guest.call("direct", 1), 7);
     equal(guest.call("direct", 0), 3);
@@ -199,7 +199,7 @@ entry const owned = fn (n: U32) -> U32 => do:
         total := items[1]
       else:
         values[0] := self + 77
-  return values.length + values[0] + total
+  break values.length + values[0] + total
 entry const escaping = fn (n: U32) -> Array U32 => do:
   let beat = if n % 2 == 0 then #Up else #Down
   let values = @array.generate 4 (fn index => index)
@@ -208,7 +208,7 @@ entry const escaping = fn (n: U32) -> Array U32 => do:
       values[1] := 99
     #Down => do:
       values := #[n, n]
-  return values
+  break values
 type Beat is data = #Up | #Down
 `, (guest) => {
     equal(guest.call("owned", 0), 86);
@@ -250,7 +250,7 @@ const pick = fn (n: U32) -> U32 => do:
         count := 50
       else:
         count := 5
-  return count + values.length
+  break count + values.length
 const folded_fall = pick 0
 const folded_rise = pick 1
 const folded_still = pick 9
@@ -273,11 +273,11 @@ entry const main = fn (n: U32) -> U32 => do:
     #Up => do:
       count := 7
       if n > 4:
-        return ()
+        break ()
       count := 8
     #Down => do:
       count := 3
-  return count
+  break count
 `, "case_arm_return");
 });
 
@@ -287,7 +287,7 @@ entry const main = fn (n: U32) -> U32 => do:
   let count = n
   do:
     count := self + 1
-  return count
+  break count
 `, "dead_rebinding");
 });
 
@@ -298,47 +298,47 @@ const step = fn n => n + 1
 const build = fn start => do:
   start := step self
   start := step self
-  return start
+  break start
 entry const arm = fn (n: U32) -> U32 => do:
   let beat = if n > 0 then #Up else #Down
   let count = 2
   let result = case beat of
     #Up => do:
       count := count + 5
-      return count
+      break count
     #Down => do:
       count := self + 1
-      return count
-  return result
+      break count
+  break result
 entry const branch = fn (n: U32) -> U32 => do:
   let count = 0
   if n > 0:
     count := 7
   else:
     count := 3
-  return count
+  break count
 entry const chosen = fn (n: U32) -> U32 => do:
   let beat = if n > 0 then #Up else #Down
   let count = 0
   count := case beat of
     #Up => 7
     #Down => 3
-  return count
+  break count
 entry const guarded = fn (n: U32) -> U32 => do:
   let held = n
-  return case n of
+  break case n of
     0 => do:
       let total = 1
       if held == 0:
         held := 9
         total := held + 1
-      return total
+      break total
     _ => 2
 entry const looped = fn (n: U32) -> U32 => do:
   let total = 0
   for 0 .. n:
     total := self + 2
-  return total + build 0
+  break total + build 0
 `, (guest) => {
     equal(guest.call("arm", 1), 7);
     equal(guest.call("arm", 0), 3);

@@ -12,17 +12,17 @@ const advance = fn () => do:
   let #Cell amount = fraction
   use write (#Cell (count + 1))
   use write (#Cell (amount + 0.5))
-  return count
+  break count
 const answer = fn () => do:
   let (#Cell count, (#Cell amount, previous)) = @state.run (#Cell 40) (fn () =>
     @state.run (#Cell 1.0) advance)
-  return U32.to_f32 count + amount + U32.to_f32 previous
+  break U32.to_f32 count + amount + U32.to_f32 previous
 entry const run = fn () => answer ()
 entry const expected = answer ()
 entry const witness = fn () => do:
   let (_, #Cell result) = @state.run (#Cell 42) (fn () =>
     read (fn ignored -> Cell U32 => @panic "type witnesses must never be called"))
-  return result
+  break result
 `, guest => {
     equal(guest.read("expected"), 82.5);
     for (let count = 0; count < 100; count++) {
@@ -41,7 +41,7 @@ entry const run = fn () => do:
     read_local (fn ignored -> Cell U32 => @panic "integer witness called"))
   let (_, #Cell fraction) = @state.run (#Cell 2.5) (fn () =>
     read_local (fn ignored -> Cell F32 => @panic "floating witness called"))
-  return @f32.add (@u32.to_f32 integer) fraction
+  break @f32.add (@u32.to_f32 integer) fraction
 `, guest => equal(guest.call("run", null), 42.5));
 });
 
@@ -54,7 +54,7 @@ const write = fn value => @state.set value
 const reader = fn witness => fn implementation => fn action => @state.reader witness implementation action
 const writer = fn witness => fn implementation => fn action => @state.writer witness implementation action
 entry const run = fn () => do (@effect.provider Notice (fn value => ())):
-  return reader #Count (fn () => #Count 7) (fn () => do:
+  break reader #Count (fn () => #Count 7) (fn () => do:
     use cell_before <- read #Count
     let #Count before = cell_before
     use outcome <- @state.run (#Count 41) (fn () => do:
@@ -62,16 +62,16 @@ entry const run = fn () => do (@effect.provider Notice (fn value => ())):
       let #Count value = cell_value
       use write (#Count (@u32.add value 1))
       use Notice value
-      return value)
+      break value)
     let (_, nested) = outcome
     use cell_after <- read #Count
     let #Count after = cell_after
-    return @u32.add before (@u32.add nested after))
+    break @u32.add before (@u32.add nested after))
 entry const written = fn () => do:
   let (final, _) = @state.run (#Count 0) (fn () => writer #Count (fn value => @state.set value) (fn () =>
     @state.set (#Count 42)))
   let #Count result = final
-  return result
+  break result
 `, guest => {
     for (let count = 0; count < 50; count++) {
       equal(guest.call("run", null), 55);

@@ -376,7 +376,7 @@ const read = fn (seed: U32) => do:
   let values = @array.from_list [seed, ...[2, 3], 4]
   values[1] := (@array.from_list frozen)[512]
   let array = @array.from_list [value | value <- values, @u32.lt 0 value]
-  return first (@list.from_array array)
+  break first (@list.from_array array)
 `,
     );
     await Deno.writeTextFile(entry, source(2));

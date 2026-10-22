@@ -21,7 +21,7 @@ const loops = (factor: number) =>
   let total = input[0]
   for index in 1..input.length:
     total := self + input[index] * ${factor}
-  return total
+  break total
 `;
 const inputs = [
   Uint32Array.of(0),

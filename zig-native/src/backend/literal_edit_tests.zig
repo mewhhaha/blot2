@@ -17,7 +17,7 @@ const source =
     \\const other = 0
     \\entry const answer = fn () => do forty:
     \\  use value <- Reader.ask U32 ()
-    \\  return @u32.add value 1
+    \\  break @u32.add value 1
     \\entry const plain = fn (x: U32) => @u32.add x 2
     \\entry const unrelated = fn () => other
 ;
@@ -117,7 +117,7 @@ test "a changed operation catalog declines retained fragments of the module" {
     var initial = try before.compile(a, null);
     defer initial.deinit(a);
     // A second provider adds an operation value and shifts the catalog.
-    const text = try std.mem.replaceOwned(u8, a, source, "const other = 0", "const other = 0\nconst forty_one = reader 41\nentry const second = fn () => do forty_one:\n  use value <- Reader.ask U32 ()\n  return value");
+    const text = try std.mem.replaceOwned(u8, a, source, "const other = 0", "const other = 0\nconst forty_one = reader 41\nentry const second = fn () => do forty_one:\n  use value <- Reader.ask U32 ()\n  break value");
     defer a.free(text);
     var after = try Fixture.init(text);
     defer after.deinit();

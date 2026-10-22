@@ -24,7 +24,7 @@ Deno.test("async capabilities suspend main while retaining locals and exclusive 
 entry const main = fn (host: U32 -> U32 ! {Foreign}) => do:
   use first <- host 40
   use second <- host first
-  return @u32.add first second
+  break @u32.add first second
 entry const pure = fn () => 7
 `);
   const guest = await instantiateGuest(bytes, { asynchronous: true });
@@ -85,7 +85,7 @@ entry const main = fn (host: Array F32 -> Array F32 ! {Foreign}) => do:
   let retained = @array.fill 70000 9.5
   use first <- host #[1.5, 2.5]
   use second <- host first
-  return #[@array.get retained 69999, @array.get first 0, @array.get second 69999]
+  break #[@array.get retained 69999, @array.get first 0, @array.get second 69999]
 `);
   equal(WebAssembly.Module.imports(new WebAssembly.Module(bytes)), [{
     module: "blot:host/1",
@@ -147,13 +147,13 @@ Deno.test("array callback signatures support unsigned arrays and mixed scalar re
   const bytes = await compile(`
 entry const arrays = fn (host: Array U32 -> Array U32 ! {Foreign}) => do:
   use result <- host #[4_294_967_295]
-  return result
+  break result
 entry const input = fn (host: Array U32 -> U32 ! {Foreign}) => do:
   use result <- host #[4_294_967_295]
-  return result
+  break result
 entry const output = fn (host: U32 -> Array U32 ! {Foreign}) => do:
   use result <- host 4_294_967_295
-  return result
+  break result
 `);
   const guest = await instantiateGuest(bytes, { asynchronous: true });
   try {

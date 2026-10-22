@@ -22,10 +22,10 @@ entry const named = fn (host: U32 -> U32 ! {Foreign}) => invoke host 41
 entry const captured = fn (host: U32 -> U32 ! {Foreign}) => do:
   let callback = retain host
   use next <- callback 41
-  return next
+  break next
 entry const provided = fn (host: U32 -> U32 ! {Foreign}) => do (@effect.provider Advance host):
   use next <- Advance 41
-  return next
+  break next
 entry const ignored = fn (host: U32 -> U32 ! {Foreign}) => 42
 entry const pure = fn () => 7
 `,
@@ -66,8 +66,8 @@ Deno.test("source Foreign scalar entries recover after repeated host exceptions,
 entry const main = fn (host: U32 -> U32 ! {Foreign}) => do:
   use next <- host 41
   if @u32.eq next 0:
-    return @panic "host requested panic"
-  return next
+    break @panic "host requested panic"
+  break next
 entry const pure = fn () => 7
 `,
     (guest) => {
@@ -118,7 +118,7 @@ entry const main = fn (host: Array F32 -> Array F32 ! {Foreign}) => do:
   let retained = @array.fill 70000 9.5
   use first <- invoke host #[1.5, 2.5]
   use second <- invoke host first
-  return #[@array.get retained 69999, @array.get first 0, @array.get second 69999]
+  break #[@array.get retained 69999, @array.get first 0, @array.get second 69999]
 `,
     (guest, bytes) => {
       deepStrictEqual(WebAssembly.Module.imports(new WebAssembly.Module(bytes)), [{ module: "blot:host/1", name: "call_array_f32_array_f32", kind: "function" }]);
@@ -161,7 +161,7 @@ Deno.test({
 entry const main = fn (host: U32 -> U32 ! {Foreign}) => do:
   use first <- host 40
   use second <- host first
-  return @u32.add first second
+  break @u32.add first second
 entry const pure = fn () => 7
 `,
       async (guest) => {

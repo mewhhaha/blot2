@@ -26,7 +26,7 @@ entry const snapshots = fn () => do:
   scan[0] := 99
   let filtered = array.filter (fn x => #True) input
   filtered[0] := 7
-  return #[input[0], scan[0], filtered[0]]
+  break #[input[0], scan[0], filtered[0]]
 `,
     (guest) => {
       equal(guest.read("staged"), 524800);
@@ -83,7 +83,7 @@ import * as list from "../../std/list"
 entry const fold = fn (host: U32 -> U32 ! {Foreign}) =>
   list.fold_left (fn total => fn value => do:
     use amount <- host value
-    return total + amount) 0 [1, 2, 3]
+    break total + amount) 0 [1, 2, 3]
 entry const any = fn (host: U32 -> Bool ! {Foreign}) => list.any host [1, 2, 3]
 entry const all = fn (host: U32 -> Bool ! {Foreign}) => list.all host [1, 2, 3]
 entry const empty_any = fn (host: U32 -> Bool ! {Foreign}) => list.any host []
@@ -173,7 +173,7 @@ entry const run = fn (count: U32) => do:
     else:
       values := [i, ...self]
     prior := before
-  return Array.from_list prior
+  break Array.from_list prior
 `,
     (guest) => {
       let current: number[] = [], previous: number[] = [];
@@ -196,12 +196,12 @@ entry const appended = fn (count: U32) => do:
   let values: List U32 = []
   for index in 0..count:
     values := alias index values
-  return Array.from_list values
+  break Array.from_list values
 entry const prepended = fn (count: U32) => do:
   let values: List F32 = []
   for index in 0..count:
     values := prepend (F32.from index) values
-  return Array.from_list values
+  break Array.from_list values
 `,
     (guest) => {
       const count = 8193;
@@ -227,16 +227,16 @@ Deno.test("collection wrapper elimination preserves argument effects and shared 
 import * as list from "../../std/list"
 entry const order = fn (host: U32 -> U32 ! {Foreign}) => Array.from_list (list.append (host 1) (do:
   use initial <- host 2
-  return [initial]))
+  break [initial]))
 entry const shared = fn () => do:
   let original = [1, 2]
   let appended = list.append 3 original
-  return #[original.length, appended.length, (Array.from_list original)[1]]
+  break #[original.length, appended.length, (Array.from_list original)[1]]
 entry const captured = fn (count: U32) => do:
   let callbacks: List (Unit -> U32) = []
   for index in 0..count:
     callbacks := list.append (fn () => callbacks.length) callbacks
-  return #[callback () | callback <- callbacks]
+  break #[callback () | callback <- callbacks]
 `,
     (guest) => {
       const calls: number[] = [];
@@ -274,7 +274,7 @@ const build = fn (count: U32) => do:
   let values: List U32 = []
   for index in 0..count:
     values := append index values
-  return Array.from_list values
+  break Array.from_list values
 `;
   try {
     for (
@@ -362,16 +362,16 @@ Deno.test("F32 trig boundaries and vector interpolation retain scalar arithmetic
 import { Vec2, Vec3 } from "../../std/vector"
 entry const trig = fn (value: F32) => do:
   let (s, c) = sin_cos value
-  return #[sin value, cos value, tan value, s, c]
+  break #[sin value, cos value, tan value, s, c]
 entry const vector = fn (values: Array F32) => do:
   let a = #Vec3 { x: values[0], y: values[1], z: values[2] }
   let b = #Vec3 { x: values[3], y: values[4], z: values[5] }
   let v = lerp a b values[6]
   let w = lerp (#Vec2 { x: a.x, y: a.y }) (#Vec2 { x: b.x, y: b.y }) values[6]
-  return #[v.x, v.y, v.z, w.x, w.y]
+  break #[v.x, v.y, v.z, w.x, w.y]
 entry const zero = fn () => do:
   let v = (#Vec3 { x: 0.0, y: 0.0, z: 0.0 }).normalized
-  return #[v.x, v.y, v.z]
+  break #[v.x, v.y, v.z]
 `,
     (guest) => {
       for (

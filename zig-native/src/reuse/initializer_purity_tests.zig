@@ -9,7 +9,7 @@ const project = @import("project.zig");
 const project_check = @import("project_check.zig");
 const display = @import("purity_diagnostics.zig");
 const a = std.testing.allocator;
-const source190 = "\neffect ask: Unit -> U32\nlet value = do:\n  use answer <- ask ()\n  return answer\n";
+const source190 = "\neffect ask: Unit -> U32\nlet value = do:\n  use answer <- ask ()\n  break answer\n";
 fn rejected(allocator: std.mem.Allocator, source: []const u8, expected: check.Code, point: ?u32, message: ?[]const u8) !void {
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
@@ -45,16 +45,16 @@ fn rejected(allocator: std.mem.Allocator, source: []const u8, expected: check.Co
 }
 test "initializer actual frozen runtime reason first operation and no typed Core publication" {
     try rejected(a, source190, .initializer_effect, 29, "pure evaluation cannot perform main::ask; sequence an operation with use inside a provider scope");
-    try rejected(a, "effect ask: Unit -> U32\nconst value = do:\n  use answer <- ask ()\n  return answer\n", .const_effect, 30, "pure evaluation cannot perform main::ask; sequence an operation with use inside a provider scope");
-    try rejected(a, "effect zebra: Unit -> U32\neffect alpha: Unit -> U32\nlet value = do:\n  use first <- zebra ()\n  use second <- alpha ()\n  return @u32.add first second\n", .initializer_effect, 56, "pure evaluation cannot perform main::zebra; sequence an operation with use inside a provider scope");
-    try rejected(a, "effect zebra: Unit -> U32\neffect alpha: Unit -> U32\nlet value = do:\n  use second <- alpha ()\n  use first <- zebra ()\n  return @u32.add first second\n", .initializer_effect, 56, "pure evaluation cannot perform main::alpha; sequence an operation with use inside a provider scope");
+    try rejected(a, "effect ask: Unit -> U32\nconst value = do:\n  use answer <- ask ()\n  break answer\n", .const_effect, 30, "pure evaluation cannot perform main::ask; sequence an operation with use inside a provider scope");
+    try rejected(a, "effect zebra: Unit -> U32\neffect alpha: Unit -> U32\nlet value = do:\n  use first <- zebra ()\n  use second <- alpha ()\n  break @u32.add first second\n", .initializer_effect, 56, "pure evaluation cannot perform main::zebra; sequence an operation with use inside a provider scope");
+    try rejected(a, "effect zebra: Unit -> U32\neffect alpha: Unit -> U32\nlet value = do:\n  use second <- alpha ()\n  use first <- zebra ()\n  break @u32.add first second\n", .initializer_effect, 56, "pure evaluation cannot perform main::alpha; sequence an operation with use inside a provider scope");
 }
 test "initializer successful type constraints precede purity and failed type checking refuses Core" {
-    try rejected(a, "effect ask: Unit -> U32\nlet value: U32 = do:\n  use answer <- ask ()\n  return #True\n", .type_mismatch, null, null);
+    try rejected(a, "effect ask: Unit -> U32\nlet value: U32 = do:\n  use answer <- ask ()\n  break #True\n", .type_mismatch, null, null);
 }
 test "initializer all allocation failures release source row witness and rejection owners" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, rejected, .{ source190, check.Code.initializer_effect, @as(?u32, 29), @as(?[]const u8, "pure evaluation cannot perform main::ask; sequence an operation with use inside a provider scope") });
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, rejected, .{ "effect ask: Unit -> U32\nlet value: U32 = do:\n  use answer <- ask ()\n  return #True\n", check.Code.type_mismatch, @as(?u32, null), @as(?[]const u8, null) });
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, rejected, .{ "effect ask: Unit -> U32\nlet value: U32 = do:\n  use answer <- ask ()\n  break #True\n", check.Code.type_mismatch, @as(?u32, null), @as(?[]const u8, null) });
 }
 fn failedProject(allocator: std.mem.Allocator, path: []const u8) !void {
     var loaded = try project.load(allocator, std.testing.io, path, .{ .prelude_path = null });
@@ -77,7 +77,7 @@ test "initializer aliased import retains producer identity and rejects typed mod
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
     try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "dependency.blot", .data = "effect ask: Unit -> U32\n" });
-    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import { ask as query } from \"./dependency\"\nlet value = do:\n  use answer <- query ()\n  return answer\nentry const answer = 42\n" });
+    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import { ask as query } from \"./dependency\"\nlet value = do:\n  use answer <- query ()\n  break answer\nentry const answer = 42\n" });
     var buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const count = try tmp.dir.realPath(std.testing.io, &buffer);
     const path = try std.Io.Dir.path.join(a, &.{ buffer[0..count], "main.blot" });
@@ -116,7 +116,7 @@ test "canonical purity display source store and symbols teardown plus every fail
     const sources = [_][]const u8{
         "type Reader a is effect={read:Unit->a}\nlet value=Reader.read (Array (U32,F32)) ()\n",
         "type Reader {pair:(a,[b,c])} is effect={read:Unit->a}\nlet value=Reader.read {pair:(U32,[F32,Bool])} ()\n",
-        "type Reader a is effect={read:Unit->a}\nlet value=do:\n  let selected=1\n  if #True:\n    selected:=2\n  use answer<-Reader.read U32 ()\n  return @u32.add selected answer\n",
+        "type Reader a is effect={read:Unit->a}\nlet value=do:\n  let selected=1\n  if #True:\n    selected:=2\n  use answer<-Reader.read U32 ()\n  break @u32.add selected answer\n",
     };
     for (sources) |source| {
         try retainedSnapshot(a, source);

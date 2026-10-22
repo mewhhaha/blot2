@@ -13,21 +13,21 @@ const fold_left = fn reduce => fn initial => fn (values: List a) => do:
   for value in values:
     use next <- reduce state value
     state := next
-  return state
+  break state
 
 const any = fn predicate => fn (values: List a) => do:
   for value in values:
     use found <- predicate value
     if found:
-      return #True
-  return #False
+      break #True
+  break #False
 
 const all = fn predicate => fn (values: List a) => do:
   for value in values:
     use accepted <- predicate value
     if Bool.not accepted:
-      return #False
-  return #True
+      break #False
+  break #True
 
 // Whole subtrees are shared; partial boundary leaves are copied.
 const concat = fn left => fn right => @list.concat left right
@@ -37,16 +37,16 @@ const split_at = fn index => fn values =>
 const take = fn count => fn values => slice 0 (min count values.length) values
 const drop = fn count => fn values => do:
   let start = min count values.length
-  return slice start (values.length - start) values
+  break slice start (values.length - start) values
 
 // Positions refer to the original list; unchanged subtrees remain shared.
 const splice = fn start => fn delete_count => fn replacement => fn values => do:
   if start > values.length || delete_count > values.length - start:
-    return @panic "list splice range is out of bounds"
+    break @panic "list splice range is out of bounds"
   if delete_count == 0 && replacement.is_empty:
-    return values
+    break values
   let end = start + delete_count
-  return concat (concat (slice 0 start values) replacement) (slice end (values.length - end) values)
+  break concat (concat (slice 0 start values) replacement) (slice end (values.length - end) values)
 
 // Validate sorted, nonoverlapping edits before constructing the result. Multiple
 // insertions at the same position keep their written order. Empty edits share xs.
@@ -54,13 +54,13 @@ const splice_many = fn (edits: List { start: U32, delete_count: U32, replacement
   let end = 0
   for edit in edits:
     if edit.start < end || edit.start > values.length || edit.delete_count > values.length - edit.start:
-      return @panic "list splice edits must be ordered, nonoverlapping and in bounds"
+      break @panic "list splice edits must be ordered, nonoverlapping and in bounds"
     end := edit.start + edit.delete_count
   if edits.is_empty:
-    return values
+    break values
   let result = []
   let cursor = 0
   for edit in edits:
     result := concat (concat self (slice cursor (edit.start - cursor) values)) edit.replacement
     cursor := edit.start + edit.delete_count
-  return concat result (slice cursor (values.length - cursor) values)
+  break concat result (slice cursor (values.length - cursor) values)

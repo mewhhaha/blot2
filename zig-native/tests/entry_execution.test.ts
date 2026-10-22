@@ -8,8 +8,8 @@ const compose = fn outer => fn inner => fn value => outer (inner value)
 entry const composed = compose doubled increment
 entry const factorial = fn value => do:
   if value <= 1:
-    return 1
-  return value * factorial (value - 1)
+    break 1
+  break value * factorial (value - 1)
 entry const floating = fn value => value + 1.5
 `, guest => {
     for (const value of [0, 1, 20, 41, 0xffffffff]) {
@@ -29,7 +29,7 @@ Deno.test("entry inference preserves unhandled operations and unresolved host pa
 effect Read: Unit -> U32
 entry const invalid = fn value => do:
   use ignored <- Read ()
-  return value + 1
+  break value + 1
 `, "entry_type", undefined, { prelude: "std/prelude.blot" });
   await compileExpectedFailure(`entry const identity = fn value => value\n`, "entry_type");
   await compileExpectedFailure(`

@@ -11,12 +11,12 @@ entry const answer = fn (seed: U32) => @effect.scope (fn (s: State U32) => do:
   let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
     use store Box.set (fn () => do:
       let (state, value) = do (@effect.state s.get s.set seed):
-        return s.get ()
-      return value
+        break s.get ()
+      break value
     )
     use callback <- Box.get ()
-    return callback ()
-  return result
+    break callback ()
+  break result
 )
 `;
 async function execute(bytes: Uint8Array) {
@@ -83,15 +83,15 @@ type State a is effect = {get: Unit -> a, set: a -> Unit}
 type Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}
 entry const answer = fn () => do:
   let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
-    return @effect.scope (fn (s: State U32) => do:
+    break @effect.scope (fn (s: State U32) => do:
       use store Box.set (fn () => do:
         let (state, value) = do (@effect.state s.get s.set 42):
-          return s.get ()
-        return value
+          break s.get ()
+        break value
       )
-      return 0
+      break 0
     )
-  return result
+  break result
 `;
           const ordinary = source.replace(
             "@effect.state Box.get Box.set (fn () => 0)",

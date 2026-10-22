@@ -11,7 +11,7 @@ Deno.test("frozen publication preserves wide scalar captures and distinct factor
   for (let i = width - 2; i >= 0; i--) sum = `(@u32.add c${i} ${sum})`;
   const source = `const make: U32 -> (U32 -> U32 ! {}) = fn seed => do:
 ${bindings.join("\n")}
-  return fn value => @u32.add value ${sum}
+  break fn value => @u32.add value ${sum}
 const first = make 1
 const second = make 2
 entry const one: U32 -> U32 = fn value => first value

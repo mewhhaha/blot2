@@ -22,12 +22,12 @@ entry const forward = fn (count: U32) => do:
   let values: List U32 = []
   for index in 0..count:
     values := [...self, index]
-  return Array.from_list values
+  break Array.from_list values
 entry const backward = fn (count: U32) => do:
   let values: List U32 = []
   for index in 0..count:
     values := [index, ...self]
-  return Array.from_list values
+  break Array.from_list values
 `,
       },
     });
@@ -76,10 +76,10 @@ entry const run = fn (value: U32) => do:
   let child = make value
   let parent = #[child, child]
   let alias = choose parent
-  return alias[0] + parent[1][1]
+  break alias[0] + parent[1][1]
 entry const trapped = fn (value: U32) => do:
   let values = make value
-  return values[value]
+  break values[value]
 `;
 Deno.test("source returned and borrowed Arrays own typed invocation roots across calls and failure", async () => {
   const directory = await Deno.makeTempDir();
@@ -147,8 +147,8 @@ const first = fn (end: U32) => fn (value: U32) => do:
   for index in 0..end:
     let values = make (value + index)
     if index == 3:
-      return values
-  return make value
+      break values
+  break make value
 entry const run = fn (end: U32) => do:
   let values = make 41
   let before = values
@@ -159,12 +159,12 @@ entry const run = fn (end: U32) => do:
     previous := old
     if index == 6:
       break
-  return before[0] + values[0] + previous[0] + (first end 100)[0]
+  break before[0] + values[0] + previous[0] + (first end 100)[0]
 entry const trapped = fn (end: U32) => do:
   let values = make 41
   for index in 0..end:
     values := make (self[0] + 1)
-  return values[10]
+  break values[10]
 `;
   try {
     for (const tier of ["development", "optimized"] as const) {
@@ -237,10 +237,10 @@ entry const run = fn (value: U32) => do:
   let before = @force pending
   let after = @force alias
   let changed = @array.set values 0 value
-  return saved 2 + before[1] + after[2] + changed[0]
+  break saved 2 + before[1] + after[2] + changed[0]
 entry const pressure = fn (count: U32) => do:
   let values = @array.fill count 99
-  return values[count - 1]
+  break values[count - 1]
 `;
   try {
     for (const tier of ["development", "optimized"] as const) {
@@ -305,12 +305,12 @@ entry const run = fn (value: U32) => do:
     let pending = delay (do:
       use cell <- @state.get (fn () => #Cell #[0])
       let #Cell values = cell
-      return values)
+      break values)
     use before <- @force pending
     use @state.set (#Cell #[value + 100])
     use after <- @force pending
-    return before[0] + after[0])
-  return result
+    break before[0] + after[0])
+  break result
 `;
   try {
     for (const tier of ["development", "optimized"] as const) {
@@ -454,10 +454,10 @@ entry const run = fn (index: U32) => do:
   let total = 0
   for selected in values:
     total := self + selected[1]
-  return before[1] + after[2] + total + index
+  break before[1] + after[2] + total + index
 entry const pressure = fn (count: U32) => do:
   let values = @array.fill count 99
-  return values[count - 1]
+  break values[count - 1]
 `;
   try {
     for (const tier of ["development", "optimized"] as const) {
@@ -517,7 +517,7 @@ const build = fn () => do:
   let children = #[40, 41]
   let pending = delay children
   let read = fn (index: U32) => children[index]
-  return @list.fill 3 {pending, read}
+  break @list.fill 3 {pending, read}
 let saved = build ()
 entry const run = fn (value: U32) => do:
   let values = @array.from_list saved
@@ -527,7 +527,7 @@ entry const run = fn (value: U32) => do:
   let changed = values[0]
   let cached = @force old.pending
   let current = @force changed.pending
-  return cached[1] + current[1] + old.read 1 + changed.read 1
+  break cached[1] + current[1] + old.read 1 + changed.read 1
 `;
   try {
     for (const tier of ["development", "optimized"] as const) {
@@ -598,7 +598,7 @@ entry const run = fn (count: U32) => do:
   let before = values
   for index in 0..count:
     values := #[self[0] + 1, self[1] + 1]
-  return before[0] + values[0]
+  break before[0] + values[0]
 entry const memory = fn () -> Array U32 => #[]
 `,
       },
@@ -662,14 +662,14 @@ const sorted_ids = fn (count: U32) -> Array U32 => do:
       ids[j] := previous_id
       ids[j - 1] := current_id
       j := self - 1
-  return ids
+  break ids
 entry const order = sorted_ids
 entry const order_checksum = fn (count: U32) => do:
   let ids = sorted_ids count
   let total = 0
   for i in 0..count:
     total := self + (i + 1) * ids[i]
-  return total
+  break total
 entry const paths = fn (count: U32) -> Array F32 => do:
   let rows = @array.generate 8 (fn (r: U32) => @array.fill 4 r)
   let costs = @array.fill count 1.0
@@ -683,7 +683,7 @@ entry const paths = fn (count: U32) -> Array F32 => do:
   let sum = 0.0
   for cost in costs:
     sum := self + cost
-  return #[U32.to_f32 total, sum, U32.to_f32 rows[7][0], U32.to_f32 rows[3][3]]
+  break #[U32.to_f32 total, sum, U32.to_f32 rows[7][0], U32.to_f32 rows[3][3]]
 entry const snapshots = fn (count: U32) => do:
   let values = @array.fill count 0
   let before = values
@@ -695,7 +695,7 @@ entry const snapshots = fn (count: U32) => do:
   let total = 0
   for value in before:
     total := self + value
-  return seen * 1000 + total
+  break seen * 1000 + total
 entry const escapes = fn (count: U32) => do:
   let values = @array.fill 4 0
   let holder = @array.generate count (fn (i: U32) => @array.fill 1 i)
@@ -706,7 +706,7 @@ entry const escapes = fn (count: U32) => do:
   for i in 0..count:
     let row = holder[i]
     total := self + row[0] + row[1] * 3 + row[2] * 5 + row[3] * 7
-  return total
+  break total
 entry const swaps = fn (count: U32) => do:
   let a = @array.fill 8 1
   let b = @array.fill 8 2
@@ -717,7 +717,7 @@ entry const swaps = fn (count: U32) => do:
     a := b
     b := t
     total := self + a[0] + b[0]
-  return total
+  break total
 `;
 function expectedEscapes(count: number): number {
   const values = [0, 0, 0, 0];

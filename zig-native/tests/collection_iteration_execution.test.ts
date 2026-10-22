@@ -9,7 +9,7 @@ const fold = `const fold = fn reduce => fn initial => fn values => do:
   for value in values:
     use next <- reduce state value
     state := next
-  return state
+  break state
 `;
 const program = `${fold}
 entry const run = fn (count: U32) => fold add 0 (@list.generate count identity)
@@ -26,12 +26,12 @@ const bounded = fn values => do:
       total := self + 1
     if value >= 3:
       break
-  return total
+  break total
 entry const joined = fn (count: U32) => bounded (@list.generate count identity)
 const first = fn values => do:
   for value in values:
-    return value
-  return 0
+    break value
+  break 0
 entry const early = fn () => first [7, 8, 9]
 entry const forks = fn () => do:
   let values = [0, 1, 2, 3]
@@ -46,7 +46,7 @@ entry const forks = fn () => do:
     total := self + value
     if total >= 1:
       break
-  return total + @cursor.value cursor + @cursor.value saved
+  break total + @cursor.value cursor + @cursor.value saved
 `;
 async function session(
   source: string,
@@ -163,11 +163,11 @@ Deno.test("effectful collection iter and next retain written pulls and early exi
   const changed = original
     .replace(
       "const List.iter = fn values => @list.cursor values",
-      "const List.iter = fn values => do:\n  use Audit.pull 1\n  return @list.cursor values",
+      "const List.iter = fn values => do:\n  use Audit.pull 1\n  break @list.cursor values",
     )
     .replace(
       "const Cursor.next = fn cursor =>\n  if @cursor.has cursor\n  then #Some (@cursor.value cursor, @cursor.advance cursor)\n  else #Nothing",
-      "const Cursor.next = fn cursor => do:\n  use Audit.pull 0\n  if @cursor.has cursor:\n    return #Some (@cursor.value cursor, @cursor.advance cursor)\n  return #Nothing",
+      "const Cursor.next = fn cursor => do:\n  use Audit.pull 0\n  if @cursor.has cursor:\n    break #Some (@cursor.value cursor, @cursor.advance cursor)\n  break #Nothing",
     ) + "\ntype Audit is effect = { pull: U32 -> Unit }\n";
   const source = `${fold}
 const measured = fn action => do:
@@ -178,12 +178,12 @@ const measured = fn action => do:
         pulls := self + 1
         yield ()
       complete value =>
-        return #[value, pulls]
+        break #[value, pulls]
 entry const run = fn (count: U32) => measured (@computation (fn () => fold add 0 (@list.generate count identity)))
 const first = fn values => do:
   for value in values:
-    return value
-  return 0
+    break value
+  break 0
 entry const early = fn () => measured (@computation (fn () => first [3, 4, 5]))
 `;
   const directory = await Deno.makeTempDir();
@@ -242,7 +242,7 @@ const smallest = fn entries => do:
     if let #Some value = entry:
       if value < closest:
         closest := value
-  return closest
+  break closest
 entry const optional = fn (count: U32) => smallest (@array.generate count (fn index => if index % 3 == 0 then #Nothing else #Some (count - index)))
 `, (guest) => {
     for (const count of [0, 1, 2, 3, 4, 245, 4096]) {

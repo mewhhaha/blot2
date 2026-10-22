@@ -70,7 +70,7 @@ Deno.test("callable subtraction reports source operands and recovers after corre
   const invalid = `entry const good = fn (value: F32) -> F32 => value - 1.0
 entry const broken = fn (value: F32) -> F32 => do:
   let transform: F32 -> F32 = fn (x: F32) => x + 1.0
-  return transform - value
+  break transform - value
 `;
   const corrected = invalid.replace(
     "transform - value",
@@ -138,7 +138,7 @@ Deno.test("imported generic subtraction points to the mismatched call", async ()
   const invalid = `import { difference } from "./helper"
 entry const broken = fn (value: F32) -> F32 => do:
   let transform: F32 -> F32 = fn (x: F32) => x + 1.0
-  return difference transform value
+  break difference transform value
 `;
   const corrected = invalid.replace(
     "difference transform value",
@@ -193,11 +193,11 @@ const library = "type Meters is data=#Meters F32\n" +
   "const meters = fn (value: F32) => #Meters value\n";
 const method = "const Meters.add = fn left => fn right => do:\n" +
   "  let #Meters a = left\n  let #Meters b = right\n" +
-  "  return #Meters (@f32.add a b)\n";
+  "  break #Meters (@f32.add a b)\n";
 const main = (annotation: string) =>
   'import { meters } from "./library"\n' +
   "entry const answer = fn () => do:\n" +
-  `  let total${annotation} = meters 1.0 + meters 2.0\n  return 7\n`;
+  `  let total${annotation} = meters 1.0 + meters 2.0\n  break 7\n`;
 
 Deno.test("project diagnostics carry dispatch explanations and recover after correction", async () => {
   const directory = await Deno.makeTempDir();

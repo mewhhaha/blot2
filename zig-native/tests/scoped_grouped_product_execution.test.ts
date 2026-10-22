@@ -24,19 +24,19 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (lef
       use b <- first.get ()
       use c <- second.get ()
       use d <- repeated.get ()
-      return @u32.add (@u32.add changed b) (@u32.add c d)
+      break @u32.add (@u32.add changed b) (@u32.add c d)
     let (state, result) = inner
-    return result
+    break result
   let (state, result) = outer
-  return result
+  break result
 ))
 entry const lifetime = fn () => @effect.scope (fn (older: State U32) => do:
   let (retained, count) = @effect.scope (fn (younger: State U32) => shadow younger older)
   use handled <- do (@effect.state retained.get retained.set 7):
     use value <- retained.get ()
-    return @u32.add value count
+    break @u32.add value count
   let (state, result) = handled
-  return result
+  break result
 )
 `;
   const observe = async (bytes: Uint8Array<ArrayBuffer>) => {

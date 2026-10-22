@@ -300,7 +300,7 @@ pub const LoopExit = struct { node: ast.Id, loop: ast.Id, bindings: T.List };
 pub const StatementArm = struct { node: ast.Id };
 pub const ClosedRow = struct { owner: BindingId, variable: u32 };
 pub const Merge = struct { node: ast.Id, result: BindingId, then_binding: BindingId, else_binding: BindingId };
-pub const Code = enum { task_escape, task_handle_consumed, task_capture_transfer, task_capability_shared, task_demand_shared, task_regions_overlap, task_host_contract, task_budget, invalid_proof_operand, proof_scope_escape, proof_runtime_use, proof_mismatch, contradictory_proof, proof_analysis_limit, effect_identity_scope, capability_escape, capability_analysis_limit, undetermined_implementation, orphan_implementation, overlapping_implementation, incompatible_implementation, recursive_evidence, missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, unknown_rebinding, dead_rebinding, case_arm_return, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget, skolem_escape, rank_mismatch, package_expected, package_witness_mismatch, package_escape, abstract_representation_access, use_after_move, duplicate_owner, borrow_conflict, borrow_escape, once_reused, multiplicity_unknown, cleanup_not_safe, usage_evidence_mismatch, usage_analysis_limit, code_shape_mismatch, stage_unavailable, cross_stage_authority, descriptor_private, generated_binding_escape, staging_budget };
+pub const Code = enum { task_escape, task_handle_consumed, task_capture_transfer, task_capability_shared, task_demand_shared, task_regions_overlap, task_host_contract, task_budget, invalid_proof_operand, proof_scope_escape, proof_runtime_use, proof_mismatch, contradictory_proof, proof_analysis_limit, effect_identity_scope, capability_escape, capability_analysis_limit, undetermined_implementation, orphan_implementation, overlapping_implementation, incompatible_implementation, recursive_evidence, missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, return_outside_function, return_across_continuation, unknown_rebinding, dead_rebinding, case_arm_return, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget, skolem_escape, rank_mismatch, package_expected, package_witness_mismatch, package_escape, abstract_representation_access, use_after_move, duplicate_owner, borrow_conflict, borrow_escape, once_reused, multiplicity_unknown, cleanup_not_safe, usage_evidence_mismatch, usage_analysis_limit, code_shape_mismatch, stage_unavailable, cross_stage_authority, descriptor_private, generated_binding_escape, staging_budget };
 pub const PurityWitness = @import("../reuse/purity_diagnostics.zig").Witness;
 pub const Diagnostic = struct {
     pub const TypeApplication = enum { missing_array, missing_nominal, extra };
@@ -456,7 +456,7 @@ pub const Diagnostic = struct {
             .missing_member => "This receiver has no associated member with this name",
             .type_constructor_required => "Monad requires a nominal type constructor value",
             .invalid_provider => "Do requires an effect provider or monad resolver",
-            .resolver_required => "Return $ requires a monad resolver",
+            .resolver_required => "Break $ requires a monad resolver",
             .literal_required => "This compiler primitive requires a literal string argument",
             .call_arity => "This compiler primitive requires its exact literal and operand arguments",
             .break_scope => "Break requires an enclosing loop in this function",
@@ -466,10 +466,12 @@ pub const Diagnostic = struct {
                 .none => "A statement follows an unconditional return or break",
             },
             .invalid_operator => "This operator is not declared or supported",
-            .return_outside_block => "Return requires an enclosing do block in this function",
+            .return_outside_block => "Break with a value requires an enclosing do block in this function",
+            .return_outside_function => "Return requires an enclosing function; use break with a value to finish a do block",
+            .return_across_continuation => "Return cannot cross a monadic continuation or a nested request callback; finish that do block with break value instead",
             .unknown_rebinding => if (self.symbol != 0) ":= requires an existing local binding" else "Rebinding requires an existing lexical name",
             .dead_rebinding => "This := inside a nested do: block is never read and leaves the enclosing binding unchanged; rebind it with if/else or a statement case, or assign a case expression",
-            .case_arm_return => "This return would leave only its case arm and skip the rebinding the arm carries out; return directly in the arm's do: block or restructure with if/else",
+            .case_arm_return => "This break would leave only its case arm and skip the rebinding the arm carries out; break directly in the arm's do: block or restructure with if/else",
             .nesting_limit => "Semantic nesting exceeds the compiler limit",
             .inference_budget => "Type inference exceeded this module's work budget",
             .constructor_marker => "Record constructors require # before the name",
@@ -524,6 +526,7 @@ pub const RankImplementation = struct { scope: u32, quantified: T.Id, node: ast.
 /// empty ambient, so body replay covers the same requirement again.
 pub const CoveredRequirement = struct { scope: ast.Id, value: T.Obligation };
 pub const Checked = struct {
+    function_exit_lambdas: []ast.Id = &.{},
     usage_loans: []UsageLoan = &.{},
     proof_contracts: []ProofContract = &.{},
     proof_bodies: proof_bodies.Owned = .{},
@@ -622,6 +625,7 @@ pub const Checked = struct {
         return if (origin == 0) span else tree.span(origin);
     }
     pub fn deinit(self: *Checked, allocator: Allocator) void {
+        allocator.free(self.function_exit_lambdas);
         self.capability_contracts.deinit(allocator);
         if (self.editor) |editor| {
             allocator.free(editor.names);
@@ -901,6 +905,9 @@ const Engine = struct {
     env: std.ArrayList(Entry) = .empty,
     /// The block that is a lambda's own body, as opposed to a nested do:.
     function_body: ast.Id = 0,
+    function_exit_allowed: bool = false,
+    function_exit_target: T.Id = 0,
+    function_exit_lambdas: std.ArrayList(ast.Id) = .empty,
     /// The case being checked as a statement, whose value is discarded.
     statement_case: ast.Id = 0,
     /// The statement case arm block awaiting its carried versions.
@@ -11867,6 +11874,9 @@ const Engine = struct {
         defer self.generative_owner = saved_generation_owner;
         const saved_proof_owner = self.proof_owner;
         const saved_target = self.return_target;
+        const saved_function_body = self.function_body;
+        const saved_function_exit_allowed = self.function_exit_allowed;
+        const saved_function_exit_target = self.function_exit_target;
         const saved_loops = self.loop_stack;
         const saved_escape = self.suspended_loop_escape;
         const saved_resolver = self.resolver_scope;
@@ -11885,11 +11895,16 @@ const Engine = struct {
         self.owner = id;
         self.proof_owner = id;
         self.return_target = 0;
+        self.function_exit_allowed = true;
+        self.function_exit_target = 0;
         defer {
             self.env.shrinkRetainingCapacity(scope);
             self.owner = saved_owner;
             self.proof_owner = saved_proof_owner;
             self.return_target = saved_target;
+            self.function_body = saved_function_body;
+            self.function_exit_allowed = saved_function_exit_allowed;
+            self.function_exit_target = saved_function_exit_target;
         }
         if (parameter.name != 0) {
             const binding = try self.addBinding(.{ .name = parameter.name, .declaration = node.a, .owner = id, .kind = .parameter, .ty = parameter_ty });
@@ -11904,6 +11919,11 @@ const Engine = struct {
         var result: T.Id = 0;
         self.function_body = node.b;
         if (required != 0) result = try self.contextualLambda(node.b, required) else if (contextual) result = try self.contextualLambda(node.b, required_arrow.b) else result = try self.expression(node.b);
+        if (self.function_exit_target != 0) {
+            try self.function_exit_lambdas.append(self.allocator, id);
+            if (try self.types.resolve(result, 0) != T.never) try self.constrain(self.function_exit_target, result, id);
+            result = self.function_exit_target;
+        }
         if (required != 0) {
             try self.constrain(result, required, id);
             result = required;
@@ -12933,6 +12953,24 @@ const Engine = struct {
         self.expr_types[id] = T.never;
         return .{ .ty = T.never, .exits = true, .returns = true };
     }
+    fn functionReturnStatement(self: *Engine, id: ast.Id) T.Error!Flow {
+        const value = try self.expression(self.tree.node(id).a);
+        if (!self.function_exit_allowed) {
+            try self.diagnostic(.return_outside_function, id);
+        } else {
+            if (self.function_exit_target == 0) self.function_exit_target = try self.types.fresh();
+            try self.constrain(self.function_exit_target, value, id);
+            if (self.resolver_scope.block != 0) {
+                try self.diagnostic(.return_across_continuation, id);
+            } else if (self.request_scope.loop != 0 and !self.request_scope.completion) {
+                if (self.owner == self.request_scope.return_scope and self.function_body == self.owner) {
+                    try self.request_controls.append(self.allocator, .{ .node = id, .loop = self.request_scope.loop, .kind = .cancel, .value_type = value, .target_scope = self.owner });
+                } else try self.diagnostic(.return_across_continuation, id);
+            }
+        }
+        self.expr_types[id] = T.never;
+        return .{ .ty = T.never, .exits = true, .breaks = true };
+    }
     fn useStatement(self: *Engine, id: ast.Id) T.Error!Flow {
         const node = self.tree.node(id);
         const value = try self.expression(node.b);
@@ -12963,6 +13001,7 @@ const Engine = struct {
             .let_stmt => return self.letStatement(id),
             .rebind_stmt => return self.rebindStatement(id),
             .return_stmt => return self.returnStatement(id),
+            .function_return_stmt => return self.functionReturnStatement(id),
             .use_stmt, .iterator_bind => return self.useStatement(id),
             .forever_stmt, .range_stmt, .for_stmt => return self.loopStatement(id),
             .break_stmt => return self.breakStatement(id),
@@ -12998,7 +13037,7 @@ const Engine = struct {
             }
             result.exits = result.exits or flow.exits;
             const tag = self.tree.node(child).tag;
-            direct_exit = direct_exit or tag == .return_stmt or tag == .break_stmt or tag == .yield_stmt;
+            direct_exit = direct_exit or tag == .return_stmt or tag == .function_return_stmt or tag == .break_stmt or tag == .yield_stmt;
         }
         self.expr_types[id] = if (result.exits) T.never else T.unit;
         return result;
@@ -15184,6 +15223,7 @@ noinline fn deinitEngine(engine: *Engine, published: bool) void {
         allocator.free(engine.lambda_closed_rows);
     }
     engine.row_sources.deinit(allocator);
+    engine.function_exit_lambdas.deinit(allocator);
     engine.closed_row_keys.deinit(allocator);
     engine.annotation_givens.deinit(allocator);
     engine.dictionary_givens.deinit(allocator);
@@ -15440,6 +15480,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     };
     published = true;
     errdefer checked.deinit(allocator);
+    checked.function_exit_lambdas = try engine.function_exit_lambdas.toOwnedSlice(allocator);
     checked.computations = try engine.computations.toOwnedSlice(allocator);
     checked.request_loops = try engine.request_loops.toOwnedSlice(allocator);
     checked.request_arms = try engine.request_arms.toOwnedSlice(allocator);

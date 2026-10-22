@@ -74,18 +74,18 @@ entry const order = fn (host: U32 -> U32 ! {Foreign}) => choose (host 1) (host 2
 entry const mixed = fn (host: U32 -> U32 ! {Foreign}) => do:
   use first <- conditional #False (host 20)
   use second <- conditional #True (host 1)
-  return first + second
+  break first + second
 entry const repeated = fn (host: U32 -> U32 ! {Foreign}) => do:
   let total = 0
   for i in 0..20:
     use value <- twice (host i)
     total := total + value
-  return total
+  break total
 entry const captured = fn (x: U32) => do:
   let before = x
   let value = twice before
   before := 99
-  return value
+  break value
 `,
     (guest) => {
       equal(guest.call("skipped", 0), 42);

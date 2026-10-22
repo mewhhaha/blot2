@@ -27,7 +27,7 @@ const main =
     \\entry const summed = fn (value: U32) -> U32 => (combine (#Box { value }) (#Box { value: 2 })).value
     \\entry const converted = fn (value: U32) -> U32 => do:
     \\  let box: Box = convert value
-    \\  return box.value
+    \\  break box.value
     \\entry const plain = fn (value: U32) -> U32 => unrelated value
 ;
 // Same-length edits with no new spelling keep the namespace and every

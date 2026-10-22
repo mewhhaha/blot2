@@ -7,23 +7,23 @@ Deno.test("user-defined checked edits and nested paths retain snapshots across e
 type Outcome a is data = #Updated a | #Refused
 const replace_if = fn index => fn value => fn values => do:
   if index < @array.length values:
-    return #Updated (@array.set values index value)
-  return #Refused
+    break #Updated (@array.set values index value)
+  break #Refused
 type Store is data = #Store { left: Array U32, right: Array U32 }
 entry const checked = fn (count: U32) => do:
   let values = @array.fill count 0
   for i in 0..(count + 1):
     let #Updated next = replace_if i (i + 1) values else:
-      return values
+      break values
     values := next
-  return values
+  break values
 entry const nested = fn (count: U32) => do:
   let store = #Store { left: @array.fill count 0, right: @array.fill count 1 }
   for i in 0..count:
     if i == 2049:
       break
     store.left[i] := i + 1
-  return store.left
+  break store.left
 entry const forever = fn (count: U32) => do:
   let values = @array.fill count 0
   let i = 0
@@ -32,7 +32,7 @@ entry const forever = fn (count: U32) => do:
       break
     values[i] := i + 1
     i := i + 1
-  return values
+  break values
 entry const versions = fn () => do:
   let leaf = #[1, 2]
   let store = #Store { left: leaf, right: leaf }
@@ -42,12 +42,12 @@ entry const versions = fn () => do:
     if i == 0:
       break
   store.left[1] := 8
-  return #[saved (), leaf[0], store.right[0], store.left[0], store.left[1]]
+  break #[saved (), leaf[0], store.right[0], store.left[0], store.left[1]]
 entry const extracted = fn () => do:
   let values = #[#[1], #[2]]
   let first = values[0]
   values[0][0] := 9
-  return #[first[0], values[0][0]]
+  break #[first[0], values[0][0]]
 entry const after_break = fn () => do:
   let values = #[1, 2]
   let saved = values
@@ -55,7 +55,7 @@ entry const after_break = fn () => do:
     values[0] := 8
     break
   values[1] := 9
-  return #[saved[0], saved[1], values[0], values[1]]
+  break #[saved[0], saved[1], values[0], values[1]]
 `,
     (guest) => {
       for (const name of ["checked", "nested", "forever"]) {
@@ -94,16 +94,16 @@ entry const iterate = fn (count: U32) => do:
   for i in 0..count:
     previous := value
     value := advance value
-  return #[F32.from value.count, value.value, F32.from previous.count, previous.value]
+  break #[F32.from value.count, value.value, F32.from previous.count, previous.value]
 entry const branch = fn (flag: Bool) => do:
   let original = #Pair { count: 7, value: -0.0 }
   let changed = if flag then advance original else #Pair { count: 3, value: 1.5 }
-  return #[F32.from original.count, original.value, F32.from changed.count, changed.value]
+  break #[F32.from original.count, original.value, F32.from changed.count, changed.value]
 entry const captured = fn () => do:
   let value = #Pair { count: 1, value: 1.0 }
   let read = fn () => value.count
   value := advance value
-  return read () + value.count
+  break read () + value.count
 `,
     (guest) => {
       for (const count of [0, 1, 8193]) {
@@ -148,15 +148,15 @@ entry const demand = fn (host: U32 -> U32 ! {Foreign}) => do:
   use a <- select (host 10) (#Chosen 42)
   use b <- select (host 11) (#Chosen 0)
   use c <- select (host 12) #Absent
-  return #[a, b, c]
+  break #[a, b, c]
 entry const callback = fn (host: U32 -> U32 ! {Foreign}) => do:
   use amount <- host 10
   let callback = fn i => @u32.add i amount
   amount := 99
-  return generate 4 callback
+  break generate 4 callback
 entry const untouched = fn (host: U32 -> U32 ! {Foreign}) => generate (host 0) (do:
   use offset <- host 20
-  return fn i => i + offset)
+  break fn i => i + offset)
 `,
     (guest) => {
       const calls: number[] = [];
@@ -193,22 +193,22 @@ const build = fn values => do:
   let saved = fn () => values[0]
   for i in 0..4096:
     values[i] := i + 1
-  return (values, saved ())
+  break (values, saved ())
 const source = @array.fill 4096 7
 const constructed = build source
 const repeated = do:
   let values = #[10, 20]
   for i in 0..4096:
     values[i % 2] := self + 1
-  return values
+  break values
 const primitive = do:
   let values = @array.fill 4096 0
   for i in 0..4096:
     values := @array.set values i (i + 1)
-  return values
+  break values
 entry const answer = fn () => do:
   let (values, old) = constructed
-  return #[source[0], old, values[0], values[4095], repeated[0], repeated[1], primitive[4095]]
+  break #[source[0], old, values[0], values[4095], repeated[0], repeated[1], primitive[4095]]
 `,
     (guest) => {
       assert.deepEqual(
@@ -233,7 +233,7 @@ const custom = do:
     for i in 0..2:
       output[start + i] := chunk[i]
     start := start + 2
-  return output
+  break output
 entry const answers = fn () => #[flattened[4095], joined[8191], custom[4095]]
 `,
     (guest) => {

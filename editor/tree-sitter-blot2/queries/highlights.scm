@@ -67,7 +67,7 @@
 (declaration_tag callee: (tag_callee (type_identifier) @attribute))
 ["#" "@"] @punctuation.special
 (spread) @operator
-(forward_return "$" @punctuation.special)
+(forward_break "$" @punctuation.special)
 
 (text_literal "\"" @string)
 (text_fragment) @string

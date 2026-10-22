@@ -36,11 +36,11 @@ fn span(source: []const u8, expression: []const u8) core.Span {
 
 test "specialization dispatch keeps its definition beside the outermost use" {
     const cases = [_]struct { source: []const u8, use: []const u8, definition: []const u8 }{
-        .{ .source = "const add=fn a=>fn b=>@type.call \"add\" a b\nentry const answer=fn()=>do:\n  let x=add #True #False\n  return 7\n", .use = "add #True #False", .definition = "@type.call \"add\" a b" },
-        .{ .source = "const add=fn a=>fn b=>@type.call \"add\" a b\nconst forward=fn a=>fn b=>add a b\nentry const answer=fn()=>do:\n  let x=forward #True #False\n  return 7\n", .use = "forward #True #False", .definition = "@type.call \"add\" a b" },
-        .{ .source = "const twice=fn f=>fn x=>f (f x)\nentry const answer=fn()=>do:\n  let x=twice (fn v=>@type.call \"add\" v v) #True\n  return 7\n", .use = "twice (fn v=>@type.call \"add\" v v) #True", .definition = "@type.call \"add\" v v" },
-        .{ .source = "const add=fn a=>fn b=>@type.call \"add\" a b\nentry const answer=do:\n  let x=add #True #False\n  return 7\n", .use = "add #True #False", .definition = "@type.call \"add\" a b" },
-        .{ .source = "type Box is data=#Box U32\nconst convert=fn v=>@type.result \"from\" v\nentry const answer=fn()=>do:\n  let value: Box=convert 1\n  return 7\n", .use = "convert 1", .definition = "@type.result \"from\" v" },
+        .{ .source = "const add=fn a=>fn b=>@type.call \"add\" a b\nentry const answer=fn()=>do:\n  let x=add #True #False\n  break 7\n", .use = "add #True #False", .definition = "@type.call \"add\" a b" },
+        .{ .source = "const add=fn a=>fn b=>@type.call \"add\" a b\nconst forward=fn a=>fn b=>add a b\nentry const answer=fn()=>do:\n  let x=forward #True #False\n  break 7\n", .use = "forward #True #False", .definition = "@type.call \"add\" a b" },
+        .{ .source = "const twice=fn f=>fn x=>f (f x)\nentry const answer=fn()=>do:\n  let x=twice (fn v=>@type.call \"add\" v v) #True\n  break 7\n", .use = "twice (fn v=>@type.call \"add\" v v) #True", .definition = "@type.call \"add\" v v" },
+        .{ .source = "const add=fn a=>fn b=>@type.call \"add\" a b\nentry const answer=do:\n  let x=add #True #False\n  break 7\n", .use = "add #True #False", .definition = "@type.call \"add\" a b" },
+        .{ .source = "type Box is data=#Box U32\nconst convert=fn v=>@type.result \"from\" v\nentry const answer=fn()=>do:\n  let value: Box=convert 1\n  break 7\n", .use = "convert 1", .definition = "@type.result \"from\" v" },
     };
     for (cases) |case| {
         const diagnostic = try diagnose(case.source);
@@ -54,7 +54,7 @@ test "specialization dispatch keeps its definition beside the outermost use" {
 }
 
 test "specialization keeps concrete failures at their own body" {
-    const source = "const broken=fn value=>@type.call \"add\" #True #False\nentry const answer=fn()=>do:\n  let x=broken 42\n  return 7\n";
+    const source = "const broken=fn value=>@type.call \"add\" #True #False\nentry const answer=fn()=>do:\n  let x=broken 42\n  break 7\n";
     const diagnostic = try diagnose(source);
     try std.testing.expectEqualDeep(span(source, "@type.call \"add\" #True #False"), diagnostic.span);
     try std.testing.expect(diagnostic.related == null);
@@ -62,8 +62,8 @@ test "specialization keeps concrete failures at their own body" {
 
 test "specialization keeps concrete callback failures inside the callback" {
     const sources = [_][]const u8{
-        "const twice=fn f=>fn x=>f (f x)\nentry const answer=fn()=>do:\n  let x=twice (fn v=>@type.call \"add\" #True #False) #True\n  return 7\n",
-        "const twice=fn f=>fn x=>f (f x)\nentry const answer=fn()=>do:\n  let x=twice (fn (v: Bool)=>@type.call \"add\" v v) #True\n  return 7\n",
+        "const twice=fn f=>fn x=>f (f x)\nentry const answer=fn()=>do:\n  let x=twice (fn v=>@type.call \"add\" #True #False) #True\n  break 7\n",
+        "const twice=fn f=>fn x=>f (f x)\nentry const answer=fn()=>do:\n  let x=twice (fn (v: Bool)=>@type.call \"add\" v v) #True\n  break 7\n",
     };
     for (sources) |source| {
         const diagnostic = try diagnose(source);

@@ -20,7 +20,7 @@ entry const records = fn (count: U32) => do:
       m: value, n: value, o: value, p: value, q: value, r: value + 1 }
     let alias = record
     sum := self + alias.a + record.r
-  return sum
+  break sum
 const make_record = fn value => { a: value, b: value, c: value, d: value, e: value, f: value,
   g: value, h: value, i: value, j: value, k: value, l: value,
   m: value, n: value, o: value, p: value, q: value, r: value + 1 }
@@ -35,7 +35,7 @@ entry const branches = fn (count: U32) => do:
       sum := self + read_record record
     else:
       sum := self + read_record record + 1
-  return sum
+  break sum
 entry const shared = fn (count: U32) => do:
   let sum = 0
   for value in 0..count:
@@ -53,7 +53,7 @@ entry const shared = fn (count: U32) => do:
       sum := self + alias.a + right.child.r + left.q + right.q
     else:
       sum := self + right.child.a + left.child.r + left.q + right.q
-  return sum
+  break sum
 `;
 const input = `${output}/lifetimes.blot`;
 await Deno.writeTextFile(input, source);

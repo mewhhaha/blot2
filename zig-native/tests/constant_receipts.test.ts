@@ -13,7 +13,7 @@ const grown: List U32 = do:
   let values = []
   for index in 0..${count}:
     values := if @u32.lt index 16 then @list.append values index else @list.prepend values index
-  return values
+  break values
 const later = @list.prepend (@list.append grown 99) 100
 entry const first = fn () => @array.from_list grown
 entry const following = fn () => @array.from_list later
@@ -99,7 +99,7 @@ Deno.test("constant receipts retain qualified scalar and owning graphs with fres
     `const seed = ${seed}
 const expensive: U32 where { type_rep U32 } = do:
   let local = fn value => value
-  return ${expression}
+  break ${expression}
 const collection = #[${
       Array.from({ length: 80 }, () => `@u32.add 0 (@u32.add 0 ${element})`)
         .join(", ")
@@ -258,7 +258,7 @@ Deno.test("enclosing constant member judgments retain exact executed authority i
       expression = `@u32.add 1 (${expression})`;
     }
     method =
-      `do:\n  let total = (${method})\n  for index in 0..128:\n    total := @u32.add self 1\n  return total`;
+      `do:\n  let total = (${method})\n  for index in 0..128:\n    total := @u32.add self 1\n  break total`;
     if (twice) expression = `@u32.add (#[].count) (${expression})`;
     let prefix = "";
     if (alias) prefix = "const alias: Array U32 = #[]\n";
@@ -364,7 +364,7 @@ const ready = #Box { value: seed }
 ${qualifier}const warmed = fn () => ready.value
 const compound = do:
   let cost = ${cost}
-  return { first: ready, second: ready, values: #[ready, ready], answer: cost, callback: fn (value: U32) => @u32.add value (@u32.add cost ${delta}) }
+  break { first: ready, second: ready, values: #[ready, ready], answer: cost, callback: fn (value: U32) => @u32.add value (@u32.add cost ${delta}) }
 entry const run = fn (value: U32) => compound.callback value
 entry const answer = fn () => compound.first.value
 entry const count = fn () => @array.length compound.values
@@ -457,7 +457,7 @@ const grown = do:
     values := if @u32.lt index 16 then @list.append values index else @list.prepend values index
     other := @list.append other (@u32.add index 100)
     earlier := if @u32.eq index 30 then values else earlier
-  return #Bundle { earlier: earlier, current: values, alias: values, other: other, answer: seed }
+  break #Bundle { earlier: earlier, current: values, alias: values, other: other, answer: seed }
 const later = @list.prepend (@list.append grown.current 99) 100
 const branched = @list.append grown.earlier 200
 entry const first = fn () => @array.from_list grown.current
@@ -587,7 +587,7 @@ const named = fn (value: U32) => @u32.add (delayed value) (@u32.add global ${bod
 const saved = do:
   let cost = ${cost}
   let captured = capture
-  return { named: named, anonymous: fn (value: U32) => @u32.add (delayed value) (@u32.add global ${delta}), captured: fn (value: U32) => @u32.add (delayed value) (@u32.add cost captured) }
+  break { named: named, anonymous: fn (value: U32) => @u32.add (delayed value) (@u32.add global ${delta}), captured: fn (value: U32) => @u32.add (delayed value) (@u32.add cost captured) }
 entry const run_named = fn (value: U32) => saved.named value
 entry const run_anonymous = fn (value: U32) => saved.anonymous value
 entry const run_captured = fn (value: U32) => saved.captured value
@@ -689,7 +689,7 @@ const choose = fn flag => fn (left: State a) => fn (right: State a) => if flag t
 const hidden = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   let picked = choose #True left right
   let deferred = fn () => picked.get ()
-  return ${answer}
+  break ${answer}
 ))
 const expensive = #[{answer: ${expression}}]
 entry const value = fn () => (@array.get expensive 0).answer
@@ -776,7 +776,7 @@ const answer = do:
   let cost = 0
   for index in 0..256:
     cost := @u32.add self 1
-  return {selected, cost, value: nested.value}
+  break {selected, cost, value: nested.value}
 entry const run = fn () => @u32.add answer.selected (@u32.add answer.cost answer.value)
 entry const unrelated = seed
 `;
@@ -932,7 +932,7 @@ const seed = ${seed}
 const limit = ${limit}
 const checked = do:
   let valid = @proof.lt 0 limit
-  return 0
+  break 0
 entry const run = fn () => result ()
 entry const unrelated = @u32.add seed checked
 `;

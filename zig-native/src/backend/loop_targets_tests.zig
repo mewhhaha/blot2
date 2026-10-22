@@ -48,11 +48,11 @@ const source =
     \\        carried_other := 20
     \\    let ignored = do:
     \\      separate := 15
-    \\      return 0
+    \\      break 0
     \\    let closure = fn () => do:
     \\      separate_closure := 16
-    \\      return 0
-    \\  return 0
+    \\      break 0
+    \\  break 0
 ;
 
 const Fixture = struct {

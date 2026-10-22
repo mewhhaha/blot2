@@ -9,17 +9,17 @@ const plain: code [U32, row {}] = @code.quote 42
 const inner: code [U32, row {Read}] = @code.quote (Read ())
 const generated = @code.quote (do:
   use first <- @code.splice inner
-  return @u32.add first 2)
+  break @u32.add first 2)
 `;
 const source = `import {Read, plain, generated} from "./producer"
 entry const answer = fn (host: U32 -> U32 ! {Foreign}) => do:
   use ignored <- host 0
   let provider = @effect.provider Read (fn () => host 40)
-  return do provider:
-    return @code.emit generated
+  break do provider:
+    break @code.emit generated
 entry const pure = fn (host: U32 -> U32 ! {Foreign}) => do:
   use ignored <- host 0
-  return @code.emit plain
+  break @code.emit plain
 entry const checked: U32 = @code.run plain
 entry const snapshot = fn (value: U32) => #[value]
 `;

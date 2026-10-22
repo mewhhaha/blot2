@@ -45,7 +45,7 @@ const nominal_source =
     \\const Box.add = fn left => fn right => do:
     \\  let #Box a = left
     \\  let #Box b = right
-    \\  return #Box (@u32.add a b)
+    \\  break #Box (@u32.add a b)
     \\entry const answer = fn () => case @type.call "add" (#Box 21) (#Box 21) of
     \\  #Box value => value
     \\entry const folded = answer ()

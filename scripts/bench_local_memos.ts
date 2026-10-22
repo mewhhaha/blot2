@@ -35,7 +35,7 @@ let body = `const sum = fn (count: U32) => fn ~(value: U32) => do:
   for i in 0..count:
     use current <- @demand second
     total := @u32.add self current
-  return total
+  break total
 `;
 if (Deno.args[3] === "--callbacks") {
   body = `const sum = fn (count: U32) => fn ~(value: U32) => do:
@@ -47,7 +47,7 @@ if (Deno.args[3] === "--callbacks") {
     use current <- alias ()
     use second ()
     total := @u32.add self current
-  return total
+  break total
 `;
 }
 const source = body + `entry const outside = fn (count: U32) => sum count 21
@@ -56,7 +56,7 @@ entry const inside = fn (count: U32) => do:
   for i in 0..count:
     use current <- sum 4 i
     total := @u32.add self current
-  return total
+  break total
 `;
 async function compile(
   variant: typeof variants[number],

@@ -283,7 +283,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
       }
       if (local) {
         selected =
-          `do:\n  let forward = fn item => Source.first item\n  return ${
+          `do:\n  let forward = fn item => Source.first item\n  break ${
             selected.replace("Source.first value", "forward value")
           }`;
       }
@@ -302,7 +302,7 @@ entry const captures = fn (value: U32) => do:
   let forward = fn item => (Source.first value, Source.first item)
   let whole = forward 1
   let fraction = forward 0.5
-  return @u32.add (@product.get whole 0) (@product.get fraction 0)
+  break @u32.add (@product.get whole 0) (@product.get fraction 0)
 entry const sibling = ${sibling}
 `;
       const directory = await Deno.makeTempDir();

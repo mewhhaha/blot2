@@ -17,8 +17,8 @@ const probe_with = fn pick => fn value => do:
   let (_, count) = run_scoped simulation (create ()) (fn () => do:
     use time <- get #Time
     let #Time { seconds } = time
-    return pick ())
-  return value + value + count
+    break pick ())
+  break value + value + count
 entry const probe_schema: U32 = ${schema}
 entry const probe: U32 where { type_rep U32 } = probe_with (fn () => probe_schema) 3
 `;

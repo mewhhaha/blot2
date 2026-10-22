@@ -44,7 +44,7 @@ const constructor_source =
     \\  let original=(40,2.5)
     \\  let selected=pair original
     \\  selected.x:=99
-    \\  return @f32.add (@u32.to_f32 (@product.get original 0)) selected.y
+    \\  break @f32.add (@u32.to_f32 (@product.get original 0)) selected.y
     \\) ()
     \\const phantom: F32 -> Phantom U32=#Phantom
     \\entry const phantom_value=case phantom 42.5 of

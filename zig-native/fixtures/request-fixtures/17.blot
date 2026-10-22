@@ -4,6 +4,6 @@ entry const answer = fn () => do:
     let local = do:
       break
     @panic "inner do intercepted the loop break"
-  return 42
+  break 42
 
 entry const checked_answer = answer ()

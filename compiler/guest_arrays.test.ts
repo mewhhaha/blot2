@@ -12,7 +12,7 @@ entry const empty = fn () => @array.fill 0 0
 entry const constant = fn () => #[1, 4_294_967_295]
 entry const callback = fn (io: U32 -> U32 ! {Foreign}) => do:
   use value <- io 40
-  return value
+  break value
 `;
 
 async function exercise(bytes: Uint8Array<ArrayBuffer>) {

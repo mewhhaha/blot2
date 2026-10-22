@@ -17,7 +17,7 @@ const source =
     \\    total := @u32.add self 1
     \\    let total = 42
     \\    break
-    \\  return total
+    \\  break total
 ;
 const Fixture = struct {
     pool: symbols.Pool = .{},
@@ -63,7 +63,7 @@ test "loop breaks isolate lambdas and named use remains monomorphic" {
     const cases = [_]struct { source: []const u8, code: check.Code }{
         .{ .source = "const bad = fn () => do:\n  break\n", .code = .break_scope },
         .{ .source = "const bad = fn () => do:\n  for ever:\n    let nested = fn () => do:\n      break\n    break\n", .code = .break_scope },
-        .{ .source = "const identity = fn value => value\nconst bad = fn () => do:\n  use once <- identity\n  use once 1\n  return once 1.0\n", .code = .type_mismatch },
+        .{ .source = "const identity = fn value => value\nconst bad = fn () => do:\n  use once <- identity\n  use once 1\n  break once 1.0\n", .code = .type_mismatch },
         .{ .source = "const bad = fn () => do:\n  for ever:\n    break\n    use ()\n", .code = .unreachable_statement },
     };
     for (cases) |case| {

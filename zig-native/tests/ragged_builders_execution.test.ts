@@ -14,7 +14,7 @@ entry const triangle = fn count => do:
   for x in 0..count:
     for y in 0..x:
       result := [...self, x * 10 + y]
-  return @array.from_list result
+  break @array.from_list result
 entry const selected = fn (values: Array U32) =>
   #[square | x <- values, x > 1, let square = x * x, square < 10]
 const lists = fn (values: List U32) => [y | x <- values, x > 1, y <- values, y < x]
@@ -25,19 +25,19 @@ entry const exhausted = fn (count: U32) => do:
   for x in 0..count:
     if #False:
       result := [...self, x]
-  return @array.from_list result
+  break @array.from_list result
 entry const reversed = fn (first: U32) => do:
   let result: List U32 = []
   for x in first..2:
     for y in 0..x:
       result := [...self, y]
-  return @array.from_list result
+  break @array.from_list result
 entry const skip = fn () => do:
   let result: List U32 = []
   for x in 0..0:
     for y in 0..4_294_967_295:
       result := [...self, x + y]
-  return @array.from_list result
+  break @array.from_list result
 `,
     (guest) => {
       for (const count of [0, 1, 8, 32, 128, 256]) {
@@ -85,13 +85,13 @@ entry const effectful = fn (send: U32 -> U32 ! {Foreign}) => do:
   for x in 0..3:
     use value <- send x
     result := [...self, value]
-  return @array.from_list result
+  break @array.from_list result
 entry const observed = fn count => do:
   let result: List U32 = []
   for x in 0..count:
     for y in 0..x:
       result := [...self, result.length]
-  return @array.from_list result
+  break @array.from_list result
 `,
     (guest) => {
       throws(
@@ -130,7 +130,7 @@ const sum = fn rows => do:
   let total = 0
   for row in rows:
     total := self + row.a + row.b + row.z
-  return total
+  break total
 entry const packed = fn count => do:
   let input = @array.generate count (fn i => {a: i, b: i + 1, z: i * 3})
   let from_array = arrays input
@@ -138,7 +138,7 @@ entry const packed = fn count => do:
   let from_list = lists list_input
   let snapshot = input
   input[0].a := 42
-  return #[sum from_array, sum from_list, from_array.length, from_list.length, snapshot[0].a, input[0].a]
+  break #[sum from_array, sum from_list, from_array.length, from_list.length, snapshot[0].a, input[0].a]
 entry const four = fn count => do:
   let values: List U32 = []
   for a in 0..count:
@@ -146,7 +146,7 @@ entry const four = fn count => do:
       for c in 0..b:
         for d in 0..c:
           values := @list.append self d
-  return @array.from_list values
+  break @array.from_list values
 `,
     (guest) => {
       for (const count of [1, 82, 83, 84, 249, 1000]) {
@@ -182,7 +182,7 @@ const triangle = fn count => do:
   for x in 0..count:
     for y in 0..x:
       result := [...self, x * 10 + y]
-  return @array.from_list result
+  break @array.from_list result
 const saved = triangle 4
 entry const staged = fn () => #[selected_values[0], selected_values[1], saved.length, saved[0], saved[5]]
 `,
@@ -200,7 +200,7 @@ Deno.test("ragged empty and rejected branches retain complete payload checking",
     "unknown_value",
   );
   await compileExpectedFailure(
-    "entry const run = fn count => do:\n  let result: List U32 = []\n  for x in 0..0:\n    for y in 0..count:\n      result := [...self, absent]\n  return @array.from_list result\n",
+    "entry const run = fn count => do:\n  let result: List U32 = []\n  for x in 0..0:\n    for y in 0..count:\n      result := [...self, absent]\n  break @array.from_list result\n",
     "unknown_value",
   );
 });
@@ -214,12 +214,12 @@ entry const memo = fn (seed: U32) -> U32 => do:
   let first = @demand pending
   let values = #[pending, pending]
   let copied = #[value | value <- values, #True]
-  return (@demand copied[0])[0] + (@demand copied[1])[2] + first[1]
+  break (@demand copied[0])[0] + (@demand copied[1])[2] + first[1]
 entry const closures = fn (seed: U32) -> U32 => do:
   let callback = fn value => value + seed
   let values = #[callback, callback]
   let copied = @array.from_list [value | value <- values, #True]
-  return copied[0] 1 + copied[1] 2
+  break copied[0] 1 + copied[1] 2
 type State a is effect = { get: Unit -> a, set: a -> Unit }
 type Node is data = #End | #Next (Unit -> Node ! {State.get Node})
 const keep = fn ~value => fn () => @demand value
@@ -232,20 +232,20 @@ const cycle = fn (seed: U32) => do:
     let values = #[first, first]
     let copied = @array.from_list [value | value <- values, #True]
     use State.set #End
-    return case copied[1] of
+    break case copied[1] of
       #End => @panic "copied cycle disappeared"
       #Next same => do:
         use again <- same ()
-        return case again of
+        break case again of
           #End => @panic "copied memo disappeared"
           #Next _ => seed
   )
-  return result
+  break result
 entry const cyclic = fn (count: U32) -> U32 => do:
   let total = 0
   for i in 0..count:
     total := self + cycle i
-  return total
+  break total
 `,
     (guest) => {
       equal(guest.call("memo", 14), 42);
@@ -267,7 +267,7 @@ entry const triangle = fn (count: U32) => do:
   for x in 0..count:
     for y in 0..x:
       values := [...self, x]
-  return @array.from_list values
+  break @array.from_list values
 `,
     (guest, bytes) => {
       equal(guest.call("saved", null), 22);
@@ -320,7 +320,7 @@ Deno.test("ragged demanded bounds guards payloads and opaque callbacks decline r
   let values: List U32 = []
   for x in 0..(@demand limit):
     values := [...self, x]
-  return @array.from_list values
+  break @array.from_list values
 const guard = fn (input: Array U32) => fn ~(decision: U32) => #[x | x <- input, @u32.lt 0 (@demand decision)]
 entry const bound = fn (host: U32 -> U32 ! {Foreign}) => bounds (host 3)
 entry const guarded = fn (host: U32 -> U32 ! {Foreign}) => guard #[1,2,3] (host 1)
@@ -330,7 +330,7 @@ const payload = fn ~(value: U32) => do:
   for x in 0..3:
     use current <- @demand value
     values := [...self, current]
-  return @array.from_list values
+  break @array.from_list values
 entry const filled = fn (host: U32 -> U32 ! {Foreign}) => payload (host 3)
 const keep = fn ~(value: U32) => fn () => @demand value
 const dynamic_payload = fn (callback: Unit -> U32 ! {Foreign}) => do:
@@ -338,7 +338,7 @@ const dynamic_payload = fn (callback: Unit -> U32 ! {Foreign}) => do:
   for x in 0..3:
     use current <- callback ()
     values := [...self, current]
-  return @array.from_list values
+  break @array.from_list values
 entry const dynamic = fn (host: U32 -> U32 ! {Foreign}) => dynamic_payload (keep (host 3))
 let first = bounds 3
 entry const staged_bound = fn () => first
@@ -351,13 +351,13 @@ const dynamic_first = fn ~(value: U32) => do:
   let values: List U32 = []
   for x in 0..(@demand value):
     values := [...self, x]
-  return @array.from_list values
+  break @array.from_list values
 const dynamic_second = fn ~(value: U32) => do:
   let values: List U32 = []
   for x in 0..3:
     if @u32.lt 0 x && @u32.lt x (@demand value):
       values := [...self, x]
-  return @array.from_list values
+  break @array.from_list values
 let dynamic_input = #[0,1,2]
 const dynamic_third = fn ~(value: U32) => #[@demand value | x <- dynamic_input, #True]
 const invoke = fn (next: ~U32 -> Array U32) => next 3
@@ -367,7 +367,7 @@ entry const opaque_demand = fn (host: U32 -> U32 ! {Foreign}) => do:
     0 => dynamic_first
     1 => dynamic_second
     _ => dynamic_third
-  return invoke selected
+  break invoke selected
 `,
     );
     const result = await new Deno.Command(

@@ -11,14 +11,14 @@ const forwarded = fn (value: U32) => advance (copy value) 0
 const invoke = fn callback => fn (index: U32) => callback index
 const Probe.choose = fn (unused: Probe) => do:
   let copied = forwarded 0
-  return fn (index: U32) => fn (delta: U32) => advance (forwarded index) (advance copied delta)
+  break fn (index: U32) => fn (delta: U32) => advance (forwarded index) (advance copied delta)
 const Probe.unknown = fn (unused: Probe) => fn (index: U32) => fn callback => invoke callback index
 const Probe.foreign = fn (unused: Probe) => fn (index: U32) => fn (callback: U32 -> U32 ! {Foreign}) => invoke callback index
 const lookup = fn probe => fn (index: U32) => do:
   let values = #[8, 13]
   if @u32.lt index 2:
-    return @array.get values ((@type.call "choose" probe index) 0)
-  return 0
+    break @array.get values ((@type.call "choose" probe index) 0)
+  break 0
 const lookup_unknown = fn probe => fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "unknown" probe index) (fn (value: U32) => value)) else 0
 const lookup_foreign = fn probe => fn (callback: U32 -> U32 ! {Foreign}) => @array.get #[8, 13] ((@type.call "foreign" probe 1) callback)
 const run = fn (index: U32) => lookup (#Probe 42) index

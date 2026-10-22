@@ -24,59 +24,59 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (lef
         use x <- left.get ()
         use y <- right.get ()
         use z <- host x
-        return @u32.add z y
+        break @u32.add z y
       )
       use b <- invoke right left (fn () => do:
         use x <- right.get ()
         use y <- left.get ()
-        return @u32.add x y
+        break @u32.add x y
       )
       use c <- first (fn () => left.get ()) left left
       use d <- first (fn () => left.get ()) left right
       use e <- shadow left (fn () => right.get ()) right
-      return @u32.add (@u32.add a b) (@u32.add c (@u32.add d e))
+      break @u32.add (@u32.add a b) (@u32.add c (@u32.add d e))
     let (state, result) = inner
-    return result
+    break result
   let (state, result) = outer
-  return result
+  break result
 ))
 entry const mixed = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State F32) => do:
   use outer <- do (@effect.state left.get left.set 7):
     use inner <- do (@effect.state right.get right.set 1.5):
-      return invoke left right (fn () => do:
+      break invoke left right (fn () => do:
         use value <- left.get ()
         use ignored <- right.get ()
-        return host value
+        break host value
       )
     let (state, result) = inner
-    return result
+    break result
   let (state, result) = outer
-  return result
+  break result
 ))
 entry const repeated = fn () => @effect.scope (fn (state: State U32) => do:
   use outer <- do (@effect.state state.get state.set 7):
     use inner <- do (@effect.state state.get state.set 11):
-      return invoke state state (fn () => do:
+      break invoke state state (fn () => do:
         use x <- state.get ()
         use y <- state.get ()
-        return @u32.add x y
+        break @u32.add x y
       )
     let (state, result) = inner
-    return result
+    break result
   let (state, result) = outer
-  return result
+  break result
 )
 `;
 const unmatched = `import {State, invoke} from "./state"
 entry const invalid = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
   use handled <- do (@effect.state left.get left.set 7):
-    return invoke left right (fn () => do:
+    break invoke left right (fn () => do:
       use x <- left.get ()
       use y <- right.get ()
-      return @u32.add x y
+      break @u32.add x y
     )
   let (state, result) = handled
-  return result
+  break result
 ))
 `;
 for (const [syntax, library] of Object.entries(libraries)) {
@@ -184,7 +184,7 @@ for (const [syntax, library] of Object.entries(libraries)) {
                 ...sources,
                 [dependency]: library.replace(
                   "=> callback ()",
-                  "=> do:\n  let saved = callback\n  return saved ()",
+                  "=> do:\n  let saved = callback\n  break saved ()",
                 ),
               },
             });

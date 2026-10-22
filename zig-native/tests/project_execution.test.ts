@@ -70,9 +70,9 @@ effect Measure: Unit -> F32
 const reader = @effect.provider Read (fn () => 42)
 const measure = @effect.provider Measure (fn () => 42.5)
 entry const integer = fn () => do reader:
-  return invoke (fn () => Read ())
+  break invoke (fn () => Read ())
 entry const floating = fn () => do measure:
-  return invoke (fn () => Measure ())
+  break invoke (fn () => Measure ())
 `,
     library:
       `const invoke: (Unit -> a ! {| e}) -> a ! {| e} = fn callback => callback ()
@@ -127,8 +127,8 @@ entry const answer = fn () => do:
       let #Cell fraction = amount
       use write (#Cell (@u32.add count 1))
       use write (#Cell (@f32.add fraction 0.5))
-      return count))
-  return @f32.add (@u32.to_f32 final) (@f32.add floating (@u32.to_f32 value))
+      break count))
+  break @f32.add (@u32.to_f32 final) (@f32.add floating (@u32.to_f32 value))
 `,
     library: `data Cell value = #Cell value
 const read = fn witness => @state.get witness

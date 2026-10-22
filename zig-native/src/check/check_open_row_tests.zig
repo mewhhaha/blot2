@@ -19,10 +19,10 @@ const source =
     \\const local = fn () => do:
     \\  let first = fn (callback: Unit -> U32 ! {| e}) => callback ()
     \\  let second = fn (value: e) => value
-    \\  return second (first (fn () => 42))
+    \\  break second (first (fn () => 42))
     \\const inherited = fn () => do:
     \\  let shared = fn (callback: Unit -> U32 ! {| e}) => callback ()
-    \\  return fn (callback: Unit -> U32 ! {| e}) => shared callback
+    \\  break fn (callback: Unit -> U32 ! {| e}) => shared callback
     \\entry const answer = fn () => invoke (fn () => local ())
 ;
 
@@ -97,10 +97,10 @@ fn rejectedRows(allocator: std.mem.Allocator) !void {
     const cases = [_]struct { source: []const u8, code: check.Code, marker: []const u8 }{
         .{ .source = "const bad: e -> U32 ! {| e} = fn value => 1\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "e}" },
         .{ .source = "const bad = fn (callback: Unit -> U32 ! {| e}) => fn (value: e) => 42\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "e) => 42" },
-        .{ .source = "const bad = fn (value: e) => do:\n  let invoke = fn (callback: Unit -> U32 ! {| e}) => callback ()\n  return 42\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let invoke" },
-        .{ .source = "const bad = fn (callback: Unit -> U32 ! {| e}) => do:\n  let identity = fn (value: e) => value\n  return 42\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let identity" },
-        .{ .source = "const outer = fn () => do:\n  let invoke = fn (callback: Unit -> U32 ! {| e}) => callback ()\n  return fn (value: e) => value\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let invoke" },
-        .{ .source = "const outer = fn () => do:\n  let identity = fn (value: e) => value\n  return fn (callback: Unit -> U32 ! {| e}) => callback ()\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let identity" },
+        .{ .source = "const bad = fn (value: e) => do:\n  let invoke = fn (callback: Unit -> U32 ! {| e}) => callback ()\n  break 42\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let invoke" },
+        .{ .source = "const bad = fn (callback: Unit -> U32 ! {| e}) => do:\n  let identity = fn (value: e) => value\n  break 42\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let identity" },
+        .{ .source = "const outer = fn () => do:\n  let invoke = fn (callback: Unit -> U32 ! {| e}) => callback ()\n  break fn (value: e) => value\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let invoke" },
+        .{ .source = "const outer = fn () => do:\n  let identity = fn (value: e) => value\n  break fn (callback: Unit -> U32 ! {| e}) => callback ()\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let identity" },
         .{ .source = "type State a is effect = { get: Unit -> a }\nconst bad = fn (callback: Unit -> U32 ! {State.get e | e}) => callback ()\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "e | e" },
         .{ .source = "type Box is data = #Box { callback: Unit -> U32 ! {| e} }\nentry const answer = 42\n", .code = .invalid_effect_annotation, .marker = "e}" },
         .{ .source = "const pure = fn (callback: Unit -> U32) => callback ()\nconst bad = fn (callback: Unit -> U32 ! {Foreign | e}) => pure callback\nentry const answer = 42\n", .code = .effect_mismatch, .marker = "pure callback" },
@@ -191,9 +191,9 @@ test "written row quantifiers survive source imports and independent caller inst
         \\const reader = @effect.provider Read (fn () => 42)
         \\const measure = @effect.provider Measure (fn () => 42.5)
         \\entry const integer = fn () => do reader:
-        \\  return invoke (fn () => Read ())
+        \\  break invoke (fn () => Read ())
         \\entry const floating = fn () => do measure:
-        \\  return invoke (fn () => Measure ())
+        \\  break invoke (fn () => Measure ())
     });
     const path = try tmp.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
     defer a.free(path);

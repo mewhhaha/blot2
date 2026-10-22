@@ -28,10 +28,10 @@ const other = ${other}
 entry const pick = fn (i: U32) => table[i]
 entry const first = fn () => do:
   let #Pair { left, right } = pair
-  return @u32.add left right
+  break @u32.add left right
 entry const sum_alias = fn (i: U32) => do:
   let (left, right) = aliased
-  return @u32.add left[i] right[i]
+  break @u32.add left[i] right[i]
 entry const from_dep = fn (i: U32) => dep.shared[i]
 entry const unrelated = fn () => other
 `;

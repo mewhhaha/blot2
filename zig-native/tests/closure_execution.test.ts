@@ -9,7 +9,7 @@ entry const snapshot = fn (input: U32) -> U32 => do:
   saved := 0
   let partial = add input
   let inner = nested 1
-  return inner (partial 1)
+  break inner (partial 1)
 `, guest => {
     for (const input of [0, 1, 20, 2000, 0x7fffffff]) equal(guest.call("snapshot", input), (input * 2 + 2) >>> 0);
     for (let input = 0; input < 2000; input++) equal(guest.call("snapshot", input), input * 2 + 2);
@@ -36,7 +36,7 @@ entry const boxed = fn (input: U32) -> U32 => do:
   let wrap = #Box
   let choose = fn box -> U32 => case box of
     #Box value => value + input
-  return choose (wrap 21)
+  break choose (wrap 21)
 entry const direct = fn (value: U32) -> U32 => (fn (argument: U32) => argument + 1) value
 `, guest => {
     equal(guest.call("boxed", 21), 42);

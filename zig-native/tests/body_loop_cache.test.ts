@@ -23,14 +23,14 @@ const sum = fn (limit: U32) -> U32 => do:
     total := @u32.add self ${increment}
     let total = 42
     break
-  return total
+  break total
 const keep = fn (values: Array U32) -> Array U32 => do:
   let chosen = values
   for index in 0..4:
     chosen := values
     if @u32.eq index 2:
       break
-  return chosen
+  break chosen
 entry const run = fn (limit: U32) -> U32 => sum limit
 entry const copied = fn (limit: U32) -> Array U32 => keep #[limit, seed]
 `;

@@ -54,7 +54,7 @@ fn frontendFailures(a: std.mem.Allocator) !void {
         \\entry const append = fn (value: U32) => do:
         \\  let xs = @array.from_list [value, ...[1, 2], 3]
         \\  xs[0] := 42
-        \\  return xs[0]
+        \\  break xs[0]
     );
     defer module.deinit(a);
     var proof = try ownership.Proof.init(a, &.{module}, 1);
@@ -92,7 +92,7 @@ test "packed array constants and runtime copies release every emission allocatio
         \\  let copied = @array.from_list (@list.concat (@list.from_array rows) saved)
         \\  let row = @array.get copied 2
         \\  let (left, right) = row
-        \\  return @u32.add left right
+        \\  break @u32.add left right
     );
     defer module.deinit(a);
     const units = [_]core.Module{module};
@@ -110,7 +110,7 @@ test "collection ownership rejects an old value observed after an update and on 
         \\    xs := @list.append xs 3
         \\  else:
         \\    xs := @list.prepend xs 4
-        \\  return @u32.add (@list.length old) (@list.length xs)
+        \\  break @u32.add (@list.length old) (@list.length xs)
     );
     defer module.deinit(a);
     var proof = try ownership.Proof.init(a, &.{module}, 1);
@@ -133,7 +133,7 @@ test "packed List span emission preserves immutable Core under allocation failur
         \\        total := @u32.add total first
         \\        break
         \\      total := @u32.add total (@u32.add x (@u32.add y z))
-        \\  return total
+        \\  break total
     );
     defer module.deinit(a);
     const before = @import("../check/core_snapshot_tests.zig").stamp(module);
@@ -155,7 +155,7 @@ test "packed List borrowed row emission preserves immutable Core under allocatio
         \\        total := @u32.add total first.a
         \\        break
         \\      total := @u32.add total (@u32.add row.a row.c)
-        \\  return total
+        \\  break total
     );
     defer module.deinit(a);
     const before = @import("../check/core_snapshot_tests.zig").stamp(module);
@@ -176,7 +176,7 @@ test "ordinary checked row consumers remove per-row scalar boxes" {
             \\  let total = 0
             \\  for row in values:
             \\    total := @u32.add total (consume row)
-            \\  return total
+            \\  break total
             \\
         , .{collection});
         defer a.free(text);
@@ -215,7 +215,7 @@ test "ordinary numeric scope helpers lower to vector stores with immutable Core"
         \\const calculate = fn (index: U32) => do:
         \\  let shifted = @u32.add index 17
         \\  let wrapped = @u32.mul shifted 4294967295
-        \\  return @u32.add wrapped 1
+        \\  break @u32.add wrapped 1
         \\entry const run = fn (count: U32) => @array.generate count calculate
     );
     defer module.deinit(a);
@@ -246,7 +246,7 @@ test "ordinary checked row products lower to SIMD without reordering scalar addi
         \\  let total = 0.0
         \\  for row in rows:
         \\    total := @f32.add total (consume row)
-        \\  return total
+        \\  break total
     );
     defer module.deinit(a);
     const before = @import("../check/core_snapshot_tests.zig").stamp(module);
@@ -285,7 +285,7 @@ test "private cursor versions keep immutable Core replay and emission OOM owners
         \\    let row = @cursor.value cursor
         \\    sum := @u32.add self row.x
         \\    cursor := @cursor.advance self
-        \\  return @u32.add sum (@cursor.value original).y
+        \\  break @u32.add sum (@cursor.value original).y
     );
     defer module.deinit(a);
     const nodes = try a.dupe(core.Node, module.nodes);
@@ -316,7 +316,7 @@ test "eager tuple reductions keep immutable Core fresh retained replay and emiss
         \\    let (a, b, c, d, e, f, g, h, i) = @cursor.value cursor
         \\    total := self + a + b + c + d + e + f + g + h + i
         \\    cursor := @cursor.advance self
-        \\  return total
+        \\  break total
     );
     defer module.deinit(a);
     const before = @import("../check/core_snapshot_tests.zig").stamp(module);
@@ -354,7 +354,7 @@ test "checked List literal publications retain exact leaf roles under every emis
         \\  let child = #[value, @u32.add value 1]
         \\  let rows = [child, child]
         \\  let copied = @array.from_list rows
-        \\  return @array.get (@array.get copied 1) 0
+        \\  break @array.get (@array.get copied 1) 0
         \\entry const floating = fn (value: F32) => @array.from_list [value, -0.0]
     );
     defer module.deinit(a);
@@ -384,20 +384,20 @@ test "bottom completion representations preserve cancellation fresh retained rep
         \\        use value <- Outer.check 0
         \\        yield value
         \\      complete value =>
-        \\        return value
+        \\        break value
         \\const outer = fn computation => do:
         \\  for request in @requests computation:
         \\    case request of
         \\      effect Outer.check value =>
-        \\        return 42
+        \\        break 42
         \\      complete value =>
-        \\        return value
+        \\        break value
         \\entry const answer = fn () => outer (@computation (fn () => do:
         \\  use inner (make (fn () => do:
         \\    use Inner.read ()
-        \\    return @panic "cancelled inner suffix"
+        \\    break @panic "cancelled inner suffix"
         \\  ))
-        \\  return @panic "cancelled outer suffix"
+        \\  break @panic "cancelled outer suffix"
         \\))
     );
     defer module.deinit(a);
@@ -418,15 +418,15 @@ test "bottom result proof declines normal returns outward branch and loop contro
         \\const trapped = fn () => @panic "trap"
         \\const bottom = fn () => do:
         \\  let value = 7
-        \\  return trapped ()
+        \\  break trapped ()
         \\const ordinary = fn (flag: Bool) => do:
         \\  if flag:
-        \\    return 7
-        \\  return @panic "suffix"
+        \\    break 7
+        \\  break @panic "suffix"
         \\const looping = fn () => do:
         \\  for i in 0..1:
-        \\    return 7
-        \\  return @panic "suffix"
+        \\    break 7
+        \\  break @panic "suffix"
         \\entry const answer = fn (flag: Bool) => ordinary flag
     );
     defer module.deinit(a);
@@ -459,7 +459,7 @@ test "resolved collection iteration preserves frozen Core retained replay and co
         \\  for value in values:
         \\    use next <- reduce state value
         \\    state := next
-        \\  return state
+        \\  break state
         \\entry const run = fn (count: U32) => fold (fn left => fn right => @u32.add left right) 0 (@list.generate count (fn index => index))
     , true);
     defer module.deinit(a);
@@ -519,7 +519,7 @@ test "leaf List traversal keeps reference carries outside its private root scope
         \\  let carried = @array.fill 1 count
         \\  for value in values:
         \\    carried := @array.fill 1 value
-        \\  return @array.get carried 0
+        \\  break @array.get carried 0
     , true);
     defer module.deinit(a);
     const before = @import("../check/core_snapshot_tests.zig").stamp(module);
@@ -541,7 +541,7 @@ test "chunk scalar publications retain complete ownership through static chains"
         \\  let values = @array.from_list [seed, ...[2, 3], 4]
         \\  values[1] := (@array.from_list frozen)[512]
         \\  let array = @array.from_list [value | value <- values, @u32.lt 0 value]
-        \\  return first (@list.from_array array)
+        \\  break first (@list.from_array array)
         \\entry const answer = fn () => @u32.add (read 40) 2
     );
     defer module.deinit(a);
@@ -575,8 +575,8 @@ const immediateStepSource =
     \\entry const run = fn (values: Array U32) => do:
     \\  use step <- (@array.cursor values).next
     \\  let #Some (value, rest) = step else:
-    \\    return 0
-    \\  return @u32.add value (@u32.add (@cursor.value rest) (@cursor.value (@array.cursor values)))
+    \\    break 0
+    \\  break @u32.add value (@u32.add (@cursor.value rest) (@cursor.value (@array.cursor values)))
 ;
 
 test "immediate collection step requires exact producer constructor and a single adjacent sink" {
@@ -609,10 +609,10 @@ test "immediate collection step requires exact producer constructor and a single
     try std.testing.expect((try stepSinkOf(&module, step)) == null);
     module.nodes[sink.pattern] = pattern;
     for ([_][]const u8{
-        "  let #Some (again, _) = step else:\n    return 0\n  return again\n",
-        "  let read = fn () => step\n  let #Some (again, _) = read () else:\n    return 0\n  return again\n",
+        "  let #Some (again, _) = step else:\n    break 0\n  break again\n",
+        "  let read = fn () => step\n  let #Some (again, _) = read () else:\n    break 0\n  break again\n",
     }) |tail| {
-        const text = try std.mem.concat(a, u8, &.{ immediateStepSource[0..std.mem.find(u8, immediateStepSource, "  return @u32.add").?], tail });
+        const text = try std.mem.concat(a, u8, &.{ immediateStepSource[0..std.mem.find(u8, immediateStepSource, "  break @u32.add").?], tail });
         defer a.free(text);
         var retained = try lowerWithCatalog(a, text, true);
         defer retained.deinit(a);
@@ -678,7 +678,7 @@ const localCursorSource =
     \\      break
     \\    total := @u32.add self value
     \\    cursor := rest
-    \\  return cursor
+    \\  break cursor
     \\entry const run = fn (values: Array U32) => @cursor.has (progress values)
 ;
 /// The step sink of a statement, over a fresh def-use index of `module`.
@@ -712,11 +712,11 @@ test "private cursor successors require a closed lexical family and reject calls
     try std.testing.expect(!proof.check(&module, &uses, root, step.input));
     const family = proof.checkSteps(&module, &uses, root, step.input, &.{step}).?;
     try std.testing.expect(std.mem.findScalar(core.BindingId, family.bindings[0..family.len], step.rest) != null);
-    const position = std.mem.find(u8, localCursorSource, "  return cursor").?;
+    const position = std.mem.find(u8, localCursorSource, "  break cursor").?;
     for ([_][]const u8{
-        "  let read = fn () => @cursor.has cursor\n  return cursor\n",
-        "  let read = fn cursor => @cursor.has cursor\n  use ignored <- read cursor\n  return cursor\n",
-        "  if @cursor.has cursor:\n    cursor := @array.cursor values\n  return cursor\n",
+        "  let read = fn () => @cursor.has cursor\n  break cursor\n",
+        "  let read = fn cursor => @cursor.has cursor\n  use ignored <- read cursor\n  break cursor\n",
+        "  if @cursor.has cursor:\n    cursor := @array.cursor values\n  break cursor\n",
     }) |tail| {
         const text = try std.mem.concat(a, u8, &.{ localCursorSource[0..position], tail });
         defer a.free(text);
@@ -763,7 +763,7 @@ test "private cursor successors release all family and materialization allocatio
 
 test "finite cursor carry owners cover duplicate row publications and preserve replay" {
     const a = std.testing.allocator;
-    const text = try std.mem.replaceOwned(u8, a, localCursorSource, "  return cursor\nentry const run = fn (values: Array U32) => @cursor.has (progress values)", "  return total\nentry const run = fn (values: Array U32) => progress values");
+    const text = try std.mem.replaceOwned(u8, a, localCursorSource, "  break cursor\nentry const run = fn (values: Array U32) => @cursor.has (progress values)", "  break total\nentry const run = fn (values: Array U32) => progress values");
     defer a.free(text);
     const finite = try std.mem.replaceOwned(u8, a, text, "for ever:", "for unused in values:");
     defer a.free(finite);
@@ -813,7 +813,7 @@ test "persistent List snapshots lazily freeze the descriptor and preserve comple
         \\  let values = [seed, @u32.add seed 1, @u32.add seed 2]
         \\  let left = @list.cursor values
         \\  let right = @list.cursor values
-        \\  return @u32.add (@cursor.value left) (@cursor.value (@cursor.advance right))
+        \\  break @u32.add (@cursor.value left) (@cursor.value (@cursor.advance right))
     );
     defer module.deinit(a);
     const before = @import("../check/core_snapshot_tests.zig").stamp(module);
@@ -929,7 +929,7 @@ test "collection steps, loops and private cursors keep their physical forms abov
             \\  for value in values:
             \\    use next <- reduce state value
             \\    state := next
-            \\  return state
+            \\  break state
             \\entry const run = fn (count: U32) => fold (fn left => fn right => @u32.add left right) 0 (@list.generate count (fn index => index))
         );
         defer a.free(text);

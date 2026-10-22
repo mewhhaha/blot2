@@ -34,22 +34,22 @@ Deno.test("specialization uses survive fresh CLI, retained project rejection and
     const cases = [
       {
         source:
-          "type Box is data=#Box U32\nentry const answer=fn()=>do:\n  let result=#Box 1 + #Box 2\n  return 7\n",
+          "type Box is data=#Box U32\nentry const answer=fn()=>do:\n  let result=#Box 1 + #Box 2\n  break 7\n",
         use: "#Box 1 + #Box 2",
       },
       {
         source:
-          'import { plus } from "./library"\ntype Box is data=#Box U32\nentry const answer=fn()=>do:\n  let result=plus (#Box 1) (#Box 2)\n  return 7\n',
+          'import { plus } from "./library"\ntype Box is data=#Box U32\nentry const answer=fn()=>do:\n  let result=plus (#Box 1) (#Box 2)\n  break 7\n',
         use: "plus (#Box 1) (#Box 2)",
       },
       {
         source:
-          'import { nested } from "./library"\ntype Box is data=#Box U32\nentry const answer=fn()=>do:\n  let result=nested (#Box 1) (#Box 2)\n  return 7\n',
+          'import { nested } from "./library"\ntype Box is data=#Box U32\nentry const answer=fn()=>do:\n  let result=nested (#Box 1) (#Box 2)\n  break 7\n',
         use: "nested (#Box 1) (#Box 2)",
       },
       {
         source:
-          "const twice=fn f=>fn x=>f (f x)\nentry const answer=fn()=>do:\n  let result=twice (fn v=>v + v) #True\n  return 7\n",
+          "const twice=fn f=>fn x=>f (f x)\nentry const answer=fn()=>do:\n  let result=twice (fn v=>v + v) #True\n  break 7\n",
         use: "twice (fn v=>v + v) #True",
       },
     ];
@@ -129,7 +129,7 @@ Deno.test("a concrete invalid operation in a library stays in that library", asy
     const result = await compiler.build({
       sources: {
         [entry]:
-          'import { broken } from "./library"\nentry const answer=fn()=>do:\n  let result=broken 42\n  return 7\n',
+          'import { broken } from "./library"\nentry const answer=fn()=>do:\n  let result=broken 42\n  break 7\n',
         [library]: source,
       },
     });
@@ -166,7 +166,7 @@ Deno.test("compiled callback definitions preserve source origins", async () => {
     }).output();
     ok(packed.success, new TextDecoder().decode(packed.stdout));
     const source =
-      'import { twice, callback } from "./library"\nentry const answer=fn()=>do:\n  let result=twice callback #True\n  return 7\n';
+      'import { twice, callback } from "./library"\nentry const answer=fn()=>do:\n  let result=twice callback #True\n  break 7\n';
     await Deno.writeTextFile(entry, source);
     const compiler = await createZigProjectCompiler({
       executable,

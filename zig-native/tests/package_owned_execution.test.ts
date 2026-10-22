@@ -11,9 +11,9 @@ const read: (unique U32) -> U32 = fn hidden => @usage.borrow hidden (fn loan => 
 const make = fn (owner: unique U32) => pack [U32] (owner, read) as Item
 entry const answer = fn () => do:
   use owner <- @resource.acquire (fn () => ${value}) (fn released => ())
-  return unpack (make owner) as [a] value in do:
+  break unpack (make owner) as [a] value in do:
     let (hidden, operation) = value
-    return operation hidden
+    break operation hidden
 `;
 
 async function observe(bytes: Uint8Array<ArrayBuffer>, value: number) {
@@ -157,8 +157,8 @@ Deno.test("explicit owning package interfaces preserve resource cleanup through 
             const failed = await retained.build({
               sources: {
                 [entry]: source(value).replace(
-                  "return operation hidden",
-                  "return @u32.add (operation hidden) (operation hidden)",
+                  "break operation hidden",
+                  "break @u32.add (operation hidden) (operation hidden)",
                 ),
               },
             });
@@ -206,12 +206,12 @@ const read: (unique U32) -> U32 = fn hidden => @usage.borrow hidden (fn loan => 
 const make: (unique U32) -> Item = fn owner => pack [U32] (owner, read) as Item
 const consume: Item -> U32 = fn item => unpack item as [a] value in do:
   let (hidden, operation) = value
-  return operation hidden
+  break operation hidden
 `;
   const consumer = `import {make, consume} from "./producer"
 entry const answer = fn () => do:
   use owner <- @resource.acquire (fn () => 42) (fn released => ())
-  return consume (make owner)
+  break consume (make owner)
 `;
   try {
     const sources = { [entry]: consumer, [producer]: library };

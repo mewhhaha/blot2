@@ -150,12 +150,12 @@ test "usage sharing backend preserves managed owners replay and rejects unsealed
         \\const shared = fn (owner: unique (Array U32)) => @usage.share owner
         \\entry const run = fn (value: U32) => do:
         \\  let values = shared #[value, @u32.add value 1]
-        \\  return @u32.add (@usage.length values) (@usage.length values)
+        \\  break @u32.add (@usage.length values) (@usage.length values)
         \\entry const captured = fn (value: U32) => do:
         \\  let owner: unique (Array U32) = #[value, @u32.add value 1]
         \\  let transfer: once (Unit -> shared (Array U32)) = fn () => @usage.share owner
         \\  let shared = transfer ()
-        \\  return @usage.length shared
+        \\  break @usage.length shared
     );
     defer module.deinit(a);
     const stamp = @import("core_snapshot_tests.zig").stamp(module);
@@ -215,7 +215,7 @@ test "resource acquired owners execute through exact Core and backend contracts"
         \\  use owner <- make ()
         \\  use value <- @usage.borrow owner (fn loan => @usage.read loan)
         \\  use @resource.release (forward owner)
-        \\  return value
+        \\  break value
         \\entry const merged = fn (choose: Bool) => do:
         \\  let initial_left: unique (Array U32) = #[1]
         \\  let initial_right: unique (Array U32) = #[1, 2]
@@ -226,12 +226,12 @@ test "resource acquired owners execute through exact Core and backend contracts"
         \\    left := @usage.share first
         \\    use second <- @resource.acquire (fn () => #[1, 2, 3]) (fn owner => ())
         \\    right := @usage.share second
-        \\  return @u32.add (@usage.length left) (@usage.length right)
+        \\  break @u32.add (@usage.length left) (@usage.length right)
         \\entry const broken = fn () => do:
         \\  for ever:
         \\    use owner <- make ()
         \\    break
-        \\  return 9
+        \\  break 9
     );
     defer module.deinit(a);
     try @import("frozen_core_validation.zig").validate(a, &module, .{});
@@ -281,7 +281,7 @@ test "resource closed aggregate backend retains child roles through replay and f
         \\  use owner <- @resource.acquire (fn () => (value, #[value, 8])) (fn owned => ())
         \\  let transfer: once (Unit -> Unit ! {Foreign}) = fn () => @resource.release owner
         \\  use transfer ()
-        \\  return 42
+        \\  break 42
     );
     defer module.deinit(a);
     try @import("frozen_core_validation.zig").validate(a, &module, .{});
@@ -308,7 +308,7 @@ test "resource nominal closed storage backend owns opaque references through rep
         \\  use owner <- @resource.acquire (fn () => #Secret {right: #[value, 8], left: value}) (fn owned => ())
         \\  let transfer: once (Unit -> Unit ! {Foreign}) = fn () => @resource.release owner
         \\  use transfer ()
-        \\  return 42
+        \\  break 42
     );
     defer module.deinit(a);
     try @import("frozen_core_validation.zig").validate(a, &module, .{});

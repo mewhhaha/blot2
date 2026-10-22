@@ -15,15 +15,15 @@ const cycle = fn (seed: U32) => do:
     use first <- delayed ()
     use State.set #End
     use cached <- delayed ()
-    return case cached of
+    break case cached of
       #End => @panic "the demand lost its memoized cycle"
       #Next same => do:
         use again <- same ()
-        return case again of
+        break case again of
           #End => @panic "the retained closure lost its memo"
           #Next _ => seed
   )
-  return result
+  break result
 `;
 
 const cycleSource = `${cycleDefinitions}
@@ -32,7 +32,7 @@ entry const run = fn (count: U32) => do:
   let sum = 0
   for ever:
     if index == count:
-      return sum
+      break sum
     sum := self + cycle index
     index := self + 1
 entry const memory = fn () -> Array U32 => #[]
@@ -179,7 +179,7 @@ Deno.test("a large retained heap preserves its owner while local cycle passes us
     "  let index = 0",
     "  let older = @array.fill 1048576 7\n  let index = 0",
   )
-    .replace("      return sum", "      return sum + older[1048575]");
+    .replace("      break sum", "      break sum + older[1048575]");
   await compileCyclesInBothTiers(source, (bytes, tier) => {
     const module = new WebAssembly.Module(bytes);
     assert.deepEqual([
@@ -246,16 +246,16 @@ entry const run = fn (host: Unit -> U32 ! {Foreign}) => do:
       let discarded = cycle index
     use seed <- host ()
     use cached <- delayed ()
-    return case cached of
+    break case cached of
       #End => @panic "the suspended memo lost its cycle"
       #Next same => do:
         use again <- same ()
-        return case again of
+        break case again of
           #End => @panic "the suspended closure lost its memo"
           #Next _ => seed
   )
   let (_, result) = outcome
-  return result
+  break result
 entry const memory = fn () -> Array U32 => #[]
 `;
 
@@ -324,10 +324,10 @@ const abort = fn computation => do:
   for request in @requests computation:
     case request of
       effect Tick.read value =>
-        return 7
+        break 7
       complete value =>
-        return value
-  return 7
+        break value
+  break 7
 entry const run = fn (count: U32) => do:
   let sum = 0
   for index in 0..count:
@@ -341,16 +341,16 @@ entry const run = fn (count: U32) => do:
           let discarded = cycle pressure
         use resumed <- Tick.read index
         use cached <- delayed ()
-        return case cached of
+        break case cached of
           #End => @panic "the request lost its ready memo"
           #Next _ => resumed
       )
       let (_, result) = outcome
-      return result
+      break result
     )
     let result = abort work
     sum := self + result
-  return sum
+  break sum
 entry const memory = fn () -> Array U32 => #[]
 `;
 
@@ -390,7 +390,7 @@ entry const run = fn (count: U32) => do:
   values := [1, 2, 3, ...self]
   let joined_array = @array.from_list values
   let original_array = @array.from_list original
-  return joined_array[3] + original_array[0]
+  break joined_array[3] + original_array[0]
 entry const memory = fn () -> Array U32 => #[]
 `,
     (_, bytes) => {
@@ -418,7 +418,7 @@ entry const run = fn (count: U32) => do:
   let values = @array.fill count 42
   let original = values
   values[0] := 7
-  return original[0] + values[0]
+  break original[0] + values[0]
 `,
     async (_, bytes) => {
       const module = new WebAssembly.Module(bytes);

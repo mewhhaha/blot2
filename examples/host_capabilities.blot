@@ -9,40 +9,40 @@ type Io is data = #Io { window: WindowIo, render: RenderIo }
 const title = fn window => do:
   let #WindowIo { set_title } = window
   use status <- set_title 7
-  return status
+  break status
 
 // Only rendering authority reaches this function, not the whole Io bundle.
 const render_frame = fn render => fn frame => do:
   let #RenderIo { submit } = render
   use status <- submit frame
-  return status
+  break status
 
 const launch = fn io => do:
   let #Io { window, render } = io
   use status <- title window
   if status != 0:
-    return status
+    break status
   use rendered <- render_frame render 42
-  return rendered
+  break rendered
 
 // The single host callback uses disjoint scalar command ranges. The wrappers
 // grant only the specific operations needed by each guest capability record.
 entry const main = fn (dispatch: U32 -> U32 ! {Foreign}) => do:
   let set_title = fn title_id => do:
     if title_id >= 1000:
-      return 1
+      break 1
     use status <- dispatch (1000 + title_id)
-    return status
+    break status
   let submit = fn frame => do:
     if frame >= 1000:
-      return 1
+      break 1
     use status <- dispatch (2000 + frame)
-    return status
+    break status
   use status <- launch (#Io {
     window: #WindowIo { set_title },
     render: #RenderIo { submit },
   })
-  return status
+  break status
 
 entry const render_only = fn (submit: U32 -> U32 ! {Foreign}) =>
   render_frame (#RenderIo { submit }) 42

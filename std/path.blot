@@ -10,19 +10,19 @@ const identity = make (fn value => value) (fn replacement => fn _ => replacement
 
 const get = fn path => fn source => do:
   let #Path { read, write: _ } = path
-  return read source
+  break read source
 
 const set = fn path => fn replacement => fn source => do:
   let #Path { read: _, write } = path
-  return write replacement source
+  break write replacement source
 
 const modify = fn path => fn transform => fn source => do:
   let #Path { read, write } = path
-  return write (transform (read source)) source
+  break write (transform (read source)) source
 
 const compose = fn outer => fn inner => do:
   let #Path { read: read_outer, write: write_outer } = outer
   let #Path { read: read_inner, write: write_inner } = inner
-  return make
+  break make
     (fn source => read_inner (read_outer source))
     (fn replacement => fn source => write_outer (write_inner replacement (read_outer source)) source)

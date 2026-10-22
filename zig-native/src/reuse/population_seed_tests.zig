@@ -48,7 +48,7 @@ const layered =
     \\entry const right = fn (value: F32) -> F32 => (mid.chosen value).right
     \\entry const kept = fn (value: F32) -> F32 => do:
     \\  let #Box held = dep.keep value
-    \\  return held.left
+    \\  break held.left
 ;
 const Case = struct { main: []const u8 = main, dep: []const u8 = dep };
 const cases = [_]Case{

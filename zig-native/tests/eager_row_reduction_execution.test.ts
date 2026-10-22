@@ -20,7 +20,7 @@ function program(width: number, bias: number, pressure = false) {
     let (${names.join(", ")}) = @cursor.value cursor
     total := self + ${names.join(" + ")}
 ${garbage}    cursor := @cursor.advance self
-  return total
+  break total
 entry const probe_${width} = fn (seed: U32) => #[seed]
 `;
 }

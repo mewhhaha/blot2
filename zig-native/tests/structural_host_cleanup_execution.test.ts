@@ -291,7 +291,7 @@ Deno.test("scoped structured cleanup needs no persistent owner ABI", async () =>
     `entry const abandoned = fn (drop: cleanup ((unique {items: Array U32, nonce: U32}) -> Unit ! {Foreign})) => do:
   use owner <- @resource.acquire (fn () => {nonce: 7, items: #[1, 2]}) drop
   let transfer: once (Unit -> unique {items: Array U32, nonce: U32}) = fn () => owner
-  return 42
+  break 42
 `;
   try {
     for (const codegenTier of ["development", "optimized"] as const) {

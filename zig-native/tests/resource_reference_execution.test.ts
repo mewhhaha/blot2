@@ -9,7 +9,7 @@ const source = `
 entry const normal = fn (host: Unit -> U32 ! {Foreign}) => @resource.scope (fn () => #[7, 9]) (fn owner => ()) (fn loan => @u32.add (@usage.length loan) (host ()))
 entry const nested = fn (host: Unit -> U32 ! {Foreign}) => @resource.scope (fn () => #[7, 9]) (fn owner => ()) (fn outer => @resource.scope (fn () => [1.5, 2.5, 3.5]) (fn owner => ()) (fn inner => @u32.add (@usage.length outer) (@u32.add (@usage.length inner) (host ()))))
 entry const early = fn () => @resource.scope (fn () => #[1, 2]) (fn owner => ()) (fn loan => do:
-  return @usage.length loan
+  break @usage.length loan
 )
 entry const trapped = fn () => @resource.scope (fn () => #[1, 2]) (fn owner => ()) (fn loan => @u32.div (@usage.length loan) 0)
 entry const cleanup_failed = fn () => @resource.scope (fn () => #[1, 2]) (fn owner => ()) (fn outer => @resource.scope (fn () => [1.5, 2.5, 3.5]) (fn owner => @panic "cleanup") (fn inner => @usage.length inner))

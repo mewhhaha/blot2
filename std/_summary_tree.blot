@@ -30,17 +30,17 @@ private const nonempty_total = fn (node: Node s) => case node of
 
 private const branch = fn (combine: s -> s -> s) => fn (left: Node s) => fn (right: Node s) -> Node s => do:
   if @u32.eq (node_length left) 0:
-    return right
+    break right
   if @u32.eq (node_length right) 0:
-    return left
+    break left
   let left_length = node_length left
   let right_length = node_length right
   if U32.gt right_length (@u32.sub 4294967295 left_length):
-    return @panic "summary length overflow"
+    break @panic "summary length overflow"
   let height = node_height left
   if U32.gt (node_height right) height:
     height := node_height right
-  return #Branch {
+  break #Branch {
     length: @u32.add left_length right_length,
     height: @u32.add height 1,
     total: combine (nonempty_total left) (nonempty_total right),
@@ -52,36 +52,36 @@ private const branch = fn (combine: s -> s -> s) => fn (left: Node s) => fn (rig
 private const balance = fn (combine: s -> s -> s) => fn (left: Node s) => fn (right: Node s) -> Node s => do:
   if U32.gt (node_height left) (@u32.add (node_height right) 1):
     let #Branch { left: far, right: near } = left else:
-      return @panic "invalid summary height"
+      break @panic "invalid summary height"
     if U32.ge (node_height far) (node_height near):
-      return branch combine far (branch combine near right)
+      break branch combine far (branch combine near right)
     let #Branch { left: middle_left, right: middle_right } = near else:
-      return @panic "invalid summary height"
-    return branch combine (branch combine far middle_left) (branch combine middle_right right)
+      break @panic "invalid summary height"
+    break branch combine (branch combine far middle_left) (branch combine middle_right right)
   if U32.gt (node_height right) (@u32.add (node_height left) 1):
     let #Branch { left: near, right: far } = right else:
-      return @panic "invalid summary height"
+      break @panic "invalid summary height"
     if U32.ge (node_height far) (node_height near):
-      return branch combine (branch combine left near) far
+      break branch combine (branch combine left near) far
     let #Branch { left: middle_left, right: middle_right } = near else:
-      return @panic "invalid summary height"
-    return branch combine (branch combine left middle_left) (branch combine middle_right far)
-  return branch combine left right
+      break @panic "invalid summary height"
+    break branch combine (branch combine left middle_left) (branch combine middle_right far)
+  break branch combine left right
 
 private const join = fn (combine: s -> s -> s) => fn (left: Node s) => fn (right: Node s) -> Node s => do:
   if @u32.eq (node_length left) 0:
-    return right
+    break right
   if @u32.eq (node_length right) 0:
-    return left
+    break left
   if U32.gt (node_height left) (@u32.add (node_height right) 1):
     let #Branch { left: far, right: near } = left else:
-      return @panic "invalid summary height"
-    return balance combine far (join combine near right)
+      break @panic "invalid summary height"
+    break balance combine far (join combine near right)
   if U32.gt (node_height right) (@u32.add (node_height left) 1):
     let #Branch { left: near, right: far } = right else:
-      return @panic "invalid summary height"
-    return balance combine (join combine left near) far
-  return branch combine left right
+      break @panic "invalid summary height"
+    break balance combine (join combine left near) far
+  break branch combine left right
 
 private const drop_first = fn (combine: s -> s -> s) => fn (node: Node s) -> Node s => case node of
   #Empty => @panic "summary index out of bounds"
@@ -92,23 +92,23 @@ private const drop_first = fn (combine: s -> s -> s) => fn (node: Node s) -> Nod
 // input never computes a summary and is never polled after its first end.
 private const read_nodes = fn (identity: s) => fn (count: U32) => fn (cursor: i) -> Maybe (Node s, i) => do:
   if @u32.eq count 0:
-    return #Some (#Empty, cursor)
+    break #Some (#Empty, cursor)
   if @u32.eq count 1:
     use step <- cursor.next
     let #Some (value, rest) = step else:
-      return #Nothing
-    return #Some (#Leaf value, rest)
+      break #Nothing
+    break #Some (#Leaf value, rest)
   let half = @u32.div count 2
   use first <- read_nodes identity half cursor
   let #Some (left, middle) = first else:
-    return #Nothing
+    break #Nothing
   use last <- read_nodes identity (@u32.sub count half) middle
   let #Some (right, rest) = last else:
-    return #Nothing
+    break #Nothing
   let height = node_height left
   if U32.gt (node_height right) height:
     height := node_height right
-  return #Some (#Branch { length: count, height: @u32.add height 1, total: identity, left, right }, rest)
+  break #Some (#Branch { length: count, height: @u32.add height 1, total: identity, left, right }, rest)
 
 private const reduced = fn (combine: s -> s -> s) => fn (node: Node s) -> Node s => case node of
   #Empty => #Empty
@@ -119,15 +119,15 @@ private const folded = fn step => fn initial => fn (node: Node s) => case node o
   #Leaf value => step initial value
   #Branch { left, right } => do:
     use accumulated <- folded step initial left
-    return folded step accumulated right
+    break folded step accumulated right
 
 const length = fn (#Tree node) => node_length node
 const total = fn identity => fn (#Tree node) => node_total identity node
 const read = fn identity => fn count => fn cursor => do:
   use result <- read_nodes identity count cursor
   let #Some (node, rest) = result else:
-    return #Nothing
-  return #Some (#Tree node, rest)
+    break #Nothing
+  break #Some (#Tree node, rest)
 const reduce = fn (combine: s -> s -> s) => fn (#Tree node) => #Tree (reduced combine node)
 const fold = fn step => fn initial => fn (#Tree node) => folded step initial node
 private const first_node = fn (node: Node s) -> s => case node of
@@ -163,54 +163,54 @@ const build = fn (combine: s -> s -> s) => fn values => do:
       break
     node := join combine previous self
     forest := rest
-  return #Tree node
+  break #Tree node
 
 private const get_node = fn (index: U32) => fn (node: Node s) -> s => case node of
   #Empty => @panic "summary index out of bounds"
   #Leaf value => value
   #Branch { left, right } => do:
     if @u32.lt index (node_length left):
-      return get_node index left
-    return get_node (@u32.sub index (node_length left)) right
+      break get_node index left
+    break get_node (@u32.sub index (node_length left)) right
 const get = fn (index: U32) => fn (#Tree node) => do:
   if Bool.not (@u32.lt index (node_length node)):
-    return @panic "summary index out of bounds"
-  return get_node index node
+    break @panic "summary index out of bounds"
+  break get_node index node
 
 private const query_node = fn (combine: s -> s -> s) => fn identity => fn (start: U32) => fn (count: U32) => fn (node: Node s) -> s => do:
   if @u32.eq count 0:
-    return identity
+    break identity
   if @u32.eq start 0:
     if @u32.eq count (node_length node):
-      return nonempty_total node
-  return case node of
+      break nonempty_total node
+  break case node of
     #Empty => identity
     #Leaf value => value
     #Branch { left, right } => do:
       let left_length = node_length left
       if U32.ge start left_length:
-        return query_node combine identity (@u32.sub start left_length) count right
+        break query_node combine identity (@u32.sub start left_length) count right
       let left_count = @u32.sub left_length start
       if U32.le count left_count:
-        return query_node combine identity start count left
-      return combine (query_node combine identity start left_count left) (query_node combine identity 0 (@u32.sub count left_count) right)
+        break query_node combine identity start count left
+      break combine (query_node combine identity start left_count left) (query_node combine identity 0 (@u32.sub count left_count) right)
 const query = fn (combine: s -> s -> s) => fn identity => fn (start: U32) => fn (count: U32) => fn (#Tree node) => do:
   let size = node_length node
   if U32.gt start size:
-    return @panic "summary range out of bounds"
+    break @panic "summary range out of bounds"
   if U32.gt count (@u32.sub size start):
-    return @panic "summary range out of bounds"
-  return query_node combine identity start count node
+    break @panic "summary range out of bounds"
+  break query_node combine identity start count node
 
 private const set_node = fn (combine: s -> s -> s) => fn (index: U32) => fn value => fn (node: Node s) -> Node s => case node of
   #Empty => @panic "summary index out of bounds"
   #Leaf _ => #Leaf value
   #Branch { left, right } => do:
     if @u32.lt index (node_length left):
-      return branch combine (set_node combine index value left) right
-    return branch combine left (set_node combine (@u32.sub index (node_length left)) value right)
+      break branch combine (set_node combine index value left) right
+    break branch combine left (set_node combine (@u32.sub index (node_length left)) value right)
 const set = fn (combine: s -> s -> s) => fn (index: U32) => fn value => fn (#Tree node) => do:
   if Bool.not (@u32.lt index (node_length node)):
-    return @panic "summary index out of bounds"
-  return #Tree (set_node combine index value node)
+    break @panic "summary index out of bounds"
+  break #Tree (set_node combine index value node)
 const concat = fn (combine: s -> s -> s) => fn (#Tree left) => fn (#Tree right) => #Tree (join combine left right)

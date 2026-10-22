@@ -13,7 +13,7 @@ const source = `entry const carried = fn (count: U32) => do:
     let pressure = @array.fill 8192 count
     if pressure[0] != count:
       @panic "pressure changed"
-  return kept
+  break kept
 entry const trace = fn (send: U32 -> U32 ! {Foreign}) => do:
   let values = [#[41], #[42]]
   let sum = 0
@@ -21,7 +21,7 @@ entry const trace = fn (send: U32 -> U32 ! {Foreign}) => do:
     values := []
     use reply <- send row[0]
     sum := self + reply
-  return sum
+  break sum
 `;
 
 for (const codegenTier of ["optimized", "development"] as const) {

@@ -31,10 +31,10 @@ const other = 0
 entry const pick = fn (i: U32) => table[i]
 entry const first = fn () => do:
   let #Pair { left, right } = pair
-  return @u32.add left right
+  break @u32.add left right
 entry const sum_alias = fn (i: U32) => do:
   let (left, right) = aliased
-  return @u32.add left[i] right[i]
+  break @u32.add left[i] right[i]
 entry const from_dep = fn (i: U32) => dep.shared[i]
 entry const unrelated = fn () => other
 `);
@@ -44,7 +44,7 @@ const forty = reader 40
 const other = 0
 entry const answer = fn () => do forty:
   use value <- Reader.ask U32 ()
-  return @u32.add value 1
+  break @u32.add value 1
 entry const plain = fn (x: U32) => @u32.add x 2
 entry const unrelated = fn () => other
 `);
@@ -55,7 +55,7 @@ const sum = fn (n: U32) -> U32 => do:
   let total = 0
   for i in 0..n:
     total := @u32.add self i
-  return total
+  break total
 const table: Array U32 = #[1, 2, 3, 4]
 const pick = fn (i: U32) -> U32 => table[i]
 `);
@@ -66,7 +66,7 @@ const reader = fn value => @effect.provider (Reader.ask F32) (fn () => value)
 const extent = reader floor_half_extent
 entry const reach = fn (x: F32) -> F32 => do extent:
   use limit <- Reader.ask F32 ()
-  return @f32.add x limit
+  break @f32.add x limit
 entry const scale = fn (x: F32) -> F32 => @f32.add x 2.5
 entry const area = fn (w: U32) -> U32 => math.square w
 entry const total = fn (n: U32) -> U32 => math.sum n
@@ -79,7 +79,7 @@ await Deno.writeTextFile(`${aggregateDirectory}/large.blot`, Array.from({ length
     total := @u32.add self (@u32.add i ${k})
   for j in 0..total:
     total := @u32.add self j
-  return total
+  break total
 `).join(""));
 await Deno.writeTextFile(`${aggregateDirectory}/effects_large.blot`, `import * as large from "./large"
 type Reader a is effect = { ask: Unit -> a }
@@ -87,7 +87,7 @@ const reader = fn value => @effect.provider (Reader.ask F32) (fn () => value)
 const extent = reader 60.0
 entry const reach = fn (x: F32) -> F32 => do extent:
   use limit <- Reader.ask F32 ()
-  return @f32.add x limit
+  break @f32.add x limit
 entry const scale = fn (x: F32) -> F32 => @f32.add x 2.5
 ` + Array.from({ length: 40 }, (_, k) => `entry const call${k} = fn (n: U32) -> U32 => large.f${k} n\n`).join(""));
 const workloads = [

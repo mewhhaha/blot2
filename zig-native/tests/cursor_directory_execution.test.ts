@@ -29,8 +29,8 @@ entry const run = fn count => do:
     total := self + row.x + row.y + row.z
     cursor := @cursor.advance self
   if count == 0:
-    return #[warm, total, 0, 0]
-  return #[warm, total, (@cursor.value old).x, (@cursor.value (@list.cursor values)).x]
+    break #[warm, total, 0, 0]
+  break #[warm, total, (@cursor.value old).x, (@cursor.value (@list.cursor values)).x]
 `;
   const producer = (sliced: boolean, wide = false) => {
     let row = "{x: i, y: i + 1, z: i + 2}";
@@ -148,7 +148,7 @@ entry const run = fn count => do:
     total := self + x + y + z
     cursor := @cursor.advance self
   let (x,y,z) = @cursor.value old
-  return total + x + y + z
+  break total + x + y + z
 `,
     (guest) => {
       for (const count of [0, 1, 81, 82, 244, 245]) {

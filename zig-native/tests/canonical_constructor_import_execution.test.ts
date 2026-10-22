@@ -12,7 +12,7 @@ const advance = fn witness => do:
   use previous <- @state.get witness
   let #Box old = previous
   use @state.set (#Box (@u32.add old 1))
-  return old
+  break old
 `;
 export const consumerSource = `
 import * as model from "./model"
@@ -20,7 +20,7 @@ const unwrap = fn box => case box of
   #model.Box value => value
 const retain = fn () => do:
   let constructor = #model.Box
-  return fn value => unwrap (constructor value)
+  break fn value => unwrap (constructor value)
 entry const unsigned = fn (value:U32) => unwrap (model.box value)
 entry const floating = fn (value:F32) => unwrap (model.ready value)
 entry const captured = fn (value:F32) => (retain ()) value
@@ -29,10 +29,10 @@ entry const tuple = fn (value:U32) => case model.pair (value,2.5) of
 entry const ordered = fn () => do:
   let (#model.Box count,selected) = @state.run (#model.Box 0) (fn () => do:
     use pair <- model.pair (model.advance model.witness,@u32.to_f32 (model.advance model.witness))
-    return pair
+    break pair
   )
   let #model.Pair (x,y) = selected
-  return @f32.add (@u32.to_f32 (@u32.add (@u32.mul count 10) x)) y
+  break @f32.add (@u32.to_f32 (@u32.add (@u32.mul count 10) x)) y
 entry const folded = ordered ()
 `;
 const compiler=Deno.args[0]??new URL("../zig-out/bin/blotc",import.meta.url).pathname;

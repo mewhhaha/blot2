@@ -48,7 +48,7 @@ const generic_source =
     \\entry const alias = identity
     \\entry const update = fn value => do:
     \\  value.lower := 42
-    \\  return value
+    \\  break value
     \\const maker = fn captured => fn (value: U32) => @u32.add captured value
     \\entry const selected = maker 21
     \\entry const closed = fn (value: U32) => value
@@ -56,7 +56,7 @@ const generic_source =
     \\entry const unclosed_capture = hidden (fn value => value)
     \\entry const unresolved_body = fn value => do:
     \\  let deferred = fn owner => owner.missing
-    \\  return (deferred value, value)
+    \\  break (deferred value, value)
 ;
 fn entryInferenceScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
     var session = try evaluator.Session.init(allocator, &.{module.*});

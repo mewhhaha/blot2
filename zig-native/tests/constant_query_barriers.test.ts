@@ -14,7 +14,7 @@ const bundle = do:
   let cost = 1
   for index in 0..256:
     cost := @u32.add self 1
-  return {first, second, cost}
+  break {first, second, cost}
 entry const run = fn () => @u32.add bundle.first (@u32.add bundle.second bundle.cost)
 entry const unrelated = seed
 `;

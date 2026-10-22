@@ -22,7 +22,7 @@ entry const width_${width} = fn count => do:
       total := self + snapshot.f0 + row.f${width - 1}
     else:
       total := self + snapshot.f${width - 1} + row.f0
-  return #[total, previous.f0, previous.f${width - 1}]
+  break #[total, previous.f0, previous.f${width - 1}]
 `;
   });
   await compileAndRun(functions.join("\n"), (guest) => {
@@ -70,7 +70,7 @@ entry const tuple_${width} = fn count => do:
   let total = 0
   for (${names.join(", ")}) in values:
     total := self + ${names.join(" + ")}
-  return total
+  break total
 `;
   });
   await compileAndRun(functions.join("\n"), (guest) => {
@@ -104,7 +104,7 @@ entry const bits_${width} = fn (input: Array F32) => do:
   let result = #[]
   for row in values:
     result := #[...self, row.f0, row.f${width - 1}]
-  return result
+  break result
 `;
   });
   const source = functions.join("\n") + `
@@ -115,7 +115,7 @@ entry const edit_during = fn count => do:
     let before = row.a
     values := [{a: 100000, b: 200000, c: 300000}, ...self]
     total := self + before + row.c
-  return #[total, values.length]
+  break #[total, values.length]
 entry const collect = fn count => do:
   let rows = @list.generate 3 (fn i => {a: i, b: i + 1, c: i + 2})
   let total = 0
@@ -128,7 +128,7 @@ entry const collect = fn count => do:
       let discarded = @array.fill 8192 index
       index := self + 1
     total := self + first + row.c
-  return total
+  break total
 `;
   await compileAndRun(source, (guest) => {
     for (const count of [0, 1, 83, 90]) {

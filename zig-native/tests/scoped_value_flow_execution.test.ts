@@ -9,12 +9,12 @@ const identity = fn value => value
 const fields = fn (discarded: State a) => fn (retained: State b) => do:
   let dropped = fn () => do:
     let alias = discarded
-    return alias.get ()
+    break alias.get ()
   let kept = fn () => do:
     let alias = retained
-    return case (alias, 1) of
+    break case (alias, 1) of
       (cell, number) => cell.get ()
-  return {discarded: dropped, retained: kept}
+  break {discarded: dropped, retained: kept}
 const provider = fn unused => fn (state: State a) => fn implementation => @effect.provider state.get implementation
 const state = fn unused => fn (state: State a) => fn initial => @effect.state state.get state.set initial
 const computation = fn unused => fn action => @computation action
@@ -25,7 +25,7 @@ const take_second = fn (values: (a, b)) => @product.get values 1
 const keep = fn unused => fn (state: State a) => {callbacks: #[(fn () => state.get ())]}
 const aliases = fn unused => fn retained => do:
   let version = retained
-  return {nested: #[version]}
+  break {nested: #[version]}
 opaque type Wrapper a = a
 const wrap = fn unused => fn retained => #Wrapper retained
 const unwrap = fn unused => fn wrapped => case wrapped of
@@ -39,16 +39,16 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (old
     let version = identity alias
     let discarded = fn () => do:
       let ignored = younger
-      return 1
+      break 1
     let retained = fn () => do:
       let ignored = older
-      return 7
-    return {provider: provider younger older (fn () => 11), state: state younger older 7, computation: computation younger (fn () => older.get ()), retained: keep younger older, nested: (version, #[version]), aliased: aliases younger version, wrapped: wrap younger version, selected: select (unwrap older (wrap younger (fields younger older))), array: take_array #[discarded, retained], product: take_second (discarded, retained), pure: select_pure {discarded: discarded, retained: retained}}
+      break 7
+    break {provider: provider younger older (fn () => 11), state: state younger older 7, computation: computation younger (fn () => older.get ()), retained: keep younger older, nested: (version, #[version]), aliased: aliases younger version, wrapped: wrap younger version, selected: select (unwrap older (wrap younger (fields younger older))), array: take_array #[discarded, retained], product: take_second (discarded, retained), pure: select_pure {discarded: discarded, retained: retained}}
   )
   use provided <- do bundle.provider:
-    return older.get ()
+    break older.get ()
   use stored <- do bundle.state:
-    return older.get ()
+    break older.get ()
   let (cell, stored_value) = stored
   let resumed = do:
     for request in @requests bundle.computation:
@@ -56,7 +56,7 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (old
         effect older.get () =>
           yield 13
         complete value =>
-          return value
+          break value
   use handled <- do (@effect.state older.get older.set 7):
     use left <- (@array.get bundle.retained.callbacks 0) ()
     let (callback, callbacks) = bundle.nested
@@ -68,9 +68,9 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (old
     use seventh <- bundle.array ()
     use eighth <- bundle.product ()
     use ninth <- bundle.pure ()
-    return host (@u32.add (@u32.add provided (@u32.add stored_value resumed)) (@u32.add ninth (@u32.add (@u32.add seventh eighth) (@u32.add sixth (@u32.add (@u32.add left right) (@u32.add third (@u32.add fourth fifth)))))))
+    break host (@u32.add (@u32.add provided (@u32.add stored_value resumed)) (@u32.add ninth (@u32.add (@u32.add seventh eighth) (@u32.add sixth (@u32.add (@u32.add left right) (@u32.add third (@u32.add fourth fifth)))))))
   let (state, result) = handled
-  return result
+  break result
 )
 `;
 for (const codegenTier of ["optimized", "development"] as const) {
@@ -166,7 +166,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
               [entry]: main +
                 `entry const bad = fn () => @effect.scope (fn (state: State U32) => do:
   let hidden = fn () => state.get ()
-  return {nested: #[(hidden, 42)]}
+  break {nested: #[(hidden, 42)]}
 )
 `,
             },
@@ -183,7 +183,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
               "provider 0 cell (fn () => 7)",
               "state 0 cell 7",
               "computation 0 (fn () => cell.get ())",
-              "computation 0 (fn () => do:\n    let ignored = cell\n    return 7\n  )",
+              "computation 0 (fn () => do:\n    let ignored = cell\n    break 7\n  )",
             ]
           ) {
             const escaped = await compiler.build({

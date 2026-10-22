@@ -13,10 +13,10 @@ const source =
     \\const alias = from
     \\entry const integer = fn () => do:
     \\  let #Box value:Box U32 = alias 42
-    \\  return value
+    \\  break value
     \\entry const floating = fn () => do:
     \\  let #Box value:Box F32 = alias 1.25
-    \\  return value
+    \\  break value
 ;
 const Fixture = struct {
     pool: symbols.Pool = .{},
@@ -87,11 +87,11 @@ test "result selection uses only the destination owner and retains missing unuse
         \\const Source.from = fn value => @panic "input owner was selected"
         \\const Target.from = fn (source:Source) => do:
         \\  let #Source value=source
-        \\  return #Target value
+        \\  break #Target value
         \\const unused = fn (value:U32) -> Missing => @type.result "from" value
         \\entry const answer = fn () => do:
         \\  let #Target value:Target = @type.result "from" (#Source 42)
-        \\  return value
+        \\  break value
     );
     defer f.deinit(a);
     try f.valid();

@@ -8,7 +8,7 @@ entry const answer = fn () => do:
   let (field, extracted) = (0.5, fn value => value)
   let (_, qualified) = ((), selected)
   let integer = identity (qualified (extracted 41))
-  return @f32.add (@u32.to_f32 integer) (@f32.add field (identity 1.0))
+  break @f32.add (@u32.to_f32 integer) (@f32.add field (identity 1.0))
 `, guest => equal(guest.call("answer", null), 42.5));
 });
 
@@ -22,6 +22,6 @@ Deno.test("destructured callable aliases cannot select two argument types", asyn
   ]) await compileExpectedFailure(`entry const answer = fn () => do:
   ${binding}
   let first = identity 41
-  return @f32.add (@u32.to_f32 first) (identity 1.5)
+  break @f32.add (@u32.to_f32 first) (identity 1.5)
 `, "type_mismatch");
 });

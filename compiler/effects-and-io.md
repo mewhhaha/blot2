@@ -20,13 +20,13 @@ type Reader a is effect = { ask: Unit -> a }
 const read_twice = fn () => do:
   use left <- Reader.ask U32 ()
   use right <- Reader.ask U32 ()
-  return left + right
+  break left + right
 
 const reader = @effect.provider (Reader.ask U32) (fn () => 21)
 
 const answer = fn () => do reader:
   use value <- read_twice ()
-  return value
+  break value
 
 const accesses = @effect.of read_twice
 const reads_reader = @effect.has accesses (Reader.ask U32)
@@ -47,12 +47,12 @@ provider does not recurse into itself. Escaping functions retain their effects
 and do not capture the provider chain.
 
 Monadic resolvers are also supported: `do (monad Maybe):` uses `Maybe.bind` for
-`use`, `Maybe.pure` for `return`, and forwards an existing wrapper with
-`return $`. A failed bind skips the remaining block, including later effects and
+`use`, `Maybe.pure` for `break value`, and forwards an existing wrapper with
+`break $`. A failed bind skips the remaining block, including later effects and
 loop iterations. The adapter is an ordinary prelude function backed by a generic
 resolver protocol; user-defined data types can provide their own `pure` and
 `bind`. It preserves unrelated effect requirements. Nested plain `do:` blocks
-retain direct sequencing and return rules.
+retain direct sequencing and block-result rules.
 
 Monadic loops call the selected type's `iterate initial step` member. Steps
 return wrapped `#Continue state` or `#Done result` values of the prelude's
@@ -65,7 +65,8 @@ and `bind` remain sufficient for blocks without loops.
 
 Capture a Unit thunk with `@computation`, then handle its operations with a
 request loop. Capturing does not run the thunk. Each operation clause can reply
-with `yield`, return from the handler's enclosing `do`, or cancel with `break`:
+with `yield`, finish the handler's enclosing `do` with `break value`, or exit
+the function with `return value`:
 
 ```blot
 type Validate is effect = { check: U32 -> U32 }
@@ -75,15 +76,15 @@ const checked = fn computation => do:
     case request of
       effect Validate.check value =>
         if value == 0:
-          return 0
+          break 0
         yield value
       complete value =>
-        return value
+        break value
 
 entry const answer = fn () => checked (@computation (fn () => do:
   use left <- Validate.check 40
   use right <- Validate.check 2
-  return left + right
+  break left + right
 ))
 ```
 
@@ -94,10 +95,10 @@ closed instance, for example `effect (Reader.ask U32) () =>`.
 
 `yield value` supplies the pending operation's result and ends that clause. The
 computation proceeds to its next operation or completion without keeping a
-recursive chain of handler callbacks. `return value` cancels the computation and
-exits the nearest enclosing `do`; it skips the loop's suffix. `break` cancels
-the computation and runs the suffix after the request loop. The `complete`
-clause receives the computation's final value and must return or break; it
+recursive chain of handler callbacks. `break value` cancels the computation and
+exits the nearest enclosing `do`; it skips the loop's suffix. Bare `break`
+cancels the computation and runs the suffix after the request loop. The
+`complete` clause receives the computation's final value and must exit; it
 cannot yield. Clauses cannot fall through.
 
 Rebinding an outer local with `:=` carries handler state to subsequent requests
@@ -129,8 +130,8 @@ const advance = fn initial => do:
   let (next, previous) = do (@effect.state (State.get U32) (State.set U32) initial):
     use value <- State.get U32 ()
     use State.set U32 (value + 1)
-    return value
-  return (next, previous)
+    break value
+  break (next, previous)
 ```
 
 `State U32` names the concrete family instance; type application uses spaces
@@ -162,11 +163,11 @@ const set = fn value => State.set value
 const advance = fn () => do:
   use counter <- get #Counter
   let #Counter value = counter
-  return set (#Counter (value + 1))
+  break set (#Counter (value + 1))
 
 const answer = fn () => do:
   let (#Counter next, _) = @effect.run State.get State.set (#Counter 41) advance
-  return next
+  break next
 ```
 
 `State.get ()` and `State.set value` are ordinary effect calls. The compiler
@@ -233,7 +234,7 @@ and returns a scalar or numeric array. For example:
 ```blot
 entry const main = fn (advance: U32 -> U32 ! {Foreign}) => do:
   use next <- advance 41
-  return next
+  break next
 ```
 
 Run `just demo-host`; [the executable example](../examples/host_io.blot) also

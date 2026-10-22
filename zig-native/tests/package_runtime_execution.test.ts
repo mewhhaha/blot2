@@ -59,7 +59,7 @@ const arrays: U32 -> Item = fn value => pack [Array U32] { value: #[value, 7], r
 const read: Item -> U32 = fn item => unpack item as [a] body in body.run body.value
 entry const answer = fn (value: U32) => do:
   let items = #[arrays value, floats (@u32.to_f32 value)]
-  return @u32.add (read (@array.get items 0)) (read (@array.get items 1))
+  break @u32.add (read (@array.get items 0)) (read (@array.get items 1))
 entry const nested = fn (value: U32) => unpack (arrays value) as [a] left in unpack (floats 3.0) as [b] right in @u32.add (left.run left.value) (right.run right.value)
 `,
     (guest, bytes) => {

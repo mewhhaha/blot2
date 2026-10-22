@@ -15,7 +15,7 @@ const source = `entry const gen = fn (count: U32) => do:
   let checksum = 0
   for row in rows:
     checksum := self + row[0] + row[1]
-  return checksum
+  break checksum
 `;
 const entry = `${output}/main.blot`;
 await Deno.writeTextFile(entry, source);

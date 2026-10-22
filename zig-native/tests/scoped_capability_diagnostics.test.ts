@@ -11,16 +11,16 @@ const escaping = `
 import {State, Save} from "./library"
 entry const bad = fn () => do:
   let (saved, result) = @state.run (fn () => 0) (fn () => do (@effect.provider (Save.keep U32) (fn value => @state.set value)):
-    return @effect.scope (fn (s: State U32) => do:
+    break @effect.scope (fn (s: State U32) => do:
       use Save.keep U32 (fn () => do:
         let (state, result) = do (@effect.state s.get s.set 0):
-          return 42
-        return result
+          break 42
+        break result
       )
-      return 42
+      break 42
     )
   )
-  return saved ()
+  break saved ()
 `;
 const valid = `
 import {State, Save} from "./library"

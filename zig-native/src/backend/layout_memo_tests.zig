@@ -34,16 +34,16 @@ const shapes =
     \\  #Box { width, height } => @f32.mul width height
     \\const swap = fn pair => do:
     \\  let #Pair { left, right } = pair
-    \\  return #Pair { left: right, right: left }
+    \\  break #Pair { left: right, right: left }
     \\const total = fn (values: Array (Pair [U32, F32])) => @array.length values
     \\const counter = fn () => do:
     \\  use value <- State.get ()
     \\  State.set (@u32.add value 1)
-    \\  return value
+    \\  break value
     \\entry const run = fn (x: U32) => do:
     \\  let shapes = #[#Circle 1.0, #Box { width: 2.0, height: 3.0 }]
     \\  let pair = swap (#Pair { left: 2.5, right: x })
-    \\  return @u32.add (total #[pair]) (@array.length shapes)
+    \\  break @u32.add (total #[pair]) (@array.length shapes)
 ;
 
 /// Derives every type of `units[0]` twice, unsubstituted and with its first

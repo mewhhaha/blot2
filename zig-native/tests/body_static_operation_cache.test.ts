@@ -14,7 +14,7 @@ const source = (seed: string, prefix = "") =>
   `import {Read as Input, invoke} from "./logic"
 ${prefix}const seed = ${seed}
 entry const run = fn (host: U32 -> U32 ! {Foreign}) => do (@effect.provider Input (fn () => host seed)):
-  return invoke ()
+  break invoke ()
 `;
 async function observe(bytes: Uint8Array<ArrayBuffer>, seed: number) {
   for (const asynchronous of [false, true]) {
