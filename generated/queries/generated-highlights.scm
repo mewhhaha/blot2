@@ -24,6 +24,7 @@
 "}" @punctuation.bracket
 "~" @operator
 "·" @operator
+(async_block "async" @keyword)
 (binding_else "else" @keyword)
 (binding "let" @keyword)
 (boolean_constructor_pattern value: "False" @keyword)
@@ -48,6 +49,8 @@
 (data_type "data" @keyword)
 (data_type "is" @keyword)
 (data_type "type" @keyword)
+(declaration_name rest: "finish" @keyword)
+(declaration_name root: "finish" @keyword)
 (declaration visibility: "privatE" @keyword)
 (descriptor_type "descriptor" @keyword)
 (do_block "do" @keyword)
@@ -74,6 +77,8 @@
 (implementation_type_member "type" @keyword)
 (implementation_value_member "const" @keyword)
 (import_binding alias: "as" @keyword)
+(import_binding alias: "finish" @keyword)
+(import_binding name: "finish" @keyword)
 (import_declaration "froM" @keyword)
 (import_declaration "import" @keyword)
 (lambda "fn" @keyword)
@@ -89,6 +94,7 @@
 (package_unpack "unpack" @keyword)
 (pattern_conditional "if" @keyword)
 (pattern_conditional "let" @keyword)
+(qualified_name rest: "finish" @keyword)
 (quantified_binder name: "borrow" @keyword)
 (quantified_binder name: "borrow_mut" @keyword)
 (quantified_binder name: "cleanup" @keyword)
@@ -134,6 +140,8 @@
 (symbolic_fixity associativity: "infix" @keyword)
 (symbolic_fixity associativity: "infixl" @keyword)
 (symbolic_fixity associativity: "infixr" @keyword)
+(task_block "tasks" @keyword)
+(task_finish "finish" @keyword)
 (type_alias "type" @keyword)
 (usage_type kind: "borrow" @keyword)
 (usage_type kind: "borrow_mut" @keyword)

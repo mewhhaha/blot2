@@ -1,6 +1,25 @@
 import { deepStrictEqual as equal } from "node:assert/strict";
 import { formatSource } from "./format.ts";
 
+Deno.test("formatter preserves task block and finish boundaries", async () => {
+  const source = `entry const answer=fn ()=>tasks group:
+  let child=async group:
+    do:
+      finish 42
+  finish @task.join child
+entry const sparked = fn () => tasks group:
+  let pending = *(work 42)
+  finish |pending|
+`;
+  const formatted = await formatSource(source);
+  equal(formatted.includes("tasks group:"), true);
+  equal(formatted.includes("async group:"), true);
+  equal(formatted.includes("      finish 42"), true);
+  equal(formatted.includes("*(work 42)"), true);
+  equal(formatted.includes("|pending|"), true);
+  equal(await formatSource(formatted), formatted);
+});
+
 Deno.test("formatter preserves grouped curried parameter lists and named record calls", async () => {
   const source = `const area=fn (width:U32) (height:U32)=>@u32.mul width height
 const named=fn (fields:{width:U32,height:U32})=>area fields.width fields.height

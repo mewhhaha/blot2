@@ -43,10 +43,10 @@ Scalars: `Unit` (`()`), `Bool` (`#True`, `#False`), `U32` (`42`, `0xFF`,
 arithmetic wraps at 32 bits; F32 rounds to binary32 and can yield infinity or
 NaN. Prefix `-` negates F32; parenthesize negative arguments: `F32.abs (-2.0)`.
 
-Functions take one argument at a time. Calls associate left:
-`f a b` means `(f a) b`. Application binds tighter than infix operators. `f(x)`
-also calls a function; `f(a, b)` passes one tuple. Unit thunks defer work until
-called with `()`, without memoization. Recursion is supported.
+Functions take one argument at a time. Calls associate left: `f a b` means
+`(f a) b`. Application binds tighter than infix operators. `f(x)` also calls a
+function; `f(a, b)` passes one tuple. Unit thunks defer work until called with
+`()`, without memoization. Recursion is supported.
 
 Write several parameters after one `fn` to abbreviate a curried chain:
 `fn first second => body` means `fn first => fn second => body`, and
@@ -59,10 +59,10 @@ explicit nested lambdas; the short form introduces no such work or extra
 allocation beyond the equivalent chain.
 
 For many same-typed arguments, use a parameter record as a named-call
-convention. The record type gives names a public interface, so renaming a
-field requires updating callers. Field expressions run once in their written
-order, even when that differs from the record type's order; unknown and
-duplicate supplied fields receive diagnostics at the supplied field.
+convention. The record type gives names a public interface, so renaming a field
+requires updating callers. Field expressions run once in their written order,
+even when that differs from the record type's order; unknown and duplicate
+supplied fields receive diagnostics at the supplied field.
 
 ```blot
 const rectangle = fn (left: U32) (top: U32) (width: U32) (height: U32) =>
@@ -231,11 +231,11 @@ block is rejected with `dead_rebinding`. Rebind with `if`/`else` or a statement
 `case`, or assign the value of a `case` expression. `break value` exits the
 enclosing `do`; a loop creates no new `do` boundary. Bare `break` exits the
 nearest loop and carries its latest local values into the statements after it.
-In a request loop it also cancels the captured computation. `continue` skips
-the rest of the nearest loop's current iteration and carries the values visible
-at that point into the next one. Range and collection loops still advance one
-element; effects already performed stay performed, and temporary values from
-the skipped path are cleaned up. A `continue` in a monadic loop produces its
+In a request loop it also cancels the captured computation. `continue` skips the
+rest of the nearest loop's current iteration and carries the values visible at
+that point into the next one. Range and collection loops still advance one
+element; effects already performed stay performed, and temporary values from the
+skipped path are cleaned up. A `continue` in a monadic loop produces its
 resolver's `Continue` state. A request handler can use `continue` in a loop
 inside that handler, but it cannot continue the enclosing request loop across
 the handler callback boundary.
@@ -501,8 +501,8 @@ enough type information to resolve dispatch; annotate unconstrained parameters.
 `1 + 2` selects `U32.add`; `1.0 + 2.0` selects `F32.add`. Mixed operands fail
 unless an implementation explicitly accepts them. `/` supports F32 and U32; U32
 division truncates and a zero divisor fails/traps. Bool supports ordinary
-equality. Structural equality for arrays, records and algebraic data is
-opt-in through [std/equality](../std/equality.blot) and the
+equality. Structural equality for arrays, records and algebraic data is opt-in
+through [std/equality](../std/equality.blot) and the
 [derivation tool](derive.md), which can also generate debug formatting and
 explicitly versioned codecs from checked declarations.
 
@@ -709,18 +709,18 @@ can remove these allocations. Allocations inside runtime helpers or without a
 source site are absent, so this record is not a complete runtime count. The
 executed-Wasm allocation tests give measured traffic after optimization.
 
-Each `array_costs` site points to a recognized
-array edit with UTF-8 byte offsets. `reuse_eligible` means the Core ownership
-proof admits updating that local version in place; `copy_required` means it
-cannot prove exclusive ownership. The `reason` names the failed condition:
-`escaped`, `multiple_consumers`, `later_read`, `no_fresh_origin`, `unanchored`,
-`nested_alias`, or `nonexclusive_predecessor`. A retained pre-edit snapshot in
-a loop normally appears as `nonexclusive_predecessor`, because that earlier
+Each `array_costs` site points to a recognized array edit with UTF-8 byte
+offsets. `reuse_eligible` means the Core ownership proof admits updating that
+local version in place; `copy_required` means it cannot prove exclusive
+ownership. The `reason` names the failed condition: `escaped`,
+`multiple_consumers`, `later_read`, `no_fresh_origin`, `unanchored`,
+`nested_alias`, or `nonexclusive_predecessor`. A retained pre-edit snapshot in a
+loop normally appears as `nonexclusive_predecessor`, because that earlier
 version can still be observed. The report covers only edits recognized by this
 proof, including checked edits an entry may never reach. It is a source-level
-decision, not measured allocator traffic: later optimization may remove an
-edit or its copy. `omitted` counts sites beyond the
-256-site limit, and the requested source is listed before imported modules.
+decision, not measured allocator traffic: later optimization may remove an edit
+or its copy. `omitted` counts sites beyond the 256-site limit, and the requested
+source is listed before imported modules.
 
 For proven local temporaries, the compiler releases storage after the final
 borrowed read or write. This also covers objects larger than the scalar
@@ -758,15 +758,14 @@ array; doing so on every iteration of a growing loop can be quadratic. Keep an
 exclusive loop carry when only the final version is needed.
 
 For collection construction, `@array.generate count (fn index => value)`
-allocates one fixed-size contiguous result, and `@array.fill` does the same
-with one evaluated fill value. A List loop using an exclusive carry and
+allocates one fixed-size contiguous result, and `@array.fill` does the same with
+one evaluated fill value. A List loop using an exclusive carry and
 `[...self, value]` grows through the List's bounded leaves, then
-`Array.from_list` copies the final contents once if an Array is needed.
-Avoid repeated Array append/prepend: each step copies the contiguous payload.
-If older List versions remain live, path copying preserves them, so the
-exclusive-growth cost bound no longer applies. A comprehension is another
-documented construction form when its result expression fits the generator
-syntax.
+`Array.from_list` copies the final contents once if an Array is needed. Avoid
+repeated Array append/prepend: each step copies the contiguous payload. If older
+List versions remain live, path copying preserves them, so the exclusive-growth
+cost bound no longer applies. A comprehension is another documented construction
+form when its result expression fits the generator syntax.
 
 Small pure structural helpers and locally named or inline callbacks can be
 allocation-free in optimized code. A generic callback whose callee cannot be
@@ -775,12 +774,12 @@ nominal constructor can still allocate. Development codegen keeps some
 allocations that optimized scalar replacement removes. Use the executed-Wasm
 allocation matrix in `zig-native/tests/allocation_cost_matrix.test.ts` for
 concrete tier and size comparisons; no source spelling alone guarantees those
-record or closure allocations will disappear.
-In the qualified scalar-record fixture, locally bound, global named, and
-globally aliased callbacks passed through `apply` have zero optimized allocator
-traffic. The global path's direct callable adapter and its scalar reader are
-inlined under bounded proofs before scalar replacement. A dynamically unknown
-callback still keeps the conservative call boundary.
+record or closure allocations will disappear. In the qualified scalar-record
+fixture, locally bound, global named, and globally aliased callbacks passed
+through `apply` have zero optimized allocator traffic. The global path's direct
+callable adapter and its scalar reader are inlined under bounded proofs before
+scalar replacement. A dynamically unknown callback still keeps the conservative
+call boundary.
 
 Constant evaluation uses a separate representation. Append/prepend can extend
 the latest collection version into unused buffer slots, with geometric growth;
@@ -824,13 +823,13 @@ The implicit prelude supplies `identity`, `apply`, `always`, `compose`, `flip`,
 Ordinary arguments are eager, including `Maybe.unwrap_or` fallbacks. `&&` and
 `||` call the source-defined `and` and `or`, whose right parameters use `~`.
 `Maybe.unwrap_or_else fallback candidate` and
-`Result.unwrap_or_else fallback candidate` also defer their fallbacks.
-Local `let` initializers are eager too. The compiler may place single-use,
-total scalar work at its only use when this preserves observable behavior;
-trapping, effectful and unknown work stays in source order. A value consumed
-directly by the next `if` or `return` can avoid a temporary without changing
-that order. Use a demand parameter or unit thunk when delayed evaluation is
-part of the program's intended behavior.
+`Result.unwrap_or_else fallback candidate` also defer their fallbacks. Local
+`let` initializers are eager too. The compiler may place single-use, total
+scalar work at its only use when this preserves observable behavior; trapping,
+effectful and unknown work stays in source order. A value consumed directly by
+the next `if` or `return` can avoid a temporary without changing that order. Use
+a demand parameter or unit thunk when delayed evaluation is part of the
+program's intended behavior.
 
 `std/array` also supplies `map`, `filter`, `filter_map`, `slice start count`,
 `concat`, `flatten`, `push`, `zip`, `unzip`, and `unzip3`. Collection arguments
@@ -851,10 +850,11 @@ entry const total_length = fn () =>
 ## Runtime text
 
 `Text` is an alias for `Array U32` containing Unicode scalar values. A string
-literal such as `"Hi, 世界🙂"` is an ordinary `Text` value. Text length, indexing
-and `std/array.slice` count scalars, rather than UTF-8 bytes or grapheme clusters;
-the example has seven elements. Equality in `std/text` compares scalar sequences
-exactly and does not perform Unicode normalization. Text has no implicit IO.
+literal such as `"Hi, 世界🙂"` is an ordinary `Text` value. Text length,
+indexing and `std/array.slice` count scalars, rather than UTF-8 bytes or
+grapheme clusters; the example has seven elements. Equality in `std/text`
+compares scalar sequences exactly and does not perform Unicode normalization.
+Text has no implicit IO.
 
 ```blot
 import * as text from "std/text"
@@ -871,17 +871,17 @@ the host boundary: `encodeText` and `decodeText` from `mod.ts` convert between
 JavaScript strings and the existing `Array U32` guest ABI, rejecting unpaired
 UTF-16 surrogates and invalid scalar values. No numeric ABI change is needed.
 `@panic` still requires a literal; send a dynamic assertion message through an
-explicit `Array U32 -> U32 ! {Foreign}` host callback or return the `Text` to the
-host.
+explicit `Array U32 -> U32 ! {Foreign}` host callback or return the `Text` to
+the host.
 
 `text.from_u32` formats a decimal integer. `text.from_f32_fixed places value`
 formats 0–6 fractional places and returns `#Nothing` for non-finite values or
 when the scaled result does not fit U32. `text.Format` is an ordinary contract:
 applications can implement its `format` member for their own types. Each
 `text.concat` copies both inputs, so repeatedly appending to a growing `Text`
-can take quadratic time. Build with `text.builder`, `text.push` or `text.append`,
-and `text.finish` to collect scalars in a List and convert once. `text.join`
-uses this path.
+can take quadratic time. Build with `text.builder`, `text.push` or
+`text.append`, and `text.finish` to collect scalars in a List and convert once.
+`text.join` uses this path.
 
 ## SIMD
 
@@ -1580,6 +1580,32 @@ entry const answer = fn () => @task.scope (fn group => do:
   let right = @task.spawn group (fn () => 22)
   break @u32.add (@task.join left) (@task.join right))
 ```
+
+`tasks group:` introduces the same checked scope in block form. `async group:`
+starts a child in that group and returns its affine handle. Within a task group,
+`*(function argument)` sparks a parenthesized call and returns a handle;
+`|handle|` consumes that handle and receives its ordinary result. These
+spellings lower to the checked `@task.spawn` and `@task.join` operations.
+`finish value` completes the enclosing task or child block, including from a
+nested ordinary `do`; `break value` still completes only an explicit `do`.
+Cancel uses the existing task operation. Tuple receive, cold jobs and channel
+endpoints are not yet part of this source surface.
+
+```blot
+const compute = fn value => value
+entry const answer = fn () => tasks group:
+  let left = *(compute 20)
+  let right = async group:
+    do:
+      finish 22
+  finish @u32.add (|left|) (|right|)
+```
+
+`finish` cannot cross a user function boundary. A `return` inside either task
+block currently gets an explicit diagnostic, because that source function would
+need to exit across a generated task callback. Use `finish` to complete the task
+block. A child captures values and capabilities under the same task transfer
+checks as `@task.spawn`.
 
 Unique captures move to one child. Immutable data can be shared. Read loans
 require an owner enclosing the destination group. Mutable state/provider

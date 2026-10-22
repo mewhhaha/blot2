@@ -38,6 +38,8 @@ function needsGrouping(group: Cst, parents: Map<Cst, Cst>): boolean {
     "if_expression",
     "case_expression",
     "do_block",
+    "task_block",
+    "async_block",
   ].includes(kind);
   if (!compound) return false;
   for (let node = parents.get(group); node; node = parents.get(node)) {
@@ -198,6 +200,7 @@ export async function formatSource(source: string): Promise<string> {
     if (equivalent(laidOut)) source = laidOut;
     original = frontend.parse(source).root;
     const tightAfter = new Set<number>();
+    const tightBefore = new Set<number>();
     const witness = new Set<number>();
     const pending = [original];
     for (let node = pending.pop(); node; node = pending.pop()) {
@@ -217,6 +220,17 @@ export async function formatSource(source: string): Promise<string> {
         // its space after the closing one.
         const opening = nested.find((child) => child.text === "`");
         if (opening) tightAfter.add(Number(opening.offset));
+      }
+      if (
+        node.kind === "receive" ||
+        (node.kind === "expression" && nested[0]?.text === "|" &&
+          nested.at(-1)?.text === "|")
+      ) {
+        const bars = nested.filter((child) => child.text === "|");
+        if (bars.length === 2) {
+          tightAfter.add(Number(bars[0].offset));
+          tightBefore.add(Number(bars[1].offset));
+        }
       }
     }
     const lexed = frontend.lex(source);
@@ -266,6 +280,7 @@ export async function formatSource(source: string): Promise<string> {
           previous.text === "#" || previous.text === "..."
         ) space = false;
         else if (tightAfter.has(previous.start)) space = false;
+        else if (tightBefore.has(token.span.start)) space = false;
         else if (value === "}" && previous.text === "{") space = false;
         if (value === "`") {
           if (backtick) space = false;

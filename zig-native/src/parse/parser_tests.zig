@@ -229,6 +229,71 @@ test "imports preserve aliases decoded paths and literal source spans" {
     try std.testing.expectEqualStrings("value", pool.get(binding.name));
     try std.testing.expectEqualStrings("renamed", pool.get(binding.alias));
 }
+test "task finish targets its generated callback while return and bare break keep distinct scopes" {
+    const source =
+        \\entry const answer = fn () => tasks group:
+        \\  let child = async group:
+        \\    do:
+        \\      finish 42
+        \\  finish @task.join child
+    ;
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(std.testing.allocator);
+    var tree = try parsed(std.testing.allocator, source, &pool);
+    defer tree.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    const lambda = tree.node(tree.valueDecl(tree.roots.items[0]).body);
+    try std.testing.expectEqual(ast.Tag.lambda, lambda.tag);
+    const scope = tree.node(lambda.b);
+    try std.testing.expectEqual(ast.Tag.apply, scope.tag);
+    try std.testing.expectEqualStrings("@task.scope", pool.get(tree.node(scope.a).a));
+    const callback = tree.node(scope.b);
+    try std.testing.expectEqual(ast.Tag.lambda, callback.tag);
+    const statements = tree.children(callback.b);
+    try std.testing.expectEqual(ast.Tag.function_return_stmt, tree.node(statements[statements.len - 1]).tag);
+    for ([_]struct { source: []const u8, code: ast.Code }{
+        .{ .source = "entry const value = fn () => tasks group:\n  return 1\n", .code = .task_return_scope },
+        .{ .source = "entry const value = fn () => tasks group:\n  break 1\n", .code = .task_break_scope },
+        .{ .source = "entry const value = fn () => do:\n  finish 1\n", .code = .task_finish_scope },
+    }) |case| {
+        var rejected = try parsed(std.testing.allocator, case.source, &pool);
+        defer rejected.deinit(std.testing.allocator);
+        try std.testing.expect(rejected.diagnostics.items.len != 0);
+        try std.testing.expectEqual(case.code, rejected.diagnostics.items[0].code);
+    }
+}
+
+test "spark and receive lower to checked task operations with bounded syntax" {
+    const source =
+        \\entry const answer = fn () => tasks group:
+        \\  let pending = *(work 42)
+        \\  finish |pending|
+    ;
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(std.testing.allocator);
+    var tree = try parsed(std.testing.allocator, source, &pool);
+    defer tree.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var spawns: usize = 0;
+    var joins: usize = 0;
+    for (tree.nodes.items) |node| if (node.tag == .intrinsic) {
+        const name = pool.get(node.a);
+        spawns += @intFromBool(std.mem.eql(u8, name, "@task.spawn"));
+        joins += @intFromBool(std.mem.eql(u8, name, "@task.join"));
+    };
+    try std.testing.expectEqual(@as(usize, 1), spawns);
+    try std.testing.expectEqual(@as(usize, 1), joins);
+    for ([_]struct { source: []const u8, code: ast.Code }{
+        .{ .source = "entry const value = fn () => *(work 1)\n", .code = .task_spark_scope },
+        .{ .source = "entry const value = fn () => tasks group:\n  finish *(work)\n", .code = .task_spark_call },
+        .{ .source = "entry const value = fn () => tasks group:\n  finish |(left, right)|\n", .code = .task_receive_tuple },
+    }) |case| {
+        var rejected = try parsed(std.testing.allocator, case.source, &pool);
+        defer rejected.deinit(std.testing.allocator);
+        try std.testing.expect(rejected.diagnostics.items.len != 0);
+        try std.testing.expectEqual(case.code, rejected.diagnostics.items[0].code);
+    }
+}
 
 test "operator reduction retains each subtree span rather than the full chain span" {
     const source = "infixl 60 (+) = add\ninfixl 70 (*) = multiply\nconst value = 1 + 2 * 3 + 4\n";

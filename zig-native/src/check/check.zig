@@ -5730,7 +5730,7 @@ const Engine = struct {
                 return try self.bindingFootprint(binding, boundary, inherited, remaining, depth + 1) orelse true;
             },
             .intrinsic, .integer, .float, .string, .boolean, .unit => return false,
-            .group, .field_access, .return_stmt, .yield_stmt => return self.closureCaptureFootprint(value.a, closure, boundary, inherited, remaining, depth + 1),
+            .group, .field_access, .return_stmt, .function_return_stmt, .yield_stmt => return self.closureCaptureFootprint(value.a, closure, boundary, inherited, remaining, depth + 1),
             .field, .unary, .operator_tail => return self.closureCaptureFootprint(value.b, closure, boundary, inherited, remaining, depth + 1),
             .lambda => return self.closureCaptureFootprint(value.b, closure, boundary, inherited, remaining, depth + 1),
             .apply, .index_access => return try self.closureCaptureFootprint(value.a, closure, boundary, inherited, remaining, depth + 1) or try self.closureCaptureFootprint(value.b, closure, boundary, inherited, remaining, depth + 1),
@@ -5776,7 +5776,7 @@ const Engine = struct {
         if (try self.dictionaryGoalFootprint(source, boundary, inherited, remaining)) return true;
         switch (value.tag) {
             .intrinsic, .integer, .float, .string, .boolean, .unit, .constructor_ref => return false,
-            .group, .return_stmt, .yield_stmt, .type_witness => return self.valueFootprint(value.a, boundary, inherited, remaining, depth + 1),
+            .group, .return_stmt, .function_return_stmt, .yield_stmt, .type_witness => return self.valueFootprint(value.a, boundary, inherited, remaining, depth + 1),
             .field => {
                 if (value.b != 0) return self.valueFootprint(value.b, boundary, inherited, remaining, depth + 1);
                 // Record shorthand has no expression node, but its resolved
@@ -6327,7 +6327,7 @@ const Engine = struct {
         }
         remaining.* -= 1;
         const value = self.tree.node(source);
-        if (value.tag == .return_stmt) {
+        if (value.tag == .return_stmt or value.tag == .function_return_stmt) {
             found.* = true;
             return self.valueFootprint(value.a, boundary, inherited, remaining, depth + 1);
         }

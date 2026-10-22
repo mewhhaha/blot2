@@ -130,6 +130,7 @@ export type LiteralKind =
   | "{"
   | ","
   | "}"
+  | "finish"
   | "privatE"
   | "opaquE"
   | "type"
@@ -181,6 +182,8 @@ export type LiteralKind =
   | "..."
   | "<-"
   | "do"
+  | "tasks"
+  | "async"
   | "case"
   | "of"
   | ":="
@@ -288,6 +291,7 @@ export type RuleName =
   | "symbolic_fixity"
   | "named_fixity"
   | "qualified_name"
+  | "declaration_name"
   | "parameter"
   | "typed_parameter"
   | "type_array"
@@ -324,6 +328,7 @@ export type RuleName =
   | "application"
   | "member_access"
   | "atom"
+  | "receive"
   | "constructor_reference"
   | "selector"
   | "type_witness"
@@ -343,6 +348,8 @@ export type RuleName =
   | "comprehension_binding"
   | "comprehension_guard"
   | "do_block"
+  | "task_block"
+  | "async_block"
   | "case_expression"
   | "case_suite"
   | "case_arm"
@@ -368,6 +375,7 @@ export type RuleName =
   | "effect_binding"
   | "effect_step"
   | "function_exit"
+  | "task_finish"
   | "result"
   | "reply"
   | "loop_exit"
@@ -457,8 +465,8 @@ export interface NamedImportCursor extends RuleCursorBase<"named_import"> {
 }
 
 export interface ImportBindingCursor extends RuleCursorBase<"import_binding"> {
-  field(name: "alias"): readonly [TokenCursor<"literal", "as">, TokenCursor<"named", "TYPE_IDENT"> | SourceIdentifierCursor] | null;
-  field(name: "name"): TokenCursor<"named", "TYPE_IDENT"> | SourceIdentifierCursor;
+  field(name: "alias"): readonly [TokenCursor<"literal", "as">, TokenCursor<"literal", "finish"> | TokenCursor<"named", "TYPE_IDENT"> | SourceIdentifierCursor] | null;
+  field(name: "name"): TokenCursor<"literal", "finish"> | TokenCursor<"named", "TYPE_IDENT"> | SourceIdentifierCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -549,7 +557,7 @@ export interface ValueDeclarationCursor extends RuleCursorBase<"value_declaratio
   field(name: "annotation"): readonly [TokenCursor<"literal", ":">, TypeExpressionCursor] | null;
   field(name: "kind"): TokenCursor<"literal", "const"> | TokenCursor<"literal", "let">;
   field(name: "modifier"): SourceIdentifierCursor | null;
-  field(name: "name"): QualifiedNameCursor;
+  field(name: "name"): DeclarationNameCursor;
   field(name: "value"): ExpressionCursor;
   field(name: "where"): WhereClauseCursor | null;
   field(name: string): CursorFieldValue | undefined;
@@ -640,8 +648,15 @@ export interface NamedFixityCursor extends RuleCursorBase<"named_fixity"> {
 }
 
 export interface QualifiedNameCursor extends RuleCursorBase<"qualified_name"> {
-  field(name: "rest"): ReadonlyArray<readonly [TokenCursor<"literal", ".">, TokenCursor<"named", "TYPE_IDENT"> | SourceIdentifierCursor]>;
+  field(name: "rest"): ReadonlyArray<readonly [TokenCursor<"literal", ".">, TokenCursor<"literal", "finish"> | TokenCursor<"named", "TYPE_IDENT"> | SourceIdentifierCursor]>;
   field(name: "root"): TokenCursor<"named", "TYPE_IDENT"> | SourceIdentifierCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface DeclarationNameCursor extends RuleCursorBase<"declaration_name"> {
+  field(name: "rest"): ReadonlyArray<readonly [TokenCursor<"literal", ".">, TokenCursor<"literal", "finish"> | TokenCursor<"named", "TYPE_IDENT"> | SourceIdentifierCursor]>;
+  field(name: "root"): TokenCursor<"literal", "finish"> | TokenCursor<"named", "TYPE_IDENT"> | SourceIdentifierCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -831,7 +846,7 @@ export interface TypeGroupCursor extends RuleCursorBase<"type_group"> {
 }
 
 export interface ExpressionCursor extends RuleCursorBase<"expression"> {
-  field(name: "value"): CaseExpressionCursor | DoBlockCursor | IfExpressionCursor | InfixExpressionCursor | LambdaCursor | PackagePackCursor | PackageUnpackCursor;
+  field(name: "value"): AsyncBlockCursor | CaseExpressionCursor | DoBlockCursor | IfExpressionCursor | InfixExpressionCursor | LambdaCursor | PackagePackCursor | PackageUnpackCursor | ReceiveCursor | TaskBlockCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -852,7 +867,7 @@ export interface InfixExpressionCursor extends RuleCursorBase<"infix_expression"
 }
 
 export interface InfixTailCursor extends RuleCursorBase<"infix_tail"> {
-  field(name: "argument"): CaseExpressionCursor | DoBlockCursor | IfExpressionCursor | LambdaCursor | PrefixExpressionCursor;
+  field(name: "argument"): AsyncBlockCursor | CaseExpressionCursor | DoBlockCursor | IfExpressionCursor | LambdaCursor | PrefixExpressionCursor | TaskBlockCursor;
   field(name: "operator"): TokenCursor<"literal", "$"> | TokenCursor<"literal", "*"> | TokenCursor<"literal", "^"> | TokenCursor<"literal", "|"> | NamedOperatorCursor | TokenCursor<"named", "SYMBOL">;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -885,6 +900,12 @@ export interface MemberAccessCursor extends RuleCursorBase<"member_access"> {
 }
 
 export interface AtomCursor extends RuleCursorBase<"atom"> {
+}
+
+export interface ReceiveCursor extends RuleCursorBase<"receive"> {
+  field(name: "value"): GroupCursor | QualifiedNameCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
 }
 
 export interface ConstructorReferenceCursor extends RuleCursorBase<"constructor_reference"> {
@@ -1019,6 +1040,20 @@ export interface DoBlockCursor extends RuleCursorBase<"do_block"> {
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
+export interface TaskBlockCursor extends RuleCursorBase<"task_block"> {
+  field(name: "body"): SuiteCursor;
+  field(name: "group"): SourceIdentifierCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface AsyncBlockCursor extends RuleCursorBase<"async_block"> {
+  field(name: "body"): SuiteCursor;
+  field(name: "group"): SourceIdentifierCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
 export interface CaseExpressionCursor extends RuleCursorBase<"case_expression"> {
   field(name: "body"): CaseSuiteCursor;
   field(name: "values"): ReadonlyArray<ExpressionCursor>;
@@ -1106,7 +1141,7 @@ export interface SuiteCursor extends RuleCursorBase<"suite"> {
 }
 
 export interface StatementCursor extends RuleCursorBase<"statement"> {
-  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | FunctionExitCursor | LoopContinueCursor | LoopExitCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ReplyCursor | RequestCaseCursor | ResultCursor;
+  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | FunctionExitCursor | LoopContinueCursor | LoopExitCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ReplyCursor | RequestCaseCursor | ResultCursor | TaskFinishCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -1184,6 +1219,12 @@ export interface FunctionExitCursor extends RuleCursorBase<"function_exit"> {
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
+export interface TaskFinishCursor extends RuleCursorBase<"task_finish"> {
+  field(name: "value"): ExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
 export interface ResultCursor extends RuleCursorBase<"result"> {
   field(name: "forwarding"): TokenCursor<"literal", "$"> | null;
   field(name: "value"): ExpressionCursor;
@@ -1249,7 +1290,7 @@ export interface ElseClauseCursor extends RuleCursorBase<"else_clause"> {
 }
 
 export interface CollectionExpressionCursor extends RuleCursorBase<"collection_expression"> {
-  field(name: "value"): CaseExpressionCursor | CollectionIfCursor | CollectionInfixCursor | CollectionLambdaCursor | DoBlockCursor;
+  field(name: "value"): AsyncBlockCursor | CaseExpressionCursor | CollectionIfCursor | CollectionInfixCursor | CollectionLambdaCursor | DoBlockCursor | TaskBlockCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -1278,7 +1319,7 @@ export interface CollectionInfixCursor extends RuleCursorBase<"collection_infix"
 }
 
 export interface CollectionInfixTailCursor extends RuleCursorBase<"collection_infix_tail"> {
-  field(name: "argument"): CaseExpressionCursor | CollectionIfCursor | CollectionLambdaCursor | DoBlockCursor | PrefixExpressionCursor;
+  field(name: "argument"): AsyncBlockCursor | CaseExpressionCursor | CollectionIfCursor | CollectionLambdaCursor | DoBlockCursor | PrefixExpressionCursor | TaskBlockCursor;
   field(name: "operator"): TokenCursor<"literal", "$"> | TokenCursor<"literal", "*"> | TokenCursor<"literal", "^"> | NamedOperatorCursor | TokenCursor<"named", "SYMBOL">;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -1360,6 +1401,7 @@ export type AnyRuleCursor =
   | SymbolicFixityCursor
   | NamedFixityCursor
   | QualifiedNameCursor
+  | DeclarationNameCursor
   | ParameterCursor
   | TypedParameterCursor
   | TypeArrayCursor
@@ -1396,6 +1438,7 @@ export type AnyRuleCursor =
   | ApplicationCursor
   | MemberAccessCursor
   | AtomCursor
+  | ReceiveCursor
   | ConstructorReferenceCursor
   | SelectorCursor
   | TypeWitnessCursor
@@ -1415,6 +1458,8 @@ export type AnyRuleCursor =
   | ComprehensionBindingCursor
   | ComprehensionGuardCursor
   | DoBlockCursor
+  | TaskBlockCursor
+  | AsyncBlockCursor
   | CaseExpressionCursor
   | CaseSuiteCursor
   | CaseArmCursor
@@ -1440,6 +1485,7 @@ export type AnyRuleCursor =
   | EffectBindingCursor
   | EffectStepCursor
   | FunctionExitCursor
+  | TaskFinishCursor
   | ResultCursor
   | ReplyCursor
   | LoopExitCursor

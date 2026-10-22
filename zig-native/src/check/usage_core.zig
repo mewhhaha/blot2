@@ -8,7 +8,7 @@ const usage = @import("usage_check.zig");
 const Error = error{InvalidArtifact};
 const State = struct { binding: u32, first: u32 = 0, loan: u32 = 0 };
 const Outcome = enum { live, exit };
-const ExitFrame = struct { target: u32, joined: []State, seen: bool = false };
+const ExitFrame = struct { target: u32, joined: []State, seen: bool = false, parent: ?*ExitFrame = null };
 const StageEnvironment = struct {
     states: []State,
     regions: []const T.Id,
@@ -42,7 +42,7 @@ const Walker = struct {
         const count = self.len;
         const mark = self.snapshot_len;
         defer self.snapshot_len = mark;
-        var frame: ExitFrame = .{ .target = source, .joined = try self.snapshot() };
+        var frame: ExitFrame = .{ .target = source, .joined = try self.snapshot(), .parent = self.returns };
         const outer = self.returns;
         self.returns = &frame;
         defer self.returns = outer;
@@ -786,10 +786,12 @@ const Walker = struct {
             },
             .return_ => {
                 if (try self.expression(node.a, depth + 1) == .exit) return .exit;
-                const frame = self.returns orelse return error.InvalidArtifact;
-                if (frame.target != node.b) return error.InvalidArtifact;
-                self.record(frame);
-                return .exit;
+                var frame = self.returns;
+                while (frame) |target| : (frame = target.parent) if (target.target == node.b) {
+                    self.record(target);
+                    return .exit;
+                };
+                return error.InvalidArtifact;
             },
             .break_ => {
                 for (self.module.extra[node.b..][0..node.c]) |child| if (try self.expression(child, depth + 1) == .exit) return .exit;

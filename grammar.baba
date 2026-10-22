@@ -21,7 +21,7 @@ import_declaration = ("import" binding:(namespace_import | named_import) "froM" 
 export_declaration = ("exporT" binding:named_import "froM" path:STRING LAYOUT_NEWLINE) ;
 namespace_import = ("*" "as" name:source_identifier) ;
 named_import = ("{" (bindings:import_binding ("," bindings:import_binding)* ","?)? "}") ;
-import_binding = (name:(source_identifier | TYPE_IDENT) alias:("as" (source_identifier | TYPE_IDENT))?) ;
+import_binding = (name:(source_identifier | TYPE_IDENT | "finish") alias:("as" (source_identifier | TYPE_IDENT | "finish"))?) ;
 declaration = (visibility:"privatE"? (value:opaque_type | attributes:declaration_attribute* value:(value_declaration | implementation_declaration | data_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity)) LAYOUT_NEWLINE) ;
 opaque_type = ("opaquE" value:type_alias) ;
 type_alias = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "=" value:type_expression) ;
@@ -33,7 +33,7 @@ implementation_type_member = ("type" name:TYPE_IDENT "=" value:type_expression) 
 implementation_value_member = ("const" name:(source_identifier | TYPE_IDENT) annotation:(":" type_expression)? "=" value:lambda) ;
 declaration_attribute = ("@" body:attribute_name LAYOUT_NEWLINE?) ;
 attribute_name = ("[" value:expression "]") ;
-value_declaration = (modifier:source_identifier? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? where:where_clause? "=" value:expression) ;
+value_declaration = (modifier:source_identifier? kind:("const" | "let") name:declaration_name annotation:(":" type_expression)? where:where_clause? "=" value:expression) ;
 effect_declaration = ("effect" name:qualified_name ":" signature:type_expression) ;
 effect_type = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "is" "effect" "=" (operations:effect_operations | signature:effect_signature)) ;
 // A bare record declares operations; signatures start with a type name or group.
@@ -46,7 +46,8 @@ data_type = (("data" name:TYPE_IDENT parameters:type_atom? ("=>" "type" paramete
 constructor = ("#" name:TYPE_IDENT payload:type_expression?) ;
 symbolic_fixity = (associativity:("infixl" | "infixr" | "infix") precedence:INTEGER "(" symbol:(SYMBOL | "$" | "*" | "^" | "|") ")" "=" target:qualified_name) ;
 named_fixity = (associativity:("infixl" | "infixr" | "infix") precedence:INTEGER "`" target:qualified_name "`") ;
-qualified_name = (root:(source_identifier | TYPE_IDENT) rest:("." (source_identifier | TYPE_IDENT))*) ;
+qualified_name = (root:(source_identifier | TYPE_IDENT) rest:("." (source_identifier | TYPE_IDENT | "finish"))*) ;
+declaration_name = (root:(source_identifier | TYPE_IDENT | "finish") rest:("." (source_identifier | TYPE_IDENT | "finish"))*) ;
 parameter = (demand:"~"? (name:source_identifier | "(" (typed:typed_parameter | pattern:pattern)? ")")) ;
 typed_parameter = (name:source_identifier ":" annotation:type_expression where:where_clause?) ;
 type_array = ("[" (elements:type_expression ("," elements:type_expression)* ","?)? "]") ;
@@ -77,16 +78,17 @@ usage_type = (kind:("unique" | "shared" | "once" | "many" | "cleanup" | "concurr
 type_binder = ("(" name:source_identifier ":" annotation:type_expression ")") ;
 type_group = ("(" (value:type_expression ("," value:type_expression)* ","?)? ")") ;
 
-expression = (value:(package_pack | package_unpack | lambda | do_block | case_expression | if_expression | infix_expression)) ;
+expression = (value:(package_pack | package_unpack | lambda | task_block | async_block | do_block | case_expression | if_expression | receive | infix_expression)) ;
 lambda = ("fn" parameter:parameter+ result:("->" type_expression)? "=>" body:expression) ;
 infix_expression = (head:prefix_expression tails:infix_tail*) ;
 // Standalone $, *, and ^ are also reserved by forwarding, imports, and patterns.
-infix_tail = (operator:(SYMBOL | "$" | "*" | "^" | "|" | named_operator) argument:(lambda | do_block | case_expression | if_expression | prefix_expression)) ;
+infix_tail = (operator:(SYMBOL | "$" | "*" | "^" | "|" | named_operator) argument:(lambda | task_block | async_block | do_block | case_expression | if_expression | prefix_expression)) ;
 prefix_expression = (operator:(SYMBOL | "*" | "^")? value:application) ;
 named_operator = ("`" name:qualified_name "`") ;
 application = (head:atom arguments:(atom | member_access)*) ;
 member_access = ("." name:(source_identifier | TYPE_IDENT)) ;
 atom = (FLOAT | INTEGER | STRING | INTRINSIC | PROOF_LENGTH | selector | type_witness | constructor_reference | qualified_name | group | comprehension | collection_spread | collection_cons | list | array | record_values) ;
+receive = ("|" value:(qualified_name | group) "|") ;
 constructor_reference = ("#" value:(record | qualified_name | "True" | "False")) ;
 selector = ("·" name:(source_identifier | TYPE_IDENT) ("." name:(source_identifier | TYPE_IDENT))*) ;
 type_witness = (":" value:atom) ;
@@ -106,6 +108,8 @@ generator = (name:source_identifier "<-" value:expression) ;
 comprehension_binding = ("let" name:source_identifier "=" value:expression) ;
 comprehension_guard = (value:expression) ;
 do_block = ("do" resolver:application? ":" body:suite) ;
+task_block = ("tasks" group:source_identifier ":" body:suite) ;
+async_block = ("async" group:source_identifier ":" body:suite) ;
 case_expression = ("case" values:expression ("," values:expression)* "of" body:case_suite) ;
 case_suite = (LAYOUT_NEWLINE LAYOUT_INDENT arms:case_arm* LAYOUT_DEDENT) ;
 case_arm = (alternatives:pattern_row ("|" alternatives:pattern_row)* ("if" guard:expression)? "=>" body:expression LAYOUT_NEWLINE) ;
@@ -121,7 +125,7 @@ pattern_group = ("(" (value:pattern ("," value:pattern)*)? ")") ;
 record_pattern = ("{" (fields:record_pattern_field ("," fields:record_pattern_field)* ","?)? "}") ;
 record_pattern_field = (name:source_identifier (":" value:pattern)?) ;
 suite = (LAYOUT_NEWLINE LAYOUT_INDENT statements:statement* LAYOUT_DEDENT) ;
-statement = (value:(binding | rebinding | effect_binding | effect_step | function_exit | result | reply | loop_exit | loop_continue | request_case | pattern_conditional | conditional | ever_statement | range_statement | for_statement | expression) LAYOUT_NEWLINE) ;
+statement = (value:(binding | rebinding | effect_binding | effect_step | function_exit | task_finish | result | reply | loop_exit | loop_continue | request_case | pattern_conditional | conditional | ever_statement | range_statement | for_statement | expression) LAYOUT_NEWLINE) ;
 binding = ("let" pattern:pattern annotation:(":" type_expression)? where:where_clause? "=" value:expression fallback:binding_else?) ;
 rebinding = (name:source_identifier path:(member_access | index_access)* ":=" value:expression) ;
 index_access = ("[" index:expression "]") ;
@@ -133,6 +137,7 @@ binding_else = ("else" ":" alternative:suite) ;
 effect_binding = ("use" name:source_identifier annotation:(":" type_expression)? "<-" value:expression) ;
 effect_step = ("use" value:expression) ;
 function_exit = ("return" value:expression) ;
+task_finish = ("finish" value:expression) ;
 result = ("break" forwarding:"$"? value:expression) ;
 reply = ("yield" value:expression) ;
 loop_exit = ("break") ;
@@ -146,11 +151,11 @@ else_clause = (LAYOUT_NEWLINE? "else" ":" alternative:suite) ;
 
 // At this nesting level a pipe begins comprehension qualifiers or a cons tail.
 // Parenthesized and nested expressions retain the ordinary operator grammar.
-collection_expression = (value:(collection_lambda | do_block | case_expression | collection_if | collection_infix)) ;
+collection_expression = (value:(collection_lambda | task_block | async_block | do_block | case_expression | collection_if | collection_infix)) ;
 collection_lambda = ("fn" parameter:parameter+ result:("->" type_expression)? "=>" body:collection_expression) ;
 collection_if = ("if" condition:collection_infix "then" consequence:collection_expression "else" alternative:collection_expression) ;
 collection_infix = (head:prefix_expression tails:collection_infix_tail*) ;
-collection_infix_tail = (operator:(SYMBOL | "$" | "*" | "^" | named_operator) argument:(collection_lambda | do_block | case_expression | collection_if | prefix_expression)) ;
+collection_infix_tail = (operator:(SYMBOL | "$" | "*" | "^" | named_operator) argument:(collection_lambda | task_block | async_block | do_block | case_expression | collection_if | prefix_expression)) ;
 
 source_identifier = (IDENT | "code" | "descriptor" | "forall" | "exists" | "row" | "region" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent") ;
 

@@ -53,6 +53,37 @@ test "structured task checking admits once siblings and closed immutable capture
         \\entry const answer = fn () => @task.scope (fn group => @task.join (@task.spawn group (fn () => nested ())))
     , null);
 }
+test "task blocks lower through checked scope and spawn operations" {
+    try law(std.testing.allocator,
+        \\entry const answer = fn () => @task.scope (fn group => do:
+        \\  return 42)
+    , null);
+    try law(std.testing.allocator,
+        \\entry const answer = fn () => tasks group:
+        \\  finish 42
+    , null);
+    try law(std.testing.allocator,
+        \\entry const answer = fn () => tasks group:
+        \\  let first = async group:
+        \\    finish 20
+        \\  let second = async group:
+        \\    finish 22
+        \\  finish @u32.add (@task.join first) (@task.join second)
+    , null);
+    try law(std.testing.allocator,
+        \\const add22 = fn value => @u32.add value 22
+        \\entry const answer = fn () => tasks group:
+        \\  let pending = *(add22 20)
+        \\  finish |pending|
+    , null);
+    try law(std.testing.allocator,
+        \\entry const answer = fn () => tasks group:
+        \\  let pending = async group:
+        \\    finish 42
+        \\  let first = |pending|
+        \\  finish |pending|
+    , .task_handle_consumed);
+}
 test "structured task checking rejects escaped groups and consumed handles" {
     try law(std.testing.allocator, "entry const answer = fn () => @task.scope (fn group => group)", .task_escape);
     try law(std.testing.allocator,

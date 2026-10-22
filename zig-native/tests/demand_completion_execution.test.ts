@@ -27,7 +27,7 @@ const abort = fn log => fn computation => do:
       complete value =>
         break value
   break 7
-const finish = fn log => fn computation => do:
+const resume = fn log => fn computation => do:
   for request in @requests computation:
     case request of
       effect Tick.read value =>
@@ -43,8 +43,8 @@ const scenario = fn log => do:
   )
   let work = @computation (fn () => @demand pending)
   use first <- abort log work
-  use second <- finish log work
-  use third <- finish log work
+  use second <- resume log work
+  use third <- resume log work
   break @u32.add first (@u32.add second third)
 entry const answer = fn (log: U32 -> U32 ! {Foreign}) => do:
   use result <- scenario log
