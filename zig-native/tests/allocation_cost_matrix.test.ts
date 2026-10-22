@@ -18,6 +18,10 @@ entry const helper = fn value => read (fields value)
 entry const named_callback = fn value => named (fields value)
 entry const inline_callback = fn value => apply (fn row => row.a + row.b) (fields value)
 entry const generic_callback = fn value => apply read (fields value)
+entry const aliased_callback = fn value => apply named (fields value)
+entry const local_callback = fn value => do:
+  let callback = fn row => row.a + row.b
+  break apply callback (fields value)
 entry const nominal_record = fn value => read_box (boxed value)
 const replace = array.replace
 const wrapped_replace = fn index value values => replace index value values
@@ -88,6 +92,8 @@ Deno.test("allocation cost matrix keeps equivalent results and measures size sca
             "named_callback",
             "inline_callback",
             "generic_callback",
+            "aliased_callback",
+            "local_callback",
             "nominal_record",
           ]
         ) {
@@ -120,6 +126,16 @@ Deno.test("allocation cost matrix keeps equivalent results and measures size sca
         }
         const traffic = (name: string, input: number) =>
           rows.find((row) => row.name === name && row.input === input)!;
+        assert.equal(
+          traffic("local_callback", 5).rounded_allocation_bytes,
+          traffic("inline_callback", 5).rounded_allocation_bytes,
+          `${codegenTier} locally bound callback cost differs from inline callback`,
+        );
+        assert.equal(
+          traffic("aliased_callback", 5).rounded_allocation_bytes,
+          traffic("generic_callback", 5).rounded_allocation_bytes,
+          `${codegenTier} global alias cost differs from generic callback`,
+        );
         for (const count of [32, 128, 512]) {
           const direct = traffic("update_direct", count);
           for (

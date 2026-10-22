@@ -25,7 +25,7 @@ compiler is the Zig development backend; the `codegenTier` column selects the
 guest Wasm optimization tier. These are allocator size-class traffic figures,
 not live memory or exact payload copies. The current matrix uses compiler
 SHA-256 `a362ba461b9ea108b452689a625d7a160d7d2780444e48a5f2e1617531c1e8a6`,
-source file SHA-256 `1b1624eed838146f5562fab3ac2d4b52a6c859dec18f3db93d142c3bd797ca6f`,
+source file SHA-256 `93e715f799bb8834cceb40335648472e58b67fa528732501f03e1ba154c83893`,
 prelude SHA-256 `677ccf723198511a812a5d7539512253197df9842cd07d1da9749d137262006e`
 and `std/array` SHA-256 `1a11c8ef63fc18fec2515889efc8fdf0fa3030db59e061b43f38c8f0ea506be1`.
 Reproduce with `deno test --no-config --allow-read --allow-write --allow-run
@@ -39,6 +39,8 @@ zig-native/zig-out-dev/bin/blotc`.
 | Named callback | 4,800 | 0 |
 | Inline callback | 4,800 | 0 |
 | Generic callback through `apply` | 4,800 | 4,800 |
+| Alias of the global callback through `apply` | 4,800 | 4,800 |
+| Locally bound callback through `apply` | 4,800 | 0 |
 | Nominal `#Box` construction and reader | 9,600 | 9,600 |
 
 The generic and nominal rows are current conservative costs, not promises
@@ -46,8 +48,10 @@ that all such calls allocate. At this fixture's optimized tier the compiler
 eliminates the small structural/callback allocations but retains one rounded
 48-byte allocation per generic callback call and two rounded allocations per
 nominal call. Development tier retains the structural allocation as well.
-Naming the callback does not cause the generic cliff; passing it through the
-generic `apply` path does. Those rows identify remaining optimization work.
+The cliff follows a global named callback through `apply`, including a plain
+global alias. The same wrapper with an inline or locally bound callback has
+zero optimized traffic. The generated global path adds a callable adapter
+between `apply` and the reader; this is the remaining specialization work.
 
 | Collection form, 100 calls | 32 elements | 128 elements | 512 elements |
 | --- | ---: | ---: | ---: |
