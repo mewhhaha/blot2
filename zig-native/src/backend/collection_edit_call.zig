@@ -6,6 +6,8 @@
 const core = @import("../check/core.zig");
 pub const Plan = struct {
     target: core.BindingRef,
+    /// The primitive body reached through one forwarding source wrapper.
+    forwarded_target: ?core.BindingRef = null,
     op: core.ArrayOp,
     positions: [3]usize,
     count: usize,
@@ -19,6 +21,9 @@ pub fn analyze(units: []const core.Module, owner: u32, id: core.Id) ?Plan {
     if (call.count < 2 or call.count > 3) return null;
     var target = call.target;
     if (target.unit == 0) target.unit = owner;
+    var outer_target: ?core.BindingRef = null;
+    var forwarded_target: ?core.BindingRef = null;
+    var forwarded_positions: [3]usize = .{ 0, 1, 2 };
     for (0..16) |_| {
         if (target.unit == 0 or target.unit > units.len) return null;
         const source = &units[target.unit - 1];
@@ -38,10 +43,31 @@ pub fn analyze(units: []const core.Module, owner: u32, id: core.Id) ?Plan {
             continue;
         }
         if (!body.is_function or body.parameters.len != call.count) return null;
+        if (outer_target == null) outer_target = target;
+        // A source wrapper which forwards every parameter exactly once keeps
+        // the primitive's consuming argument, even through a plain alias.
+        // Calls, captures, extra work and repeated arguments remain excluded.
+        if (source.node(body.root).tag == .call and forwarded_target == null) {
+            const forwarded = @import("known_call.zig").resolve(units, target.unit, body.root) orelse return null;
+            if (forwarded.count != call.count) return null;
+            var used: u8 = 0;
+            var next_positions: [3]usize = .{ 0, 1, 2 };
+            for (forwarded.arguments[0..forwarded.count], 0..) |argument, index| {
+                const position = @import("known_call.zig").parameterPosition(source, target.unit, source.bodyParameters(body), argument, &used) orelse return null;
+                next_positions[index] = forwarded_positions[position];
+            }
+            forwarded_positions = next_positions;
+            forwarded_target = target;
+            const previous = target.unit;
+            target = forwarded.target;
+            if (target.unit == 0) target.unit = previous;
+            continue;
+        }
         var edit = body.root;
         var condition: core.Id = 0;
         var success: ?u32 = null;
         if (source.node(edit).tag == .block) {
+            if (forwarded_target != null) return null;
             const statements = source.children(edit);
             if (statements.len != 2) return null;
             const branch = source.node(statements[0]);
@@ -70,14 +96,14 @@ pub fn analyze(units: []const core.Module, owner: u32, id: core.Id) ?Plan {
             const reference = source.reference(operand);
             if (reference.unit != 0 and reference.unit != target.unit) return null;
             positions[i] = for (source.bodyParameters(body), 0..) |parameter, index| {
-                if (parameter.binding != 0 and parameter.binding == reference.binding) break index;
+                if (parameter.binding != 0 and parameter.binding == reference.binding) break forwarded_positions[index];
             } else return null;
             const bit = @as(u8, 1) << @intCast(positions[i]);
             if (used & bit != 0) return null;
             used |= bit;
         }
         if (condition != 0 and !borrowPredicate(units, target.unit, condition, source.bodyParameters(body)[positions[0]].binding, 0)) return null;
-        return .{ .target = target, .op = op, .positions = positions, .count = count, .receiver = call.arguments[positions[0]], .edit = edit, .success = success, .arguments = call.arguments[0..3].* };
+        return .{ .target = outer_target.?, .forwarded_target = if (forwarded_target != null) target else null, .op = op, .positions = positions, .count = count, .receiver = call.arguments[positions[0]], .edit = edit, .success = success, .arguments = call.arguments[0..3].* };
     }
     return null;
 }

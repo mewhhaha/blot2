@@ -720,9 +720,15 @@ See `zig-native/TRACING_REPLACEMENT.md`, `zig-native/PERSISTENT_ROOTS.md` and
 `zig-native/SUSPENDED_OWNERSHIP.md` for ownership and qualification records.
 
 Direct `array.replace`, `list.append` and `list.prepend` calls preserve this
-ownership optimization, including aliases and source wrappers whose body passes
-each parameter exactly once to the primitive. Arguments still evaluate in their
-written order. Arbitrary higher-order wrappers remain conservative.
+ownership optimization. One plain source forwarding wrapper may reach the
+primitive through an alias and may reorder its parameters, provided it passes
+each parameter exactly once and does no other work. For example,
+`fn values index value => array.replace index value values` retains the same
+in-place opportunity as the direct call. Arguments still evaluate in their
+written order. Arbitrary higher-order wrappers remain conservative. If an old
+array version is still observed after the edit, replacement copies the whole
+array; doing so on every iteration of a growing loop can be quadratic. Keep an
+exclusive loop carry when only the final version is needed.
 
 Constant evaluation uses a separate representation. Append/prepend can extend
 the latest collection version into unused buffer slots, with geometric growth;

@@ -1977,7 +1977,10 @@ pub const Owner = struct {
         const plan = @import("collection_edit_call.zig").analyze(g.units, self.unit_id, id) orelse return false;
         if (key.count != plan.count or !std.meta.eql(plan.target, key.target)) return false;
         for (key.parameters[0..key.count]) |ty| if (self.hasErasedType(ty, 0)) return false;
-        if (g.artifacts) |artifacts| try artifacts.readInlineBody(plan.target);
+        if (g.artifacts) |artifacts| {
+            try artifacts.readInlineBody(plan.target);
+            if (plan.forwarded_target) |target| try artifacts.readInlineBody(target);
+        }
         const source = g.unit(self.unit_id);
         var values: [3]u32 = undefined;
         for (plan.arguments[0..plan.count], 0..) |argument, i| values[i] = try self.capture(argument, depth);
