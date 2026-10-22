@@ -738,6 +738,12 @@ Ordinary arguments are eager, including `Maybe.unwrap_or` fallbacks. `&&` and
 `||` call the source-defined `and` and `or`, whose right parameters use `~`.
 `Maybe.unwrap_or_else fallback candidate` and
 `Result.unwrap_or_else fallback candidate` also defer their fallbacks.
+Local `let` initializers are eager too. The compiler may place single-use,
+total scalar work at its only use when this preserves observable behavior;
+trapping, effectful and unknown work stays in source order. A value consumed
+directly by the next `if` or `return` can avoid a temporary without changing
+that order. Use a demand parameter or unit thunk when delayed evaluation is
+part of the program's intended behavior.
 
 `std/array` also supplies `map`, `filter`, `filter_map`, `slice start count`,
 `concat`, `flatten`, `push`, `zip`, `unzip`, and `unzip3`. Collection arguments

@@ -96,6 +96,7 @@ pub const Counters = struct {
     /// arguments past a selected callee's parameters.
     resolved_bodies: u64 = 0,
     resolved_plan_entries: u64 = 0,
+    safe_local_sinks: u64 = 0,
     resolved_plan_reads: u64 = 0,
     prepared_named_calls: u64 = 0,
     prepared_dispatch_calls: u64 = 0,

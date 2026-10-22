@@ -100,6 +100,7 @@ comptime {
     _ = @import("reuse/specialization_origin_tests.zig");
     _ = @import("backend/resolved_flow.zig");
     _ = @import("backend/resolved_body.zig");
+    _ = @import("backend/safe_local_sinking.zig");
     _ = @import("backend/runtime_flags_tests.zig");
     _ = @import("backend/backend_timing.zig");
     _ = @import("phase_profile.zig");

@@ -6,7 +6,7 @@ const compiler = Deno.args[0] ?? new URL("../zig-out/bin/blotc", import.meta.url
 
 export async function compileAndRun(
   source: string,
-  run: (guest: Awaited<ReturnType<typeof instantiateGuest>>, bytes: Uint8Array<ArrayBuffer>) => void | Promise<void>,
+  run: (guest: Awaited<ReturnType<typeof instantiateGuest>>, bytes: Uint8Array<ArrayBuffer>, metrics: Record<string, unknown>) => void | Promise<void>,
   options: { prelude?: string; stdRoot?: string; asynchronous?: boolean } = {},
 ): Promise<void> {
   const parent = new URL("../../build", import.meta.url).pathname;
@@ -26,7 +26,7 @@ export async function compileAndRun(
     const bytes = await Deno.readFile(output);
     if (!WebAssembly.validate(bytes)) throw new Error("Invalid native Wasm");
     const guest = await instantiateGuest(bytes, { asynchronous: options.asynchronous });
-    try { await run(guest, bytes); } finally { guest.dispose(); }
+    try { await run(guest, bytes, metrics); } finally { guest.dispose(); }
   } finally { await Deno.remove(dir, { recursive: true }); }
 }
 

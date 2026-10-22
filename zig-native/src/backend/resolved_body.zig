@@ -22,6 +22,7 @@ pub fn Body(comptime Entry: type) type {
         rows_evidence: u32 = 0,
         has_owners: bool = false,
         entries: std.AutoHashMapUnmanaged(core.Id, Slot) = .empty,
+        sinks: std.AutoHashMapUnmanaged(core.BindingId, core.Id) = .empty,
         // The largest variant must not size every occupied and spare bucket.
         // Offsets survive growth; payload pointers are temporary preparation borrows.
         payloads: std.array_list.Aligned(u8, .of(Entry)) = .empty,
@@ -39,6 +40,7 @@ pub fn Body(comptime Entry: type) type {
                 entry.deinit(a);
             }
             self.entries.deinit(a);
+            self.sinks.deinit(a);
             self.payloads.deinit(a);
             a.free(self.mappings);
             a.free(self.rows);

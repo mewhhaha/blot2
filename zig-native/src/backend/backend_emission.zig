@@ -815,6 +815,8 @@ pub const Owner = struct {
         try preparer.prepareNode(&body, root, depth, template);
         if (preparer.has_collection_steps) try preparer.prepareCursorFamilies(&body);
         try preparer.prepareNumeric(&body);
+        try @import("safe_local_sinking.zig").plan(g.allocator, g.unit(self.unit_id), try g.unitUses(self.unit_id, .{}), root, &body.entries, &body.sinks);
+        g.evaluator.counters.safe_local_sinks += body.sinks.count();
         g.evaluator.counters.resolved_bodies += 1;
         g.evaluator.counters.resolved_plan_entries += body.entries.count();
         return body;
@@ -7875,6 +7877,7 @@ pub const Owner = struct {
                 }
                 return g.fail(self.unit_id, id, .unsupported);
             }
+            if (self.body.?.sinks.get(reference.binding)) |initializer| return self.expression(initializer, 0);
             if (self.locals.get(reference.binding)) |local| {
                 try self.emit(.local_get, local);
                 return;
@@ -9111,6 +9114,7 @@ pub const Owner = struct {
             switch (n.tag) {
                 .suite => if (try self.suite(statement, depth + 1)) return true,
                 .bind => {
+                    if (self.body.?.sinks.contains(n.a)) continue;
                     if (self.body.?.entries.contains(statement)) {
                         const plan = self.body.?.get(statement);
                         if (plan == .static_binding) {
