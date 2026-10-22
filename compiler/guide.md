@@ -500,8 +500,11 @@ keeps using each value type's `eq` implementation. Exported functions need
 enough type information to resolve dispatch; annotate unconstrained parameters.
 `1 + 2` selects `U32.add`; `1.0 + 2.0` selects `F32.add`. Mixed operands fail
 unless an implementation explicitly accepts them. `/` supports F32 and U32; U32
-division truncates and a zero divisor fails/traps. Bool/record equality is not
-automatically derived.
+division truncates and a zero divisor fails/traps. Bool supports ordinary
+equality. Structural equality for arrays, records and algebraic data is
+opt-in through [std/equality](../std/equality.blot) and the
+[derivation tool](derive.md), which can also generate debug formatting and
+explicitly versioned codecs from checked declarations.
 
 ```blot
 type Count is data = #Count U32

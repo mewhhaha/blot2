@@ -278,10 +278,11 @@ const retainedToday: Record<string, Reuse> = {
     reused_named: 0,
     validated_modules: 5,
     recheck_body_elaborations: 0,
-    check_body_elaborations: 150,
+    // Bool.eq and Bool.ne add two prelude bodies to the first population.
+    check_body_elaborations: 152,
     rebuilt_seed: true,
     reused_output: false,
-    check_body_lowerings: 150,
+    check_body_lowerings: 152,
   },
   "edit:trivia": {
     fresh_named: 0,

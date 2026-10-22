@@ -51,7 +51,9 @@
     "./packages": "./compiler/packages.ts",
     "./guest": "./compiler/guest.ts",
     "./zig-project": "./compiler/zig_project_client.ts",
-    "./format": "./compiler/format.ts"
+    "./format": "./compiler/format.ts",
+    "./derive": "./compiler/derive.ts",
+    "./derive-cli": "./scripts/derive.ts"
   },
   "publish": {
     "include": [
@@ -78,6 +80,9 @@
       "compiler/assets.ts",
       "compiler/native_assets.ts",
       "compiler/format.ts",
+      "compiler/text.ts",
+      "compiler/derive.ts",
+      "compiler/derive.md",
       "compiler/syntax.ts",
       "compiler/postfix_syntax.ts",
       "compiler/parser_source.ts",
@@ -88,6 +93,7 @@
       "generated/wasm/parser.plan",
       "generated/wasm/parser.wasm",
       "generated/wasm/syntax.ts",
+      "scripts/derive.ts",
       "std/*.blot",
       "blot-workspace.yaml"
     ]

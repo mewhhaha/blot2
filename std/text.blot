@@ -82,3 +82,15 @@ impl Boolean : Format Bool = {
   const format = fn value => if value then "true" else "false",
 }
 const format: a -> Text where { Format a } = fn value => Format.format value
+const format_sequence: Array a -> Text where { Format a } = fn values => do:
+  let out = append "[" (builder ())
+  let first = #True
+  for value in values:
+    if Bool.not first:
+      out := append ", " self
+    out := append (format value) self
+    first := #False
+  break finish (append "]" out)
+impl Sequence a : Format (Array a) where { Format a } = {
+  const format = fn values => format_sequence values,
+}

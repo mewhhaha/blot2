@@ -1,0 +1,68 @@
+// A numeric-lane codec contract. Applications choose their own stable schema
+// numbers and can replace these implementations with validated field codecs.
+type Codec a is contract = {
+  const encode: a -> Array U32,
+  const decode: Array U32 -> Maybe a,
+}
+const encode: a -> Array U32 where { Codec a } = fn value => Codec.encode value
+
+impl Unsigned : Codec U32 = {
+  const encode = fn value => #[value],
+  const decode = fn values =>
+    if values.length == 1 then #Some values[0] else #Nothing,
+}
+impl Boolean : Codec Bool = {
+  const encode = fn value => #[if value then 1 else 0],
+  const decode = fn values =>
+    if values.length != 1 then #Nothing
+    else if values[0] == 0 then #Some #False
+    else if values[0] == 1 then #Some #True
+    else #Nothing,
+}
+
+// Each array element is length-framed so a nested codec can have any width.
+const sequence_encode: Array a -> Array U32 where { Codec a } = fn values => do:
+  let out: List U32 = [values.length]
+  for value in values:
+    let payload = encode value
+    out := [...self, payload.length]
+    for word in payload:
+      out := [...self, word]
+  break Array.from_list out
+const sequence_decode: Array U32 -> Maybe (Array a) where { Codec a } = fn words => do:
+  if words.length == 0:
+    return #Nothing
+  let count = words[0]
+  let cursor = 1
+  let output: List a = []
+  for ignored in 0..count:
+    if cursor >= words.length:
+      return #Nothing
+    let width = words[cursor]
+    cursor := self + 1
+    if width > words.length - cursor:
+      return #Nothing
+    let payload = @array.slice words cursor width
+    let decoded: Maybe a = Codec.decode payload
+    let #Some value = decoded else:
+      return #Nothing
+    output := [...self, value]
+    cursor := self + width
+  if cursor != words.length:
+    return #Nothing
+  break #Some (Array.from_list output)
+impl Sequence a : Codec (Array a) where { Codec a } = {
+  const encode = fn values => sequence_encode values,
+  const decode = fn words => sequence_decode words,
+}
+
+// Field framing is deliberately separate from a source declaration's order.
+const frame = fn (field_id: U32) (payload: Array U32) -> Array U32 =>
+  @array.concat #[field_id, payload.length] payload
+const take_field = fn (field_id: U32) (words: Array U32) -> Maybe (Array U32, Array U32) => do:
+  if words.length < 2 || words[0] != field_id:
+    return #Nothing
+  let width = words[1]
+  if width > words.length - 2:
+    return #Nothing
+  break #Some (@array.slice words 2 width, @array.slice words (width + 2) (words.length - width - 2))

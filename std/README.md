@@ -6,6 +6,10 @@ source compiler sessions. It currently covers generic functions, `Maybe`,
 prelude names; the prelude keeps its own scope and nominal identities. Top-level
 bindings are public to other Blot modules. Import [text.blot](text.blot) for
 Unicode-scalar text operations, formatting, validation and a linear builder.
+Import [equality.blot](equality.blot) for structural equality contracts and
+[codec.blot](codec.blot) for explicit numeric-lane codecs; the
+[derivation guide](../compiler/derive.md) shows opt-in equality, debug and codec
+generation from checked data declarations.
 Only the root module's `entry const`
 and `entry let` declarations become Wasm exports; they must fit the guest ABI,
 and Wasm emission keeps the declarations they reach. Unused source declarations
@@ -499,12 +503,11 @@ See [the executable array example](../examples/arrays.blot).
 ## Current boundary
 
 This prelude is a useful executable core, not the complete standard library. It
-does not yet provide collection patterns, general text values, F64, general
-type-valued programming, or resumable handlers. The generic core supports closed
-source-declared operations, scoped providers, and compile-time effect
-descriptors. Libraries provide application behavior through explicit entrypoint
-IO capabilities. Literal strings are accepted as panic messages, not as general
-runtime `Text` values or privileged asset/window operations.
+does not yet provide collection patterns, F64, general type-valued programming,
+or resumable handlers. The generic core supports closed source-declared
+operations, scoped providers, and compile-time effect descriptors. Libraries
+provide application behavior through explicit entrypoint IO capabilities.
+Runtime `Text` values have no implicit IO or privileged asset/window operations.
 
 For a complete small program, see
 [examples/prelude.blot](../examples/prelude.blot).

@@ -66,6 +66,8 @@ const on = fn combine => fn project => fn left => fn right =>
   combine (project left) (project right)
 
 const Bool.not = fn value => if value then #False else #True
+const Bool.eq = fn left => fn right => if left then right else Bool.not right
+const Bool.ne = fn left => fn right => Bool.not (Bool.eq left right)
 
 const Type.eq = fn left => fn right => case left, right of
   #Type a, #Type b => @type.same a b

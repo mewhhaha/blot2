@@ -65,10 +65,15 @@ ${
     }
 `;
   };
+  const small = await check(record(8));
   const checker = await check(record(64));
   assert(checker.obligations_appended >= 64 * 64);
+  const addedObligations = checker.obligations_appended -
+    small.obligations_appended;
+  const addedSteps = checker.inference_steps - small.inference_steps;
+  assert(addedObligations > 0);
   assert(
-    checker.inference_steps <= 2 * checker.obligations_appended,
-    JSON.stringify(checker),
+    addedSteps <= 2 * addedObligations,
+    JSON.stringify({ small, checker }),
   );
 });
