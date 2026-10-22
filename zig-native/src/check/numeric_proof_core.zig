@@ -968,7 +968,7 @@ const Checker = struct {
                 var loop_target = self.loop;
                 while (loop_target) |loop| : (loop_target = loop.previous) {
                     if (loop.source != n.a) continue;
-                    loop.breaks = true;
+                    if (n.op != .continue_) loop.breaks = true;
                     return .{ .exits = true };
                 }
                 return error.InvalidArtifact;

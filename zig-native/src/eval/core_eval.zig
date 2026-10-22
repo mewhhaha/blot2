@@ -205,7 +205,7 @@ const Work = union(enum) {
     node: struct { unit: usize, id: core.Id },
     pattern: struct { unit: usize, id: core.PatternId },
 };
-const Flow = union(enum) { value: ValueId, returning: struct { target: core.Id, value: ValueId }, breaking: struct { target: core.Id, values: core.List } };
+const Flow = union(enum) { value: ValueId, returning: struct { target: core.Id, value: ValueId }, breaking: struct { target: core.Id, values: core.List, continues: bool = false } };
 const Frame = struct {
     staged: ?ValueId = null,
     providers: provider_chain.Head = provider_chain.empty,
@@ -5361,7 +5361,7 @@ pub const Session = struct {
         if (values.len > self.options.max_children -| self.break_values.items.len or values.len > std.math.maxInt(u32) - self.break_values.items.len) return self.failNode(owner, id, .constant_fuel);
         const start: u32 = @intCast(self.break_values.items.len);
         try self.break_values.appendSlice(self.allocator, values);
-        return .{ .breaking = .{ .target = module.node(id).a, .values = .{ .start = start, .len = @intCast(values.len) } } };
+        return .{ .breaking = .{ .target = module.node(id).a, .values = .{ .start = start, .len = @intCast(values.len) }, .continues = module.node(id).op == .continue_ } };
     }
     fn indexedEdit(self: *Session, region: *IndexedRegion, edit: @import("eval_indexed_builder.zig").Edit) Error!Flow {
         const owner = region.owner;
@@ -5452,7 +5452,9 @@ pub const Session = struct {
                 if (span.len != carries.len) return self.failNode(owner, id, .unsupported);
                 @memcpy(current, self.break_values.items[span.start..][0..span.len]);
                 self.break_values.shrinkRetainingCapacity(span.start);
-                break;
+                if (!outcome.breaking.continues) break;
+                if (metadata.kind != .forever) index += 1;
+                continue;
             }
             // Read all successors before replacing any iteration slot.
             for (carries, 0..) |carry, position| current[position] = frame.values.get(carry.backedge) orelse return self.failNode(owner, id, .unsupported);

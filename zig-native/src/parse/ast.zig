@@ -73,6 +73,7 @@ pub const Tag = enum(u32) {
     return_stmt,
     yield_stmt,
     break_stmt,
+    continue_stmt,
     if_expr,
     if_stmt,
     if_let_stmt,

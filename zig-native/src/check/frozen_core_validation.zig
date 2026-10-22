@@ -1198,9 +1198,11 @@ const Bounds = struct {
                 .panic => try range(self.m.names.len, value.a, value.b),
                 .loop => try index(self.m.loops.len, value.a),
                 .break_ => {
+                    try require(value.op == .none or value.op == .continue_);
                     try self.control(value.a, true, false);
                     try self.listNodes(.{ .start = value.b, .len = value.c });
                     const target = self.m.nodes[value.a];
+                    if (value.op == .continue_) try require(target.tag == .loop);
                     const carries = if (target.tag == .loop) self.m.loops[target.a].carries else self.m.request_loops[target.a].carries;
                     try require(value.c == carries.len);
                 },

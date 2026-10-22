@@ -1828,7 +1828,7 @@ const Shape = struct {
                 self.word(n.a);
                 break :blk true;
             },
-            .unit, .break_stmt => true,
+            .unit, .break_stmt, .continue_stmt => true,
             .invalid, .numeric_error, .import_decl, .export_decl, .import_binding, .data_decl, .type_alias_decl, .contract_decl, .contract_type_member, .contract_value_member, .implementation_decl, .effect_decl, .effect_type_decl, .fixity_decl, .constructors, .effect_operations, .effect_operation => false,
         };
     }

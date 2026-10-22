@@ -1304,6 +1304,7 @@ const Parser = struct {
             const forwarding: u32 = @intFromBool(self.eat(.dollar));
             return self.add(.return_stmt, try self.expression(), forwarding, 0, start);
         }
+        if (self.eat(.kw_continue)) return self.add(.continue_stmt, 0, 0, 0, start);
         if (self.at(.kw_if)) return self.ifStatement();
         if (self.at(.kw_for)) return self.forStatement();
         if (self.eat(.kw_use)) {

@@ -189,7 +189,7 @@ const Scratch = struct {
         allocator.free(self.reference_epochs);
     }
 };
-const ResolverLoopFrame = struct { source: ast.Id, cursor: T.Id, parameter: core.BindingId, finalizer: core.Id };
+const ResolverLoopFrame = struct { source: ast.Id, cursor: T.Id, parameter: core.BindingId, finalizer: core.Id, continued: u32, continue_constructor: u32 };
 const RequestCallbackFrame = struct { loop: ast.Id, return_target: core.Id, decision_type: T.Id, state_type: T.Id };
 const Builder = struct {
     allocator: Allocator,
@@ -1961,6 +1961,7 @@ const Builder = struct {
             const simple = switch (self.source.tree.node(child).tag) {
                 .return_stmt,
                 .break_stmt,
+                .continue_stmt,
                 .use_stmt,
                 .if_stmt,
                 .if_let_stmt,
@@ -1993,6 +1994,7 @@ const Builder = struct {
             return self.checkedResolverNode(info, &.{value});
         }
         if (syntax.tag == .break_stmt) return self.resolverBreak(statement_source);
+        if (syntax.tag == .continue_stmt) return self.resolverContinue(statement_source);
         const next = try self.resolverStatements(source, statements_[1..], tail, depth + 1);
         switch (syntax.tag) {
             .use_stmt => {
@@ -2178,6 +2180,26 @@ const Builder = struct {
         }
         return error.CoreLimit;
     }
+    fn resolverContinue(self: *Builder, source: ast.Id) Error!core.Id {
+        const exit_index = if (self.scratch.loop_exit_indices.len == 0) 0 else self.scratch.loop_exit_indices[source];
+        if (exit_index == 0) return error.CoreLimit;
+        const exit = self.source.checked.loop_exits[exit_index - 1];
+        var index = self.scratch.resolver_loop_frames.items.len;
+        while (index != 0) {
+            index -= 1;
+            const frame = self.scratch.resolver_loop_frames.items[index];
+            if (frame.source != exit.loop) continue;
+            const current = try self.referenceNode(source, frame.parameter, frame.cursor);
+            const counter = try self.productField(source, current, 0);
+            const one = try self.make(source, .{ .tag = .constant, .ty = T.u32_type, .a = 1 });
+            const successor = try self.make(source, .{ .tag = .scalar, .op = .add, .ty = T.u32_type, .a = counter, .b = one });
+            const cursor = try self.cursorValue(source, frame.cursor, successor, self.source.checked.types.list(exit.bindings));
+            const continued = self.source.checked.resolver_ops[frame.continued - 1];
+            const progress = try self.make(source, .{ .tag = .construct, .ty = try self.projectType(continued.payload, 0), .a = frame.continue_constructor, .b = cursor });
+            return self.checkedResolverNode(continued, &.{progress});
+        }
+        return error.CoreLimit;
+    }
     fn resolverLoop(self: *Builder, source: ast.Id, next: core.Id, depth: usize) Error!core.Id {
         const index = self.source.checked.resolver_loop_ids[source];
         if (index == 0) return error.CoreLimit;
@@ -2251,7 +2273,7 @@ const Builder = struct {
             try step_prefix.append(self.allocator, try self.make(source, .{ .tag = .pattern_bind, .ty = T.unit, .a = try self.patternNode(pattern_source, depth + 1), .b = iterator }));
         }
         const stack_mark = self.scratch.resolver_loop_frames.items.len;
-        try self.scratch.resolver_loop_frames.append(self.allocator, .{ .source = source, .cursor = cursor_type, .parameter = info.cursor_parameter, .finalizer = finalizer });
+        try self.scratch.resolver_loop_frames.append(self.allocator, .{ .source = source, .cursor = cursor_type, .parameter = info.cursor_parameter, .finalizer = finalizer, .continued = info.continued, .continue_constructor = info.continue_constructor });
         const iteration = self.resolverStatements(body_source, self.source.tree.children(body_source), progress_tail, depth + 1) catch |err| {
             self.scratch.resolver_loop_frames.shrinkRetainingCapacity(stack_mark);
             return err;
@@ -2443,7 +2465,8 @@ const Builder = struct {
             try self.diagnostic(.unresolved_binding, source);
             return 0;
         }
-        self.tables.loops.items[self.tables.nodes.items[target_id].a].can_exit = true;
+        const continues = self.source.tree.node(source).tag == .continue_stmt;
+        if (!continues) self.tables.loops.items[self.tables.nodes.items[target_id].a].can_exit = true;
         var values: std.ArrayList(core.Id) = .empty;
         defer values.deinit(self.allocator);
         for (bindings) |binding| {
@@ -2454,7 +2477,7 @@ const Builder = struct {
             try values.append(self.allocator, try self.referenceNode(source, binding, self.tables.bindings.items[binding].ty));
         }
         const range = try self.save(values.items);
-        return self.make(source, .{ .tag = .break_, .ty = T.never, .a = target_id, .b = range.start, .c = range.len });
+        return self.make(source, .{ .tag = .break_, .op = if (continues) .continue_ else .none, .ty = T.never, .a = target_id, .b = range.start, .c = range.len });
     }
     fn statement(self: *Builder, source: ast.Id, depth: usize) Error!core.Id {
         if (depth >= 1024) {
@@ -2471,7 +2494,7 @@ const Builder = struct {
                 const range = self.source.checked.loop_ranges[source];
                 return self.loopStatement(source, self.source.checked.loop_carries[range.start..][0..range.len], depth + 1);
             },
-            .break_stmt => {
+            .break_stmt, .continue_stmt => {
                 const index = if (self.scratch.loop_exit_indices.len == 0) 0 else self.scratch.loop_exit_indices[source];
                 if (index == 0) {
                     try self.diagnostic(.unresolved_binding, source);

@@ -1,5 +1,88 @@
 export const loopCases = [
   {
+    name: "continue_range_collection_and_pattern_guard",
+    expected: { range: 18, collection: 8, nested: 6, guarded: 7, folded: 18 },
+    source: `
+type Maybe a is data = #Some a | #None
+entry const range = fn () => do:
+  let total = 0
+  for index in 0..6:
+    total := @u32.add self 1
+    if @u32.lt index 3:
+      continue
+    total := @u32.add self index
+  break total
+entry const collection = fn () => do:
+  let total = 0
+  for value in #[1, 2, 3, 4]:
+    if @u32.eq value 2:
+      continue
+    total := @u32.add self value
+  break total
+entry const nested = fn () => do:
+  let total = 0
+  for outer in 0..3:
+    for inner in 0..3:
+      if @u32.eq inner 1:
+        continue
+      total := @u32.add self 1
+  break total
+entry const guarded = fn () => do:
+  let total = 0
+  for candidate in #[#None, #Some 2, #Some 5]:
+    let #Some value = candidate else:
+      continue
+    total := @u32.add self value
+  break total
+entry const folded = range ()
+`,
+  },
+  {
+    name: "continue_forever_and_simultaneous_carries",
+    expected: { forever: 7, swap: 21, shadow: 99, snapshot: 3, row: 6 },
+    source: `
+entry const forever = fn () => do:
+  let total = 0
+  for ever:
+    total := @u32.add self 1
+    if @u32.lt total 7:
+      continue
+    break
+  break total
+entry const swap = fn () => do:
+  let first = 1
+  let second = 2
+  for 0..3:
+    let before = first
+    first := second
+    second := before
+    continue
+  break @u32.add (@u32.mul first 10) second
+entry const shadow = fn () => do:
+  let total = 0
+  for 0..1:
+    total := @u32.add self 1
+    let total = 99
+    continue
+  break total
+entry const snapshot = fn () => do:
+  let values = #[1, 2]
+  let total = 0
+  for value in values:
+    values := #[99]
+    total := @u32.add self value
+    continue
+  break total
+entry const row = fn () => do:
+  let total = 0
+  for (left, right) in #[(1, 2), (3, 4)]:
+    if @u32.eq left 3:
+      continue
+    total := @u32.add self (@u32.add left right)
+  break @u32.add total 3
+`,
+  },
+  {
     name: "range_carry",
     expected: { folded: 45, run: 45, reversed: 42, maximum: 1 },
     arguments: { run: 10 },
@@ -207,6 +290,23 @@ entry const run = fn () => do:
     name: "break_outside",
     error: "break_scope",
     source: "entry const run = fn () => do:\n  break\n",
+  },
+  {
+    name: "continue_outside",
+    error: "continue_scope",
+    source: "entry const run = fn () => do:\n  continue\n",
+  },
+  {
+    name: "continue_lambda_boundary",
+    error: "continue_scope",
+    source:
+      "entry const run = fn () => do:\n  for ever:\n    let closure = fn () => do:\n      continue\n    break\n  break 0\n",
+  },
+  {
+    name: "unreachable_after_continue",
+    error: "unreachable_statement",
+    source:
+      "entry const run = fn () => do:\n  for ever:\n    continue\n    use ()\n",
   },
   {
     name: "break_lambda_boundary",

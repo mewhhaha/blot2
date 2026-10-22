@@ -676,7 +676,7 @@ fn Walker(comptime Engine: type) type {
                     if (try self.expression(node.a, depth + 1) == .exit) return .exit;
                     return .exit;
                 },
-                .break_stmt => {
+                .break_stmt, .continue_stmt => {
                     if (self.breaks) |frame| self.record(frame);
                     return .exit;
                 },

@@ -190,8 +190,9 @@ export type LiteralKind =
   | "ever"
   | "use"
   | "return"
-  | "yield"
   | "break"
+  | "yield"
+  | "continue"
   | "complete"
   | "forall"
   | "exists"
@@ -366,9 +367,11 @@ export type RuleName =
   | "binding_else"
   | "effect_binding"
   | "effect_step"
+  | "function_exit"
   | "result"
   | "reply"
   | "loop_exit"
+  | "loop_continue"
   | "request_case"
   | "request_case_suite"
   | "request_arm"
@@ -1103,7 +1106,7 @@ export interface SuiteCursor extends RuleCursorBase<"suite"> {
 }
 
 export interface StatementCursor extends RuleCursorBase<"statement"> {
-  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | LoopExitCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ReplyCursor | RequestCaseCursor | ResultCursor;
+  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | FunctionExitCursor | LoopContinueCursor | LoopExitCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ReplyCursor | RequestCaseCursor | ResultCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -1175,6 +1178,12 @@ export interface EffectStepCursor extends RuleCursorBase<"effect_step"> {
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
+export interface FunctionExitCursor extends RuleCursorBase<"function_exit"> {
+  field(name: "value"): ExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
 export interface ResultCursor extends RuleCursorBase<"result"> {
   field(name: "forwarding"): TokenCursor<"literal", "$"> | null;
   field(name: "value"): ExpressionCursor;
@@ -1189,6 +1198,9 @@ export interface ReplyCursor extends RuleCursorBase<"reply"> {
 }
 
 export interface LoopExitCursor extends RuleCursorBase<"loop_exit"> {
+}
+
+export interface LoopContinueCursor extends RuleCursorBase<"loop_continue"> {
 }
 
 export interface RequestCaseCursor extends RuleCursorBase<"request_case"> {
@@ -1427,9 +1439,11 @@ export type AnyRuleCursor =
   | BindingElseCursor
   | EffectBindingCursor
   | EffectStepCursor
+  | FunctionExitCursor
   | ResultCursor
   | ReplyCursor
   | LoopExitCursor
+  | LoopContinueCursor
   | RequestCaseCursor
   | RequestCaseSuiteCursor
   | RequestArmCursor

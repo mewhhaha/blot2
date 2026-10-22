@@ -300,7 +300,7 @@ pub const LoopExit = struct { node: ast.Id, loop: ast.Id, bindings: T.List };
 pub const StatementArm = struct { node: ast.Id };
 pub const ClosedRow = struct { owner: BindingId, variable: u32 };
 pub const Merge = struct { node: ast.Id, result: BindingId, then_binding: BindingId, else_binding: BindingId };
-pub const Code = enum { task_escape, task_handle_consumed, task_capture_transfer, task_capability_shared, task_demand_shared, task_regions_overlap, task_host_contract, task_budget, invalid_proof_operand, proof_scope_escape, proof_runtime_use, proof_mismatch, contradictory_proof, proof_analysis_limit, effect_identity_scope, capability_escape, capability_analysis_limit, undetermined_implementation, orphan_implementation, overlapping_implementation, incompatible_implementation, recursive_evidence, missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, return_outside_function, return_across_continuation, unknown_rebinding, dead_rebinding, case_arm_return, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget, skolem_escape, rank_mismatch, package_expected, package_witness_mismatch, package_escape, abstract_representation_access, use_after_move, duplicate_owner, borrow_conflict, borrow_escape, once_reused, multiplicity_unknown, cleanup_not_safe, usage_evidence_mismatch, usage_analysis_limit, code_shape_mismatch, stage_unavailable, cross_stage_authority, descriptor_private, generated_binding_escape, staging_budget };
+pub const Code = enum { task_escape, task_handle_consumed, task_capture_transfer, task_capability_shared, task_demand_shared, task_regions_overlap, task_host_contract, task_budget, invalid_proof_operand, proof_scope_escape, proof_runtime_use, proof_mismatch, contradictory_proof, proof_analysis_limit, effect_identity_scope, capability_escape, capability_analysis_limit, undetermined_implementation, orphan_implementation, overlapping_implementation, incompatible_implementation, recursive_evidence, missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, continue_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, return_outside_function, return_across_continuation, unknown_rebinding, dead_rebinding, case_arm_return, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget, skolem_escape, rank_mismatch, package_expected, package_witness_mismatch, package_escape, abstract_representation_access, use_after_move, duplicate_owner, borrow_conflict, borrow_escape, once_reused, multiplicity_unknown, cleanup_not_safe, usage_evidence_mismatch, usage_analysis_limit, code_shape_mismatch, stage_unavailable, cross_stage_authority, descriptor_private, generated_binding_escape, staging_budget };
 pub const PurityWitness = @import("../reuse/purity_diagnostics.zig").Witness;
 pub const Diagnostic = struct {
     pub const TypeApplication = enum { missing_array, missing_nominal, extra };
@@ -471,6 +471,7 @@ pub const Diagnostic = struct {
             .literal_required => "This compiler primitive requires a literal string argument",
             .call_arity => "This compiler primitive requires its exact literal and operand arguments",
             .break_scope => "Break requires an enclosing loop in this function",
+            .continue_scope => "Continue requires an enclosing loop in this function",
             .invalid_return => "Loop control cannot escape a suspended argument",
             .unreachable_statement => switch (self.source_terminator) {
                 .return_, .break_, .yield_ => "statement after return in the same suite",
@@ -1159,6 +1160,7 @@ const Engine = struct {
                 .requests_scope => .requests_scope,
                 .yield_scope => .yield_scope,
                 .break_scope => .break_scope,
+                .continue_scope => .continue_scope,
                 .literal_required => .literal_required,
                 .product_index_literal => .product_index_literal,
                 .nesting_limit => .nesting_limit,
@@ -13037,6 +13039,7 @@ const Engine = struct {
             .use_stmt, .iterator_bind => return self.useStatement(id),
             .forever_stmt, .range_stmt, .for_stmt => return self.loopStatement(id),
             .break_stmt => return self.breakStatement(id),
+            .continue_stmt => return self.continueStatement(id),
             .yield_stmt => return self.requestReply(id),
             .if_stmt, .if_let_stmt => return self.conditional(id),
             .case_expr => return self.caseStatement(id),
@@ -13069,7 +13072,7 @@ const Engine = struct {
             }
             result.exits = result.exits or flow.exits;
             const tag = self.tree.node(child).tag;
-            direct_exit = direct_exit or tag == .return_stmt or tag == .function_return_stmt or tag == .break_stmt or tag == .yield_stmt;
+            direct_exit = direct_exit or tag == .return_stmt or tag == .function_return_stmt or tag == .break_stmt or tag == .continue_stmt or tag == .yield_stmt;
         }
         self.expr_types[id] = if (result.exits) T.never else T.unit;
         return result;
@@ -13516,13 +13519,23 @@ const Engine = struct {
         return .{ .exits = node.tag == .forever_stmt and breaks == 0, .returns = flow.returns };
     }
     fn breakStatement(self: *Engine, id: ast.Id) T.Error!Flow {
+        return self.loopExitStatement(id, false);
+    }
+    fn continueStatement(self: *Engine, id: ast.Id) T.Error!Flow {
+        return self.loopExitStatement(id, true);
+    }
+    fn loopExitStatement(self: *Engine, id: ast.Id, continues: bool) T.Error!Flow {
         self.expr_types[id] = T.never;
         if (self.loop_stack.items.len == 0) {
-            try self.diagnostic(if (self.suspended_loop_escape) .invalid_return else .break_scope, id);
+            try self.diagnostic(if (self.suspended_loop_escape) .invalid_return else if (continues) .continue_scope else .break_scope, id);
             return .{ .exits = true, .breaks = true };
         }
         const frame_index = self.loop_stack.items.len - 1;
         const frame = self.loop_stack.items[frame_index];
+        if (continues and self.request_scope.loop == frame.node) {
+            try self.diagnostic(.invalid_return, id);
+            return .{ .exits = true, .breaks = true };
+        }
         if (frame.resolver_block != 0 and self.resolver_scope.block == 0) {
             // An ordinary do cannot complete the enclosing resolver's loop
             // progress protocol. Its own return boundary must remain intact.
@@ -13538,6 +13551,10 @@ const Engine = struct {
             try self.constrain(self.bindings.items[iteration].ty, self.bindings.items[binding.*].ty, if (self.request_scope.loop == frame.node) frame.node else id);
         }
         const nested_resolver = self.resolver_scope.block != 0 and self.resolver_scope.block != frame.resolver_block;
+        if (continues and nested_resolver) {
+            try self.diagnostic(.invalid_return, id);
+            return .{ .exits = true, .breaks = true };
+        }
         // Canonical loop_targets prepends source targets. Ordinary loop
         // metadata follows our forward catalog; the exposed nested-resolver
         // snapshot uses the canonical reverse source-write order.
@@ -13555,7 +13572,7 @@ const Engine = struct {
             _ = try self.resolverMethod(id, .pure, state, self.resolver_scope.result, 0, true);
             return .{ .exits = true, .returns = true };
         }
-        self.loop_stack.items[frame_index].exits += 1;
+        if (!continues) self.loop_stack.items[frame_index].exits += 1;
         return .{ .exits = true, .breaks = true };
     }
     fn updatedFieldType(self: *Engine, original: T.Id, name: symbols.Symbol, assigned: T.Id, source: ast.Id) T.Error!?T.Id {

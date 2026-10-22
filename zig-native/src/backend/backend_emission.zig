@@ -49,7 +49,8 @@ pub const Owner = struct {
     const Emitter = @This();
     const ReturnTarget = struct { node: core.Id, label: u32, cleanup: runtime_cleanup.Mark, template_result: bool = false };
     const CarryRoot = struct { iteration: core.BindingId, outgoing: core.BindingId, slot: u32 };
-    const LoopTarget = struct { node: core.Id, label: u32, cleanup: runtime_cleanup.Mark, roots: []const CarryRoot = &.{} };
+    const ContinueTarget = struct { plan: resolved_flow.Loop, metadata: core.LoopInfo, input: LoopInput, outer_cleanup: runtime_cleanup.Mark, inner_cleanup: runtime_cleanup.Mark, row_label: u32, head_label: u32 };
+    const LoopTarget = struct { node: core.Id, label: u32, cleanup: runtime_cleanup.Mark, roots: []const CarryRoot = &.{}, backedge: ?ContinueTarget = null };
 
     const RaggedCount = struct { plan: ragged_builder.Plan, count: u32, eligible: u32, budget: u32, limit: u32, exit: u32, cleanup: runtime_cleanup.Mark };
     const ResolverPlan = union(enum) { monad, forward, run: resolved_call.Arrow, call: resolved_call.Applied };
@@ -9496,13 +9497,14 @@ pub const Owner = struct {
             }
         }
         if (input.borrowed_view) |view| try self.bindRowViewPattern(id, metadata.pattern, view);
+        self.loop_targets.items[self.loop_targets.items.len - 1].backedge = .{ .plan = plan, .metadata = metadata, .input = input, .outer_cleanup = outer_cleanup, .inner_cleanup = inner_cleanup, .row_label = row_label, .head_label = head_label };
         var skip: usize = 0;
         if (plan.collection) |collection| {
             try self.locals.put(g.allocator, collection.rest, self.locals.get(collection.iteration).?);
             skip = 2;
         }
         if (!try self.suiteSkip(metadata.body, depth + 1, skip)) {
-            try self.commitLoopBackedge(plan, metadata, input, outer_cleanup, inner_cleanup, row_label, head_label);
+            try self.commitLoopBackedge(plan, metadata, input, outer_cleanup, inner_cleanup, row_label, head_label, true);
         }
         if (input.row_view != null) {
             self.labels -= 1;
@@ -9660,7 +9662,7 @@ pub const Owner = struct {
             }
         }
     }
-    fn commitLoopBackedge(self: *Emitter, plan: resolved_flow.Loop, metadata: core.LoopInfo, input: LoopInput, outer_cleanup: runtime_cleanup.Mark, inner_cleanup: runtime_cleanup.Mark, row_label: u32, head_label: u32) Error!void {
+    fn commitLoopBackedge(self: *Emitter, plan: resolved_flow.Loop, metadata: core.LoopInfo, input: LoopInput, outer_cleanup: runtime_cleanup.Mark, inner_cleanup: runtime_cleanup.Mark, row_label: u32, head_label: u32, restore_cleanup: bool) Error!void {
         const g = self.generator;
         const id = plan.node;
         const carries = plan.carries;
@@ -9719,7 +9721,7 @@ pub const Owner = struct {
             try self.emit(.if_, 0);
             self.labels += 1;
             try self.cleanupTo(inner_cleanup);
-            self.cleanups.restore(inner_cleanup);
+            if (restore_cleanup) self.cleanups.restore(inner_cleanup);
             try self.emit(.local_get, view.address);
             try self.emit(.i32_const, bytes);
             try self.emit(.i32_add, 0);
@@ -9734,16 +9736,17 @@ pub const Owner = struct {
     }
 
     fn breakStatement(self: *Emitter, id: core.Id, depth: usize) Error!void {
-        const exit = try self.bindExit(self.resolvedPlan(id).exit);
-        for (exit.values) |value| {
+        const symbolic = self.resolvedPlan(id).exit;
+        for (symbolic.values) |value| {
             if (self.privateCursorReference(value)) |fields| {
                 for (fields.values[0..4]) |field| try self.emit(.local_get, field);
             } else try self.expression(value, depth + 1);
         }
-        var index = exit.carries.len;
+        var index = symbolic.carries.len;
         while (index != 0) {
             index -= 1;
-            if (self.privateCursor(exit.carries[index].outgoing)) |fields| {
+            const destination = if (symbolic.kind == .continue_) symbolic.carries[index].backedge else symbolic.carries[index].outgoing;
+            if (self.privateCursor(destination)) |fields| {
                 var field: usize = 4;
                 while (field != 0) {
                     field -= 1;
@@ -9751,9 +9754,21 @@ pub const Owner = struct {
                 }
                 try self.emit(.local_get, fields.values[0]);
             }
-            try self.save(exit.carries[index].outgoing, id);
+            try self.save(destination, id);
         }
-        try self.takeExit(exit);
+        if (symbolic.kind == .continue_) {
+            var target_index = self.loop_targets.items.len;
+            while (target_index != 0) {
+                target_index -= 1;
+                const target = self.loop_targets.items[target_index];
+                if (target.node != symbolic.target) continue;
+                const backedge = target.backedge orelse return self.generator.fail(self.unit_id, id, .unsupported);
+                try self.commitLoopBackedge(backedge.plan, backedge.metadata, backedge.input, backedge.outer_cleanup, backedge.inner_cleanup, backedge.row_label, backedge.head_label, false);
+                return;
+            }
+            return self.generator.fail(self.unit_id, id, .unsupported);
+        }
+        try self.takeExit(try self.bindExit(symbolic));
     }
     /// Selects the block a `return` (or a request handler's return) leaves,
     /// before any instruction of the edge.
@@ -9779,7 +9794,7 @@ pub const Owner = struct {
         const carries = if (source.node(loop).tag == .request_loop) source.requestLoopCarries(loop) else source.loopCarries(loop);
         const values = source.breakValues(id);
         if (values.len != carries.len) return g.fail(self.unit_id, id, .unsupported);
-        return .{ .kind = .break_, .source = id, .target = loop, .values = values, .carries = carries };
+        return .{ .kind = if (source.node(id).op == .continue_) .continue_ else .break_, .source = id, .target = loop, .values = values, .carries = carries };
     }
     /// Symbolic edges retain the source target; encoding binds only its
     /// machine label and invocation-local cleanup boundary.

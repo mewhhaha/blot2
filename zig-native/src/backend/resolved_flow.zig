@@ -13,6 +13,8 @@ pub const Exit = struct {
         return_,
         /// `break` from a loop or request loop to its exit.
         break_,
+        /// `continue` with the current carried values to the next iteration.
+        continue_,
         /// A request loop whose handler returned from the enclosing block.
         request_return,
         /// A request loop whose handler broke out of it with new carries.

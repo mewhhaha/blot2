@@ -4,6 +4,7 @@ import {
   equal,
 } from "./compile_helpers.ts";
 import { loopCases } from "./loop_cases.ts";
+import { strict as assert } from "node:assert";
 
 // These source cases and outputs are also run against the unchanged compiler
 // in build/zig-native-core-eval/loop_oracle.ts. No hand-constructed IR bypasses
@@ -50,4 +51,117 @@ entry const run = fn (limit: U32) -> U32 => do:
       equal(guest.call("run", 100001), 705082704);
     },
   );
+});
+
+Deno.test("continue works in a loop local to a request callback", async () => {
+  await compileAndRun(`
+type Tick is effect = { read: Unit -> U32 }
+const handled = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Tick.read () =>
+        let total = 0
+        for index in 0..4:
+          if @u32.eq index 2:
+            continue
+          total := @u32.add self index
+        yield total
+      complete value =>
+        break value
+entry const answer = fn () => handled (@computation (fn () => Tick.read ()))
+`, guest => equal(guest.call("answer", null), 4));
+});
+
+Deno.test("continue cannot cross a request callback boundary", async () => {
+  const source = `
+type Tick is effect = { read: Unit -> U32 }
+const handled = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Tick.read () =>
+        continue
+      complete value =>
+        break value
+entry const answer = fn () => handled (@computation (fn () => Tick.read ()))
+`;
+  await compileExpectedFailure(source, "invalid_return");
+});
+
+Deno.test("continue and a guarded body perform the same effects", async () => {
+  await compileAndRun(`
+entry const skipped = fn (record: U32 -> U32 ! {Foreign}) => do:
+  let total = 0
+  for index in 0..5:
+    if @u32.eq index 2:
+      continue
+    use record index
+    total := @u32.add self index
+  break total
+entry const guarded = fn (record: U32 -> U32 ! {Foreign}) => do:
+  let total = 0
+  for index in 0..5:
+    if @u32.eq index 2:
+      use ()
+    else:
+      use record index
+      total := @u32.add self index
+  break total
+`, guest => {
+    const skipped: number[] = [];
+    const guarded: number[] = [];
+    const first = guest.capability({ parameter: "U32", result: "U32", call: (value: number) => { skipped.push(value); return value; } });
+    const second = guest.capability({ parameter: "U32", result: "U32", call: (value: number) => { guarded.push(value); return value; } });
+    equal(guest.call("skipped", first), 8);
+    equal(guest.call("guarded", second), 8);
+    equal(skipped.join(","), "0,1,3,4");
+    equal(guarded.join(","), skipped.join(","));
+  });
+});
+
+Deno.test("continue retires skipped iteration arrays and restores ownership roots", async () => {
+  await compileAndRun(`
+entry const run = fn (count: U32) => do:
+  let checksum = 0
+  for index in 0..count:
+    let discarded = @array.fill 8192 index
+    checksum := @u32.add self discarded[8191]
+    continue
+  break checksum
+`, (_, bytes) => {
+    const raw = new WebAssembly.Instance(new WebAssembly.Module(bytes)).exports;
+    const enter = raw["blot:ownership_enter"] as CallableFunction;
+    const leave = raw["blot:ownership_leave"] as CallableFunction;
+    const count = (name: string) => Number((raw[`blot:rc_${name}`] as WebAssembly.Global).value);
+    for (const iterations of [8, 40, 8]) {
+      enter();
+      const destroyed = count("destroyed");
+      assert.equal((raw.run as CallableFunction)(iterations), iterations * (iterations - 1) / 2);
+      assert(count("destroyed") - destroyed >= iterations);
+      leave(0);
+      assert.equal(count("roots"), 0);
+      assert.equal(count("leases"), 0);
+    }
+  });
+});
+
+Deno.test("continue advances packed array and list rows across leaf boundaries", async () => {
+  await compileAndRun(`
+entry const run = fn (count: U32) => do:
+  let rows = @array.generate count (fn index => {value: index, extra: @u32.add index 1})
+  let listed = @list.from_array rows
+  let total = 0
+  for row in rows:
+    if @u32.eq (@u32.rem row.value 2) 0:
+      continue
+    total := @u32.add self row.value
+  for row in listed:
+    if @u32.eq (@u32.rem row.value 2) 0:
+      continue
+    total := @u32.add self row.value
+  break total
+`, guest => {
+    for (const count of [0, 1, 2, 83, 244, 245, 1000, 1025]) {
+      assert.equal(guest.call("run", count), 2 * Math.floor(count / 2) ** 2);
+    }
+  });
 });

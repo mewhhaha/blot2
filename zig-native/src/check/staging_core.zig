@@ -1665,7 +1665,7 @@ const Named = struct {
                     .rem, .bit_and, .bit_or, .bit_xor, .shift_left, .shift_right, .convert_u32_f32 => try require(tag == .u32),
                     .abs, .ceil, .floor, .trunc, .sqrt, .convert_f32_u32 => try require(tag == .f32),
                     .and_, .or_ => try require(tag == .boolean),
-                    .none, .shift_right_signed, .min, .max, .bit_not, .bit_andnot, .any_true, .all_true, .select, .shuffle, .swizzle, .broadcast, .bits, .from_bits, .relaxed_madd, .relaxed_nmadd, .convert_i32_f32, .convert_f32_i32 => return error.InvalidArtifact,
+                    .none, .continue_, .shift_right_signed, .min, .max, .bit_not, .bit_andnot, .any_true, .all_true, .select, .shuffle, .swizzle, .broadcast, .bits, .from_bits, .relaxed_madd, .relaxed_nmadd, .convert_i32_f32, .convert_f32_i32 => return error.InvalidArtifact,
                 }
                 if (n.b != 0) try require(try equal(self.m, left, self.m.typeOf(n.b), 0, self.remaining));
                 const expected: T.Id = switch (n.op) {

@@ -1,6 +1,21 @@
 import { deepStrictEqual as equal } from "node:assert/strict";
 import { formatSource } from "./format.ts";
 
+Deno.test("formatter preserves continue and a flat pattern guard", async () => {
+  const source = `type Candidate is data=#Keep U32|#Skip
+entry const kept=fn (values:Array Candidate)=>do:
+  let total=0
+  for candidate in values:
+    let #Keep value=candidate else:
+      continue
+    total:=self+value
+  break total
+`;
+  const formatted = await formatSource(source);
+  equal(formatted.includes("      continue"), true);
+  equal(await formatSource(formatted), formatted);
+});
+
 Deno.test("formatter preserves typed code descriptors and stage composition", async () => {
   const source = `const code=1
 const descriptor=fn code=>code

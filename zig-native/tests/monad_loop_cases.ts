@@ -1,5 +1,36 @@
 export const monadLoopCases = [
   {
+    name: "continue_pattern_guard",
+    source: `type Candidate is data = #Keep U32 | #Skip
+const sequence = fn () => do (monad Maybe):
+  let total = 0
+  for candidate in #[#Skip, #Keep 2, #Keep 5]:
+    let #Keep value = candidate else:
+      continue
+    use amount <- #Some value
+    total := @u32.add self amount
+  break total
+entry const answer = fn () => Maybe.unwrap_or 0 (sequence ())
+`,
+    expected: { answer: 7 },
+  },
+  {
+    name: "continue_carries_and_skips_effects",
+    source: `const sequence = fn () => do (monad Maybe):
+  let total = 0
+  for index in 0..5:
+    use value <- #Some 1
+    total := @u32.add self value
+    if @u32.lt index 3:
+      continue
+    total := @u32.add self index
+  break total
+entry const answer = fn () => Maybe.unwrap_or 0 (sequence ())
+entry const folded = answer ()
+`,
+    expected: { answer: 12, folded: 12 },
+  },
+  {
     name: "nested_loop_break",
     source: `const sequence = fn () => do (monad Maybe):
   let total = 0

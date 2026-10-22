@@ -63,6 +63,7 @@ pub const Tag = enum(u32) {
     kw_return,
     kw_yield,
     kw_break,
+    kw_continue,
     kw_complete,
     kw_true,
     kw_false,
@@ -91,20 +92,21 @@ comptime {
 
 pub fn keyword(text: []const u8) Tag {
     const words = .{
-        .{ "import", Tag.kw_import }, .{ "as", Tag.kw_as },
-        .{ "const", Tag.kw_const },   .{ "let", Tag.kw_let },
-        .{ "type", Tag.kw_type },     .{ "is", Tag.kw_is },
-        .{ "data", Tag.kw_data },     .{ "effect", Tag.kw_effect },
-        .{ "infixl", Tag.kw_infixl }, .{ "infixr", Tag.kw_infixr },
-        .{ "infix", Tag.kw_infix },   .{ "fn", Tag.kw_fn },
-        .{ "if", Tag.kw_if },         .{ "then", Tag.kw_then },
-        .{ "else", Tag.kw_else },     .{ "do", Tag.kw_do },
-        .{ "case", Tag.kw_case },     .{ "of", Tag.kw_of },
-        .{ "for", Tag.kw_for },       .{ "in", Tag.kw_in },
-        .{ "ever", Tag.kw_ever },     .{ "use", Tag.kw_use },
-        .{ "return", Tag.kw_return }, .{ "yield", Tag.kw_yield },
-        .{ "break", Tag.kw_break },   .{ "complete", Tag.kw_complete },
-        .{ "True", Tag.kw_true },     .{ "False", Tag.kw_false },
+        .{ "import", Tag.kw_import },     .{ "as", Tag.kw_as },
+        .{ "const", Tag.kw_const },       .{ "let", Tag.kw_let },
+        .{ "type", Tag.kw_type },         .{ "is", Tag.kw_is },
+        .{ "data", Tag.kw_data },         .{ "effect", Tag.kw_effect },
+        .{ "infixl", Tag.kw_infixl },     .{ "infixr", Tag.kw_infixr },
+        .{ "infix", Tag.kw_infix },       .{ "fn", Tag.kw_fn },
+        .{ "if", Tag.kw_if },             .{ "then", Tag.kw_then },
+        .{ "else", Tag.kw_else },         .{ "do", Tag.kw_do },
+        .{ "case", Tag.kw_case },         .{ "of", Tag.kw_of },
+        .{ "for", Tag.kw_for },           .{ "in", Tag.kw_in },
+        .{ "ever", Tag.kw_ever },         .{ "use", Tag.kw_use },
+        .{ "return", Tag.kw_return },     .{ "yield", Tag.kw_yield },
+        .{ "break", Tag.kw_break },       .{ "continue", Tag.kw_continue },
+        .{ "complete", Tag.kw_complete }, .{ "True", Tag.kw_true },
+        .{ "False", Tag.kw_false },
     };
     inline for (words) |entry| {
         if (std.mem.eql(u8, text, entry[0])) return entry[1];

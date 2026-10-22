@@ -202,8 +202,31 @@ block is rejected with `dead_rebinding`. Rebind with `if`/`else` or a statement
 `case`, or assign the value of a `case` expression. `break value` exits the
 enclosing `do`; a loop creates no new `do` boundary. Bare `break` exits the
 nearest loop and carries its latest local values into the statements after it.
-In a request loop it also cancels the captured computation. There is no
-`continue` statement yet.
+In a request loop it also cancels the captured computation. `continue` skips
+the rest of the nearest loop's current iteration and carries the values visible
+at that point into the next one. Range and collection loops still advance one
+element; effects already performed stay performed, and temporary values from
+the skipped path are cleaned up. A `continue` in a monadic loop produces its
+resolver's `Continue` state. A request handler can use `continue` in a loop
+inside that handler, but it cannot continue the enclosing request loop across
+the handler callback boundary.
+
+Use `let pattern = value else: continue` as a flat pattern guard. A successful
+match binds names for the rest of the loop body; a failed match starts the next
+iteration.
+
+```blot
+type Candidate is data = #Keep U32 | #Skip
+entry const kept_total = fn () => do:
+  let total = 0
+  for candidate in #[#Skip, #Keep 2, #Keep 5]:
+    let #Keep value = candidate else:
+      continue
+    if value > 3:
+      continue
+    total := self + value
+  break total
+```
 
 ```blot
 entry const sum_to = fn (end: U32) => do:

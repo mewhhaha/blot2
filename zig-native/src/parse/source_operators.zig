@@ -4,7 +4,7 @@ const std = @import("std");
 const ast = @import("ast.zig");
 const symbols = @import("symbols.zig");
 const T = @import("../check/types.zig");
-pub const Code = enum { private_access, effect_member, constructor_marker, integer_range, float_range, float_literal, duplicate_name, unknown_operator, unknown_value, unknown_rebinding, unreachable_statement, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, unsupported_expression, unknown_constructor, sealed_effect, call_arity, requests_scope, yield_scope, break_scope, literal_required, product_index_literal, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, nesting_limit };
+pub const Code = enum { private_access, effect_member, constructor_marker, integer_range, float_range, float_literal, duplicate_name, unknown_operator, unknown_value, unknown_rebinding, unreachable_statement, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, unsupported_expression, unknown_constructor, sealed_effect, call_arity, requests_scope, yield_scope, break_scope, continue_scope, literal_required, product_index_literal, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, nesting_limit };
 pub const Terminator = enum { none, return_, break_, yield_ };
 pub const Issue = struct { code: Code, node: ast.Id, point: u32, symbol: symbols.Symbol = 0, implicit_type_witness: bool = false, terminator: Terminator = .none, numeric_literal: ?ast.NumericFault = null };
 pub fn origin(tree: *const ast.Tree, id: ast.Id) u32 {
@@ -288,7 +288,7 @@ fn Validator(comptime Context: type) type {
                 const node = self.tree.node(child);
                 const terminator: Terminator = switch (node.tag) {
                     .return_stmt, .function_return_stmt => .return_,
-                    .break_stmt => .break_,
+                    .break_stmt, .continue_stmt => .break_,
                     .yield_stmt => .yield_,
                     else => .none,
                 };
@@ -473,6 +473,7 @@ fn Validator(comptime Context: type) type {
                     self.fail(.yield_scope, id, self.tree.span(id).start, 0);
                 } else try self.walk(node.a, depth + 1),
                 .break_stmt => if (self.validateControls() and self.loops == 0) self.fail(.break_scope, id, self.tree.span(id).start, 0),
+                .continue_stmt => if (self.validateControls() and self.loops == 0) self.fail(.continue_scope, id, self.tree.span(id).start, 0),
                 .forever_stmt => try self.loopScope(0, node.a, depth + 1),
                 .field_access => {
                     var base = node.a;
