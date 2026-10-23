@@ -10,6 +10,13 @@ comparison separate from allocation-free contract research.
 
 ## Execution checkpoint, 23 October 2026
 
+The subsequent
+[associated-work repair](zig-native/ASSOCIATED_WORK_QUALIFICATION.md) restores
+compilation of the unchanged frozen gdev game, honors configured budgets and
+corrects exhaustion diagnostics. Its full gate and fresh release measurements
+are recorded separately. This repair and the preceding derive work do not close
+any additional milestone below.
+
 The owner reconfirmed the full remaining plan and asked to implement before
 final verification. The task-surface continuation from `87ba3f6` in
 `/home/mewhhaha/src/blot2` is now qualified. The former `/workspace` paths below

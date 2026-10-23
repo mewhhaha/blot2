@@ -100,7 +100,12 @@ for the actual release compiler and release measurements. The installed native
 executable accepts `--test=EXACT_INVENTORY_NAME` and emits a `BLOT_NATIVE_TEST`
 JSON timing/result line for each executed law.
 
-Inference-budget rejection and recovery use a small-budget executable fixture.
+The project API accepts `inferenceBudget` (default 1,000,000) for ordinary
+inference and associated work through checking and evaluation. See
+[budget behavior](zig-native/PROJECT_CLIENT.md) for accounting and diagnostics.
+The [associated-work qualification](zig-native/ASSOCIATED_WORK_QUALIFICATION.md)
+records the gdev repair and fresh release compile times. Inference-budget
+rejection and recovery use a small-budget executable fixture.
 `deno task test:compiler:stress` separately checks the production million-step
 limit against an adversarial stage chain.
 

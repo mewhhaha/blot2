@@ -1751,7 +1751,9 @@ const Engine = struct {
     fn constrain(self: *Engine, a: T.Id, b: T.Id, id: ast.Id) T.Error!void {
         var left = a;
         var right = b;
-        if (self.implementations.items.len != 0) {
+        // Imported implementations alone do not make ordinary types contain
+        // associated projections. Keep plain effect rows on ordinary unification.
+        if (self.implementations.items.len != 0 and self.types.has_projections) {
             left = try self.normalizeAssociated(left, id, false);
             right = try self.normalizeAssociated(right, id, false);
         }
@@ -15360,7 +15362,7 @@ pub fn validateModuleSource(allocator: Allocator, tree: *const ast.Tree, pool: *
 fn checkInternal(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool, imports: []const ImportedBinding, headers: []const SourceHeader, catalogs: []const ImportedCatalog, source_catalogs: []const SourceCatalog, unit: u32, allow_imports: bool, options: ModuleOptions, source_validation: bool) !Checked {
     return checkInternalExecution(allocator, tree, pool, imports, headers, catalogs, source_catalogs, unit, allow_imports, options, source_validation, .{});
 }
-const BudgetExhaustion = struct { associated: bool = false, exhausted: bool = false, name: symbols.Symbol = 0, node: ast.Id = 0, span: ast.Span = .{ .start = 0, .end = 0 } };
+const BudgetExhaustion = struct { associated: bool = false, associated_limit: usize = 0, exhausted: bool = false, name: symbols.Symbol = 0, node: ast.Id = 0, span: ast.Span = .{ .start = 0, .end = 0 } };
 fn checkInternalExecution(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool, imports: []const ImportedBinding, headers: []const SourceHeader, catalogs: []const ImportedCatalog, source_catalogs: []const SourceCatalog, unit: u32, allow_imports: bool, options: ModuleOptions, source_validation: bool, execution: PrivateExecution) !Checked {
     var exhaustion: BudgetExhaustion = .{};
     return checkEngine(allocator, tree, pool, imports, headers, catalogs, source_catalogs, unit, allow_imports, options, source_validation, execution, &exhaustion) catch |err| {
@@ -15371,10 +15373,12 @@ fn checkInternalExecution(allocator: Allocator, tree: *const ast.Tree, pool: *sy
 /// The partially inferred engine is gone; the module is rejected with one
 /// diagnostic that names the budget and the declaration that exhausted it.
 fn rejectExhaustedBudget(allocator: Allocator, pool: *const symbols.Pool, unit: u32, limit: usize, exhaustion: BudgetExhaustion) !Checked {
+    const label: []const u8 = if (exhaustion.associated) "Associated type normalization exceeded its work budget" else "Type inference exceeded this module's budget";
+    const exhausted_limit = if (exhaustion.associated) exhaustion.associated_limit else limit;
     const detail = if (exhaustion.name != 0)
-        try allocator.print("Type inference exceeded this module's budget of {d} steps while checking `{s}`", .{ limit, pool.get(exhaustion.name) })
+        try allocator.print("{s} of {d} steps while checking `{s}`", .{ label, exhausted_limit, pool.get(exhaustion.name) })
     else
-        try allocator.print("Type inference exceeded this module's budget of {d} steps", .{limit});
+        try allocator.print("{s} of {d} steps", .{ label, exhausted_limit });
     defer allocator.free(detail);
     var rejected = try rejectedSource(allocator, &.{.{ .code = if (exhaustion.associated) .associated_limit else .inference_budget, .span = exhaustion.span, .node = exhaustion.node, .symbol = exhaustion.name, .detail = detail }});
     rejected.unit = unit;
@@ -15557,7 +15561,7 @@ noinline fn deinitEngine(engine: *Engine, published: bool) void {
 fn initializeEngineAccounting(engine: *Engine, options: ModuleOptions) void {
     // The proof store borrows the final Engine address after construction.
     engine.proof_body.values.account = &engine.proof_visits;
-    engine.types.projection_limit = @min(1_000_000, inferenceBudget(options));
+    engine.types.projection_limit = inferenceBudget(options);
     if (options.associated_remaining) |remaining| engine.types.projection_limit = @min(engine.types.projection_limit, remaining.*);
 }
 
@@ -15692,6 +15696,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
         if (engine.types.projection_exhausted) {
             engine.exhaustBudget();
             exhaustion.associated = true;
+            exhaustion.associated_limit = engine.types.projection_limit;
         }
     }
     try engine.collectModuleHeaders(imports, headers, catalogs, source_catalogs, allow_imports, options.inherited_fixities);

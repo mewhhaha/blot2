@@ -269,3 +269,92 @@ test "associated contract coverage preserves distinct application binders" {
     try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
     try std.testing.expectEqual(@as(u32, 2), checked.bindings[1].scheme.variables.len);
 }
+
+// Ordinary effect composition must not spend associated-type work merely
+// because an unrelated implementation is in scope.
+fn effectRowSource(allocator: std.mem.Allocator, width: usize, calls: usize, projection: bool) ![]u8 {
+    var source: std.ArrayList(u8) = .empty;
+    errdefer source.deinit(allocator);
+    try source.appendSlice(allocator,
+        \\type Keep a is contract = { const keep: a -> a }
+        \\impl KeepNumber : Keep U32 = { const keep = fn value => value }
+        \\
+    );
+    if (projection) try source.appendSlice(allocator,
+        \\type Identity a is contract = { type Item = a }
+        \\const identity: Identity.Item U32 = 42
+        \\
+    );
+    for (0..width) |index| try source.print(allocator, "type Read{d} is effect = Unit -> U32\n", .{index});
+    try source.appendSlice(allocator, "entry const answer = fn (action: Unit -> U32 ! {");
+    for (0..width) |index| {
+        if (index != 0) try source.appendSlice(allocator, ", ");
+        try source.print(allocator, "Read{d}", .{index});
+    }
+    try source.appendSlice(allocator, "}) => do:\n");
+    for (0..calls) |index| try source.print(allocator, "  use value{d} <- action ()\n", .{index});
+    try source.appendSlice(allocator, "  break 42\n");
+    return source.toOwnedSlice(allocator);
+}
+
+test "ordinary effect rows preserve associated work for actual projections" {
+    const allocator = std.testing.allocator;
+    for ([_]usize{ 16, 64 }) |width| {
+        const source = try effectRowSource(allocator, width, 4, false);
+        defer allocator.free(source);
+        var tokens = try lexer.lex(allocator, source);
+        defer tokens.deinit(allocator);
+        var pool: symbols.Pool = .{};
+        defer pool.deinit(allocator);
+        var tree = try parser.parse(allocator, source, tokens.tokens.items, &pool);
+        defer tree.deinit(allocator);
+        try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+        var remaining: usize = 128;
+        var checked = try check.checkModuleWithOptions(allocator, &tree, &pool, &.{}, &.{}, 1, .{ .associated_remaining = &remaining });
+        defer checked.deinit(allocator);
+        for (checked.diagnostics) |diagnostic| std.debug.print("ordinary row: {s}\n", .{diagnostic.message()});
+        try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+        try std.testing.expect(remaining > 0);
+    }
+}
+
+test "associated exhaustion reports its actual remaining work allowance" {
+    const allocator = std.testing.allocator;
+    const source = try effectRowSource(allocator, 64, 4, true);
+    defer allocator.free(source);
+    var tokens = try lexer.lex(allocator, source);
+    defer tokens.deinit(allocator);
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parser.parse(allocator, source, tokens.tokens.items, &pool);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var remaining: usize = 128;
+    var checked = try check.checkModuleWithOptions(allocator, &tree, &pool, &.{}, &.{}, 1, .{ .max_inference_transitions = 4096, .associated_remaining = &remaining });
+    defer checked.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 1), checked.diagnostics.len);
+    try std.testing.expectEqual(check.Code.associated_limit, checked.diagnostics[0].code);
+    try std.testing.expect(std.mem.find(u8, checked.diagnostics[0].message(), "work budget of 128 steps") != null);
+    try std.testing.expect(std.mem.find(u8, checked.diagnostics[0].message(), "4096") == null);
+    try std.testing.expectEqual(@as(usize, 0), remaining);
+}
+
+test "configured associated work can exceed the legacy million step cap" {
+    const allocator = std.testing.allocator;
+    const source = try effectRowSource(allocator, 512, 1000, true);
+    defer allocator.free(source);
+    var tokens = try lexer.lex(allocator, source);
+    defer tokens.deinit(allocator);
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parser.parse(allocator, source, tokens.tokens.items, &pool);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var remaining: usize = 4_000_000;
+    var checked = try check.checkModuleWithOptions(allocator, &tree, &pool, &.{}, &.{}, 1, .{ .max_inference_transitions = 4_000_000, .associated_remaining = &remaining });
+    defer checked.deinit(allocator);
+    for (checked.diagnostics) |diagnostic| std.debug.print("configured row: {s}\n", .{diagnostic.message()});
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    try std.testing.expect(checked.counters.associated_steps > 1_000_000);
+    try std.testing.expect(remaining > 0);
+}

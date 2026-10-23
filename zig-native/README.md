@@ -52,6 +52,10 @@ performance measurements.
 compiles a project. `dependencies ENTRY OUTPUT.blotdep` produces reusable typed
 dependencies. `serve-project` serves the framed retained-project protocol used
 by [the client](PROJECT_CLIENT.md).
+The client `inferenceBudget` setting and native `--inference-budget` option
+control ordinary inference and associated work through checking and evaluation.
+See [budget accounting](PROJECT_CLIENT.md) and the
+[associated-work qualification](ASSOCIATED_WORK_QUALIFICATION.md).
 
 The language distinguishes chunked `List a` from contiguous `Array a`. Indexing
 and indexed rebinding are array-only. Shared list edits copy the chain; proven

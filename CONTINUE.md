@@ -1,5 +1,18 @@
 # Continue here
 
+Latest checkpoint, 23 October 2026: the derive and budget propagation work is
+committed in `58e00c3`, followed by the frontend associated-work repair. The
+associated-work repair compiles the unchanged frozen gdev game without a source
+migration. Five fresh release builds have a median of 16.192 seconds for the
+game and 0.918 seconds for devtools. It honors configured budgets through
+checking and evaluation, skips unnecessary normalization for ordinary effect
+rows, and reports the allowance actually exhausted. The combined gate passes
+2,539 exhaustive native tests and 1,647 guest/client checks, with zero analyzer
+findings. The release CLI and compiler are installed locally. See
+[qualification and measurements](zig-native/ASSOCIATED_WORK_QUALIFICATION.md).
+Continue the remaining completion plan below; this repair closes the observed
+gdev rejection, not the outstanding task/channel or performance program.
+
 23 October 2026, local continuation from `87ba3f6`: the owner confirmed the
 entire remaining [completion plan](FINISH_PLAN.md), with implementation before
 the final verification campaign. This checkout started clean and has two old

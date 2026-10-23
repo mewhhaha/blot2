@@ -40,6 +40,19 @@ file created by `blot dependencies`. A mismatched bundle is rejected.
 `expectedCompilerIdentity` can pin a 64-character lowercase compiler
 fingerprint.
 
+`inferenceBudget` sets the inference work allowance (default 1,000,000 steps).
+The native CLI accepts the same setting as `--inference-budget`. Each module's
+ordinary inference has that allowance; associated-type checking shares an
+allowance across the project, and evaluator sessions start their associated
+work allowance from the same setting. Larger configured values apply throughout
+these stages, without an additional one-million-step cap. Budget changes alter
+the compiler identity, so retained and persistent candidates cannot cross them.
+An `associated_limit` diagnostic from module checking reports the actual
+associated work allowance available to that module, which can be smaller after
+checking its dependencies. Ordinary effect rows in a solver with no associated
+projections do not consume associated normalization work merely because an
+implementation is in scope.
+
 `codegenTier: "development"` skips optional scalar replacement and automatic
 vectorization. Type/effect checking, constant evaluation, explicit cleanup and
 lifetime analysis still run. The default is `"optimized"`. A project session

@@ -1,5 +1,18 @@
 # Zig compiler status
 
+## Associated work budgets, 23 October 2026
+
+The associated-work repair compiles the unchanged frozen gdev game without a
+source migration. Five fresh release builds have a median of 16.192 seconds
+for the game and 0.918 seconds for devtools. It honors configured budgets
+through checking and evaluation, skips unnecessary normalization for ordinary
+effect rows, and reports the allowance actually exhausted. The combined gate
+passes 2,539 exhaustive native tests and 1,647 guest/client checks, with
+zero analyzer findings. The release CLI and compiler are installed locally.
+See [qualification and measurements](ASSOCIATED_WORK_QUALIFICATION.md).
+The preceding derive/budget changes are in `58e00c3`; the broader completion
+plan remains open.
+
 ## Qualified task-surface continuation, 23 October 2026
 
 The current continuation adds checker-selected spark regions, ordinary scope
