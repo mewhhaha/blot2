@@ -64,6 +64,18 @@ incomplete check as passed. See
 `type-effects`, `body-checking`, `numeric-aggregates` or `tasks`; each runs
 existing positive, rejection/recovery and ownership regressions plus guests.
 
+The [compile measurements](COMPILE_MEASUREMENTS.md) separate application compile
+time from building and checking the compiler. The
+[CT96 optimization](zig-native/CT96_QUALIFICATION.md) cuts fresh gdev game CPU by
+28.6%: paired median build wall time falls from 17.24 s to 12.16 s, with identical
+Wasm. Compiler source edits take roughly 3.4 s, and the warm `type-effects`
+development cycle takes 4.64 s on the measured host. Use stable writable Zig
+caches; the measured `-fincremental` mode does not improve real edits and makes
+cache hits slower. Run `deno task bench:compiler-build --out build/bench/build-next`
+for isolated build/edit/revert measurements. See the
+[compile-time hills](COMPILE_HILLS.md) and [build hills](BUILD_HILLS.md) for the
+next experiments, acceptance targets and reproduction commands.
+
 For a smaller development check, run `deno task test:compiler:dev`. It checks
 the project protocol, client and inference-budget recovery against the
 Safe/noLLVM compiler. Select guest files and native laws when working on a

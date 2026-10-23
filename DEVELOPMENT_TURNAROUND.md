@@ -1,5 +1,21 @@
 # Five-minute development feedback
 
+The [CT96 task-family edit cycle](zig-native/CT96_QUALIFICATION.md) passes in
+14.54 s, including complete native compilation, 17 native laws, 27 guest checks
+and local analysis. Full qualification still needs 665 s of native execution on
+this run. Use the [build hills](BUILD_HILLS.md) for measured targets and a phase
+allowance with enough headroom; a cancelled gate never counts as a pass.
+
+The [23 October local measurements](COMPILE_MEASUREMENTS.md) supersede the
+historical cloud timings below for this host: ordinary Safe/noLLVM compiler
+edits take about 3.4 s, native compilation about 5.5 s, and two warm
+`check:dev --area type-effects` cycles pass in 4.71 / 4.64 s. Empty-cache Zig
+build-system initialization alone costs 56 s, so retain stable writable caches.
+Explicit incremental mode shows no useful real-edit gain in the three-cycle
+screen and regresses cache hits. The [build hills](BUILD_HILLS.md) separate cache
+initialization, edit/check cycles and exhaustive qualification; full native
+execution remains the largest gate cost at 596 s.
+
 Run `deno task check:dev --area static-sharing` from the repository root. In the
 cloud environment, activate the pinned tools and avoid waiting behind a heavy
 job:

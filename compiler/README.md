@@ -12,6 +12,11 @@ retained revisions and unsaved source overrides. See
 setting controls ordinary inference and associated work through project checking
 and compile-time evaluation; its default is 1,000,000.
 
+For fresh and retained compile costs, profiling commands and the current
+performance priorities, see [compile measurements](../COMPILE_MEASUREMENTS.md).
+The benchmark preserves the project's budget, native assets and frozen standard
+library so its timings match the configured workload.
+
 [Typed asset imports](assets.md) register explicit parsers that produce ordinary
 typed modules and optional host resource snapshots. JSON data, shader input
 types, and asset references share this interface.

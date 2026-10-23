@@ -17,6 +17,7 @@
 // it). Samples stay in the output directory: they name compiler functions and
 // files only, never gdev source.
 import { parseArgs } from "node:util";
+import { verifySnapshotFiles } from "./snapshot.ts";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
@@ -40,7 +41,7 @@ const usage = `Usage: deno task profile:compile [--blotc BLOTC]
   [--workload game|devtools] [--test tests/NAME.blot] [--edit SCENARIO]
   [--runs 3] [--reps 10] [--min-ms 3] [--max-ms 10] [--top 40]
   [--snapshot DIR] [--out DIR] [--codegen-workers 4]
-  [--successive-literals] [--verify-manifest]
+  [--successive-literals] [--verify-manifest] [--manifest FILE]
        deno task profile:compile --aggregate SAMPLES.jsonl... [--top 40]
 Results: build/tmp/profile/<timestamp>/{samples.jsonl,report.txt}.`;
 
@@ -59,6 +60,7 @@ const { values: args, positionals } = parseArgs({
     "max-ms": { type: "string", default: "10" },
     top: { type: "string", default: "40" },
     snapshot: { type: "string" },
+    manifest: { type: "string" },
     out: { type: "string" },
     "codegen-workers": { type: "string", default: "4" },
     aggregate: { type: "boolean", default: false },
@@ -457,13 +459,18 @@ async function main(): Promise<number> {
       "Profile output already contains a run; choose a new --out directory",
     );
   }
+  const manifestPath = resolve(
+    args.manifest ?? `${repo}/scripts/bench/gdev-manifest.json`,
+  );
+  const verifyManifest = args["verify-manifest"] || args.manifest !== undefined;
   const pins: Record<string, string> = {};
   for (
     const path of [
       blotc,
       fileURLToPath(import.meta.url),
       `${repo}/scripts/bench/gdb_sampler.py`,
-      `${repo}/scripts/bench/gdev-manifest.json`,
+      manifestPath,
+      `${repo}/scripts/bench/gdev.ts`,
     ]
   ) {
     const digest = await crypto.subtle.digest(
@@ -475,12 +482,10 @@ async function main(): Promise<number> {
     ).join("");
   }
   const manifest = JSON.parse(
-    await Deno.readTextFile(`${repo}/scripts/bench/gdev-manifest.json`),
+    await Deno.readTextFile(manifestPath),
   ) as Record<string, string>;
   for (
-    const [name, expected] of args["verify-manifest"]
-      ? Object.entries(manifest)
-      : []
+    const [name, expected] of verifyManifest ? Object.entries(manifest) : []
   ) {
     const path = `${snapshotRoot}/${name}`;
     if (await digest(path) !== expected) {
@@ -497,7 +502,8 @@ async function main(): Promise<number> {
       }
     }
   }
-  await pinTree(`${repo}/std`);
+  await pinTree(workload.stdRoot ?? `${repo}/std`);
+  if (verifyManifest) await verifySnapshotFiles(snapshotRoot, manifest);
   await Deno.writeTextFile(
     `${out}/metadata.json`,
     JSON.stringify(
@@ -508,6 +514,8 @@ async function main(): Promise<number> {
         codegen_workers: codegenWorkers,
         cache_directory: false,
         profile_backend: true,
+        inference_budget: workload.inferenceBudget ?? 1_000_000,
+        standard_library: workload.stdRoot,
         args,
         attribution:
           "Report tables count stacks including idle threads; raw cpu_ns records per-thread scheduler CPU deltas",
@@ -525,6 +533,7 @@ async function main(): Promise<number> {
       throw new Error(`Pinned input changed: ${path}`);
     }
   }
+  if (verifyManifest) await verifySnapshotFiles(snapshotRoot, manifest);
   const text = report(await loadStacks([`${out}/samples.jsonl`]), top);
   await Deno.writeTextFile(`${out}/report.txt`, text + "\n");
   console.log(text);

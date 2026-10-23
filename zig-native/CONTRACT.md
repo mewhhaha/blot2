@@ -24,6 +24,11 @@ Source bytes are immutable UTF-8. Tokens refer to byte ranges. Identifiers use
 offset/length entries and stable numeric IDs. Hashes locate candidates; exact
 bytes decide identity. Array growth must never invalidate hash keys or handles.
 Immutable Core keeps one owned spelling for each record field symbol it uses.
+Backend spawn preparation computes contract presence once per generator and
+owns a pointer view of that run's immutable modules only when a spawn contract
+exists. The view borrows Core, is freed with the generator, and never crosses a
+retained revision or retry. Every positive application still validates its
+actual spawn wrapper and arguments; cached presence grants no authority.
 Runtime structural record slots follow UTF-8 spelling order, independent of
 source evaluation order and symbol relocation. Constructor tuple views keep
 declaration order and convert explicitly at the representation boundary.

@@ -10,6 +10,19 @@ comparison separate from allocation-free contract research.
 
 ## Execution checkpoint, 23 October 2026
 
+The [CT96 optimization](zig-native/CT96_QUALIFICATION.md) removes repeated
+whole-program spawn-contract scans during emission. Seven alternating release
+pairs show 28.6% less game CPU and 29.0% less devtools CPU with identical Wasm.
+The isolated compiler passes full qualification; the remaining inference,
+retained-reuse and absolute performance targets below stay open.
+
+The baseline [compile/build measurements](COMPILE_MEASUREMENTS.md) established
+the remaining performance work against compiler `63c931f`. Follow
+[CT95–CT101](COMPILE_HILLS.md) for application compilation and
+[BT1–BT5](BUILD_HILLS.md) for compiler iteration. CT96 addressed the repeated
+spawn-capability scan; the earlier task-086 constant-work
+decision remains separate because these clocks include nested preparation.
+
 The subsequent
 [associated-work repair](zig-native/ASSOCIATED_WORK_QUALIFICATION.md) restores
 compilation of the unchanged frozen gdev game, honors configured budgets and

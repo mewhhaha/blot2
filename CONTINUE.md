@@ -1,5 +1,34 @@
 # Continue here
 
+CT96 checkpoint, 23 October 2026: the generator now prepares spawn-contract
+presence and its immutable module-pointer view once per compilation. Seven
+alternating release pairs show **28.6% less game CPU** and **29.0% less devtools
+CPU**, with identical Wasm; game median build wall changes from 17.24 to 12.16 s.
+The [qualification record](zig-native/CT96_QUALIFICATION.md) covers 2,539 exhaustive
+native laws, 1,648 guest checks, 48 smoke checks, 57 tooling checks and zero lint.
+It also preserves the first gate's timeout and the complete rerun with a longer
+allowance. The edited task development cycle passes in 14.54 s. The qualified
+release is `build/bench/ct96-20261023/candidate/blotc`; it is isolated from the
+concurrent text-capability repair and does not replace the installed tools.
+The new profile has no scan self-CPU samples; effect-row lookup/version traversal
+now owns 27.4% of sampled CPU. Continue with **CT97** in the updated
+[compile-time hills](COMPILE_HILLS.md). CT99 stays deferred: constant preparation
+is about 0.33 s. Retained backend reuse and the broader completion plan remain open.
+
+Baseline measurement checkpoint, 23 October 2026: compiler `63c931f` was unchanged.
+The [measurement report](COMPILE_MEASUREMENTS.md) pins the current 554-file gdev
+snapshot, fresh/profiled pairs, retained edits, CPU stacks and compiler-build
+experiments. That checkpoint selected **CT96** in the [compile-time queue](COMPILE_HILLS.md):
+`prepareSpawnApplication` repeatedly scans all bindings and owns 27.6% of sampled
+CPU. Reprofile after that before choosing effect-row work or backend reuse;
+ordinary code edits currently offer zero backend candidates. Do not rerun the
+historical CT1–CT94 program. [Build hills](BUILD_HILLS.md) keep ordinary caching
+as the default (3.4 s real compiler edits; 15 ms unchanged builds), preserve the
+4.64 s warm development cycle, and target the slow exhaustive allocation tests.
+Measurement tooling and documentation were implemented at that checkpoint; CT96
+is qualified above, and the later hills and broader completion plan remain open.
+Raw baseline evidence is linked from the report.
+
 Latest checkpoint, 23 October 2026: the derive and budget propagation work is
 committed in `58e00c3`, followed by the frontend associated-work repair. The
 associated-work repair compiles the unchanged frozen gdev game without a source

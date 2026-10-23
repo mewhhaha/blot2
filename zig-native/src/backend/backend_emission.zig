@@ -7552,19 +7552,8 @@ pub const Owner = struct {
     }
     fn prepareSpawnApplication(self: *Emitter, id: core.Id) Error!?@import("../check/task_core.zig").SpawnApplication {
         const g = self.generator;
-        var present = false;
-        for (g.units) |*unit_| {
-            for (unit_.bindings) |binding| if (binding.capability_flow == .spawn_task) {
-                present = true;
-                break;
-            };
-            if (present) break;
-        }
-        if (!present) return null;
-        const units = try g.allocator.alloc(*const core.Module, g.units.len);
-        defer g.allocator.free(units);
-        for (g.units, units) |*unit_, *pointer| pointer.* = unit_;
-        return @import("../check/task_core.zig").spawnApplication(g.unit(self.unit_id), id, units) catch return g.fail(self.unit_id, id, .unsupported);
+        if (g.spawn_units.len == 0) return null;
+        return @import("../check/task_core.zig").spawnApplication(g.unit(self.unit_id), id, g.spawn_units) catch return g.fail(self.unit_id, id, .unsupported);
     }
     fn emitSpawnApplication(self: *Emitter, application: @import("../check/task_core.zig").SpawnApplication, depth: usize) Error!void {
         switch (application) {

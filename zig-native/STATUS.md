@@ -1,5 +1,30 @@
 # Zig compiler status
 
+## CT96 spawn preparation, 23 October 2026
+
+The [qualified optimization](CT96_QUALIFICATION.md) scans for spawn contracts once
+per generator and reuses one immutable module-pointer view. Every positive call
+keeps its existing authority checks. Seven alternating release pairs reduce game
+CPU by 28.6% and devtools CPU by 29.0%; game median build wall falls from 17.24 to
+12.16 s, with byte-identical Wasm. The isolated gate passes 2,539 exhaustive native
+laws, 1,648 guest checks, 48 smoke checks and 57 tooling checks, with zero lint.
+The separate text-capability repair is outside this candidate's qualification.
+
+## Compile and build costs, 23 October 2026
+
+The [current measurements](../COMPILE_MEASUREMENTS.md) use the unchanged qualified
+release `63c931f`: fresh gdev takes 16.292 s, backend inference accounts for
+9.64 s of the profiled build, and repeated spawn-capability scanning owns 27.6%
+of sampled CPU. Retained code edits offer zero backend reuse candidates. The
+[new compile hills](../COMPILE_HILLS.md) start with that scan and require a fresh
+profile before selecting the next optimization. No speedup is claimed yet.
+
+Compiler development edits take about 3.4 s with ordinary Safe/noLLVM caching;
+the warm affected check takes 4.64 s. [Build hills](../BUILD_HILLS.md) retain
+ordinary caching and target exhaustive test cost separately. The benchmark
+tools preserve configured budgets/assets/std, pin inputs and outputs, distinguish
+wall and CPU clocks, and measure isolated build/edit/revert cycles.
+
 ## Associated work budgets, 23 October 2026
 
 The associated-work repair compiles the unchanged frozen gdev game without a

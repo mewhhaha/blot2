@@ -48,6 +48,19 @@ suite. `deno task test:compiler:dev --native-suite types` selects a Safe/noLLVM
 check. Reserve LLVM for the actual final release compiler and release
 performance measurements.
 
+Use `deno task bench:compiler-build --out build/bench/build-next` from the
+repository root to measure isolated cache initialization, compiler/native builds,
+source edits and reverts. The [current measurements](../COMPILE_MEASUREMENTS.md)
+record roughly 3.4 s real compiler edits and a 4.64 s warm development cycle.
+Keep ordinary writable Zig caches; explicit incremental mode did not improve
+the measured edit cycle. [Build hills](../BUILD_HILLS.md) track the remaining
+iteration and qualification costs separately from
+[application compile hills](../COMPILE_HILLS.md).
+
+[CT96](CT96_QUALIFICATION.md) prepares spawn capability data once per compilation.
+It reduces fresh game CPU by 28.6% and devtools CPU by 29.0% in seven alternating
+release pairs, preserving exact Wasm and passing the full isolated compiler gate.
+
 `blotc build ENTRY OUTPUT.wasm --prelude std/prelude.blot --std-root std`
 compiles a project. `dependencies ENTRY OUTPUT.blotdep` produces reusable typed
 dependencies. `serve-project` serves the framed retained-project protocol used

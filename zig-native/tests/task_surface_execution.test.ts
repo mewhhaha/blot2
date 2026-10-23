@@ -242,6 +242,110 @@ entry const spawned = fn () => region (fn group => do:
   }
 });
 
+Deno.test("spawn helper presence follows imported revisions and restart in both tiers", async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-spawn-revision-" });
+  const entry = `${directory}/main.blot`;
+  const dependency = `${directory}/helper.blot`;
+  const ordinary = "const value = fn () => 41\n";
+  const helper = ordinary +
+    "const launch = fn group => fn action => @task.spawn group action\nconst alias = launch\n";
+  const plain = `import * as helper from "./helper"
+entry const answer = fn () => @u32.add (helper.value ()) 1
+`;
+  const spawned = `import {alias as launch, value} from "./helper"
+entry const answer = fn () => @task.scope (fn group => do:
+  let here = launch group
+  let pending = here (fn () => @u32.add (value ()) 2)
+  return |pending|)
+`;
+  const executable = Deno.args[0] ??
+    new URL("../zig-out/bin/blotc", import.meta.url);
+  const execute = async (bytes: Uint8Array<ArrayBuffer>, expected: number) => {
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(bytes, { asynchronous });
+      try {
+        assert.equal(
+          asynchronous
+            ? await guest.callAsync("answer", null)
+            : guest.call("answer", null),
+          expected,
+        );
+      } finally {
+        guest.dispose();
+      }
+    }
+  };
+  try {
+    await Deno.writeTextFile(entry, plain);
+    await Deno.writeTextFile(dependency, ordinary);
+    for (const codegenTier of ["development", "optimized"] as const) {
+      const options = {
+        executable,
+        entry,
+        prelude: null,
+        cacheDirectory: false as const,
+        codegenTier,
+      };
+      const compiler = await createZigProjectCompiler(options);
+      let checkpoint: Uint8Array<ArrayBuffer>;
+      const outputs = new Map<string, Uint8Array<ArrayBuffer>>();
+      try {
+        for (
+          const [main, library, expected] of [
+            [plain, ordinary, 42],
+            [spawned, helper, 43],
+            [plain, ordinary, 42],
+            [spawned, helper, 43],
+          ] as const
+        ) {
+          const sources = { [entry]: main, [dependency]: library };
+          const build = await compiler.build({ sources });
+          assert(build.success, JSON.stringify(build));
+          await execute(build.bytes, expected);
+          const previous = outputs.get(main);
+          if (previous) assert.deepEqual(build.bytes, previous);
+          else outputs.set(main, build.bytes.slice());
+          const fresh = await createZigProjectCompiler(options);
+          try {
+            const control = await fresh.build({ sources });
+            assert(control.success, JSON.stringify(control));
+            assert.deepEqual(build.bytes, control.bytes);
+          } finally {
+            await fresh.dispose();
+          }
+        }
+        checkpoint = await compiler.exportCheckpoint();
+      } finally {
+        await compiler.dispose();
+      }
+      const restored = await createZigProjectCompiler({
+        ...options,
+        checkpoint,
+      });
+      try {
+        for (
+          const [main, library, expected] of [[spawned, helper, 43], [
+            plain,
+            ordinary,
+            42,
+          ]] as const
+        ) {
+          const build = await restored.build({
+            sources: { [entry]: main, [dependency]: library },
+          });
+          assert(build.success, JSON.stringify(build));
+          assert.deepEqual(build.bytes, outputs.get(main));
+          await execute(build.bytes, expected);
+        }
+      } finally {
+        await restored.dispose();
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 Deno.test("tuple collection drains failures and transfers owning results once", async () => {
   const text = `
 const launch = fn group => fn action => @task.spawn group action

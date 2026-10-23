@@ -5,9 +5,9 @@
 // Every build runs through `serve-project`, as pen runs it: gdev builds open
 // the project with the snapshot's pen.json imports and native asset roots.
 // Fresh builds start a new process per sample; retained phases reuse one
-// session. CPU is the child's per-thread schedstat time over the build itself
-// (process start and open excluded), never wall time, because wall samples on
-// a shared host mostly measure contention. Variants alternate within each pair.
+// session. CPU is the child's user+system tick total over the build itself
+// (process start and open excluded), including exited worker threads. Wall time
+// and live-thread schedstat are separate measurements. Variants alternate within each pair.
 //
 // Both binaries must emit the same Wasm for every workload and phase, a
 // retained session must match a fresh build, and restoring a source must
@@ -29,6 +29,8 @@
 // with reuse and recheck counters. --shared-session also builds every selected
 // test entry in turn in one session, as pen's test workers do (CT90).
 import { parseArgs } from "node:util";
+import { costSummary } from "./bench/costs.ts";
+import { snapshotFiles, verifySnapshotFiles } from "./bench/snapshot.ts";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -55,13 +57,12 @@ import {
 } from "./bench/verification.ts";
 
 const repo = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const manifestPath = `${repo}/scripts/bench/gdev-manifest.json`;
-const hashesPath = `${repo}/scripts/bench/gdev-wasm.json`;
 const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   [--runs 5] [--workload all|gdev|game|devtools|tests|synthetic|NAME,...]
   [--test-runs 1] [--no-retained] [--profile] [--out DIR] [--snapshot DIR]
   [--allow-wasm-diff] [--write-hashes] [--write-manifest] [--restart-cache]
   [--shared-session] [--guard-cpu] [--codegen-workers 4]
+  [--candidate-profile] [--manifest FILE] [--hashes FILE] [--scenarios NAMES]
 
   --baseline/--candidate  blotc executables. Pass one binary twice to measure noise.
   --workload              comma-separated: gdev entries (game, devtools), every
@@ -73,6 +74,9 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   --no-retained           skip the retained-session phases.
   --profile               open every session with profileBackend (detailed
                           clocks cost a few percent of CPU).
+  --candidate-profile     profile only candidate; use one binary twice to measure instrumentation cost.
+  --manifest / --hashes    separate input/output pins for a new frozen workload.
+  --scenarios             comma-separated retained scenarios (default all).
   --snapshot              gdev snapshot (default build/bench/gdev-snapshot).
   --allow-wasm-diff       report, but do not fail on, Wasm differing between
                           binaries or from scripts/bench/gdev-wasm.json.
@@ -101,6 +105,10 @@ const { values: args } = parseArgs({
     out: { type: "string" },
     snapshot: { type: "string" },
     profile: { type: "boolean", default: false },
+    "candidate-profile": { type: "boolean", default: false },
+    manifest: { type: "string" },
+    hashes: { type: "string" },
+    scenarios: { type: "string" },
     "no-retained": { type: "boolean", default: false },
     "allow-wasm-diff": { type: "boolean", default: false },
     "write-manifest": { type: "boolean", default: false },
@@ -112,6 +120,13 @@ const { values: args } = parseArgs({
     help: { type: "boolean", default: false },
   },
 });
+
+const manifestPath = resolve(
+  args.manifest ?? `${repo}/scripts/bench/gdev-manifest.json`,
+);
+const hashesPath = resolve(
+  args.hashes ?? `${repo}/scripts/bench/gdev-wasm.json`,
+);
 
 const snapshotRoot = resolve(
   args.snapshot ?? `${repo}/build/bench/gdev-snapshot`,
@@ -130,7 +145,7 @@ async function sha256(bytes: Uint8Array<ArrayBuffer>): Promise<Hash> {
 
 // ---------------------------------------------------------------- workloads
 
-async function verifySnapshot(): Promise<
+async function verifySnapshot(write = args["write-manifest"]): Promise<
   { status: "missing" } | { status: "verified"; files: number }
 > {
   try {
@@ -139,57 +154,19 @@ async function verifySnapshot(): Promise<
     if (!(error instanceof Deno.errors.NotFound)) throw error;
     return { status: "missing" };
   }
-  const manifest: Record<string, Hash> = {};
-  if (args["write-manifest"]) {
-    for await (const path of walk(snapshotRoot)) {
-      const name = relative(snapshotRoot, path);
-      if (name === "manifest.json") continue;
-      manifest[name] = await sha256(await Deno.readFile(path));
-    }
-    const sorted = Object.fromEntries(Object.entries(manifest).sort());
+  if (write) {
     await Deno.writeTextFile(
       manifestPath,
-      JSON.stringify(sorted, null, 2) + "\n",
+      JSON.stringify(await snapshotFiles(snapshotRoot), null, 2) + "\n",
     );
-    console.log(`Wrote ${manifestPath} (${Object.keys(sorted).length} files)`);
   }
   const expected: Record<string, Hash> = JSON.parse(
     await Deno.readTextFile(manifestPath),
   );
-  const problems: string[] = [];
-  for (const [name, hash] of Object.entries(expected)) {
-    try {
-      const actual = await sha256(
-        await Deno.readFile(`${snapshotRoot}/${name}`),
-      );
-      if (actual !== hash) problems.push(`modified: ${name}`);
-    } catch (error) {
-      if (!(error instanceof Deno.errors.NotFound)) throw error;
-      problems.push(`missing: ${name}`);
-    }
-  }
-  for await (const path of walk(snapshotRoot)) {
-    const name = relative(snapshotRoot, path);
-    if (name !== "manifest.json" && !(name in expected)) {
-      problems.push(`unlisted: ${name}`);
-    }
-  }
-  if (problems.length) {
-    throw new Error(
-      `${snapshotRoot} does not match scripts/bench/gdev-manifest.json:\n  ${
-        problems.join("\n  ")
-      }\nA moved snapshot invalidates comparisons across runs. Restore it or pass --write-manifest to re-freeze deliberately.`,
-    );
-  }
-  return { status: "verified", files: Object.keys(expected).length };
-}
-
-async function* walk(directory: string): AsyncGenerator<string> {
-  for await (const entry of Deno.readDir(directory)) {
-    const path = `${directory}/${entry.name}`;
-    if (entry.isDirectory) yield* walk(path);
-    else if (entry.isFile) yield path;
-  }
+  return {
+    status: "verified",
+    files: await verifySnapshotFiles(snapshotRoot, expected),
+  };
 }
 
 function printMissingSnapshot() {
@@ -197,7 +174,7 @@ function printMissingSnapshot() {
     `gdev snapshot not found at ${snapshotRoot}; continuing with the synthetic corpus.
 To recreate it: copy the private gdev checkout's src/, devtools/, pen/, tests/,
 test_support/ and pen.json into build/bench/gdev-snapshot, with the Ink
-library's lib/ as ink/, then rerun. Every file is verified against the sha256
+library's lib/ as ink/ and the configured standard library as std/, then rerun. Every file is verified against the sha256
 manifest in scripts/bench/gdev-manifest.json. build/ is gitignored and gdev
 source must never be committed to this public repository.`,
   );
@@ -269,6 +246,7 @@ interface Sample {
   /** `fresh`, `restart`, `shared`, or the retained phase name. */
   phase: string;
   cpu_ms: number;
+  schedstat_cpu_ms: number;
   /** /proc tick time over the same interval; 10 ms resolution cross-check. */
   tick_cpu_ms: number;
   wall_ms: number;
@@ -334,7 +312,10 @@ async function openSession(
     ...sessionOptions(variant.executable, workload),
     codegenWorkers,
     cacheDirectory,
-    ...(args.profile ? { profileBackend: true } : {}),
+    ...((args.profile ||
+        (args["candidate-profile"] && variant.name === "candidate"))
+      ? { profileBackend: true }
+      : {}),
   });
   return { compiler, variant, workload };
 }
@@ -353,7 +334,8 @@ async function measuredBuild(
   const wall_ms = performance.now() - started;
   const after = await processUsage(pid);
   const usage = {
-    cpu_ms: (after.cpu_ns - before.cpu_ns) / 1e6,
+    cpu_ms: (after.ticks - before.ticks) * 1000 / ticksPerSecond,
+    schedstat_cpu_ms: (after.cpu_ns - before.cpu_ns) / 1e6,
     tick_cpu_ms: (after.ticks - before.ticks) * 1000 / ticksPerSecond,
     wall_ms,
     peak_rss_kib: after.peak_rss_kib,
@@ -402,11 +384,11 @@ async function retainedSession(
   variant: Variant,
   workload: Workload,
   run: number,
-): Promise<Sample[]> {
+  record: (sample: Sample) => Promise<void>,
+): Promise<void> {
   const session = await openSession(variant, workload);
-  const samples: Sample[] = [];
   const phase = async (name: string, sources: Record<string, string>) => {
-    samples.push({
+    await record({
       kind: "retained",
       workload: workload.name,
       variant: variant.name,
@@ -428,7 +410,6 @@ async function retainedSession(
   } finally {
     await session.compiler.dispose();
   }
-  return samples;
 }
 
 /**
@@ -544,9 +525,34 @@ async function main(): Promise<number> {
   const workloads: Workload[] = [];
   if (snapshot.status === "verified") {
     for (const workload of await gdevWorkloads(repo, snapshotRoot)) {
-      if (chosen("all", "gdev", workload.name)) workloads.push(workload);
+      if (chosen("all", "gdev", workload.name)) {
+        const names = args.scenarios?.split(",");
+        if (names && workload.name === "game") {
+          for (const name of names) {
+            if (!workload.scenarios.some((s) => s.name === name)) {
+              throw new Error(`Unknown scenario ${name}`);
+            }
+          }
+        }
+        workloads.push(
+          names
+            ? {
+              ...workload,
+              scenarios: workload.scenarios.filter((s) =>
+                names.includes(s.name)
+              ),
+            }
+            : workload,
+        );
+      }
     }
-    for (const workload of await testWorkloads(repo, snapshotRoot)) {
+    for (
+      const workload of selected.some((n) =>
+          n === "tests" || n.startsWith("tests/")
+        )
+        ? await testWorkloads(repo, snapshotRoot)
+        : []
+    ) {
       if (chosen("tests", workload.name)) workloads.push(workload);
     }
   }
@@ -571,12 +577,33 @@ async function main(): Promise<number> {
   ) {
     throw new Error("--guard-cpu requires --runs >= 3 and the game workload");
   }
+  const standardPins = new Map<string, Record<string, string>>();
+  for (const workload of workloads) {
+    const root = workload.stdRoot ?? `${repo}/std`;
+    if (!standardPins.has(root)) {
+      standardPins.set(root, await snapshotFiles(root));
+    }
+  }
+  const manifestPin = await sha256(await Deno.readFile(manifestPath));
   const runsOf = (workload: Workload) =>
     workload.group === "tests" ? testRuns : runs;
 
   const samples: Sample[] = [];
   const record = async (sample: Sample) => {
+    const expectedProfile = args.profile ||
+      (args["candidate-profile"] && sample.variant === "candidate");
+    if (
+      expectedProfile && sample.phase === "fresh" && !sample.failure &&
+      !(sample.stats.phaseProfile as PhaseProfile | undefined)?.phases
+    ) {
+      throw new Error("Profiled fresh build omitted its phase clocks");
+    }
     samples.push(sample);
+    console.log(
+      `${sample.workload} ${sample.variant} ${sample.phase}: ${
+        sample.wall_ms.toFixed(1)
+      } ms wall, ${sample.cpu_ms.toFixed(1)} ms CPU`,
+    );
     await Deno.writeTextFile(
       `${out}/samples.jsonl`,
       JSON.stringify(sample) + "\n",
@@ -632,9 +659,7 @@ async function main(): Promise<number> {
       }
       if (!args["no-retained"] && workload.retained) {
         for (const variant of order) {
-          for (const sample of await retainedSession(variant, workload, run)) {
-            await record(sample);
-          }
+          await retainedSession(variant, workload, run, record);
         }
       }
     }
@@ -897,7 +922,9 @@ async function main(): Promise<number> {
     ),
   );
   const reuse = reuseTables(workloads, samples, medians);
-  const phases = args.profile ? phaseTables(workloads, samples) : {};
+  const phases = (args.profile || args["candidate-profile"])
+    ? phaseTables(workloads, samples)
+    : {};
   const cpuGuard = args["guard-cpu"] ? pairedCpuGuard(samples) : null;
   if (cpuGuard) {
     problems.push(...cpuGuard.problems);
@@ -908,6 +935,20 @@ async function main(): Promise<number> {
     );
   }
 
+  // Re-read bytes, including additions/removals; a successful timing run never
+  // blesses a moving input tree or a replaced compiler.
+  if (snapshot.status === "verified") await verifySnapshot(false);
+  if (await sha256(await Deno.readFile(manifestPath)) !== manifestPin) {
+    throw new Error("Manifest changed during measurement");
+  }
+  for (const [root, pins] of standardPins) {
+    await verifySnapshotFiles(root, pins);
+  }
+  for (const variant of variants) {
+    if (
+      await sha256(await Deno.readFile(variant.executable)) !== variant.sha256
+    ) throw new Error("Compiler changed during measurement");
+  }
   const loadEnd = loadAverage();
   // Intentional backend changes may differ between binaries. They must never
   // excuse nondeterministic output or a broken retained/restart comparison.
@@ -959,7 +1000,13 @@ async function main(): Promise<number> {
     JSON.stringify(
       {
         kind: "blot-compile-bench",
-        version: 2,
+        success: unexpectedProblems.length === 0,
+        version: 3,
+        cpu_accounting:
+          "Linux process user+system ticks, including exited threads; USER_HZ=100",
+        input_manifest: manifestPath,
+        inputs_unchanged: true,
+        candidate_profile: args["candidate-profile"],
         timestamp,
         runs,
         profile: args.profile,
@@ -977,9 +1024,24 @@ async function main(): Promise<number> {
           name: w.name,
           group: w.group,
           scenarios: w.scenarios.map((s) => s.name),
+          settings: {
+            inferenceBudget: w.inferenceBudget ?? 1_000_000,
+            codegenTier: w.codegenTier ?? "optimized",
+            stdRoot: w.stdRoot,
+            nativeAssetImports: w.nativeAssetImports,
+          },
         })),
         medians,
         counters,
+        costs: costSummary(samples),
+        clock_scopes: {
+          cpu: "Process user+system CPU",
+          phases: "Exclusive coordinator wall intervals",
+          backend_work:
+            "Nested backend wall intervals; never add to whole-build phases",
+          regions:
+            "Inclusive nested region observations; never sum as independent phases",
+        },
         tests,
         shared,
         failures,
@@ -1311,14 +1373,14 @@ interface PhaseCell {
 }
 /**
  * Median exclusive phase clocks and allocation counts of each variant's fresh
- * builds (profiled sessions only), and how much of the measured CPU the named
+ * builds (profiled sessions only), and how much of the profiled wall interval the named
  * phases cover.
  */
 function phaseTables(workloads: Workload[], samples: Sample[]) {
   type Table = {
     phases: Record<string, PhaseCell>;
     total_ms: number;
-    named_over_cpu: number;
+    named_over_profile_wall: number;
     peak_rss_mib: number | null;
   };
   const tables: Record<string, Record<string, Table>> = {};
@@ -1357,10 +1419,10 @@ function phaseTables(workloads: Workload[], samples: Sample[]) {
       byVariant[variant] = {
         phases,
         total_ms: median(profiles.map((p) => p.total_us! / 1000)),
-        named_over_cpu: median(
+        named_over_profile_wall: median(
           profiled.map((s) => {
             const p = s.stats.phaseProfile as PhaseProfile;
-            return (p.total_us! - p.phases!.other.us) / 1000 / s.cpu_ms;
+            return (p.total_us! - p.phases!.other.us) / p.total_us!;
           }),
         ),
         peak_rss_mib: optional(profiles.map((p) => p.peak_rss_kib), 1024),
@@ -1410,9 +1472,9 @@ function phaseTables(workloads: Workload[], samples: Sample[]) {
     ]);
     rows.push([
       "",
-      "named/cpu",
-      fixed(byVariant.baseline?.named_over_cpu, 3),
-      fixed(byVariant.candidate?.named_over_cpu, 3),
+      "named/profile wall",
+      fixed(byVariant.baseline?.named_over_profile_wall, 3),
+      fixed(byVariant.candidate?.named_over_profile_wall, 3),
       "",
       "",
       "",

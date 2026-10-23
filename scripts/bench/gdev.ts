@@ -3,6 +3,7 @@
 // built the way pen builds it, and the retained edit scenarios on it.
 import { resolve } from "node:path";
 import type { ZigProjectCompilerOptions } from "../../compiler/zig_project_client.ts";
+import type { NativeAssetImport } from "../../compiler/native_assets.ts";
 
 export interface Replacement {
   /** Path relative to the workload root. */
@@ -30,6 +31,9 @@ export interface Workload {
   /** Import alias prefix to absolute directory. */
   readonly imports: Readonly<Record<string, string>>;
   readonly nativeAssetRoots: readonly string[] | null;
+  readonly nativeAssetImports?: readonly NativeAssetImport[];
+  readonly inferenceBudget?: number;
+  readonly codegenTier?: "optimized" | "development";
   /** Retained scenarios; an empty list measures population and no-op only. */
   readonly scenarios: readonly Scenario[];
 }
@@ -45,8 +49,15 @@ export function sessionOptions(
     prelude: workload.prelude,
     ...(workload.stdRoot ? { stdRoot: workload.stdRoot } : {}),
     imports: workload.imports,
+    inferenceBudget: workload.inferenceBudget,
+    codegenTier: workload.codegenTier,
     ...(workload.nativeAssetRoots
-      ? { nativeAssets: { roots: workload.nativeAssetRoots } }
+      ? {
+        nativeAssets: {
+          roots: workload.nativeAssetRoots,
+          imports: workload.nativeAssetImports,
+        },
+      }
       : {}),
   };
 }
@@ -78,11 +89,18 @@ export async function editedSources(
  * pen.json paths that point outside the game checkout, and where the snapshot
  * keeps them. The Ink library is frozen inside the snapshot as `ink/`.
  */
-const relocated: Readonly<Record<string, string>> = { "../ink/lib/": "ink/" };
+const relocated: Readonly<Record<string, string>> = {
+  "../ink/lib": "ink",
+  "../blot2/std": "std",
+};
 
 interface PenSettings {
   readonly imports: Record<string, string>;
   readonly nativeAssetRoots: string[];
+  readonly nativeAssetImports: NativeAssetImport[];
+  readonly stdRoot?: string;
+  readonly inferenceBudget?: number;
+  readonly codegenTier?: "optimized" | "development";
 }
 async function penSettings(snapshotRoot: string): Promise<PenSettings> {
   const pen = JSON.parse(await Deno.readTextFile(`${snapshotRoot}/pen.json`));
@@ -90,12 +108,16 @@ async function penSettings(snapshotRoot: string): Promise<PenSettings> {
   if (!settings?.imports || !Array.isArray(settings.nativeAssets?.roots)) {
     throw new Error(`${snapshotRoot}/pen.json has no compiler settings`);
   }
-  const inside = async (path: string, label: string) => {
-    const local = relocated[path] ?? path;
+  const located = (path: string, label: string) => {
+    const local = relocated[path.replace(/\/+$/, "")] ?? path;
     const absolute = resolve(snapshotRoot, local);
     if (!absolute.startsWith(`${snapshotRoot}/`)) {
       throw new Error(`${label} ${path} leaves the snapshot; relocate it`);
     }
+    return absolute;
+  };
+  const inside = async (path: string, label: string) => {
+    const absolute = located(path, label);
     if (!(await Deno.stat(absolute)).isDirectory) {
       throw new Error(`${label} ${path} is not a snapshot directory`);
     }
@@ -109,7 +131,24 @@ async function penSettings(snapshotRoot: string): Promise<PenSettings> {
   for (const root of settings.nativeAssets.roots) {
     nativeAssetRoots.push(await inside(String(root), "native asset root"));
   }
-  return { imports, nativeAssetRoots };
+  const nativeAssetImports = (settings.nativeAssets.imports ?? []).map((
+    item: NativeAssetImport,
+  ) => ({
+    ...item,
+    module: located(String(item.module), "asset module"),
+    path: located(String(item.path), "asset input"),
+  }));
+  const stdRoot = settings.std
+    ? await inside(settings.std, "standard library")
+    : undefined;
+  return {
+    imports,
+    nativeAssetRoots,
+    nativeAssetImports,
+    stdRoot,
+    inferenceBudget: settings.inferenceBudget,
+    codegenTier: settings.codegenTier,
+  };
 }
 
 /**
@@ -215,10 +254,13 @@ export async function gdevWorkloads(
     entry: `${snapshotRoot}/${entry}`,
     overlay: {},
     retained: true,
-    stdRoot: `${repo}/std`,
-    prelude: `${repo}/std/prelude.blot`,
+    stdRoot: settings.stdRoot ?? `${repo}/std`,
+    prelude: `${settings.stdRoot ?? `${repo}/std`}/prelude.blot`,
     imports: settings.imports,
     nativeAssetRoots: settings.nativeAssetRoots,
+    nativeAssetImports: settings.nativeAssetImports,
+    inferenceBudget: settings.inferenceBudget,
+    codegenTier: settings.codegenTier,
     scenarios,
   });
   return [

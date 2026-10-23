@@ -28,7 +28,8 @@
     "package:build": "deno task build:compiler && deno task package:pack",
     "package:check": "deno task package:build && deno publish --dry-run --allow-dirty",
     "lint:zig:dev": "deno run --allow-env=ZIG_ANALYZER --allow-read --allow-write --allow-run scripts/lint_zig.ts --changed",
-    "test:native:inventory": "deno run --allow-env=ZIG --allow-read --allow-write --allow-run scripts/native_test_inventory.ts"
+    "test:native:inventory": "deno run --allow-env=ZIG --allow-read --allow-write --allow-run scripts/native_test_inventory.ts",
+    "bench:compiler-build": "python3 scripts/bench/compiler_iteration.py"
   },
   "imports": {
     "@mewhhaha/baba": "npm:@jsr/mewhhaha__baba@9.0.1"

@@ -1,5 +1,48 @@
 # Compile-time hills
 
+## Current queue: CT95–CT101 (23 October 2026)
+
+CT95 and **CT96 are complete**. The [CT96 qualification](zig-native/CT96_QUALIFICATION.md)
+records seven unprofiled release pairs: game CPU falls 28.6%, devtools CPU falls
+29.0%, and all output, edit/revert/restart and full compiler checks pass. Game
+median build wall changes from 17.24 to 12.16 s. The old scan has no self-CPU
+samples in the new profile (99.29% coverage). Keep the qualified candidate at
+`build/bench/ct96-20261023/candidate/blotc` as the next comparison baseline.
+
+**Next: CT97.** Effect-row node lookup and version traversal now own 27.4% of
+sampled CPU. CT98 remains open: code edits still offer zero backend candidates.
+CT99 is deferred because post-CT96 constant preparation is about 0.33 s, below
+its eligibility threshold. CT101's 12 s / 8 s absolute CPU milestones remain
+open; the current seven-pair fresh-game CPU median is 12.25 s.
+
+The table retains each hill's original hypothesis and acceptance target from
+[the preceding measurements](COMPILE_MEASUREMENTS.md). Update its cost baseline
+from the CT96 record before the next experiment. CT1–CT94 below are historical;
+the remaining targets are not promised speedups.
+
+| Hill                                                           | Evidence and experiment                                                                                                                                                                                                                                                                   | Acceptance target                                                                                                                                                                                                                                             |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CT95: trustworthy current measurements                         | Preserve all `pen.json` settings and frozen std; compare instrumented and ordinary builds; retain wall, process CPU, phase allocations, sampled CPU and output hashes.                                                                                                                    | Current baseline recorded; every run rejects input drift and output/revert differences. Profiling is separate from throughput acceptance.                                                                                                                     |
+| CT96: stop scanning every binding at ordinary call preparation | `prepareSpawnApplication` has 27.6% sampled self CPU. It scans every unit's bindings on each call and builds a module-pointer list on the positive path. Prepare immutable capability-presence/index data once per generator, retaining exact positive-path validation.                   | At least 20% less fresh-game CPU in seven alternating unprofiled pairs; task preparation under 5% of sampled CPU. Exact Wasm and all task authority/capture/OOM laws preserved.                                                                               |
+| CT97: bound effect-row resolution in large inference regions   | Backend inference is 9.64 s; `effects.Store.node`/`replacement` together own 19.0% sampled CPU. The former is a trivial load, so inspect its callers and locality; the latter follows chronological versions. Measure visits by region/cursor before choosing indexing or cached answers. | At least 25% less inference wall and 10% less whole-build CPU against the preceding accepted hill. No weakening of chronology, rollback, occurs checks, independent rows or work limits.                                                                      |
+| CT98: restore backend reuse for ordinary source edits          | Literal/body edits recheck one module but offer zero backend candidates and rebuild 4,266 named functions plus 1,424 closures. Explain the first rejection of the retained seed/receipt before changing admission.                                                                        | First milestone: literal/body edits at least 50% cheaper in CPU; next milestone below 4 s wall on this host. Fresh/edit/revert/restart outputs and rejection/recovery remain exact. No unchecked fallback may publish a reusable receipt.                     |
+| CT99: reduce constant preparation after removing the scan      | Constant-work clocks total 5.08 s, but nested runtime emission can be charged to this context. Reprofile after CT96; separate real value computation, static serialization and callable preparation before introducing reuse.                                                             | Pursue only if the residual eligible cost exceeds 10% of whole-build CPU; then reduce that cost by at least 30% and whole-build CPU by at least 5%. The earlier task-086 decision is not reopened merely by this broad clock.                                 |
+| CT100: reduce frontend allocation and repeated row work        | Frontend checking takes 1.16 s and requests roughly 1 GiB across 7.65 million allocations. Identify repeated owned copies/row traversals; preserve durability and failed-allocation cleanup.                                                                                              | At least 25% fewer checking allocations and 20% less check time, with no whole-build CPU regression. Requested bytes and peak RSS must both be reported.                                                                                                      |
+| CT101: qualify the combined result and keep the costs visible  | The first integrated target is fresh-game CPU below 12 s, then below 8 s after remeasurement. Preserve the historical 500 ms / 30 ms literal / 100 ms body targets as longer-term goals.                                                                                                  | Seven unprofiled pairs, fresh/retained/revert/restart equality, both entries, at most 5% CPU regression on unaffected workloads, complete compiler gate and zero lint. Publish each accepted hill's phase/counter change and update the next hill's baseline. |
+
+CT96's new profile selects **CT97** next. The old 27.6% scan estimate overlapped
+constant preparation and cannot be added to that clock as a separate saving.
+Assembly remains a small part of this workload; additional codegen workers are
+not a leading hill.
+
+For each experiment, write the hypothesis and acceptance threshold first. Keep
+failed candidates and their measurements separate from the accepted baseline. If
+two bounded experiments miss the whole-build target, stop that approach, record
+the result and move to the next measured cost. Update this queue after each
+accepted change rather than executing the historical 94 entries again.
+
+## Historical program: CT1–CT94
+
 A program of 94 hills to cut the time Blot takes to compile, measured on the
 gdev game. It follows the [twenty-hill program](PLAN.md#twenty-hill-program),
 whose targets it keeps:

@@ -125,6 +125,9 @@ pub const Generator = struct {
     work_timing: @import("backend_timing.zig").Work = .{},
     allocator: Allocator,
     units: []const core.Module,
+    /// Owned pointer view of the immutable units, present only when a binding
+    /// carries a spawn contract. Rebuilt for each generator, never retained.
+    spawn_units: []const *const core.Module,
     artifacts: ?*code_artifacts.Context = null,
     retained: ?*artifact_fragment.State = null,
     principal_state: ?*principal_evidence_reuse.State = null,
@@ -186,7 +189,16 @@ pub const Generator = struct {
         for (units) |unit_| for (unit_.closures) |closure_| {
             if (unit_.types.node(closure_.parameter.ty).tag == .scoped) scoped_effects = true;
         };
-        return .{ .allocator = allocator, .units = units, .module = module, .request_owner = owner, .scoped_effects = scoped_effects, .evaluator = evaluator, .representations = representations, .planning = @import("backend_plan.zig").State.init(allocator) };
+        const spawn_units: []const *const core.Module = spawn: {
+            for (units) |unit_| for (unit_.bindings) |binding| {
+                if (binding.capability_flow != .spawn_task) continue;
+                const pointers = try allocator.alloc(*const core.Module, units.len);
+                for (units, pointers) |*source_unit, *pointer| pointer.* = source_unit;
+                break :spawn pointers;
+            };
+            break :spawn &.{};
+        };
+        return .{ .allocator = allocator, .units = units, .spawn_units = spawn_units, .module = module, .request_owner = owner, .scoped_effects = scoped_effects, .evaluator = evaluator, .representations = representations, .planning = @import("backend_plan.zig").State.init(allocator) };
     }
     fn principalLookup(context: *anyopaque, target: core.BindingRef, options: core_eval.Options) Allocator.Error!?core_eval.SolvedEvidence {
         const self: *Generator = @ptrCast(@alignCast(context));
@@ -261,6 +273,7 @@ pub const Generator = struct {
         };
     }
     fn deinit(self: *Generator) void {
+        self.allocator.free(self.spawn_units);
         self.numeric_rows.deinit(self.allocator);
         self.demand_lowering.deinit(self.allocator);
         self.planning.deinit(self.allocator);
