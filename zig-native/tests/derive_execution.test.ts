@@ -1,10 +1,5 @@
 import { strict as assert } from "node:assert";
-import {
-  dataShapes,
-  deriveCodec,
-  deriveEqualityAndDebug,
-  type DeriveSchema,
-} from "../../compiler/derive.ts";
+import { dataShapes, deriveCodec, deriveEqualityAndDebug, type DeriveSchema } from "../../compiler/derive.ts";
 import { decodeText } from "../../compiler/text.ts";
 import { deriveFile } from "../../scripts/derive.ts";
 import { compileAndRun } from "./compile_helpers.ts";
@@ -168,8 +163,7 @@ Deno.test("derivation rejects unsupported fields and unstable schema maps", asyn
 });
 
 Deno.test("explicit schema migration preserves field IDs across source reordering", async () => {
-  const source =
-    "type Ticket is data = #Ticket { active: Bool, number: U32 } | #Empty\n";
+  const source = "type Ticket is data = #Ticket { active: Bool, number: U32 } | #Empty\n";
   const [ticket] = await dataShapes(source);
   const schema: DeriveSchema = {
     version: 2,
@@ -361,6 +355,53 @@ entry const run = fn () => do:
     #Nothing => 0
 `,
     (guest) => assert.equal(guest.call("run", null), 1),
+    { stdRoot: new URL("../../std/", import.meta.url).pathname },
+  );
+});
+
+Deno.test("scalar codec emission preserves strict words and rejects malformed framing", async () => {
+  const declarations = "type Fixed is data = #Fixed { number: U32, enabled: Bool }\n";
+  const [shape] = await dataShapes(declarations);
+  const schema = { version: 2, variants: { Fixed: { tag: 9, fields: { number: 20, enabled: 10 } } } };
+  const options = {
+    scalars: {
+      U32: { encode: "unsigned_word", decode: "unsigned_value" },
+      Bool: { encode: "boolean_word", decode: "boolean_value" },
+    },
+  };
+  const generated = deriveCodec(shape, schema, options);
+  assert.throws(
+    () => deriveCodec(shape, schema, { scalars: { U32: { encode: "bad call", decode: "read" } } }),
+    /Invalid scalar/,
+  );
+  await compileAndRun(
+    `
+import * as _derive_codec from "std/codec"
+${declarations}
+const unsigned_word = fn (value: U32) => value
+const unsigned_value = fn (word: U32) => #Some word
+const boolean_word = fn value => if value then 1 else 0
+const boolean_value = fn (word: U32) => if word <= 1 then #Some (word == 1) else #Nothing
+${generated}
+entry const encode = fn () => _derive_codec.encode (#Fixed { number: 4294967295, enabled: #True })
+entry const decode = fn (words: Array U32) => do:
+  let value: Maybe Fixed = _derive_codec.Codec.decode words
+  return case value of
+    #Some (#Fixed { number, enabled }) => if enabled then number else 0
+    #Nothing => 0
+`,
+    (guest) => {
+      const expected = Uint32Array.of(2, 9, 2, 10, 1, 1, 20, 1, 0xffffffff);
+      assert.deepEqual(guest.call("encode", null), expected);
+      assert.equal(guest.call("decode", expected), 0xffffffff);
+      for (let end = 0; end < expected.length; end++) assert.equal(guest.call("decode", expected.slice(0, end)), 0);
+      for (const [offset, word] of [[0, 1], [1, 0], [2, 1], [3, 20], [4, 2], [5, 2], [6, 10], [7, 0]]) {
+        const malformed = expected.slice();
+        malformed[offset] = word;
+        assert.equal(guest.call("decode", malformed), 0);
+      }
+      assert.equal(guest.call("decode", Uint32Array.of(...expected, 0)), 0);
+    },
     { stdRoot: new URL("../../std/", import.meta.url).pathname },
   );
 });
