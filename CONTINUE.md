@@ -1,5 +1,14 @@
 # Continue here
 
+Local installation, 24 October 2026: the qualified performance release from
+`1aa132e` is installed as `~/.local/bin/blot` and `~/.local/bin/blotc`. Both
+resolve through `PATH`; formatting, checking and building work outside the
+repository. CLI and native builds produce identical Wasm, and the list example
+returns 29. The CLI bundles the matching compiler, parser, guide and standard
+library. Installation hashes and verification are in
+`build/install/ct97-1aa132e/installed.json`; previous executables are preserved
+under `build/install/ct97-1aa132e/previous-7c3_oje0`.
+
 CT97/CT98/BT4 checkpoint, 24 October 2026: Seven alternating release pairs
 reduce fresh game CPU by **32.5%** against CT96; median build wall falls from
 **13.60 to 8.68 s**, with identical Wasm. Matching instrumented inference falls
@@ -17,7 +26,7 @@ release, comparisons and raw evidence. Next, attribute the three large
 principal-region rebuilds and the remaining frontend allocations. Keep exact
 source/input/replay checks; executable index capacity is no longer the observed
 blocker. The separate text-capability changes remain preserved outside this
-candidate; this work does not replace the locally installed compiler.
+candidate.
 
 Post-CT96 review, 23 October 2026: `c5b9ad1` commits the measurement tools and
 qualified spawn optimization. The [new performance review](PERFORMANCE_REVIEW.md)

@@ -172,8 +172,14 @@ application commands; `final-gate-command.json` records full qualification. Use
 Zig 0.17.0; native tests use Safe/noLLVM and application performance uses the
 final LLVM release. The original frozen workload remains at
 `build/bench/compile-cost-20261023`. The final release is
-`build/bench/ct97/final-src/zig-native/zig-out/bin/blotc`. Locally installed
-tools have not been replaced.
+`build/bench/ct97/final-src/zig-native/zig-out/bin/blotc`. The qualified release
+was installed as `~/.local/bin/blot` and `~/.local/bin/blotc` after publication
+on 24 October 2026. The raw compiler matches the SHA-256 above; the CLI bundles
+the same compiler and matching parser, guide and standard library. The CLI
+passes external-directory formatting, checking and building. Both commands emit
+identical Wasm, which executes the list example with result 29. Previous
+executables and installation evidence are preserved under
+`build/install/ct97-1aa132e/`.
 
 ## Bounded experiments and remaining targets
 
@@ -202,5 +208,5 @@ Two intermediate development attempts failed because they used a missing
 analyzer path; the successful rerun uses the pinned analyzer in `build/tools`.
 An initial diagnostic failed to forward counters; a later one captured them,
 then its retained edit was deliberately stopped. These are retained as
-incomplete evidence, never counted as passes. No candidate from this work is
-installed.
+incomplete evidence, never counted as passes. Intermediate candidates were not
+installed; only the final qualified release was installed after publication.

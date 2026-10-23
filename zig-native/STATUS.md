@@ -11,8 +11,11 @@ cuts 33 exhaustive sweeps from 44,074 to 37,930 runs. The isolated full gate
 passes 2,540 exhaustive native laws, 1,648 guest checks, 48 smoke checks and
 57 tooling checks, with zero Zig lint findings. See
 [qualification](CT97_QUALIFICATION.md). CT97 is complete; CT98 and BT4 retain
-their remaining timing targets. The separate text repair and installed tools
-are outside this candidate.
+their remaining timing targets. The separate text repair remains outside this
+candidate. The qualified release was installed locally on 24 October 2026; see
+the installation checkpoint in
+[the handoff](../CONTINUE.md).
+
 ## CT96 spawn preparation, 23 October 2026
 
 The [qualified optimization](CT96_QUALIFICATION.md) scans for spawn contracts once
