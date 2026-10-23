@@ -69,11 +69,9 @@ pub const EditorCapture = struct {
     namespace: symbols.Symbol = 0,
     context: ?@import("../reuse/hole_diagnostics.zig").Snapshot = null,
 };
-const default_inference_budget = if (@hasDecl(@import("root"), "compiler_defaults")) @import("root").compiler_defaults.inference_budget else 1_000_000;
 fn inferenceBudget(options: ModuleOptions) usize {
     if (options.max_inference_transitions) |limit| return limit;
-    if (@hasDecl(@import("root"), "inferenceBudget")) return @import("root").inferenceBudget();
-    return default_inference_budget;
+    return @import("../inference_limits.zig").configured();
 }
 pub const ModuleOptions = struct { editor: ?EditorMarker = null, purity_origins: ModuleOrigins = .{}, builtin_catalog: bool = false, prelude_unit: u32 = 0, inherited_fixities: []const ImportedFixity = &.{}, max_inference_transitions: ?usize = null, associated_remaining: ?*usize = null, body_source: []const u8 = &.{}, retained_bodies: ?*@import("../reuse/body_check_cache.zig").Cache = null, previous_bodies: ?*const @import("../reuse/body_check_cache.zig").Cache = null, body_external_names: ?@import("../reuse/body_check_cache.zig").ExternalNames = null, producer_capabilities: ?ProducerCapabilities = null, producer_storage: ?ProducerStorage = null };
 /// Private differential control. This changes execution, never semantic module

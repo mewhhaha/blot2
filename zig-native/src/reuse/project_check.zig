@@ -821,7 +821,7 @@ fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: c
 fn checkProjectModeDeferring(allocator: Allocator, source: *project.Project, execution: check.PrivateExecution, previous: ?entry_cutoff.Previous, editor: ?EditorQuery, retain_bodies: bool, defer_entry: bool, first_diagnostic: bool) !CheckedProject {
     const timing = @import("../phase_profile.zig").enter(.check);
     defer timing.exit();
-    var engine: Engine = .{ .allocator = allocator, .source = source, .result = .{}, .execution = execution, .editor = editor, .retain_bodies = retain_bodies };
+    var engine: Engine = .{ .associated_remaining = @import("../inference_limits.zig").configured(), .allocator = allocator, .source = source, .result = .{}, .execution = execution, .editor = editor, .retain_bodies = retain_bodies };
     defer engine.previous_bodies.deinit(allocator);
     try engine.offerBodies(previous);
     errdefer engine.result.deinit(allocator);

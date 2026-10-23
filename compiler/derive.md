@@ -90,6 +90,14 @@ source type so imported user-defined element implementations remain available
 during generic specialization. The one-layer array tests cover records, generic
 types, custom codecs, and malformed payloads. More deeply nested generic
 collections still need explicit operation implementations when their required
-contracts cannot be resolved. Repeated field framing copies the accumulated
-fixed-size record prefix; array construction collects words in a List before one
-conversion.
+contracts cannot be resolved. Record encoding computes the complete size and
+writes framing and payloads into one output buffer. Array payload construction
+collects words in a List before one conversion.
+
+The TypeScript `deriveCodec(shape, schema, options)` API also accepts
+`options.scalars`, a map from a scalar type spelling to named `encode` and
+`decode` functions. Each encoder returns one U32 word; each decoder returns a
+`Maybe` scalar. If every field in a constructor has such a mapping, its codec
+emits and reads the fixed frame directly. The contract owner supplies these
+operations, and the generated module still undergoes native checking. Framing,
+field IDs, version checks and malformed-input rejection remain the same.

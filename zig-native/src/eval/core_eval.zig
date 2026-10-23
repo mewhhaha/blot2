@@ -1534,7 +1534,7 @@ pub const Session = struct {
                 for (0..payload.b) |field| field_locations.putAssumeCapacity(.{ .family = first.family, .tag = constructor.tag, .name = module.types.recordField(payload, field).name }, .{ .field = @intCast(field), .len = payload.b });
             }
         }
-        return .{ .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .node_count = node_count, .field_locations = field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = has_implementations, .has_generative_sources = has_generative_sources };
+        return .{ .associated_remaining = @import("../inference_limits.zig").configured(), .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .node_count = node_count, .field_locations = field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = has_implementations, .has_generative_sources = has_generative_sources };
     }
     /// A private session over exactly `parent.units`. The facts Session.init
     /// derives from those immutable units (the implementation and generative
@@ -1547,7 +1547,7 @@ pub const Session = struct {
         @memset(slots, .{});
         var storage = try value_storage.Store.init(allocator);
         errdefer storage.deinit(allocator);
-        return .{ .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = parent.units, .providers = provider_chain.Store.init(allocator), .binding_offsets = parent.binding_offsets, .node_offsets = parent.node_offsets, .slots = slots, .node_count = parent.node_count, .borrowed_tables = true, .field_locations = parent.field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = parent.has_implementations, .has_generative_sources = parent.has_generative_sources };
+        return .{ .associated_remaining = @import("../inference_limits.zig").configured(), .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = parent.units, .providers = provider_chain.Store.init(allocator), .binding_offsets = parent.binding_offsets, .node_offsets = parent.node_offsets, .slots = slots, .node_count = parent.node_count, .borrowed_tables = true, .field_locations = parent.field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = parent.has_implementations, .has_generative_sources = parent.has_generative_sources };
     }
     pub fn deinit(self: *Session) void {
         self.retained.deinit(self.allocator);

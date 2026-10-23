@@ -308,8 +308,27 @@ function checkedSchema(shape: DeriveShape, schema: DeriveSchema) {
   }
 }
 
-/** Emit a strict versioned numeric-lane codec from explicit persisted IDs. */
-export function deriveCodec(shape: DeriveShape, schema: DeriveSchema): string {
+/** Explicit scalar operations supplied by the owner of the Codec contract.
+ * encode takes one scalar and returns one U32; decode returns Maybe scalar.
+ * Both are checked with the rest of the emitted source by the native compiler.
+ */
+export interface CodecEmission {
+  scalars?: Record<string, { encode: string; decode: string }>;
+}
+
+/** Emit strict framing directly into exact buffers; never rewrite emitted source. */
+export function deriveCodec(
+  shape: DeriveShape,
+  schema: DeriveSchema,
+  options: CodecEmission = {},
+): string {
+  for (const operation of Object.values(options.scalars ?? {})) {
+    for (const name of [operation.encode, operation.decode]) {
+      if (!/^[A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)*$/.test(name)) {
+        throw new Error(`Invalid scalar codec operation: ${name}`);
+      }
+    }
+  }
   for (const constructor of shape.constructors) {
     for (const field of constructor.fields) {
       if (new RegExp(`\\b${shape.name}\\b`).test(field.type)) {
@@ -325,41 +344,79 @@ export function deriveCodec(shape: DeriveShape, schema: DeriveSchema): string {
     }
   }
   checkedSchema(shape, schema);
-  const encodeName = `_derive_${shape.name.toLowerCase()}_encode`;
-  const encodeArms = shape.constructors.flatMap((constructor) => {
+  const plans = shape.constructors.map((constructor) => {
     const variant = schema.variants[constructor.name];
-    const sorted = constructor.fields.map((field, index) => ({
+    const fields = constructor.fields.map((field, index) => ({
       ...field,
       index,
       id: variant.fields[field.name],
-    })).sort((left, right) => left.id - right.id);
-    const lines = [
-      `  ${pattern(constructor, "v")} => do:`,
-      `    let out = #[${schema.version}, ${variant.tag}, ${sorted.length}]`,
-    ];
-    for (const field of sorted) {
-      if (field.type.startsWith("Array ")) {
-        lines.push(
-          `    let collected${field.index}: List U32 = [v${field.index}.length]`,
-          `    for item${field.index} in v${field.index}:`,
-          `      let item_words${field.index} = _derive_codec.encode item${field.index}`,
-          `      collected${field.index} := [...self, item_words${field.index}.length]`,
-          `      for word${field.index} in item_words${field.index}:`,
-          `        collected${field.index} := [...self, word${field.index}]`,
-          `    let payload${field.index} = Array.from_list collected${field.index}`,
-        );
-      } else {
-        lines.push(
-          `    let payload${field.index} = _derive_codec.encode v${field.index}`,
-        );
+      scalar: options.scalars?.[field.type],
+    })).sort((a, b) => a.id - b.id);
+    return {
+      constructor,
+      variant,
+      fields,
+      fixed: fields.every((field) => field.scalar),
+    };
+  });
+  const encodeName = `_derive_${shape.name.toLowerCase()}_encode`;
+  const encodeArms = plans.flatMap(
+    ({ constructor, variant, fields, fixed }) => {
+      const lines = [`  ${pattern(constructor, "v")} => do:`];
+      if (fixed) {
+        const words: (string | number)[] = [
+          schema.version,
+          variant.tag,
+          fields.length,
+        ];
+        for (const f of fields) {
+          words.push(f.id, 1, `${f.scalar!.encode} v${f.index}`);
+        }
+        lines.push(`    break #[${words.join(", ")}]`);
+        return lines;
+      }
+      for (const field of fields) {
+        if (field.type.startsWith("Array ")) {
+          lines.push(
+            `    let collected${field.index}: List U32 = [v${field.index}.length]`,
+            `    for item${field.index} in v${field.index}:`,
+            `      let item_words${field.index} = _derive_codec.encode item${field.index}`,
+            `      collected${field.index} := [...self, item_words${field.index}.length]`,
+            `      for word${field.index} in item_words${field.index}:`,
+            `        collected${field.index} := [...self, word${field.index}]`,
+            `    let payload${field.index} = Array.from_list collected${field.index}`,
+          );
+        } else {lines.push(
+            `    let payload${field.index} = _derive_codec.encode v${field.index}`,
+          );}
       }
       lines.push(
-        `    out := @array.concat self (_derive_codec.frame ${field.id} payload${field.index})`,
+        `    let out = @array.fill (${
+          [
+            3 + 2 * fields.length,
+            ...fields.map((f) => `payload${f.index}.length`),
+          ].join(" + ")
+        }) 0`,
+        `    out[0] := ${schema.version}`,
+        `    out[1] := ${variant.tag}`,
+        `    out[2] := ${fields.length}`,
       );
-    }
-    lines.push(`    break out`);
-    return lines;
-  });
+      if (fields.length) lines.push("    let cursor = 3");
+      fields.forEach((f, index) => {
+        lines.push(
+          `    out[cursor] := ${f.id}`,
+          `    out[cursor + 1] := payload${f.index}.length`,
+          `    for index in 0 .. payload${f.index}.length:`,
+          `      out[cursor + 2 + index] := payload${f.index}[index]`,
+        );
+        if (index + 1 < fields.length) {
+          lines.push(`    cursor := self + 2 + payload${f.index}.length`);
+        }
+      });
+      lines.push("    break out");
+      return lines;
+    },
+  );
   const parameter = shape.parameters.length === 0
     ? ""
     : shape.parameters.length === 1
@@ -369,84 +426,107 @@ export function deriveCodec(shape: DeriveShape, schema: DeriveSchema): string {
   const encodeAnnotation = shape.parameters.length
     ? `: ${typeHead(shape)} -> Array U32${requirement}`
     : "";
-  const decodeArms = shape.constructors.flatMap((constructor) => {
-    const variant = schema.variants[constructor.name];
-    const sorted = constructor.fields.map((field, index) => ({
-      ...field,
-      index,
-      id: variant.fields[field.name],
-    })).sort((left, right) => left.id - right.id);
-    const lines = [
-      `    if tag == ${variant.tag}:`,
-      `      if count != ${sorted.length}:`,
-      `        return #Nothing`,
-      `      let tail0 = rest`,
-    ];
-    sorted.forEach((field, position) => {
-      lines.push(
-        `      let #Some (payload${position}, tail${
-          position + 1
-        }) = _derive_codec.take_field ${field.id} tail${position} else:`,
-        `        return #Nothing`,
-      );
-      if (field.type.startsWith("Array ")) {
-        const element = field.type.slice("Array ".length);
+  const decodeArms = plans.flatMap(
+    ({ constructor, variant, fields, fixed }) => {
+      const lines = [
+        `    if tag == ${variant.tag}:`,
+        `      if count != ${fields.length}:`,
+        "        return #Nothing",
+      ];
+      if (fixed) {
         lines.push(
-          `      if payload${position}.length == 0:`,
-          `        return #Nothing`,
-          `      let element_count${field.index} = payload${position}[0]`,
-          `      let cursor${field.index} = 1`,
-          `      let elements${field.index}: List ${
-            typeArgument(element)
-          } = []`,
-          `      for ignored${field.index} in 0..element_count${field.index}:`,
-          `        if cursor${field.index} >= payload${position}.length:`,
-          `          return #Nothing`,
-          `        let width${field.index} = payload${position}[cursor${field.index}]`,
-          `        cursor${field.index} := self + 1`,
-          `        if width${field.index} > payload${position}.length - cursor${field.index}:`,
-          `          return #Nothing`,
-          `        let item_words${field.index} = @array.slice payload${position} cursor${field.index} width${field.index}`,
-          `        let item_decoded${field.index}: Maybe ${
-            typeArgument(element)
-          } = _derive_codec.Codec.decode item_words${field.index}`,
-          `        let #Some item${field.index} = item_decoded${field.index} else:`,
-          `          return #Nothing`,
-          `        elements${field.index} := [...self, item${field.index}]`,
-          `        cursor${field.index} := self + width${field.index}`,
-          `      if cursor${field.index} != payload${position}.length:`,
-          `        return #Nothing`,
-          `      let value${field.index} = Array.from_list elements${field.index}`,
+          `      if words.length != ${3 + fields.length * 3}:`,
+          "        return #Nothing",
         );
-      } else {
+      } else lines.push("      let cursor = 3");
+      fields.forEach((field, position) => {
+        if (fixed) {
+          const offset = 3 + 3 * position;
+          lines.push(
+            `      if words[${offset}] != ${field.id} || words[${
+              offset + 1
+            }] != 1:`,
+            "        return #Nothing",
+            `      let #Some value${field.index} = ${
+              field.scalar!.decode
+            } words[${offset + 2}] else:`,
+            "        return #Nothing",
+          );
+          return;
+        }
         lines.push(
-          `      let decoded${field.index}: Maybe ${
-            typeArgument(field.type)
-          } = _derive_codec.Codec.decode payload${position}`,
-          `      let #Some value${field.index} = decoded${field.index} else:`,
-          `        return #Nothing`,
+          "      if words.length - cursor < 2:",
+          "        return #Nothing",
+          `      if words[cursor] != ${field.id}:`,
+          "        return #Nothing",
+          `      let width${position} = words[cursor + 1]`,
+          "      cursor := self + 2",
+          `      if width${position} > words.length - cursor:`,
+          "        return #Nothing",
+          `      let payload${position} = @array.slice words cursor width${position}`,
+          `      cursor := self + width${position}`,
+        );
+        if (field.type.startsWith("Array ")) {
+          const element = field.type.slice("Array ".length);
+          lines.push(
+            `      if payload${position}.length == 0:`,
+            "        return #Nothing",
+            `      let element_count${field.index} = payload${position}[0]`,
+            `      if element_count${field.index} > payload${position}.length - 1:`,
+            "        return #Nothing",
+            `      let cursor${field.index} = 1`,
+            `      let elements${field.index}: List ${
+              typeArgument(element)
+            } = []`,
+            `      for ignored${field.index} in 0..element_count${field.index}:`,
+            `        if cursor${field.index} >= payload${position}.length:`,
+            "          return #Nothing",
+            `        let element_width${field.index} = payload${position}[cursor${field.index}]`,
+            `        cursor${field.index} := self + 1`,
+            `        if element_width${field.index} > payload${position}.length - cursor${field.index}:`,
+            "          return #Nothing",
+            `        let item_words${field.index} = @array.slice payload${position} cursor${field.index} element_width${field.index}`,
+            `        let item_decoded${field.index}: Maybe ${
+              typeArgument(element)
+            } = _derive_codec.Codec.decode item_words${field.index}`,
+            `        let #Some item${field.index} = item_decoded${field.index} else:`,
+            "          return #Nothing",
+            `        elements${field.index} := [...self, item${field.index}]`,
+            `        cursor${field.index} := self + element_width${field.index}`,
+            `      if cursor${field.index} != payload${position}.length:`,
+            "        return #Nothing",
+            `      let value${field.index} = Array.from_list elements${field.index}`,
+          );
+        } else {lines.push(
+            `      let decoded${field.index}: Maybe ${
+              typeArgument(field.type)
+            } = _derive_codec.Codec.decode payload${position}`,
+            `      let #Some value${field.index} = decoded${field.index} else:`,
+            "        return #Nothing",
+          );}
+      });
+      if (!fixed) {
+        lines.push(
+          "      if cursor != words.length:",
+          "        return #Nothing",
         );
       }
-    });
-    lines.push(
-      `      if tail${sorted.length}.length != 0:`,
-      `        return #Nothing`,
-    );
-    const values = constructor.fields.map((field, index) =>
-      constructor.payload === "record"
-        ? `${field.name}: value${index}`
-        : `value${index}`
-    );
-    const constructed = constructor.payload === "none"
-      ? `#${constructor.name}`
-      : constructor.payload === "record"
-      ? `#${constructor.name} { ${values.join(", ")} }`
-      : constructor.payload === "product"
-      ? `#${constructor.name} (${values.join(", ")})`
-      : `#${constructor.name} ${values[0]}`;
-    lines.push(`      return #Some (${constructed})`);
-    return lines;
-  });
+      const values = constructor.fields.map((field, index) =>
+        constructor.payload === "record"
+          ? `${field.name}: value${index}`
+          : `value${index}`
+      );
+      const constructed = constructor.payload === "none"
+        ? `#${constructor.name}`
+        : constructor.payload === "record"
+        ? `#${constructor.name} { ${values.join(", ")} }`
+        : constructor.payload === "product"
+        ? `#${constructor.name} (${values.join(", ")})`
+        : `#${constructor.name} ${values[0]}`;
+      lines.push(`      return #Some (${constructed})`);
+      return lines;
+    },
+  );
   return [
     `const ${encodeName}${encodeAnnotation} = fn value => case value of`,
     ...encodeArms,
@@ -454,15 +534,14 @@ export function deriveCodec(shape: DeriveShape, schema: DeriveSchema): string {
       typeHead(shape)
     }${requirement} = {`,
     `  const encode = fn value => ${encodeName} value,`,
-    `  const decode = fn words => do:`,
+    "  const decode = fn words => do:",
     `    if words.length < 3 || words[0] != ${schema.version}:`,
-    `      return #Nothing`,
-    `    let tag = words[1]`,
-    `    let count = words[2]`,
-    `    let rest = @array.slice words 3 (words.length - 3)`,
+    "      return #Nothing",
+    "    let tag = words[1]",
+    "    let count = words[2]",
     ...decodeArms,
-    `    break #Nothing`,
-    `}`,
+    "    break #Nothing",
+    "}",
     "",
   ].join("\n");
 }
