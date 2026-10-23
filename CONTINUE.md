@@ -1,5 +1,12 @@
 # Continue here
 
+23 October 2026: the [compact symbolic journal](zig-native/SYMBOLIC_JOURNAL.md)
+is qualified: 2,527 exhaustive native laws, 1,640 guest/client checks, exact
+application output and a seven-pair CPU guard of 1.01083 (limit 1.05). A native
+screen requested 43.8 MB less per fresh/edit/revert phase and reduced peak RSS.
+The language task/channel batch is separate, still in progress and unqualified;
+issues #25/#27 and the remaining task requirements stay open.
+
 23 October 2026: [the completion plan](FINISH_PLAN.md) orders the preserved
 local candidate, the remaining task records, and issue #25's remaining
 language/runtime milestones. New issues #26 (numeric layouts) and #27

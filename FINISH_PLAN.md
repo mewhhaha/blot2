@@ -10,6 +10,12 @@ comparison separate from allocation-free contract research.
 
 ## Execution checkpoint, 23 October 2026
 
+The [compact symbolic instruction journal](zig-native/SYMBOLIC_JOURNAL.md)
+passes the full compiler gate and strict seven-pair application comparison.
+It reduces temporary allocation in emission; it does not close the remaining
+performance targets. The task-region, tuple receive and channel lifecycle batch
+is still being implemented and has no integrated release qualification.
+
 Milestone 1 is integrated and passes the complete compiler gate. Issue 26's
 bounded numeric layout repair passes both-tier runtime, allocation, immutable
 snapshot, host-copy and fresh/retained/restart checks. The
