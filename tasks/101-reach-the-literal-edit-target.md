@@ -62,3 +62,11 @@ fresh/retained Wasm and diagnostics byte-identical.
   on the 084 workload.
 - Remaining limitations: not yet assessed.
 - Durable record: pending; link qualification outside `tasks/` before cleanup.
+
+## Current attribution, 23 October 2026
+
+Task 086's completed gate bounds sampled constant work at a median 14.9% of
+later-edit CPU (16.9% under tick sensitivity). Plain current-main later edits
+still take about 1,188 ms median. Backend runtime-function reconstruction and
+non-constant inference are larger; the below-30-ms target remains open. See
+[the evidence](../zig-native/CONSTANT_REUSE.md#measurement-gate-resolved-23-october-2026).

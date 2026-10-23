@@ -29,10 +29,18 @@ import {
 } from "./gdev.ts";
 
 const repo = resolve(fileURLToPath(new URL("../..", import.meta.url)));
+async function digest(path: string): Promise<string> {
+  return [
+    ...new Uint8Array(
+      await crypto.subtle.digest("SHA-256", await Deno.readFile(path)),
+    ),
+  ].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 const usage = `Usage: deno task profile:compile [--blotc BLOTC]
   [--workload game|devtools] [--test tests/NAME.blot] [--edit SCENARIO]
   [--runs 3] [--reps 10] [--min-ms 3] [--max-ms 10] [--top 40]
   [--snapshot DIR] [--out DIR] [--codegen-workers 4]
+  [--successive-literals] [--verify-manifest]
        deno task profile:compile --aggregate SAMPLES.jsonl... [--top 40]
 Results: build/tmp/profile/<timestamp>/{samples.jsonl,report.txt}.`;
 
@@ -43,6 +51,8 @@ const { values: args, positionals } = parseArgs({
     workload: { type: "string", default: "game" },
     test: { type: "string" },
     edit: { type: "string" },
+    "successive-literals": { type: "boolean", default: false },
+    "verify-manifest": { type: "boolean", default: false },
     runs: { type: "string", default: "3" },
     reps: { type: "string", default: "10" },
     "min-ms": { type: "string", default: "3" },
@@ -131,6 +141,7 @@ async function sampleRun(
     ],
     env: {
       SAMPLE_CONTROL: control,
+      SAMPLE_RUN: String(run),
       SAMPLE_BINARY: blotc,
       SAMPLE_OUT: `${out}/samples.jsonl`,
       SAMPLE_MIN_MS: args["min-ms"]!,
@@ -184,6 +195,11 @@ async function sampleRun(
           cpu_ms: ((await ticks()) - before) * 10,
           cpu_accounting: "Linux USER_HZ=100 child user plus system ticks",
           codegen_workers: codegenWorkers,
+          wasm_sha256: [
+            ...new Uint8Array(
+              await crypto.subtle.digest("SHA-256", result.bytes),
+            ),
+          ].map((byte) => byte.toString(16).padStart(2, "0")).join(""),
           stats: result.stats,
         }) + "\n",
         { append: true },
@@ -193,10 +209,31 @@ async function sampleRun(
     if (scenario && edited) {
       await build({}, "population");
       measured = async () => {
+        const second =
+          args["successive-literals"] && scenario.name === "literal_constant"
+            ? Object.fromEntries(
+              Object.entries(edited).map(([path, source]) => {
+                if (!source.includes("const floor_half_extent = 61.0")) {
+                  throw new Error("Unexpected literal workload");
+                }
+                return [
+                  path,
+                  source.replace(
+                    "const floor_half_extent = 61.0",
+                    "const floor_half_extent = 62.0",
+                  ),
+                ];
+              }),
+            )
+            : undefined;
         for (let rep = 0; rep < Number(args.reps); rep++) {
-          await build(edited, `edit ${scenario.name}`);
-          await build({}, `revert ${scenario.name}`);
+          await build(
+            second && rep % 2 ? second : edited,
+            `edit ${scenario.name}`,
+          );
+          if (!second) await build({}, `revert ${scenario.name}`);
         }
+        if (second) await build({}, `revert ${scenario.name}`);
       };
     } else measured = () => build({}, "cold build");
     // The wrapper execs blotc in place, so the client's pid is the compiler.
@@ -393,6 +430,9 @@ async function main(): Promise<number> {
     return 0;
   }
   if (Deno.build.os !== "linux") throw new Error("profile:compile needs Linux");
+  if (args["successive-literals"] && args.edit !== "literal_constant") {
+    throw new Error("--successive-literals requires --edit literal_constant");
+  }
   const blotc = resolve(args.blotc ?? `${repo}/zig-native/zig-out/bin/blotc`);
   const snapshotRoot = resolve(
     args.snapshot ?? `${repo}/build/bench/gdev-snapshot`,
@@ -434,6 +474,30 @@ async function main(): Promise<number> {
       byte.toString(16).padStart(2, "0")
     ).join("");
   }
+  const manifest = JSON.parse(
+    await Deno.readTextFile(`${repo}/scripts/bench/gdev-manifest.json`),
+  ) as Record<string, string>;
+  for (
+    const [name, expected] of args["verify-manifest"]
+      ? Object.entries(manifest)
+      : []
+  ) {
+    const path = `${snapshotRoot}/${name}`;
+    if (await digest(path) !== expected) {
+      throw new Error(`Snapshot mismatch: ${name}`);
+    }
+    pins[path] = expected;
+  }
+  async function pinTree(directory: string): Promise<void> {
+    for await (const entry of Deno.readDir(directory)) {
+      const path = `${directory}/${entry.name}`;
+      if (entry.isDirectory) await pinTree(path);
+      else if (entry.isFile && entry.name.endsWith(".blot")) {
+        pins[path] = await digest(path);
+      }
+    }
+  }
+  await pinTree(`${repo}/std`);
   await Deno.writeTextFile(
     `${out}/metadata.json`,
     JSON.stringify(
@@ -455,6 +519,11 @@ async function main(): Promise<number> {
   const wrapper = await ptracerWrapper(out, blotc);
   for (let run = 0; run < Number(args.runs); run++) {
     await sampleRun(run, out, blotc, wrapper, workload);
+  }
+  for (const [path, expected] of Object.entries(pins)) {
+    if (await digest(path) !== expected) {
+      throw new Error(`Pinned input changed: ${path}`);
+    }
   }
   const text = report(await loadStacks([`${out}/samples.jsonl`]), top);
   await Deno.writeTextFile(`${out}/report.txt`, text + "\n");

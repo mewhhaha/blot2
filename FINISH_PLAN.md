@@ -18,6 +18,10 @@ measured compiler tradeoffs and rejected broad-inlining variants. Milestones 2
 and 3 still have the explicit remaining iterator and performance requirements
 below; issue 25's later language/runtime milestones are not complete.
 
+Task 086 is complete as not needed on the measured workload: its conservative
+constant-work estimate is 14.9% of later-edit CPU, below the 20% gate. Larger
+backend/inference work remains, and the eleven other task records stay open.
+
 Published commits: Blot `4091cb2` closes issue 26 after complete qualification.
 Pen `b2f06cf` reuses its validated module cache during scene discovery: warm
 export falls from 3.440 to 0.169 seconds and 2,471 to 105 MiB maximum RSS, with

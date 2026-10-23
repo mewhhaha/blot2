@@ -42,7 +42,7 @@ def stack(thread):
     thread.switch()
     frame = gdb.newest_frame()
     frames = []
-    while frame is not None and len(frames) < 500:
+    while frame is not None and len(frames) < 4096:
         try:
             sal = frame.find_sal()
             frames.append([
@@ -110,7 +110,8 @@ with open(os.environ["SAMPLE_OUT"], "a") as out:
                               else max(0, current - previous))
         except gdb.error:
             break
-        out.write(json.dumps({"t": time.time() - started, "st": stacks,
+        out.write(json.dumps({"t": time.time() - started, "wall_ns": time.time_ns(),
+                              "run": int(os.environ.get("SAMPLE_RUN", "0")), "frame_limit": 4096, "st": stacks,
                               "tid": tids, "cpu_ns": cpu_ns}) + "\n")
         out.flush()
         taken += 1

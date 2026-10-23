@@ -307,3 +307,83 @@ Source/archive/edit/recovery/checkpoint tests run both tiers and host modes.
 Root integration evidence is in
 `build/bench/finish-rest-20261015/pure-temporary-integration/`. This removes a
 blanket syntax/value deny switch without widening the portable graph authority.
+
+## Measurement gate resolved, 23 October 2026
+
+Task 086 is complete as **not needed on the current pinned workload**. Existing
+receipt implementations remain; no broader receipt authority is added.
+
+The LLVM compiler from main `4091cb2` (documentation-only main `2e0c974`) is
+`6daefd5ffc0331dc9a7dcd559244657f0350ef019da42244c1c3c4c7bef7140e`. The
+recreated 583-file workload has manifest
+`60e11cc0c22ba75b4c5bb892f02a3509d9835a710036874aad360fa09b19a030`. Each
+retained session runs four successive 61/62 scalar edits with persistence off
+and one codegen/semantic worker. All later-edit statistics exclude edit 1.
+
+Seven alternating baseline/current pairs also alternate plain/profiled modes.
+Median later-edit CPU is 1,178.7/1,188.2 ms without profiling and
+1,216.3/1,184.2 ms with profiling (baseline/current). The current paired median
+profile/plain ratio is 1.006; the paired current/baseline ratio is 0.970 in
+plain mode. Distributions overlap, so this is not a general speedup claim.
+Independent fresh controls, final reverts and all sampled builds preserve their
+exact Wasm.
+
+Seven CPU-weighted stack profiles cover 21 later edits. The initial 500-frame
+trace cap truncated relevant inference stacks; those results remain
+inconclusive. The final cap is 4,096, and the deepest observed stack is 803.
+Per-thread scheduler CPU is aligned with exact build windows; intervals crossing
+a build boundary are omitted and charged as unknown. Whole-child user/system
+ticks provide the edit CPU denominator.
+
+A frame in `backend_static_data` alone is insufficient evidence of data
+serialization: it can call `Generator.callable`, `function`, `closureFunction`
+or `reconstructRetained` to restore or emit a runtime function. That runtime
+work is separate. The conservative constant estimate counts every observed
+constant evaluation/preparation context, its nested inference, and remaining
+static-data serialization, including closure specialization and changed inputs.
+All uncovered or unattributed CPU is added to it. Because unchanged-input work
+is a subset, this estimate also bounds the sampled Quantity C; it does not claim
+to identify each constant's unchanged dependency set.
+
+| Run | Edit CPU, ms | Conservative constant estimate, ms | Share | Runtime function work beneath serializer, ms |
+| --- | -----------: | ---------------------------------: | ----: | -------------------------------------------: |
+| 1   |         1300 |                              166.6 | 12.8% |                                        415.1 |
+| 2   |         1170 |                              216.7 | 18.5% |                                        313.6 |
+| 3   |         1260 |                              198.2 | 15.7% |                                        331.0 |
+| 4   |         1250 |                              183.5 | 14.7% |                                        402.4 |
+| 5   |         1200 |                              179.2 | 14.9% |                                        355.9 |
+| 6   |         1230 |                              178.8 | 14.5% |                                        371.9 |
+| 7   |         1200 |                              187.6 | 15.6% |                                        340.7 |
+
+The median conservative share is **14.9%**, below the 20% gate. Adding 20 ms to
+its numerator and subtracting 20 ms from its denominator for tick-accounting
+sensitivity raises that median to **16.9%**; this is not a confidence interval.
+Other inference and runtime-function work are both larger than the constant
+estimate. Thus neither condition for broader constant receipts holds. The
+sampled child CPU median is 1,230 ms, about 3.5% above the earlier plain
+control; sampling and run-to-run variation remain explicit limitations.
+
+Task 101 retains the below-30-ms target. These measurements instead prioritize
+backend reconstruction/emission and non-constant inference. The profiled median
+cumulative requested allocation is 483.6 MiB; that is separate from retained RSS
+and does not meet task 104's 100-MB goal.
+
+The [decision record](measurements/constant-work-decision-2026-10-23.json) links
+the
+[raw evidence archive](measurements/constant-work-decision-2026-10-23.tar.gz):
+paired measurements, full timed stacks, exact measured scripts, workload/tool
+pins, the inconclusive trace, and attribution controls. The controls distinguish
+runtime-function work from constant work and charge missing coverage correctly.
+The published profiler also passes an executed six-build smoke with independent
+fresh/revert witnesses.
+
+Reproduce using
+`scripts/bench_repeated_edits.ts BASELINE CURRENT SNAPSHOT OUT
+7 4 both`, then
+`deno task profile:compile --blotc CURRENT --snapshot SNAPSHOT
+--workload game --edit literal_constant --successive-literals --verify-manifest
+--codegen-workers 1 --runs 7 --reps 4`.
+Analyze its output with `scripts/bench/summarize_compile_profile.py DIRECTORY`.
+Use an LLVM release compiler and the shared heavy-job lock. Re-measure this gate
+if larger costs are subsequently removed; these results do not grant new cache
+admission.

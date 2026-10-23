@@ -1,7 +1,7 @@
 # Continue here
 
 23 October 2026: [the completion plan](FINISH_PLAN.md) orders the preserved
-local candidate, the twelve open task records, and issue #25's remaining
+local candidate, the remaining task records, and issue #25's remaining
 language/runtime milestones. New issues #26 (numeric layouts) and #27
 (application compilation/memory) share the representation and measurement work.
 The plan records current state and exit criteria; it does not claim
@@ -26,10 +26,14 @@ unavailable cache recovery preserve the same output. See
 [Pen's measurements](https://github.com/mewhhaha/pen/blob/b2f06cf201cbc4dd1533b2cdb0477b2571b6386f/docs/compile-memory.md).
 
 Issue #26 is closed after the verified `4091cb2` main push. Issues #25 and #27
-and the remaining task requirements stay open. The next measurement runs seven
-paired retained sessions with four successive literal edits, alternating
-plain/profiled modes, before attributing unaffected-constant CPU for task 086.
-Continue with that gate and the remaining milestones in the completion plan.
+and the remaining task requirements stay open. Task 086 closes as not needed:
+the conservative constant-work estimate is 14.9% of later-edit CPU, below its
+20% gate, and other inference and runtime-function reconstruction are larger.
+The
+[measured decision](zig-native/CONSTANT_REUSE.md#measurement-gate-resolved-23-october-2026)
+preserves the paired runs, complete stacks and limitations. There are eleven
+open task records. Continue with backend reconstruction/emission, non-constant
+inference, bounded long edit sessions and issue #25's remaining contracts.
 
 ## Issue #25: minimal task/channel/control surface (22 October 2026)
 
@@ -417,10 +421,10 @@ the CPU guard.
 
 ## Tasks program ([tasks/README.md](tasks/README.md))
 
-Finish every task in the program. As of 20 October 2026:
+Finish every task in the program. As of 23 October 2026:
 
-- 98 are complete (including four designs);
-- 12 remain open: 5 in progress and 7 pending.
+- 99 are complete (including four designs);
+- 11 remain open: 4 in progress and 7 pending.
 
 The index in tasks/README.md is authoritative. Each task file carries its own
 status, evidence and closed-acceptance rows.
@@ -431,8 +435,8 @@ The previous long handoff, with per-task evidence through 17 October, is in git:
 ### Open tasks
 
 - **In progress:** 047 (iterator state and cursor cost), 081 (final durable
-  documentation), 082 (local analyzer backend and final-source checks), 086
-  (constant-work decision) and 093 (gdev edit gap).
+  documentation), 082 (local analyzer backend and final-source checks), and 093
+  (gdev edit gap).
 - **Pending:** 084 (complete-program qualification), 100–104 (cold, literal,
   body, largest-region and requested-allocation targets), and 999 (conditional
   removal of tasks and PLAN.md).

@@ -2,9 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — owner approved the constant-receipt design on 12
-  October 2026; since 17 October 2026 further work is gated on the measurement
-  below. No completion is claimed.
+- **Status:** Complete — closed as not needed on the pinned workload by the 23
+  October 2026 measurement gate. Existing receipt slices remain.
 - **19 October 2026:** the compile-time hills cut the gdev literal edit to about
   1.0 s, from 1.88 s before CT9. Results for CT9, CT12, CT14–CT17, CT22, CT27
   and CT89 are in [COMPILE_HILLS.md](../COMPILE_HILLS.md).
@@ -81,17 +80,17 @@ portable member authority) is built only if the gate justifies it.
 
 ## Implementation checklist
 
-- [ ] Run the measurement gate below on current main and record it in
+- [x] Run the measurement gate below on current main and record it in
       [CONSTANT_REUSE.md](../zig-native/CONSTANT_REUSE.md) before any further
       receipt work.
-- [ ] If the gate justifies the work: record each constant's exact value
+- [x] Not required by the measured gate: record each constant's exact value
       dependencies (source bodies, reads, providers, generative identities and
       fuel/failure outcomes).
-- [ ] If justified: reuse an evaluated value and its data only when all
-      dependencies are unchanged; keep demand cells, generative values and
-      failures exact.
-- [ ] If justified: preserve evaluation order, diagnostics, failed-revision
-      rollback and fresh/retained byte equality.
+- [x] Not required by the measured gate: reuse an evaluated value and its data
+      only when all dependencies are unchanged; keep demand cells, generative
+      values and failures exact.
+- [x] Existing implementations preserve evaluation order, diagnostics,
+      failed-revision rollback and fresh/retained byte equality.
 
 ## Validation
 
@@ -131,15 +130,15 @@ If the work proceeds:
 
 ## Acceptance criteria
 
-- [ ] The measurement gate is recorded durably with workload pins, compiler
+- [x] The measurement gate is recorded durably with workload pins, compiler
       identity, distributions and C.
-- [ ] Either C is at or above the threshold and unaffected constants are not
+- [x] Either C is at or above the threshold and unaffected constants are not
       re-evaluated across admitted edits, with counters and laws, or C is below
       the threshold and the task is closed as not needed with C handed to task
       [101](101-reach-the-literal-edit-target.md)'s attribution.
-- [ ] The literal-edit target is measured or remains explicitly open for task
+- [x] The literal-edit target is measured or remains explicitly open for task
       [101](101-reach-the-literal-edit-target.md).
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
@@ -172,3 +171,18 @@ If the work proceeds:
   [cloud preparation](../zig-native/CONSTANT_REUSE.md#cloud-measurement-preparation-20-october-2026)
   records the observed contexts, pins and both comparisons needed for closure.
 - Durable record: [constant receipts](../zig-native/CONSTANT_REUSE.md).
+
+### Final gate, 23 October 2026
+
+Seven paired retained campaigns and seven complete-stack profiles qualify the
+current LLVM compiler. The conservative sampled C estimate includes changed
+inputs and all missing coverage: its median is 14.9% of later-edit CPU, or 16.9%
+with a 20-ms tick-accounting sensitivity margin. Other inference and
+runtime-function reconstruction are larger. No new receipt authority is needed.
+All fresh/retained/revert witnesses pass; current source has the complete
+2,525-native/1,640-guest gate. The published profiling tools pass type/lint
+checks, executed smoke and known attribution controls.
+
+See the
+[durable decision and raw evidence](../zig-native/CONSTANT_REUSE.md#measurement-gate-resolved-23-october-2026).
+The 30-ms literal-edit target remains open in task 101.
