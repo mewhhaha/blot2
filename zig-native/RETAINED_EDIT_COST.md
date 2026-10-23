@@ -132,3 +132,43 @@ controls and zero analyzer findings. Evidence is in
 `build/bench/finish-rest-20261015/dependency-owner-memo-integration/`. Release
 captured-project timing and the total edit/allocation targets remain open;
 structural reuse counters do not establish a speedup.
+
+## Long-session and checkpoint recovery, 23 October 2026
+
+The LLVM compiler from `4091cb2` (unchanged compiler source in `8d73aa8`) passes
+64 distinct scalar edits on the 583-file frozen workload, with one
+codegen/semantic worker and profiling enabled. All 64 outputs have distinct
+hashes. Edits 1, 16, 32 and 64 match independent fresh builds; an invalid edit
+after 32 is rejected and recovery restores the prior valid bytes. Final revert
+and an actual checkpoint-loaded restart both preserve the original bytes.
+
+| Edit | Child CPU, ms | Current child RSS, MiB | Child high-water RSS, MiB |
+| ---- | ------------: | ---------------------: | ------------------------: |
+| 1    |        1494.8 |                  323.7 |                     447.1 |
+| 8    |        1275.5 |                  325.1 |                     447.1 |
+| 16   |        1312.3 |                  325.8 |                     447.7 |
+| 24   |        1192.4 |                  326.5 |                     449.1 |
+| 32   |        1208.8 |                  327.1 |                     450.4 |
+| 40   |        1734.1 |                  327.8 |                     488.4 |
+| 48   |        1309.1 |                  328.3 |                     488.4 |
+| 56   |        1190.1 |                  329.0 |                     488.4 |
+| 64   |        1128.1 |                  329.6 |                     488.4 |
+
+The last sixteen edits have 1,167.6 ms median CPU. Current RSS rises by about 6
+MiB over the session; this does **not** demonstrate an RSS plateau or identify a
+leak. Optimizer-retained bytes stay at 15,778,924. Region-retained bytes are
+normally 6,680,792, with a transient rise to 57,225,552 at edit 40 that clears
+afterward. Cumulative requested allocation, live owned state, allocator capacity
+and RSS remain distinct measurements. The memory target is still open.
+
+The checkpoint directory contains a 26.9-MB seed, a 24.9-MB checkpoint and
+4.0-MB saved output. Independent copies with a flipped byte in each of
+`.blotcache`, `.blotseed` and `.blotout` all fall back to valid work: restart,
+changed-source build and revert match the known hashes. An unchanged copied
+checkpoint also loads successfully. Raw cache payloads are not published.
+
+The
+[report and exact measured scripts](measurements/long-edit-recovery-2026-10-23.tar.gz)
+pin compiler, source and library identities and retain all per-edit statistics
+and corruption checks. This completes a longer correctness/recovery screen, not
+all of issue 27's memory or latency requirements.
