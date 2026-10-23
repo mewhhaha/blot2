@@ -109,6 +109,36 @@ Deno.test("dispatch explanation readers copy known fields and reject malformed p
   }
 });
 
+Deno.test("hole readers preserve task receiver requirements and validate their edges", () => {
+  const hole: TypedHoleDiagnostic = {
+    expected: 0,
+    nodes: [{
+      kind: "variable",
+      name: null,
+      identity: null,
+      variable: 0,
+      children: { start: 0, len: 0 },
+      effects: null,
+    }],
+    edges: [],
+    scope: [],
+    requirements: [{
+      kind: "task_receive",
+      name: null,
+      subject: 0,
+      argument: null,
+      result: 0,
+      signature: 0,
+      explicit: false,
+    }],
+    enclosing: { start: 0, len: 1 },
+    truncated: false,
+  };
+  equal(readTypedHole(hole), hole);
+  hole.requirements[0].result = 1;
+  throws(() => readTypedHole(hole), /Invalid typed-hole diagnostic/);
+});
+
 Deno.test("implementation explanations validate owned origins steps and total bytes", () => {
   const value = {
     operation: null,

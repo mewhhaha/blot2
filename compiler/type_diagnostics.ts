@@ -60,6 +60,7 @@ export type DiagnosticRequirementKind =
   | "type_head"
   | "collection"
   | "record_merge"
+  | "task_receive"
   | "type_eq"
   | "contract";
 export interface DiagnosticRequirement {
@@ -130,6 +131,7 @@ const predicates = new Set<DiagnosticRequirementKind>([
   "type_head",
   "collection",
   "record_merge",
+  "task_receive",
   "type_eq",
   "contract",
 ]);

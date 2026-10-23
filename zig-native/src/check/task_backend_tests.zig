@@ -29,6 +29,99 @@ fn emit(allocator: std.mem.Allocator, module: *const core.Module) !void {
     try std.testing.expectEqual(@as(?backend.Diagnostic, null), result.diagnostic);
     try std.testing.expect(result.bytes.len > 8 and result.capture != null);
 }
+test "task scope wrapper authority requires its exact callback body" {
+    var module = try lower(
+        \\const scope = fn body => @task.scope body
+        \\const relay = fn body => scope body
+        \\entry const answer = fn () => relay (fn group => do:
+        \\  let pending = @task.spawn group (fn () => 42)
+        \\  break @task.join pending)
+    );
+    defer module.deinit(a);
+    var wrappers: usize = 0;
+    for (module.bindings) |*binding| {
+        if (binding.capability_flow != .scope_task) continue;
+        wrappers += 1;
+        const body = module.bodies[binding.body_id];
+        try std.testing.expect(@import("task_core.zig").scopeWrapper(&module, body.root));
+        const before = module.nodes[body.root];
+        module.nodes[body.root].c = @backingInt(@import("task_types.zig").Op.join);
+        try std.testing.expectError(error.InvalidArtifact, @import("frozen_core_validation.zig").validate(a, &module, .{}));
+        module.nodes[body.root] = before;
+    }
+    try std.testing.expectEqual(@as(usize, 1), wrappers);
+    try emit(a, &module);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+}
+test "spawn helper partial calls retain actual capture ownership and reject forged contracts through OOM" {
+    var module = try lower(
+        \\const launch = fn group => fn action => @task.spawn group action
+        \\const alias = launch
+        \\entry const answer = fn (owner: unique U32) => @task.scope (fn group => do:
+        \\  let here = alias group
+        \\  let renamed = here
+        \\  let pending = renamed (fn () => owner)
+        \\  let result = |pending|
+        \\  break @usage.borrow result (fn loan => @usage.read loan))
+    );
+    defer module.deinit(a);
+    var wrappers: usize = 0;
+    for (module.bindings, 0..) |binding, index| {
+        if (binding.capability_flow != .spawn_task) continue;
+        wrappers += 1;
+        try @import("task_core.zig").spawnWrapper(&module, @intCast(index), &.{});
+        const body = module.bodies[binding.body_id];
+        if (!body.is_function) continue;
+        const before = module.nodes[body.root];
+        module.nodes[body.root].c = @backingInt(@import("task_types.zig").Op.join);
+        try std.testing.expectError(error.InvalidArtifact, @import("frozen_core_validation.zig").validate(a, &module, .{}));
+        module.nodes[body.root] = before;
+    }
+    try std.testing.expectEqual(@as(usize, 2), wrappers);
+    try emit(a, &module);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+}
+test "task collect validates every result field before emission through allocation failures" {
+    var module = try lower(
+        \\entry const answer = fn () => @task.scope (fn group => do:
+        \\  let left = @task.spawn group (fn () => 20)
+        \\  let right = @task.spawn group (fn () => 1.5)
+        \\  let (first, second) = |(left, right)|
+        \\  break @f32.add (@u32.to_f32 first) second)
+    );
+    defer module.deinit(a);
+    var found = false;
+    for (module.nodes) |node| {
+        if (node.tag != .task or node.c != @backingInt(@import("task_types.zig").Op.collect)) continue;
+        found = true;
+        const result = module.types.node(node.ty);
+        const before = module.types.extra[result.a];
+        module.types.extra[result.a] = @import("types.zig").f32_type;
+        try std.testing.expectError(error.InvalidArtifact, @import("task_core.zig").validate(&module));
+        module.types.extra[result.a] = before;
+    }
+    try std.testing.expect(found);
+    try emit(a, &module);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+}
+test "generic tuple receive preserves a complete task lifetime graph" {
+    var module = try lower(
+        \\const await = fn source => |source|
+        \\entry const answer = fn () => @task.scope (fn group => do:
+        \\  let first = @task.spawn group (fn () => 20)
+        \\  let second = @task.spawn group (fn () => 22)
+        \\  let (left, right) = await (first, second)
+        \\  break @u32.add left right)
+    );
+    defer module.deinit(a);
+    const entry = for (module.bodies) |body| {
+        if (body.exported) break body.binding;
+    } else return error.MissingEntry;
+    var graph = try @import("capability_lifetimes.zig").analyze(a, &module, &.{&module}, .{ .binding = entry });
+    defer graph.deinit(a);
+    try std.testing.expect(graph.complete);
+    try std.testing.expect(graph.boundaries.len != 0);
+}
 test "structured task backend owns replay retained helpers and every failed allocation" {
     var module = try lower(
         \\entry const answer = fn (owner: unique U32) => do:

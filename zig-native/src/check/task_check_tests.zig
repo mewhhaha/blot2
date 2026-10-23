@@ -26,7 +26,10 @@ fn law(allocator: std.mem.Allocator, source: []const u8, expected: ?checker.Code
     defer module.deinit(allocator);
     if (module.diagnostics.len != 0) std.debug.print("task lower source: {s}\n", .{source});
     try std.testing.expectEqual(@as(usize, 0), module.diagnostics.len);
-    try @import("frozen_core_validation.zig").validate(allocator, &module, .{});
+    @import("frozen_core_validation.zig").validate(allocator, &module, .{}) catch |err| {
+        std.debug.print("task validation source: {s}\n", .{source});
+        return err;
+    };
     const format = @import("../reuse/dependency_format.zig");
     const key: format.Key = .{ .compiler = @splat(0), .settings = @splat(0), .source = @splat(0), .dependencies = @splat(0) };
     const bytes = try format.encode(allocator, key, module);
@@ -41,6 +44,34 @@ const siblings =
     \\  let right = @task.spawn group (fn () => 22)
     \\  break @u32.add (@task.join left) (@task.join right))
 ;
+test "spawn wrappers validate each actual action and preserve explicit group identity" {
+    try law(std.testing.allocator,
+        \\const launch = fn group => fn action => @task.spawn group action
+        \\const alias = launch
+        \\entry const answer = fn () => @task.scope (fn group => do:
+        \\  let pending = alias group (fn () => 42)
+        \\  break |pending|)
+    , null);
+    try law(std.testing.allocator,
+        \\const launch = fn group => fn action => @task.spawn group action
+        \\entry const answer = fn () => @task.scope (fn group => do:
+        \\  let partial = launch group
+        \\  let alias = partial
+        \\  let pending = alias (fn () => 42)
+        \\  break |pending|)
+    , null);
+    try law(std.testing.allocator,
+        \\const launch = fn group => fn action => @task.spawn group action
+        \\entry const answer = fn () => @task.scope (fn outer => @task.scope (fn inner => do:
+        \\  let pending = launch outer (fn () => @task.join (@task.spawn inner (fn () => 42)))
+        \\  break |pending|))
+    , .task_capture_transfer);
+    try law(std.testing.allocator,
+        \\const launch = fn group => fn action => @task.spawn group action
+        \\const identity = fn value => value
+        \\const escaping = identity launch
+    , .task_capture_transfer);
+}
 test "structured task checking admits once siblings and closed immutable captures" {
     try law(std.testing.allocator, siblings, null);
     try law(std.testing.allocator,
@@ -70,6 +101,120 @@ test "spark and receive use the checked explicit task scope" {
         \\  let first = |pending|
         \\  return |pending|)
     , .task_handle_consumed);
+}
+
+test "task collection checks stored receiver tuples and preserves tuple payloads" {
+    try law(std.testing.allocator,
+        \\const await = fn source => |source|
+        \\entry const answer = fn () => @task.scope (fn group => do:
+        \\  let left = @task.spawn group (fn () => 20)
+        \\  let right = @task.spawn group (fn () => 22)
+        \\  let receivers = (left, right)
+        \\  let (first, second) = await receivers
+        \\  break @u32.add first second)
+    , null);
+    try law(std.testing.allocator,
+        \\entry const answer = fn () => @task.scope (fn group => do:
+        \\  let left = @task.spawn group (fn () => 20)
+        \\  let right = @task.spawn group (fn () => 22)
+        \\  let receivers = (left, right)
+        \\  let (first, second) = |receivers|
+        \\  break @u32.add first second)
+    , null);
+    try law(std.testing.allocator,
+        \\entry const answer = fn () => @task.scope (fn group => do:
+        \\  let pending = @task.spawn group (fn () => (20, 22))
+        \\  let (first, second) = |pending|
+        \\  break @u32.add first second)
+    , null);
+    try law(std.testing.allocator,
+        \\entry const answer = fn () => @task.scope (fn group => do:
+        \\  let pending = @task.spawn group (fn () => 42)
+        \\  break |(pending, pending)|)
+    , .task_handle_consumed);
+    try law(std.testing.allocator,
+        \\const duplicate = fn source => (|source|, |source|)
+    , .task_host_contract);
+}
+
+fn inferredSparkRegion(allocator: std.mem.Allocator) !void {
+    try law(allocator,
+        \\const identity = fn value => value
+        \\entry const answer = fn () => @task.scope (fn group => do:
+        \\  let group = 100
+        \\  let pending = *(identity 42)
+        \\  break @u32.add group (|pending|))
+    , null);
+    try law(allocator,
+        \\const identity = fn value => value
+        \\entry const answer = fn () => *(identity 42)
+    , .task_escape);
+    try law(allocator,
+        \\const identity = fn value => value
+        \\entry const answer = fn () => @task.scope (fn group => do:
+        \\  let delayed = fn () => *(identity 42)
+        \\  break ())
+    , .task_escape);
+}
+
+test "spark region checking preserves exact scope owners under shadowing through OOM" {
+    try inferredSparkRegion(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, inferredSparkRegion, .{});
+}
+
+fn wrappedTaskScope(allocator: std.mem.Allocator) !void {
+    try law(allocator,
+        \\const scope = fn body => @task.scope body
+        \\const identity = fn value => value
+        \\const wrap = fn () => fn body => scope body
+        \\const relay = identity (wrap ())
+        \\entry const answer = fn () => relay (fn group => @task.join (@task.spawn group (fn () => 42)))
+    , null);
+    try law(allocator,
+        \\const scope = fn body => @task.scope body
+        \\const relay = fn body => scope body
+        \\const identity = fn value => value
+        \\entry const answer = fn () => relay (fn group => do:
+        \\  let pending = *(identity 42)
+        \\  break |pending|)
+    , null);
+    try law(allocator,
+        \\const scope = fn body => @task.scope body
+        \\const renamed = scope
+        \\const identity = fn value => value
+        \\entry const answer = fn () => renamed (fn group => do:
+        \\  let pending = *(identity 42)
+        \\  break |pending|)
+    , null);
+    try law(allocator,
+        \\const scope = fn body => @task.scope body
+        \\const identity = fn value => value
+        \\entry const answer = fn () => scope (fn outer => do:
+        \\  let first = *(identity 20)
+        \\  let second = scope (fn inner => do:
+        \\    let pending = *(identity 22)
+        \\    break |pending|)
+        \\  break @u32.add (|first|) second)
+    , null);
+    try law(allocator,
+        \\const scope = fn body => @task.scope body
+        \\entry const escaped = fn () => scope (fn group => group)
+    , .task_escape);
+    try law(allocator,
+        \\const scope = fn body => @task.scope body
+        \\const identity = fn value => value
+        \\entry const escaped = fn () => scope (fn group => *(identity 42))
+    , .task_escape);
+    try law(allocator,
+        \\const scope = fn body => @task.scope body
+        \\const relay = fn body => scope body
+        \\entry const escaped = fn () => relay (fn group => fn () => @task.join (@task.spawn group (fn () => 42)))
+    , .task_escape);
+}
+
+test "ordinary task scope wrappers preserve fresh regions and reject escaping results through OOM" {
+    try wrappedTaskScope(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, wrappedTaskScope, .{});
 }
 test "structured task checking rejects escaped groups and consumed handles" {
     try law(std.testing.allocator, "entry const answer = fn () => @task.scope (fn group => group)", .task_escape);

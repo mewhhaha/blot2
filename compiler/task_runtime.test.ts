@@ -38,6 +38,102 @@ function code(code: TaskError["code"]) {
   return (cause: unknown) => cause instanceof TaskError && cause.code === code;
 }
 
+Deno.test("tasks: collect establishes every dependency and preserves written result order", async () => {
+  const trace: string[] = [];
+  const runtime = new TaskRuntime();
+  const group = runtime.open();
+  const left = deferred<number>();
+  const right = deferred<number>();
+  const background = deferred<number>();
+  const first = runtime.spawn(
+    group,
+    adapter(trace, "left", () => left.promise),
+    1,
+  );
+  const second = runtime.spawn(
+    group,
+    adapter(trace, "right", () => right.promise),
+    2,
+  );
+  const backgroundId = runtime.spawn(
+    group,
+    adapter(trace, "background", () => background.promise),
+    3,
+  );
+  const result = runtime.collect([second, first]);
+  assert(result instanceof Promise);
+  assert.deepEqual(trace, ["run left", "run right", "run background"]);
+  let settled = false;
+  result.then(() => settled = true);
+  right.resolve(22);
+  await Promise.resolve();
+  assert.equal(settled, false);
+  assert(!trace.some((entry) => entry.startsWith("result ")));
+  left.resolve(20);
+  assert.deepEqual(await result, [22, 20]);
+  assert.equal(runtime.poll(first), "succeeded");
+  assert.equal(runtime.poll(second), "succeeded");
+  assert.equal(runtime.poll(backgroundId), "suspended");
+  background.resolve(7);
+  await runtime.close(group);
+  assert.equal(
+    trace.filter((entry) => entry === "result background").length,
+    1,
+  );
+  assert(!trace.includes("result left"));
+  assert(!trace.includes("result right"));
+  assert.equal(runtime.liveRecords, 0);
+});
+
+Deno.test("tasks: collect validates every handle before consuming or starting work", () => {
+  const trace: string[] = [];
+  const runtime = new TaskRuntime();
+  const group = runtime.open();
+  const first = runtime.spawn(group, adapter(trace, "first", () => 20), 1);
+  const second = runtime.spawn(group, adapter(trace, "second", () => 22), 2);
+  assert.throws(
+    () => runtime.collect([first, first]),
+    code("task_handle_consumed"),
+  );
+  assert.throws(() => runtime.collect([first, 0]), code("task_host_contract"));
+  assert.deepEqual(trace, []);
+  assert.deepEqual(runtime.collect([second, first]), [22, 20]);
+  assert.throws(() => runtime.join(first), code("task_handle_consumed"));
+  assert.throws(() => runtime.collect([second]), code("task_handle_consumed"));
+  runtime.close(group);
+  assert.equal(runtime.liveRecords, 0);
+});
+
+Deno.test("tasks: failed collection retains partial results for exactly one scope cleanup", async () => {
+  const trace: string[] = [];
+  const runtime = new TaskRuntime();
+  const group = runtime.open();
+  const pending = deferred<number>();
+  const failure = new Error("producer failed");
+  const first = runtime.spawn(group, adapter(trace, "ready", () => 42), 1);
+  const second = runtime.spawn(
+    group,
+    adapter(trace, "pending", () => pending.promise),
+    2,
+  );
+  const result = runtime.collect([first, second]);
+  assert(result instanceof Promise);
+  assert(!trace.includes("result ready"));
+  const rejected = assert.rejects(result, (cause) => {
+    assert(cause instanceof TaskFailure);
+    assert.deepEqual(cause.failures, [failure]);
+    return true;
+  });
+  pending.reject(failure);
+  await rejected;
+  assert(!trace.includes("result ready"));
+  assert.throws(() => runtime.close(group), TaskFailure);
+  assert.equal(trace.filter((entry) => entry === "result ready").length, 1);
+  assert.equal(trace.filter((entry) => entry === "captures ready").length, 1);
+  assert.equal(trace.filter((entry) => entry === "captures pending").length, 1);
+  assert.equal(runtime.liveRecords, 0);
+});
+
 Deno.test("tasks: join moves a result once and close drops unused siblings in order", () => {
   const trace: string[] = [];
   const runtime = new TaskRuntime();

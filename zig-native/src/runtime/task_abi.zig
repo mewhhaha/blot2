@@ -7,6 +7,7 @@ pub const imports = [_]Import{
     .{ .name = "close", .parameters = &.{.i32}, .result = .none },
     .{ .name = "spawn", .parameters = &.{ .i32, .i32, .i32 }, .result = .i32 },
     .{ .name = "join", .parameters = &.{ .i32, .i32 }, .result = .i32 },
+    .{ .name = "collect", .parameters = &.{ .i32, .i32, .i32 }, .result = .none },
     .{ .name = "cancel", .parameters = &.{.i32}, .result = .none },
     .{ .name = "poll", .parameters = &.{ .i32, .i32 }, .result = .i32 },
     .{ .name = "drop", .parameters = &.{ .i32, .i32 }, .result = .none },

@@ -617,6 +617,9 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
       );
     }
   }
+  // Collect extends the private task protocol; older task modules only use
+  // the original single-receiver operations.
+  expectedTaskImports.delete("collect");
   if (expectedTaskImports.size !== 0) {
     throw new GuestError("invalid_abi", "Missing task protocol import");
   }
@@ -1336,7 +1339,7 @@ export async function instantiateGuest(
       };
       if (
         options.asynchronous &&
-        ["close", "join", "cancel", "drop", "drain"].includes(name)
+        ["close", "join", "collect", "cancel", "drop", "drain"].includes(name)
       ) callbacks[name] = new (requireAsync().Suspending)(invoke);
       else callbacks[name] = invoke;
     }

@@ -9,6 +9,14 @@ ownership programs, collections,
 [language evolution](../zig-native/LANGUAGE_EVOLUTION.md), and
 [demand evaluation](../zig-native/DEMANDS.md).
 
+For the current remaining work and qualification state, start with
+[FINISH_PLAN.md](../FINISH_PLAN.md) and [CONTINUE.md](../CONTINUE.md). The
+baseline and continuation records below are historical. Issue #25's scope/spawn
+helper and task collect-all work is recorded in
+[task surface qualification](../zig-native/TASK_SURFACE_QUALIFICATION.md). It
+does not close the remaining caller-region, channel, control, purity, worker,
+iterator or performance requirements.
+
 ## Starting revision and qualified baseline
 
 The starting revision is `632b461` (`632b461000d93dbc1bdf8f9cae520f54e1419011`)

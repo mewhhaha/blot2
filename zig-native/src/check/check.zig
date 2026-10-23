@@ -845,6 +845,7 @@ const Engine = struct {
     scoped_parameter_type: T.Id = 0,
     active_effect_scopes: usize = 0,
     has_tasks: bool = false,
+    task_region_parameter: ast.Id = 0,
     expected_lambda_source: ast.Id = 0,
     expected_lambda_type: T.Id = 0,
     scope_lifetimes: std.ArrayList(T.Id) = .empty,
@@ -1068,6 +1069,9 @@ const Engine = struct {
             if (binding.capability_flow == .unknown or parameters.kind == .product) binding.capability_parameters = parameters;
             if (binding.capability_parameters.inputInvokes()) self.has_input_invocations = true;
         };
+        for (self.bindings.items) |binding| {
+            if (binding.capability_flow == .scope_task) self.has_tasks = true;
+        }
         for (self.bindings.items, 0..) |binding, index| {
             if (binding.kind != .global or !binding.named_function or !binding.capability_parameters.present()) continue;
             const root = @import("capability_contract_source.zig").derive(allocator, &self.capability_store, tree, pool, tree.valueDecl(binding.declaration).body, binding.capability_parameters) catch |err| switch (err) {
@@ -5668,7 +5672,7 @@ const Engine = struct {
         if (try self.dictionaryGoalFootprint(source, boundary, inherited, remaining)) return true;
         const value = self.tree.node(source);
         switch (value.tag) {
-            .name => {
+            .name, .task_region => {
                 const binding = self.resolved[source];
                 if (binding == 0 or self.bindings.items[binding].owner == closure) return false;
                 const captured = self.bindings.items[binding];
@@ -5783,7 +5787,7 @@ const Engine = struct {
                 // binding is an ordinary immutable version.
                 return self.bindingFootprint(self.resolved[source], boundary, inherited, remaining, depth + 1);
             },
-            .name => {
+            .name, .task_region => {
                 if (self.access_paths[source].len != 0) return try self.projectedFootprint(source, boundary, inherited, remaining, depth + 1);
                 const operation = self.operation_refs[source];
                 if (operation != 0) return try self.identityFootprint(self.operation_uses.items[operation - 1].instance, boundary);
@@ -5885,6 +5889,17 @@ const Engine = struct {
     }
     fn finishCapabilityRole(self: *Engine, id: BindingId) T.Error!void {
         const binding = self.bindings.items[id];
+        if (binding.capability_flow == .unknown) {
+            var source = self.tree.valueDecl(binding.declaration).body;
+            while (self.tree.node(source).tag == .group) source = self.tree.node(source).a;
+            if (self.tree.node(source).tag == .name) {
+                const target = self.resolved[source];
+                if (target != 0) switch (self.bindings.items[target].capability_flow) {
+                    .consume_task, .spawn_task => |flow| self.bindings.items[id].capability_flow = flow,
+                    else => {},
+                };
+            }
+        }
         if (binding.capability_flow != .input_shape) return;
         if (binding.scheme.generative.len != 0) {
             // The completed declaring-arrow recipe owns fresh selections;
@@ -6108,7 +6123,7 @@ const Engine = struct {
                 if (value.b != 0) return self.valueShape(store, value.b, boundary, inherited, remaining, depth + 1);
                 return self.bindingShape(store, self.resolved[source], boundary, inherited, remaining, depth + 1);
             },
-            .name => {
+            .name, .task_region => {
                 if (self.operation_refs[source] != 0) {
                     if (!try self.identityFootprint(self.operation_uses.items[self.operation_refs[source] - 1].instance, boundary)) return 0;
                     return store.append(self.allocator, .{ .tag = .unknown }) catch |err| return contractError(err);
@@ -6467,6 +6482,7 @@ const Engine = struct {
         return parameters;
     }
     fn capabilityFlowUse(self: *Engine, callee: ast.Id, argument: T.Id) T.Error!bool {
+        if (self.spawnUse(callee) != null) return true;
         var source = callee;
         while (self.tree.node(source).tag == .group) source = self.tree.node(source).a;
         var supplied: usize = 0;
@@ -6511,7 +6527,9 @@ const Engine = struct {
             .unknown, .input_shape => return false,
             .identity => return supplied == 0,
             .invoke_unit => return supplied == 0 and self.types.node(try self.types.resolve(argument, 0)).tag == .function,
-            .consume_task => return supplied == 0 and @import("task_types.zig").isHandle(&self.types, argument),
+            .consume_task => return supplied == 0 and @import("task_types.zig").receivers(&self.types, argument),
+            .scope_task => return supplied == 0,
+            .spawn_task => return supplied < 2,
             .member_unit => return supplied == 0 and self.types.node(try self.types.resolve(argument, 0)).tag == .scoped,
             .member_first_unit, .member_second_unit => return supplied < 2 and self.types.node(try self.types.resolve(argument, 0)).tag == .scoped,
             .invoke_with_capability => {
@@ -6629,6 +6647,8 @@ const Engine = struct {
     }
     fn capabilityFlowContract(self: *const Engine, source: ast.Id, annotation_: ast.Id) CapabilityFlow {
         if (@import("capability_flow.zig").taskJoinSource(self.tree, self.pool, source)) return .consume_task;
+        if (@import("capability_flow.zig").taskScopeSource(self.tree, self.pool, source)) return .scope_task;
+        if (@import("capability_flow.zig").taskSpawnSource(self.tree, self.pool, source)) return .spawn_task;
         const basic = @import("capability_flow.zig").source(self.tree, source);
         if (basic != .unknown) return basic;
         const member = @import("capability_flow.zig").memberSource(self.tree, self.pool, source);
@@ -6738,6 +6758,52 @@ const Engine = struct {
         }
         return null;
     }
+    const SpawnUse = struct { group: ast.Id = 0 };
+    pub fn isSpawnUse(self: *const Engine, source: ast.Id) bool {
+        return self.spawnUse(source) != null;
+    }
+    fn spawnUse(self: *const Engine, initial: ast.Id) ?SpawnUse {
+        var source = initial;
+        var group: ast.Id = 0;
+        var remaining: usize = 65_536;
+        for (0..128) |_| {
+            if (remaining == 0) return null;
+            remaining -= 1;
+            const node = self.tree.node(source);
+            if (node.tag == .group) {
+                source = node.a;
+                continue;
+            }
+            if (node.tag == .apply) {
+                if (group != 0) return null;
+                group = node.b;
+                source = node.a;
+                continue;
+            }
+            if (node.tag != .name) return null;
+            const id = self.resolved[source];
+            if (id == 0) return null;
+            const binding = self.bindings.items[id];
+            if (binding.capability_flow == .spawn_task) return .{ .group = group };
+            if (binding.kind == .global and binding.declaration != 0) {
+                source = self.tree.valueDecl(binding.declaration).body;
+                continue;
+            }
+            if (binding.kind != .local or binding.declaration == 0) return null;
+            source = for (self.tree.nodes.items[binding.declaration..], binding.declaration..) |candidate, index| {
+                if (remaining == 0) return null;
+                remaining -= 1;
+                if (candidate.tag == .let_stmt and candidate.a == binding.declaration) break self.tree.binding(@intCast(index)).value;
+            } else return null;
+        }
+        return null;
+    }
+    fn checkSpawnAction(self: *Engine, group: T.Id, action: ast.Id) T.Error!void {
+        var remaining: usize = 65_536;
+        if (self.taskClosure(action, &remaining)) |callback| {
+            if (try self.closureCaptureFootprint(self.tree.node(callback).b, callback, .{ .task_group = group }, &.{}, &remaining, 0)) try self.diagnostic(.task_capture_transfer, action);
+        } else try self.diagnostic(.task_capture_transfer, action);
+    }
     fn taskCaptureType(self: *Engine, root: T.Id, owning: bool, remaining: *usize, depth: usize) T.Error!?Code {
         var cell = root;
         for (0..128) |_| {
@@ -6794,13 +6860,30 @@ const Engine = struct {
             while (self.tree.node(callback).tag == .group) callback = self.tree.node(callback).a;
             const lambda = self.tree.node(callback);
             if (lambda.tag != .lambda) {
-                try self.diagnostic(.task_escape, first);
-                return try self.types.fresh();
+                const result = try self.types.fresh();
+                const effects = try self.types.freshEffects();
+                const region = try self.types.boundType(0, 2);
+                const capability = try self.types.scoped(try self.types.nominal(tasks.group, &.{}), .{ .unit = 0, .decl = region });
+                const action = try self.types.quantified(.forall, try self.types.functionWithEffects(capability, result, effects), &.{region});
+                const required = try self.types.usage(action, .once, 0);
+                const actual = try self.expression(first);
+                if (self.types.node(self.types.head(actual, 0)).tag == .variable) {
+                    // The intrinsic supplies an explicit rank contract; this
+                    // does not enable general impredicative inference.
+                    try self.types.bindRankAnnotation(actual, required);
+                } else try self.constrain(actual, required, first);
+                self.expr_types[first] = required;
+                try self.constrainEffects(effects, self.ambient, id);
+                self.expr_types[head] = try self.types.functionWithEffects(required, result, effects);
+                return result;
             }
             const capability = try self.types.scoped(try self.types.nominal(tasks.group, &.{}), .{ .unit = self.unit, .decl = lambda.a });
             const result = try self.types.fresh();
             const effects = try self.types.freshEffects();
             const required = try self.types.usage(try self.types.functionWithEffects(capability, result, effects), .once, 0);
+            const enclosing_region = self.task_region_parameter;
+            self.task_region_parameter = lambda.a;
+            defer self.task_region_parameter = enclosing_region;
             try self.scope_lifetimes.append(self.allocator, capability);
             self.active_effect_scopes += 1;
             defer {
@@ -6816,6 +6899,54 @@ const Engine = struct {
             return result;
         }
         const input = try self.expression(first);
+        const input_shape = self.types.node(try self.types.resolve(input, 0));
+        if (operation == .receive) {
+            const effects = try self.types.freshEffects();
+            const received = tasks.receiveResult(&self.types, input, effects) catch |err| switch (err) {
+                error.TypeMismatch, error.EffectMismatch, error.InfiniteEffect => {
+                    try self.diagnostic(.task_host_contract, first);
+                    return try self.types.fresh();
+                },
+                else => return err,
+            };
+            if (received) |result| {
+                try self.constrainEffects(effects, self.ambient, id);
+                self.expr_types[head] = try self.types.functionWithEffects(input, result, effects);
+                return result;
+            }
+            if (self.bindings.items[self.current].capability_flow != .consume_task) {
+                try self.diagnostic(.task_host_contract, first);
+                return try self.types.fresh();
+            }
+            const result = try self.types.fresh();
+            const signature = try self.types.functionWithEffects(input, result, effects);
+            try self.appendPending(.{ .owner = self.current, .direct = true, .value = .{ .kind = .task_receive, .ty = input, .result = result, .signature = signature, .source = id } });
+            try self.constrainEffects(effects, self.ambient, id);
+            self.expr_types[head] = signature;
+            return result;
+        }
+        if (operation == .collect or (operation == .join and input_shape.tag == .product)) {
+            if (input_shape.tag != .product or input_shape.b == 0 or input_shape.b > 16) {
+                try self.diagnostic(.task_host_contract, first);
+                return try self.types.fresh();
+            }
+            var results: [16]T.Id = undefined;
+            for (self.types.list(.{ .start = input_shape.a, .len = input_shape.b }), 0..) |item, index| {
+                if (!tasks.isHandle(&self.types, try self.types.resolve(item, 0))) {
+                    try self.diagnostic(.task_host_contract, first);
+                    return try self.types.fresh();
+                }
+                const wrapper = self.types.node(try self.types.resolve(item, 0));
+                const handle = self.types.node(try self.types.resolve(wrapper.a, 0));
+                const arguments = self.types.nominalArguments(handle);
+                const arrow = self.types.node(try self.types.resolve(arguments[1], 0));
+                results[index] = arrow.b;
+                try self.constrainEffects(arrow.c, self.ambient, id);
+            }
+            const result = try self.types.product(results[0..input_shape.b]);
+            self.expr_types[head] = try self.types.functionWithEffects(input, result, self.ambient);
+            return result;
+        }
         if (operation == .spawn) {
             const group = try self.types.resolve(input, 0);
             if (!tasks.isGroup(&self.types, group)) {
@@ -6828,10 +6959,7 @@ const Engine = struct {
             const thunk = try self.types.usage(arrow, .once, 0);
             const actual_thunk = try self.contextualLambda(reverse[0], thunk);
             try self.constrain(actual_thunk, thunk, reverse[0]);
-            var remaining: usize = 65_536;
-            if (self.taskClosure(reverse[0], &remaining)) |callback| {
-                if (try self.closureCaptureFootprint(self.tree.node(callback).b, callback, .{ .task_group = group }, &.{}, &remaining, 0)) try self.diagnostic(.task_capture_transfer, reverse[0]);
-            } else try self.diagnostic(.task_capture_transfer, reverse[0]);
+            if (self.bindings.items[self.current].capability_flow != .spawn_task) try self.checkSpawnAction(group, reverse[0]);
             const handle = try self.types.usage(try self.types.nominal(tasks.handle, &.{ group, arrow }), .unique, 0);
             const tail = try self.types.function(thunk, handle);
             self.expr_types[head] = try self.types.function(group, tail);
@@ -9843,7 +9971,7 @@ const Engine = struct {
     }
     fn sharedKind(kind: T.ObligationKind) bool {
         return switch (kind) {
-            .dispatch, .result_dispatch, .field, .writable_field, .receiver, .collection, .record_merge, .update, .effect_operation, .type_head, .type_rep, .effect_rep, .callee_use => true,
+            .dispatch, .result_dispatch, .field, .writable_field, .receiver, .collection, .record_merge, .update, .effect_operation, .type_head, .type_rep, .effect_rep, .callee_use, .task_receive => true,
             else => false,
         };
     }
@@ -11777,6 +11905,7 @@ const Engine = struct {
         return try self.types.proofKind();
     }
     fn runtimeValue(self: *Engine, ty: T.Id, source: ast.Id) T.Error!T.Id {
+        if (self.has_tasks and self.spawnUse(source) != null) try self.diagnostic(.task_capture_transfer, source);
         if (!self.types.has_proof_kinds or self.types.node(self.types.head(ty, 0)).tag != .erased_proof) return ty;
         try self.diagnostic(.proof_runtime_use, source);
         return self.types.fresh();
@@ -11801,6 +11930,17 @@ const Engine = struct {
         if (try self.typeConstructorValue(self.catalogKey(node.a))) |ty| return ty;
         try self.diagnostic(.unknown_name, id);
         return try self.types.fresh();
+    }
+    fn taskRegionExpression(self: *Engine, id: ast.Id) T.Error!T.Id {
+        const parameter = self.task_region_parameter;
+        const binding = if (parameter == 0) 0 else self.resolved[parameter];
+        if (binding == 0 or !@import("task_types.zig").isGroup(&self.types, self.types.head(self.bindings.items[binding].ty, 0))) {
+            try self.diagnostic(.task_escape, id);
+            return self.types.fresh();
+        }
+        if (self.tree.has_typed_staging and (self.staging_bindings.get(binding) orelse 0) != self.staging_depth) try self.diagnostic(.stage_unavailable, id);
+        self.resolved[id] = binding;
+        return self.bindings.items[binding].ty;
     }
     fn fieldExpression(self: *Engine, id: ast.Id) T.Error!T.Id {
         const node = self.tree.node(id);
@@ -11879,6 +12019,9 @@ const Engine = struct {
     }
     fn lambdaExpression(self: *Engine, id: ast.Id) T.Error!T.Id {
         const node = self.tree.node(id);
+        const enclosing_region = self.task_region_parameter;
+        if (node.a != enclosing_region) self.task_region_parameter = 0;
+        defer self.task_region_parameter = enclosing_region;
         const parameter = self.tree.parameter(node.a);
         if (parameter.where_node != 0) try self.diagnostic(.higher_rank_constraint, parameter.where_node);
         var expected: T.Id = 0;
@@ -11892,8 +12035,10 @@ const Engine = struct {
         if (!scoped) self.scoped_parameter = 0;
         defer self.scoped_parameter = saved_selection_parameter;
         const descriptor = if (!scoped) try self.capabilityDescriptorAnnotation(parameter.annotation) else null;
-        const symbolic_capability = descriptor != null or contextual_capability;
-        const element_ty = if (scoped) self.scoped_parameter_type else if (contextual) required_arrow.a else if (descriptor) |family| try self.types.capabilityParameter(family) else if (parameter.is_unit) T.unit else try self.types.fresh();
+        const spawn_group = @import("capability_flow.zig").taskSpawnSource(self.tree, self.pool, id);
+        const symbolic_capability = descriptor != null or contextual_capability or spawn_group;
+        const element_ty = if (scoped) self.scoped_parameter_type else if (contextual) required_arrow.a else if (descriptor) |family| try self.types.capabilityParameter(family) else if (spawn_group) try self.types.capabilityParameter(try self.types.nominal(@import("task_types.zig").group, &.{})) else if (parameter.is_unit) T.unit else try self.types.fresh();
+        if (contextual and @import("task_types.zig").isGroup(&self.types, self.types.head(element_ty, 0))) self.task_region_parameter = node.a;
         if (contextual) {
             if (descriptor) |family| try self.constrain(element_ty, try self.types.capabilityParameter(family), node.a);
             if (parameter.is_unit) try self.constrain(element_ty, T.unit, node.a);
@@ -11988,7 +12133,23 @@ const Engine = struct {
             } else result = try self.types.fresh();
         }
         if (self.types.has_proof_kinds and self.types.node(self.types.head(result, 0)).tag == .erased_proof) try self.proofResult(id, node.b);
+        if (contextual_capability and @import("task_types.zig").isGroup(&self.types, self.types.head(element_ty, 0))) {
+            const group = self.types.node(self.types.head(element_ty, 0));
+            if (group.b == 0) {
+                const region = self.types.node(self.types.head(group.c, 0));
+                if (region.tag == .rigid and region.c == 2) {
+                    var remaining: usize = 65_536;
+                    const boundary: FootprintBoundary = .{ .rank_scope = region.a };
+                    if (try self.valueFootprint(node.b, boundary, &.{}, &remaining, 0) orelse try self.scopeFootprintDepth(result, 0, &remaining, &.{}, boundary)) try self.diagnostic(.task_escape, id);
+                }
+            }
+        }
         const raw_function = try self.types.functionWithEffects(parameter_ty, result, latent);
+        if (self.has_tasks and self.spawnUse(node.b) != null) try self.diagnostic(.task_capture_transfer, node.b);
+        // Apply the contextual row before certifying this implementation.
+        // Otherwise a rank introduction publishes the required row while its
+        // closure certificate still names the discarded inference variable.
+        if (contextual) try self.constrainEffects(latent, required_arrow.c, id);
         for (self.generative_bindings.items) |*binder| {
             if (binder.owner == id and binder.arrow == 0) binder.arrow = raw_function;
         }
@@ -12090,6 +12251,7 @@ const Engine = struct {
     }
     fn ordinaryApplication(self: *Engine, id: ast.Id, leaf: ast.Id) T.Error!T.Id {
         const node = self.tree.node(id);
+        const pending_begin = self.pending.items.len;
         var function_ty = try self.types.openCovariant(try self.types.resolve(try self.expression(node.a), 0));
         var rank_goals: T.List = .{};
         if (self.types.node(function_ty).tag == .forall) {
@@ -12120,6 +12282,7 @@ const Engine = struct {
             return err;
         };
         self.exact_argument_types = saved_exact;
+        if (self.has_tasks and self.spawnUse(node.b) != null) try self.diagnostic(.task_capture_transfer, node.b);
         // A closed parameter record is also the supported named-argument
         // convention. Diagnose a misspelled supplied name at that field,
         // before the structural mismatch collapses to the whole call.
@@ -12162,6 +12325,9 @@ const Engine = struct {
             if (result_kind == .erased_proof or result_kind == .forall) result = function.b;
         }
         try self.constrain(function_ty, try self.invocation(parameter, result), id);
+        if (self.has_tasks) if (self.spawnUse(node.a)) |spawn| {
+            if (spawn.group != 0) try self.checkSpawnAction(try self.types.resolve(self.expr_types[spawn.group], 0), node.b);
+        };
         for (0..rank_goals.len) |ordinal| {
             var goal = self.types.quantifier_obligations.items[rank_goals.start + ordinal];
             goal.source = id;
@@ -12172,6 +12338,7 @@ const Engine = struct {
             try self.appendPending(.{ .owner = self.current, .suspended = goal.explicit, .value = goal });
         }
 
+        if (self.has_tasks and pending_begin != self.pending.items.len) try self.solveFieldsFrom(pending_begin);
         return try self.applicationFlow(id, function_ty, argument, try self.freshFormalInvocation(id, result));
     }
     // Only a demand parameter declared affine before instantiation may move
@@ -12323,6 +12490,7 @@ const Engine = struct {
             .string => try self.types.sequence(.array, T.u32_type),
             .group => try self.expression(node.a),
             .name => try self.nameExpression(id),
+            .task_region => try self.taskRegionExpression(id),
             .selector => try self.selectorFunction(id),
             .field_access => try self.fieldExpression(id),
             .constructor_ref => try self.constructorExpression(id),
@@ -12990,6 +13158,7 @@ const Engine = struct {
         if (self.return_target != 0 and self.types.node(self.types.head(self.return_target, 0)).tag == .erased_proof) {
             value = try self.contextualLambda(node.a, self.return_target);
         } else value = try self.expression(node.a);
+        if (self.has_tasks and self.spawnUse(node.a) != null) try self.diagnostic(.task_capture_transfer, node.a);
         if (self.request_scope.loop != 0 and self.owner == self.request_scope.return_scope) try self.request_controls.append(self.allocator, .{ .node = id, .loop = self.request_scope.loop, .kind = .cancel, .value_type = value, .target_scope = self.request_scope.return_scope });
         if (self.resolver_scope.block != 0) {
             if (self.definitelyPanic(node.a, 0)) {
@@ -13973,6 +14142,23 @@ const Engine = struct {
             self.pending.items[i].solved = true;
             progress = true;
             return progress;
+        }
+        if (constraint.kind == .task_receive) {
+            const signature = self.types.node(try self.types.resolve(constraint.signature, 0));
+            const result = @import("task_types.zig").receiveResult(&self.types, constraint.ty, signature.c) catch |err| switch (err) {
+                error.TypeMismatch, error.EffectMismatch, error.InfiniteEffect => {
+                    try self.diagnostic(.task_host_contract, constraint.source);
+                    self.pending.items[i].solved = true;
+                    return true;
+                },
+                else => return err,
+            };
+            if (result) |value| {
+                try self.constrain(value, constraint.result, constraint.source);
+                self.pending.items[i].solved = true;
+                return true;
+            }
+            return false;
         }
         if (constraint.kind == .monad_factory) {
             const token = self.types.node(try self.types.resolve(constraint.ty, 0));

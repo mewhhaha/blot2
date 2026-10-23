@@ -61,8 +61,6 @@ const Parser = struct {
     /// Hygienic collection names are numbered within each top-level
     /// declaration, so edits elsewhere never rename them.
     collection_names: u32 = 0,
-    task_group: symbols.Symbol = 0,
-    scope_callback: bool = false,
     fn current(self: *const Parser) token.Token {
         if (self.index >= self.expression_end) return .{ .tag = .eof, .start = self.tokens[self.index].start, .end = self.tokens[self.index].start };
         return if (self.index < self.tokens.len) self.tokens[self.index] else .{ .tag = .eof, .start = @intCast(self.source.len), .end = @intCast(self.source.len) };
@@ -815,14 +813,6 @@ const Parser = struct {
     }
     fn lambda(self: *Parser) Error!Id {
         const start = (try self.expect(.kw_fn)).start;
-        const enclosing_group = self.task_group;
-        const scoped = self.scope_callback;
-        self.task_group = 0;
-        self.scope_callback = false;
-        defer {
-            self.task_group = enclosing_group;
-            self.scope_callback = scoped;
-        }
         const Parameter = struct { node: Id, pattern: Id, name: symbols.Symbol, start: u32 };
         var fixed: [8]Parameter = undefined;
         var overflow: std.ArrayList(Parameter) = .empty;
@@ -864,7 +854,6 @@ const Parser = struct {
         }
         const result = if (self.eat(.arrow)) try self.typeExpression() else 0;
         _ = try self.expect(.fat_arrow);
-        if (scoped and count == 1 and fixed[0].pattern == 0 and fixed[0].name != 0) self.task_group = fixed[0].name;
         var body = try self.expression();
         const parameters = if (count <= fixed.len) fixed[0..count] else overflow.items;
         var index = parameters.len;
@@ -986,7 +975,6 @@ const Parser = struct {
             const grouped = try self.atom();
             const call = self.tree.node(grouped);
             if (call.tag != .group or self.tree.node(call.a).tag != .apply) return self.fail(.task_spark_call);
-            if (self.task_group == 0) return self.fail(.task_spark_scope);
             return self.sparkCall(call.a, t.start);
         }
         if (t.tag == .symbol or t.tag == .star or t.tag == .caret) {
@@ -1026,7 +1014,7 @@ const Parser = struct {
         }
         const parameter = try self.add(.parameter, 0, 0, try self.extra(&.{ 2, 0, 0, 0 }), start);
         const thunk = try self.add(.lambda, parameter, invocation, 0, start);
-        const group = try self.add(.name, self.task_group, 0, 0, start);
+        const group = try self.add(.task_region, 0, 0, 0, start);
         const spawn = try self.collectionIntrinsic("@task.spawn", &.{ group, thunk }, start);
         try statements.append(self.allocator, try self.add(.return_stmt, spawn, 0, 0, start));
         return self.listNode(.block, statements.items, start);
@@ -1037,14 +1025,7 @@ const Parser = struct {
         while (true) {
             if (!atomTag(self.current().tag) or (!allow_witness and self.at(.colon))) break;
             if (self.at(.colon) and self.peek(1) == .newline) break;
-            const callback = self.tree.node(value).tag == .intrinsic and std.mem.eql(u8, self.pool.get(self.tree.node(value).a), "@task.scope");
-            const before = self.scope_callback;
-            self.scope_callback = callback;
-            const argument = self.postfix() catch |err| {
-                self.scope_callback = before;
-                return err;
-            };
-            self.scope_callback = before;
+            const argument = try self.postfix();
             value = try self.add(.apply, value, argument, 0, start);
         }
         return value;
@@ -1107,8 +1088,7 @@ const Parser = struct {
                 self.expression_end = previous;
                 if (self.index != end) return self.fail(.expected_token);
                 _ = try self.expect(.pipe);
-                if (self.tree.node(receiver).tag == .product) return self.fail(.task_receive_tuple);
-                return self.collectionIntrinsic("@task.join", &.{receiver}, start);
+                return self.collectionIntrinsic("@task.receive", &.{receiver}, start);
             },
             .integer => {
                 _ = self.advance();

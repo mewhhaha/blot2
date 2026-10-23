@@ -6,6 +6,7 @@ export const taskImports = [
   ["close", 1, false],
   ["spawn", 3, true],
   ["join", 2, true],
+  ["collect", 3, false],
   ["cancel", 1, false],
   ["poll", 2, true],
   ["drop", 2, false],
@@ -112,6 +113,7 @@ export class TaskGuest {
   readonly #entries = new Map<number, Entry>();
   readonly #handles = new Map<number, Entry>();
   readonly #hooks: WebAssembly.Exports;
+  readonly #memory?: WebAssembly.Memory;
   #root?: Entry;
   #active?: Entry;
   #source?: ResourceJournal;
@@ -143,6 +145,9 @@ export class TaskGuest {
       signatures.push([`blot:task_move_result/${id}`, 1, false]);
     }
     this.#hooks = typedTaskFunctions(exports, signatures);
+    this.#memory = exports["blot:memory"] instanceof WebAssembly.Memory
+      ? exports["blot:memory"]
+      : undefined;
   }
   #call(name: string, value: number): number {
     return (this.#hooks[name] as (value: number) => number)(value) >>> 0;
@@ -417,6 +422,98 @@ export class TaskGuest {
       const result = this.#runtime.join(handle >>> 0, owner.context.id);
       if (result instanceof Promise) return result.then(publish);
       return publish(result);
+    },
+    collect: (
+      input: number,
+      count: number,
+      output: number,
+    ): Completion<void> => {
+      const owner = this.#owner();
+      const memory = this.#memory ?? invalid("Task collection has no memory");
+      input >>>= 0;
+      count >>>= 0;
+      output >>>= 0;
+      const view = (): DataView => new DataView(memory.buffer);
+      const range = (pointer: number, bytes: number): void => {
+        if (
+          pointer === 0 || pointer % 4 !== 0 ||
+          pointer > memory.buffer.byteLength - bytes
+        ) invalid("Invalid task collection storage");
+      };
+      if (count === 0 || count > 4096) invalid("Invalid task collection size");
+      range(input, count * 8);
+      range(output, count * 4);
+      const entries: Entry[] = [];
+      const handles: number[] = [];
+      const seen = new Set<number>();
+      for (let index = 0; index < count; index++) {
+        const handle = view().getUint32(input + index * 8, true);
+        const descriptor = view().getUint32(input + index * 8 + 4, true);
+        const entry = this.#handles.get(handle);
+        if (!entry || entry.descriptor !== descriptor || seen.has(handle)) {
+          invalid("Task collection contains an invalid or repeated handle");
+        }
+        entries.push(entry);
+        handles.push(handle);
+        seen.add(handle);
+      }
+      for (const handle of handles) this.#handles.delete(handle);
+      const publish = (results: number[]): void => {
+        this.#activate(owner);
+        let moved = 0;
+        try {
+          for (let index = 0; index < count; index++) {
+            const entry = entries[index];
+            this.#move(
+              entry.results,
+              owner.resources,
+              `blot:task_move_result/${entry.descriptor}`,
+              results[index],
+            );
+            moved++;
+          }
+          for (const entry of entries) entry.results.finish();
+          // Publish only after every result and cleanup obligation has moved.
+          const target = view();
+          for (let index = 0; index < count; index++) {
+            target.setUint32(output + index * 4, results[index], true);
+          }
+        } catch (cause) {
+          for (let index = moved - 1; index >= 0; index--) {
+            const entry = entries[index];
+            try {
+              this.#move(
+                owner.resources,
+                entry.results,
+                `blot:task_move_result/${entry.descriptor}`,
+                results[index],
+              );
+            } catch { /* Keep draining all acquired results. */ }
+          }
+          for (let index = 0; index < count; index++) {
+            try {
+              this.#call("blot:task_release", results[index]);
+            } catch { /* Release every other publication lease as well. */ }
+            try {
+              this.cleanup(() => entries[index].results.finish());
+            } catch { /* Preserve the original collection failure. */ }
+          }
+          throw cause;
+        }
+      };
+      try {
+        const results = this.#runtime.collect(handles, owner.context.id);
+        if (results instanceof Promise) {
+          return results.then(publish, (cause) => {
+            this.#activate(owner);
+            throw cause;
+          });
+        }
+        return publish(results);
+      } catch (cause) {
+        this.#activate(owner);
+        throw cause;
+      }
     },
     cancel: (handle: number): Completion<void> => {
       const owner = this.#owner();

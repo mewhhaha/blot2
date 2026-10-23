@@ -303,8 +303,8 @@ the revision.
 - integers: `nativeWorkSteps`, `sourceBytes`, `freshModules` and
   `cachedModules`;
 - objects: `frontend`, `backend`, `optimization`, `runtimeOptimization`,
-  `backendTiming`, `phaseProfile`, `workCounters`, `principals`,
-  `refinements`, `selectedQueries`, `constantReceipts` and `attemptStats`;
+  `backendTiming`, `phaseProfile`, `workCounters`, `principals`, `refinements`,
+  `selectedQueries`, `constantReceipts` and `attemptStats`;
 - a boolean: `restartCacheLoaded`;
 - `restartCacheWrite`: null, or the report the cache's last writer left in the
   `.lock` file when this process opened (see the restart cache below).
@@ -317,11 +317,10 @@ lowering and reason. Reporting preserves executable bytes. See
 
 `phaseProfile` is empty unless the session opened with `profileBackend`. A
 profiled build reports `total_us`, the process's `peak_rss_kib` and exclusive
-`phases` (`other`, `assets`, `inputs`, `load`, `lex`, `parse`, `check`,
-`lower`, `freeze`, `validation`, `backend`), which partition the build up to
-its stats. Each phase is `{us, requested_bytes, allocations, rss_growth_kib}`:
-session allocator requests charged while it was active, and how far it raised
-peak RSS.
+`phases` (`other`, `assets`, `inputs`, `load`, `lex`, `parse`, `check`, `lower`,
+`freeze`, `validation`, `backend`), which partition the build up to its stats.
+Each phase is `{us, requested_bytes, allocations, rss_growth_kib}`: session
+allocator requests charged while it was active, and how far it raised peak RSS.
 
 The objects are measurements for people, and their insides are not part of the
 contract. The reference client validates the four integers as nonnegative safe
@@ -432,9 +431,11 @@ node index; `argument`, `result` and `signature` are node indexes or null;
 `ordered`, `equality`, `integer`, `field`, `writable_field`, `dispatch`,
 `result_dispatch`, `monad_factory`, `resolver_dispatch`, `resolver_shape`,
 `effect_operation`, `effect_handler`, `receiver`, `update`, `type_rep`,
-`effect_rep`, `type_head`, `collection` and `record_merge`. All indexes and
-spans must be in bounds. All strings together contain at most 16,384 UTF-8
-bytes; identities are local to this diagnostic.
+`effect_rep`, `type_head`, `collection`, `record_merge`, `type_eq`, `contract`
+and `task_receive`. The last relates a generic task receiver or tuple of
+receivers to its result and latent effects. All indexes and spans must be in
+bounds. All strings together contain at most 16,384 UTF-8 bytes; identities are
+local to this diagnostic.
 
 An `explanation` is `{operation, member, candidates, truncated}`. `operation`
 and `member` are strings or null, at most 256 UTF-8 bytes each. `truncated` is a
@@ -467,20 +468,20 @@ rather than leave the host and the server disagreeing about the revision.
 **The restart cache.** It is saved after the first successful build and again at
 close. Its files sit under the cache root, keyed by the compiler identity and
 the entry: the backend checkpoint (`.blotcache`), the revision's output with
-every input it read (`.blotout`), its frozen dependency frontend
-(`.blotseed`, keyed also by the project settings), and a `.lock` file.
+every input it read (`.blotout`), its frozen dependency frontend (`.blotseed`,
+keyed also by the project settings), and a `.lock` file.
 
-- **Restored output.** The first build of a process whose inputs equal the
-  saved revision's exactly (every source byte, path resolution and import, the
-  open settings, entry, codegen tier, workers and machine-code sharing, without
+- **Restored output.** The first build of a process whose inputs equal the saved
+  revision's exactly (every source byte, path resolution and import, the open
+  settings, entry, codegen tier, workers and machine-code sharing, without
   `explainDemands`) replies with the saved Wasm without compiling, under the
   same rule as an unchanged build in one session. Its `attemptStats` has
   `restored_output` true, it keeps no retained state, and the next build that
-  differs compiles in full. Otherwise the checkpoint and the seed are read
-  then, before compiling.
-- **Seed.** Without `dependencies` at open, the first build that compiles
-  starts from the saved seed, as if opened with it: dependencies whose sources
-  are unchanged are not checked or lowered again, and changed ones and their
+  differs compiles in full. Otherwise the checkpoint and the seed are read then,
+  before compiling.
+- **Seed.** Without `dependencies` at open, the first build that compiles starts
+  from the saved seed, as if opened with it: dependencies whose sources are
+  unchanged are not checked or lowered again, and changed ones and their
   importers are rebuilt. A seed that fails validation is ignored.
 
 - **Promise.** Once the first successful build's reply has been sent, the cache
@@ -494,9 +495,9 @@ every input it read (`.blotout`), its frozen dependency frontend
   revision after the reply, writes `<file>.partial`, renames it over the cache
   file and exits. Its CPU time is not the server's. On other platforms the
   server writes the cache before replying.
-- **Readers.** An open waits for a shared lock on the `.lock` file, at most
-  10 s, before reading the cache. Concurrent opens all wait and read the same
-  file. After the timeout it reads whatever file is published.
+- **Readers.** An open waits for a shared lock on the `.lock` file, at most 10
+  s, before reading the cache. Concurrent opens all wait and read the same file.
+  After the timeout it reads whatever file is published.
 - **Failures.** A writer that dies, or cannot encode or write, publishes
   nothing; the kernel releases its lock, and the previous file, if any, stays
   whole. A `.partial` file is never read, and the next writer replaces it. A

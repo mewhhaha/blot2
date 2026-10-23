@@ -31,7 +31,11 @@ const decoder = new TextDecoder();
 const median = (values: number[]) =>
   values.toSorted((a, b) => a - b)[Math.floor(values.length / 2)];
 async function hash(bytes: Uint8Array): Promise<string> {
-  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((
+  return [
+    ...new Uint8Array(
+      await crypto.subtle.digest("SHA-256", new Uint8Array(bytes)),
+    ),
+  ].map((
     value,
   ) => value.toString(16).padStart(2, "0")).join("");
 }

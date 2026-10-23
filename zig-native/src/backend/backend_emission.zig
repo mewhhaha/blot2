@@ -100,6 +100,7 @@ pub const Owner = struct {
     const DictionaryMemberPlan = struct { offset: usize, signature: layout.Id };
     const NamedPlan = struct {
         call: resolved_call.Named,
+        spawn: ?@import("../check/task_core.zig").SpawnApplication = null,
         evaluated: ?*EvaluatedNamed = null,
         dictionary_owner: ?DictionaryOwner = null,
         dictionary_member: ?DictionaryMemberPlan = null,
@@ -119,6 +120,7 @@ pub const Owner = struct {
         capture_count: usize,
     };
     const ApplyPlan = struct {
+        spawn: ?@import("../check/task_core.zig").SpawnApplication = null,
         factory: ?FactoryPlan = null,
         evaluated: ?*EvaluatedNamed = null,
         static_closure: ?StaticClosurePlan = null,
@@ -2508,7 +2510,7 @@ pub const Owner = struct {
             try g.mapType(header.unit, &mappings, arrow.a, concrete, definition.span);
             source_type = arrow.b;
         }
-        try g.mapType(header.unit, &mappings, source_type, selected, definition.span);
+        try g.mapTypeDepth(header.unit, &mappings, &rows, source_type, selected, definition.span, 0);
         var full = try g.codeLayoutWithRows(header.unit, producer.binding(header.identity).ty, mappings.items, rows.items, definition.span);
         try g.refineMappings(header.unit, .{ .body = .{ .unit = header.unit, .binding = header.identity } }, full, &mappings, &rows, definition.span);
         full = try g.codeLayoutWithRows(header.unit, producer.binding(header.identity).ty, mappings.items, rows.items, definition.span);
@@ -6842,6 +6844,7 @@ pub const Owner = struct {
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const node = source.node(id);
+        if (try self.prepareSpawnApplication(id)) |spawn| return .{ .spawn = spawn };
         if (source.types.node(source.typeOf(node.a)).tag == .never) return .{ .never = true };
         if (self.inline_demands.len != 0) if (@import("demand_inline.zig").localClosure(source, node.a)) |closure_id| {
             return .{ .local_callback = closure_id, .arrow = try self.prepareIndirect(node.a, id) };
@@ -6874,6 +6877,7 @@ pub const Owner = struct {
         const unit_ = g.unit(self.unit_id);
         const n = unit_.node(id);
         const prepared = self.resolvedPlan(id).application;
+        if (prepared.spawn) |spawn| return self.emitSpawnApplication(spawn, depth);
         if (prepared.universal) |boxed| {
             const concrete = prepared.arrow.?;
             const abstract = g.representations.store.node(boxed);
@@ -7344,6 +7348,19 @@ pub const Owner = struct {
     fn taskDescriptor(self: *Emitter, thunk: core.Id) Error!u32 {
         const g = self.generator;
         const source = g.unit(self.unit_id);
+        const metadata = metadata: {
+            if (source.node(thunk).tag == .reference) {
+                if (self.templates.get(source.reference(thunk).binding)) |selected| break :metadata selected;
+            }
+            const actual = @import("../check/task_core.zig").callable(source, thunk) catch return error.Declined;
+            const prepared = self.resolvedPlan(actual).template;
+            var selected = prepared.metadata;
+            if (prepared.static_key) |key| selected.captures = key.captures;
+            break :metadata selected;
+        };
+        const owner_id = if (metadata.unit == 0) self.unit_id else metadata.unit;
+        const owner = g.unit(owner_id);
+        if (owner.node(metadata.node).tag != .closure) return error.Declined;
         const ty = try self.codeLayout(source.typeOf(thunk), source.span(thunk));
         const arrow = g.representations.store.node(ty);
         const task_descriptor = g.module.taskCount();
@@ -7361,8 +7378,7 @@ pub const Owner = struct {
         try adapter.emit(.local_set, provider);
         adapter.provider_local = provider;
         try adapter.invokeUsageClosure(callable, null, arrow);
-        const actual_thunk = @import("../check/task_core.zig").callable(source, thunk) catch return error.Declined;
-        const result_role = g.bodyResultRole(arrow.b, self.unit_id, source.closure(actual_thunk).body);
+        const result_role = g.bodyResultRole(arrow.b, owner_id, owner.closure(metadata.node).body);
         try adapter.boxOwnerStorage(g.representations.store.machine(arrow.b), result_role);
         const result = try adapter.temporary(.i32);
         try adapter.emit(.local_tee, result);
@@ -7370,15 +7386,6 @@ pub const Owner = struct {
         try adapter.emit(.local_get, result);
         const name = try g.allocator.print("blot:task_start/{d}", .{task_descriptor});
         defer g.allocator.free(name);
-        const metadata = metadata: {
-            if (source.node(thunk).tag == .reference) {
-                if (self.templates.get(source.reference(thunk).binding)) |selected| break :metadata selected;
-            }
-            const prepared = self.resolvedPlan(actual_thunk).template;
-            var selected = prepared.metadata;
-            if (prepared.static_key) |key| selected.captures = key.captures;
-            break :metadata selected;
-        };
         try g.module.exportTaskAdapter(run, name, false);
         inline for (.{ false, true }) |result_move| {
             const move = try g.module.addTypedFunction(&.{.i32}, .none, .scalar);
@@ -7543,6 +7550,78 @@ pub const Owner = struct {
             else => err,
         };
     }
+    fn prepareSpawnApplication(self: *Emitter, id: core.Id) Error!?@import("../check/task_core.zig").SpawnApplication {
+        const g = self.generator;
+        var present = false;
+        for (g.units) |*unit_| {
+            for (unit_.bindings) |binding| if (binding.capability_flow == .spawn_task) {
+                present = true;
+                break;
+            };
+            if (present) break;
+        }
+        if (!present) return null;
+        const units = try g.allocator.alloc(*const core.Module, g.units.len);
+        defer g.allocator.free(units);
+        for (g.units, units) |*unit_, *pointer| pointer.* = unit_;
+        return @import("../check/task_core.zig").spawnApplication(g.unit(self.unit_id), id, units) catch return g.fail(self.unit_id, id, .unsupported);
+    }
+    fn emitSpawnApplication(self: *Emitter, application: @import("../check/task_core.zig").SpawnApplication, depth: usize) Error!void {
+        switch (application) {
+            .partial => |group_source| {
+                const group = try self.capture(group_source, depth);
+                // Private, non-callable carrier for a checked partial spawn.
+                // Core admits only further application and aliasing of it.
+                const carrier = try self.allocate(8, .{ .words = &.{ .scalar, .reference } });
+                try self.emit(.local_get, carrier);
+                try self.emit(.i32_const, 0);
+                try self.emit(.i32_store, heap.offset(heap.Closure, "function"));
+                try self.emit(.local_get, carrier);
+                try self.emit(.local_get, group);
+                try self.emit(.i32_store, heap.offset(heap.Closure, "environment"));
+                try self.emit(.local_get, carrier);
+            },
+            .full => |call| {
+                const group = if (call.carrier == 0) try self.capture(call.group, depth) else group: {
+                    const carrier = try self.capture(call.carrier, depth);
+                    const local = try self.temporary(.i32);
+                    try self.emit(.local_get, carrier);
+                    try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
+                    try self.emit(.local_set, local);
+                    break :group local;
+                };
+                const thunk = try self.capture(call.action, depth);
+                try self.emitTaskSpawn(group, thunk, try self.taskDescriptor(call.action));
+            },
+        }
+    }
+    fn emitTaskSpawn(self: *Emitter, group: u32, thunk: u32, task_descriptor: u32) Error!void {
+        const g = self.generator;
+        _ = try g.taskRuntime();
+        const captures = try self.allocate(8, .{ .words = &.{ .reference, .reference } });
+        try self.emit(.local_get, captures);
+        try self.emit(.local_get, thunk);
+        try self.emit(.i32_store, 0);
+        try self.emit(.local_get, captures);
+        try self.providerHead();
+        try self.emit(.i32_store, 4);
+        const handle = try self.allocate(8, .{ .words = &.{ .scalar, .scalar } });
+        try self.emit(.local_get, handle);
+        try self.boxOwnerStorage(.i32, .reference);
+        const boxed = try self.temporary(.i32);
+        try self.emit(.local_set, boxed);
+        try self.emit(.local_get, handle);
+        try self.emit(.local_get, group);
+        try self.emit(.i32_load, heap.offset(heap.EffectAuthority, "active"));
+        try self.emit(.i32_const, task_descriptor);
+        try self.emit(.local_get, captures);
+        try self.emit(.call_import, g.module.taskImportNamed("spawn").?);
+        try self.emit(.i32_store, 0);
+        try self.emit(.local_get, handle);
+        try self.emit(.i32_const, task_descriptor);
+        try self.emit(.i32_store, 4);
+        try self.emit(.local_get, boxed);
+    }
     fn taskImpl(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
         const source = g.unit(self.unit_id);
@@ -7552,6 +7631,7 @@ pub const Owner = struct {
         const op: @import("../check/task_types.zig").Op = @fromBackingInt(n.c);
         switch (op) {
             .scope => {
+                if (source.node(args[0]).tag != .closure and @import("../check/task_types.zig").scopeCallback(&source.types, source.typeOf(args[0])) == null) return error.Declined;
                 const checkpoint = self.cleanups.mark();
                 defer self.cleanups.restore(checkpoint);
                 const callback = try self.capture(args[0], depth);
@@ -7563,7 +7643,9 @@ pub const Owner = struct {
                 try self.emit(.call, g.module.arena.?.root_authority);
                 try self.cleanups.append(g.allocator, .{ .revoke_effect = @fromBackingInt(@intCast(owner)) });
                 try self.cleanups.append(g.allocator, .{ .task_group = .{ .owner = @fromBackingInt(@intCast(owner)), .close = g.module.taskImportNamed("close").? } });
-                const arrow = g.representations.store.node(try self.codeLayout(source.typeOf(args[0]), source.span(id)));
+                var callable = g.representations.store.node(try self.codeLayout(source.typeOf(args[0]), source.span(id)));
+                if (callable.tag == .universal) callable = g.representations.store.node(callable.a);
+                const arrow = callable;
                 try self.invokeUsageClosure(callback, owner, arrow);
                 const result = try self.temporary(g.representations.store.machine(arrow.b));
                 try self.emit(.local_set, result);
@@ -7574,45 +7656,24 @@ pub const Owner = struct {
                 const group = try self.capture(args[0], depth);
                 const thunk = try self.capture(args[1], depth);
                 const task_descriptor = try self.taskDescriptor(args[1]);
-                const captures = try self.allocate(8, .{ .words = &.{ .reference, .reference } });
-                try self.emit(.local_get, captures);
-                try self.emit(.local_get, thunk);
-                try self.emit(.i32_store, 0);
-                try self.emit(.local_get, captures);
-                try self.providerHead();
-                try self.emit(.i32_store, 4);
-                const handle = try self.allocate(8, .{ .words = &.{ .scalar, .scalar } });
-                try self.emit(.local_get, handle);
-                try self.boxOwnerStorage(.i32, .reference);
-                const boxed = try self.temporary(.i32);
-                try self.emit(.local_set, boxed);
-                try self.emit(.local_get, handle);
-                try self.emit(.local_get, group);
-                try self.emit(.i32_load, heap.offset(heap.EffectAuthority, "active"));
-                try self.emit(.i32_const, task_descriptor);
-                try self.emit(.local_get, captures);
-                try self.emit(.call_import, g.module.taskImportNamed("spawn").?);
-                try self.emit(.i32_store, 0);
-                try self.emit(.local_get, handle);
-                try self.emit(.i32_const, task_descriptor);
-                try self.emit(.i32_store, 4);
-                try self.emit(.local_get, boxed);
+                try self.emitTaskSpawn(group, thunk, task_descriptor);
             },
-            .join, .cancel => {
+            .join, .cancel, .receive => {
+                if (op == .receive and g.representations.store.node(try self.codeLayout(source.typeOf(args[0]), source.span(id))).tag == .product) return self.taskCollect(id, depth);
                 const boxed = try self.capture(args[0], depth);
                 const handle = try self.temporary(.i32);
                 try self.emit(.local_get, boxed);
                 try self.emit(.i32_load, heap.offset(heap.Owning, "payload"));
                 try self.emit(.local_set, handle);
                 const slot = try self.temporary(.i32);
-                if (op == .join) try self.rootDirective(3, slot);
+                if (op != .cancel) try self.rootDirective(3, slot);
                 try self.emit(.local_get, handle);
                 try self.emit(.i32_load, 0);
-                if (op == .join) {
+                if (op != .cancel) {
                     try self.emit(.local_get, handle);
                     try self.emit(.i32_load, 4);
                 }
-                try self.emit(.call_import, g.module.taskImportNamed(if (op == .join) "join" else "cancel").?);
+                try self.emit(.call_import, g.module.taskImportNamed(if (op != .cancel) "join" else "cancel").?);
                 if (op == .cancel) {
                     try self.emit(.i32_const, 0);
                 } else {
@@ -7632,8 +7693,63 @@ pub const Owner = struct {
                 }
             },
             .split => try self.taskSplit(id, depth),
+            .collect => try self.taskCollect(id, depth),
             .read, .write => try self.taskView(id, depth, op == .write),
         }
+    }
+    fn taskCollect(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const result = try self.codeLayout(source.typeOf(id), source.span(id));
+        const shape = g.representations.store.node(result);
+        if (shape.tag != .product or shape.b == 0 or shape.b > 16) return g.fail(self.unit_id, id, .unsupported);
+        var field_buffer: [16]layout.Id = undefined;
+        @memcpy(field_buffer[0..shape.b], g.representations.store.children(result));
+        const fields = field_buffer[0..shape.b];
+        const input = try self.capture(source.children(id)[0], depth);
+        const scalar_roles: [32]ir.Role = @splat(.scalar);
+        const handles = try self.allocate(shape.b * 8, .{ .words = scalar_roles[0 .. shape.b * 2] });
+        for (0..shape.b) |index| {
+            const handle = try self.temporary(.i32);
+            try self.emit(.local_get, input);
+            try self.emit(.i32_load, @intCast(index * 4));
+            try self.emit(.i32_load, heap.offset(heap.Owning, "payload"));
+            try self.emit(.local_set, handle);
+            inline for (0..2) |word| {
+                try self.emit(.local_get, handles);
+                try self.emit(.local_get, handle);
+                try self.emit(.i32_load, word * 4);
+                try self.emit(.i32_store, @intCast(index * 8 + word * 4));
+            }
+        }
+        const envelopes = try self.allocate(shape.b * 4, .{ .words = scalar_roles[0..shape.b] });
+        var slots: [16]u32 = undefined;
+        var roles: [16]ir.Role = undefined;
+        for (fields, 0..) |field, index| {
+            slots[index] = try self.temporary(.i32);
+            try self.rootDirective(3, slots[index]);
+            roles[index] = g.layoutRole(field);
+        }
+        const output = try self.allocate(shape.b * 4, .{ .words = roles[0..shape.b] });
+        try self.emit(.local_get, handles);
+        try self.emit(.i32_const, shape.b);
+        try self.emit(.local_get, envelopes);
+        try self.emit(.call_import, g.module.taskImportNamed("collect").?);
+        for (fields, 0..) |field, index| {
+            const envelope = try self.temporary(.i32);
+            try self.emit(.local_get, envelopes);
+            try self.emit(.i32_load, @intCast(index * 4));
+            try self.emit(.local_set, envelope);
+            try self.rootDirective(4, slots[index] | (envelope << 13));
+            try self.emit(.local_get, output);
+            try self.emit(.local_get, envelope);
+            const floating = g.representations.store.machine(field) == .f32;
+            try self.emit(if (floating) .f32_load else .i32_load, 0);
+            try self.emit(if (floating) .f32_store else .i32_store, @intCast(index * 4));
+            try self.emit(.local_get, envelope);
+            try self.emit(.call, g.module.arena.?.release);
+        }
+        try self.emit(.local_get, output);
     }
     fn resourceScope(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
@@ -8461,6 +8577,7 @@ pub const Owner = struct {
         const dictionary_member = try self.dictionaryMember(id, target, call.callee_type);
         if (dictionary_member == null and g.evaluator.has_implementations) target = try g.selectMemberTemplate(self.unit_id, id, target, try self.codeLayout(call.callee_type, unit_.span(id)));
         var key = try g.signature(target, call.callee_type, self.unit_id, self.mappings, self.row_mappings, unit_.span(id), false);
+        if (try self.prepareSpawnApplication(id)) |spawn| return .{ .call = .{ .key = key }, .spawn = spawn };
         if (dictionary_member != null) {
             // A stored method is a curried value. Its erased declaration's
             // flattened arity cannot delay this application boundary.
@@ -8554,6 +8671,7 @@ pub const Owner = struct {
         }
         defer g.evaluator.specialization_origin = previous_origin;
         const prepared = self.resolvedPlan(id).named;
+        if (prepared.spawn) |spawn| return self.emitSpawnApplication(spawn, depth);
         if (prepared.evaluated) |evaluated| if (try self.emitEvaluatedNamed(evaluated, depth)) return;
         const plan = prepared.call;
         g.evaluator.counters.prepared_named_calls += 1;

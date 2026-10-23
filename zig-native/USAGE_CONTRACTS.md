@@ -149,6 +149,17 @@ has no executable performance claim.
 
 ## Bounded implementation and qualification
 
+The 23 October task-surface continuation preserves affine authority through
+ordinary scope wrappers, exact spawn helpers, aliases, imports and stored spawn
+partial applications. Each completed spawn checks the actual action's captures
+against its destination region. Generic tuple receive preserves the complete
+lifetime graph and keeps partial results owned until collection succeeds or
+cleanup runs. A once callback alone does not prove capture transfer; arbitrary
+higher-order spawn forwarding remains rejected. See
+[structured concurrency](STRUCTURED_CONCURRENCY.md) and the current
+[qualification status](STATUS.md). The earlier continuation records below keep
+their historical test counts and completion statements.
+
 Tasks 061 and 062 closed on 17 October 2026 against the usage and resource rows
 of the
 [language qualification index](LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),

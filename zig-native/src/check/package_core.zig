@@ -453,6 +453,10 @@ const Walker = struct {
             proof.instance_rows = .{};
             for (proof.witnesses[0..declaration.scheme.variables.len]) |witness| {
                 if (witness == 0) continue;
+                // The independently checked identity body returns its sole
+                // argument exactly once. It can forward a value carrying a
+                // scoped callback contract without treating it as plain data.
+                if (declaration.capability_flow == .identity or declaration.capability_flow == .consume_task or declaration.capability_flow == .spawn_task) continue;
                 var work: @import("usage_check.zig").Work = .{ .remaining = self.scopes.remaining.* };
                 defer self.scopes.remaining.* = work.remaining;
                 try require(!(@import("usage_check.zig").containsNominalWork(&self.module.types, self.module.nominals, witness, &work) catch return error.InvalidArtifact));
@@ -579,6 +583,9 @@ const Walker = struct {
         };
     }
     fn goalRows(self: *Self, signature: T.Id, depth: usize) Error!void {
+        // Invocation predicates perform these rows. A task_receive predicate
+        // only relates an input shape to its latent result/effects; its actual
+        // receive node and ordinary call edge prove execution separately.
         var cursor = signature;
         var count: usize = 0;
         while (cursor != 0 and self.module.types.node(cursor).tag == .function) {
@@ -668,7 +675,7 @@ const Walker = struct {
                         try require(!solver.oom);
                         continue;
                     }
-                    if (goal.signature != 0) try self.goalRows(goal.signature, depth + 1);
+                    if (goal.kind != .task_receive and goal.signature != 0) try self.goalRows(goal.signature, depth + 1);
                 }
                 accepted = true;
                 return true;
@@ -689,7 +696,7 @@ const Walker = struct {
                 }
                 var proof: contracts.Principal = .{ .left = &self.module.types, .right = &self.module.types, .remaining = self.scopes.remaining, .views = self.scopes };
                 if (!try self.goalMatches(&proof, given, wanted, true)) continue;
-                if (given.signature != 0) try self.goalRows(given.signature, depth + 1);
+                if (given.kind != .task_receive and given.signature != 0) try self.goalRows(given.signature, depth + 1);
                 return true;
             }
         }
@@ -697,7 +704,7 @@ const Walker = struct {
             for (self.module.types.quantifierGoals(owner)) |given| {
                 var proof: contracts.Principal = .{ .left = &self.module.types, .right = &self.module.types, .remaining = self.scopes.remaining, .views = self.scopes };
                 if (!try self.goalMatches(&proof, given, wanted, true)) continue;
-                if (given.signature != 0) try self.goalRows(given.signature, depth + 1);
+                if (given.kind != .task_receive and given.signature != 0) try self.goalRows(given.signature, depth + 1);
                 return true;
             }
         }
@@ -707,7 +714,7 @@ const Walker = struct {
                 var proof: contracts.Principal = .{ .left = &self.module.types, .right = &self.module.types, .remaining = self.scopes.remaining, .views = self.scopes, .instance = .{ .start = owner.b, .len = owner.c } };
                 @memcpy(proof.witnesses[0..opening.binders.len], self.module.types.list(opening.binders));
                 if (!try self.goalMatches(&proof, given, wanted, true)) continue;
-                if (given.signature != 0) try self.goalRows(try self.mappedRoot(&proof, given.signature, depth + 1), depth + 1);
+                if (given.kind != .task_receive and given.signature != 0) try self.goalRows(try self.mappedRoot(&proof, given.signature, depth + 1), depth + 1);
                 return true;
             }
         }
@@ -828,6 +835,26 @@ const Walker = struct {
                 const sequence = self.module.types.node(goal.ty);
                 if (sequence.tag != .array and sequence.tag != .list) return false;
                 try self.strictSame(sequence.a, goal.result);
+                return true;
+            },
+            .task_receive => {
+                const tasks = @import("task_types.zig");
+                if (!tasks.receivers(&self.module.types, goal.ty)) return false;
+                try @import("task_core.zig").receiveType(self.module, goal.ty, goal.result, self.scopes.remaining);
+                const signature = self.module.types.node(goal.signature);
+                try require(signature.tag == .function);
+                try self.strictSame(signature.a, goal.ty);
+                try self.strictSame(signature.b, goal.result);
+                const input = self.module.types.node(goal.ty);
+                const members = if (input.tag == .product) self.module.types.list(.{ .start = input.a, .len = input.b }) else &.{goal.ty};
+                for (members) |member| {
+                    const wrapper = self.module.types.node(member);
+                    const handle = self.module.types.node(wrapper.a);
+                    const parts = self.module.types.nominalArguments(handle);
+                    const arrow = self.module.types.node(parts[1]);
+                    var proof: contracts.Principal = .{ .left = &self.module.types, .right = &self.module.types, .remaining = self.scopes.remaining, .views = self.scopes };
+                    try proof.subsetRow(arrow.c, signature.c);
+                }
                 return true;
             },
             .arithmetic, .ordered, .integer, .equality => {
@@ -1105,8 +1132,11 @@ const Walker = struct {
     }
     fn header(self: *Self, signature: T.Id, parameters: []const core.Parameter, body: core.Id, resolver_parameter: bool) Error!void {
         var cursor = signature;
-        const wrapper = self.module.types.node(cursor);
-        if (wrapper.tag == .usage or (wrapper.tag == .forall and parameters.len != 0)) cursor = wrapper.a;
+        for (0..128) |_| {
+            const wrapper = self.module.types.node(cursor);
+            if (wrapper.tag != .usage and (wrapper.tag != .forall or parameters.len == 0)) break;
+            cursor = wrapper.a;
+        } else return error.InvalidArtifact;
         for (parameters) |parameter| {
             const arrow = self.module.types.node(cursor);
             try require(arrow.tag == .function);
@@ -1204,8 +1234,11 @@ const Walker = struct {
     }
     fn arguments(self: *Self, signature: T.Id, values: []const core.Id, output_: T.Id, projection: ?contracts.PrincipalProjectionResolver) Error!void {
         var cursor = signature;
-        const wrapper = self.module.types.node(cursor);
-        if (wrapper.tag == .usage or wrapper.tag == .forall) cursor = wrapper.a;
+        for (0..128) |_| {
+            const wrapper = self.module.types.node(cursor);
+            if (wrapper.tag != .usage and wrapper.tag != .forall) break;
+            cursor = wrapper.a;
+        } else return error.InvalidArtifact;
         for (values) |value| {
             const arrow = self.module.types.node(cursor);
             try require(arrow.tag == .function);
@@ -1221,8 +1254,11 @@ const Walker = struct {
     }
     fn effectSignature(self: *Self, signature: T.Id, arity: usize) Error!T.Effects.Id {
         var cursor = signature;
-        const wrapper = self.module.types.node(cursor);
-        if (wrapper.tag == .usage or wrapper.tag == .forall) cursor = wrapper.a;
+        for (0..128) |_| {
+            const wrapper = self.module.types.node(cursor);
+            if (wrapper.tag != .usage and wrapper.tag != .forall) break;
+            cursor = wrapper.a;
+        } else return error.InvalidArtifact;
         var result_: T.Effects.Id = 0;
         for (0..arity) |_| {
             const arrow = self.module.types.node(cursor);
@@ -2321,6 +2357,14 @@ const Walker = struct {
                 defer self.loop_owner = outer_loop;
                 defer self.decision_owner = outer_decision;
                 const closure = self.module.closures[node.a];
+                const prior_scope = self.scope_owner;
+                var region_owner: ScopeOwner = undefined;
+                if (node.tag == .closure) if (@import("task_types.zig").scopeCallback(&self.module.types, node.ty)) |arrow| {
+                    const group = self.module.types.node(arrow.a);
+                    region_owner = .{ .identity = .{ .unit = group.b, .decl = group.c }, .parent = prior_scope };
+                    self.scope_owner = &region_owner;
+                };
+                defer self.scope_owner = prior_scope;
                 var signature = node.ty;
                 if (node.tag == .suspend_) {
                     const demand = self.module.types.node(node.ty);
@@ -2350,9 +2394,11 @@ const Walker = struct {
                 try self.closeRows(closure.closed_rows);
                 try self.scopes.visit(node.ty);
                 try self.same(signature, closure.function_type);
-                const quantified = self.module.types.node(signature).tag == .forall;
+                var quantified_signature = signature;
+                while (self.module.types.node(quantified_signature).tag == .usage) quantified_signature = self.module.types.node(quantified_signature).a;
+                const quantified = self.module.types.node(quantified_signature).tag == .forall;
                 if (quantified) {
-                    try self.scopes.enter(signature);
+                    try self.scopes.enter(quantified_signature);
                     self.scopes.introductions[self.scopes.formal_count - 1] = closure.body;
                 }
                 defer if (quantified) self.scopes.leave();
@@ -2499,7 +2545,24 @@ const Walker = struct {
             },
             .task => {
                 try @import("task_core.zig").validateOperationContextWorkspace(self.module, self.units(), source, self.scopes.remaining, self.admission.workspace);
-                for (self.module.children(source)) |operand| try self.expression(operand, depth + 1);
+                const operands = self.module.children(source);
+                if (node.c == @backingInt(@import("task_types.zig").Op.scope)) {
+                    var signature = self.module.typeOf(operands[0]);
+                    for (0..128) |_| {
+                        const wrapper = self.module.types.node(signature);
+                        if (wrapper.tag != .usage and wrapper.tag != .forall) break;
+                        signature = wrapper.a;
+                    } else return error.InvalidArtifact;
+                    const arrow = self.module.types.node(signature);
+                    try require(arrow.tag == .function);
+                    const group = self.module.types.node(arrow.a);
+                    try require(group.tag == .scoped and group.c != 0);
+                    const parent = self.scope_owner;
+                    var owner: ScopeOwner = .{ .identity = .{ .unit = group.b, .decl = group.c }, .parent = parent };
+                    self.scope_owner = &owner;
+                    defer self.scope_owner = parent;
+                    try self.expression(operands[0], depth + 1);
+                } else for (operands) |operand| try self.expression(operand, depth + 1);
             },
             .resource_acquire, .usage_borrow => {
                 if (node.tag == .resource_acquire) try require(self.foreign_allowed);

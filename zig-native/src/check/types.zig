@@ -82,7 +82,7 @@ pub fn rowKeyFormal(key: u32) ?Id {
 pub const Scheme = struct { root: Id = absent, variables: List = .{}, row_variables: List = .{}, closed_rows: List = .{}, obligations: List = .{}, generative: List = .{} };
 pub const ClosedCovariant = struct { root: Id, closed_rows: List };
 pub const Operator = enum { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right };
-pub const ObligationKind = enum { arithmetic, ordered, equality, integer, field, writable_field, dispatch, result_dispatch, monad_factory, resolver_dispatch, resolver_shape, effect_operation, effect_handler, receiver, update, type_rep, effect_rep, type_head, collection, record_merge, callee_use, type_eq, contract };
+pub const ObligationKind = enum { arithmetic, ordered, equality, integer, field, writable_field, dispatch, result_dispatch, monad_factory, resolver_dispatch, resolver_shape, effect_operation, effect_handler, receiver, update, type_rep, effect_rep, type_head, collection, record_merge, callee_use, type_eq, contract, task_receive };
 pub const QuantifierGoals = struct { owner: Id, goals: List };
 pub const Obligation = struct { ty: Id, kind: ObligationKind, source: u32, name: u32 = 0, result: Id = 0, other: Id = 0, signature: Id = 0, operator: Operator = .none, identity: NominalIdentity = .{ .unit = 0, .decl = 0 }, explicit: bool = false, qualification_span: ?@import("../parse/ast.zig").Span = null, qualification_unit: u32 = 0 };
 pub const Version = struct { variable: u32, replacement: Id, position: Cursor, previous: u32, next: u32 = none };
@@ -382,7 +382,9 @@ pub const Store = struct {
     pub fn bindRankAnnotation(self: *Store, slot: Id, required: Id) Error!void {
         const root = try self.resolve(slot, 0);
         if (self.node(root).tag != .variable) return self.unify(root, required);
-        if (self.node(required).tag != .forall) return error.TypeMismatch;
+        var quantified_root = required;
+        if (self.node(quantified_root).tag == .usage) quantified_root = self.node(quantified_root).a;
+        if (self.node(quantified_root).tag != .forall) return error.TypeMismatch;
         if (try self.occurs(self.node(root).a, required)) return error.InfiniteType;
         try self.appendVersion(root, required);
     }
@@ -609,7 +611,7 @@ pub const Store = struct {
         if (instance.unit != 0 or instance.decl == 0) return instance;
         const bound = try self.resolveDepth(instance.decl, at, depth + 1);
         const value = self.node(bound);
-        if (value.tag == .variable or value.tag == .instance_selection) return .{ .unit = 0, .decl = bound };
+        if (value.tag == .variable or value.tag == .instance_selection or self.regionIdentity(bound)) return .{ .unit = 0, .decl = bound };
         if (value.tag != .scoped) return error.TypeMismatch;
         return .{ .unit = value.b, .decl = value.c };
     }
@@ -1679,9 +1681,12 @@ pub const Store = struct {
                     try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a });
                 },
                 .scoped => {
-                    if (an.b == 0 and self.node(an.c).tag == .variable) {
+                    // An ordinary capability parameter binds to the whole
+                    // scoped carrier. A sorted region binds to its identity.
+                    // Prefer the carrier variable when the two meet.
+                    if (an.b == 0 and self.node(an.c).tag == .variable and !self.regionIdentity(an.c)) {
                         if (bn.b != 0 or an.c != bn.c) try pending.append(scratch_allocator, .{ .a = an.c, .b = b });
-                    } else if (bn.b == 0 and self.node(bn.c).tag == .variable) {
+                    } else if (bn.b == 0 and self.node(bn.c).tag == .variable and !self.regionIdentity(bn.c)) {
                         try pending.append(scratch_allocator, .{ .a = bn.c, .b = a });
                     } else if (an.b == 0 and bn.b == 0) {
                         try pending.append(scratch_allocator, .{ .a = an.c, .b = bn.c });

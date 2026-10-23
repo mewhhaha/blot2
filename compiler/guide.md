@@ -1583,17 +1583,17 @@ entry const answer = fn () => @task.scope (fn group => do:
   break @u32.add (@task.join left) (@task.join right))
 ```
 
-Within a direct `@task.scope (fn group => ...)` callback, `*(function argument)`
-sparks a parenthesized call in that group and returns its affine task handle.
-`|handle|` consumes one task handle and returns its ordinary result. The checker
-applies the same capture, region, and ownership rules as `@task.spawn` and
-`@task.join`; these forms introduce no new block keywords. A spark outside a
+Within a checked task-scope callback, `*(function argument)` sparks a
+parenthesized call in that group and returns its affine task handle. `|handle|`
+consumes one task handle and returns its ordinary result. The checker applies
+the same capture, region, and ownership rules as `@task.spawn` and `@task.join`;
+these forms introduce no new block keywords. The checker selects the exact group
+parameter, even if a local binding shadows its name. A spark outside a
 statically known scope receives a diagnostic and can use the explicit
-`@task.spawn group thunk` operation. Tuple receive, streams, and propagation of
-inferred groups through helpers are not yet implemented. The callable and
-supplied argument expressions are evaluated at the spark site; only the
-invocation runs in the child. Effectful arguments must be bound explicitly
-before sparking.
+`@task.spawn group thunk` operation. Streams and propagation of caller regions
+into ordinary helpers are not yet implemented. The callable and supplied
+argument expressions are evaluated at the spark site; only the invocation runs
+in the child. Effectful arguments must be bound explicitly before sparking.
 
 ```blot
 const add22 = fn value => @u32.add value 22
@@ -1601,6 +1601,37 @@ entry const answer = fn () => @task.scope (fn group => do:
   let pending = *(add22 20)
   return |pending|)
 ```
+
+An ordinary scope wrapper may expose the primitive without adding syntax:
+
+```blot
+const scope = fn body => @task.scope body
+const add22 = fn value => @u32.add value 22
+entry const answer = fn () => scope (fn group => do:
+  let pending = *(add22 20)
+  return |pending|)
+```
+
+The callback accepts every fresh group region, and its result and effects must
+be independent of that region. This contract follows ordinary calls, aliases,
+curried scope wrappers and forwarding through `identity`; these calls do not
+depend on a particular helper name.
+
+An explicit spawn helper can forward the selected group and one action:
+
+```blot
+const launch = fn group => fn action => @task.spawn group action
+entry const answer = fn () => scope (fn group => do:
+  let here = launch group
+  let pending = here (fn () => 42)
+  return |pending|)
+```
+
+Direct aliases, renamed imports and stored partial calls preserve this exact
+contract. Each completed call checks the actual action's captures against the
+selected group's lifetime. Passing a spawn helper through arbitrary callbacks or
+containers requires a further transfer contract and is rejected. Implicit caller
+regions in helpers remain outside this implemented slice.
 
 A one-result receiver can pass through an ordinary helper, including an imported
 or renamed binding:
@@ -1616,6 +1647,27 @@ entry const answer = fn () => @task.scope (fn group => do:
 The helper consumes the same affine handle as direct `|pending|` and returns the
 task's result. Its checked join contract retains the enclosing group lifetime
 across the call.
+
+`|(first, second)|` collects both task results in tuple order. A tuple stored in
+a binding or passed through `await` has the same behavior. Collection admits all
+its handles before starting work and retains partial results until every
+selected task succeeds or cleanup runs. It supports one to sixteen handles. A
+single task returning a tuple returns that tuple as its payload; receiving does
+not recursively interpret payload values as more receivers.
+
+```blot
+const await = fn source => |source|
+entry const answer = fn () => @task.scope (fn group => do:
+  let first = @task.spawn group (fn () => 20)
+  let second = @task.spawn group (fn () => 22)
+  let receivers = (first, second)
+  let (left, right) = await receivers
+  return @u32.add left right)
+```
+
+An inferred generic receiver helper must be a direct receive or an alias of one.
+More complex untyped receiver bodies remain unsupported. Streams and select-one
+receives are not implemented yet.
 
 Unique captures move to one child. Immutable data can be shared. Read loans
 require an owner enclosing the destination group. Mutable state/provider

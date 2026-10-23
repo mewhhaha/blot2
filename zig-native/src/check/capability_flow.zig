@@ -4,9 +4,35 @@
 //! members and curried callbacks retain their input identity in effect rows.
 //! Unknown relationships cannot license an authority transfer.
 const ast = @import("../parse/ast.zig");
-pub const Contract = enum(u8) { unknown, identity, invoke_unit, member_unit, invoke_with_capability, member_first_unit, member_second_unit, input_shape, consume_task };
+pub const Contract = enum(u8) { unknown, identity, invoke_unit, member_unit, invoke_with_capability, member_first_unit, member_second_unit, input_shape, consume_task, scope_task, spawn_task };
+
+pub fn taskSpawnSource(tree: *const ast.Tree, pool: *const @import("../parse/symbols.zig").Pool, initial: ast.Id) bool {
+    const outer = tree.node(unwrap(tree, initial) orelse return false);
+    if (outer.tag != .lambda) return false;
+    const inner = tree.node(unwrap(tree, outer.b) orelse return false);
+    if (inner.tag != .lambda) return false;
+    const group = tree.parameter(outer.a);
+    const action = tree.parameter(inner.a);
+    if (group.name == 0 or action.name == 0 or group.name == action.name or group.demanded or action.demanded or group.is_unit or action.is_unit) return false;
+    const call = tree.node(unwrap(tree, inner.b) orelse return false);
+    if (call.tag != .apply) return false;
+    const first = tree.node(unwrap(tree, call.a) orelse return false);
+    if (first.tag != .apply) return false;
+    const head = tree.node(unwrap(tree, first.a) orelse return false);
+    const left = tree.node(unwrap(tree, first.b) orelse return false);
+    const right = tree.node(unwrap(tree, call.b) orelse return false);
+    return head.tag == .intrinsic and @import("std").mem.eql(u8, pool.get(head.a), "@task.spawn") and left.tag == .name and left.a == group.name and right.tag == .name and right.a == action.name;
+}
 
 pub fn taskJoinSource(tree: *const ast.Tree, pool: *const @import("../parse/symbols.zig").Pool, initial: ast.Id) bool {
+    return taskUnarySource(tree, pool, initial, "@task.join") or taskUnarySource(tree, pool, initial, "@task.receive");
+}
+
+pub fn taskScopeSource(tree: *const ast.Tree, pool: *const @import("../parse/symbols.zig").Pool, initial: ast.Id) bool {
+    return taskUnarySource(tree, pool, initial, "@task.scope");
+}
+
+fn taskUnarySource(tree: *const ast.Tree, pool: *const @import("../parse/symbols.zig").Pool, initial: ast.Id, primitive: []const u8) bool {
     const expression = unwrap(tree, initial) orelse return false;
     const lambda = tree.node(expression);
     if (lambda.tag != .lambda) return false;
@@ -16,7 +42,7 @@ pub fn taskJoinSource(tree: *const ast.Tree, pool: *const @import("../parse/symb
     if (body.tag != .apply) return false;
     const callee = tree.node(unwrap(tree, body.a) orelse return false);
     const argument = tree.node(unwrap(tree, body.b) orelse return false);
-    return callee.tag == .intrinsic and @import("std").mem.eql(u8, pool.get(callee.a), "@task.join") and argument.tag == .name and argument.a == parameter.name;
+    return callee.tag == .intrinsic and @import("std").mem.eql(u8, pool.get(callee.a), primitive) and argument.tag == .name and argument.a == parameter.name;
 }
 
 pub fn source(tree: *const ast.Tree, initial: ast.Id) Contract {

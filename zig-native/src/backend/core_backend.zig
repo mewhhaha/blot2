@@ -930,6 +930,10 @@ pub const Generator = struct {
         var service = try self.specializer();
         service.mapTypeDepth(unit_id, mappings, rows, ty, concrete, span, depth) catch |err| return self.specializationFailure(service, err);
     }
+    pub fn mapFunctionResult(self: *Generator, unit_id: u32, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), ty: types.Id, concrete: layout.Id, span: core.Span) Error!void {
+        var service = try self.specializer();
+        service.mapFunctionResult(unit_id, mappings, rows, ty, concrete, span, 0) catch |err| return self.specializationFailure(service, err);
+    }
     pub fn mapRow(self: *Generator, unit_id: u32, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), source_row: types.Effects.Id, actual_row: u32, span: core.Span, covariant: bool) Error!void {
         var service = try self.specializer();
         service.mapRow(unit_id, mappings, rows, source_row, actual_row, span, covariant) catch |err| return self.specializationFailure(service, err);

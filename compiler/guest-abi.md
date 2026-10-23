@@ -258,8 +258,8 @@ mismatched exports and incompatible signatures before execution. Modules without
 tasks keep the ordinary ABI.
 
 The compiler imports `blot:task/1` operations `open`, `close`, `spawn`, `join`,
-`cancel`, `poll`, `drop`, `drain`, `checkpoint`, `current`, `resume` and
-`transfer`, with exact checked Wasm signatures. Hidden descriptor exports
+`collect`, `cancel`, `poll`, `drop`, `drain`, `checkpoint`, `current`, `resume`
+and `transfer`, with exact checked Wasm signatures. Hidden descriptor exports
 `blot:task_start/N`, `blot:task_move_captures/N` and `blot:task_move_result/N`
 invoke the checked thunk and transfer resource tokens through its selected
 layout. Native context helpers save and restore each task's counted root
@@ -275,6 +275,22 @@ returned values, including cancellation and failed publication. Scope completion
 waits for children, including descendants published during an existing child's
 suspension. Independently observed failures are reported by spawn ordinal after
 every outstanding callback settles.
+
+`collect(input, count, output)` takes three i32 arguments and returns no Wasm
+value. `input` names `count` pairs of scalar `(task ID, descriptor ID)` words;
+`output` names space for `count` i32 result-envelope addresses. The bridge
+checks alignment, memory ranges, descriptors, live generations and duplicate
+handles before consuming any input or starting work. The compiler currently
+emits one to sixteen handles per collection; the bridge independently bounds its
+count at 4096. It retains partial results until every selected task succeeds,
+transfers all result journals, then publishes the envelope addresses in written
+order. A failure drains in-flight children and releases partial-result
+ownership.
+
+`collect` is an optional extension when loading older task modules: their
+original import set remains supported. Duplicate imports and incompatible
+signatures still reject. These protocol changes do not add stream or select-one
+support.
 
 Use a `concurrent` callback type in Source and an explicit host binding:
 

@@ -441,7 +441,10 @@ pub const Context = struct {
             .scoped => {
                 try require(!self.witness);
                 try self.walk(node.a, depth + 1);
-                if (node.b == 0) try self.walk(node.c, depth + 1);
+                if (node.b == 0) {
+                    const identity = self.types.node(node.c);
+                    if (identity.tag == .bound and identity.b == 2) try self.region(node.c, depth + 1) else try self.walk(node.c, depth + 1);
+                }
             },
             .instance_version => try require(!self.witness),
             .instance_selection => {

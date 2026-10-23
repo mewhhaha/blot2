@@ -69,6 +69,16 @@ replacement, vectorization and lifetime analysis consume these shared facts.
 as soon as the next pass replaces it. This is a stack IR, not SSA, and it does
 not infer reference ownership from an arbitrary i32 word.
 
+Task syntax retains an unresolved region until checking. Ordinary scope wrappers
+carry a once callback universally quantified over its fresh region; generic
+receive helpers carry a deferred input/result/effect relation. Frozen Core
+validates exact spawn-wrapper bodies and the actual action captures at each
+completed call. Partial spawn calls retain their already evaluated group in a
+private carrier, and tuple collection uses one guest operation with ownership
+transfer before result publication. These mechanisms preserve ordinary
+aliases/imports without granting arbitrary higher-order functions transfer
+authority. See [structured concurrency](STRUCTURED_CONCURRENCY.md).
+
 `runtime_layout.zig` defines the guest's fixed heap structures, their field
 roles and offsets. Runtime constructors, static serialization, list helpers and
 arena headers use those definitions. `runtime_cleanup.zig` records lexical
@@ -228,12 +238,11 @@ API's `profileBackend: true` and the CLI's `build ... --profile` (also
 `build-project`) add nested phase timings and the eight slowest inference
 regions as `backend_timing.work`, and whole-build exclusive phase clocks (load,
 lex, parse, check, lower, freeze, validation, backend and the rest) with each
-phase's requested bytes, allocation count and peak-RSS growth as
-`phase_profile` (`phaseProfile`). The counting allocator is inserted only for
-profiled builds. Detailed clocks are disabled by default so
-profiling does not tax ordinary hot paths: an unprofiled record omits `work`
-and publishes an empty phase profile. Deterministic work counters (`work_counters` in CLI stats,
-`workCounters` in the project API) are always on: inference regions, region
-scopes, callee body collections split into closed (memoized) and unresolved
-(re-collected), solver passes and constraint visits, and occurs steps. Budget on
-these, not wall time.
+phase's requested bytes, allocation count and peak-RSS growth as `phase_profile`
+(`phaseProfile`). The counting allocator is inserted only for profiled builds.
+Detailed clocks are disabled by default so profiling does not tax ordinary hot
+paths: an unprofiled record omits `work` and publishes an empty phase profile.
+Deterministic work counters (`work_counters` in CLI stats, `workCounters` in the
+project API) are always on: inference regions, region scopes, callee body
+collections split into closed (memoized) and unresolved (re-collected), solver
+passes and constraint visits, and occurs steps. Budget on these, not wall time.

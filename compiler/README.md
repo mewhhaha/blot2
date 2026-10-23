@@ -28,6 +28,16 @@ limits. It does not reproduce retired Bend step counts. Runtime values use the
 [guest ABI](guest-abi.md); hosts pass explicit callable capabilities into entry
 functions. Lists and arrays have distinct types and representations.
 
+Structured tasks use checked scope/spawn helpers and `|receiver|` or tuple
+collect-all. The guest bridge preserves partial-result ownership, task cleanup,
+and synchronous/JSPI execution. Scope callbacks, exact spawn helpers, aliases
+and imported receivers retain their contracts. Channels, select-one and CPU
+workers remain unfinished. See [structured tasks](guide.md#structured-tasks) and
+the [task ABI](guest-abi.md#structured-task-extension).
+
+The repository [installation instructions](../README.md#build-and-use) bundle
+the release compiler with this CLI, formatter, guide and standard library.
+
 Run `deno task test:compiler` from the repository root. Tests cover compiler
 ownership, language behavior, generated Wasm, host lifetimes, retained builds,
 failed-edit recovery, packaging, and command-line compilation.

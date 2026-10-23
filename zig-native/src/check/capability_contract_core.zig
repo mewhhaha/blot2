@@ -240,7 +240,18 @@ fn Builder(comptime Module: type) type {
                             }
                             return self.store.aggregate(self.allocator, .product, &.{ owner, result });
                         },
-                        .join => return self.store.project(self.allocator, try self.expression(operands[0], environment, depth + 1), 1, .index),
+                        .join, .receive => return self.store.project(self.allocator, try self.expression(operands[0], environment, depth + 1), 1, .index),
+                        .collect => {
+                            const input = try self.expression(operands[0], environment, depth + 1);
+                            const shape = self.module.types.nodes[self.module.typeOf(operands[0])];
+                            if (shape.tag != .product or shape.b > 16) return error.Unavailable;
+                            var results: [16]terms.Id = undefined;
+                            for (results[0..shape.b], 0..) |*result, index| {
+                                const item = try self.store.project(self.allocator, input, @intCast(index), .index);
+                                result.* = try self.store.project(self.allocator, item, 1, .index);
+                            }
+                            return self.store.aggregate(self.allocator, .product, results[0..shape.b]);
+                        },
                         .cancel, .write => {
                             if (self.input_globals) for (operands) |operand| try self.inputStore(try self.expression(operand, environment, depth + 1));
                             return 0;

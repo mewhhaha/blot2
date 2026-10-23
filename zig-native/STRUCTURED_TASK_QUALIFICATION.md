@@ -1,5 +1,9 @@
 # Structured task implementation qualification
 
+For the 23 October scope/spawn wrappers and tuple collection continuation, see
+[task surface qualification](TASK_SURFACE_QUALIFICATION.md). This document
+records the earlier cooperative lifecycle and ownership milestone.
+
 Tasks 073/074 complete the eight owner-fixed cooperative traces in
 [STRUCTURED_CONCURRENCY.md](STRUCTURED_CONCURRENCY.md). The
 [19 October full gate](CLOUD_QUALIFICATION.md) executes the mapped native/OOM

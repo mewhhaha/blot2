@@ -1,5 +1,27 @@
 # Zig compiler status
 
+## Qualified task-surface continuation, 23 October 2026
+
+The current continuation adds checker-selected spark regions, ordinary scope
+wrappers with universally quantified callbacks, exact spawn helpers through
+aliases/imports/partial calls, and collect-all through direct generic receivers.
+Tuple collection preserves partial-result ownership and written result order.
+The full gate passes 2,536 native tests with exhaustive allocation-failure
+sweeps in four shards, 1,645 guest/client tests, 48 smoke checks, 54 harness
+checks and 15 preflight regressions. Zig analyzer reports zero findings across
+517 source files plus the fixture module. The
+[qualification record](TASK_SURFACE_QUALIFICATION.md) pins raw evidence,
+source/binary hashes, the frozen application corpus and local installation
+checks. The final release CLI and native compiler are installed locally.
+
+Inferred caller regions, general higher-order spawn forwarding, channels,
+select-one, scoped nonlocal exits, purity certification and CPU workers remain
+unfinished. The iterator and performance targets also remain open. See
+[the completion plan](../FINISH_PLAN.md) and
+[structured concurrency](STRUCTURED_CONCURRENCY.md).
+
+## Earlier qualified milestones
+
 Blot's production compiler is handwritten Zig 0.17. Deno hosts the public
 compiler API, formatter and Wasm guest API. The earlier full-qualified source
 freeze passes 2,223 native laws, 1,404 guest/client tests and all 455 Zig
@@ -12,23 +34,24 @@ contracts and their separate costs. Language behavior remains defined by
 [the guide](../compiler/guide.md), with ownership rules in
 [CONTRACT.md](CONTRACT.md).
 
-The current cloud milestone on 19 October 2026 passes **2,470 native laws
-executed, 1,556 guest/client checks and 37 harness checks**. All native counts
-are free of skips, failures, leaks and logged errors. CI lint checks 507 source
-files plus the fixture module at zero findings. Package dry run, editor and
-local-link checks pass. The [complete current record](CLOUD_QUALIFICATION.md)
-includes exact source, compiler/test-binary and toolchain pins, paired
-comparison, heap and runtime measurements, and the correction preventing
-unverified Zig run-cache hits from becoming native qualification evidence.
+The cloud milestone on 19 October 2026 passes **2,470 native laws executed,
+1,556 guest/client checks and 37 harness checks**. All native counts are free of
+skips, failures, leaks and logged errors. CI lint checks 507 source files plus
+the fixture module at zero findings. Package dry run, editor and local-link
+checks pass. The [complete current record](CLOUD_QUALIFICATION.md) includes
+exact source, compiler/test-binary and toolchain pins, paired comparison, heap
+and runtime measurements, and the correction preventing unverified Zig run-cache
+hits from becoming native qualification evidence.
 
 Task 024's declared/qualified field recipes and the missing staging/scoped-task
 trace laws are qualified. Tasks 035, 067/068, 073/074, 075–080 and 105–107 also
 close against the current gate and measurements. Task 108 also closes with
 [recreated Ink callback probes](STATIC_CAPTURE_ROWS.md); 97 tasks are complete
-and 13 remain open. General iterator/module cutoff work and all final performance
-targets remain open. The published `codeberg.org` network rule is active and
-the local analyzer backend builds and doctor passes; its final source scan is
-still required.
+and 13 remained open at that checkpoint. General iterator/module cutoff work and
+all final performance targets remain open. The published `codeberg.org` network
+rule is active and the local analyzer backend built and its doctor passed; that
+checkpoint still required its final source scan. Later evidence is recorded
+above and in [CONTINUE.md](../CONTINUE.md).
 
 CT92–CT94's retained work budgets and explicit five-percent CPU gate pass. The
 final seven-pair pinned candidate/baseline median is 0.941, with substantial

@@ -6457,7 +6457,7 @@ const ClosureRegion = struct {
             self.frames.deinit(allocator);
         }
     };
-    const Source = struct { origin: ?SourceLocation = null, implementation_context: ?u32 = null, binding: core.BindingId = 0, value: ValueId, owner: usize, root: types.Id = 0, body: core.Id = 0, closed_rows: types.List = .{}, body_collected: bool = false };
+    const Source = struct { origin: ?SourceLocation = null, implementation_context: ?u32 = null, binding: core.BindingId = 0, value: ValueId, owner: usize, root: types.Id = 0, body: core.Id = 0, closed_rows: types.List = .{}, body_collected: bool = false, import_parent: ?u32 = null, import_binders: types.List = .{} };
     const Import = struct { scope: u32, ty: types.Id };
     const RowImport = struct { scope: u32, row: types.Effects.Id };
     const LabelImport = struct { scope: u32, label: types.Effects.Label };
@@ -6481,7 +6481,7 @@ const ClosureRegion = struct {
     };
     const DefinitionKey = struct { owner: usize, node: core.Id };
     const CandidateKey = struct { caller: u32, node: core.Id, target: Target };
-    const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge, call_summary, scheme_use, callback_use, type_eq, contract, implementation_method };
+    const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge, call_summary, scheme_use, callback_use, type_eq, contract, implementation_method, task_receive };
     const Constraint = struct { use_node: core.Id = 0, origin: ?SourceLocation = null, lexical_key: u32 = 0, callback_slot: u32 = 0, callback_stage: u32 = 0, callback_interface: bool = false, target: Target = .{ .unit = 0, .binding = 0 }, arguments: core.List = .{}, explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, instance: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, principal_only: bool = false, solved: bool = false };
     const Worklists = struct {
         constraints: @import("../check/solver_worklist.zig").Queue = .{},
@@ -7007,7 +7007,7 @@ const ClosureRegion = struct {
         const scope = try self.typeScope(owner);
         self.scratch.sources.items[scope].body = body;
         self.scratch.sources.items[scope].closed_rows = closed_rows;
-        self.scratch.sources.items[scope].root = try self.importImplementation(scope, root);
+        self.setSourceRoot(scope, try self.importImplementation(scope, root));
         try self.seed(scope, seeds);
         try self.seedRows(scope, row_seeds);
         try self.expectShape(self.scratch.sources.items[scope].root, expected);
@@ -7049,7 +7049,7 @@ const ClosureRegion = struct {
         if (capture.node == 0 or capture.node >= module.nodes.len) return error.UnresolvedType;
         const node = module.node(capture.node);
         const scope = try self.typeScope(owner);
-        self.scratch.sources.items[scope].root = try self.importType(scope, node.ty, 0);
+        self.setSourceRoot(scope, try self.importType(scope, node.ty, 0));
         if (capture.mappings != 0) {
             if (capture.mappings >= self.session.storage.evidence.nodes.items.len) return error.UnresolvedType;
             const words = try self.session.allocator.dupe(type_evidence.Id, self.session.storage.evidence.children(capture.mappings));
@@ -7095,7 +7095,7 @@ const ClosureRegion = struct {
         self.scratch.sources.items[scope].body = closure.body;
         self.scratch.sources.items[scope].binding = closure.qualifier;
         self.scratch.sources.items[scope].closed_rows = closure.closed_rows;
-        self.scratch.sources.items[scope].root = if (closure.function_type != 0) try self.importImplementation(scope, closure.function_type) else try self.solver.function(try self.importType(scope, closure.parameter.ty, 0), try self.importType(scope, module.typeOf(closure.body), 0));
+        self.setSourceRoot(scope, if (closure.function_type != 0) try self.importImplementation(scope, closure.function_type) else try self.solver.function(try self.importType(scope, closure.parameter.ty, 0), try self.importType(scope, module.typeOf(closure.body), 0)));
         try self.seed(scope, seeds);
         try self.seedRows(scope, row_seeds);
         try self.expectShape(self.scratch.sources.items[scope].root, expected);
@@ -7448,6 +7448,13 @@ const ClosureRegion = struct {
             .function => return self.solver.functionWithEffects(try self.codeUsageView(node.a, depth + 1), try self.codeUsageView(node.b, depth + 1), node.c),
             .array, .list, .cursor => return self.solver.sequence(node.tag, try self.codeUsageView(node.a, depth + 1)),
             .product, .nominal => {
+                const task_handle = @import("../check/task_types.zig").handle;
+                if (node.tag == .nominal and node.a == task_handle.unit and node.b == task_handle.decl) {
+                    // A handle's private payload is two scalar identifiers.
+                    // Its region and result remain in the semantic graph;
+                    // neither can be reconstructed from this physical key.
+                    return self.solver.product(&.{ types.u32_type, types.u32_type });
+                }
                 const count = if (node.tag == .product) node.b else self.solver.nominalArguments(node).len;
                 const values = try self.scratch_allocator.alloc(types.Id, count);
                 defer self.scratch_allocator.free(values);
@@ -7547,6 +7554,13 @@ const ClosureRegion = struct {
     fn importImplementation(self: *ClosureRegion, scope: u32, root: types.Id) RegionError!types.Id {
         const source = &self.session.units[self.scratch.sources.items[scope].owner].types;
         const body = source.withoutForall(root) catch return error.TypeLimit;
+        const wrapper = source.node(body);
+        if (wrapper.tag == .usage) {
+            // A callable qualifier does not move its quantifier into the
+            // implementation. Open the callback's own binders just as for an
+            // unqualified rank-polymorphic function body.
+            return self.solver.usage(try self.importImplementation(scope, wrapper.a), @fromBackingInt(@intCast(wrapper.b)), if (wrapper.c == 0) 0 else try self.importType(scope, wrapper.c, 0));
+        }
         return self.importType(scope, body, 0);
     }
     fn importType(self: *ClosureRegion, scope: u32, ty: types.Id, depth: usize) RegionError!types.Id {
@@ -7556,6 +7570,9 @@ const ClosureRegion = struct {
         const owner = self.scratch.sources.items[scope].owner;
         const source = &self.session.units[owner].types;
         const node = source.node(ty);
+        if (self.scratch.sources.items[scope].import_parent) |parent| {
+            if (node.tag == .variable or node.tag == .bound) return self.importType(parent, ty, depth + 1);
+        }
         const shared = ty > types.never and
             try self.session.specializations.closed_source_types.closed(self.session.allocator, self.session.units, owner, ty, 0);
         const closed_key = @import("closed_source_types.zig").Cache.key(owner, ty, depth);
@@ -7581,12 +7598,19 @@ const ClosureRegion = struct {
                 break :blk try self.solver.rigid(try self.solver.rigidScope(), node.a, 2);
             },
             .forall, .existential => blk: {
+                // Bound imports belong only to this type expression. A later
+                // visit to its executable callback body opens fresh inference
+                // slots, rather than inheriting a free bound type from here.
+                const inner = try self.typeScope(owner);
+                self.scratch.sources.items[inner].import_parent = scope;
+                self.scratch.sources.items[inner].import_binders = .{ .start = node.b, .len = node.c };
+                self.scratch.sources.items[inner].closed_rows = self.scratch.sources.items[scope].closed_rows;
                 const binders = try self.scratch_allocator.alloc(types.Id, node.c);
                 defer self.scratch_allocator.free(binders);
                 for (source.list(.{ .start = node.b, .len = node.c }), binders, 0..) |binder, *bound, ordinal| {
                     const leaf = source.node(binder);
                     if (leaf.tag != .bound or leaf.a != ordinal or leaf.b > 2 or leaf.c != 0) return error.UnresolvedType;
-                    const binder_key: Import = .{ .scope = scope, .ty = binder };
+                    const binder_key: Import = .{ .scope = inner, .ty = binder };
                     if (self.scratch.imported.get(binder_key)) |existing| {
                         const imported = self.solver.node(existing);
                         if (imported.tag != .bound or imported.a != ordinal or imported.b != leaf.b) return error.UnresolvedType;
@@ -7596,7 +7620,7 @@ const ClosureRegion = struct {
                         try self.scratch.imported.put(self.scratch_allocator, binder_key, bound.*);
                     }
                 }
-                const body = try self.importType(scope, node.a, depth + 1);
+                const body = try self.importType(inner, node.a, depth + 1);
                 break :blk try self.solver.quantified(node.tag, body, binders);
             },
             .rigid => return error.UnresolvedType,
@@ -7745,6 +7769,10 @@ const ClosureRegion = struct {
         const owner = self.scratch.sources.items[scope].owner;
         const source = &self.session.units[owner].types;
         const formal = types.rowKeyFormal(variable);
+        if (self.scratch.sources.items[scope].import_parent) |parent| {
+            const owned = if (formal) |binder| std.mem.findScalar(types.Id, source.list(self.scratch.sources.items[scope].import_binders), binder) != null else false;
+            if (!owned) return self.importRowVariable(parent, variable);
+        }
         if (formal) |binder| {
             if (binder == 0 or binder >= source.nodes.len) return error.UnresolvedType;
             const leaf = source.node(binder);
@@ -8442,7 +8470,7 @@ const ClosureRegion = struct {
             self.scratch.sources.items[scope].body = body_root;
             self.scratch.sources.items[scope].binding = target_.binding;
             self.scratch.sources.items[scope].closed_rows = definition.?.closed_rows;
-            self.scratch.sources.items[scope].root = try self.importType(scope, source_type, 0);
+            self.setSourceRoot(scope, try self.importType(scope, source_type, 0));
             _ = try self.admitSignature(instantiated, self.scratch.sources.items[scope].root);
             try self.importScheme(scope, binding.scheme, body_root);
             if (self.source_interface) {
@@ -8983,7 +9011,7 @@ const ClosureRegion = struct {
         self.scratch.sources.items[scope].body = body_root;
         self.scratch.sources.items[scope].binding = target_.binding;
         self.scratch.sources.items[scope].closed_rows = if (definition) |body| body.closed_rows else if (module.node(body_root).tag == .closure) module.closure(body_root).closed_rows else binding.scheme.closed_rows;
-        self.scratch.sources.items[scope].root = try self.importType(scope, source_type, 0);
+        self.setSourceRoot(scope, try self.importType(scope, source_type, 0));
         try self.importScheme(scope, binding.scheme, body_root);
         if (self.source_interface) {
             var formal = self.scratch.sources.items[scope].root;
@@ -9362,8 +9390,8 @@ const ClosureRegion = struct {
             self.scratch.sources.items[scope].closed_rows = closure.closed_rows;
             qualifier = closure.qualifier;
             if (closure.function_type == 0) {
-                self.scratch.sources.items[scope].root = try self.solver.function(try self.importType(scope, closure.parameter.ty, 0), try self.importType(scope, module.typeOf(closure.body), 0));
-            } else self.scratch.sources.items[scope].root = try self.importType(scope, closure.function_type, 0);
+                self.setSourceRoot(scope, try self.solver.function(try self.importType(scope, closure.parameter.ty, 0), try self.importType(scope, module.typeOf(closure.body), 0)));
+            } else self.setSourceRoot(scope, try self.importType(scope, closure.function_type, 0));
         } else {
             const body = module.body(input.identity) orelse return error.UnresolvedType;
             self.scratch.sources.items[scope].body = body.root;
@@ -9375,7 +9403,7 @@ const ClosureRegion = struct {
                 if (arrow.tag != .function) return error.TypeMismatch;
                 source_type = arrow.b;
             }
-            self.scratch.sources.items[scope].root = try self.importType(scope, source_type, 0);
+            self.setSourceRoot(scope, try self.importType(scope, source_type, 0));
         }
         // These arrays are owned by the Session key. Neither a live value
         // handle nor a caller solver variable is imported into the private job.
@@ -10805,7 +10833,21 @@ const ClosureRegion = struct {
         const module = &self.session.units[self.scratch.sources.items[scope].owner];
         const n = module.node(id);
         switch (n.tag) {
-            .task => try work.appendSlice(self.session.allocator, module.children(id)),
+            .task => {
+                if (n.c == @backingInt(@import("../check/task_types.zig").Op.receive)) {
+                    const input = try self.importType(scope, module.typeOf(module.children(id)[0]), 0);
+                    const output = try self.importType(scope, n.ty, 0);
+                    var signature = try self.solver.functionWithEffects(input, output, try self.solver.freshEffects());
+                    for (module.obligations) |goal| {
+                        if (goal.kind == .task_receive and std.meta.eql(goal.span, module.span(id))) {
+                            signature = try self.importType(scope, goal.signature, 0);
+                            break;
+                        }
+                    }
+                    try self.appendConstraint(.{ .kind = .task_receive, .scope = scope, .node = id, .left = input, .result = output, .signature = signature });
+                }
+                try work.appendSlice(self.session.allocator, module.children(id));
+            },
             .resource_release, .usage_share, .usage_read => try work.append(self.session.allocator, n.a),
             .resource_scope => try work.appendSlice(self.session.allocator, &.{ n.a, n.b, n.c }),
             .resource_acquire, .usage_borrow, .staging => try work.appendSlice(self.session.allocator, &.{ n.a, n.b }),
@@ -11221,6 +11263,14 @@ const ClosureRegion = struct {
             if (owner_type.tag == .variable) return .open;
             if (owner_type.tag != .array and owner_type.tag != .list) return error.TypeMismatch;
             try self.unify(owner_type.a, constraint.result);
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        if (constraint.kind == .task_receive) {
+            const signature = self.solver.node(try self.solver.resolve(constraint.signature, 0));
+            if (signature.tag != .function) return error.TypeMismatch;
+            const result = try @import("../check/task_types.zig").receiveResult(&self.solver, constraint.left, signature.c) orelse return .open;
+            try self.unify(result, constraint.result);
             self.scratch.constraints.items[index].solved = true;
             return .solved;
         }
@@ -11668,13 +11718,18 @@ const ClosureRegion = struct {
         try self.scratch.sources.append(self.scratch_allocator, .{ .value = 0, .owner = owner, .origin = self.current_origin });
         return scope;
     }
+    fn setSourceRoot(self: *ClosureRegion, scope: u32, root: types.Id) void {
+        // Importing a quantified type may append a lexical type scope and
+        // relocate sources. Evaluate the imported root before taking its slot.
+        self.scratch.sources.items[scope].root = root;
+    }
     fn callableScope(self: *ClosureRegion, target_: Target) RegionError!u32 {
         const module = &self.session.units[target_.unit];
         const body = module.body(target_.binding) orelse return error.UnresolvedType;
         const scope = try self.typeScope(target_.unit);
         self.scratch.sources.items[scope].body = body.root;
         self.scratch.sources.items[scope].closed_rows = body.closed_rows;
-        self.scratch.sources.items[scope].root = try self.importImplementation(scope, module.binding(target_.binding).ty);
+        self.setSourceRoot(scope, try self.importImplementation(scope, module.binding(target_.binding).ty));
         self.scratch.sources.items[scope].binding = target_.binding;
         if (!self.building_principal or scope == 0) try self.importScheme(scope, body.scheme, body.root);
         return scope;

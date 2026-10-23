@@ -130,6 +130,9 @@ pub const Tag = enum(u32) {
     type_code,
     // Immutable descriptor: a=described type,b/c=0.
     type_descriptor,
+    // Compiler-generated spark group. No children or spelling; checking binds
+    // it to the active task scope's exact parameter, independently of shadowing.
+    task_region,
 };
 pub const BinderSort = enum(u32) { type_, row, region };
 pub const UsageKind = enum(u32) { unique, shared, borrow, borrow_mut, once, many, cleanup, concurrent };

@@ -243,7 +243,7 @@ test "scoped effect public flow contracts validate bodies and release failed all
                 invoke_count += 1;
                 binding.capability_flow = .identity;
             },
-            .unknown, .member_unit, .invoke_with_capability, .member_first_unit, .member_second_unit, .input_shape, .consume_task => unreachable,
+            .unknown, .member_unit, .invoke_with_capability, .member_first_unit, .member_second_unit, .input_shape, .consume_task, .scope_task, .spawn_task => unreachable,
         }
         try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
         binding.capability_flow = original;

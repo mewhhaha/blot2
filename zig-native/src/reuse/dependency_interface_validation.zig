@@ -117,7 +117,8 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
         .scoped => {
             try ty(owner, node.a);
             try ty(owner, node.c);
-            try require(node.b == 0 and (owner.graph.nodes[node.c].tag == .variable or owner.graph.nodes[node.c].tag == .instance_selection) and owner.graph.nodes[node.a].tag == .nominal);
+            const region = owner.graph.nodes[node.c];
+            try require(node.b == 0 and (region.tag == .variable or region.tag == .instance_selection or (region.tag == .bound and region.b == 2)) and owner.graph.nodes[node.a].tag == .nominal);
         },
         .absent, .unit, .boolean, .u32, .f32, .never => {},
         .variable => try require(node.b == 0 and node.c == 0),
@@ -211,13 +212,13 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
     };
     for (owner.bindings) |binding| {
         try require(binding.name < symbol_count);
-        try require(@backingInt(binding.capability_flow) <= @backingInt(@import("../check/capability_flow.zig").Contract.consume_task));
+        try require(@backingInt(binding.capability_flow) <= @backingInt(@import("../check/capability_flow.zig").Contract.spawn_task));
         try ty(owner, binding.ty);
         try scheme(owner, binding.scheme);
         try require(binding.capability_parameters.valid());
         if (binding.capability_flow == .input_shape) try require(binding.capability_parameters.kind == .product and binding.capability_parameters.arity() != 0 and binding.scheme.generative.len == 0);
         if (binding.capability_flow != .unknown or binding.capability_parameters.present()) {
-            try require(binding.external == null and binding.named_function);
+            try require(binding.external == null and (binding.named_function or binding.capability_flow == .consume_task or binding.capability_flow == .spawn_task));
             try require(binding.scheme.root != 0);
             var root = binding.scheme.root;
             if (owner.graph.nodes[root].tag == .forall) {

@@ -38,7 +38,7 @@ fn reusableModules(modules: []const *const core.Module, comptime caller: bool) b
         // Staged calls now inspect exact foreign bodies and schemes. An owner
         // receipt containing only table bounds cannot reuse that authority.
         for (module.nodes) |node| if (node.tag == .staging or node.tag == .effect_scope) return false;
-        for (module.bindings) |binding| if (binding.scheme.generative.len != 0 or binding.capability_parameters.invokes() or binding.capability_flow == .input_shape or binding.capability_flow == .consume_task) return false;
+        for (module.bindings) |binding| if (binding.scheme.generative.len != 0 or binding.capability_parameters.invokes() or binding.capability_flow == .input_shape or binding.capability_flow == .consume_task or binding.capability_flow == .scope_task or binding.capability_flow == .spawn_task) return false;
         for (module.types.nodes) |node| {
             if (node.tag == .existential or node.tag == .forall) return false;
             if (node.tag == .instance_version) return false;
@@ -433,6 +433,8 @@ const Bounds = struct {
         if (instance.unit == 0) {
             try self.ty(instance.decl);
             if (self.m.types.node(instance.decl).tag == .instance_selection) return;
+            const region = self.m.types.node(instance.decl);
+            if (region.tag == .bound and region.b == 2) return;
             try require(self.m.types.node(instance.decl).tag == .variable);
             for (self.m.bindings) |binding_| {
                 try self.scopedCharge();
@@ -542,16 +544,15 @@ const Bounds = struct {
                     continue;
                 }
                 if (value.capability_flow == .consume_task) {
-                    try require(body.is_function and body.parameters.len == 1 and body.root != 0);
-                    try range(self.m.parameters.len, body.parameters.start, 1);
-                    const formal = self.m.parameters[body.parameters.start];
-                    try require(@import("task_types.zig").isHandle(&self.m.types, formal.ty));
-                    const result = self.m.node(body.root);
-                    try require(result.tag == .task and result.c == @backingInt(@import("task_types.zig").Op.join));
-                    const operands = self.m.children(body.root);
-                    try require(operands.len == 1 and self.m.node(operands[0]).tag == .reference);
-                    const reference = self.m.reference(operands[0]);
-                    try require((reference.unit == 0 or reference.unit == self.m.unit) and reference.binding == formal.binding);
+                    try @import("task_core.zig").receiveWrapper(self.m, @intCast(id), self.context.units);
+                    continue;
+                }
+                if (value.capability_flow == .spawn_task) {
+                    try @import("task_core.zig").spawnWrapper(self.m, @intCast(id), self.context.units);
+                    continue;
+                }
+                if (value.capability_flow == .scope_task) {
+                    try require(@import("task_core.zig").scopeWrapper(self.m, body.root));
                     continue;
                 }
                 const curried = value.capability_flow == .invoke_with_capability;

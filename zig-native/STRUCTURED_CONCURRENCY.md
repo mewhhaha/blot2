@@ -1,8 +1,8 @@
 # Structured tasks and host scheduling
 
 Normative design for 072–074. The compiler and guest adapter implement the
-cooperative task surface below; release qualification still depends on task 035
-and the combined compiler gate. [Usage](USAGE_CONTRACTS.md),
+cooperative task surface below; the current release evidence is recorded in
+[compiler status](STATUS.md). [Usage](USAGE_CONTRACTS.md),
 [scoped effects](SCOPED_EFFECTS.md),
 [demands](DEMANDS.md#completion-and-cancellation) and
 [suspension ownership](SUSPENDED_OWNERSHIP.md) keep their existing laws. Task
@@ -21,17 +21,41 @@ children in spawn order, discards unused results and closes the group; returning
 a handle, loan or closure containing the group is rejected. No detached tasks or
 implicit spawn.
 
-`const await = fn source => |source|` is an ordinary helper for one-result
-task receivers. Its checked join contract passes through global aliases and
-imports, so it consumes the handle and returns the task's exact result without
-weakening the enclosing group lifetime.
+Spark syntax `*(function argument)` selects the exact enclosing group during
+checking, including when its source name is shadowed. It evaluates the callable
+and arguments in the parent and invokes them in the child. Nested ordinary
+helpers do not yet infer their caller's group.
+
+`const scope = fn body => @task.scope body` accepts a once callback universally
+quantified over a fresh region; its result cannot contain that region. Ordinary
+relays, currying, identity forwarding and renamed imports preserve that scope
+contract. `const spawn = fn group => fn action => @task.spawn group action` also
+works through direct aliases, imports and stored partial calls. Its exact body
+is validated, and each completed call checks the actual action's captures
+against the selected group's lifetime. Arbitrary higher-order transport of spawn
+helpers requires further transfer evidence and remains rejected.
+
+`const await = fn source => |source|` is an ordinary helper for either one task
+receiver or a tuple of task receivers. Its checked contract passes through
+global aliases and imports. `|(left, right)|`, a stored tuple and `await pair`
+have the same collect-all behavior: admit all dependencies together, retain
+partial results until completion, and transfer results in written order. On
+failure, drain affected children and release partial results exactly once.
+Collections contain one to sixteen handles. A single task with a tuple payload
+returns that payload without recursively receiving its fields. Generic receive
+helpers currently require a direct receive body or an alias of one.
 
 ```blot
 // Pure sibling tasks.
-entry const sum = fn () => @task.scope (fn group => do:
-  let left = @task.spawn group (fn () => 20)
-  let right = @task.spawn group (fn () => 22)
-  return @u32.add (@task.join left) (@task.join right))
+const scope = fn body => @task.scope body
+const spawn = fn group => fn action => @task.spawn group action
+const await = fn source => |source|
+entry const sum = fn () => scope (fn group => do:
+  let here = spawn group
+  let left = here (fn () => 20)
+  let right = here (fn () => 22)
+  let (first, second) = await (left, right)
+  return @u32.add first second)
 ```
 
 The task state machine is new/runnable/running/suspended followed by exactly one
@@ -86,7 +110,7 @@ callback handles or unverified ownership. This keeps host exceptions and routing
 tied to one owner.
 
 The task-enabled ABI publishes descriptor/layout IDs, group/task generations,
-start/join/cancel/poll/drop operations and owned success/failure/cancel
+start/join/collect/cancel/poll/drop operations and owned success/failure/cancel
 envelopes. The host validates instance+generation before touching a handle;
 counters may not wrap into live identity. Each outstanding child roots its
 captures, suspended frames and result. Cleanup uses the same typed journals as
@@ -144,3 +168,9 @@ relevant owner and scope.
 schedule-independent invariants. These implementations remain dependent on
 ownership/capability gates; the design itself may be completed ahead of them. No
 runtime performance or full concurrency completion is claimed here.
+
+Caller-region inference and generic capture-transfer evidence, general
+higher-order spawn forwarding, stream channels, select-one, scoped nonlocal
+exits, purity certification and CPU worker transport remain open in
+[the completion plan](../FINISH_PLAN.md). Task collect-all is implemented;
+comma-separated select-one syntax is not.

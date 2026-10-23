@@ -122,7 +122,7 @@ fn callable(m: *const core.Module, raw: T.Id, remaining: *usize) Error!T.Node {
         try require(remaining.* != 0);
         remaining.* -= 1;
         const node_ = m.types.node(current);
-        if (node_.tag != .usage) {
+        if (node_.tag != .usage and node_.tag != .forall) {
             try require(node_.tag == .function);
             return node_;
         }
@@ -1765,6 +1765,14 @@ const TaskCallSite = struct {
         }
         if (n.tag == .closure or n.tag == .suspend_) {
             const closure = &m.closures[n.a];
+            var region_owner: Named.ScopeOwner = undefined;
+            const prior_scope = self.proof.scope_owner;
+            if (n.tag == .closure) if (@import("task_types.zig").scopeCallback(&m.types, n.ty)) |arrow| {
+                const group = m.types.node(arrow.a);
+                region_owner = .{ .identity = .{ .unit = group.b, .decl = group.c }, .parent = prior_scope };
+                self.proof.scope_owner = &region_owner;
+            };
+            defer self.proof.scope_owner = prior_scope;
             const parent_ambient = self.proof.ambient;
             self.proof.ambient = m.types.row((try callable(m, closure.function_type, self.proof.remaining)).c);
             defer self.proof.ambient = parent_ambient;
@@ -1805,6 +1813,12 @@ const TaskCallSite = struct {
         if (n.tag == .effect_scope or (n.tag == .task and n.c == @backingInt(@import("task_types.zig").Op.scope))) {
             var callback = n.a;
             if (n.tag == .task) callback = m.children(id)[0];
+            if (m.node(callback).tag != .closure) {
+                // A checked generic wrapper contains a formal callback, not
+                // a lexical scope owner for unrelated named call sites.
+                try require(n.tag == .task and @import("task_types.zig").scopeCallback(&m.types, m.typeOf(callback)) != null);
+                return self.visit(callback, depth + 1);
+            }
             const scope = m.types.node(m.closure(callback).parameter.ty);
             try require(scope.tag == .scoped and scope.c != 0);
             var owner: Named.ScopeOwner = .{ .identity = .{ .unit = scope.b, .decl = scope.c }, .parent = self.proof.scope_owner };
@@ -2359,15 +2373,38 @@ const Effects = struct {
                 const operation: @import("task_types.zig").Op = @fromBackingInt(n.c);
                 const operands = self.m.children(id);
                 for (operands) |operand| try self.visit(operand, depth + 1);
+                if (operation == .receive) {
+                    const input = self.m.types.node(self.m.typeOf(operands[0]));
+                    if (input.tag == .variable) {
+                        const requirement = try @import("task_core.zig").receiveRequirement(self.m, id, self.remaining);
+                        try self.consume(self.m.types.node(requirement.signature).c);
+                    } else {
+                        const wrapper = self.m.types.node(self.m.typeOf(operands[0]));
+                        const nominal = self.m.types.node(wrapper.a);
+                        const args = self.m.types.nominalArguments(nominal);
+                        try self.consume(self.m.types.node(args[1]).c);
+                    }
+                } else if (operation == .collect) {
+                    const input = self.m.types.node(self.m.typeOf(operands[0]));
+                    for (self.m.types.list(.{ .start = input.a, .len = input.b })) |item| {
+                        const nominal = self.m.types.node(self.m.types.node(item).a);
+                        const args = self.m.types.nominalArguments(nominal);
+                        try self.consume(self.m.types.node(args[1]).c);
+                    }
+                }
                 if (operation == .scope or operation == .spawn or operation == .split) {
                     var position: usize = 0;
                     if (operation == .spawn) position = 1;
                     if (operation == .split) position = 2;
                     var callback_id = operands[position];
                     if (operation == .spawn) callback_id = try @import("task_core.zig").callable(self.m, callback_id);
-                    const callback = self.m.closure(callback_id);
                     const arrow = try callable(self.m, self.m.typeOf(operands[position]), self.remaining);
                     try self.consume(arrow.c);
+                    if (self.m.node(callback_id).tag != .closure) {
+                        try require(operation == .scope and @import("task_types.zig").scopeCallback(&self.m.types, self.m.typeOf(callback_id)) != null);
+                        return;
+                    }
+                    const callback = self.m.closure(callback_id);
                     var nested: Effects = .{ .workspace = self.workspace, .m = self.m, .units = self.units, .target_module = self.m, .target = self.m.types.row(arrow.c), .closed_rows = callback.closed_rows, .remaining = self.remaining, .checked_calls = self.checked_calls, .variables = self.variables, .handlers = self.handlers };
                     try require(nested.target.labels.len <= nested.seen.len);
                     try nested.visit(callback.body, depth + 1);

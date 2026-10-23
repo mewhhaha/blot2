@@ -58,7 +58,7 @@ pub const View = struct {
             for (self.quantifier_obligations[entry.goals.start..][0..entry.goals.len]) |goal| {
                 if (remaining.* == 0) return error.EvidenceLimit;
                 remaining.* -= 1;
-                if (@backingInt(goal.kind) > @backingInt(types.ObligationKind.contract) or @backingInt(goal.operator) > @backingInt(types.Operator.shift_right) or goal.ty == 0) return error.TypeMismatch;
+                if (@backingInt(goal.kind) > @backingInt(types.ObligationKind.task_receive) or @backingInt(goal.operator) > @backingInt(types.Operator.shift_right) or goal.ty == 0) return error.TypeMismatch;
                 inline for (.{ "ty", "other", "result", "signature" }) |field| if (@field(goal, field) >= entry.owner) return error.TypeMismatch;
             }
             previous = entry.owner;
@@ -432,7 +432,7 @@ pub const Store = struct {
                 try self.view().bodyWithGoalsValidated(a, values, goals, &remaining, null);
                 if (tag == .existential) for (values) |binder| if (self.node(binder).b != 0) return error.TypeMismatch;
                 for (goals) |goal| {
-                    if (goal.ty == 0 or @backingInt(goal.kind) > @backingInt(types.ObligationKind.contract) or @backingInt(goal.operator) > @backingInt(types.Operator.shift_right)) return error.TypeMismatch;
+                    if (goal.ty == 0 or @backingInt(goal.kind) > @backingInt(types.ObligationKind.task_receive) or @backingInt(goal.operator) > @backingInt(types.Operator.shift_right)) return error.TypeMismatch;
                     inline for (.{ "ty", "other", "result", "signature" }) |field| {
                         const endpoint = @field(goal, field);
                         if (endpoint != 0) try self.view().bodyWithGoalsValidated(endpoint, values, goals, &remaining, null);

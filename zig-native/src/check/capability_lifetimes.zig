@@ -758,8 +758,16 @@ const Scan = struct {
     }
     fn taskScope(self: *Scan, module: *const C.Module, source: C.Id, callback_id: C.Id, environment: *Environment, depth: usize) Error!?Id {
         const callback = try self.node(module, callback_id, depth + 1);
-        if (callback.tag != .closure or callback.a >= module.closures.len) return error.InvalidArtifact;
-        const closure_ = module.closures[callback.a];
+        if (callback.tag != .closure and @import("task_types.zig").scopeCallback(&module.types, callback.ty) == null) return error.InvalidArtifact;
+        const function = (try self.expression(module, callback_id, environment, depth + 1)) orelse return null;
+        if (self.nodes.items[function].kind == .unknown and @import("task_types.zig").scopeCallback(&module.types, callback.ty) != null) {
+            // The independently checked universal callback cannot return or
+            // store this invocation's fresh region. Its result may retain its
+            // earlier captures, so preserve that origin without granting a
+            // complete executable report for the abstract callback body.
+            self.complete = false;
+            return try self.aggregate(module, source, .unknown, &.{function});
+        }
         const saved_owner = self.owner;
         const owner = try self.value(module, source, .scope);
         self.owner = owner;
@@ -769,11 +777,26 @@ const Scan = struct {
             self.owner = saved_owner;
         }
         const capability = try self.value(module, callback_id, .capability);
-        _ = closure_;
-        const function = try self.closure(module, callback_id, callback.a, environment, false, depth + 1);
         const result = try self.invoke(module, callback_id, function, capability, depth + 1);
         if (try self.reaches(result, owner, null)) return error.LifetimeEscape;
         try self.boundaries.append(self.a, .{ .site = self.site(module, source), .owner = owner, .result = result });
+        return result;
+    }
+    fn taskReceive(self: *Scan, module: *const C.Module, source: C.Id, input: Id, collect: bool) Error!Id {
+        if (!collect) {
+            if (input >= self.nodes.items.len or self.nodes.items[input].kind != .wrapper) return error.Unsupported;
+            return self.nodes.items[input].contents;
+        }
+        if (input >= self.nodes.items.len or self.nodes.items[input].kind != .product) return error.Unsupported;
+        const result = try self.value(module, source, .product);
+        var next = self.nodes.items[input].first_edge;
+        while (next) |index| {
+            const item = self.edges.items[index];
+            next = item.next;
+            const handle = self.nodes.items[item.to];
+            if (handle.kind != .wrapper) return error.Unsupported;
+            try self.edge(result, handle.contents, .value, item.field);
+        }
         return result;
     }
     fn expression(self: *Scan, module: *const C.Module, source: C.Id, environment: *Environment, depth: usize) Error!?Id {
@@ -875,11 +898,14 @@ const Scan = struct {
                         self.nodes.items[handle].contents = result;
                         return handle;
                     },
-                    .join, .cancel => {
+                    .join, .cancel, .receive => {
                         const handle = (try self.expression(module, operands[0], environment, depth + 1)) orelse return null;
                         if (operation == .cancel) return try self.value(module, source, .scalar);
-                        if (handle >= self.nodes.items.len or self.nodes.items[handle].kind != .wrapper) return error.Unsupported;
-                        return self.nodes.items[handle].contents;
+                        return try self.taskReceive(module, source, handle, operation == .receive and self.nodes.items[handle].kind == .product);
+                    },
+                    .collect => {
+                        const input = (try self.expression(module, operands[0], environment, depth + 1)) orelse return null;
+                        return try self.taskReceive(module, source, input, true);
                     },
                     .split => {
                         const owner_value = (try self.expression(module, operands[0], environment, depth + 1)) orelse return null;

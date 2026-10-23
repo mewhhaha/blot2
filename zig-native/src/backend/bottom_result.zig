@@ -30,7 +30,10 @@ fn visit(units: []const core.Module, owner: u32, id: core.Id, depth: usize, budg
         .task => {
             const operation: @import("../check/task_types.zig").Op = @fromBackingInt(@intCast(n.c));
             const operands = source.children(id);
-            if (operation == .scope) return visit(units, owner, source.closure(operands[0]).body, depth + 1, budget);
+            if (operation == .scope) {
+                if (source.node(operands[0]).tag != .closure) return false;
+                return visit(units, owner, source.closure(operands[0]).body, depth + 1, budget);
+            }
             if (operation != .join) return false;
             var handle = operands[0];
             for (0..32) |_| {

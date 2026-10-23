@@ -10,11 +10,31 @@ comparison separate from allocation-free contract research.
 
 ## Execution checkpoint, 23 October 2026
 
+The owner reconfirmed the full remaining plan and asked to implement before
+final verification. The task-surface continuation from `87ba3f6` in
+`/home/mewhhaha/src/blot2` is now qualified. The former `/workspace` paths below
+describe historical integration work; both existing stashes remain preserved.
+The new slice covers checker-selected spark groups, universally quantified
+ordinary scope callbacks, and runtime collect-all. Direct relays, currying,
+identity forwarding and renamed imports execute in both tiers and sync/JSPI.
+Tuple collection works through direct generic receive helpers, aliases and
+imports, preserving partial-result ownership. Exact explicit spawn helpers work
+through aliases, renamed imports and stored partial calls, with capture checks
+at the completed call.
+
+The [full qualification](zig-native/TASK_SURFACE_QUALIFICATION.md) passes 2,536
+exhaustive native tests, 1,645 guest/client tests, 48 smoke checks, 54 harness
+checks and 15 preflight regressions. Zig lint reports zero findings. The release
+CLI and native compiler are installed locally, and the README, language guide
+and implementation contracts describe this slice. Arbitrary higher-order spawn
+forwarding and implicit caller-region propagation still require further
+signature evidence. The entire completion plan remains open.
+
 The [compact symbolic instruction journal](zig-native/SYMBOLIC_JOURNAL.md)
-passes the full compiler gate and strict seven-pair application comparison.
-It reduces temporary allocation in emission; it does not close the remaining
-performance targets. The task-region, tuple receive and channel lifecycle batch
-is still being implemented and has no integrated release qualification.
+passes the full compiler gate and strict seven-pair application comparison. It
+reduces temporary allocation in emission; it does not close the remaining
+performance targets. The scope/spawn/tuple slice is qualified above; the
+remaining task-region and channel lifecycle work is still unfinished.
 
 Milestone 1 is integrated and passes the complete compiler gate. Issue 26's
 bounded numeric layout repair passes both-tier runtime, allocation, immutable
@@ -34,7 +54,7 @@ export falls from 3.440 to 0.169 seconds and 2,471 to 105 MiB maximum RSS, with
 complete bundle and cache-recovery equality. Issue 27's later-edit,
 bounded-session and remaining compiler targets are still open.
 
-## Scope and current state
+## Scope and starting state
 
 The outcome is one integrated, qualified main branch covering the remaining
 `CONTINUE.md` work and issue #25. Issues #26 and #27 overlap the existing
@@ -53,10 +73,11 @@ representation and performance program and share its measurements.
   `/workspace/blot2/build/bench`. Verify the recorded manifest before using
   them. The lost original snapshot is not a prerequisite; its recreation was
   already authorized.
-- Issue #25 currently supports single task receives and sparks in a literal task
-  scope, plus ordinary receive helpers through aliases/imports. Generic region
-  propagation, tuple collection, selection, streams, scoped exits, purity
-  certification, and CPU worker transport remain open.
+- At plan creation, issue #25 supported single task receives and sparks in a
+  literal task scope, plus ordinary receive helpers through aliases/imports. The
+  execution checkpoint above records the subsequent scope/spawn wrapper and
+  tuple collection work. Generic caller-region propagation, selection, streams,
+  scoped exits, purity certification, and CPU worker transport remain open.
 
 Existing decisions stand: `return` exits the function, `break value` finishes
 the nearest `do`, and unsupported returns across generated continuations give

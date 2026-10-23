@@ -14,6 +14,60 @@ pub fn isGroup(store: anytype, id: T.Id) bool {
     const family = store.node(scope.a);
     return family.tag == .nominal and family.a == group.unit and family.b == group.decl;
 }
+/// A scope callback accepts every fresh region and cannot mention that region
+/// in its result or latent effects. The quantifier is executable evidence,
+/// unlike a free identity variable in an ordinary function header.
+pub fn scopeCallback(store: anytype, raw: T.Id) ?T.Node {
+    const usage = store.node(store.head(raw, 0));
+    if (usage.tag != .usage or usage.b != @backingInt(T.UsageKind.once) or usage.c != 0) return null;
+    const quantified = store.node(store.head(usage.a, 0));
+    if (quantified.tag != .forall or quantified.c != 1) return null;
+    const binder = store.list(.{ .start = quantified.b, .len = quantified.c })[0];
+    const bound = store.node(binder);
+    if (bound.tag != .bound or bound.b != 2 or bound.c != 0) return null;
+    const arrow = store.node(store.head(quantified.a, 0));
+    if (arrow.tag != .function or !isGroup(store, store.head(arrow.a, 0))) return null;
+    const region = store.node(store.head(arrow.a, 0));
+    if (region.b != 0 or region.c != binder) return null;
+    var remaining: usize = 4096;
+    if (mentionsRegion(store, arrow.b, binder, &remaining, 0) or rowMentionsRegion(store, arrow.c, binder, &remaining, 0)) return null;
+    return arrow;
+}
+fn rowMentionsRegion(store: anytype, row: T.Effects.Id, binder: T.Id, remaining: *usize, depth: usize) bool {
+    if (remaining.* == 0 or depth >= 128) return true;
+    remaining.* -= 1;
+    for (store.rowLabels(row)) |label| {
+        const operation = store.operation(label);
+        if (operation.instance.unit == 0 and operation.instance.decl != 0 and mentionsRegion(store, operation.instance.decl, binder, remaining, depth + 1)) return true;
+        for (store.list(operation.arguments)) |argument| if (mentionsRegion(store, argument, binder, remaining, depth + 1)) return true;
+    }
+    return false;
+}
+fn mentionsRegion(store: anytype, raw: T.Id, binder: T.Id, remaining: *usize, depth: usize) bool {
+    if (raw == 0) return false;
+    if (raw == binder or remaining.* == 0 or depth >= 128) return true;
+    remaining.* -= 1;
+    const node = store.node(store.head(raw, 0));
+    switch (node.tag) {
+        .scoped => return (node.b == 0 and mentionsRegion(store, node.c, binder, remaining, depth + 1)) or mentionsRegion(store, node.a, binder, remaining, depth + 1),
+        .function => return mentionsRegion(store, node.a, binder, remaining, depth + 1) or mentionsRegion(store, node.b, binder, remaining, depth + 1) or rowMentionsRegion(store, node.c, binder, remaining, depth + 1),
+        .usage => return mentionsRegion(store, node.a, binder, remaining, depth + 1) or mentionsRegion(store, node.c, binder, remaining, depth + 1),
+        .demand, .provider => return mentionsRegion(store, node.a, binder, remaining, depth + 1) or rowMentionsRegion(store, node.c, binder, remaining, depth + 1),
+        .state_provider => return mentionsRegion(store, node.a, binder, remaining, depth + 1) or mentionsRegion(store, node.b, binder, remaining, depth + 1) or mentionsRegion(store, node.c, binder, remaining, depth + 1),
+        .array, .list, .cursor, .resolver, .forall, .existential => return mentionsRegion(store, node.a, binder, remaining, depth + 1),
+        .product => for (store.list(.{ .start = node.a, .len = node.b })) |child| {
+            if (mentionsRegion(store, child, binder, remaining, depth + 1)) return true;
+        },
+        .record => for (0..node.b) |index| {
+            if (mentionsRegion(store, store.recordField(node, index).ty, binder, remaining, depth + 1)) return true;
+        },
+        .nominal, .instance_selection, .projection => for (store.nominalArguments(node)) |child| {
+            if (mentionsRegion(store, child, binder, remaining, depth + 1)) return true;
+        },
+        else => {},
+    }
+    return false;
+}
 pub fn isRegion(store: anytype, id: T.Id) bool {
     const scope = store.node(id);
     if (scope.tag != .scoped) return false;
@@ -26,7 +80,47 @@ pub fn isHandle(store: anytype, id: T.Id) bool {
     const family = store.node(store.head(wrapper.a, 0));
     return family.tag == .nominal and family.a == handle.unit and family.b == handle.decl;
 }
+/// The receiver relation is deferred while its input is unknown, so an
+/// ordinary helper can receive either one handle or a tuple of handles.
+pub fn receiveResult(store: *T.Store, raw: T.Id, effects: T.Effects.Id) T.Error!?T.Id {
+    const input = store.node(try store.resolve(raw, 0));
+    if (input.tag == .variable or input.tag == .projection) return null;
+    var inputs: [16]T.Id = undefined;
+    var count: usize = 1;
+    inputs[0] = raw;
+    if (input.tag == .product) {
+        if (input.b == 0 or input.b > inputs.len) return error.TypeMismatch;
+        count = input.b;
+        @memcpy(inputs[0..count], store.list(.{ .start = input.a, .len = input.b }));
+    }
+    var results: [16]T.Id = undefined;
+    var rows: [16]T.Effects.Id = undefined;
+    for (inputs[0..count], 0..) |item, index| {
+        const id = try store.resolve(item, 0);
+        const wrapper = store.node(id);
+        if (wrapper.tag == .variable or wrapper.tag == .projection) return null;
+        if (!isHandle(store, id)) return error.TypeMismatch;
+        const arguments = store.nominalArguments(store.node(wrapper.a));
+        if (arguments.len != 2) return error.TypeMismatch;
+        const arrow = store.node(arguments[1]);
+        if (arrow.tag != .function or arrow.a != T.unit) return error.TypeMismatch;
+        results[index] = arrow.b;
+        rows[index] = arrow.c;
+    }
+    for (rows[0..count]) |row| {
+        const opened = store.node(try store.openCovariant(try store.functionWithEffects(T.unit, T.unit, row)));
+        try store.unifyEffects(opened.c, effects);
+    }
+    return if (input.tag == .product) try store.product(results[0..count]) else results[0];
+}
 pub const View = struct { payload: T.Id, scope: T.Id, version: T.Id };
+pub fn receivers(store: anytype, raw: T.Id) bool {
+    if (isHandle(store, raw)) return true;
+    const input = store.node(store.head(raw, 0));
+    if (input.tag != .product or input.b == 0 or input.b > 16) return false;
+    for (store.list(.{ .start = input.a, .len = input.b })) |item| if (!isHandle(store, item)) return false;
+    return true;
+}
 pub fn viewInfo(store: anytype, raw: T.Id) ?View {
     const wrapper = store.node(store.head(raw, 0));
     if (wrapper.tag != .usage or wrapper.b != @backingInt(T.UsageKind.unique)) return null;
@@ -38,10 +132,10 @@ pub fn viewInfo(store: anytype, raw: T.Id) ?View {
     if (arguments.len != 2 or store.node(arguments[0]).tag != .array or store.node(arguments[1]).tag != .instance_version) return null;
     return .{ .payload = arguments[0], .scope = wrapper.a, .version = arguments[1] };
 }
-pub const Op = enum(u32) { scope, spawn, join, cancel, split, read, write };
+pub const Op = enum(u32) { scope, spawn, join, cancel, split, read, write, collect, receive };
 pub fn lookup(name: []const u8) ?Op {
     if (!std.mem.startsWith(u8, name, "@task.")) return null;
-    inline for (.{ "scope", "spawn", "join", "cancel", "split", "read", "write" }, 0..) |suffix, index|
+    inline for (.{ "scope", "spawn", "join", "cancel", "split", "read", "write", "collect", "receive" }, 0..) |suffix, index|
         if (std.mem.eql(u8, name, "@task." ++ suffix)) return @fromBackingInt(@intCast(index));
     return null;
 }
@@ -53,7 +147,7 @@ pub fn present(pool: anytype) bool {
 }
 pub fn arity(op: Op) usize {
     return switch (op) {
-        .scope, .join, .cancel => 1,
+        .scope, .join, .cancel, .collect, .receive => 1,
         .spawn, .read => 2,
         .split, .write => 3,
     };

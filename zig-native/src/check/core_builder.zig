@@ -336,7 +336,21 @@ const Builder = struct {
                 const owner = for (self.source.checked.rank_implementations) |implementation| {
                     if (implementation.scope == original.a) break implementation;
                 } else return error.CoreLimit;
-                const quantifier = self.source.checked.types.node(self.source.checked.types.head(owner.quantified, 0));
+                var quantified_type = owner.quantified;
+                if (owner.node != 0 and owner.node < self.source.checked.expr_types.len) {
+                    var published = self.source.checked.types.head(self.source.checked.expr_types[owner.node], 0);
+                    for (0..128) |_| {
+                        const wrapper = self.source.checked.types.node(published);
+                        if (wrapper.tag != .usage) break;
+                        published = self.source.checked.types.head(wrapper.a, 0);
+                    } else return error.CoreLimit;
+                    // Solving a result after checking its rank callback may
+                    // rebuild the quantifier with fresh owned binder IDs.
+                    // Its executable rigid uses belong to that published
+                    // callback, not the now unreferenced inference header.
+                    if (self.source.checked.types.node(published).tag == .forall) quantified_type = published;
+                }
+                const quantifier = self.source.checked.types.node(self.source.checked.types.head(quantified_type, 0));
                 if ((quantifier.tag != .forall and quantifier.tag != .existential) or original.b >= quantifier.c) return error.CoreLimit;
                 const bound = self.source.checked.types.list(.{ .start = quantifier.b, .len = quantifier.c })[original.b];
                 const leaf = self.source.checked.types.node(bound);
@@ -1389,6 +1403,7 @@ const Builder = struct {
                 try self.make(source, .{ .tag = .type_constructor, .ty = ty })
             else
                 try self.resolvedReference(source, ty),
+            .task_region => try self.resolvedReference(source, ty),
             .selector => try self.selectorExpression(source, ty),
             .intrinsic => try self.primitiveExpression(source, ty),
             .field_access => blk: {
@@ -1545,7 +1560,7 @@ const Builder = struct {
         var id = original;
         for (0..128) |_| {
             const node = self.tables.type_nodes.items[id];
-            if (node.tag != .usage) return node;
+            if (node.tag != .usage and node.tag != .forall) return node;
             id = node.a;
         }
         return error.CoreLimit;
@@ -1666,7 +1681,8 @@ const Builder = struct {
             var values: [3]core.Id = undefined;
             for (0..backwards.items.len) |index| values[index] = try self.expression(backwards.items[backwards.items.len - index - 1].value, depth + 1);
             const operands = try self.save(values[0..backwards.items.len]);
-            return self.make(source, .{ .tag = .task, .a = operands.start, .b = operands.len, .c = @backingInt(operation), .ty = result });
+            const selected = if ((operation == .join or operation == .receive) and self.tables.type_nodes.items[self.tables.nodes.items[values[0]].ty].tag == .product) @import("task_types.zig").Op.collect else operation;
+            return self.make(source, .{ .tag = .task, .a = operands.start, .b = operands.len, .c = @backingInt(selected), .ty = result });
         };
         for (self.source.checked.usage_loans) |loan| {
             if (loan.source != source) continue;

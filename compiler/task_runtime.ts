@@ -460,6 +460,86 @@ export class TaskRuntime {
       return value;
     });
   }
+  /** Establish the complete dependency set before running any child. Results
+   * stay in their task records until all selected tasks succeed, so scope
+   * cleanup still owns every partial result if collection fails. */
+  collect(ids: readonly number[], callerId = 0): Completion<number[]> {
+    if (ids.length > this.limit) {
+      throw new TaskError("task_budget", "Task collection exceeds its budget");
+    }
+    const caller = callerId === 0 ? this.#root : this.#task(callerId);
+    if (
+      caller.cancel ||
+      (caller.state !== "running" && caller.state !== "suspended")
+    ) {
+      throw new TaskError("task_escape", "Collecting task is terminating");
+    }
+    const tasks: Task[] = [];
+    const selected = new Set<Task>();
+    const groups = new Set<Group>();
+    for (const id of ids) {
+      const task = this.#task(id);
+      if (task.consumed || selected.has(task)) {
+        throw new TaskError(
+          "task_handle_consumed",
+          "Task collection contains a consumed or repeated handle",
+        );
+      }
+      for (
+        let ancestor: Task | undefined = caller;
+        ancestor;
+        ancestor = ancestor.parent
+      ) {
+        if (task === ancestor) {
+          throw new TaskError(
+            "task_host_contract",
+            "A task cannot collect itself or an ancestor",
+          );
+        }
+      }
+      tasks.push(task);
+      selected.add(task);
+      groups.add(task.group!);
+    }
+    // Complete dependency admission precedes the affine move.
+    for (const task of tasks) task.consumed = true;
+    for (const group of groups) this.#run(group, caller);
+    const pending = tasks.flatMap((task) =>
+      task.completion ? [task.completion] : []
+    );
+    const complete = (): Completion<number[]> => {
+      const failures = [...groups].flatMap((group) => this.#failures(group));
+      if (failures.length !== 0) {
+        const draining: Promise<void>[] = [];
+        for (const group of groups) {
+          const completion = this.#run(group, caller);
+          if (promise(completion)) draining.push(completion);
+        }
+        const failed = (): never => {
+          throw new TaskFailure(
+            [...groups].flatMap((group) => this.#failures(group)),
+          );
+        };
+        if (draining.length !== 0) return Promise.all(draining).then(failed);
+        return failed();
+      }
+      for (const task of tasks) {
+        if (task.state === "cancelled") throw new Cancelled();
+        if (task.state !== "succeeded" || task.result === undefined) {
+          throw new TaskError(
+            "task_host_contract",
+            "Missing collected task result",
+          );
+        }
+      }
+      const values = tasks.map((task) => task.result!);
+      for (const task of tasks) task.result = undefined;
+      return values;
+    };
+    return pending.length === 0
+      ? complete()
+      : Promise.all(pending).then(complete);
+  }
   cancel(id: number): Completion<void> {
     const task = this.#task(id, true);
     this.#request(task);

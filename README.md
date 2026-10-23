@@ -34,6 +34,24 @@ without LLVM and writes to `zig-native/zig-out-dev`. Add `--incremental` to
 enable Zig's experimental incremental compilation. Final releases and release
 measurements use LLVM through `deno task build:compiler`.
 
+To install a release locally on Linux x86-64, build the compiler above, then
+bundle the CLI and its matching compiler, parser, guide and standard library:
+
+```sh
+deno task package:pack
+deno compile --allow-read --allow-write --allow-run \
+  --allow-env=HOME,XDG_CACHE_HOME,BPM_CACHE_DIR \
+  --include generated/compiler/blotc.gz --include generated/wasm \
+  --include std --include compiler/guide.md \
+  --output build/install/blot compiler/installed_cli.ts
+mkdir -p "$HOME/.local/bin"
+install -m 755 build/install/blot "$HOME/.local/bin/blot"
+install -m 755 zig-native/zig-out/bin/blotc "$HOME/.local/bin/blotc"
+```
+
+Put `$HOME/.local/bin` on `PATH`. `blot` is the self-contained project CLI;
+`blotc` is the raw native compiler and takes explicit prelude/library paths.
+
 For a five-minute development cycle, run
 `deno task check:dev --area static-sharing`. It compiles the complete native
 inventory with Zig, executes the affected regression family with
@@ -43,8 +61,8 @@ recorded in `build/bench/check-dev`. It fails rather than reporting an
 incomplete check as passed. See
 [the turnaround plan](DEVELOPMENT_TURNAROUND.md). List focused areas with
 `deno task check:dev --list-areas`. Besides `static-sharing`, choose `syntax`,
-`type-effects` or `body-checking`; each runs existing positive,
-rejection/recovery and ownership regressions plus guests.
+`type-effects`, `body-checking`, `numeric-aggregates` or `tasks`; each runs
+existing positive, rejection/recovery and ownership regressions plus guests.
 
 For a smaller development check, run `deno task test:compiler:dev`. It checks
 the project protocol, client and inference-budget recovery against the
@@ -85,6 +103,37 @@ JSON timing/result line for each executed law.
 Inference-budget rejection and recovery use a small-budget executable fixture.
 `deno task test:compiler:stress` separately checks the production million-step
 limit against an adversarial stage chain.
+
+## Structured tasks
+
+Spark `*(function argument)` starts an invocation in the checked enclosing task
+scope. Receive its result with `|receiver|`; `|(left, right)|` collects task
+results together in written order. Stored tuples work through the same receive
+helper, while one task returning a tuple keeps that payload intact.
+
+```blot
+const scope = fn body => @task.scope body
+const spawn = fn group => fn action => @task.spawn group action
+const await = fn receivers => |receivers|
+
+entry const answer = fn () => scope (fn group => do:
+  let here = spawn group
+  let left = here (fn () => 20)
+  let right = here (fn () => 22)
+  let (first, second) = await (left, right)
+  break @u32.add first second)
+```
+
+These are ordinary user-defined helpers. Their checked contracts survive aliases
+and imports; spawn partial calls retain their selected group. Scope exit drains
+children and cleanup, and task handles cannot escape their region. Execution is
+cooperative within one guest, with synchronous and JSPI support. Caller-region
+inference in arbitrary helpers, general higher-order spawn forwarding, stream
+channels, select-one, scoped nonlocal exits and CPU workers remain unfinished.
+See the [language guide](compiler/guide.md#structured-tasks) and
+[task contracts](zig-native/STRUCTURED_CONCURRENCY.md). The
+[qualification record](zig-native/TASK_SURFACE_QUALIFICATION.md) lists the
+tested boundaries and remaining work.
 
 ## Project API
 

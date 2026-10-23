@@ -1062,7 +1062,7 @@ test "scoped public claim wire rejects unknown values after the admitted maximum
     try std.testing.expectEqual(Contract.member_second_unit, try format.decode(Contract, a, bytes, key));
     // The payload is the enum's one-byte LEB128 value.
     const payload = bytes.len - 1;
-    bytes[payload] = @intCast(@backingInt(Contract.consume_task) + 1);
+    bytes[payload] = @intCast(@backingInt(Contract.spawn_task) + 1);
     // Recompute integrity so rejection tests the enum domain, not its digest.
     @memcpy(bytes[payload - 32 .. payload], &format.digest(bytes[payload..]));
     try std.testing.expectError(error.InvalidArtifact, format.decode(Contract, a, bytes, key));

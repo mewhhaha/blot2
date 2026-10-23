@@ -1,11 +1,60 @@
 # Continue here
 
+23 October 2026, local continuation from `87ba3f6`: the owner confirmed the
+entire remaining [completion plan](FINISH_PLAN.md), with implementation before
+the final verification campaign. This checkout started clean and has two old
+stashes, both preserved. The `/workspace` worktrees mentioned below are absent
+on this host; they are historical paths, not recoverable local candidates.
+
+The qualified task-surface batch moves spark group selection into checking and
+gives ordinary scope callbacks a once, universally quantified region contract.
+Direct relays, curried wrappers, identity forwarding and renamed imports use
+ordinary calls. Tuple collection is wired through checking, Core, emission and
+the guest ABI. Stored tuples and the generic direct `await` helper collect in
+written order; one task returning a tuple keeps its payload intact. Partial
+results and resource journals remain owned until the whole collection succeeds.
+Exact explicit spawn helpers now carry a checked contract through direct
+aliases, renamed imports and stored partial calls. Completed calls validate the
+actual action's captures against the selected group. Arbitrary higher-order
+transport of spawn helpers remains rejected; once usage alone does not prove
+capture transfer. The final gate passes all 2,536 native laws with exhaustive
+allocation-failure sweeps in four shards, 1,645 guest/client tests, 48 smoke
+checks, 54 harness checks and 15 preflight regressions. Zig analyzer v0.17.0-3
+reports zero findings across 517 source files plus the fixture module. The
+[qualification record](zig-native/TASK_SURFACE_QUALIFICATION.md) preserves raw
+evidence, source/binary hashes, verification repairs and the frozen
+application-corpus manifest. `check:dev --area tasks` records the focused
+development family. The verified release CLI and native compiler are installed
+as `~/.local/bin/blot` and `~/.local/bin/blotc`; previous binaries are preserved
+under `build/install/previous`. Inferred caller regions in ordinary helpers,
+general spawn forwarding, stream receive/selection, channels, control exits,
+purity, workers, iterator requirements and the remaining performance targets are
+still open. Generic receiver bodies that do more than a direct receive are
+deliberately not granted affine authority.
+
+The next region boundary needs evidence in the helper's checked signature for
+both the caller's region and generic capture transfer. Issue #25 explicitly
+excludes selecting a process-global current group. Do not infer transfer safety
+from a once callback or invent a fresh scope at each helper call. The explicit
+spawn carrier is private to validated partial applications; it is not a general
+indirect-call representation.
+
+This host's default Zig cache is read-only. The successful compile-only command
+uses `ZIG_GLOBAL_CACHE_DIR=$PWD/build/task-regions-global` and
+`ZIG_LOCAL_CACHE_DIR=$PWD/build/task-regions-local` (set from the repository
+root), then
+`zig build test-compile -Doptimize=safe -Dllvm=false --prefix
+zig-out-native-dev`
+in `zig-native`. Zig is 0.17.0. Keep those cache variables for the later checks;
+`--global-cache-dir` is not accepted by this build runner.
+
 23 October 2026: the [compact symbolic journal](zig-native/SYMBOLIC_JOURNAL.md)
 is qualified: 2,527 exhaustive native laws, 1,640 guest/client checks, exact
 application output and a seven-pair CPU guard of 1.01083 (limit 1.05). A native
 screen requested 43.8 MB less per fresh/edit/revert phase and reduced peak RSS.
-The language task/channel batch is separate, still in progress and unqualified;
-issues #25/#27 and the remaining task requirements stay open.
+The broader task/channel program remains incomplete; its qualified
+scope/spawn/collect slice is recorded above. Issues #25/#27 and the remaining
+task requirements stay open.
 
 23 October 2026: [the completion plan](FINISH_PLAN.md) orders the preserved
 local candidate, the remaining task records, and issue #25's remaining
@@ -42,7 +91,7 @@ preserves the paired runs, complete stacks and limitations. There are eleven
 open task records. Continue with backend reconstruction/emission, non-constant
 inference, bounded long edit sessions and issue #25's remaining contracts.
 
-## Issue #25: minimal task/channel/control surface (22 October 2026)
+## Historical issue #25 checkpoint (22 October 2026)
 
 This checkpoint's compiler revision is `e3e7463`. At that time the only open
 GitHub issue was #25. The current one-result task slice implements `*(call)` and
@@ -55,9 +104,11 @@ returns). The full gate passed: 2,510 native laws in four exhaustive shards,
 1,633 guest/client checks, release build and harness/smoke checks. Zig lint
 found zero issues.
 
-Issue #25 is **open**. Tuple collect/select, stream channels, scoped nonlocal
-exits, purity proofs, worker transport and their benchmarks are not implemented.
-The next boundary is helper propagation for task regions:
+At this checkpoint, tuple collect/select, stream channels, scoped nonlocal
+exits, purity proofs, worker transport and their benchmarks were not
+implemented. The task-surface continuation at the top supersedes the tuple
+collection and literal-scope restrictions below. Issue #25 remains **open**. The
+next boundary at that time was helper propagation for task regions:
 
 - `parse/parser.zig` binds `*call` to `task_group` and rewrites it immediately
   to `@task.spawn`; the parser only sets that group for a literal

@@ -545,12 +545,14 @@ fn Walker(comptime Engine: type) type {
                 break;
             }
             var source = callee_source;
+            if (self.engine.isSpawnUse(source)) return true;
             while (self.engine.tree.node(source).tag == .group) source = self.engine.tree.node(source).a;
             const node = self.engine.tree.node(source);
             if (node.tag == .lambda or node.tag == .constructor_ref) return true;
             const binding = self.engine.resolved[source];
             if (binding == 0) return false;
             const declaration = self.engine.bindings.items[binding];
+            if (declaration.capability_flow == .consume_task or declaration.capability_flow == .spawn_task) return true;
             if (declaration.kind == .parameter) {
                 const parameter = self.engine.tree.parameter(declaration.declaration);
                 var annotation = parameter.annotation;
@@ -664,7 +666,7 @@ fn Walker(comptime Engine: type) type {
                 return .live;
             }
             switch (node.tag) {
-                .name => try self.use(self.engine.resolved[source], source),
+                .name, .task_region => try self.use(self.engine.resolved[source], source),
                 .lambda => try self.lambda(source, depth + 1),
                 .group, .field_access, .type_witness => return self.expression(node.a, depth + 1),
                 .return_stmt => {

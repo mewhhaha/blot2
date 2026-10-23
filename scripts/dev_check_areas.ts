@@ -1,5 +1,34 @@
 /** Explicit regression families. A development pass never qualifies the full tree. */
 export const devCheckAreas = {
+  "tasks": {
+    description:
+      "Task region inference, affine handles, capture transfer and portable authority.",
+    native: [
+      "parse.parser_tests.test.spark syntax leaves task region selection to checking",
+      "parse.parser_tests.test.spark and receive lower to checked task operations with bounded syntax",
+      "check.task_check_tests.test.spark and receive use the checked explicit task scope",
+      "check.task_check_tests.test.spark region checking preserves exact scope owners under shadowing through OOM",
+      "check.task_check_tests.test.ordinary task scope wrappers preserve fresh regions and reject escaping results through OOM",
+      "check.task_check_tests.test.task collection checks stored receiver tuples and preserves tuple payloads",
+      "check.task_check_tests.test.spawn wrappers validate each actual action and preserve explicit group identity",
+      "check.task_check_tests.test.structured task checking rejects escaped groups and consumed handles",
+      "check.task_check_tests.test.structured tasks reject children returning group scoped callbacks and packages through OOM",
+      "check.task_check_tests.test.structured task checking transfers unique captures and rejects ordinary Foreign contracts",
+      "check.task_backend_tests.test.structured task backend owns replay retained helpers and every failed allocation",
+      "check.task_backend_tests.test.task scope wrapper authority requires its exact callback body",
+      "check.task_backend_tests.test.task collect validates every result field before emission through allocation failures",
+      "check.task_backend_tests.test.spawn helper partial calls retain actual capture ownership and reject forged contracts through OOM",
+      "check.task_backend_tests.test.generic tuple receive preserves a complete task lifetime graph",
+      "check.task_backend_tests.test.portable task capture authority encloses the destination rather than only the spawn site",
+      "check.scoped_effect_backend_tests.test.task join wrapper contract requires the exact checked join body",
+    ],
+    guests: [
+      "compiler/task_runtime.test.ts",
+      "zig-native/tests/task_surface_execution.test.ts",
+      "zig-native/tests/task_execution.test.ts",
+    ],
+    guestFilters: {} as Record<string, string>,
+  },
   "numeric-aggregates": {
     description:
       "Numeric call adapters, physical layouts, immutable snapshots and ownership.",

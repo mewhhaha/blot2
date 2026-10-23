@@ -184,7 +184,7 @@ pub const Service = struct {
     }
     // A returned callable may be used under a conservative effect superset.
     // Its inputs remain invariant; only subsequent result arrows widen rows.
-    fn mapFunctionResult(self: *Service, unit_id: u32, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), ty: types.Id, concrete: layout.Id, span: core.Span, depth: usize) Error!void {
+    pub fn mapFunctionResult(self: *Service, unit_id: u32, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), ty: types.Id, concrete: layout.Id, span: core.Span, depth: usize) Error!void {
         if (depth >= 1024) return self.decline(unit_id, span, .complexity);
         const source = self.unit(unit_id).types.node(ty);
         const physical = self.layouts.node(concrete);
@@ -302,6 +302,17 @@ pub const Service = struct {
         const n = source.types.node(ty);
         if (n.tag == .usage) {
             const physical = self.layouts.node(concrete);
+            if (@import("../check/task_types.zig").scopeCallback(&source.types, ty)) |callback| {
+                if (physical.tag == .universal) {
+                    const actual = self.layouts.node(physical.a);
+                    if (actual.tag != .function) return self.decline(unit_id, span, .unresolved_type);
+                    // Scope results and effects are outside the fresh-region
+                    // binder. Infer those free parameters before comparing
+                    // the complete universal callback below.
+                    try self.mapTypeDepth(unit_id, mappings, rows, callback.b, actual.b, span, depth + 1);
+                    if (rows) |values| try self.mapRow(unit_id, mappings, values, callback.c, actual.c, span, false);
+                }
+            }
             if (n.b == @backingInt(types.UsageKind.unique) or n.b == @backingInt(types.UsageKind.shared)) {
                 if (physical.tag != .owning or physical.b != n.b or n.c != 0) return self.decline(unit_id, span, .unresolved_type);
                 return self.mapTypeDepth(unit_id, mappings, rows, n.a, physical.a, span, depth + 1);

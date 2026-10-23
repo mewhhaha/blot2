@@ -245,20 +245,33 @@ test "spark and receive lower to checked task operations with bounded syntax" {
     for (tree.nodes.items) |node| if (node.tag == .intrinsic) {
         const name = pool.get(node.a);
         spawns += @intFromBool(std.mem.eql(u8, name, "@task.spawn"));
-        joins += @intFromBool(std.mem.eql(u8, name, "@task.join"));
+        joins += @intFromBool(std.mem.eql(u8, name, "@task.receive"));
     };
     try std.testing.expectEqual(@as(usize, 1), spawns);
     try std.testing.expectEqual(@as(usize, 1), joins);
     for ([_]struct { source: []const u8, code: ast.Code }{
-        .{ .source = "entry const value = fn () => *(work 1)\n", .code = .task_spark_scope },
         .{ .source = "entry const value = fn () => @task.scope (fn group => do:\n  return *(work))\n", .code = .task_spark_call },
-        .{ .source = "entry const value = fn () => @task.scope (fn group => do:\n  return |(left, right)|)\n", .code = .task_receive_tuple },
     }) |case| {
         var rejected = try parsed(std.testing.allocator, case.source, &pool);
         defer rejected.deinit(std.testing.allocator);
         try std.testing.expect(rejected.diagnostics.items.len != 0);
         try std.testing.expectEqual(case.code, rejected.diagnostics.items[0].code);
     }
+}
+
+test "spark syntax leaves task region selection to checking" {
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(std.testing.allocator);
+    var tree = try parsed(std.testing.allocator, "const start = fn value => *(work value)\n", &pool);
+    defer tree.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var regions: usize = 0;
+    for (tree.nodes.items) |node| {
+        if (node.tag != .task_region) continue;
+        regions += 1;
+        try std.testing.expectEqual(@as(u32, 0), node.a | node.b | node.c);
+    }
+    try std.testing.expectEqual(@as(usize, 1), regions);
 }
 
 test "spark binds call arguments before creating the child" {

@@ -1719,6 +1719,7 @@ const Shape = struct {
         self.word(span.start - self.start);
         self.word(span.end - self.start);
         return switch (n.tag) {
+            .task_region => n.a == 0 and n.b == 0 and n.c == 0,
             .value_decl => blk: {
                 const d = self.tree.valueDecl(id);
                 self.name(d.name);

@@ -829,6 +829,34 @@ order, fixity and written evaluation order. Grammar keywords `froM`/`wherE` are
 private frontend markers; source accepts contextual `from`/`where` without
 reserving them everywhere.
 
+Spark expansion retains an unbound `task_region` leaf until checking. It has no
+source spelling and resolves to the exact active task-scope parameter, including
+under local shadowing. Ordinary nested lambdas do not inherit that permission.
+An ordinary scope wrapper requires a once callback universally quantified over
+its fresh region. That region cannot occur in the callback's result or effects.
+The primitive creates the region when the wrapper executes; forwarding uses
+ordinary calls and retains the callback's rank evidence. The exact
+`fn body => @task.scope body` marker is checked against its immutable Core body.
+Neither the marker nor a physical closure layout certifies arbitrary callbacks
+or permits a scoped result to escape.
+
+The exact `fn group => fn action => @task.spawn group action` body has a
+separate spawn contract. Its group parameter is symbolic; the action has once
+usage. Frozen admission validates both formal references and checks the actual
+action at every completed call, including aliases and partial applications.
+These callable values cannot flow into arbitrary data or higher-order inputs. A
+partial call retains its already evaluated group in a private carrier; final
+emission uses the actual action's capture descriptor. That carrier never grants
+authority through an ordinary indirect invocation.
+
+Receiver helpers retain a `task_receive` type/effect predicate until the input
+shape is known. Its generic form requires the exact consuming body or a checked
+alias; arbitrary polymorphic bodies gain no affine authority. Frozen admission
+reconstructs the input/result relation and every latent row. Collect-all passes
+an array of `(task ID, descriptor ID)` words to the guest bridge and publishes
+result-envelope slots only after all selected results and their resource
+journals transfer. The host never interprets source payload layouts.
+
 Document exact node fields in ast.zig before checker/backend consumers use them.
 Lambda fields must expose parameter, annotations, and body. Declaration fields
 must expose name, annotations, body and export modifier. No consumer should

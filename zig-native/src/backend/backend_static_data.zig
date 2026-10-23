@@ -22,6 +22,16 @@ const OperationKey = code_artifacts.OperationKey;
 const Error = Allocator.Error || error{ Declined, ModuleTooLarge, InvalidFunctionReference, InvalidGlobalReference };
 const SerializedKey = struct { value: core_eval.ValueId, ty: layout.Id, suspension: bool = false };
 pub const State = struct {
+    fn taskCallbackRows(source: *const core.Module, ty: types.Id, depth: usize) bool {
+        if (depth >= 128) return false;
+        if (@import("../check/task_types.zig").scopeCallback(&source.types, ty) != null) return true;
+        const node = source.types.node(ty);
+        return switch (node.tag) {
+            .function => taskCallbackRows(source, node.a, depth + 1) or taskCallbackRows(source, node.b, depth + 1),
+            .usage, .forall => taskCallbackRows(source, node.a, depth + 1),
+            else => false,
+        };
+    }
     cache: std.AutoHashMapUnmanaged(SerializedKey, u32) = .empty,
     closures: std.ArrayList(u32) = .empty,
     pub fn deinit(self: *State, a: Allocator) void {
@@ -369,6 +379,8 @@ pub const State = struct {
         // A quantified field retains its checked parametric implementation;
         // it has no single monomorphic evaluator invocation to specialize.
         if (g.representations.store.node(ty).tag == .universal) return self.serializeClosure(g, id, ty, depth);
+        const arrow = g.representations.store.node(ty);
+        if (arrow.tag == .function and g.representations.store.node(arrow.a).tag == .universal) return self.serializeClosure(g, id, ty, depth);
         var selected = ty;
         // A constant sum/array may contain callbacks whose parameter is
         // unobserved by this consumer. Infer that callback independently;
@@ -589,8 +601,12 @@ pub const State = struct {
                 }
                 const fn_type = g.representations.store.node(implementation);
                 if (fn_type.tag != .function) return g.fail(metadata.unit, closure_.body, .unresolved_type);
-                try g.mapType(metadata.unit, &mappings, closure_.parameter.ty, fn_type.a, closure_.parameter.span);
-                try g.mapType(metadata.unit, &mappings, source.typeOf(closure_.body), fn_type.b, source.span(closure_.body));
+                if (taskCallbackRows(source, closure_.parameter.ty, 0)) {
+                    try g.mapTypeDepth(metadata.unit, &mappings, &rows, closure_.parameter.ty, fn_type.a, closure_.parameter.span, 0);
+                } else try g.mapType(metadata.unit, &mappings, closure_.parameter.ty, fn_type.a, closure_.parameter.span);
+                if (taskCallbackRows(source, source.typeOf(closure_.body), 0)) {
+                    try g.mapFunctionResult(metadata.unit, &mappings, &rows, source.typeOf(closure_.body), fn_type.b, source.span(closure_.body));
+                } else try g.mapType(metadata.unit, &mappings, source.typeOf(closure_.body), fn_type.b, source.span(closure_.body));
                 const captures = source.extra[closure_.captures.start..][0..closure_.captures.len];
                 if (captures.len != child_count) return g.fail(metadata.unit, closure_.body, .constant_expression);
                 for (captures, 0..) |binding, index| try child_types.append(g.allocator, try g.captureLayout(metadata.unit, binding, g.evaluator.valueChildren(id)[index], &mappings, &rows));
@@ -704,6 +720,11 @@ pub const State = struct {
             if (metadata.applied != 0 or source.types.node(source.binding(metadata.identity).ty).tag != .forall) return g.decline(metadata.unit, body.span, .unresolved_type);
             try g.mapTypeDepth(metadata.unit, &mappings, &rows, source.binding(metadata.identity).ty, ty, body.span, 0);
             dictionaries = source.types.quantifierGoals(source.binding(metadata.identity).ty).len != 0;
+        } else if (taskCallbackRows(source, source_ty, 0)) {
+            // A stored implementation keeps its own effects even when its
+            // consumer permits a wider row. Infer open rows without imposing
+            // that consumer's effects on a closed, pure captured helper.
+            try g.mapFunctionResult(metadata.unit, &mappings, &rows, source_ty, ty, body.span);
         } else try g.mapType(metadata.unit, &mappings, source_ty, ty, body.span);
         var full_type = try g.codeLayoutWithRows(metadata.unit, source.binding(metadata.identity).ty, mappings.items, rows.items, body.span);
         if (g.representations.store.node(ty).tag == .universal) full_type = g.representations.store.node(full_type).a;
