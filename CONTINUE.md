@@ -1,5 +1,18 @@
 # Continue here
 
+Post-CT96 review, 23 October 2026: `c5b9ad1` commits the measurement tools and
+qualified spawn optimization. The [new performance review](PERFORMANCE_REVIEW.md)
+selects CT97's row traversal first: the 27.4% hotspot is already inlined and
+almost all node self CPU follows replacement rows. Count chain hops and
+cache misses/bypasses before choosing an index or memo. For CT98, zero backend
+candidates is a late counter: literal edits already reuse 17 principals and
+145 specialization queries, so trace the earlier executable-admission filters.
+BT4's three slowest laws passed a new 33-sweep diagnostic run with 44,074
+scenario executions. Profile backend allocations in the two deep-path fixtures;
+their frontend setup is already outside the fault sweeps. No further compiler
+optimization or installation is claimed by this review. The separate dirty
+text-capability repair remains preserved and outside CT96's qualification.
+
 CT96 checkpoint, 23 October 2026: the generator now prepares spawn-contract
 presence and its immutable module-pointer view once per compilation. Seven
 alternating release pairs show **28.6% less game CPU** and **29.0% less devtools

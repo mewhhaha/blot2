@@ -60,6 +60,8 @@ iteration and qualification costs separately from
 [CT96](CT96_QUALIFICATION.md) prepares spawn capability data once per compilation.
 It reduces fresh game CPU by 28.6% and devtools CPU by 29.0% in seven alternating
 release pairs, preserving exact Wasm and passing the full isolated compiler gate.
+The [next-hill review](../PERFORMANCE_REVIEW.md) traces the remaining row-resolution
+hotspot and retained-admission filters, and profiles the slowest exhaustive laws.
 
 `blotc build ENTRY OUTPUT.wasm --prelude std/prelude.blot --std-root std`
 compiles a project. `dependencies ENTRY OUTPUT.blotdep` produces reusable typed

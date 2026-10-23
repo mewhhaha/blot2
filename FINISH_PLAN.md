@@ -15,6 +15,9 @@ whole-program spawn-contract scans during emission. Seven alternating release
 pairs show 28.6% less game CPU and 29.0% less devtools CPU with identical Wasm.
 The isolated compiler passes full qualification; the remaining inference,
 retained-reuse and absolute performance targets below stay open.
+The [post-CT96 review](PERFORMANCE_REVIEW.md) narrows CT97 to repeated row
+traversal, CT98 to executable-admission diagnostics and BT4 to allocations in
+the slow backend sweeps. It adds evidence, without closing those hills.
 
 The baseline [compile/build measurements](COMPILE_MEASUREMENTS.md) established
 the remaining performance work against compiler `63c931f`. Follow

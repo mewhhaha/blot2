@@ -75,6 +75,9 @@ cache hits slower. Run `deno task bench:compiler-build --out build/bench/build-n
 for isolated build/edit/revert measurements. See the
 [compile-time hills](COMPILE_HILLS.md) and [build hills](BUILD_HILLS.md) for the
 next experiments, acceptance targets and reproduction commands.
+The [post-CT96 review](PERFORMANCE_REVIEW.md) prioritizes inlined effect-row
+traversal, retained executable admission and allocation-heavy exhaustive tests,
+with new caller attribution and 33 completed diagnostic fault sweeps.
 
 For a smaller development check, run `deno task test:compiler:dev`. It checks
 the project protocol, client and inference-budget recovery against the

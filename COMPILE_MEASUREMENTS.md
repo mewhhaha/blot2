@@ -6,6 +6,8 @@ seven alternating release pairs (17.24 → 12.16 s median build wall), with
 identical Wasm. The measurements below preserve the preceding baseline and its
 original profiling evidence; use the follow-up record for the optimized
 candidate.
+The [post-CT96 review](PERFORMANCE_REVIEW.md) updates the next hills with caller
+attribution, retained-admission analysis and 33 new exhaustive sweep profiles.
 
 23 October 2026 baseline. This identified repeated whole-program scans in
 `prepareSpawnApplication`, owning **27.6% of sampled CPU**, as the first

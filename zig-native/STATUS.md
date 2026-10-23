@@ -9,15 +9,19 @@ CPU by 28.6% and devtools CPU by 29.0%; game median build wall falls from 17.24 
 12.16 s, with byte-identical Wasm. The isolated gate passes 2,539 exhaustive native
 laws, 1,648 guest checks, 48 smoke checks and 57 tooling checks, with zero lint.
 The separate text-capability repair is outside this candidate's qualification.
+The [post-CT96 review](../PERFORMANCE_REVIEW.md) selects row traversal next and
+explains why zero executable candidates does not imply zero semantic reuse.
+Its three-law diagnostic run passes 33 exhaustive sweeps and 44,074 scenario
+runs; it implements no further compiler optimization.
 
 ## Compile and build costs, 23 October 2026
 
-The [current measurements](../COMPILE_MEASUREMENTS.md) use the unchanged qualified
+The [preceding baseline measurements](../COMPILE_MEASUREMENTS.md) use qualified
 release `63c931f`: fresh gdev takes 16.292 s, backend inference accounts for
 9.64 s of the profiled build, and repeated spawn-capability scanning owns 27.6%
 of sampled CPU. Retained code edits offer zero backend reuse candidates. The
-[new compile hills](../COMPILE_HILLS.md) start with that scan and require a fresh
-profile before selecting the next optimization. No speedup is claimed yet.
+[compile hills](../COMPILE_HILLS.md) now incorporate CT96 above and its fresh
+profile. The older scan cost is historical; CT97 is the next experiment.
 
 Compiler development edits take about 3.4 s with ordinary Safe/noLLVM caching;
 the warm affected check takes 4.64 s. [Build hills](../BUILD_HILLS.md) retain
