@@ -225,6 +225,7 @@ Deno.test("guest filters build directly while default development and full gates
     assert.deepEqual(
       result.report.phases.map((phase: { name: string }) => phase.name),
       [name],
+      JSON.stringify({ args, stdout: result.stdout, stderr: result.stderr }),
     );
     assert.equal(result.report.phases[0].code, 19);
     assert.deepEqual(result.commands[0], ["version"]);

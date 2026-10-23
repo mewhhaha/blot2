@@ -306,7 +306,7 @@ pub const Module = struct {
         };
         std.debug.assert(table_kind == null or instruction.op == .i32_const);
         try self.recordTableReference(role, instruction.operand, id, @intCast(self.functions.items[id].instructions.items.len));
-        if (self.artifacts) |journal| try journal.append(.{ .instruction = .{ .function = id, .op = instruction.op, .operand = .{ .role = role, .value = instruction.operand } } });
+        if (self.artifacts) |journal| try journal.appendInstruction(id, instruction.op, .{ .role = role, .value = instruction.operand });
         var owned = instruction;
         if (role == .callable_layout) {
             std.debug.assert(instruction.op == .ownership and instruction.operand != 0 and instruction.operand < 1 << 26);

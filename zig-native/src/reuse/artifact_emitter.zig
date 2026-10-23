@@ -35,6 +35,7 @@ pub const Event = union(enum) {
     mutable_static: void,
     static_field: struct { address: u32, role: @import("../backend/runtime_ir.zig").Role },
     start: u32,
+    instruction_run: struct { function: u32, instructions: Span },
 };
 pub const Record = struct { sequence: u64, owner: u32, event: Event };
 pub const SymbolicInstruction = struct { op: wasm.Op, operand: Operand };
@@ -53,6 +54,8 @@ pub const Recorder = struct {
     functions: []FunctionArtifact = &.{},
     locals: []wasm.ValueType = &.{},
     instructions: []SymbolicInstruction = &.{},
+    pending_instructions: std.ArrayList(SymbolicInstruction) = .empty,
+    frozen_instructions: bool = false,
     sealed: bool = false,
     arena: ?wasm.Arena = null,
     lists: ?@import("../runtime/list_runtime.zig").Runtime = null,
@@ -67,6 +70,7 @@ pub const Recorder = struct {
         self.allocator.free(self.functions);
         self.allocator.free(self.locals);
         self.allocator.free(self.instructions);
+        self.pending_instructions.deinit(self.allocator);
         self.* = undefined;
     }
     pub fn append(self: *Recorder, event: Event) Allocator.Error!void {
@@ -76,6 +80,40 @@ pub const Recorder = struct {
         const sequence = clock.*;
         clock.* += 1;
         self.records.appendAssumeCapacity(.{ .sequence = sequence, .owner = if (self.owner) |owner| owner.* else 0, .event = event });
+    }
+    /// A run never crosses a job, resource event or metadata clock boundary.
+    /// Its operands remain symbolic until the ordinary replay admission checks.
+    pub fn appendInstruction(self: *Recorder, function: u32, op: wasm.Op, operand: Operand) Allocator.Error!void {
+        std.debug.assert(!self.sealed and !self.frozen_instructions);
+        if (self.pending_instructions.items.len == std.math.maxInt(u32)) return error.OutOfMemory;
+        const owner = if (self.owner) |current| current.* else 0;
+        const clock = self.clock orelse &self.local_clock;
+        if (self.records.items.len != 0) {
+            const last = &self.records.items[self.records.items.len - 1];
+            if (last.owner == owner and last.event == .instruction_run) {
+                const run = &last.event.instruction_run;
+                if (run.function == function and last.sequence + run.instructions.len == clock.* and
+                    @as(usize, run.instructions.start) + run.instructions.len == self.pending_instructions.items.len)
+                {
+                    try self.pending_instructions.append(self.allocator, .{ .op = op, .operand = operand });
+                    run.instructions.len += 1;
+                    clock.* += 1;
+                    return;
+                }
+            }
+        }
+        try self.records.ensureUnusedCapacity(self.allocator, 1);
+        try self.pending_instructions.ensureUnusedCapacity(self.allocator, 1);
+        const start: u32 = @intCast(self.pending_instructions.items.len);
+        self.pending_instructions.appendAssumeCapacity(.{ .op = op, .operand = operand });
+        self.records.appendAssumeCapacity(.{ .sequence = clock.*, .owner = owner, .event = .{ .instruction_run = .{ .function = function, .instructions = .{ .start = start, .len = 1 } } } });
+        clock.* += 1;
+    }
+    pub fn instructionRun(self: *const Recorder, span: Span) ?[]const SymbolicInstruction {
+        const values = if (self.frozen_instructions) self.instructions else self.pending_instructions.items;
+        const start: usize = span.start;
+        if (start > values.len or span.len > values.len - start) return null;
+        return values[start..][0..span.len];
     }
     pub fn recordArena(self: *Recorder, arena: wasm.Arena) Allocator.Error!void {
         std.debug.assert(self.arena == null);
@@ -157,6 +195,7 @@ pub const Recorder = struct {
             .function => count += 1,
             .local => local_count += 1,
             .instruction => instruction_count += 1,
+            .instruction_run => |run| instruction_count += run.instructions.len,
             else => {},
         };
         const functions = try self.allocator.alloc(FunctionArtifact, count);
@@ -177,6 +216,7 @@ pub const Recorder = struct {
             },
             .local => |item| functions[item.function].locals.len += 1,
             .instruction => |item| functions[item.function].instructions.len += 1,
+            .instruction_run => |item| functions[item.function].instructions.len += item.instructions.len,
             else => {},
         };
         for (self.records.items) |record| switch (record.event) {
@@ -222,7 +262,7 @@ pub const Recorder = struct {
             function.locals.len = 0;
             function.instructions.len = 0;
         }
-        for (self.records.items) |record| switch (record.event) {
+        for (self.records.items) |*record| switch (record.event) {
             .local => |item| {
                 const span = &functions[item.function].locals;
                 locals[span.start + span.len] = item.ty;
@@ -232,6 +272,14 @@ pub const Recorder = struct {
                 const span = &functions[item.function].instructions;
                 instructions[span.start + span.len] = .{ .op = item.op, .operand = item.operand };
                 span.len += 1;
+            },
+            .instruction_run => |*item| {
+                const span = &functions[item.function].instructions;
+                const source = self.instructionRun(item.instructions).?;
+                const start = span.start + span.len;
+                @memcpy(instructions[start..][0..source.len], source);
+                span.len += item.instructions.len;
+                item.instructions.start = start;
             },
             else => {},
         };
@@ -243,6 +291,9 @@ pub const Recorder = struct {
         self.functions = functions;
         self.locals = locals;
         self.instructions = instructions;
+        self.pending_instructions.deinit(self.allocator);
+        self.pending_instructions = .empty;
+        self.frozen_instructions = true;
     }
     pub fn materialize(self: *const Recorder, allocator: Allocator) !wasm.Module {
         var module = wasm.Module.init(allocator);
@@ -291,6 +342,14 @@ pub const Recorder = struct {
             .instruction => |item| {
                 if (item.operand.role == .callable_layout and (item.op != .ownership or item.operand.value == 0 or item.operand.value >= 1 << 26)) return error.InvalidArtifact;
                 try module.emitReference(try replay.get(replay.functions.items, item.function), .{ .op = item.op, .operand = try replay.resolve(item.operand) }, item.operand.role);
+            },
+            .instruction_run => |run| {
+                const instructions = self.instructionRun(run.instructions) orelse return error.InvalidArtifact;
+                if (instructions.len == 0) return error.InvalidArtifact;
+                for (instructions) |item| {
+                    if (item.operand.role == .callable_layout and (item.op != .ownership or item.operand.value == 0 or item.operand.value >= 1 << 26)) return error.InvalidArtifact;
+                    try module.emitReference(try replay.get(replay.functions.items, run.function), .{ .op = item.op, .operand = try replay.resolve(item.operand) }, item.operand.role);
+                }
             },
             .global => |item| {
                 const actual = try module.addGlobal(item.scalar, try replay.resolve(item.bits), item.mutable);

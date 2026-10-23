@@ -563,6 +563,16 @@ pub const State = struct {
                     if (try self.importer.importSemanticSite(g, site) == null) return false;
                 },
                 .instruction => |item| if (!try self.admitOperand(g, item.operand, record.owner, roots.items)) return false,
+                .instruction_run => |run| {
+                    const instructions = self.old.emission.instructionRun(run.instructions) orelse return false;
+                    if (instructions.len == 0 or run.function >= self.old.emission.functions.len) return false;
+                    const stop = std.math.add(u64, record.sequence, instructions.len) catch return false;
+                    if (stop - 1 > last) return false;
+                    if (e + 1 < self.old.emission.records.items.len and self.old.emission.records.items[e + 1].sequence < stop) return false;
+                    const next_meta = self.metaAt(record.sequence);
+                    if (next_meta < self.old.metadata.events.items.len and self.old.metadata.events.items[next_meta].sequence < stop) return false;
+                    for (instructions) |item| if (!try self.admitOperand(g, item.operand, record.owner, roots.items)) return false;
+                },
                 .data_word => |item| if (!self.localAddress(item.address, record.owner) or !try self.admitOperand(g, item.operand, record.owner, roots.items)) return false,
                 .global => |item| if (!self.knownGlobal(item.id, g.request_owner)) return false,
                 .global_bits => |item| if (!self.knownGlobal(item.id, g.request_owner)) return false,
@@ -802,6 +812,16 @@ pub const State = struct {
                     if (item.operand.role == .operation) {
                         g.planning.runtime_operations.emit(&g.module, target, try self.operation(g, item.operand.value)) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else error.InvalidFunctionReference;
                     } else try g.module.emitReference(target, .{ .op = item.op, .operand = try self.resolveOperand(g, item.operand) }, item.operand.role);
+                },
+                .instruction_run => |run| if (self.old.emission.functions[run.function].owner != 0 or self.staticHelper(self.old.emission.functions[run.function], record.owner)) {
+                    const instructions = self.old.emission.instructionRun(run.instructions) orelse return error.InvalidFunctionReference;
+                    if (instructions.len == 0) return error.InvalidFunctionReference;
+                    const target = try self.resolveFunction(g, run.function);
+                    for (instructions) |item| {
+                        if (item.operand.role == .operation) {
+                            g.planning.runtime_operations.emit(&g.module, target, try self.operation(g, item.operand.value)) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else error.InvalidFunctionReference;
+                        } else try g.module.emitReference(target, .{ .op = item.op, .operand = try self.resolveOperand(g, item.operand) }, item.operand.role);
+                    }
                 },
                 .import_ => |item| _ = try self.importFunction(g, item.id),
                 .operation_symbol => |item| _ = try self.operation(g, item.id),

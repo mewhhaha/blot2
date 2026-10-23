@@ -5,6 +5,40 @@ const operations = @import("../backend/runtime_operations.zig");
 const evidence = @import("../eval/type_evidence.zig");
 const failures = @import("../allocation_failures.zig");
 
+fn instructionRuns(allocator: std.mem.Allocator) !void {
+    var journal = artifact.Recorder.init(allocator);
+    defer journal.deinit();
+    var clock: u64 = 20;
+    var owner: u32 = 7;
+    journal.clock = &clock;
+    journal.owner = &owner;
+    try journal.appendInstruction(0, .i32_const, .{ .value = 1 });
+    try journal.appendInstruction(0, .i32_const, .{ .value = 2 });
+    try journal.appendInstruction(0, .i32_add, .{});
+    // A metadata event shares the clock but not the emission stream.
+    clock += 1;
+    try journal.appendInstruction(0, .drop, .{});
+    owner = 8;
+    try journal.appendInstruction(0, .i32_const, .{ .value = 42 });
+    try journal.append(.{ .demand = .{ .kind = .signature, .id = 0, .hit = true } });
+    try journal.appendInstruction(0, .drop, .{});
+    try std.testing.expectEqual(@as(usize, 5), journal.records.items.len);
+    try std.testing.expectEqual(@as(u32, 3), journal.records.items[0].event.instruction_run.instructions.len);
+    try std.testing.expectEqual(@as(u64, 24), journal.records.items[1].sequence);
+    try std.testing.expectEqual(@as(u32, 8), journal.records.items[2].owner);
+    try std.testing.expectEqual(@as(u64, 28), clock);
+    const first = journal.instructionRun(journal.records.items[0].event.instruction_run.instructions).?;
+    try std.testing.expectEqual(@as(usize, 3), first.len);
+    try std.testing.expectEqual(wasm.Op.i32_add, first[2].op);
+    try std.testing.expect(journal.instructionRun(.{ .start = 6, .len = 1 }) == null);
+    try std.testing.expect(journal.instructionRun(.{ .start = std.math.maxInt(u32), .len = 1 }) == null);
+}
+
+test "instruction journal runs preserve owner clock and resource boundaries through OOM" {
+    try instructionRuns(std.testing.allocator);
+    try failures.checkAllAllocationFailures(std.testing.allocator, instructionRuns, .{});
+}
+
 fn scenario(allocator: std.mem.Allocator) !void {
     var journal = artifact.Recorder.init(allocator);
     defer journal.deinit();

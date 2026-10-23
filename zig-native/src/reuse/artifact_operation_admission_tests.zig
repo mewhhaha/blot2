@@ -188,7 +188,7 @@ test "operation admission qualifies cached and exact entry catalogs without publ
     }
 }
 
-const Reference = enum { instruction, symbol, demand };
+const Reference = enum { instruction, instruction_run, symbol, demand };
 fn journalCapture(fixture: *const Fixture, reference: Reference, id: u32) !capture.Capture {
     var producer = try Generator.init(a, fixture);
     defer producer.deinit();
@@ -205,6 +205,7 @@ fn journalCapture(fixture: *const Fixture, reference: Reference, id: u32) !captu
     try scope.reserve(0);
     switch (reference) {
         .instruction => try result.emission.append(.{ .instruction = .{ .function = 0, .op = .i32_const, .operand = .{ .role = .operation, .value = id } } }),
+        .instruction_run => try result.emission.appendInstruction(0, .i32_const, .{ .role = .operation, .value = id }),
         .symbol => {
             const operation = producer.planning.runtime_operations.entries.items[id - 1];
             try result.emission.operationSymbol(id, operation.key, operation.foreign);
@@ -227,7 +228,7 @@ test "operation admission validates exact entry catalogs in inline references an
     var producer = try Generator.init(a, &fixture);
     defer producer.deinit();
     const inputs = try buildInputs(&producer, &fixture);
-    for ([_]Reference{ .instruction, .symbol, .demand }) |reference| for ([_]u32{ inputs.stable, inputs.fresh }) |id| {
+    for ([_]Reference{ .instruction, .instruction_run, .symbol, .demand }) |reference| for ([_]u32{ inputs.stable, inputs.fresh }) |id| {
         var old = try journalCapture(&fixture, reference, id);
         defer old.deinit();
         try std.testing.expectEqual(@as(usize, 1), old.metadata.jobs.items.len);
@@ -242,6 +243,35 @@ test "operation admission validates exact entry catalogs in inline references an
         try std.testing.expectEqual(@as(?u32, 1), hit);
         try std.testing.expectEqual(before, tableStamp(&current));
     };
+}
+
+test "instruction run admission rejects invalid spans and clock overlap before publication" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    var producer = try Generator.init(a, &fixture);
+    defer producer.deinit();
+    const inputs = try buildInputs(&producer, &fixture);
+    for (0..4) |mode| {
+        var old = try journalCapture(&fixture, .instruction_run, inputs.stable);
+        defer old.deinit();
+        for (old.emission.records.items) |*record| {
+            if (record.event != .instruction_run) continue;
+            switch (mode) {
+                0 => record.event.instruction_run.instructions.start = std.math.maxInt(u32),
+                1 => record.event.instruction_run.instructions.len = 0,
+                2 => record.sequence = old.metadata.events.items[0].sequence,
+                3 => record.event.instruction_run.function = std.math.maxInt(u32),
+                else => unreachable,
+            }
+        }
+        var current = try Generator.init(a, &fixture);
+        defer current.deinit();
+        const before = tableStamp(&current);
+        var state = try fragment.State.init(a, &old, fixture.units, fixture.names.view(), 1);
+        defer state.deinit();
+        try std.testing.expect(try state.find(&current, .{ .named = fixture.key() }) == null);
+        try std.testing.expectEqual(before, tableStamp(&current));
+    }
 }
 
 test "executable fragment queries decline unsealed and saturated captures while preserving the live request owner" {
