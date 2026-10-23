@@ -1120,8 +1120,11 @@ pub const Generator = struct {
         return function_id;
     }
     pub fn mappingEvidence(self: *Generator, mappings: []const Mapping) Error!u32 {
+        var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+        const temporary = scratch.allocator();
         var words: std.ArrayList(u32) = .empty;
-        defer words.deinit(self.allocator);
+        defer words.deinit(temporary);
         for (mappings) |mapping| {
             if (mapping.instance.decl != 0) continue;
             const actual = self.representations.toEvidence(self.evaluator.evidenceStore(), mapping.layout) catch |err| switch (err) {
@@ -1129,15 +1132,18 @@ pub const Generator = struct {
                 error.OutOfMemory => return error.OutOfMemory,
                 else => return self.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type),
             };
-            try words.appendSlice(self.allocator, &.{ mapping.variable, actual });
+            try words.appendSlice(temporary, &.{ mapping.variable, actual });
         }
         // Semantic record interning canonicalizes variable order and checks
         // equality after hash collisions. Its owner is the evaluation session.
         return self.evaluator.storage.evidence.intern(.record, 0, 0, words.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
     }
     pub fn rowMappingEvidence(self: *Generator, rows: []const RowMapping) Error!substitution_keys.Id {
+        var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+        const temporary = scratch.allocator();
         var entries: std.ArrayList(substitution_keys.Entry) = .empty;
-        defer entries.deinit(self.allocator);
+        defer entries.deinit(temporary);
         for (rows) |mapping| {
             if (mapping.row == layout.unknown_row) continue;
             const actual = self.representations.rowToEvidence(self.evaluator.evidenceStore(), mapping.row) catch |err| switch (err) {
@@ -1145,7 +1151,7 @@ pub const Generator = struct {
                 error.OutOfMemory => return error.OutOfMemory,
                 else => return self.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type),
             };
-            try entries.append(self.allocator, .{ .variable = mapping.variable, .value = actual });
+            try entries.append(temporary, .{ .variable = mapping.variable, .value = actual });
         }
         return self.representations.row_keys.intern(entries.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
     }

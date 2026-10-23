@@ -1,5 +1,19 @@
 # Performance hills after CT96
 
+Follow-up, 24 October 2026:
+[CT97 and the reuse/scratch changes are qualified](zig-native/CT97_QUALIFICATION.md).
+Seven alternating release pairs reduce fresh game CPU by **32.5%** against CT96;
+median build wall falls from **13.60 to 8.68 s**, with identical Wasm. Inference
+falls 9.93 → 6.23 s under matching instrumentation. The executable index
+saturated at 4,096 records; its separate bounded capacity restores thousands of
+hits. Literal/body edits use 40.7% / 43.1% less CPU and take 7.63 / 6.56 s
+median wall. The 50% edit-CPU and four-second wall targets remain open. The
+three slow laws now execute 37,930 exhaustive scenarios. Their timing target
+remains open. Next, attribute the three large principal-region rebuilds and the
+remaining frontend allocations. Keep exact source/input/replay checks;
+executable index capacity is no longer the observed blocker. The dated analysis
+below preserves the evidence that selected these experiments.
+
 Review of `c5b9ad1`, 23 October 2026. **Start with CT97's effect-row traversal,
 then CT98's retained executable reuse.** For compiler iteration, prioritize
 BT4's allocation-heavy backend sweeps. Ordinary compiler edits already build in

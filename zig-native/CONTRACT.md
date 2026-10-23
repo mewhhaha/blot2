@@ -888,6 +888,14 @@ occurs checks, rollback and cursor-relative resolution. Invalid inference is a
 diagnostic; unsupported features must explicitly decline. Frozen principal
 schemes belong to declarations, instantiated evidence belongs to uses.
 
+Effect-row resolution may retain a followed prefix across appended writes, but
+must recheck its terminal open tail. Prefix row IDs are invalidated by physical
+rollback. Chronological version shortcuts skip only empty-label intermediate
+rows between already selected first successors; each target is a later version
+with the same birth stamp. A suffix rollback or recycled target invalidates the
+shortcut. Saturated epochs disable these caches. Neither cache changes label
+order/multiplicity, cursor selection, occurs checks or independent row identity.
+
 Recursive inference uses exact region-local body edges and heap scheduling.
 Adding a late selected edge may merge components; restart unfinished joint
 solver state before any member becomes visible. Publish a component's closed
@@ -965,6 +973,13 @@ Owned snapshot metering preserves the read-only copy API and returns slices
 freed by its original backing allocator. See
 [semantic allocation ownership](SEMANTIC_ALLOCATION.md).
 
+Row/layout conversion, mapping export and certificate maps may use 512-byte
+stack scratch; scalar replacement uses 2 KiB for temporary analysis. Overflow
+uses the original allocator and remains subject to allocation-failure checks.
+Interned evidence copies its inputs; exported mappings and scalar-replacement
+output always belong to the destination allocator. No returned slice or
+retained allocator points into local scratch.
+
 The shared query tables retain distinct selected, principal, source-description
 and open-residual claims. A completed selected receipt pins its evaluator owner;
 a principal result never includes caller-selected implementations. Local source
@@ -993,6 +1008,11 @@ newest-first relocation order, exact instruction/signature/context comparisons
 and completed transitive lifetime checks. Unsealed or saturated tables decline,
 including the same-position optimizer path. Semantic interface stability never
 certifies executable consumers. See [the qualification](EXECUTABLE_QUERIES.md).
+
+Executable capture indexes have a separate 16,384-record / 8 MiB retained
+capacity budget so moderately sized complete captures can be sealed. The
+generic semantic query default remains 4,096 records / 2 MiB. Owned payload and
+lookup-work limits are unchanged; exceeding any bound still declines reuse.
 
 Same-position optimizer invalidation scans local observations once, then walks
 callee-to-caller edges until every changed dependency has invalidated its

@@ -1,6 +1,67 @@
 const std = @import("std");
 const E = @import("effects.zig");
 
+fn compareRows(cached: *E.Store, oracle: *E.Store, left: E.Id, right: E.Id, at: E.Cursor) !void {
+    const actual = cached.node(try cached.resolve(left, at));
+    const expected = oracle.node(try oracle.resolve(right, at));
+    try std.testing.expectEqualDeep(expected.tail, actual.tail);
+    try std.testing.expectEqual(expected.cursor, actual.cursor);
+    try std.testing.expectEqualSlices(E.Label, oracle.list(expected.labels), cached.list(actual.labels));
+}
+
+fn rowPrefixHistory(allocator: std.mem.Allocator) !void {
+    var cached = try E.Store.init(allocator);
+    defer cached.deinit();
+    var oracle = try E.Store.initWithOptions(allocator, .{ .resolution_cache = false });
+    defer oracle.deinit();
+    var roots: [2][4]E.Id = undefined;
+    const stores = [_]*E.Store{ &cached, &oracle };
+    for (stores, &roots) |store, *set| for (set) |*root| {
+        root.* = try store.fresh();
+    };
+    for (stores, &roots) |store, *set| {
+        set[0] = try store.row(&.{ 7, 7 }, store.node(set[0]).tail);
+        try store.appendVersionAt(store.node(set[0]).tail.variable, set[1], 2);
+    }
+    const marks = [_]E.Mark{ cached.mark(), oracle.mark() };
+    for (1..3) |step| {
+        for (stores, roots) |store, set| {
+            try store.appendVersionAt(store.node(set[step]).tail.variable, set[step + 1], @intCast(2 + step * 3));
+        }
+        for ([_]E.Cursor{ 0, 1, 4, 10 }) |at| for (roots[0], roots[1]) |left, right| {
+            try compareRows(&cached, &oracle, left, right, at);
+        };
+    }
+    for (stores, roots) |store, set| {
+        // Later writes to an earlier variable must not replace its first edge.
+        try store.appendVersionAt(store.node(set[0]).tail.variable, try store.row(&.{99}, .closed), 12);
+        try store.appendVersionAt(store.node(set[3]).tail.variable, try store.row(&.{23}, .closed), 15);
+    }
+    for ([_]E.Cursor{ 0, 3, 12, 16 }) |at| try compareRows(&cached, &oracle, roots[0][0], roots[1][0], at);
+    for (stores, marks, roots) |store, mark_, set| {
+        store.rollback(mark_);
+        // The first edge survives with a shortcut to a discarded slot. Recycle
+        // that slot for an unrelated write which must never replace the path.
+        try store.appendVersionAt(store.node(set[1]).tail.variable, try store.row(&.{41}, .closed), 5);
+        try store.appendVersionAt(store.node(set[3]).tail.variable, try store.row(&.{61}, .closed), 8);
+        try store.appendVersionAt(store.node(set[2]).tail.variable, try store.row(&.{71}, .closed), 12);
+        try store.appendVersionAt(store.node(set[0]).tail.variable, try store.row(&.{81}, .closed), 15);
+    }
+    try compareRows(&cached, &oracle, roots[0][0], roots[1][0], 0);
+    cached.physical_epoch = std.math.maxInt(u64);
+    cached.mutation_epoch = std.math.maxInt(u64);
+    for (stores, marks, roots) |store, mark_, set| {
+        store.rollback(mark_);
+        try store.appendVersionAt(store.node(set[1]).tail.variable, try store.row(&.{53}, .closed), 5);
+    }
+    try compareRows(&cached, &oracle, roots[0][0], roots[1][0], 0);
+}
+
+test "effect row prefixes follow appended tails and revoke on rollback recycled IDs and saturated epochs" {
+    try rowPrefixHistory(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, rowPrefixHistory, .{});
+}
+
 test "effect resolution observes one ordered clock including gaps for type writes" {
     var store = try E.Store.init(std.testing.allocator);
     defer store.deinit();

@@ -14,7 +14,16 @@ pub const Row = struct { labels: List = .{}, tail: Tail = .closed, cursor: Curso
 pub const Error = std.mem.Allocator.Error || error{ EffectMismatch, InfiniteEffect, EffectLimit };
 const none = std.math.maxInt(u32);
 const Variable = struct { first: u32 = none, last: u32 = none };
-pub const Version = struct { variable: u32, replacement: Id, position: Cursor, previous: u32, next: u32 = none };
+pub const Version = struct {
+    variable: u32,
+    replacement: Id,
+    position: Cursor,
+    previous: u32,
+    next: u32 = none,
+    birth: u32 = none,
+    shortcut: u32 = none,
+    shortcut_birth: u32 = none,
+};
 pub const Mark = struct { rows: usize, labels: usize, variables: usize, versions: usize, next_position: Cursor };
 pub const Extraction = struct { remaining: Id, expanded: ?u32 = null };
 
@@ -130,29 +139,58 @@ pub const Store = struct {
         if (position == none or self.versions.items.len == none) return error.EffectLimit;
         const old = self.variables.items[variable];
         const index: u32 = @intCast(self.versions.items.len);
-        try self.versions.append(self.allocator, .{ .variable = variable, .replacement = replacement_id, .position = position, .previous = old.last });
+        try self.versions.append(self.allocator, .{ .variable = variable, .replacement = replacement_id, .position = position, .previous = old.last, .birth = resolution_cache.stamp(self.physical_epoch) orelse none });
         if (old.last == none) self.variables.items[variable].first = index else self.versions.items[old.last].next = index;
         self.variables.items[variable].last = index;
         self.next_position = position + 1;
         resolution_cache.tick(&self.mutation_epoch);
     }
-    fn replacement(self: *const Store, variable: u32, at: Cursor) ?Version {
+    fn replacementIndex(self: *const Store, variable: u32, at: Cursor) ?u32 {
         var index = self.variables.items[variable].first;
         while (index != none) : (index = self.versions.items[index].next) {
             const write = self.versions.items[index];
-            if (write.position >= at) return write;
+            if (write.position >= at) return index;
         }
         return null;
     }
     pub fn replacementAt(self: *const Store, variable: u32, at: Cursor) ?Version {
         return self.replacement(variable, at);
     }
+    fn replacement(self: *const Store, variable: u32, at: Cursor) ?Version {
+        return self.versions.items[self.replacementIndex(variable, at) orelse return null];
+    }
+    // A shortcut skips only empty-label rows between two already selected
+    // writes. Appends cannot change those first successors. A surviving target
+    // also proves the intervening writes survived a suffix rollback; its birth
+    // stamp rejects a recycled slot without clearing every surviving shortcut.
+    fn retainShortcut(self: *Store, from: u32, to: u32) void {
+        std.debug.assert(from < to);
+        self.versions.items[from].shortcut = to;
+        self.versions.items[from].shortcut_birth = self.versions.items[to].birth;
+    }
+    fn shortcut(self: *Store, first: u32) u32 {
+        var current = first;
+        while (true) {
+            const link = self.versions.items[current];
+            if (link.shortcut >= self.versions.items.len or self.versions.items[link.shortcut].birth != link.shortcut_birth) break;
+            std.debug.assert(current < link.shortcut);
+            current = link.shortcut;
+        }
+        if (current != first) self.retainShortcut(first, current);
+        return current;
+    }
     pub fn resolve(self: *Store, root: Id, at: Cursor) Error!Id {
+        if (self.node(root).tail != .variable) return root;
         if (!self.use_resolution_cache or at != 0 or root == 0) return self.resolveUncached(root, at);
-        const mutation = resolution_cache.stamp(self.mutation_epoch) orelse return self.resolveUncached(root, at);
-        if (!self.resolved.activate(mutation, 0)) return self.resolveUncached(root, at);
-        if (self.resolved.get(root)) |result| return result;
-        const result = try self.resolveUncached(root, at);
+        _ = resolution_cache.stamp(self.mutation_epoch) orelse return self.resolveUncached(root, at);
+        const physical = resolution_cache.stamp(self.physical_epoch) orelse return self.resolveUncached(root, at);
+        if (!self.resolved.activate(physical, 0)) return self.resolveUncached(root, at);
+        // Keep a followed prefix across appends, then recheck its terminal tail.
+        // Rollback revokes row headers before their numeric IDs can be recycled.
+        const previous = self.resolved.get(root) orelse root;
+        if (previous != root and self.node(previous).tail != .variable) return previous;
+        const result = try self.resolveUncached(previous, at);
+        if (previous != root and result == previous) return result;
         // An unchanged query must not acquire fresh retained storage.
         if (result == root and root >= self.resolved.high_water) return result;
         try self.resolved.put(self.allocator, root, result);
@@ -171,10 +209,13 @@ pub const Store = struct {
         var single: List = .{};
         var fragments: usize = 0;
         var changed = false;
+        const cache_versions = self.use_resolution_cache and resolution_cache.stamp(self.physical_epoch) != null and resolution_cache.stamp(self.mutation_epoch) != null;
+        var prefix: u32 = none;
         while (current.tail == .variable) {
             position = @max(position, current.cursor);
-            const write = self.replacement(current.tail.variable, position) orelse break;
+            const first = self.replacementIndex(current.tail.variable, position) orelse break;
             if (current.labels.len != 0) {
+                prefix = none;
                 if (fragments == 0) {
                     single = current.labels;
                 } else {
@@ -183,6 +224,11 @@ pub const Store = struct {
                 }
                 fragments += 1;
             }
+            const index = if (cache_versions) self.shortcut(first) else first;
+            if (cache_versions) {
+                if (prefix != none) self.retainShortcut(prefix, index) else prefix = first;
+            }
+            const write = self.versions.items[index];
             current = self.node(write.replacement);
             position = write.position + 1;
             changed = true;

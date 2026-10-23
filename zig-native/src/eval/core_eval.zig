@@ -6778,13 +6778,16 @@ const ClosureRegion = struct {
         }
     }
     fn exportMappings(self: *ClosureRegion, scope: u32) RegionError![]type_evidence.Mapping {
+        var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
+        const temporary = scratch.allocator();
         var mappings: std.ArrayList(type_evidence.Mapping) = .empty;
-        errdefer mappings.deinit(self.session.allocator);
+        defer mappings.deinit(temporary);
         for (self.scratch.variables.items) |variable| if (variable.source.scope == scope) {
             const actual = try self.project(variable.region);
-            if (actual != 0) try mappings.append(self.session.allocator, .{ .variable = variable.source.ty, .evidence = actual });
+            if (actual != 0) try mappings.append(temporary, .{ .variable = variable.source.ty, .evidence = actual });
         };
-        return mappings.toOwnedSlice(self.session.allocator);
+        return self.session.allocator.dupe(type_evidence.Mapping, mappings.items);
     }
     fn seedRows(self: *ClosureRegion, scope: u32, mappings: []const type_evidence.RowMapping) RegionError!void {
         for (mappings) |mapping| try self.solver.unifyEffects(try self.importRowVariable(scope, mapping.variable), try self.importEvidenceRow(mapping.evidence, 0));
@@ -6793,11 +6796,14 @@ const ClosureRegion = struct {
     /// to become empty. Expected/captured rows are solved before this fallback;
     /// their existing labels and closed facts remain authoritative.
     fn closeCertificates(self: *ClosureRegion) RegionError!bool {
+        var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
+        const temporary = scratch.allocator();
         var certified: std.AutoHashMapUnmanaged(RowVariable, void) = .empty;
-        defer certified.deinit(self.session.allocator);
+        defer certified.deinit(temporary);
         for (self.scratch.sources.items, 0..) |source, scope| {
             for (self.session.units[source.owner].types.list(source.closed_rows)) |variable|
-                try certified.put(self.session.allocator, .{ .scope = @intCast(scope), .variable = variable }, {});
+                try certified.put(temporary, .{ .scope = @intCast(scope), .variable = variable }, {});
         }
         if (certified.count() == 0) return false;
         // A reusable pure producer can be admitted under an unresolved caller
@@ -6805,13 +6811,13 @@ const ClosureRegion = struct {
         // Physical code-shape holes have no source identity and impose no such
         // semantic restriction, so their residuals may receive the certificate.
         var protected: std.AutoHashMapUnmanaged(u32, void) = .empty;
-        defer protected.deinit(self.session.allocator);
+        defer protected.deinit(temporary);
         var imported = self.scratch.row_variables.iterator();
         while (imported.next()) |entry| {
             if (certified.contains(entry.key_ptr.*)) continue;
             const resolved = try self.solver.resolveEffects(entry.value_ptr.*, 0);
             const tail = self.solver.row(resolved).tail;
-            if (tail == .variable) try protected.put(self.session.allocator, tail.variable, {});
+            if (tail == .variable) try protected.put(temporary, tail.variable, {});
         }
         var changed = false;
         for (self.scratch.sources.items, 0..) |source, scope| {
@@ -6829,10 +6835,13 @@ const ClosureRegion = struct {
         return changed;
     }
     fn exportSolved(self: *ClosureRegion, scope: u32) RegionError!SolvedEvidence {
+        var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
+        const temporary = scratch.allocator();
         const mappings = try self.exportMappings(scope);
         errdefer self.session.allocator.free(mappings);
         var rows: std.ArrayList(type_evidence.RowMapping) = .empty;
-        errdefer rows.deinit(self.session.allocator);
+        defer rows.deinit(temporary);
         var variables = self.scratch.row_variables.iterator();
         while (variables.next()) |entry| {
             if (entry.key_ptr.scope != scope) continue;
@@ -6842,7 +6851,7 @@ const ClosureRegion = struct {
                 error.UnresolvedType => continue,
                 else => return err,
             };
-            try rows.append(self.session.allocator, .{ .variable = entry.key_ptr.variable, .evidence = actual });
+            try rows.append(temporary, .{ .variable = entry.key_ptr.variable, .evidence = actual });
         }
         std.mem.sort(type_evidence.RowMapping, rows.items, {}, struct {
             fn less(_: void, left: type_evidence.RowMapping, right: type_evidence.RowMapping) bool {
@@ -6851,7 +6860,7 @@ const ClosureRegion = struct {
         }.less);
         const selected = try self.session.allocator.dupe(core.BindingRef, self.scratch.selected_targets.items);
         errdefer self.session.allocator.free(selected);
-        return .{ .types = mappings, .rows = try rows.toOwnedSlice(self.session.allocator), .selected = selected };
+        return .{ .types = mappings, .rows = try self.session.allocator.dupe(type_evidence.RowMapping, rows.items), .selected = selected };
     }
     fn selectedTarget(self: *ClosureRegion, target_: Target) RegionError!void {
         if (!self.retain_selected) return;

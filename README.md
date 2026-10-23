@@ -65,19 +65,21 @@ incomplete check as passed. See
 existing positive, rejection/recovery and ownership regressions plus guests.
 
 The [compile measurements](COMPILE_MEASUREMENTS.md) separate application compile
-time from building and checking the compiler. The
-[CT96 optimization](zig-native/CT96_QUALIFICATION.md) cuts fresh gdev game CPU by
-28.6%: paired median build wall time falls from 17.24 s to 12.16 s, with identical
-Wasm. Compiler source edits take roughly 3.4 s, and the warm `type-effects`
-development cycle takes 4.64 s on the measured host. Use stable writable Zig
-caches; the measured `-fincremental` mode does not improve real edits and makes
-cache hits slower. Run `deno task bench:compiler-build --out build/bench/build-next`
-for isolated build/edit/revert measurements. See the
-[compile-time hills](COMPILE_HILLS.md) and [build hills](BUILD_HILLS.md) for the
-next experiments, acceptance targets and reproduction commands.
-The [post-CT96 review](PERFORMANCE_REVIEW.md) prioritizes inlined effect-row
-traversal, retained executable admission and allocation-heavy exhaustive tests,
-with new caller attribution and 33 completed diagnostic fault sweeps.
+cost from building and checking the compiler. The
+[latest optimization](zig-native/CT97_QUALIFICATION.md) cuts fresh gdev game CPU
+by 32.5% against CT96 (13.60 → 8.68 s median build wall), with identical Wasm.
+Measured literal/body edit wall medians are 7.63 / 6.56 s after restoring
+executable reuse. The affected development checks take 16.10 s for static
+sharing and 3.94 s for types/effects; complete native qualification takes 584.26
+s. These are individual check cycles, not p95 estimates. Ordinary compiler edits
+previously measured about 3.4 s. Keep stable writable Zig caches; the measured
+incremental mode did not improve real edits. Use
+`deno task bench:compiler-build --out
+build/bench/build-next` for isolated
+build/edit/revert measurements. See the [compile hills](COMPILE_HILLS.md),
+[build hills](BUILD_HILLS.md) and [performance review](PERFORMANCE_REVIEW.md)
+for remaining targets. The full gate and seven-pair measurements are recorded in
+the qualification link above.
 
 For a smaller development check, run `deno task test:compiler:dev`. It checks
 the project protocol, client and inference-budget recovery against the

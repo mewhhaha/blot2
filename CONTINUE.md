@@ -1,5 +1,24 @@
 # Continue here
 
+CT97/CT98/BT4 checkpoint, 24 October 2026: Seven alternating release pairs
+reduce fresh game CPU by **32.5%** against CT96; median build wall falls from
+**13.60 to 8.68 s**, with identical Wasm. Matching instrumented inference falls
+9.93 → 6.23 s, meeting CT97. Executable capture capacity restores thousands of
+retained function hits. Literal/body edits use 40.7% / 43.1% less CPU and take
+7.63 / 6.56 s median wall. The 50% edit-CPU and four-second wall targets remain
+open. Temporary backend scratch reduces the three slow laws from 44,074 to
+37,930 exhaustive scenario runs; BT4’s halved-law/whole-gate targets remain
+open. The isolated full gate passes 2,540 exhaustive native laws, 1,648 guest
+checks, 48 smoke checks and 57 tooling checks, with zero Zig lint findings.
+Native execution takes 584.26 s; the complete gate takes 634.83 s. These gate
+intervals are observations, not paired speedup claims. The
+[qualification record](zig-native/CT97_QUALIFICATION.md) pins the source,
+release, comparisons and raw evidence. Next, attribute the three large
+principal-region rebuilds and the remaining frontend allocations. Keep exact
+source/input/replay checks; executable index capacity is no longer the observed
+blocker. The separate text-capability changes remain preserved outside this
+candidate; this work does not replace the locally installed compiler.
+
 Post-CT96 review, 23 October 2026: `c5b9ad1` commits the measurement tools and
 qualified spawn optimization. The [new performance review](PERFORMANCE_REVIEW.md)
 selects CT97's row traversal first: the 27.4% hotspot is already inlined and

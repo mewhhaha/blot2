@@ -594,6 +594,9 @@ pub const Store = struct {
         }
     }
     fn fromSolverRow(self: *Store, source: *types.Store, row: types.Effects.Id, depth: usize, budget: *usize) Error!u32 {
+        var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+        const temporary = scratch.allocator();
         if (depth >= 1024 or budget.* == 0) return error.LayoutLimit;
         budget.* -= 1;
         const root = source.resolveEffects(row, 0) catch |err| return solverError(err);
@@ -605,18 +608,18 @@ pub const Store = struct {
             if (self.node(formal).tag != .opened or self.node(formal).c != 1) return error.TypeMismatch;
         }
         var labels: std.ArrayList(u32) = .empty;
-        defer labels.deinit(self.allocator);
+        defer labels.deinit(temporary);
         var arguments: std.ArrayList(u32) = .empty;
-        defer arguments.deinit(self.allocator);
-        const source_labels = try self.allocator.dupe(types.Effects.Label, source.rowLabels(root));
-        defer self.allocator.free(source_labels);
+        defer arguments.deinit(temporary);
+        const source_labels = try temporary.dupe(types.Effects.Label, source.rowLabels(root));
+        defer temporary.free(source_labels);
         for (source_labels) |label| {
             arguments.clearRetainingCapacity();
-            const source_arguments = try self.allocator.dupe(types.Id, source.operationArguments(label));
-            defer self.allocator.free(source_arguments);
+            const source_arguments = try temporary.dupe(types.Id, source.operationArguments(label));
+            defer temporary.free(source_arguments);
             const identity = source.operation(label).identity;
-            for (source_arguments) |argument| try arguments.append(self.allocator, try self.fromSolverDepth(source, argument, depth + 1, budget));
-            try labels.append(self.allocator, self.effects.internOperationInstance(identity, arguments.items, types.selectionAtom(source, source.operation(label).instance)) catch |err| return effectError(err));
+            for (source_arguments) |argument| try arguments.append(temporary, try self.fromSolverDepth(source, argument, depth + 1, budget));
+            try labels.append(temporary, self.effects.internOperationInstance(identity, arguments.items, types.selectionAtom(source, source.operation(label).instance)) catch |err| return effectError(err));
         }
         return self.effects.internRowWithFormal(labels.items, formal) catch |err| return effectError(err);
     }
@@ -934,17 +937,20 @@ pub const Store = struct {
         return self.fromEvidenceRow(view, row, 0, &budget);
     }
     fn toEvidenceRow(self: *const Store, target: *evidence.Store, row: evidence.Effects.Id, depth: usize, budget: *usize, bound_arity: u32) evidence.Error!evidence.Effects.Id {
+        var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, target.allocator);
+        const temporary = scratch.allocator();
         if (depth >= 1024 or budget.* == 0) return error.EvidenceLimit;
         if (row == unknown_row) return error.UnresolvedType;
         budget.* -= 1;
         var labels: std.ArrayList(u32) = .empty;
-        defer labels.deinit(target.allocator);
+        defer labels.deinit(temporary);
         var arguments: std.ArrayList(u32) = .empty;
-        defer arguments.deinit(target.allocator);
+        defer arguments.deinit(temporary);
         for (self.effects.view().rowLabels(row)) |label| {
             arguments.clearRetainingCapacity();
-            for (self.effects.view().operationArguments(label)) |argument| try arguments.append(target.allocator, try self.toEvidenceDepth(target, argument, depth + 1, budget, bound_arity));
-            try labels.append(target.allocator, try target.effects.internOperationInstance(self.effects.view().operation(label).identity, arguments.items, self.effects.view().operation(label).instance));
+            for (self.effects.view().operationArguments(label)) |argument| try arguments.append(temporary, try self.toEvidenceDepth(target, argument, depth + 1, budget, bound_arity));
+            try labels.append(temporary, try target.effects.internOperationInstance(self.effects.view().operation(label).identity, arguments.items, self.effects.view().operation(label).instance));
         }
         const old_formal = self.effects.rows.items[row].formal;
         var formal: evidence.Id = 0;
@@ -952,18 +958,21 @@ pub const Store = struct {
         return target.effects.internRowWithFormal(labels.items, formal);
     }
     fn fromEvidenceRow(self: *Store, view: evidence.View, row: evidence.Effects.Id, depth: usize, budget: *usize) Error!evidence.Effects.Id {
+        var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+        const temporary = scratch.allocator();
         if (row >= view.effects.rows.len) return error.UnresolvedType;
         if (depth >= 1024 or budget.* == 0) return error.LayoutLimit;
         budget.* -= 1;
         var labels: std.ArrayList(u32) = .empty;
-        defer labels.deinit(self.allocator);
+        defer labels.deinit(temporary);
         var arguments: std.ArrayList(u32) = .empty;
-        defer arguments.deinit(self.allocator);
+        defer arguments.deinit(temporary);
         for (view.effects.rowLabels(row)) |label| {
             arguments.clearRetainingCapacity();
-            for (view.effects.operationArguments(label)) |argument| try arguments.append(self.allocator, try self.fromEvidenceDepth(view, argument, depth + 1, budget));
+            for (view.effects.operationArguments(label)) |argument| try arguments.append(temporary, try self.fromEvidenceDepth(view, argument, depth + 1, budget));
             const mapped = self.effects.internOperationInstance(view.effects.operation(label).identity, arguments.items, view.effects.operation(label).instance) catch |err| return effectError(err);
-            try labels.append(self.allocator, mapped);
+            try labels.append(temporary, mapped);
         }
         const old_formal = view.effects.rows[row].formal;
         var formal: Id = 0;
@@ -971,6 +980,9 @@ pub const Store = struct {
         return self.effects.internRowWithFormal(labels.items, formal) catch |err| return effectError(err);
     }
     fn fromTypeRow(self: *Store, module: *const core.Module, row: types.Effects.Id, mappings: []const Mapping, rows: []const RowMapping, depth: usize, allow_erased: bool) Error!evidence.Effects.Id {
+        var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+        const temporary = scratch.allocator();
         if (depth >= 1024) return error.LayoutLimit;
         const tail = module.types.row(row).tail;
         var suffix: evidence.Effects.Id = 0;
@@ -1007,16 +1019,16 @@ pub const Store = struct {
             },
         }
         var labels: std.ArrayList(u32) = .empty;
-        defer labels.deinit(self.allocator);
+        defer labels.deinit(temporary);
         var arguments: std.ArrayList(u32) = .empty;
-        defer arguments.deinit(self.allocator);
+        defer arguments.deinit(temporary);
         for (module.types.rowLabels(row)) |label| {
             arguments.clearRetainingCapacity();
-            for (module.types.operationArguments(label)) |argument| try arguments.append(self.allocator, try self.fromTypeDepth(module, argument, mappings, rows, depth + 1, allow_erased));
+            for (module.types.operationArguments(label)) |argument| try arguments.append(temporary, try self.fromTypeDepth(module, argument, mappings, rows, depth + 1, allow_erased));
             const mapped = self.effects.internOperationInstance(module.types.operation(label).identity, arguments.items, types.selectionAtom(module.types, mappedInstance(module.types.operation(label).instance, mappings))) catch |err| return effectError(err);
-            try labels.append(self.allocator, mapped);
+            try labels.append(temporary, mapped);
         }
-        try labels.appendSlice(self.allocator, self.effects.view().rowLabels(suffix));
+        try labels.appendSlice(temporary, self.effects.view().rowLabels(suffix));
         if (suffix != 0) formal = self.effects.rows.items[suffix].formal;
         return self.effects.internRowWithFormal(labels.items, formal) catch |err| return effectError(err);
     }
@@ -1097,6 +1109,13 @@ fn effectLayoutScenario(allocator: Allocator) !void {
     try std.testing.expectEqual(layouts.node(layout).c, layouts.node(layouts.node(layout).a).c);
     try std.testing.expect(layout != try layouts.intern(.function, layouts.node(layout).a, types.u32_type, &.{}));
     try std.testing.expectEqual(function, try layouts.toEvidence(&semantic, layout));
+    // Exceed local row-conversion scratch, then use the retained result after
+    // that scratch is gone. Repeated labels keep order and multiplicity.
+    const wide_labels: [129]u32 = @splat(operation);
+    const wide_row = try semantic.effects.internRow(&wide_labels);
+    const wide_layout = try layouts.rowFromEvidence(semantic.view(), wide_row);
+    try std.testing.expectEqual(@as(usize, wide_labels.len), layouts.effects.view().rowLabels(wide_layout).len);
+    try std.testing.expectEqual(wide_row, try layouts.rowToEvidence(&semantic, wide_layout));
     const mapped_operation = layouts.effects.view().rowLabels(layouts.node(layout).c)[0];
     const mapped_argument = layouts.effects.view().operationArguments(mapped_operation)[0];
     try std.testing.expectEqualSlices(u32, &.{types.f32_type}, layouts.children(mapped_argument));

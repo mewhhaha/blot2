@@ -1013,22 +1013,25 @@ fn constantReferenceLocals(a: A, proof: ReferenceProof, module: *const w.Module,
     return zeros;
 }
 fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []const w.ValueType, instructions: []const w.Instruction, owning: bool, children: bool) !?Output {
-    const events = try a.alloc(Event, instructions.len);
-    defer a.free(events);
+    var scratch_buffer: [2048]u8 align(@alignOf(usize)) = undefined;
+    var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, a);
+    const temporary = scratch.allocator();
+    const events = try temporary.alloc(Event, instructions.len);
+    defer temporary.free(events);
     @memset(events, .{});
     const local_count = std.math.add(usize, function.parameters.len, locals.len) catch return error.OutOfMemory;
-    const constants = try a.alloc(?u32, local_count);
-    defer a.free(constants);
+    const constants = try temporary.alloc(?u32, local_count);
+    defer temporary.free(constants);
     @memset(constants, null);
-    const constant_scopes = try a.alloc(?usize, constants.len);
-    defer a.free(constant_scopes);
+    const constant_scopes = try temporary.alloc(?usize, constants.len);
+    defer temporary.free(constant_scopes);
     @memset(constant_scopes, null);
-    const defined_scopes = try a.alloc(?usize, constants.len);
-    defer a.free(defined_scopes);
+    const defined_scopes = try temporary.alloc(?usize, constants.len);
+    defer temporary.free(defined_scopes);
     @memset(defined_scopes, null);
     @memset(defined_scopes[0..function.parameters.len], 0);
-    const writes = try a.alloc(bool, constants.len);
-    defer a.free(writes);
+    const writes = try temporary.alloc(bool, constants.len);
+    defer temporary.free(writes);
     @memset(writes, false);
     for (instructions, 0..) |inst, i| if (inst.op == .local_set or inst.op == .local_tee) {
         const value: ?u32 = if (i != 0 and instructions[i - 1].op == .i32_const and !instructions[i - 1].table_reference and ir.staticConstructor(instructions, i - 1) == null) instructions[i - 1].operand else null;
@@ -1036,26 +1039,26 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
         writes[inst.operand] = true;
     };
     const zeros = blk: {
-        if (children) break :blk try constantReferenceLocals(a, .zero, module, function.parameters.len, local_count, instructions);
-        const disabled = try a.alloc(bool, local_count);
+        if (children) break :blk try constantReferenceLocals(temporary, .zero, module, function.parameters.len, local_count, instructions);
+        const disabled = try temporary.alloc(bool, local_count);
         @memset(disabled, false);
         break :blk disabled;
     };
-    defer a.free(zeros);
+    defer temporary.free(zeros);
     for (zeros, 0..) |zero, id| if (zero) {
         constants[id] = 0;
         constant_scopes[id] = 0;
     };
-    var analysis: Analysis = .{ .a = a, .events = events, .constants = constants, .constant_scopes = constant_scopes, .defined_scopes = defined_scopes, .zero_locals = zeros, .locals = locals, .owning = owning, .children = children };
+    var analysis: Analysis = .{ .a = temporary, .events = events, .constants = constants, .constant_scopes = constant_scopes, .defined_scopes = defined_scopes, .zero_locals = zeros, .locals = locals, .owning = owning, .children = children };
     for (instructions) |inst| if (inst.op == .v128_load or inst.op == .v128_store) {
         analysis.vectors = true;
         break;
     };
-    defer analysis.nodes.deinit(a);
-    defer analysis.boxes.deinit(a);
-    defer analysis.unboxes.deinit(a);
-    defer analysis.stack.deinit(a);
-    defer analysis.controls.deinit(a);
+    defer analysis.nodes.deinit(temporary);
+    defer analysis.boxes.deinit(temporary);
+    defer analysis.unboxes.deinit(temporary);
+    defer analysis.stack.deinit(temporary);
+    defer analysis.controls.deinit(temporary);
     _ = try analysis.add(true, 0);
     for (0..local_count) |i| _ = try analysis.add(i < function.parameters.len, 0);
     try analysis.scan(module, function, instructions);
@@ -1115,8 +1118,8 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
             try emit(&out, a, .ownership, @bitCast(ir.Ownership{ .kind = .scope, .chunk = 3, .roles = @intCast(slot) }));
         }
     }
-    const zero_slots = try a.alloc(bool, local_count);
-    defer a.free(zero_slots);
+    const zero_slots = try temporary.alloc(bool, local_count);
+    defer temporary.free(zero_slots);
     @memset(zero_slots, false);
     for (instructions) |inst| if (inst.op == .ownership) {
         const fact: ir.Ownership = @bitCast(inst.operand);

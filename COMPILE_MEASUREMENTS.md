@@ -1,5 +1,12 @@
 # Compile and compiler-build measurements
 
+Latest follow-up:
+[CT97, executable reuse and temporary scratch](zig-native/CT97_QUALIFICATION.md).
+Seven alternating release pairs reduce fresh game CPU by **32.5%** against CT96;
+median build wall falls from **13.60 to 8.68 s**, with identical Wasm. The
+original baseline and CT96 measurements below remain historical references; use
+the latest qualification for current comparisons and remaining targets.
+
 Follow-up: [CT96 is qualified](zig-native/CT96_QUALIFICATION.md). Computing
 spawn contract presence once per compilation reduces fresh game CPU by 28.6% in
 seven alternating release pairs (17.24 → 12.16 s median build wall), with

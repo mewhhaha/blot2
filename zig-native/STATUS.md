@@ -1,5 +1,18 @@
 # Zig compiler status
 
+## Row traversal, retained reuse and scratch, 24 October 2026
+
+Seven alternating release pairs reduce fresh game CPU by **32.5%** against
+CT96; median build wall falls from **13.60 to 8.68 s**, with identical Wasm.
+Matching phase measurements reduce inference 9.93 → 6.23 s. Literal/body edits
+use 40.7% / 43.1% less CPU and take 7.63 / 6.56 s median wall. The 50%
+edit-CPU and four-second wall targets remain open. Backend temporary scratch
+cuts 33 exhaustive sweeps from 44,074 to 37,930 runs. The isolated full gate
+passes 2,540 exhaustive native laws, 1,648 guest checks, 48 smoke checks and
+57 tooling checks, with zero Zig lint findings. See
+[qualification](CT97_QUALIFICATION.md). CT97 is complete; CT98 and BT4 retain
+their remaining timing targets. The separate text repair and installed tools
+are outside this candidate.
 ## CT96 spawn preparation, 23 October 2026
 
 The [qualified optimization](CT96_QUALIFICATION.md) scans for spawn contracts once

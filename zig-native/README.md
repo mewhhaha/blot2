@@ -57,11 +57,13 @@ the measured edit cycle. [Build hills](../BUILD_HILLS.md) track the remaining
 iteration and qualification costs separately from
 [application compile hills](../COMPILE_HILLS.md).
 
-[CT96](CT96_QUALIFICATION.md) prepares spawn capability data once per compilation.
-It reduces fresh game CPU by 28.6% and devtools CPU by 29.0% in seven alternating
-release pairs, preserving exact Wasm and passing the full isolated compiler gate.
-The [next-hill review](../PERFORMANCE_REVIEW.md) traces the remaining row-resolution
-hotspot and retained-admission filters, and profiles the slowest exhaustive laws.
+[CT97 and the reuse/scratch follow-up](CT97_QUALIFICATION.md) reduce fresh game
+CPU by 32.5% against [CT96](CT96_QUALIFICATION.md), with identical Wasm in seven
+alternating release pairs. Game median build wall is 8.68 s; literal/body
+edits take 7.63 / 6.56 s. Complete native qualification takes 584.26 s;
+affected static-sharing and type-effects checks take 16.10 / 3.94 s.
+The [review](../PERFORMANCE_REVIEW.md) retains the remaining principal-inference,
+frontend allocation and exhaustive-test targets.
 
 `blotc build ENTRY OUTPUT.wasm --prelude std/prelude.blot --std-root std`
 compiles a project. `dependencies ENTRY OUTPUT.blotdep` produces reusable typed

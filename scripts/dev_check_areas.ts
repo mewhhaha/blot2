@@ -59,6 +59,9 @@ export const devCheckAreas = {
     description:
       "Static aggregate sharing, retained replay, admission and fault-policy laws.",
     native: [
+      "backend.layout.test.layout cache identity and semantic conversion preserve exact closed effect rows",
+      "backend.layout.test.solved representation projection owns partial shapes without certifying open effects",
+      "backend.wasm_sroa.test.scalar replacement owns scratch and output through every failed allocation",
       "backend.aggregate_constant_tests.test.retained callers replay aggregate constants with fresh-identical data through allocation failures",
       "backend.aggregate_constant_tests.test.aggregate constants with changed values aliases or nominal payloads rebuild their callers",
       "backend.aggregate_constant_tests.test.admission skips every aggregate child range of one caller and keeps the records between them",
@@ -129,6 +132,7 @@ export const devCheckAreas = {
       "check.types_tests.test.selected identity terms preserve alias edges and reject independent roots transactionally through OOM",
       "check.types_tests.test.owned higher rank row binders retain alpha scope substitution and independent solving through OOM",
       "check.effect_unification_tests.test.row views retain source order and multiplicity through wide permutations failures and recovery",
+      "check.effects_tests.test.effect row prefixes follow appended tails and revoke on rollback recycled IDs and saturated epochs",
       "check.check_contract_tests.test.ordinary effect rows preserve associated work for actual projections",
       "check.check_contract_tests.test.associated exhaustion reports its actual remaining work allowance",
       "check.check_contract_tests.test.configured associated work can exceed the legacy million step cap",

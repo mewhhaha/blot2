@@ -13,7 +13,12 @@ pub const Capture = struct {
     emission: emitter.Recorder,
     cached_units: usize = 0,
     optimized: ?@import("../backend/optimized_bodies.zig").Capture = null,
-    executable_queries: @import("executable_query.zig").FragmentTable = .{},
+    // This index must cover the whole executable capture before reuse is
+    // enabled. Its record budget is separate from optional semantic queries:
+    // a medium project can emit more than their default 4,096 fragments.
+    executable_queries: @import("executable_query.zig").FragmentTable = .{
+        .limits = .{ .records = 16 * 1024, .retained_capacity = 8 * 1024 * 1024 },
+    },
     executable_queries_complete: bool = false,
 
     /// Called only after owned pools, sealed emission and complete job/function

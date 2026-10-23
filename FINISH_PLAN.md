@@ -8,14 +8,22 @@ execution plan; no implementation or qualification is claimed by its creation.
 attribution before choosing an implementation and keeps the nested-layout
 comparison separate from allocation-free contract research.
 
-## Execution checkpoint, 23 October 2026
+## Execution checkpoint, 24 October 2026
+
+Seven alternating release pairs reduce fresh game CPU by **32.5%** against CT96;
+median build wall falls from **13.60 to 8.68 s**, with identical Wasm.
+Literal/body edits use 40.7% / 43.1% less CPU and take 7.63 / 6.56 s median
+wall. The 50% edit-CPU and four-second wall targets remain open. The
+[new qualification](zig-native/CT97_QUALIFICATION.md) closes CT97 and records
+restored executable reuse and fewer real backend allocations. CT98, BT4 and the
+broader completion plan remain open; follow the updated hill tables below.
 
 The [CT96 optimization](zig-native/CT96_QUALIFICATION.md) removes repeated
 whole-program spawn-contract scans during emission. Seven alternating release
 pairs show 28.6% less game CPU and 29.0% less devtools CPU with identical Wasm.
 The isolated compiler passes full qualification; the remaining inference,
-retained-reuse and absolute performance targets below stay open.
-The [post-CT96 review](PERFORMANCE_REVIEW.md) narrows CT97 to repeated row
+retained-reuse and absolute performance targets below stay open. The
+[post-CT96 review](PERFORMANCE_REVIEW.md) narrows CT97 to repeated row
 traversal, CT98 to executable-admission diagnostics and BT4 to allocations in
 the slow backend sweeps. It adds evidence, without closing those hills.
 
@@ -23,8 +31,8 @@ The baseline [compile/build measurements](COMPILE_MEASUREMENTS.md) established
 the remaining performance work against compiler `63c931f`. Follow
 [CT95–CT101](COMPILE_HILLS.md) for application compilation and
 [BT1–BT5](BUILD_HILLS.md) for compiler iteration. CT96 addressed the repeated
-spawn-capability scan; the earlier task-086 constant-work
-decision remains separate because these clocks include nested preparation.
+spawn-capability scan; the earlier task-086 constant-work decision remains
+separate because these clocks include nested preparation.
 
 The subsequent
 [associated-work repair](zig-native/ASSOCIATED_WORK_QUALIFICATION.md) restores
