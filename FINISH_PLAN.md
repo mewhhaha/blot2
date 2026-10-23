@@ -18,6 +18,12 @@ measured compiler tradeoffs and rejected broad-inlining variants. Milestones 2
 and 3 still have the explicit remaining iterator and performance requirements
 below; issue 25's later language/runtime milestones are not complete.
 
+Published commits: Blot `4091cb2` closes issue 26 after complete qualification.
+Pen `b2f06cf` reuses its validated module cache during scene discovery: warm
+export falls from 3.440 to 0.169 seconds and 2,471 to 105 MiB maximum RSS, with
+complete bundle and cache-recovery equality. Issue 27's later-edit,
+bounded-session and remaining compiler targets are still open.
+
 ## Scope and current state
 
 The outcome is one integrated, qualified main branch covering the remaining

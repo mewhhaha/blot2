@@ -16,11 +16,20 @@ measurements, limitations and rejected experiments. The original dirty
 `/workspace/blot2` checkout remains preserved; integration is in
 `/workspace/.numeric-tuning`.
 
-Pen cache bounds, artifact validation and profiling are pushed in `d8e0a2f` and
-`67a4682`. The current startup measurement is separate from the completed
-compiler qualification. Issue #26's implementation and evidence are complete;
-#25 and #27 and the remaining task requirements stay open. Continue with later
-edit/constant attribution and the remaining milestones in the completion plan.
+Pen cache bounds, artifact validation and profiling are pushed in `d8e0a2f`,
+`67a4682` and `1b459b7`. All 24 whole-application startup checks pass. The large
+headless peak belongs to Pen (about 2.5 GiB), with the compiler child below 320
+MiB in this capture. Pen `b2f06cf` fixes scene discovery bypassing the validated
+module cache: warm export falls from 3.440 to 0.169 seconds and from 2,471 to
+105 MiB maximum RSS. All 341 files match across twelve exports; corrupted and
+unavailable cache recovery preserve the same output. See
+[Pen's measurements](https://github.com/mewhhaha/pen/blob/b2f06cf201cbc4dd1533b2cdb0477b2571b6386f/docs/compile-memory.md).
+
+Issue #26 is closed after the verified `4091cb2` main push. Issues #25 and #27
+and the remaining task requirements stay open. The next measurement runs seven
+paired retained sessions with four successive literal edits, alternating
+plain/profiled modes, before attributing unaffected-constant CPU for task 086.
+Continue with that gate and the remaining milestones in the completion plan.
 
 ## Issue #25: minimal task/channel/control surface (22 October 2026)
 
