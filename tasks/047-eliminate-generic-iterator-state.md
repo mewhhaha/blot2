@@ -69,6 +69,73 @@ development and the scenarios below.
 
 ## Completion evidence
 
+- The combined working-tree implementation exposes evaluated named fold calls
+  and fixes static scalar List seed ownership metadata. Optimized named
+  range/map/filter/take folds allocate zero; Window folding still makes 40,954
+  requests at 4,096 inputs. The all-changes-off causal byte control passes.
+  Repaired private receipt fixtures retain their proof and allocation-failure
+  assertions, and forced LLVM execution passes all 2,504 native laws with zero
+  skips, failures, leaks or logged errors. All 37 harness checks pass. A
+  complete guest scan finds four canonical-constructor regressions and one
+  missing selected-query fixture. A bounded constructor-capture fallback and the
+  repaired fixture pass a new native OOM/replay law and twelve executed guest
+  groups, including the positive zero-allocation folds. Both analyzers pass.
+  LLVM guest preflight passes all 1,588 checks and forced execution passes all
+  2,505 native laws, but the full guest phase stops on a client shutdown race.
+  The deterministic process regression and 88 other focused checks pass after
+  the repair. The complete forced LLVM gate passes 2,505 native laws, 1,589
+  guest/client checks and 37 harness checks, with zero native skips, failures,
+  leaks or logged errors. Compiler cost and final combined all-width
+  confirmation remain open. See the
+  [evaluated-call and seed record](../zig-native/ITERATOR_STATE.md#evaluated-fold-calls-and-static-scalar-seeds-focused-qualification).
+- The preselected fifteen-pair compiler CPU comparison fails at paired median
+  1.059034 against the 1.05 limit; the seven-pair identity control passes. The
+  failed result remains preserved. Diagnostic instruction/allocation ratios
+  1.000737/1.001240 do not waive that limit. P1's closed-row cache passes three
+  focused native/OOM controls and the LLVM payoff screen: 3.90% fewer simulated
+  instructions, identical game Wasm and eleven work counters, requested bytes
+  +0.0029%, and fifteen-pair CPU median 0.914 against current 047. Its measured
+  `Store` growth is 128 bytes. Its complete guest preflight passes 1,588 checks
+  and fails one unchanged allocation budget by 508 bytes. The smaller eight-entry
+  version adds 64 bytes and passes the focused native/OOM
+  controls and LLVM build. Its guest preflight also passes 1,588 checks and
+  fails the same budget, now by 1,488 bytes.
+  Exact allocation tracing now attributes the extra bytes to region-pool growth.
+  A model reproduces all three measured request sequences; the four-entry
+  successor adds 32 bytes and passes the focused native/OOM and size controls.
+  Both analyzers and all 1,589 LLVM guests pass for that successor. N=64 requests
+  8,497,291 bytes, exactly the model's predicted 3,060 bytes over the control
+  and below the unchanged 8,505,963 budget. Its instruction screen passes with
+  3.77% fewer simulated instructions, identical game Wasm and eleven work counters,
+  and requested build bytes +0.000715%. Its complete forced LLVM gate passes
+  2,506 native laws, 1,589 guests and 37 harness checks, with zero skips, failures,
+  leaks or logged errors. Guest files use concurrency one after a preserved
+  four-file LSP deadline failure; the 250 ms deadline and assertions are unchanged.
+  The subsequent 74-sample retained-output control fails with 16 within-binary
+  game edit/revert byte mismatches, identically before and after P1. A private
+  control disabling only evaluated named calls restores exact last-qualified
+  bytes in seven phases. Tracing proves replay omits the serializer's shared
+  value/layout entry. The repair keeps direct static materializers fresh while
+  retaining ordinary constant replay and scalar evaluated-call reuse. Its public
+  Array repro is red before and green after; two native/OOM/source-immutability
+  laws and three guest checks pass. Both analyzers report zero findings; the
+  complete LLVM gate finishes with 2,507 native passes and one failure in the
+  existing positive static-closure reuse law, with zero skips, leaks or logged
+  errors. The conservative fallback is unqualified; preserve the law and review
+  a precise repair. The gate stops before guests; both builds and 37 harness
+  checks pass. The owner requested a pause for scope/tool-efficiency review,
+  and all three queued follow-ups are canceled. The current failure is saved
+  in `build/bench/task047-static-sharing-v2-native-failure/`. Development resumed
+  using Zig's backend. The precise successor restores only graph-proved
+  value/layout sharing bindings; derived capture-free closures undergo ordinary
+  current specialization and complete graph comparison. Eleven affected native
+  laws, second-edit/OOM, ordering and alias controls, three both-tier guests,
+  both analyzers and all seven exact original game phases pass. Evidence is in
+  `build/bench/task047-static-sharing-precise-preflight/`. Final LLVM qualification
+  remains required. The preselected seven
+  identity/31 comparison CPU pairs and final runtime qualification have not
+  started. Raw retained-output failures remain in
+  `build/bench/task047-p1-four-retained-parity-failure/`.
 - Current compiler baseline: local `4fda7c2` passes 2,497 executed native laws,
   1,585 guest/client checks, 37 harness checks and both analyzers at zero. This
   qualifies the existing iterator code; the remaining 047 performance/state

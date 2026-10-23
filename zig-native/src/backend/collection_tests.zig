@@ -83,6 +83,59 @@ fn packedEmissionFailures(a: std.mem.Allocator, units: []const core.Module) !voi
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
 }
+test "numeric nominal adapters preserve frozen Core and types through emission allocation failure" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\type Row is data = #Row {p: F32, q: F32, r: F32, s: F32}
+        \\type Matrix is data = #Matrix {a: Row, b: Row, c: Row, d: Row}
+        \\const row = fn (x: F32) => #Row {p: x, q: x, r: x, s: x}
+        \\const matrix = fn (x: F32) => #Matrix {a: row x, b: row x, c: row x, d: row x}
+        \\const read = fn (m: Matrix) =>
+        \\  @f32.add (@f32.add (@f32.add m.a.p m.a.q) (@f32.add m.a.r m.a.s))
+        \\    (@f32.add (@f32.add (@f32.add m.b.p m.b.q) (@f32.add m.b.r m.b.s))
+        \\      (@f32.add (@f32.add (@f32.add m.c.p m.c.q) (@f32.add m.c.r m.c.s))
+        \\        (@f32.add (@f32.add m.d.p m.d.q) (@f32.add m.d.r m.d.s))))
+        \\entry const run = fn (x: F32) => read (matrix x)
+    );
+    defer module.deinit(a);
+    const nodes = try a.dupe(core.Node, module.nodes);
+    defer a.free(nodes);
+    const types = try a.dupe(@import("../check/types.zig").Node, module.types.nodes);
+    defer a.free(types);
+    const extra = try a.dupe(u32, module.types.extra);
+    defer a.free(extra);
+    const units = [_]core.Module{module};
+    try packedEmissionFailures(a, &units);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, packedEmissionFailures, .{&units});
+    try std.testing.expectEqualSlices(core.Node, nodes, module.nodes);
+    try std.testing.expectEqualSlices(@import("../check/types.zig").Node, types, module.types.nodes);
+    try std.testing.expectEqualSlices(u32, extra, module.types.extra);
+}
+test "nested numeric collection rows preserve frozen evidence through emission and complete OOM" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\type Vector is data = #Vector {x: F32, y: F32}
+        \\type Matrix is data = #Matrix {a: Vector, b: Vector}
+        \\const matrix = fn (x: F32) => #Matrix {a: #Vector {x: x, y: 2.0}, b: #Vector {x: 3.0, y: 4.0}}
+        \\const read = fn (value: Matrix) => value.a.x
+        \\const saved = [matrix 1.0, matrix 5.0]
+        \\entry const run = fn (x: F32) => do:
+        \\  let rows = @array.fill 2 (matrix x)
+        \\  let old = rows
+        \\  rows[0].a.x := 9.0
+        \\  let copied = @array.from_list (@list.concat (@list.from_array rows) saved)
+        \\  let total = 0.0
+        \\  for value in copied:
+        \\    total := @f32.add self (read value)
+        \\  return @f32.add total old[0].a.x
+    );
+    defer module.deinit(a);
+    const before = @import("../check/core_snapshot_tests.zig").stamp(module);
+    const units = [_]core.Module{module};
+    try packedEmissionFailures(a, &units);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, packedEmissionFailures, .{&units});
+    try std.testing.expectEqual(before, @import("../check/core_snapshot_tests.zig").stamp(module));
+}
 test "packed array constants and runtime copies release every emission allocation failure" {
     const a = std.testing.allocator;
     var module = try lower(a,
@@ -949,4 +1002,99 @@ test "collection steps, loops and private cursors keep their physical forms abov
         try std.testing.expect(first.diagnostic == null);
         try collectionIterationEmission(a, &units, &first.capture.?, first.bytes);
     }
+}
+
+const linearCursorSource =
+    \\entry const run = fn (count: U32) => do:
+    \\  let values = @list.generate count (fn i => {x: i, y: @u32.add i 1})
+    \\  let original = @list.cursor values
+    \\  let cursor = original
+    \\  let total = 0
+    \\  for index in 0..count:
+    \\    let row = @cursor.value cursor
+    \\    total := @u32.add self row.x
+    \\    cursor := @cursor.advance self
+    \\  return @u32.add total (@cursor.value original).y
+;
+fn expectLinearCursor(a: std.mem.Allocator, text: []const u8, expected: usize) !void {
+    var module = try lowerWithCatalog(a, text, true);
+    defer module.deinit(a);
+    const before = @import("../check/core_snapshot_tests.zig").stamp(module);
+    var uses = try @import("unit_index.zig").Uses.init(a, &module, module.unit);
+    defer uses.deinit(a);
+    var admitted: usize = 0;
+    for (module.nodes, 0..) |node, index| {
+        if (node.tag != .bind or module.node(node.b).tag != .array_op or module.arrayOperation(node.b) != .cursor) continue;
+        for (module.bodies[1..]) |body| {
+            if (body.root != 0 and @import("linear_cursor.zig").check(&module, &uses, body.root, @intCast(index)) != null) admitted += 1;
+        }
+    }
+    try std.testing.expectEqual(expected, admitted);
+    try std.testing.expectEqual(before, @import("../check/core_snapshot_tests.zig").stamp(module));
+}
+test "linear cursor paths require one iteration advance and reject resets forks and nested owners" {
+    const a = std.testing.allocator;
+    try expectLinearCursor(a, linearCursorSource, 1);
+    const advance = "    cursor := @cursor.advance self";
+    const start = std.mem.find(u8, linearCursorSource, advance).?;
+    for ([_][]const u8{
+        "    cursor := @cursor.advance original",
+        "    let next = @cursor.advance cursor\n    cursor := original",
+        "    let next = @cursor.advance cursor\n    cursor := @cursor.advance next",
+        "    for nested in 0..2:\n      cursor := @cursor.advance self",
+        "    cursor := @list.cursor values",
+        "    cursor := self",
+    }) |replacement| {
+        const text = try std.mem.concat(a, u8, &.{ linearCursorSource[0..start], replacement, linearCursorSource[start + advance.len ..] });
+        defer a.free(text);
+        try expectLinearCursor(a, text, 0);
+    }
+    const position = std.mem.find(u8, linearCursorSource, "  return @u32.add").?;
+    const sequential = try std.mem.concat(a, u8, &.{ linearCursorSource[0..position], "  for index in 0..count:\n    cursor := @cursor.advance self\n", linearCursorSource[position..] });
+    defer a.free(sequential);
+    try expectLinearCursor(a, sequential, 0);
+}
+fn linearCursorProofFailures(a: std.mem.Allocator) !void {
+    try expectLinearCursor(a, linearCursorSource, 1);
+}
+test "linear cursor proof retains immutable Core through every allocation failure" {
+    try linearCursorProofFailures(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, linearCursorProofFailures, .{});
+}
+test "linear cursor path storage preserves emission replay and complete OOM cleanup" {
+    const a = std.testing.allocator;
+    var module = try lowerWithCatalog(a, linearCursorSource, true);
+    defer module.deinit(a);
+    const before = @import("../check/core_snapshot_tests.zig").stamp(module);
+    const units = [_]core.Module{module};
+    var result = try @import("core_backend.zig").compileWithOptions(a, &units, 1, .{ .retain_artifacts = true, .artifact_replay = true });
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic == null);
+    try collectionIterationEmission(a, &units, &result.capture.?, result.bytes);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, collectionIterationEmission, .{ &units, null, result.bytes });
+    try std.testing.expectEqual(before, @import("../check/core_snapshot_tests.zig").stamp(module));
+}
+
+test "linear cursor directory reference exits preserve owners through every allocation failure" {
+    const a = std.testing.allocator;
+    var module = try lowerWithCatalog(a,
+        \\const shifted = fn (count: U32) => do:
+        \\  let values = @list.generate (@u32.add count 3) (fn i => {x: i, y: @u32.add i 1})
+        \\  let cursor = @list.cursor values
+        \\  for index in 0..count:
+        \\    cursor := @cursor.advance self
+        \\  return cursor
+        \\entry const run = fn (count: U32) => do:
+        \\  let cursor = shifted count
+        \\  return (@cursor.value cursor).y
+    , true);
+    defer module.deinit(a);
+    const before = @import("../check/core_snapshot_tests.zig").stamp(module);
+    const units = [_]core.Module{module};
+    var result = try @import("core_backend.zig").compileWithOptions(a, &units, 1, .{ .retain_artifacts = true, .artifact_replay = true });
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic == null);
+    try collectionIterationEmission(a, &units, &result.capture.?, result.bytes);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, collectionIterationEmission, .{ &units, null, result.bytes });
+    try std.testing.expectEqual(before, @import("../check/core_snapshot_tests.zig").stamp(module));
 }

@@ -99,6 +99,14 @@ const Fixture = struct {
         return backend.compileWithOptions(allocator, self.units, self.entry, configured);
     }
 
+    // Component query laws require an independently selected callee. Normal
+    // inlining may eliminate that receipt before these controls can exercise it.
+    fn emitQuery(self: *const Fixture, allocator: std.mem.Allocator, options: backend.CompileOptions) !backend.Result {
+        var configured = options;
+        configured.inline_named = false;
+        return self.emit(allocator, configured);
+    }
+
     fn deinit(self: *Fixture) void {
         for (self.units) |*unit| unit.deinit(a);
         a.free(self.units);
@@ -1112,17 +1120,17 @@ test "completed specialization query replays concrete captured callback without 
     ;
     var before = try Fixture.init(source);
     defer before.deinit();
-    var initial = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
+    var initial = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     try successful(&initial);
     try std.testing.expect(initial.capture.?.metadata.specialization_queries.records.items.len > 0);
     var after = try Fixture.init(source);
     defer after.deinit();
     editSchema(&after);
-    var fresh = try backend.compileWithIdentity(a, after.units, after.entry, after.names.view());
+    var fresh = try after.emitQuery(a, .{});
     defer fresh.deinit(a);
     try successful(&fresh);
-    var imported = try backend.compileWithOptions(a, after.units, after.entry, .{ .identity = after.names.view(), .retain_artifacts = true, .previous = &initial.capture.? });
+    var imported = try after.emitQuery(a, .{ .retain_artifacts = true, .previous = &initial.capture.? });
     defer imported.deinit(a);
     try successful(&imported);
     std.debug.print("query fixture initial={d}, complete={d}, reused={d}, reasons={any}\n", .{ initial.completed_queries.recorded, initial.completed_queries.complete_records, imported.completed_queries.reused, imported.completed_queries.reasons });
@@ -1213,7 +1221,7 @@ fn independentQueryAttempt(fixture: *const Fixture, old: *const capture.Capture,
 test "independent call proof uses exact scalar inputs and preserves negative reads and declined publication" {
     var before = try Fixture.init(independent_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(independent_query_source);
@@ -1233,7 +1241,7 @@ test "independent call proof uses exact scalar inputs and preserves negative rea
 test "independent call proof rejects wrong scalar and distinct collection arrows without changing the current evaluator" {
     var before = try Fixture.init(independent_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(independent_query_source);
@@ -1298,7 +1306,7 @@ fn parallelProofScenario(allocator: Allocator, fixture: *const Fixture, old: *co
 test "private semantic artifact admission declines non positional Core source units" {
     var before = try Fixture.init(independent_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var current = try Fixture.init(independent_query_source);
@@ -1313,7 +1321,7 @@ test "private semantic artifact admission declines non positional Core source un
 test "independent semantic workers retain deterministic unpublished judgments and join through allocation failures" {
     var before = try Fixture.init(independent_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var current = try Fixture.init(independent_query_source);
@@ -1369,7 +1377,7 @@ test "independent call proof preserves List versus Array nominal identity and re
 test "independent call proof every failed allocation preserves query maps values slots and retry" {
     var before = try Fixture.init(independent_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(independent_query_source);
@@ -1383,18 +1391,18 @@ test "independent call proof every failed allocation preserves query maps values
 test "independent call proof retained dependencies survive semantic owner remapping and reject changed producers" {
     var before = try Fixture.init(independent_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     try independentQueryRead(&old.capture.?, before.target("checked"), true);
     var after = try Fixture.init(independent_query_source);
     defer after.deinit();
     editSchema(&after);
-    var checked = try after.emit(a, .{ .retain_artifacts = true, .policy = .{ .semantic_workers = 2 }, .previous = &old.capture.?, .evidence_noise = true });
+    var checked = try after.emitQuery(a, .{ .retain_artifacts = true, .policy = .{ .semantic_workers = 2 }, .previous = &old.capture.?, .evidence_noise = true });
     defer checked.deinit(a);
     try successful(&checked);
     try std.testing.expect(checked.completed_queries.independent_rechecked > 0);
-    var fresh = try after.emit(a, .{});
+    var fresh = try after.emitQuery(a, .{});
     defer fresh.deinit(a);
     try successful(&fresh);
     try std.testing.expectEqualSlices(u8, fresh.bytes, checked.bytes);
@@ -1405,11 +1413,11 @@ test "independent call proof retained dependencies survive semantic owner remapp
     // revision does; the pinned originals stay alive until the end.
     var original_nodes: ?[]core.Node = null;
     defer if (original_nodes) |nodes| a.free(nodes);
-    var reused = try third.emit(a, .{ .retain_artifacts = true, .policy = .{ .semantic_workers = 2 }, .previous = &checked.capture.? });
+    var reused = try third.emitQuery(a, .{ .retain_artifacts = true, .policy = .{ .semantic_workers = 2 }, .previous = &checked.capture.? });
     defer reused.deinit(a);
     try successful(&reused);
     try std.testing.expect(reused.completed_queries.independent_reused > 0);
-    var third_fresh = try third.emit(a, .{});
+    var third_fresh = try third.emitQuery(a, .{});
     defer third_fresh.deinit(a);
     try std.testing.expectEqualSlices(u8, third_fresh.bytes, reused.bytes);
     try std.testing.expectEqual(third_fresh.constant_steps, reused.constant_steps);
@@ -1418,11 +1426,11 @@ test "independent call proof retained dependencies survive semantic owner remapp
     edited_nodes[body.root].a = 6;
     original_nodes = third.units[0].nodes;
     third.units[0].nodes = edited_nodes;
-    var changed = try third.emit(a, .{ .retain_artifacts = true, .policy = .{ .semantic_workers = 2 }, .previous = &reused.capture.? });
+    var changed = try third.emitQuery(a, .{ .retain_artifacts = true, .policy = .{ .semantic_workers = 2 }, .previous = &reused.capture.? });
     defer changed.deinit(a);
     try successful(&changed);
     try std.testing.expectEqual(@as(usize, 0), changed.completed_queries.independent_reused);
-    var changed_fresh = try third.emit(a, .{});
+    var changed_fresh = try third.emitQuery(a, .{});
     defer changed_fresh.deinit(a);
     try std.testing.expectEqualSlices(u8, changed_fresh.bytes, changed.bytes);
     try std.testing.expectEqual(changed_fresh.constant_steps, changed.constant_steps);
@@ -1480,7 +1488,7 @@ fn plainQueryAttempt(fixture: *const Fixture, old: *const capture.Capture, mode:
 test "plain catalog query recovery preserves negative reads conflicting facts and atomic declined publication" {
     var before = try Fixture.init(plain_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(plain_query_source);
@@ -1503,7 +1511,7 @@ test "plain catalog query recovery preserves negative reads conflicting facts an
 test "plain catalog query recovery cleans every allocation failure without publishing staged facts" {
     var before = try Fixture.init(plain_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     try plainQueryFact(&old.capture.?, &.{.{ .key = plainQueryKey(&before, "PlainPayload"), .plain = true }});
@@ -1539,7 +1547,7 @@ test "semantic catalog imports nominal evidence while executable layout remains 
     ;
     var before = try Fixture.init(source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(source);
@@ -1572,19 +1580,19 @@ test "semantic catalog imports nominal evidence while executable layout remains 
 test "source declared effect query preserves fresh bytes and fuel across edits and remapped owners" {
     var before = try Fixture.init(source_row_query);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(source_row_query);
     defer after.deinit();
     editSchema(&after);
-    var fresh = try after.emit(a, .{});
+    var fresh = try after.emitQuery(a, .{});
     defer fresh.deinit(a);
     try successful(&fresh);
-    var pure = try after.emit(a, .{ .retain_artifacts = true, .previous = &old.capture.? });
+    var pure = try after.emitQuery(a, .{ .retain_artifacts = true, .previous = &old.capture.? });
     defer pure.deinit(a);
     try successful(&pure);
-    var reused = try after.emit(a, .{ .evidence_noise = true, .retain_artifacts = true, .previous = &old.capture.? });
+    var reused = try after.emitQuery(a, .{ .evidence_noise = true, .retain_artifacts = true, .previous = &old.capture.? });
     defer reused.deinit(a);
     try successful(&reused);
     std.debug.print("source rows records={d} pure={d} reused={d} reasons={any}\n", .{ old.completed_queries.recorded, pure.completed_queries.reused, reused.completed_queries.reused, reused.completed_queries.reasons });
@@ -1596,10 +1604,10 @@ test "source declared effect query preserves fresh bytes and fuel across edits a
     try std.testing.expectEqual(fresh.constant_steps, reused.constant_steps);
     var third = try Fixture.init(source_row_query);
     defer third.deinit();
-    var reverted_fresh = try third.emit(a, .{});
+    var reverted_fresh = try third.emitQuery(a, .{});
     defer reverted_fresh.deinit(a);
     try successful(&reverted_fresh);
-    var reverted = try third.emit(a, .{ .retain_artifacts = true, .previous = &reused.capture.? });
+    var reverted = try third.emitQuery(a, .{ .retain_artifacts = true, .previous = &reused.capture.? });
     defer reverted.deinit(a);
     try successful(&reverted);
     try std.testing.expect(reverted.completed_queries.reused > 0);
@@ -1633,7 +1641,7 @@ fn queryAllocationFailure(allocator: Allocator, fixture: *const Fixture, old: *c
 test "completed specialization query every allocation failure preserves all publication maps and slots" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var initial = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
+    var initial = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     try successful(&initial);
     var after = try Fixture.init(query_source);
@@ -1644,7 +1652,7 @@ test "completed specialization query every allocation failure preserves all publ
 test "completed specialization query changed concrete captures and low quotas explicitly retain ordinary inference" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var initial = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
+    var initial = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     try successful(&initial);
     var after = try Fixture.init(query_source);
@@ -1672,23 +1680,23 @@ test "completed specialization query changed concrete captures and low quotas ex
 test "completed specialization query repeated fresh owners carry remapped receipts without changing output or quotas" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var second = try Fixture.init(query_source);
     defer second.deinit();
     editSchema(&second);
-    var transported = try backend.compileWithOptions(a, second.units, second.entry, .{ .identity = second.names.view(), .retain_artifacts = true, .previous = &old.capture.? });
+    var transported = try second.emitQuery(a, .{ .retain_artifacts = true, .previous = &old.capture.? });
     defer transported.deinit(a);
     try successful(&transported);
     try std.testing.expectEqual(@as(usize, 1), transported.completed_queries.reused);
     try std.testing.expectEqual(@as(usize, 1), transported.capture.?.metadata.specialization_queries.records.items.len);
     var third = try Fixture.init(query_source);
     defer third.deinit();
-    var fresh = try backend.compileWithIdentity(a, third.units, third.entry, third.names.view());
+    var fresh = try third.emitQuery(a, .{});
     defer fresh.deinit(a);
     try successful(&fresh);
-    var reverted = try backend.compileWithOptions(a, third.units, third.entry, .{ .identity = third.names.view(), .retain_artifacts = true, .previous = &transported.capture.? });
+    var reverted = try third.emitQuery(a, .{ .retain_artifacts = true, .previous = &transported.capture.? });
     defer reverted.deinit(a);
     try successful(&reverted);
     try std.testing.expectEqual(@as(usize, 1), reverted.completed_queries.reused);
@@ -1702,7 +1710,7 @@ test "completed specialization query repeated fresh owners carry remapped receip
 test "completed specialization query exact current expected type and cache-state reads remain authoritative" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(query_source);
@@ -1735,7 +1743,7 @@ test "completed specialization query exact current expected type and cache-state
 test "completed specialization query declines foreign allocator and same-pointer shorter owner before access" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(query_source);
@@ -1771,7 +1779,7 @@ test "completed specialization query selected values and remapped receipt surviv
     var before = try Fixture.init(query_source);
     var before_live = true;
     defer if (before_live) before.deinit();
-    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     var old_live = true;
     defer if (old_live) old.deinit(a);
     try successful(&old);
@@ -1847,7 +1855,7 @@ fn pairedQueryFailure(allocator: Allocator, fixture: *const Fixture, old: *const
 test "completed specialization query ordered bucket and warmed plan distinguish same-source concrete captures under every allocation failure" {
     var before = try Fixture.init(paired_query_source);
     defer before.deinit();
-    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     try std.testing.expectEqual(@as(usize, 2), old.capture.?.metadata.specialization_queries.records.items.len);
@@ -1861,7 +1869,7 @@ test "completed specialization query ordered bucket and warmed plan distinguish 
 test "completed specialization query importer cannot cross a live Generator Session owner" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(query_source);
@@ -1966,7 +1974,7 @@ fn sourceRowOom(allocator: Allocator, fixture: *const Fixture, old: *const captu
 test "source declared effect query every allocation failure preserves publications slots and exact growth with current row noise" {
     var before = try Fixture.init(source_row_query);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(source_row_query);
@@ -1979,7 +1987,7 @@ test "source declared effect query every allocation failure preserves publicatio
 test "source declared effect query frozen row policy declines changes and semantic operation arguments stay distinct" {
     var before = try Fixture.init(source_row_query);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(source_row_query);
@@ -2015,7 +2023,7 @@ test "source declared effect query nonempty row and receipt survive destruction 
     var before = try Fixture.init(source_row_query);
     var before_live = true;
     defer if (before_live) before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     var old_live = true;
     defer if (old_live) old.deinit(a);
     try successful(&old);
@@ -2078,7 +2086,7 @@ fn expectRowDomain(old: *const capture.Capture, gate: *const gate_api.Gate, root
 test "source declared effect graph rejects generated labels and provider State operation arguments" {
     var before = try Fixture.init(source_row_query);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(source_row_query);
@@ -2130,16 +2138,16 @@ test "source declared effect query structurally remaps a nominal operation argum
     ;
     var before = try Fixture.init(source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(source);
     defer after.deinit();
     editSchema(&after);
-    var fresh = try after.emit(a, .{});
+    var fresh = try after.emitQuery(a, .{});
     defer fresh.deinit(a);
     try successful(&fresh);
-    var reused = try after.emit(a, .{ .evidence_noise = true, .retain_artifacts = true, .previous = &old.capture.? });
+    var reused = try after.emitQuery(a, .{ .evidence_noise = true, .retain_artifacts = true, .previous = &old.capture.? });
     defer reused.deinit(a);
     try successful(&reused);
     try std.testing.expect(reused.completed_queries.reused > 0);
@@ -2191,7 +2199,7 @@ test "query graph scratch clears declined alias candidates and rejects changed l
     var after = try Fixture.project(&dir);
     defer after.deinit();
     editSchema(&after);
-    var initial = try before.emit(a, .{ .retain_artifacts = true });
+    var initial = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     try successful(&initial);
     const pools = &initial.capture.?.metadata.pools.?;
@@ -2341,7 +2349,7 @@ test "query graph scratch warmed child positions preserve exact shared spans und
     var after = try Fixture.init(scratch_span_source);
     defer after.deinit();
     editSchema(&after);
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     // Prepare a valid trusted-format graph before constructing any Plan.
@@ -2362,7 +2370,7 @@ test "query graph scratch partial old child overlap declines without publication
     var after = try Fixture.init(scratch_span_source);
     defer after.deinit();
     editSchema(&after);
-    var old = try before.emit(a, .{ .retain_artifacts = true });
+    var old = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     const pools = &old.capture.?.metadata.pools.?;
@@ -2400,16 +2408,16 @@ fn gatePilotOptions(old: *const capture.Capture) backend.CompileOptions {
 test "shared query gate backend uses one clone and matches fresh output" {
     var before = try Fixture.init(source_row_query);
     defer before.deinit();
-    var initial = try before.emit(a, .{ .retain_artifacts = true });
+    var initial = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     try successful(&initial);
     var after = try Fixture.init(source_row_query);
     defer after.deinit();
     editSchema(&after);
-    var fresh = try after.emit(a, .{});
+    var fresh = try after.emitQuery(a, .{});
     defer fresh.deinit(a);
     try successful(&fresh);
-    var on = try after.emit(a, gatePilotOptions(&initial.capture.?));
+    var on = try after.emitQuery(a, gatePilotOptions(&initial.capture.?));
     defer on.deinit(a);
     try successful(&on);
     try std.testing.expectEqualSlices(u8, fresh.bytes, on.bytes);
@@ -2423,13 +2431,13 @@ test "shared query gate backend uses one clone and matches fresh output" {
 test "shared query gate new compile freshly detects changed Core at the same owner address" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var initial = try before.emit(a, .{ .retain_artifacts = true });
+    var initial = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     var after = try Fixture.init(query_source);
     defer after.deinit();
     editSchema(&after);
     {
-        var first = try after.emit(a, gatePilotOptions(&initial.capture.?));
+        var first = try after.emitQuery(a, gatePilotOptions(&initial.capture.?));
         defer first.deinit(a);
         try successful(&first);
         try std.testing.expect(first.completed_queries.reused > 0);
@@ -2442,9 +2450,9 @@ test "shared query gate new compile freshly detects changed Core at the same own
     };
     try std.testing.expectEqual(@as(usize, 1), edits);
     try std.testing.expect(after.units.ptr == same_owner);
-    var fresh = try after.emit(a, .{});
+    var fresh = try after.emitQuery(a, .{});
     defer fresh.deinit(a);
-    var changed = try after.emit(a, gatePilotOptions(&initial.capture.?));
+    var changed = try after.emitQuery(a, gatePilotOptions(&initial.capture.?));
     defer changed.deinit(a);
     try successful(&fresh);
     try successful(&changed);
@@ -2457,7 +2465,7 @@ test "shared query gate new compile freshly detects changed Core at the same own
 test "shared query gate keeps query Plans owned after principal teardown and declines changed live owners" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var initial = try before.emit(a, .{ .retain_artifacts = true });
+    var initial = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     var after = try Fixture.init(query_source);
     defer after.deinit();
@@ -2487,7 +2495,7 @@ test "shared query gate keeps query Plans owned after principal teardown and dec
 }
 
 fn gateBackendFailure(allocator: Allocator, fixture: *const Fixture, old: *const capture.Capture, expected: []const u8, fuel: usize) !void {
-    var result = try fixture.emit(allocator, gatePilotOptions(old));
+    var result = try fixture.emitQuery(allocator, gatePilotOptions(old));
     defer result.deinit(allocator);
     try successful(&result);
     try std.testing.expectEqual(@as(usize, 1), result.completed_queries.shared_gates);
@@ -2500,12 +2508,12 @@ fn gateBackendFailure(allocator: Allocator, fixture: *const Fixture, old: *const
 test "shared query gate backend releases every allocation failure without changing previous artifacts" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var initial = try before.emit(a, .{ .retain_artifacts = true });
+    var initial = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     var after = try Fixture.init(query_source);
     defer after.deinit();
     editSchema(&after);
-    var fresh = try after.emit(a, .{});
+    var fresh = try after.emitQuery(a, .{});
     defer fresh.deinit(a);
     const old_values = artifacts.stamp(initial.capture.?.metadata.pools.?.evaluator.values);
     const old_slots = artifacts.stamp(initial.capture.?.metadata.pools.?.slots);
@@ -2517,16 +2525,16 @@ test "shared query gate backend releases every allocation failure without changi
 test "checked query importer backend preserves rows and exact work" {
     var before = try Fixture.init(source_row_query);
     defer before.deinit();
-    var initial = try before.emit(a, .{ .retain_artifacts = true });
+    var initial = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     try successful(&initial);
     var after = try Fixture.init(source_row_query);
     defer after.deinit();
     editSchema(&after);
-    var fresh = try after.emit(a, .{});
+    var fresh = try after.emitQuery(a, .{});
     defer fresh.deinit(a);
     try successful(&fresh);
-    var on = try after.emit(a, gatePilotOptions(&initial.capture.?));
+    var on = try after.emitQuery(a, gatePilotOptions(&initial.capture.?));
     defer on.deinit(a);
     try successful(&on);
     try std.testing.expectEqualSlices(u8, fresh.bytes, on.bytes);
@@ -2539,7 +2547,7 @@ test "checked query importer backend preserves rows and exact work" {
 test "checked query importer new compile detects body mutation and live State owners and options remain bound" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var initial = try before.emit(a, .{ .retain_artifacts = true });
+    var initial = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     var after = try Fixture.init(query_source);
     defer after.deinit();
@@ -2577,9 +2585,9 @@ test "checked query importer new compile detects body mutation and live State ow
     };
     try std.testing.expectEqual(@as(usize, 1), edits);
     try std.testing.expect(after.units.ptr == same_owner);
-    var fresh = try after.emit(a, .{});
+    var fresh = try after.emitQuery(a, .{});
     defer fresh.deinit(a);
-    var changed = try after.emit(a, gatePilotOptions(&initial.capture.?));
+    var changed = try after.emitQuery(a, gatePilotOptions(&initial.capture.?));
     defer changed.deinit(a);
     try successful(&fresh);
     try successful(&changed);
@@ -2589,7 +2597,7 @@ test "checked query importer new compile detects body mutation and live State ow
 }
 
 fn preparedQueryBackendFailure(allocator: Allocator, fixture: *const Fixture, old: *const capture.Capture, expected: []const u8, work: usize) !void {
-    var result = try fixture.emit(allocator, gatePilotOptions(old));
+    var result = try fixture.emitQuery(allocator, gatePilotOptions(old));
     defer result.deinit(allocator);
     try successful(&result);
     try std.testing.expectEqual(@as(usize, 1), result.completed_queries.prepared_importers);
@@ -2602,12 +2610,12 @@ fn preparedQueryBackendFailure(allocator: Allocator, fixture: *const Fixture, ol
 test "checked query importer backend keeps previous values slots and query memo publication atomic under every OOM" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var initial = try before.emit(a, .{ .retain_artifacts = true });
+    var initial = try before.emitQuery(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     var after = try Fixture.init(query_source);
     defer after.deinit();
     editSchema(&after);
-    var fresh = try after.emit(a, .{});
+    var fresh = try after.emitQuery(a, .{});
     defer fresh.deinit(a);
     const old_values = artifacts.stamp(initial.capture.?.metadata.pools.?.evaluator.values);
     const old_slots = artifacts.stamp(initial.capture.?.metadata.pools.?.slots);

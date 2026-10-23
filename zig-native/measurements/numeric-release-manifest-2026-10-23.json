@@ -1,0 +1,38 @@
+{
+  "numeric-release-2026-10-23.json.gz": {
+    "raw_sha256": "1dd48f34acd22bc0217a358c45de5f0b8c4e2a4e5c52887d1063c5ca45330c35",
+    "gzip_sha256": "447796c110b8a43c574589a2eae9f40507ebb91342ebd3bc038092fe2c0dd303",
+    "bytes": 2218363,
+    "compressed_bytes": 211246
+  },
+  "numeric-memory-traffic-2026-10-23.json.gz": {
+    "raw_sha256": "d477e01b54d5cc891bab4c68974c00fbc039f1b330fd406b4c43e6e2f823ecd0",
+    "gzip_sha256": "bdd79ac2f73def94a5fbe875102d988e3459944612557bbf2001f4744dec2049",
+    "bytes": 52604,
+    "compressed_bytes": 3565
+  },
+  "numeric-application-compile-2026-10-23.json.gz": {
+    "raw_sha256": "c3eb128b5cc20af9bbb75fb42b0fb61597875257531e08b7110f87629a9de72f",
+    "gzip_sha256": "8f8d85e01e309290ae72aff897a2dfca30bac2013de2a2968d8b0cb85b24c505",
+    "bytes": 681216,
+    "compressed_bytes": 69646
+  },
+  "numeric-application-runtime-2026-10-23.json.gz": {
+    "raw_sha256": "77925ee6e4a6cb477ca8009ed2bccf3d4b29ef33036f308b7c7c9451e1b05676",
+    "gzip_sha256": "6d7c5f94063e77cd29e8f59ae4ea59221df6b03bb7ede9185f24ae7aff5c582f",
+    "bytes": 142043,
+    "compressed_bytes": 31174
+  },
+  "numeric-wide-inline-rejected-2026-10-23.json.gz": {
+    "raw_sha256": "a344cb5ad3aa1e7f7587692a24c8fe6328ce535f572d54834e1255c6af8c8920",
+    "gzip_sha256": "9d2fd42c31a5ccafcacf6ff2be13a7a24ea839ce40b3fb13f481f03ae48cb406",
+    "bytes": 10079,
+    "compressed_bytes": 2686
+  },
+  "numeric-flat-budget-rejected-2026-10-23.json.gz": {
+    "raw_sha256": "95060a6a94cc84cd5d8f7cd90315238e838217f79c621cbdbf2fbe02de496480",
+    "gzip_sha256": "2ee62d6c21f69844e9344c64251f4c4c908e67a876f2f3b3d3d62885860e1576",
+    "bytes": 10098,
+    "compressed_bytes": 2704
+  }
+}

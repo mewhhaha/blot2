@@ -119,6 +119,15 @@ through static-key graph admission, which compares current values, evidence,
 callable sources and capture relationships before importing code. These graphs
 do not authorize independent solved principal mapping receipts.
 
+Copied static data also restores its serializer sharing bindings. Each binding
+requires an exact current value graph and an imported physical layout. Old
+addresses select candidates only. A serializer-derived capture-free closure
+undergoes ordinary current specialization and complete graph comparison before
+its binding is restored; this creates no solved principal receipt from an erased
+field. Existing cache entries, conflicting aliases, missing proofs and
+unsupported mixtures with fresh aggregate children force fresh emission before
+candidate bytes are copied.
+
 Individual compilations use owned arrays and explicit deinitialization, not an
 unbounded arena of obsolete inference versions. Published syntax/typed bodies
 are immutable. Scratch state is released before final output publication.
@@ -506,23 +515,33 @@ module is admitted, with tracing available during transition; machine i32 alone
 is never evidence that a word is scalar. Runtime list branches remain
 pointerful.
 
-Collection elements that are flat products or structural records with 1–16
-checked scalar fields use consecutive payload words. Source lengths count rows;
-indexing, overflow checks, copies and edits use the checked row stride.
-Constants and runtime constructors share canonical field order. Observable
-extraction creates an owning row allocation; no interior pointer escapes. Direct
-List loops may borrow a row only when every use selects a checked scalar field,
-or a flat tuple pattern binds scalar values. Aliases, captures, returned rows,
-implicit row carries and unknown forms retain owned extraction. Scalar
-replacement may eliminate that box under its ordinary proof. Raw word copies
-preserve floating-point bits. List descriptors and tree ranges count storage
-words; typed emission converts logical counts and positions. A row may cross
-leaves. Intermediate word edits stay private until the entire row is published;
-only the first edit consumes a possibly shared input. Conversion copies spans
-and adjusts the private Array header back to a logical row count. Direct scalar
-projections retain evaluation and bounds checks without allocating an extracted
-row. Nested, nominal, reference-bearing, erased and wider rows keep the one-word
-element representation. Numeric host arrays retain their existing ABI.
+Flat products and structural records with 1–16 checked scalar fields retain
+consecutive payload storage. A generator-owned numeric layout plan also packs
+nested products, records and public, non-opaque, single-constructor nominal
+values when their complete storage has at most sixteen scalar leaves, thirty-two
+object nodes and sixteen levels. References, usage, hidden or open storage and
+exhausted proof bounds decline. Plans contain stable layout IDs, never borrowed
+inference-store or source pointers.
+
+Source lengths count rows; indexing, overflow checks, copies, conversions and
+edits use the same checked stride. Constant serialization matches physical
+record field names and nominal payloads. Observable extraction reconstructs an
+owned object tree, with children initialized before parents; no interior pointer
+escapes. A complete checked scalar projection path may borrow a packed row,
+including through a known immediate reader. Unknown calls and escaping values
+materialize ordinary owned values. Scalar replacement keeps its own proof.
+Generated temporary rows retire in normal root scopes of at most 32 rows, after
+scalar words have been copied; older captures and destination storage remain
+owned outside that scope. Full and partial batches preserve callback order and
+failure cleanup.
+
+Raw word copies preserve floating-point bits. List descriptors and tree ranges
+count storage words; typed emission converts logical counts and positions and
+handles leaf boundaries. Intermediate word edits stay private until the whole
+row is published. Numeric host-array signatures remain unchanged; structured
+host cleanup copies reconstruct checked logical records and nominal values
+without guest aliases. [Numeric layouts](NUMERIC_LAYOUTS.md) specifies the
+bounds, call ABI and separate allocation-free-boundary limitation.
 
 State plus memoized demands can construct real cycles: a demand may read a
 closure from State and cache a result that reaches that same demand. Clearing
@@ -686,8 +705,9 @@ effects. The intermediate list must never escape or be observed. Admitted
 regions allocate their final List or Array directly; count overflow uses the
 ordinary path with its original failure order. Reference storage is cleared
 before element evaluation. Effectful regions remain ordinary builders.
-Production packed collections use the flat-row rule above; the recursive packed
-scalar-row planner remains a separate fixture.
+Production packed collections use the checked flat and nested row rules above.
+The earlier layout-only recursive fixture is not the authority for nominal
+packing or ownership.
 
 `ragged_builder` admits dependent bounds and filters using already selected
 operation facts and bounded capture-free primitive forwarding spines. Exact body
@@ -867,8 +887,8 @@ arm k and otherwise binds every input once to a fresh Core local for level k+1;
 the last level tests the last two arms, and a lone arm falls back to its
 incoming versions. `Checked.statement_arms` names the arm blocks whose
 statements lower inline as their level's suite, like an if branch, with a direct
-`break value` reduced to its discarded value. Exiting arms join no merge. Consumers
-therefore never see a merge with more than two arms.
+`break value` reduced to its discarded value. Exiting arms join no merge.
+Consumers therefore never see a merge with more than two arms.
 
 Typed-hole snapshots own a bounded flat diagnostic graph and the strings inside
 its node, edge, binding and requirement arrays. Cloning copies each nested name;

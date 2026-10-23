@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { isAbsolute, relative, resolve } from "node:path";
 import type { Phase } from "./compiler_phase.ts";
 
-export async function fileDigest(path: string): Promise<string> {
+export function fileDigest(path: string): Promise<string> {
   return bufferedDigest(path, new Uint8Array(1024 * 1024));
 }
 
@@ -88,6 +88,8 @@ export async function nativeInputs(root: string): Promise<string[]> {
     "scripts/compiler_gate_state.ts",
     "scripts/compiler_lease.ts",
     "scripts/run_native_tests.ts",
+    "scripts/native_test_partitions.ts",
+    "scripts/native_test_costs.json",
     "scripts/dev_check_areas.ts",
   ].map((path) => resolve(root, path));
   // Compilation can import ignored files. Parser corpus laws also read sibling
@@ -129,8 +131,17 @@ export async function nativeToolchain(): Promise<string> {
   hash.update(await nativeToolchainFiles());
   hash.update(JSON.stringify(Deno.version));
   hash.update(JSON.stringify(Deno.build));
-  hash.update(JSON.stringify(Object.entries(Deno.env.toObject()).sort()));
+  hash.update(JSON.stringify(nativeEnvironment(Deno.env.toObject())));
   return hash.digest("hex");
+}
+
+/** Shell bookkeeping and the caller's trace ID do not configure compilation. */
+export function nativeEnvironment(
+  environment: Record<string, string>,
+): [string, string][] {
+  return Object.entries(environment).filter(([name]) =>
+    name !== "CODEX_TOOL_CALL_ID" && name !== "SHLVL" && name !== "_"
+  ).sort();
 }
 
 type Entry = {

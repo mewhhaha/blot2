@@ -20,6 +20,44 @@ steps. This slower instrumentation build identifies work; its clocks do not
 establish a release speedup. Raw pins and records are under ignored
 `build/bench/constant-receipts/`.
 
+## Cloud measurement preparation, 20 October 2026
+
+The owner-approved recreated workload has 583 files; its manifest is
+`4689301ed5ef13f9cce244a474fbe353ebfeceeb072101c85f6663995e0b0728`. It does not
+recover the lost original freeze. Task 086's decision still needs at least seven
+paired retained edits on the latest qualified LLVM compiler, using edits 2
+onward and recording persistence settings and receipt counters.
+
+A CPU-weighted reanalysis of an older profiler smoke, compiler `0f531509…`,
+exposes an attribution pitfall. Its 867 samples cover 9.582 seconds of observed
+thread CPU and are not aligned to qualifying edit windows. Assigning each sample
+to its innermost observed context gives:
+
+| Observed context          | Share of sampled CPU | Nested inference within that context |
+| ------------------------- | -------------------: | -----------------------------------: |
+| Runtime function emission |               46.74% |                               23.09% |
+| Static-data serialization |               13.78% |                                6.98% |
+| Constant evaluation       |                3.72% |                                1.47% |
+| Constant preparation      |                0.15% |                                0.00% |
+
+Nested inference is a subset of each context, not an additional phase. The older
+broad constant envelope reports 39.64%, but includes 2.107 seconds whose inner
+context is runtime function emission. Partial or unknown stacks account for
+3.51% of sampled CPU, all within that observed runtime context. These are stack
+contexts, not bounds on unaffected constant work. Raw inputs remain in
+`build/bench/task086-profiler-weighted-smoke/`; the reanalysis report is
+`/workspace/.tools/task086-historical-domain-uncertainty-summary.json`, SHA-256
+`3ff4b3a209fb1085e50863f7ff9d9c635b7e2c2ee2953627b9d5bc68d0f5111a`.
+
+Quantity C remains unmeasured. Producer IDs or equal output bytes do not prove
+unchanged inputs: classification must account for initializer and called bodies,
+actual reads, options, providers, generative identities, fuel and outcomes.
+Serialization must also exclude runtime function emission nested beneath it. The
+decision requires C to be at least 20% of edit CPU **or** the largest attributed
+phase. Closure as not needed requires both C below 20% and a larger phase; an
+unresolved largest-phase comparison leaves the gate open. No broader receipt
+authority is admitted by this diagnostic reanalysis.
+
 ## Publication authority
 
 Add a dedicated owned constant receipt. Keep the existing source value-template

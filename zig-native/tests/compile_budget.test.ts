@@ -11,6 +11,7 @@
 // counters. When they do, re-measure and tighten `today` below; a budget that
 // stays loose after an improvement stops guarding against regressions.
 import { strict as assert } from "node:assert";
+import { instantiateGuest } from "../../compiler/guest.ts";
 import {
   chainGeneric,
   chainMono,
@@ -497,16 +498,37 @@ Deno.test("budget: retained edit suite reuses at least today's work", async () =
   const retained = await createZigProjectCompiler(options);
   const observed: Record<string, Reuse> = {};
   const revalidated: Record<string, Revalidation> = {};
-  const record = (phase: string, result: ZigProjectBuildResult) => {
+  const record = async (phase: string, result: ZigProjectBuildResult) => {
     observed[phase] = reuse(result);
     revalidated[phase] = revalidation(result);
+    assert(result.success);
+    const guest = await instantiateGuest(result.bytes);
+    try {
+      assert.equal(
+        guest.call("score", 2.5),
+        phase === "edit:literal_constant" ? 780 : 767.5,
+        phase,
+      );
+      assert.equal(
+        guest.call("walked", 2.5),
+        phase === "edit:body_change" ? 4 : 3,
+        phase,
+      );
+      assert.equal(
+        guest.call("carried", 2.5),
+        phase === "edit:literal_in_body" ? Math.fround(4.1) : 4,
+        phase,
+      );
+    } finally {
+      guest.dispose();
+    }
     return result;
   };
   try {
     for (const [file, source] of Object.entries(editSuite.files)) {
       await Deno.writeTextFile(`${directory}/${file}`, source);
     }
-    record("population", await retained.build());
+    await record("population", await retained.build());
     for (const scenario of editSuite.scenarios) {
       const sources: Record<string, string> = {};
       for (const { file, search, replace } of scenario.replacements) {
@@ -515,7 +537,7 @@ Deno.test("budget: retained edit suite reuses at least today's work", async () =
         assert.equal(original.split(search).length, 2, `${scenario.name}`);
         sources[path] = original.replace(search, replace);
       }
-      const edited = record(
+      const edited = await record(
         `edit:${scenario.name}`,
         await retained.build({ sources }),
       );
@@ -527,7 +549,7 @@ Deno.test("budget: retained edit suite reuses at least today's work", async () =
       } finally {
         await fresh.dispose();
       }
-      record(`revert:${scenario.name}`, await retained.build());
+      await record(`revert:${scenario.name}`, await retained.build());
     }
   } finally {
     await retained.dispose();

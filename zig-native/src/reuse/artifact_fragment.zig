@@ -1,5 +1,6 @@
 //! Validated job replay into the candidate's shared resource domains.
-//! No source-body inference occurs here. Unknown inputs decline in preflight.
+//! Unknown inputs decline in preflight. Derived closure serializers use ordinary
+//! current specialization before their complete value graph is compared.
 const std = @import("std");
 const capture = @import("artifact_capture.zig");
 const artifacts = @import("code_artifacts.zig");
@@ -20,6 +21,7 @@ pub const Stats = struct { candidates: usize = 0, reused_named: usize = 0, reuse
 /// An admitted aggregate constant child: the current request and the old
 /// serialized root address that the retained caller's operands name.
 const AggregateConstant = struct { request: artifacts.Request, root: u32 };
+const SerializedBinding = struct { value: u32, ty: u32 };
 pub const State = struct {
     allocator: Allocator,
     old: *const capture.Capture,
@@ -42,6 +44,11 @@ pub const State = struct {
     static_matches: std.AutoHashMapUnmanaged(artifacts.StaticRead, u32) = .empty,
     /// Old non-suspension serialized roots by value and layout.
     serialized_roots: std.AutoHashMapUnmanaged(u64, u32) = .empty,
+    /// Index into the immutable old serialized entries, ordered by address.
+    serialized_order: []u32,
+    /// Only exact graph anchors and imported physical layouts grant bindings.
+    serialized_bindings: std.AutoHashMapUnmanaged(u32, SerializedBinding) = .empty,
+    serialized_addresses: std.AutoHashMapUnmanaged(u64, u32) = .empty,
     aggregate_constants: std.AutoHashMapUnmanaged(u32, AggregateConstant) = .empty,
     /// Old aggregate root address to its current serialization, exact only.
     constant_addresses: std.ArrayList(Address) = .empty,
@@ -82,6 +89,14 @@ pub const State = struct {
         var roots: std.AutoHashMapUnmanaged(u64, u32) = .empty;
         errdefer roots.deinit(a);
         for (old.metadata.pools.?.serialized) |entry| if (!entry.suspension) try roots.put(a, rootKey(entry.value, entry.ty), entry.address);
+        const serialized_order = try a.alloc(u32, old.metadata.pools.?.serialized.len);
+        errdefer a.free(serialized_order);
+        for (serialized_order, 0..) |*index, i| index.* = @intCast(i);
+        std.mem.sortUnstable(u32, serialized_order, old.metadata.pools.?.serialized, struct {
+            fn less(entries: []const artifacts.Serialized, left: u32, right: u32) bool {
+                return entries[left].address < entries[right].address;
+            }
+        }.less);
         for (old.metadata.jobs.items, 1..) |job, id| {
             var fresh = !job.reusable or switch (job.request) {
                 .constant => !scalarConstant(old, job) and aggregateRoot(old, &roots, job) == null,
@@ -128,7 +143,7 @@ pub const State = struct {
         };
         const imports = try slots(a, import_count);
         errdefer a.free(imports);
-        return .{ .allocator = a, .old = old, .importer = graphs, .starts = starts, .ends = ends, .blocked = blocked, .functions = functions, .signatures = signatures, .signature_records = signature_records, .imports = imports, .globals = try slots(a, global_count), .arena = arena, .lists = lists, .host = host, .enabled = selection_stable, .serialized_roots = roots };
+        return .{ .allocator = a, .old = old, .importer = graphs, .starts = starts, .ends = ends, .blocked = blocked, .functions = functions, .signatures = signatures, .signature_records = signature_records, .imports = imports, .globals = try slots(a, global_count), .arena = arena, .lists = lists, .host = host, .enabled = selection_stable, .serialized_roots = roots, .serialized_order = serialized_order };
     }
     pub fn deinit(self: *State) void {
         self.importer.deinit();
@@ -147,11 +162,94 @@ pub const State = struct {
         self.addresses.deinit(self.allocator);
         self.static_matches.deinit(self.allocator);
         self.serialized_roots.deinit(self.allocator);
+        self.allocator.free(self.serialized_order);
+        self.serialized_bindings.deinit(self.allocator);
+        self.serialized_addresses.deinit(self.allocator);
         self.aggregate_constants.deinit(self.allocator);
         self.constant_addresses.deinit(self.allocator);
     }
     fn rootKey(value: u32, ty: u32) u64 {
         return (@as(u64, value) << 32) | ty;
+    }
+    fn serializedAt(self: *const State, address: u32) usize {
+        const entries = self.old.metadata.pools.?.serialized;
+        var left: usize = 0;
+        var right = self.serialized_order.len;
+        while (left < right) {
+            const middle = left + (right - left) / 2;
+            if (entries[self.serialized_order[middle]].address < address) left = middle + 1 else right = middle;
+        }
+        return left;
+    }
+    fn serializedBinding(self: *State, g: anytype, entry: artifacts.Serialized) Allocator.Error!?SerializedBinding {
+        const ty = (try self.importer.importLayout(g, entry.ty)) orelse return null;
+        if (self.importer.value_anchors.get(entry.value)) |value| return .{ .value = value, .ty = ty };
+        // The serializer may have specialized a capture-free closure. Its old
+        // cache aliases select a source candidate, never authorize it. Perform
+        // ordinary specialization now and compare the complete resulting graph.
+        const source = self.old.metadata.pools.?.evaluator;
+        if (entry.value >= source.values.len or source.values[entry.value].kind != .closure or source.values[entry.value].len != 0) return null;
+        const evidence = source.value_evidence[entry.value];
+        if (evidence == 0) return null;
+        const gate = if (self.importer.code_gate) |*owned| &owned.semantic else return null;
+        const inspection = try value_template.Plan.inspectRootsWithRows(self.allocator, &self.old.metadata.pools.?, gate, &.{entry.value}, .source_declared);
+        var plan = inspection.plan orelse return null;
+        defer plan.deinit(self.allocator);
+        const expected = (try self.importer.importClosedEvidence(g, evidence)) orelse return null;
+        const header = source.closures[source.values[entry.value].bits];
+        const entries = self.old.metadata.pools.?.serialized;
+        var i = self.serializedAt(entry.address);
+        while (i < self.serialized_order.len) : (i += 1) {
+            const candidate = entries[self.serialized_order[i]];
+            if (candidate.address != entry.address) break;
+            if (candidate.suspension or candidate.value == entry.value or candidate.value >= source.values.len) continue;
+            const info = source.values[candidate.value];
+            if (info.kind != .closure or info.len != 0) continue;
+            const other = source.closures[info.bits];
+            if (header.unit != other.unit or header.identity != other.identity or header.origin != other.origin or header.staged != other.staged or header.applied != other.applied) continue;
+            const current = self.importer.value_anchors.get(candidate.value) orelse continue;
+            const diagnostic = g.evaluator.diagnostic;
+            const selected = g.evaluator.specializeClosure(current, expected) catch |err| {
+                g.evaluator.diagnostic = diagnostic;
+                return if (err == error.OutOfMemory) error.OutOfMemory else null;
+            };
+            if (try self.matchValues(g, &plan, entry.value, selected)) return .{ .value = selected, .ty = ty };
+        }
+        return null;
+    }
+    /// Reject cache hits and alias merges before copying any module data.
+    /// Neither byte equality nor an unproved old layout grants a binding.
+    fn admitSerialized(self: *State, g: anytype, address: u32, len: u32) Allocator.Error!bool {
+        const entries = self.old.metadata.pools.?.serialized;
+        var i = self.serializedAt(address);
+        while (i < self.serialized_order.len) : (i += 1) {
+            const index = self.serialized_order[i];
+            const entry = entries[index];
+            if (entry.address - address >= len) break;
+            if (entry.suspension) return false;
+            const binding = (try self.serializedBinding(g, entry)) orelse return false;
+            if (g.static_data.cache.contains(.{ .value = binding.value, .ty = binding.ty })) return false;
+            const key = rootKey(binding.value, binding.ty);
+            if (self.serialized_addresses.get(key)) |old_address| {
+                if (old_address != entry.address) return false;
+            } else try self.serialized_addresses.put(self.allocator, key, entry.address);
+            try self.serialized_bindings.put(self.allocator, index, binding);
+        }
+        return true;
+    }
+    fn publishSerialized(self: *State, g: anytype, address: u32, actual: u32, len: u32) Error!void {
+        const entries = self.old.metadata.pools.?.serialized;
+        var i = self.serializedAt(address);
+        while (i < self.serialized_order.len) : (i += 1) {
+            const index = self.serialized_order[i];
+            const entry = entries[index];
+            if (entry.address - address >= len) break;
+            const binding = self.serialized_bindings.get(index) orelse return error.InvalidFunctionReference;
+            const relocated = actual + (entry.address - address);
+            const slot = try g.static_data.cache.getOrPut(g.allocator, .{ .value = binding.value, .ty = binding.ty });
+            if (slot.found_existing and slot.value_ptr.* != relocated) return error.InvalidFunctionReference;
+            slot.value_ptr.* = relocated;
+        }
     }
     /// A completed non-scalar, non-suspension constant whose old serialized
     /// root address is known. Demand cells keep their creation identity and
@@ -396,6 +494,7 @@ pub const State = struct {
         return ty;
     }
     fn admit(self: *State, g: anytype, id: u32) Allocator.Error!bool {
+        self.serialized_addresses.clearRetainingCapacity();
         const first = self.starts[id - 1];
         const last = self.ends[id - 1];
         if (first == std.math.maxInt(u64) or last <= first) return false;
@@ -467,7 +566,10 @@ pub const State = struct {
                 .data_word => |item| if (!self.localAddress(item.address, record.owner) or !try self.admitOperand(g, item.operand, record.owner, roots.items)) return false,
                 .global => |item| if (!self.knownGlobal(item.id, g.request_owner)) return false,
                 .global_bits => |item| if (!self.knownGlobal(item.id, g.request_owner)) return false,
-                .data => |item| if (item.bytes.len % 4 != 0) return false,
+                .data => |item| {
+                    if (item.bytes.len % 4 != 0) return false;
+                    if (item.address != 0 and !try self.admitSerialized(g, item.address, item.bytes.len)) return false;
+                },
                 .operation_symbol => |item| if (!try self.importer.admitOperation(g, item.id)) return false,
                 .demand => |item| if (item.kind == .operation and !try self.importer.admitOperation(g, item.id)) return false,
                 .mutable_static, .static_field => {},
@@ -475,6 +577,10 @@ pub const State = struct {
                 else => {},
             }
         }
+        // Fresh aggregate children can create additional cache entries during
+        // replay. Mixed copied bindings need a complete serialization-order
+        // proof; otherwise rebuild before publishing any candidate bytes.
+        if (skipped.items.len != 0 and self.serialized_addresses.count() != 0) return false;
         const job = &self.old.metadata.jobs.items[id - 1];
         if (job.result_template) |template| if (try self.importer.importResultTemplate(g, template) == null) return false;
         if (job.solved) {
@@ -703,6 +809,7 @@ pub const State = struct {
                     if (item.address == 0) try self.ensureArena(g) else {
                         const actual = try g.module.staticBytes(self.old.emission.bytes.items[item.bytes.start..][0..item.bytes.len]);
                         try self.addresses.append(self.allocator, .{ .original = item.address, .actual = actual, .len = item.bytes.len, .owner = record.owner });
+                        try self.publishSerialized(g, item.address, actual, item.bytes.len);
                     }
                 },
                 .data_word => |item| {

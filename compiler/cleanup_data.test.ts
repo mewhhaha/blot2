@@ -166,6 +166,66 @@ Deno.test("cleanup packed list rows cannot read beyond the leaf logical extent",
   );
 });
 
+Deno.test("cleanup copies packed nested nominal rows with their logical shape", () => {
+  const floating = node(4, "f32");
+  const pair = node(5, "record", {
+    fields: [{ name: "x", child: 4 }, { name: "y", child: 4 }],
+  });
+  const vector = node(6, "nominal", {
+    name: "Vector",
+    variants: [{ tag: 7, child: 5 }],
+  });
+  const matrix = node(7, "product", { children: [6, 6] });
+  const values = node(8, "array", { child: 7, row_words: 4 });
+  const schemas = readDataSchemas(
+    module([floating, pair, vector, matrix, values]),
+  )!;
+  validateDataRoots(schemas, [8]);
+  const memory = new WebAssembly.Memory({ initial: 2 });
+  const view = new DataView(memory.buffer);
+  const address = 65600;
+  view.setUint32(address - 28, 20, true);
+  view.setUint32(address - 24, 4, true);
+  view.setUint32(address - 16, 1, true);
+  view.setUint32(address, 1, true);
+  for (const [index, value] of [-0, 1.5, -7.25, Infinity].entries()) {
+    view.setFloat32(address + 4 + index * 4, value, true);
+  }
+  const copied = copyData(memory, schemas, 8, address);
+  assert.deepEqual(copied, [[{
+    family: "Vector",
+    tag: 7,
+    value: { x: -0, y: 1.5 },
+  }, { family: "Vector", tag: 7, value: { x: -7.25, y: Infinity } }]]);
+  view.setFloat32(address + 4, 100, true);
+  assert.deepEqual(copied, [[{
+    family: "Vector",
+    tag: 7,
+    value: { x: -0, y: 1.5 },
+  }, { family: "Vector", tag: 7, value: { x: -7.25, y: Infinity } }]]);
+  for (
+    const invalid of [
+      { ...values, row_words: 3 },
+      { ...values, child: 8 },
+    ]
+  ) {
+    assert.throws(() =>
+      readDataSchemas(module([floating, pair, vector, matrix, invalid]))
+    );
+  }
+  assert.throws(() =>
+    readDataSchemas(
+      module([
+        floating,
+        pair,
+        { ...vector, variants: [{ tag: 7, child: 5 }, { tag: 8, child: 5 }] },
+        matrix,
+        values,
+      ]),
+    )
+  );
+});
+
 Deno.test("structured cleanup independently links the actual schema and payload import types", async () => {
   const { instantiateGuest, GuestError } = await import("./guest.ts");
   const section = (

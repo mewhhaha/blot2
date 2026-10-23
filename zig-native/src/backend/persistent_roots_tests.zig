@@ -508,6 +508,85 @@ fn emitScenario(allocator: std.mem.Allocator, fixture: *const Fixture, previous:
     try std.testing.expectEqualSlices(u8, expected, result.bytes);
 }
 
+const evaluated_named_source =
+    \\const fold = fn reduce => fn initial => fn (count: U32) => do:
+    \\  let total = initial
+    \\  for index in 0..count:
+    \\    use next <- reduce total index
+    \\    total := next
+    \\  return total
+    \\const add = fn (left: U32) => fn (right: U32) => @u32.add left right
+    \\const sum = fold add 0
+    \\entry const answer = fn (count: U32) => sum count
+;
+fn evaluatedNamedReplay(allocator: std.mem.Allocator, fixture: *const Fixture, previous: ?*const @import("../reuse/artifact_capture.zig").Capture, checkpoint: ?*const archive.Checkpoint, expected: []const u8) !void {
+    var result = try fixture.emit(allocator, previous, checkpoint);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expectEqualSlices(u8, expected, result.bytes);
+}
+test "evaluated named calls preserve exact captures source reads replay checkpoint and complete OOM cleanup" {
+    var before = try Fixture.initSource(evaluated_named_source);
+    defer before.deinit();
+    const stamp = @import("../check/core_snapshot_tests.zig").stamp(before.units[0]);
+    var first = try before.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    const target = for (before.units[0].bodies) |body| {
+        if (body.is_function and body.parameters.len == 3) break core.BindingRef{ .unit = 1, .binding = body.binding };
+    } else return error.MissingFold;
+    const reads_body = read: for (first.capture.?.metadata.jobs.items) |job| {
+        for (job.inline_bodies.items) |read| if (std.meta.eql(read, target)) break :read true;
+    } else false;
+    try std.testing.expect(reads_body);
+    var reused = try before.emit(a, &first.capture.?, null);
+    defer reused.deinit(a);
+    try std.testing.expect(reused.diagnostic == null);
+    try std.testing.expectEqualSlices(u8, first.bytes, reused.bytes);
+    try std.testing.expect(reused.reuse.reused_named > 0);
+    try evaluatedNamedReplay(a, &before, &first.capture.?, null, first.bytes);
+    const compiler: [32]u8 = @splat(47);
+    const bytes = try archive.encode(a, compiler, &first.capture.?);
+    defer a.free(bytes);
+    var checkpoint = try archive.decode(a, compiler, bytes);
+    defer checkpoint.deinit();
+    try evaluatedNamedReplay(a, &before, null, &checkpoint, first.bytes);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, evaluatedNamedReplay, .{ &before, null, null, first.bytes });
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, evaluatedNamedReplay, .{ &before, &first.capture.?, null, first.bytes });
+    try std.testing.expectEqual(stamp, @import("../check/core_snapshot_tests.zig").stamp(before.units[0]));
+    const edited = try std.mem.replaceOwned(u8, a, evaluated_named_source, "sum = fold add 0", "sum = fold add 10");
+    defer a.free(edited);
+    var after = try Fixture.initSource(edited);
+    defer after.deinit();
+    var fresh = try after.emit(a, null, null);
+    defer fresh.deinit(a);
+    try std.testing.expect(fresh.diagnostic == null);
+    try std.testing.expect(!std.mem.eql(u8, first.bytes, fresh.bytes));
+    try evaluatedNamedReplay(a, &after, &first.capture.?, null, fresh.bytes);
+    try evaluatedNamedReplay(a, &after, null, &checkpoint, fresh.bytes);
+}
+
+test "static scalar list seeds preserve word roles through growth replay and complete OOM cleanup" {
+    var fixture = try Fixture.initSource(
+        \\const append = fn values => fn value => [...values, value]
+        \\const grow = fn initial => fn (count: U32) => do:
+        \\  let values = initial
+        \\  for index in 0..count:
+        \\    values := append self (@u32.add index 65536)
+        \\  return @array.from_list values
+        \\const selected = grow [100]
+        \\entry const answer = fn (count: U32) => selected count
+    );
+    defer fixture.deinit();
+    const stamp = @import("../check/core_snapshot_tests.zig").stamp(fixture.units[0]);
+    var first = try fixture.emit(a, null, null);
+    defer first.deinit(a);
+    try std.testing.expect(first.diagnostic == null);
+    try evaluatedNamedReplay(a, &fixture, &first.capture.?, null, first.bytes);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, evaluatedNamedReplay, .{ &fixture, null, null, first.bytes });
+    try std.testing.expectEqual(stamp, @import("../check/core_snapshot_tests.zig").stamp(fixture.units[0]));
+}
+
 const static_capture_source =
     \\type Pack [unused, selected] is data = #Pack {unused: unused, selected: selected}
     \\const identity = fn value => value
@@ -531,6 +610,8 @@ const static_capture_source =
 fn staticCaptureReplay(allocator: std.mem.Allocator, fixture: *const Fixture, previous: *const @import("../reuse/artifact_capture.zig").Capture, expected: []const u8) !void {
     var result = try fixture.emit(allocator, previous, null);
     defer result.deinit(allocator);
+    if (result.diagnostic) |issue| std.debug.print("static capture replay {s}: {s}\n", .{ @tagName(issue.code), issue.message() });
+    if (result.reuse.reused_named == 0) std.debug.print("static capture replay: candidates={d}, declined={d}, reused closures={d}, fresh closures={d}\n", .{ result.reuse.candidates, result.reuse.declined, result.reuse.reused_closures, result.reuse.fresh_closures });
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expectEqualSlices(u8, expected, result.bytes);
     try std.testing.expect(result.reuse.reused_named > 0);
@@ -545,7 +626,7 @@ test "static captured value graphs admit executable closure replay independently
     var static_jobs: usize = 0;
     for (first.capture.?.metadata.jobs.items) |job| if (job.request == .closure and job.request.closure.static_values != 0) {
         static_jobs += 1;
-        try std.testing.expect(job.reusable);
+        try std.testing.expectEqual(true, job.reusable);
         // Executable graph admission must not publish a solved principal
         // receipt from a generalized static field's erased layout.
         try std.testing.expect(!job.solved);
@@ -562,6 +643,21 @@ test "static captured value graphs admit executable closure replay independently
     const original = @import("../reuse/code_artifacts.zig").stamp(first.capture.?.metadata.pools.?.evaluator.values);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, staticCaptureReplay, .{ &after, &first.capture.?, fresh.bytes });
     try std.testing.expectEqual(original, @import("../reuse/code_artifacts.zig").stamp(first.capture.?.metadata.pools.?.evaluator.values));
+    // A replayed capture must retain the sharing bindings for its next edit,
+    // including the closure selected by ordinary current specialization.
+    var second = try after.emit(a, &first.capture.?, null);
+    defer second.deinit(a);
+    const third_source = try std.mem.replaceOwned(u8, a, static_capture_source, "offset = 10", "offset = 12");
+    defer a.free(third_source);
+    var third = try Fixture.initSource(third_source);
+    defer third.deinit();
+    var third_fresh = try third.emit(a, null, null);
+    defer third_fresh.deinit(a);
+    try std.testing.expect(third_fresh.diagnostic == null);
+    try staticCaptureReplay(a, &third, &second.capture.?, third_fresh.bytes);
+    const second_stamp = @import("../reuse/code_artifacts.zig").stamp(second.capture.?.metadata.pools.?.evaluator.values);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, staticCaptureReplay, .{ &third, &second.capture.?, third_fresh.bytes });
+    try std.testing.expectEqual(second_stamp, @import("../reuse/code_artifacts.zig").stamp(second.capture.?.metadata.pools.?.evaluator.values));
 }
 
 test "promoted generalized local initializers retain fresh code and exact wrapper body dependencies" {
@@ -1419,5 +1515,46 @@ test "shared carries, fresh replacements and owning element stores keep their lo
         const journal = loopJournal(&result);
         try std.testing.expect(journal.calls != 0);
         try std.testing.expect(journal.opens != 0);
+    }
+}
+
+const constructor_capture_programs = [_][]const u8{
+    \\data Box a = #Box { value: a }
+    \\const invoke = fn constructor => fn value => case constructor value of
+    \\  #Box payload => payload
+    \\const ready = invoke #Box
+    \\entry const answer = fn (value: U32) => ready value
+    ,
+    \\data Box a = #Box { value: a }
+    \\const invoke = fn constructors => fn value => case constructors.build value of
+    \\  #Box payload => payload
+    \\const ready = invoke { build: #Box }
+    \\entry const answer = fn (value: U32) => ready value
+    ,
+};
+
+test "evaluated named calls preserve canonical constructor captures through replay and OOM" {
+    for (constructor_capture_programs) |input| {
+        var fixture = try Fixture.initSource(input);
+        defer fixture.deinit();
+        const stamp = @import("../check/core_snapshot_tests.zig").stamp(fixture.units[0]);
+        var first = try fixture.emit(a, null, null);
+        defer first.deinit(a);
+        try std.testing.expect(first.diagnostic == null);
+        try evaluatedNamedReplay(a, &fixture, &first.capture.?, null, first.bytes);
+        const compiler: [32]u8 = @splat(47);
+        const saved = try archive.encode(a, compiler, &first.capture.?);
+        defer a.free(saved);
+        var checkpoint = try archive.decode(a, compiler, saved);
+        defer checkpoint.deinit();
+        try evaluatedNamedReplay(a, &fixture, null, &checkpoint, first.bytes);
+        var replayed = try backend.compileWithOptions(a, &fixture.units, 1, .{ .identity = fixture.names.view(), .artifact_replay = true });
+        defer replayed.deinit(a);
+        try std.testing.expect(replayed.diagnostic == null);
+        try std.testing.expectEqualSlices(u8, first.bytes, replayed.bytes);
+        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, evaluatedNamedReplay, .{ &fixture, null, null, first.bytes });
+        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, evaluatedNamedReplay, .{ &fixture, &first.capture.?, null, first.bytes });
+        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, evaluatedNamedReplay, .{ &fixture, null, &checkpoint, first.bytes });
+        try std.testing.expectEqual(stamp, @import("../check/core_snapshot_tests.zig").stamp(fixture.units[0]));
     }
 }

@@ -81,3 +81,9 @@ before the local milestone commit.
   30 ms literal-edit target is task [101](101-reach-the-literal-edit-target.md);
   finishing this task does not meet it.
 - Durable record: [retained edit cost](../zig-native/RETAINED_EDIT_COST.md).
+- The 20 October
+  [recreated-workload audit](../zig-native/RETAINED_EDIT_COST.md#recreated-workload-work-audit--20-october-2026)
+  reproduces all recorded task-053 candidate medians and work distributions.
+  Body revert optimizes only 18 functions but still costs about 4 seconds CPU;
+  this identifies remaining work for profiling, not its CPU attribution or task
+  completion. Current task-047 measurements remain pending.

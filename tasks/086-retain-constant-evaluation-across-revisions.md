@@ -165,4 +165,10 @@ If the work proceeds:
   from 2,059,944 to 1,660,593 bytes.
 - Remaining: the measurement gate, then either the open receipt authority listed
   in the starting point or closure as not needed.
+- The 20 October historical CPU-weighted smoke reanalysis separates runtime
+  function emission from constant evaluation and static serialization. Its
+  samples do not align with qualifying edit windows, so Quantity C remains
+  unmeasured. The
+  [cloud preparation](../zig-native/CONSTANT_REUSE.md#cloud-measurement-preparation-20-october-2026)
+  records the observed contexts, pins and both comparisons needed for closure.
 - Durable record: [constant receipts](../zig-native/CONSTANT_REUSE.md).

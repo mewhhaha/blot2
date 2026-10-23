@@ -142,21 +142,34 @@ export function readDataSchemas(
         ...node.variants.map((variant) => variant.child),
       ]
     ) if (child !== 0 && !nodes.has(child)) fail();
-    if (node.row_words !== 0) {
-      const child = nodes.get(node.child)!;
-      let fields: readonly number[] = child.children;
-      if (child.tag === "record") {
-        fields = child.fields.map((field) => field.child);
-      }
-      if (
-        (child.tag !== "record" && child.tag !== "product") ||
-        fields.length !== node.row_words || fields.some((field) =>
-          nodes.get(field)!.reference
-        )
-      ) fail();
-    }
+    if (
+      node.row_words !== 0 &&
+      packedWords(node.child, new Set(), 0) !== node.row_words
+    ) fail();
   }
   return nodes;
+
+  function packedWords(id: number, active: Set<number>, depth: number): number {
+    if (depth >= 16 || active.has(id)) fail();
+    const node = nodes.get(id)!;
+    if (!node.reference) return 1;
+    active.add(id);
+    let children: readonly number[];
+    if (node.tag === "record") {
+      children = node.fields.map((field) => field.child);
+    } else if (node.tag === "product") children = node.children;
+    else if (node.tag === "nominal" && node.variants.length === 1) {
+      children = [node.variants[0].child];
+    } else fail();
+    if (children.length === 0 || children.length > 16) fail();
+    let words = 0;
+    for (const child of children) {
+      words += packedWords(child, active, depth + 1);
+      if (words > 16) fail();
+    }
+    active.delete(id);
+    return words;
+  }
 }
 /** Schema graphs are bounded separately from a copied value's traversal. */
 export function validateDataRoots(
@@ -296,10 +309,47 @@ export function copyData(
     row: boolean,
   ): DataValue {
     if (row) {
-      if (--budget < 0) throw new Error("Cleanup data copy limit");
-      return aggregate(node, address, depth, true);
+      const position = { address };
+      return packed(node, position, depth);
     }
     return copy(node.id, load(address), depth);
+  }
+  function packed(
+    node: DataNode,
+    position: { address: number },
+    depth: number,
+  ): DataValue {
+    if (--budget < 0 || depth >= 128) {
+      throw new Error("Cleanup data copy limit");
+    }
+    if (!node.reference) {
+      const value = scalar(node, load(position.address));
+      position.address += 4;
+      return value;
+    }
+    if (node.tag === "nominal") {
+      const variant = node.variants[0];
+      return Object.freeze({
+        family: node.name,
+        tag: variant.tag,
+        value: packed(nodes.get(variant.child)!, position, depth + 1),
+      });
+    }
+    if (node.tag === "record") {
+      const record: Record<string, DataValue> = {};
+      for (const field of node.fields) {
+        Object.defineProperty(record, field.name, {
+          value: packed(nodes.get(field.child)!, position, depth + 1),
+          enumerable: true,
+        });
+      }
+      return Object.freeze(record);
+    }
+    return Object.freeze(
+      node.children.map((child) =>
+        packed(nodes.get(child)!, position, depth + 1)
+      ),
+    );
   }
   function copy(id: number, value: number, depth: number): DataValue {
     if (--budget < 0 || depth >= 128) {

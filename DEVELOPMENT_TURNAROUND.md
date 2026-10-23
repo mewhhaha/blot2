@@ -275,9 +275,9 @@ The earlier inspected binaries reported 426,073 and 201,681 bytes respectively;
 those binaries used different surrounding source, so the sizes are evidence of
 reduced generated code rather than a controlled whole-build speedup ratio.
 
-The compiler-only LLVM time report on the separate pending candidate finishes
-in **206.15 s**, including **205.50 s** for `blotc`. Zig attributes **199.00 s**
-to LLVM emission, **5.73 s** to declaration work and about **0.16 s** to link
+The compiler-only LLVM time report on the separate pending candidate finishes in
+**206.15 s**, including **205.50 s** for `blotc`. Zig attributes **199.00 s** to
+LLVM emission, **5.73 s** to declaration work and about **0.16 s** to link
 flush. LLVM pass timing totals 187.49 s; its largest entries are loop strength
 reduction (19.45 s), instruction combining (17.84 s), instruction selection
 (14.62 s) and inlining (14.49 s). The earlier 600-s timeout used another source
@@ -292,14 +292,14 @@ all **2,500** native laws execute with exhaustive allocation-failure mode in
 **651.22 s** on four concurrent shards, all **1,587** guest/client checks pass
 in **76.50 s**, and 51 harness plus 48 smoke checks pass. Native execution has
 zero skips, failures, leaks or logged errors. All 513 Zig files pass local lint
-with zero findings. The raw gate is in
-`build/bench/capture-scratch-main-gate/` in the isolated checkout.
+with zero findings. The raw gate is in `build/bench/capture-scratch-main-gate/`
+in the isolated checkout.
 
 The four native shard intervals are 478.44, 494.16, 651.16 and 525.57 s. Their
 combined test duration gives a 537.33-s four-core lower bound, leaving at most
 about 114 s for perfect repartitioning of this run. These test names and
-durations are saved with the gate. Rebalancing is a final-gate opportunity;
-the Zig development loop remains the right path for changes in progress.
+durations are saved with the gate. Rebalancing is a final-gate opportunity; the
+Zig development loop remains the right path for changes in progress.
 
 The recreated 583-file gdev snapshot verifies the recorded Wasm for the game,
 devtools and `tests/goals_game.blot`, and all seven game edit/revert scenarios
@@ -307,13 +307,63 @@ match fresh output. The three-pair game identity control passes its 1.05 CPU
 guard at paired median 0.995. Identity pairs check benchmark noise; they do not
 measure the patch against an unmodified main compiler. Results are under
 `build/bench/capture-scratch-main-{game,other,retained}-identity/`. A separate
-seven-pair comparison on the pending candidate reports median 0.994 against
-the previous qualified compiler, with identical Wasm between those binaries,
-but both differ from the repository's older recorded game hash; it is only a
+seven-pair comparison on the pending candidate reports median 0.994 against the
+previous qualified compiler, with identical Wasm between those binaries, but
+both differ from the repository's older recorded game hash; it is only a
 diagnostic, saved in the pending checkout's
 `build/bench/compiler-build-cost-release-scratch/game-cpu-diagnostic/`.
 
 The next 20 **real** changed-source development cycles are still needed before
-claiming a five-minute p95. The two focused checks on this main patch took
-25.64 s with a rebuild and 4.57 s cached. Repeating an unchanged check would
-measure cache replay, not another development cycle.
+claiming a five-minute p95. The two focused checks on this main patch took 25.64
+s with a rebuild and 4.57 s cached. Repeating an unchanged check would measure
+cache replay, not another development cycle.
+
+## Stop a failed native gate promptly
+
+The full gate invokes each installed native shard with `--fail-fast`. A failing
+law, allocator leak or logged error writes its timing record and exits; the
+scheduler then cancels and reaps sibling process groups. Missing shard
+completion is a failure and cannot enter the successful resume journal.
+
+Successful shards still execute the complete inventory with exhaustive
+allocation failures. The flag changes failure latency, not passing coverage. An
+explicit manual invocation without `--fail-fast` retains the option to collect
+multiple failures in one run. Runner fixtures cover the early exit, complete
+inventory, ordinary failure reporting and sibling cancellation.
+
+## Preserve native evidence and balance exhaustive work
+
+Native resume identities exclude `CODEX_TOOL_CALL_ID`, `SHLVL` and `_`: these
+identify a tool invocation or shell bookkeeping, rather than compiler
+configuration. Compiler options, the remaining environment, source and fixture
+bytes, toolchain files, executable and raw logs still have to match. The real
+runner recovery test changes the tool-call ID between invocations and checks
+that a guest repair resumes native evidence while a native edit invalidates it.
+
+Exhaustive workers use successful per-test durations to balance their assigned
+work. An installed baseline supplies hints on a fresh checkout; a local complete
+run supplies newer hints. Unknown tests remain in the inventory, and missing or
+corrupt hints fall back to the ordinary partition. Each selected test, fault
+mode and worker completion is still checked against the complete inventory. The
+executable's existing exact-name selection runs each group.
+
+The first 2,525-test measurement took 1,399 seconds, with individual workers
+taking approximately 1,040, 1,399, 1,099 and 1,014 seconds. Assigning those same
+recorded durations predicts about 1,138 seconds per worker. That 19% reduction
+is a scheduling estimate; a subsequent exhaustive run must measure the result.
+
+## Integrated exhaustive run, 23 October 2026
+
+The combined numeric/ownership candidate passes all 2,525 native tests with
+exhaustive allocation failures in **1,028.47 s**, using four balanced groups.
+The complete compiler gate takes **1,113.76 s**, including 1,640 guest checks in
+**48.15 s**. Verified compiler and native build caches take 0.11 and 0.45 s. The
+final numeric development family passes in **26.03 s**. These are individual
+observations, not a p95 guarantee. Earlier unbalanced native execution took
+1,399.38 s while LLVM also ran; the difference cannot all be attributed to
+balancing. No native tests or exhaustive fault positions were removed.
+
+Native identities ignore only per-invocation tool bookkeeping while preserving
+source, toolchain, executable and log hashes. This avoids re-executing an
+unchanged successful suite merely because the next tool call has a new ID. See
+the [full qualification](zig-native/NUMERIC_QUALIFICATION.md).

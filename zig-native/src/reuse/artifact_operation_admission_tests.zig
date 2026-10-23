@@ -69,6 +69,7 @@ const Fixture = struct {
 const Generator = struct {
     representations: @import("../backend/backend_representations.zig").State,
     planning: @import("../backend/backend_plan.zig").State,
+    static_data: @import("../backend/backend_static_data.zig").State = .{},
     persistent_outputs: bool = false,
     evaluator: eval.Session,
     request_owner: ?u32 = null,
@@ -79,6 +80,7 @@ const Generator = struct {
         return .{ .evaluator = evaluator, .representations = .fromStore(allocator, try layout.Store.init(allocator)), .planning = .{ .runtime_operations = operations.Store.initProject(allocator, fixture.names.view()) }, .allocator = allocator };
     }
     fn deinit(self: *Generator) void {
+        self.static_data.deinit(self.allocator);
         self.planning.deinit(self.allocator);
         self.representations.deinit(self.allocator);
         self.evaluator.deinit();

@@ -54,6 +54,12 @@ fresh/retained Wasm and diagnostics byte-identical.
 
 - Commit: pending; record the local milestone revision.
 - Validation: not run for this task.
+- Source review, 20 October 2026: the current
+  [region clock](../zig-native/src/backend/backend_timing.zig) uses awake wall
+  time and publishes only the eight slowest wall-time regions. It does not
+  establish the 50 ms CPU bound. Final measurement needs per-thread CPU clocks,
+  coverage of all inference regions and explicit reporting of every region at or
+  above the bound; scope counts alone do not supply CPU time.
 - Comparison: pending; record baseline/candidate hashes and paired distributions
   on the 084 workload.
 - Remaining limitations: not yet assessed.

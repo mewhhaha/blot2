@@ -82,6 +82,16 @@ test "compile stack" {
     ]);
     assert.deepEqual(results.map((result) => result.code).sort(), [0, 1]);
     assert.equal((await run()).code, 1);
+    const fast = await run("--fail-fast");
+    assert.equal(fast.code, 1);
+    const fastLog = new TextDecoder().decode(fast.stderr);
+    const fastRecords = nativeTestRecords(fastLog);
+    assert.equal(
+      fastRecords.length,
+      all.findIndex((name) => name.endsWith("rejected")) + 1,
+    );
+    assert.equal(fastRecords.at(-1)?.status, "failed");
+    assert(!fastLog.includes("BLOT_NATIVE_SHARD"));
     // Select allocator/logging/panic laws from their exact inventory positions.
     const allocatorIndex = all.findIndex((name) =>
       name.endsWith("allocator law")

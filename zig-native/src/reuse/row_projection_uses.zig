@@ -3,10 +3,68 @@
 //! captures and implicit loop-carried uses keep ordinary representation.
 const core = @import("../check/core.zig");
 const layout = @import("../backend/layout.zig");
+const numeric_rows = @import("../backend/numeric_rows.zig");
 
 pub fn check(source: *const core.Module, root: core.Id, binding: core.BindingId, layouts: *const layout.Store, row: layout.Id) bool {
     var proof: Proof = .{ .source = source, .binding = binding, .layouts = layouts, .row = row };
     return proof.visit(root, 0);
+}
+
+pub fn checkNumeric(source: *const core.Module, root: core.Id, binding: core.BindingId, layouts: *const layout.Store, plan: *const numeric_rows.Plan) bool {
+    var proof: Proof = .{ .source = source, .binding = binding, .layouts = layouts, .row = plan.storage[0].layout, .numeric = plan };
+    return proof.visit(root, 0);
+}
+
+const Position = union(enum) { storage: u8, leaf: u8 };
+fn childAt(plan: *const numeric_rows.Plan, owner: u8, offset: u32) ?Position {
+    for (plan.storage[0..plan.storage_count], 0..) |storage, index| {
+        if (storage.parent == owner and storage.offset == offset) return .{ .storage = @intCast(index) };
+    }
+    for (plan.leaves[0..plan.leaf_count], 0..) |leaf, index| {
+        if (leaf.owner == owner and leaf.offset == offset) return .{ .leaf = @intCast(index) };
+    }
+    return null;
+}
+
+fn numericPosition(source: *const core.Module, id: core.Id, binding: core.BindingId, layouts: *const layout.Store, plan: *const numeric_rows.Plan, depth: usize) ?Position {
+    if (id == 0 or depth >= 16) return null;
+    const node = source.node(id);
+    if (node.tag == .reference) {
+        const ref = source.reference(id);
+        return if ((ref.unit == 0 or ref.unit == source.unit) and ref.binding == binding) .{ .storage = 0 } else null;
+    }
+    if (node.tag != .project) return null;
+    const parent = numericPosition(source, node.a, binding, layouts, plan, depth + 1) orelse return null;
+    if (parent != .storage) return null;
+    var owner = parent.storage;
+    var shape = layouts.node(plan.storage[owner].layout);
+    const projection = source.projection(node.b);
+    const variants = source.projectionVariants(node.b);
+    if (shape.tag == .nominal) {
+        const unit = if (projection.nominal.unit == 0) source.unit else projection.nominal.unit;
+        if (projection.nominal.decl != shape.b or unit != shape.a or variants.len != 1 or variants[0].tag != plan.storage[owner].tag) return null;
+        const payload = childAt(plan, owner, 4) orelse return null;
+        if (payload != .storage) return null;
+        owner = payload.storage;
+        shape = layouts.node(plan.storage[owner].layout);
+    } else if (projection.nominal.decl != 0) return null;
+    const ty = plan.storage[owner].layout;
+    if (shape.tag == .record) {
+        const fields = layouts.children(ty);
+        for (0..fields.len / 2) |index| {
+            if (fields[index * 2] == projection.field) return childAt(plan, owner, @intCast(index * 4));
+        }
+        return null;
+    }
+    if (shape.tag != .product or variants.len != 1 or variants[0].field >= layouts.children(ty).len) return null;
+    return childAt(plan, owner, variants[0].field * 4);
+}
+
+/// Only a complete scalar projection chain may borrow packed storage. A
+/// projected subobject or a bare value still needs its owned representation.
+pub fn numericOffset(source: *const core.Module, id: core.Id, binding: core.BindingId, layouts: *const layout.Store, plan: *const numeric_rows.Plan) ?u32 {
+    const position = numericPosition(source, id, binding, layouts, plan, 0) orelse return null;
+    return if (position == .leaf) @as(u32, position.leaf) * 4 else null;
 }
 
 pub fn checkBinding(source: *const core.Module, root: core.Id, definition: core.Id, binding: core.BindingId, layouts: *const layout.Store, row: layout.Id) bool {
@@ -38,6 +96,7 @@ const Proof = struct {
     row: layout.Id,
     budget: usize = 4096,
     definition: core.Id = 0,
+    numeric: ?*const numeric_rows.Plan = null,
 
     fn isRow(self: *const Proof, id: core.Id) bool {
         if (id == 0 or self.source.node(id).tag != .reference) return false;
@@ -75,7 +134,13 @@ const Proof = struct {
         switch (node.tag) {
             .constant, .constructor_function, .primitive_function, .type_constructor, .panic => return true,
             .reference => return !self.isRow(id),
-            .project => return if (self.isRow(node.a)) self.field(node.b) else self.visit(node.a, depth + 1),
+            .project => {
+                if (self.numeric) |plan| {
+                    if (numericOffset(self.source, id, self.binding, self.layouts, plan) != null) return true;
+                    return self.visit(node.a, depth + 1);
+                }
+                return if (self.isRow(node.a)) self.field(node.b) else self.visit(node.a, depth + 1);
+            },
             .bind => return node.a != self.binding and self.visit(node.b, depth + 1),
             .construct => return self.visit(node.b, depth + 1),
             .return_, .force, .result_associated => return self.visit(node.a, depth + 1),

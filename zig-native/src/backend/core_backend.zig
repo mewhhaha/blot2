@@ -141,6 +141,7 @@ pub const Generator = struct {
     evaluator: core_eval.Session,
     representations: @import("backend_representations.zig").State,
     static_data: @import("backend_static_data.zig").State = .{},
+    numeric_rows: @import("numeric_rows.zig").Cache = .{},
     persistent_outputs: bool = false,
     public_owners: ?@import("../runtime/public_owners.zig").Runtime = null,
     task_context: ?@import("../runtime/task_context.zig").Functions = null,
@@ -260,6 +261,7 @@ pub const Generator = struct {
         };
     }
     fn deinit(self: *Generator) void {
+        self.numeric_rows.deinit(self.allocator);
         self.demand_lowering.deinit(self.allocator);
         self.planning.deinit(self.allocator);
         self.module.deinit();
@@ -312,6 +314,22 @@ pub const Generator = struct {
     }
     pub fn unit(self: *const Generator, id: u32) *const core.Module {
         return &self.units[id - 1];
+    }
+    pub fn nestedRow(self: *Generator, id: layout.Id) Allocator.Error!?@import("numeric_rows.zig").Plan {
+        if (@import("packed_layout.zig").rowWords(&self.representations.store, id) != 0) return null;
+        const tag = self.representations.store.node(id).tag;
+        if (tag != .record and tag != .product and tag != .nominal) return null;
+        return self.numeric_rows.get(self.allocator, self, id);
+    }
+    pub fn rowWords(self: *Generator, id: layout.Id) Allocator.Error!u32 {
+        const flat = @import("packed_layout.zig").rowWords(&self.representations.store, id);
+        if (flat != 0) return flat;
+        const plan = try self.nestedRow(id) orelse return 0;
+        return plan.leaf_count;
+    }
+    pub fn collectionRowWords(self: *Generator, id: layout.Id) Allocator.Error!u32 {
+        const node = self.representations.store.node(id);
+        return if (node.tag == .array or node.tag == .list) self.rowWords(node.a) else 0;
     }
     pub fn numericCheck(self: *Generator, unit_id: u32, id: core.Id) Error!bool {
         if (id == 0) return false;
@@ -2000,14 +2018,8 @@ pub const Generator = struct {
                 }
                 return null;
             }
-            pub fn rowWords(context: @This(), id: layout.Id, remaining: *usize, depth: usize) error{LayoutLimit}!u32 {
-                const node = context.layouts.node(id);
-                if (node.tag != .product and node.tag != .record or node.b == 0 or node.b > 16) return 0;
-                const children = context.layouts.children(id);
-                var step: usize = 1;
-                if (node.tag == .record) step = 2;
-                for (0..node.b) |index| if ((try context.physical(children[index * step + step - 1], remaining, depth + 1)).reference) return 0;
-                return node.b;
+            pub fn rowWords(context: @This(), id: layout.Id, _: *usize, _: usize) Allocator.Error!u32 {
+                return context.generator.rowWords(id);
             }
             pub fn nominal(context: @This(), id: layout.Id, remaining: *usize) (Allocator.Error || error{LayoutLimit})!shapes.Facts {
                 const g = context.generator;

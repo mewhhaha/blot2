@@ -10,8 +10,16 @@ pub fn admits(m: *const core.Module, id: core.Id, expose_data: bool) bool {
     return if (cost(m, id)) |nodes| nodes <= (if (expose_data) @as(u16, 64) else 4) else false;
 }
 pub fn cost(m: *const core.Module, id: core.Id) ?u16 {
-    var budget: usize = 64;
-    return if (visit(m, id, &budget)) @intCast(64 - budget) else null;
+    return boundedCost(m, id, 64);
+}
+/// A numeric representation adapter can expose up to sixteen scalar leaves.
+/// Keep its larger traversal separate from the ordinary inline cost query.
+pub fn numericCost(m: *const core.Module, id: core.Id) ?u16 {
+    return boundedCost(m, id, 128);
+}
+fn boundedCost(m: *const core.Module, id: core.Id, limit: usize) ?u16 {
+    var budget = limit;
+    return if (visit(m, id, &budget)) @intCast(limit - budget) else null;
 }
 fn visit(m: *const core.Module, id: core.Id, budget: *usize) bool {
     if (id == 0) return true;

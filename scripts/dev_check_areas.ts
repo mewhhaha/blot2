@@ -1,5 +1,31 @@
 /** Explicit regression families. A development pass never qualifies the full tree. */
 export const devCheckAreas = {
+  "numeric-aggregates": {
+    description:
+      "Numeric call adapters, physical layouts, immutable snapshots and ownership.",
+    native: [
+      "check.core_proof_tests.test.numeric proof prepared associated bodies retain reusable code when ordinary facts already admit the check",
+      "backend.numeric_rows.test.numeric row plans preserve physical paths and reject references and excessive depth",
+      "backend.numeric_rows.test.numeric row cache owns positive and declined plans through every allocation failure",
+      "backend.collection_tests.test.nested numeric collection rows preserve frozen evidence through emission and complete OOM",
+      "backend.collection_tests.test.numeric nominal adapters preserve frozen Core and types through emission allocation failure",
+      "backend.packed_layout.test.production packed arrays require complete flat scalar evidence",
+      "backend.packed_layout.test.packed row plans flatten checked tuples and reject every reference representation",
+      "backend.wasm_inline.test.direct callable adapter to scalar record reader exposes caller allocation to scalar replacement",
+    ],
+    guests: [
+      "compiler/cleanup_data.test.ts",
+      "zig-native/tests/structural_host_cleanup_execution.test.ts",
+      "zig-native/tests/packed_rows_execution.test.ts",
+      "zig-native/tests/packed_rows_revision.test.ts",
+      "zig-native/tests/numeric_aggregates_execution.test.ts",
+      "zig-native/tests/compile_budget.test.ts",
+      "zig-native/tests/allocation_cost_matrix.test.ts",
+      "zig-native/tests/scalar_record_reader_execution.test.ts",
+      "zig-native/tests/record_payload_execution.test.ts",
+    ],
+    guestFilters: {} as Record<string, string>,
+  },
   "static-sharing": {
     description:
       "Static aggregate sharing, retained replay, admission and fault-policy laws.",
@@ -7,9 +33,14 @@ export const devCheckAreas = {
       "backend.aggregate_constant_tests.test.retained callers replay aggregate constants with fresh-identical data through allocation failures",
       "backend.aggregate_constant_tests.test.aggregate constants with changed values aliases or nominal payloads rebuild their callers",
       "backend.aggregate_constant_tests.test.admission skips every aggregate child range of one caller and keeps the records between them",
+      "reuse.retained_candidate_tests.test.direct static capture materialization preserves fresh edit revert bytes and scalar evaluated query reuse",
+      "reuse.retained_candidate_tests.test.direct static capture materialization releases failed candidates without changing retained source owners",
       "reuse.artifact_backend_tests.test.artifact replay preserves codegen tiers and physical sharing without merging semantic jobs",
       "backend.persistent_roots_tests.test.capture-free descriptor addresses relocate through retained portable replay and OOM",
+      "backend.persistent_roots_tests.test.evaluated named calls preserve exact captures source reads replay checkpoint and complete OOM cleanup",
+      "backend.persistent_roots_tests.test.static scalar list seeds preserve word roles through growth replay and complete OOM cleanup",
       "backend.persistent_roots_tests.test.static captured value graphs admit executable closure replay independently of principal mappings",
+      "backend.persistent_roots_tests.test.evaluated named calls preserve canonical constructor captures through replay and OOM",
       "reuse.artifact_operation_admission_tests.test.operation admission qualifies cached and exact entry catalogs without publishing tags",
       "reuse.artifact_operation_admission_tests.test.operation admission validates exact entry catalogs in inline references and unused demands",
       "reuse.artifact_operation_admission_tests.test.executable fragment queries decline unsealed and saturated captures while preserving the live request owner",
@@ -22,6 +53,7 @@ export const devCheckAreas = {
       "allocation_failures.test.sampled allocation failures reject swallowed faults and propagate scenario failures",
     ],
     guests: [
+      "zig-native/tests/evaluated_calls_execution.test.ts",
       "zig-native/tests/zig_project_protocol.test.ts",
       "zig-native/tests/zig_project_client.test.ts",
       "zig-native/tests/stage_chain_budget.test.ts",

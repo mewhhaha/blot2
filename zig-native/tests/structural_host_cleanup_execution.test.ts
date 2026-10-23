@@ -15,6 +15,11 @@ const product = fn (drop: cleanup ((unique (U32, Array F32)) -> Unit ! {Foreign}
 const listed = fn (drop: cleanup ((unique (List U32)) -> Unit ! {Foreign})) => @resource.scope (fn () => [1, 2, 3]) drop (fn loan => 42)
 const rows = fn (drop: cleanup ((unique (Array (U32, F32))) -> Unit ! {Foreign})) => @resource.scope (fn () => #[(7, 1.5), (9, 2.5)]) drop (fn loan => 42)
 const row_list = fn (drop: cleanup ((unique (List (U32, F32))) -> Unit ! {Foreign})) => @resource.scope (fn () => [(7, 1.5), (9, 2.5)]) drop (fn loan => 42)
+type Vector is data = #Vector {x: F32, y: F32}
+type Matrix is data = #Matrix {a: Vector, b: Vector}
+const matrix = #Matrix {a: #Vector {x: 1.5, y: 2.5}, b: #Vector {x: 3.5, y: 4.5}}
+const matrix_rows = fn (drop: cleanup ((unique (Array Matrix)) -> Unit ! {Foreign})) => @resource.scope (fn () => #[matrix, matrix]) drop (fn loan => 42)
+const matrix_list = fn (drop: cleanup ((unique (List Matrix)) -> Unit ! {Foreign})) => @resource.scope (fn () => [matrix, matrix]) drop (fn loan => 42)
 const tree = fn (drop: cleanup ((unique (Tree U32)) -> Unit ! {Foreign})) => @resource.scope (fn () => #Branch (#Leaf 7, #Leaf 9)) drop (fn loan => 42)
 const opaque_data = fn (drop: cleanup ((unique Secret) -> Unit ! {Foreign})) => @resource.scope (fn () => #Secret {items: #[1, 2], nonce: 7}) drop (fn loan => 42)
 const make = fn (drop: cleanup ((unique {items: Array U32, nonce: U32}) -> Unit ! {Foreign})) => @resource.acquire (fn () => {nonce: 7, items: #[1, 2]}) drop
@@ -34,6 +39,8 @@ const names = [
   "listed",
   "rows",
   "row_list",
+  "matrix_rows",
+  "matrix_list",
   "tree",
   "opaque_data",
   "make",
@@ -120,6 +127,8 @@ for (const codegenTier of ["development", "optimized"] as const) {
                   "listed",
                   "rows",
                   "row_list",
+                  "matrix_rows",
+                  "matrix_list",
                   "tree",
                   "opaque_data",
                 ]
@@ -142,6 +151,19 @@ for (const codegenTier of ["development", "optimized"] as const) {
               ]]);
               assert.deepEqual(values.get("rows"), [[[7, 1.5], [9, 2.5]]]);
               assert.deepEqual(values.get("row_list"), values.get("rows"));
+              const matrix = {
+                family: "Matrix",
+                tag: 0,
+                value: {
+                  a: { family: "Vector", tag: 0, value: { x: 1.5, y: 2.5 } },
+                  b: { family: "Vector", tag: 0, value: { x: 3.5, y: 4.5 } },
+                },
+              };
+              assert.deepEqual(values.get("matrix_rows"), [[matrix, matrix]]);
+              assert.deepEqual(
+                values.get("matrix_list"),
+                values.get("matrix_rows"),
+              );
               assert.deepEqual(values.get("tree"), [{
                 family: "Tree",
                 tag: 1,

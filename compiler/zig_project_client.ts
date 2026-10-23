@@ -644,7 +644,13 @@ class ProjectProcess implements ZigProjectCompiler {
           try {
             this.#child.kill("SIGKILL");
           } catch (error) {
-            if (!(error instanceof Deno.errors.NotFound)) throw error;
+            // Deno can observe exit before our status callback runs. Its
+            // ChildProcess then rejects kill with TypeError instead of ESRCH.
+            const terminated = error instanceof TypeError &&
+              /^Child process has already terminated\.?$/.test(error.message);
+            if (!(error instanceof Deno.errors.NotFound) && !terminated) {
+              throw error;
+            }
           }
         }
       };

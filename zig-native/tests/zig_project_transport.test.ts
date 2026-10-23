@@ -1,5 +1,6 @@
 import {
   deepStrictEqual as equal,
+  doesNotThrow,
   ok,
   rejects,
   strictEqual,
@@ -70,6 +71,97 @@ async function waiting(path: string, kind: string) {
   }
   throw new Error("Peer did not receive request");
 }
+Deno.test("client close reaps an exited child before its status observer settles", async () => {
+  const item = await fixture("fragmented");
+  const spawn = Deno.Command.prototype.spawn;
+  const setTimer = globalThis.setTimeout;
+  let releaseStatus!: () => void;
+  const heldStatus = new Promise<void>((resolve) => releaseStatus = resolve);
+  let deadlineReady!: () => void;
+  const ready = new Promise<void>((resolve) => deadlineReady = resolve);
+  let status: Promise<Deno.CommandStatus> | undefined;
+  let deadline: (() => void) | undefined;
+  let holdExit = false, kills = 0;
+  let killError: unknown;
+  let compiler: ZigProjectCompiler | undefined;
+  let closing: Promise<void> | undefined;
+  try {
+    Deno.Command.prototype.spawn = function (this: Deno.Command) {
+      const child = spawn.call(this);
+      status = child.status;
+      return new Proxy(child, {
+        get(target, property) {
+          if (property === "status") {
+            return status!.then(async (exit) => {
+              if (holdExit) await heldStatus;
+              return exit;
+            });
+          }
+          if (property === "kill") {
+            return (signal?: Deno.Signal) => {
+              kills++;
+              try {
+                target.kill(signal);
+              } catch (error) {
+                killError = error;
+                throw error;
+              }
+            };
+          }
+          const value = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+    };
+    compiler = await createZigProjectCompiler(item.options);
+    Deno.Command.prototype.spawn = spawn;
+    holdExit = true;
+    // Hold only the client's grace deadline. Fire it after Deno's real child
+    // status settles, while the client's observer is still pending.
+    globalThis.setTimeout = ((
+      handler: (...args: unknown[]) => void,
+      timeout?: number,
+      ...args: unknown[]
+    ) => {
+      if (timeout === 1000) {
+        deadline = () => handler(...args);
+        deadlineReady();
+        return 0;
+      }
+      return setTimer(handler, timeout, ...args);
+    }) as typeof setTimer;
+    closing = compiler.close();
+    await Promise.race([
+      ready,
+      closing.then(() => {
+        throw new Error("Close settled before its held status observer");
+      }),
+    ]);
+    ok((await status!).success);
+    globalThis.setTimeout = setTimer;
+    ok(deadline);
+    doesNotThrow(deadline);
+    equal(kills, 1);
+    ok(
+      killError instanceof TypeError ||
+        killError instanceof Deno.errors.NotFound,
+    );
+    releaseStatus();
+    await closing;
+    reaped(compiler.pid);
+    strictEqual(closing, compiler.close());
+  } finally {
+    Deno.Command.prototype.spawn = spawn;
+    globalThis.setTimeout = setTimer;
+    releaseStatus();
+    try {
+      await closing;
+    } finally {
+      await compiler?.dispose();
+      await item.cleanup();
+    }
+  }
+});
 Deno.test("source buffers reject unsupported peers without consuming a request ID", async () => {
   const item = await fixture("fragmented");
   const compiler = await createZigProjectCompiler(item.options);

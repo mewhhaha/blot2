@@ -97,7 +97,9 @@ const Fixture = struct {
         self.names.deinit(a);
     }
     fn compile(self: *const Fixture, allocator: std.mem.Allocator, loaded: ?*const checkpoint.Checkpoint) !backend.Result {
-        return backend.compileWithOptions(allocator, self.units, 1, .{ .identity = self.names.view(), .retain_artifacts = true, .checkpoint = loaded });
+        // These laws need an independently selected callable to exercise the
+        // semantic archive. Inlining can legitimately eliminate that receipt.
+        return backend.compileWithOptions(allocator, self.units, 1, .{ .identity = self.names.view(), .retain_artifacts = true, .checkpoint = loaded, .inline_named = false });
     }
 };
 fn successful(result: *const backend.Result) !void {
@@ -123,6 +125,31 @@ fn restartScenario(allocator: std.mem.Allocator, fixture: *const Fixture, bytes:
     try successful(&restarted);
     try std.testing.expect(restarted.completed_queries.reused > 0);
     try std.testing.expectEqualSlices(u8, expected, restarted.bytes);
+}
+
+fn inlinedRestart(allocator: std.mem.Allocator, fixture: *const Fixture, bytes: []const u8, expected: []const u8) !void {
+    var loaded = try checkpoint.decode(allocator, compiler, bytes);
+    defer loaded.deinit();
+    try std.testing.expect(loaded.semantic == null);
+    var restarted = try backend.compileWithOptions(allocator, fixture.units, 1, .{ .identity = fixture.names.view(), .retain_artifacts = true, .checkpoint = &loaded });
+    defer restarted.deinit(allocator);
+    try successful(&restarted);
+    try std.testing.expectEqualSlices(u8, expected, restarted.bytes);
+}
+
+test "inlined callbacks preserve checkpoint restart without a semantic owner through OOM" {
+    var fixture = try Fixture.init(source);
+    defer fixture.deinit();
+    var fresh = try backend.compileWithOptions(a, fixture.units, 1, .{ .identity = fixture.names.view(), .retain_artifacts = true });
+    defer fresh.deinit(a);
+    try successful(&fresh);
+    const semantic = try archive.encode(a, compiler, &fresh.capture.?);
+    defer if (semantic) |bytes| a.free(bytes);
+    try std.testing.expect(semantic == null);
+    const bytes = try checkpoint.encode(a, compiler, &fresh.capture.?);
+    defer a.free(bytes);
+    try inlinedRestart(a, &fixture, bytes, fresh.bytes);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, inlinedRestart, .{ &fixture, bytes, fresh.bytes });
 }
 
 test "portable identity rank checkpoints admit canonical ordinal evidence after frontend teardown" {

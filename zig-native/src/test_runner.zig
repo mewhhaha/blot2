@@ -35,9 +35,12 @@ fn run(init: std.process.Init) !void {
     var shard: usize = 0;
     var shards: usize = 1;
     var list = false;
+    var fail_fast = false;
     for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "--list")) {
             list = true;
+        } else if (std.mem.eql(u8, arg, "--fail-fast")) {
+            fail_fast = true;
         } else if (std.mem.startsWith(u8, arg, "--shard=")) {
             shard = try std.fmt.parseInt(usize, arg[8..], 10);
         } else if (std.mem.startsWith(u8, arg, "--shards=")) {
@@ -129,6 +132,9 @@ fn run(init: std.process.Init) !void {
             .allocation_failures = @tagName(policy.fault_mode),
             .sweeps = policy.counts,
         }, .{})});
+        // Report the failing law before exiting, so the scheduler can cancel
+        // sibling shards immediately. An incomplete shard is never a pass.
+        if (fail_fast and (status == .failed or test_leaks != 0 or logged_errors != errors_before)) std.process.exit(1);
     }
     if (list) return;
     const finished = std.Io.Clock.Timestamp.now(init.io, .awake);

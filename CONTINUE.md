@@ -1,16 +1,39 @@
 # Continue here
 
+23 October 2026: [the completion plan](FINISH_PLAN.md) orders the preserved
+local candidate, the twelve open task records, and issue #25's remaining
+language/runtime milestones. New issues #26 (numeric layouts) and #27
+(application compilation/memory) share the representation and measurement work.
+The plan records current state and exit criteria; it does not claim
+implementation or qualification.
+
+Current execution: the recovered compiler changes and bounded recursive numeric
+Array/List storage pass the full gate: 2,525 exhaustive native tests, 1,640
+guest/client checks and zero analyzer findings. Seven LLVM application pairs
+pass fresh/edit/revert/restart equality and the 5% fresh-game CPU guard (1.013).
+The [qualification record](zig-native/NUMERIC_QUALIFICATION.md) preserves raw
+measurements, limitations and rejected experiments. The original dirty
+`/workspace/blot2` checkout remains preserved; integration is in
+`/workspace/.numeric-tuning`.
+
+Pen cache bounds, artifact validation and profiling are pushed in `d8e0a2f` and
+`67a4682`. The current startup measurement is separate from the completed
+compiler qualification. Issue #26's implementation and evidence are complete;
+#25 and #27 and the remaining task requirements stay open. Continue with later
+edit/constant attribution and the remaining milestones in the completion plan.
+
 ## Issue #25: minimal task/channel/control surface (22 October 2026)
 
-Blot2 main is at `e3e7463`. The only open GitHub issue is #25. The current
-one-result task slice implements `*(call)` and `|handle|` inside a direct
-`@task.scope` callback. An ordinary `const await = fn source => |source|`
-consumes a task handle and returns its exact result through local aliases and
-renamed imports. The compiler freezes and validates that helper's exact join
-body, specializes its erased handle layout, and seals bottom-typed Wasm blocks
-after function exits (which repaired F32 returns). The full gate passed:
-2,510 native laws in four exhaustive shards, 1,633 guest/client checks,
-release build and harness/smoke checks. Zig lint found zero issues.
+This checkpoint's compiler revision is `e3e7463`. At that time the only open
+GitHub issue was #25. The current one-result task slice implements `*(call)` and
+`|handle|` inside a direct `@task.scope` callback. An ordinary
+`const await = fn source => |source|` consumes a task handle and returns its
+exact result through local aliases and renamed imports. The compiler freezes and
+validates that helper's exact join body, specializes its erased handle layout,
+and seals bottom-typed Wasm blocks after function exits (which repaired F32
+returns). The full gate passed: 2,510 native laws in four exhaustive shards,
+1,633 guest/client checks, release build and harness/smoke checks. Zig lint
+found zero issues.
 
 Issue #25 is **open**. Tuple collect/select, stream channels, scoped nonlocal
 exits, purity proofs, worker transport and their benchmarks are not implemented.
@@ -22,33 +45,35 @@ The next boundary is helper propagation for task regions:
   that literal syntax currently fails before type checking.
 - `check/check.zig::taskApplication` requires a syntactic lambda for
   `@task.scope`, so `const scope = fn body => @task.scope body` reports
-  `task_escape`. `const spawn = fn group => fn action => @task.spawn group
-  action` also reports `task_escape` when its closure captures the group.
-- The implementation must carry a validated, generative region contract
-  through wrappers/imports and elaborate spark after checking that evidence.
-  Do not recognize prelude names as keywords or weaken the existing escape
-  diagnostics. Start with `scope`/`spawn` helper execution in both tiers and
+  `task_escape`.
+  `const spawn = fn group => fn action => @task.spawn group
+  action` also
+  reports `task_escape` when its closure captures the group.
+- The implementation must carry a validated, generative region contract through
+  wrappers/imports and elaborate spark after checking that evidence. Do not
+  recognize prelude names as keywords or weaken the existing escape diagnostics.
+  Start with `scope`/`spawn` helper execution in both tiers and
   fresh/retained/imported checks, then tuple receive and the later stages in
   #25's stated order. Use the native Zig backend for development and the LLVM
   build only for release qualification.
 
-The issue body revised at 19:59 UTC intentionally has only `*` and receiver
-bars as new surface syntax; it excludes `tasks`, `async`, `finish`, `defer` and
-`channel` block keywords. Keep `return` as function exit and `break value`
-as the nearest `do` result. The untouched `/workspace/blot2` checkout is
-dirty; work in the isolated `/workspace/.issue25-next` checkout or a fresh
-worktree without overwriting it.
+The issue body revised at 19:59 UTC intentionally has only `*` and receiver bars
+as new surface syntax; it excludes `tasks`, `async`, `finish`, `defer` and
+`channel` block keywords. Keep `return` as function exit and `break value` as
+the nearest `do` result. The untouched `/workspace/blot2` checkout is dirty;
+work in the isolated `/workspace/.issue25-next` checkout or a fresh worktree
+without overwriting it.
 
-22 October 2026: the release build-cost follow-up is qualified on main. A
-single non-inlined `CaptureScratch.deinit` owns `captureBody`'s partial lists;
-the transfer and allocation-failure paths remain covered. The compiler-only
-LLVM profile completes in 206.15 s on the separate pending candidate, with
-199.00 s in LLVM emission. On the isolated main source, the complete LLVM
-release build including fixtures takes 255.10 s. The full gate passes in
-754.63 s: 2,500 exhaustive native laws in four shards, 1,587 guest/client
-checks, 51 harness checks and 48 smoke checks. Full Zig lint has zero findings.
-The recreated gdev snapshot matches recorded Wasm for the game, devtools,
-largest test and all game edit/revert phases. See
+22 October 2026: the release build-cost follow-up is qualified on main. A single
+non-inlined `CaptureScratch.deinit` owns `captureBody`'s partial lists; the
+transfer and allocation-failure paths remain covered. The compiler-only LLVM
+profile completes in 206.15 s on the separate pending candidate, with 199.00 s
+in LLVM emission. On the isolated main source, the complete LLVM release build
+including fixtures takes 255.10 s. The full gate passes in 754.63 s: 2,500
+exhaustive native laws in four shards, 1,587 guest/client checks, 51 harness
+checks and 48 smoke checks. Full Zig lint has zero findings. The recreated gdev
+snapshot matches recorded Wasm for the game, devtools, largest test and all game
+edit/revert phases. See
 [development feedback](DEVELOPMENT_TURNAROUND.md#capturebody-release-build-follow-up-22-october-2026)
 for exact scope and timing limits. The separate pending compiler candidate in
 `/workspace/blot2` remains uncommitted and needs its own qualification.

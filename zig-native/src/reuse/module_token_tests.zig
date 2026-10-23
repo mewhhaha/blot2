@@ -167,8 +167,11 @@ test "token capture and admission release every allocation failure and keep thei
 test "checkpoints persist digests, never tokens, and restored pins validate before reuse" {
     var producer = try Fixture.init(source);
     defer producer.deinit();
-    var initial = try producer.compile(a, null, false);
+    // Restored pin validation needs a selected semantic receipt. Inlining
+    // can legitimately omit that optional owner; keep this law on query replay.
+    var initial = try backend.compileWithOptions(a, producer.units, 1, .{ .identity = producer.names.view(), .retain_artifacts = true, .inline_named = false });
     defer initial.deinit(a);
+    try std.testing.expect(initial.diagnostic == null);
     const bytes = try checkpoint.encode(a, compiler, &initial.capture.?);
     defer a.free(bytes);
     for (0..2) |attempt| {
@@ -182,7 +185,7 @@ test "checkpoints persist digests, never tokens, and restored pins validate befo
         try std.testing.expect(try artifacts.pinIntact(&restored[0], null));
         var fixture = try Fixture.init(source);
         defer fixture.deinit();
-        var restarted = try backend.compileWithOptions(a, fixture.units, 1, .{ .identity = fixture.names.view(), .retain_artifacts = true, .checkpoint = &loaded });
+        var restarted = try backend.compileWithOptions(a, fixture.units, 1, .{ .identity = fixture.names.view(), .retain_artifacts = true, .checkpoint = &loaded, .inline_named = false });
         defer restarted.deinit(a);
         try std.testing.expect(restarted.diagnostic == null);
         try std.testing.expectEqualSlices(u8, initial.bytes, restarted.bytes);

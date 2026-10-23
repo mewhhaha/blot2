@@ -130,22 +130,22 @@ zero findings. Current runtime and staging measurements are recorded in
 
 ## Remaining qualification
 
-A local analyzer at `9a78ce1` and its backend build. The published `codeberg.org` rule is now
-active in enforced revision 4, and Git resolves Zig 0.17.0 to the expected
-commit `7647adab80dd088f4de3610fd245915a912eb6ad`. The supported
-`-Duse-llvm=true` host compiler option builds the analyzer backend; the resulting
-backend still uses `-Denable-llvm=false`. Its source, analysis patch and protocol
-checks remain exact. Doctor reports Zig 0.17.0 and a compatible backend.
-The analyzer binary SHA-256 is
-`1ff727d14e0e6d75f882d6b9decdae9cab657a4815cff4d7703069aa0b4d4b25`, and
-the backend executable SHA-256 is
-`010850fcfe0ec617d2477ff5f7beca4edfbfa88536ad97ccea549cd0a0183c2c`.
-The manifest's `backend_sha256` names its source/patch inputs, not the executable.
-The earlier revision-3 rejection is retained
-as historical evidence in ignored `.tools/published-network-observation.json`.
-The forced gate above qualifies the earlier source milestone. New module-cutoff
-source changes require a new gate. The local analyzer gate and the remaining
-module, iterator and final performance requirements stay open.
+A local analyzer at `9a78ce1` and its backend build. The published
+`codeberg.org` rule is now active in enforced revision 4, and Git resolves Zig
+0.17.0 to the expected commit `7647adab80dd088f4de3610fd245915a912eb6ad`. The
+supported `-Duse-llvm=true` host compiler option builds the analyzer backend;
+the resulting backend still uses `-Denable-llvm=false`. Its source, analysis
+patch and protocol checks remain exact. Doctor reports Zig 0.17.0 and a
+compatible backend. The analyzer binary SHA-256 is
+`1ff727d14e0e6d75f882d6b9decdae9cab657a4815cff4d7703069aa0b4d4b25`, and the
+backend executable SHA-256 is
+`010850fcfe0ec617d2477ff5f7beca4edfbfa88536ad97ccea549cd0a0183c2c`. The
+manifest's `backend_sha256` names its source/patch inputs, not the executable.
+The earlier revision-3 rejection is retained as historical evidence in ignored
+`.tools/published-network-observation.json`. The forced gate above qualifies the
+earlier source milestone. New module-cutoff source changes require a new gate.
+The local analyzer gate and the remaining module, iterator and final performance
+requirements stay open.
 
 ## Current external and tooling checks
 
@@ -156,8 +156,8 @@ historical `86a527b` and `48eda0a` releases. All required current/pinned ratios
 are below 1.5, break writes scale by 1.821 when the count doubles, and 60,480
 guest calls preserve witnesses and warmed memory. Each compiler uses its own
 standard library and guest API. The production compiler is unchanged from the
-full gate above. The callback qualification below brings the program to 97 complete tasks and
-13 open.
+full gate above. The callback qualification below brings the program to 97
+complete tasks and 13 open.
 
 Task 108 closes on the same qualified production compiler with owner-approved
 recreated full-Ink inputs. Its 1,854 result checks pass in both guest codegen
@@ -251,3 +251,17 @@ hardware retired instructions or pinned-workload CPU/instruction evidence.
 Results: `build/bench/instruction-counter-smoke/results.json`; the Callgrind
 output has SHA-256
 `abaa942baf83c516759247933e17a7163146a349e4e983c0ae31f0bdde945cde`.
+
+## Workload syntax migration, 23 October 2026
+
+The recreated 583-file freeze was verified against the previous manifest before
+migration. A lexical-only migration changes 4,510 `return` keywords in 218 files
+to `break`, preserving the old nearest-`do` meaning after the language
+migration. The real frontend lexer checked the changed tokens; comments, strings
+and intrinsics were preserved. Private source remains in ignored benchmark
+storage. The migrated manifest SHA-256 is
+`60e11cc0c22ba75b4c5bb892f02a3509d9835a710036874aad360fa09b19a030`. Both the
+main release baseline and the pre-numeric integrated release candidate pass all
+seven fresh/edit/revert controls on that migrated freeze. Their final combined
+candidate performance and runtime qualification remain pending; this manifest
+migration is not a waiver of output or performance gates.

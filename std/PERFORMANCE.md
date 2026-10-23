@@ -59,18 +59,24 @@ memo state instead of a heap cell. Admission is bounded to 96 expression/pattern
 nodes across the forwarding chain and preserves lexical binding identities,
 evaluation order and once-only demand behavior.
 
+Numeric collections can pack checked nested records and single-constructor data
+with at most sixteen scalar leaves. Unknown or reference-bearing layouts keep
+ordinary storage, and escaped values keep the boxed ABI. See
+[numeric layouts](../zig-native/NUMERIC_LAYOUTS.md) for storage, lifetime and
+measurement limits.
+
 ## Optimization boundaries
 
-| Mechanism           | Current boundary                                                                                                                                                                                                                |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Exclusive updates   | Checked success branches, nested unique fields, loop exits, read-only direct callees and dropped generator closures preserve ownership; surviving aliases, captures and extracted inner values prevent destructive updates.     |
-| Small aggregates    | Fully initialized, nonescaping records, tuples and wrappers can become scalar locals. ABI values, captured values, unknown offsets and runtime roots remain boxed.                                                              |
-| Small collections   | Up to eight scalar elements can use locals when all uses are admitted traversal or intrinsic length reads; escaping and updated collections remain boxed.                                                                       |
-| Exact builders      | Up to four rectangular finite generators can allocate final storage directly. Bounds must be independent of region binders, nonallocating, nontrapping and pure. Ragged, filtered and effectful regions keep ordinary builders. |
-| Staged construction | Private bounded indexed regions update scratch and freeze once. Published spans and observed intermediate versions remain immutable. Append/prepend can reuse unpublished end slack.                                            |
-| Traversal           | Word-element and packed-row cursors retain their own leaf cache. Cross-leaf fields use checked lookup. Generic iterator step/cursor allocations are not universally eliminated.                                                 |
-| Inlining            | A four-node source budget expands to 64 for aggregate results inside loops or known callbacks, with at most six nested expansions and a 4,096-instruction bound.                                                                |
-| SIMD and fusion     | Existing proofs apply to admitted typed loops. Private four-lane values use v128 locals. Bounded ragged count/fill and rolling/summary modules are implemented and qualified. Broader fusion and SIMD keep ordinary fallbacks.  |
+| Mechanism           | Current boundary                                                                                                                                                                                                                                      |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Exclusive updates   | Checked success branches, nested unique fields, loop exits, read-only direct callees and dropped generator closures preserve ownership; surviving aliases, captures and extracted inner values prevent destructive updates.                           |
+| Small aggregates    | Fully initialized, nonescaping records, tuples and wrappers can become scalar locals. ABI values, captured values, unknown offsets and runtime roots remain boxed.                                                                                    |
+| Small collections   | Up to eight scalar elements can use locals when all uses are admitted traversal or intrinsic length reads; escaping and updated collections remain boxed.                                                                                             |
+| Exact builders      | Up to four rectangular finite generators can allocate final storage directly. Bounds must be independent of region binders, nonallocating, nontrapping and pure. Ragged, filtered and effectful regions keep ordinary builders.                       |
+| Staged construction | Private bounded indexed regions update scratch and freeze once. Published spans and observed intermediate versions remain immutable. Append/prepend can reuse unpublished end slack.                                                                  |
+| Traversal           | Word-element and packed-row cursors retain their own leaf cache. Cross-leaf fields use checked lookup. Generic iterator step/cursor allocations are not universally eliminated.                                                                       |
+| Inlining            | A four-node source budget expands to 64 for aggregate results inside loops or known callbacks. Numeric adapters with four to sixteen scalar leaves get eight nodes per leaf, up to 128; six nested expansions and the 4,096-instruction bound remain. |
+| SIMD and fusion     | Existing proofs apply to admitted typed loops. Private four-lane values use v128 locals. Bounded ragged count/fill and rolling/summary modules are implemented and qualified. Broader fusion and SIMD keep ordinary fallbacks.                        |
 
 `prefix_sums` uses recursive pair sums with linear work and intermediate
 storage, including constant evaluation. Array `indices`, `filter` and

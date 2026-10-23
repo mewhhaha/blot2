@@ -8,6 +8,7 @@ import {
   shardInterval,
 } from "./run_native_tests.ts";
 import { NativeJournal } from "./compiler_gate_state.ts";
+import { nativeTestPartitions } from "./native_test_partitions.ts";
 
 async function fixture(kind = "pass") {
   const directory = await Deno.makeTempDir({ prefix: "blot-native-schedule-" });
@@ -22,6 +23,7 @@ const names = Array.from({ length: 7 }, (_, n) => "law" + n);
 if (Deno.args.includes("--list")) {
   console.log(names.join("\\n"));
 } else {
+  if (!Deno.args.includes("--fail-fast")) throw new Error("scheduler omitted fail-fast");
   const args = Object.fromEntries(Deno.args.map(arg => arg.split("=")));
   const shard = Number(args["--shard"]), shards = Number(args["--shards"]);
   const mode = args["--allocation-failures"];
@@ -46,7 +48,8 @@ if (Deno.args.includes("--list")) {
     await new Promise(resolve => setTimeout(resolve, 60_000));
   }
   await new Promise(resolve => setTimeout(resolve, 40));
-  const selected = names.filter((_, n) => n % shards === shard);
+  const requested = Deno.args.filter(arg => arg.startsWith("--test=")).map(arg => arg.slice(7));
+  const selected = names.filter((name, n) => n % shards === shard && (!requested.length || requested.includes(name)));
   for (const name of selected) {
     if (kind === "omitted" && name === "law0") continue;
     const row = {name, duration_ns: 1, status: kind === "skipped" ? "skipped" : "passed", leaks: kind === "leak" ? 1 : 0,
@@ -194,4 +197,68 @@ Deno.test("native interval accounting distinguishes serialization from overlappi
       1,
     )
   );
+});
+
+Deno.test("timing hints preserve every current test and decline unhelpful or invalid costs", () => {
+  const names = ["slow0", "new1", "slow2", "new3", "slow4", "new5"];
+  const costs = new Map([
+    ["slow0", 100],
+    ["slow2", 99],
+    ["slow4", 98],
+    ["new1", 1],
+    ["new3", 1],
+    ["new5", 1],
+    ["deleted", 1e20],
+  ]);
+  const plan = nativeTestPartitions(names, 2, costs);
+  assert(plan.weighted);
+  assert.deepEqual(plan.groups.flat().sort(), [...names].sort());
+  assert(Math.max(...plan.estimated_ns) < 297);
+  const unknown = nativeTestPartitions([...names, "new6"], 2, costs);
+  assert.deepEqual(unknown.groups.flat().sort(), [...names, "new6"].sort());
+  const invalid = nativeTestPartitions(
+    names,
+    2,
+    new Map([["slow0", NaN], ["slow2", -1], ["slow4", Infinity]]),
+  );
+  assert.equal(invalid.weighted, false);
+  assert.deepEqual(invalid.groups.flat().sort(), [...names].sort());
+  assert.equal(
+    nativeTestPartitions(["only"], 4, new Map([["only", 100]])).weighted,
+    false,
+  );
+});
+
+Deno.test("native scheduling uses history only for placement and validates exact selected execution", async () => {
+  await using input = await fixture();
+  const prior = await runNativeTests({ ...input, shards: 2 });
+  for (const phase of prior.phases) {
+    if (phase.name === "inventory") continue;
+    const text = await Deno.readTextFile(phase.stderr);
+    await Deno.writeTextFile(
+      phase.stderr,
+      text.replace(/("name":"law[024]","duration_ns":)1/g, "$1100"),
+    );
+  }
+  const measured = await runNativeTests({ ...input, shards: 2 });
+  assert.equal(measured.scheduling, "prior-timings");
+  assert.deepEqual(
+    measured.partitions.flat().sort(),
+    prior.inventory.slice().sort(),
+  );
+  assert.equal(
+    measured.intervals.reduce(
+      (total, interval) => total + interval.selected,
+      0,
+    ),
+    7,
+  );
+  assert.equal(measured.peak_active_shards, 2);
+  await Deno.writeTextFile(
+    resolve(input.directory, "results.json"),
+    "broken history",
+  );
+  const recovered = await runNativeTests({ ...input, shards: 2 });
+  assert.equal(recovered.scheduling, "round-robin");
+  assert.equal(recovered.success, true);
 });

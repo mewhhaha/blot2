@@ -543,13 +543,15 @@ caches the current leaf; word-element loops traverse a whole leaf before
 resolving the next one. Arrays stay contiguous with constant-time indexing;
 array append/prepend copies the contents.
 
-Lists and arrays of small, flat scalar tuples or records store the fields
-consecutively, without a separate heap object for each row. Reads still produce
-ordinary immutable values: keeping a row, capturing it or editing the array
-preserves the earlier value. Nested and reference-bearing rows retain their
-existing boxed storage. Lengths and slices count logical elements, including
-when a packed row crosses a list leaf boundary. List/Array conversion copies
-spans of words without constructing a separate object for each row.
+Lists and arrays can store small numeric aggregates as consecutive scalar words,
+including nested tuples, records and non-opaque data with one constructor. The
+checked plan admits up to sixteen scalar leaves; open, hidden, reference-bearing
+or larger shapes keep their ordinary representation. Reads still produce
+immutable values: keeping a row, capturing it or editing the array preserves the
+earlier value. Lengths and slices count logical elements, and List/Array
+conversion copies row words. See
+[numeric layouts](../zig-native/NUMERIC_LAYOUTS.md) for the exact limits and
+which reads avoid reconstructing a row.
 
 Both types have ordinary prelude members `values.length` and `values.is_empty`.
 Only arrays support `values[index]`, `values[index] := replacement`, `get`, and
@@ -1600,8 +1602,8 @@ entry const answer = fn () => @task.scope (fn group => do:
   return |pending|)
 ```
 
-A one-result receiver can pass through an ordinary helper, including an
-imported or renamed binding:
+A one-result receiver can pass through an ordinary helper, including an imported
+or renamed binding:
 
 ```blot
 const add22 = fn value => @u32.add value 22
@@ -1611,9 +1613,9 @@ entry const answer = fn () => @task.scope (fn group => do:
   return await pending)
 ```
 
-The helper consumes the same affine handle as direct `|pending|` and returns
-the task's result. Its checked join contract retains the enclosing group
-lifetime across the call.
+The helper consumes the same affine handle as direct `|pending|` and returns the
+task's result. Its checked join contract retains the enclosing group lifetime
+across the call.
 
 Unique captures move to one child. Immutable data can be shared. Read loans
 require an owner enclosing the destination group. Mutable state/provider

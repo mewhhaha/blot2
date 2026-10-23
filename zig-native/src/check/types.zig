@@ -103,7 +103,18 @@ const ProjectionResolution = struct { root: Id, at: Cursor, depth: u32 };
 const OperationKey = struct { identity: NominalIdentity, instance: NominalIdentity, arity: u32 };
 const OperationChain = struct { first: Effects.Label, last: Effects.Label };
 const OperationLink = struct { next: Effects.Label = none, previous: Effects.Label = none };
+const ClosedRow = struct {
+    row: Effects.Id = 0,
+    generation: u16 = 0,
+    argument_height: u8 = 0,
+    has_arguments: bool = false,
+};
+
 pub const Store = struct {
+    // Positive, solver-owned metadata. No allocation, frozen graph or row ABI
+    // changes; both clocks prevent recycled IDs from reviving old proofs.
+    use_closed_rows: bool = true,
+    closed_rows: [4]ClosedRow = @splat(.{}),
     has_usage_types: bool = false,
     has_rank_types: bool = false,
     next_rigid_scope: u32 = 1,
@@ -238,24 +249,41 @@ pub const Store = struct {
         const n = self.node(id);
         return if (n.closed_generation == self.closed_generation) n.closed_height else 0;
     }
-    fn closedRowHeight(self: *const Store, id: Effects.Id) u8 {
+    fn closedRow(self: *const Store, id: Effects.Id) ?ClosedRow {
+        // The shared physical-epoch guard is the same as closedHeight.
+        // Both synchronizeClosedGraphs and rollback advance the generation
+        // before adopting a changed physical epoch; old entries cannot revive.
+        if (!self.use_closed_rows or !self.use_closed_graphs or self.closed_generation == std.math.maxInt(u16) or self.effects.physical_epoch == std.math.maxInt(u64) or self.closed_effect_physical_epoch != self.effects.physical_epoch) return null;
+        const value = self.closed_rows[id % self.closed_rows.len];
+        return if (value.row == id and value.generation == self.closed_generation) value else null;
+    }
+    fn saveClosedRow(self: *Store, id: Effects.Id, height: u8, has_arguments: bool) void {
+        if (!self.use_closed_rows or !self.use_closed_graphs or self.closed_generation == std.math.maxInt(u16) or self.effects.physical_epoch == std.math.maxInt(u64) or self.closed_effect_physical_epoch != self.effects.physical_epoch) return;
+        self.closed_rows[id % self.closed_rows.len] = .{ .row = id, .generation = self.closed_generation, .argument_height = height, .has_arguments = has_arguments };
+    }
+    fn closedRowHeight(self: *Store, id: Effects.Id) u8 {
         const r = self.effects.node(id);
         if (r.tail != .closed) return 0;
+        if (r.labels.len == 0) return 1;
+        if (self.closedRow(id)) |cached| return if (cached.argument_height == std.math.maxInt(u8)) 0 else cached.argument_height + 1;
         var height: u8 = 0;
+        var has_arguments = false;
         for (self.effects.list(r.labels)) |label| {
             if (label >= self.operations.items.len) return 0;
             const instance = self.operations.items[label].instance;
             if (instance.unit == 0 and instance.decl != 0) return 0;
             for (self.list(self.operations.items[label].arguments)) |arg| {
+                has_arguments = true;
                 const argument_height = self.closedHeight(arg);
                 if (argument_height == 0) return 0;
                 height = @max(height, argument_height);
             }
         }
+        self.saveClosedRow(id, height, has_arguments);
         if (height == std.math.maxInt(u8)) return 0;
         return height + 1;
     }
-    fn closedNodeHeight(self: *const Store, n: Node) u8 {
+    fn closedNodeHeight(self: *Store, n: Node) u8 {
         var height: u8 = 0;
         switch (n.tag) {
             .absent, .variable, .forall, .existential, .bound, .rigid => return 0,
@@ -1226,6 +1254,16 @@ pub const Store = struct {
         if (depth >= 1024) return error.TypeLimit;
         const id = self.effects.resolve(root, at) catch |err| return effectError(err);
         const row_ = self.row(id);
+        if (row_.labels.len == 0) return id;
+        if (self.closedRow(id)) |cached| {
+            // No-argument operations have no argument-depth check in the
+            // ordinary resolver. A row height alone cannot express that case.
+            if (cached.has_arguments and depth + 1 + cached.argument_height > self.resolution_depth_limit) return error.TypeLimit;
+            return id;
+        }
+        var all_closed = row_.tail == .closed;
+        var argument_height: u8 = 0;
+        var has_arguments = false;
         var labels: std.ArrayList(Effects.Label) = .empty;
         defer labels.deinit(self.allocator);
         var changed = false;
@@ -1234,10 +1272,13 @@ pub const Store = struct {
             const operation_ = self.operation(label);
             var closed = operation_.instance.unit != 0 or operation_.instance.decl == 0;
             for (self.list(operation_.arguments)) |argument| {
+                has_arguments = true;
                 const height = self.closedHeight(argument);
+                argument_height = @max(argument_height, height);
                 if (height == 0) closed = false;
                 if (height != 0 and depth + 1 + height > self.resolution_depth_limit) return error.TypeLimit;
             }
+            all_closed = all_closed and closed;
             if (closed) {
                 if (changed) labels.appendAssumeCapacity(label);
                 continue;
@@ -1265,7 +1306,10 @@ pub const Store = struct {
             }
             if (changed) labels.appendAssumeCapacity(next);
         }
-        if (!changed) return id;
+        if (!changed) {
+            if (all_closed) self.saveClosedRow(id, argument_height, has_arguments);
+            return id;
+        }
         return self.effects.rowAt(labels.items, row_.tail, row_.cursor) catch |err| return effectError(err);
     }
     pub fn row(self: *const Store, id: Effects.Id) Effects.Row {
@@ -2529,4 +2573,106 @@ const OperationIndexTests = struct {
 test "operation chains intern exactly the oldest equal operation through rollback writes and allocation failures" {
     try OperationIndexTests.histories(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, OperationIndexTests.histories, .{});
+}
+
+const ClosedRowTests = struct {
+    fn scenario(allocator: std.mem.Allocator) !void {
+        for ([_]bool{ true, false }) |enabled| {
+            var store = try Store.initWithOptions(allocator, .{ .closed_graphs = true });
+            defer store.deinit();
+            store.use_closed_rows = enabled;
+            const argument = try store.array(u32_type);
+            const label = try store.internOperation(.{ .unit = 7, .decl = 19 }, &.{argument});
+            const row_ = try store.effects.row(&.{ label, label }, .closed);
+            try std.testing.expectEqual(@as(u8, 3), store.closedRowHeight(row_));
+            _ = try store.functionWithEffects(unit, u32_type, row_);
+            for (0..3) |_| try std.testing.expectEqual(row_, try store.resolveEffects(row_, 0));
+            store.resolution_depth_limit = 3;
+            try std.testing.expectEqual(row_, try store.resolveOperationRow(row_, 0, 0));
+            store.resolution_depth_limit = 2;
+            try std.testing.expectError(error.TypeLimit, store.resolveOperationRow(row_, 0, 0));
+            // Empty/no-argument rows never had an argument-height limit. The
+            // resolver's independent hard depth boundary remains in force.
+            const no_arguments = try store.effects.row(&.{foreign_operation}, .closed);
+            _ = store.closedRowHeight(no_arguments);
+            store.resolution_depth_limit = 0;
+            try std.testing.expectEqual(no_arguments, try store.resolveOperationRow(no_arguments, 0, 1023));
+            try std.testing.expectEqual(@as(Effects.Id, 0), try store.resolveOperationRow(0, 0, 1023));
+            try std.testing.expectError(error.TypeLimit, store.resolveOperationRow(no_arguments, 0, 1024));
+            store.resolution_depth_limit = 1024;
+            // An operation's physical argument replacement revokes a warm
+            // proof, including when the new argument is not resolved yet.
+            const unknown = try store.fresh();
+            store.replaceListItem(store.operation(label).arguments, 0, unknown);
+            try std.testing.expectEqual(@as(u8, 0), store.closedRowHeight(row_));
+            try store.appendVersion(unknown, u32_type);
+            try store.appendVersion(unknown, f32_type);
+            const first = try store.resolveEffects(row_, 0);
+            const later = try store.resolveEffects(row_, 1);
+            try std.testing.expectEqual(u32_type, store.operationArguments(store.rowLabels(first)[0])[0]);
+            try std.testing.expectEqual(f32_type, store.operationArguments(store.rowLabels(later)[0])[0]);
+            // The normalized result has immutable arguments at every view.
+            try std.testing.expectEqual(first, try store.resolveEffects(first, 1));
+            // Store rollback recycles row IDs but never proof generations.
+            const point = store.mark();
+            const temporary = try store.effects.row(&.{store.rowLabels(first)[0]}, .closed);
+            _ = store.closedRowHeight(temporary);
+            store.rollback(point);
+            const reused = try store.effects.row(&.{store.rowLabels(later)[0]}, .closed);
+            try std.testing.expectEqual(temporary, reused);
+            const changed = try store.resolveEffects(reused, 0);
+            try std.testing.expectEqual(f32_type, store.operationArguments(store.rowLabels(changed)[0])[0]);
+            // Physical row rollback has its own epoch, even without calling
+            // the type-store rollback or advancing its substitution history.
+            const physical = store.effects.mark();
+            const old_row = try store.effects.row(&.{store.rowLabels(first)[0]}, .closed);
+            _ = store.closedRowHeight(old_row);
+            store.effects.rollback(physical);
+            const new_row = try store.effects.row(&.{store.rowLabels(later)[0]}, .closed);
+            try std.testing.expectEqual(old_row, new_row);
+            const current = try store.resolveEffects(new_row, 0);
+            try std.testing.expectEqual(f32_type, store.operationArguments(store.rowLabels(current)[0])[0]);
+            // A symbolic instance must still resolve after its variable is
+            // assigned; closed type arguments alone cannot certify it.
+            const descriptor = try store.nominal(.{ .unit = 1, .decl = 7 }, &.{u32_type});
+            const parameter = try store.capabilityParameter(descriptor);
+            const term = store.node(parameter);
+            const symbolic = try store.internScopedOperation(.{ .unit = 1, .decl = 8 }, .{ .unit = term.b, .decl = term.c }, &.{u32_type});
+            const symbolic_row = try store.effects.row(&.{symbolic}, .closed);
+            try std.testing.expectEqual(@as(u8, 0), store.closedRowHeight(symbolic_row));
+            _ = try store.resolveEffects(symbolic_row, 0);
+            const selected = try store.scoped(descriptor, .{ .unit = 1, .decl = 30 });
+            try store.unify(parameter, selected);
+            const resolved = try store.resolveEffects(symbolic_row, 0);
+            try std.testing.expectEqual(NominalIdentity{ .unit = 1, .decl = 30 }, store.operation(store.rowLabels(resolved)[0]).instance);
+            const open = try store.freshEffects();
+            try std.testing.expectEqual(@as(u8, 0), store.closedRowHeight(open));
+            _ = try store.resolveEffects(open, 0);
+            try std.testing.expect(store.closedRow(open) == null);
+            const row_variable = store.row(open).tail.variable;
+            const clock = store.cursor();
+            try store.effects.appendVersionAt(row_variable, first, clock + 2);
+            try store.effects.appendVersionAt(row_variable, later, clock + 5);
+            const old_view = try store.resolveEffects(open, clock);
+            const new_view = try store.resolveEffects(open, clock + 3);
+            try std.testing.expectEqual(u32_type, store.operationArguments(store.rowLabels(old_view)[0])[0]);
+            try std.testing.expectEqual(f32_type, store.operationArguments(store.rowLabels(new_view)[0])[0]);
+            const future = try store.resolveEffects(open, clock + 6);
+            try std.testing.expect(store.row(future).tail == .variable);
+            try std.testing.expectEqual(row_variable, store.row(future).tail.variable);
+            try std.testing.expectEqual(clock + 6, store.row(future).cursor);
+            try std.testing.expectEqual(@as(u8, 0), store.closedRowHeight(future));
+            store.closed_generation = std.math.maxInt(u16);
+            try std.testing.expectEqual(first, try store.resolveEffects(first, 0));
+            try std.testing.expect(store.closedRow(first) == null);
+            store.effects.physical_epoch = std.math.maxInt(u64);
+            try std.testing.expectEqual(later, try store.resolveEffects(later, 1));
+            try std.testing.expect(store.closedRow(later) == null);
+        }
+    }
+};
+
+test "closed row certificates preserve depth history physical edits instances and saturation through OOM" {
+    try ClosedRowTests.scenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, ClosedRowTests.scenario, .{});
 }

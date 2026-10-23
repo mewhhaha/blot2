@@ -5,10 +5,42 @@ import {
   failedGuestFiles,
   fileDigest,
   inputDigest,
+  nativeEnvironment,
   nativeInputs,
   NativeJournal,
 } from "./compiler_gate_state.ts";
 import { runPhase, together } from "./compiler_phase.ts";
+
+Deno.test("native identity ignores launch bookkeeping and retains compiler configuration", () => {
+  const baseline = {
+    PATH: "/tools",
+    ZIG_GLOBAL_CACHE_DIR: "/cache",
+    LANG: "C",
+    CODEX_TOOL_CALL_ID: "first",
+    SHLVL: "1",
+    _: "deno",
+  };
+  assert.deepEqual(
+    nativeEnvironment(baseline),
+    nativeEnvironment({
+      ...baseline,
+      CODEX_TOOL_CALL_ID: "second",
+      SHLVL: "3",
+      _: "python",
+    }),
+  );
+  for (const name of ["PATH", "ZIG_GLOBAL_CACHE_DIR", "LANG"]) {
+    assert.notDeepEqual(
+      nativeEnvironment(baseline),
+      nativeEnvironment({ ...baseline, [name]: "changed" }),
+      name,
+    );
+  }
+  assert.notDeepEqual(
+    nativeEnvironment(baseline),
+    nativeEnvironment({ ...baseline, NEW_COMPILER_OPTION: "on" }),
+  );
+});
 
 Deno.test("buffered identities preserve SHA-256 across chunk boundaries and same-size edits", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-digest-" });
@@ -345,6 +377,7 @@ Deno.test("full runner resumes native qualification after a guest repair and inv
         "compiler_gate_state.ts",
         "compiler_lease.ts",
         "run_native_tests.ts",
+        "native_test_partitions.ts",
         "dev_check_areas.ts",
         "compiler_fixtures.ts",
         "build_compiler.ts",
@@ -451,6 +484,7 @@ fi
     // This fixture exercises recovery, including cold Deno startup and checks
     // of its synthetic modules. The short deadline and descendant-kill laws
     // above test timer behavior independently.
+    let invocation = 0;
     const run = async () => {
       try {
         await Deno.remove(releaseStarted);
@@ -470,7 +504,10 @@ fi
           "--budget-seconds",
           "120",
         ],
-        env: { PATH: `${resolve(root, "bin")}:${Deno.env.get("PATH")}` },
+        env: {
+          PATH: `${resolve(root, "bin")}:${Deno.env.get("PATH")}`,
+          CODEX_TOOL_CALL_ID: `fixture-call-${++invocation}`,
+        },
         stdout: "piped",
         stderr: "piped",
       }).output();

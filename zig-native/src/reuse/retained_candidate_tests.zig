@@ -18,9 +18,212 @@ const refinement_source =
     \\entry const answer = fn (value: U32) => @u32.add (read value) changed
 ;
 
+// These transaction laws need independently selected queries. Keep this
+// synthetic identity above the source-inlining budget while preserving its
+// generic captured value and the original Unit/extra parameter forms.
+const query_identity_body =
+    \\do:
+    \\  let query_copy_00 = value
+    \\  let query_copy_01 = query_copy_00
+    \\  let query_copy_02 = query_copy_01
+    \\  let query_copy_03 = query_copy_02
+    \\  let query_copy_04 = query_copy_03
+    \\  let query_copy_05 = query_copy_04
+    \\  let query_copy_06 = query_copy_05
+    \\  let query_copy_07 = query_copy_06
+    \\  let query_copy_08 = query_copy_07
+    \\  let query_copy_09 = query_copy_08
+    \\  let query_copy_10 = query_copy_09
+    \\  let query_copy_11 = query_copy_10
+    \\  let query_copy_12 = query_copy_11
+    \\  let query_copy_13 = query_copy_12
+    \\  let query_copy_14 = query_copy_13
+    \\  let query_copy_15 = query_copy_14
+    \\  let query_copy_16 = query_copy_15
+    \\  let query_copy_17 = query_copy_16
+    \\  let query_copy_18 = query_copy_17
+    \\  let query_copy_19 = query_copy_18
+    \\  let query_copy_20 = query_copy_19
+    \\  let query_copy_21 = query_copy_20
+    \\  let query_copy_22 = query_copy_21
+    \\  let query_copy_23 = query_copy_22
+    \\  let query_copy_24 = query_copy_23
+    \\  let query_copy_25 = query_copy_24
+    \\  let query_copy_26 = query_copy_25
+    \\  let query_copy_27 = query_copy_26
+    \\  let query_copy_28 = query_copy_27
+    \\  let query_copy_29 = query_copy_28
+    \\  let query_copy_30 = query_copy_29
+    \\  let query_copy_31 = query_copy_30
+    \\  let query_copy_32 = query_copy_31
+    \\  return query_copy_32
+;
+const query_factory_extra = "const factory = fn value => fn extra => " ++ query_identity_body;
+const query_factory_unit = "const factory = fn value => fn () => " ++ query_identity_body;
+
+fn staticMaterializationLibrary() ![]u8 {
+    const read = try std.mem.replaceOwned(u8, a, query_identity_body, "return query_copy_32", "return stored query_copy_32");
+    defer a.free(read);
+    const scalar = try std.mem.replaceOwned(u8, a, query_identity_body, "return query_copy_32", "return biased query_copy_32");
+    defer a.free(scalar);
+    return a.print("const factory = fn values => fn (index: U32) => values[@u32.rem index 2]\n" ++
+        "const stored = factory #[41, 7]\n" ++
+        "const add = fn amount => fn value => @u32.add amount value\n" ++
+        "const biased = add 8\n" ++
+        "const read = fn (value: U32) => {s}\n" ++
+        "const scalar = fn (value: U32) => {s}\n", .{ read, scalar });
+}
+fn staticMaterializationSource(offset: u8) ![]u8 {
+    return a.print("import {{read, stored, scalar}} from \"./dep\"\n" ++
+        "entry const left = fn (value: U32) => read value\n" ++
+        "entry const right = fn (value: U32) => stored (@u32.add value {d})\n" ++
+        "entry const stable = fn (value: U32) => scalar value\n", .{offset});
+}
+fn staticMaterializationBeforeReplay() ![]u8 {
+    const source = try staticMaterializationSource(2);
+    defer a.free(source);
+    const left = try std.mem.replaceOwned(u8, a, source, "=> read value", "=> stored value");
+    defer a.free(left);
+    return std.mem.replaceOwned(u8, a, left, "=> stored (@u32.add", "=> read (@u32.add");
+}
+fn staticMaterializationAliasLibrary(merged: bool) ![]u8 {
+    const base = try staticMaterializationLibrary();
+    defer a.free(base);
+    const declarations = try a.print("const first = #[41, 7]\nconst second = {s}\n" ++
+        "const other_factory = fn values => fn (index: U32) => values[@u32.rem index 2]\n" ++
+        "const stored = factory first\nconst other = other_factory second\n", .{if (merged) "first" else "#[41, 7]"});
+    defer a.free(declarations);
+    const library = try std.mem.replaceOwned(u8, a, base, "const stored = factory #[41, 7]\n", declarations);
+    defer a.free(library);
+    return std.mem.replaceOwned(u8, a, library, "return stored query_copy_32", "return @u32.add (stored query_copy_32) (other query_copy_32)");
+}
+fn staticMaterializationMergedAliases(fixture: *Fixture) !void {
+    const library = try staticMaterializationAliasLibrary(false);
+    defer a.free(library);
+    try fixture.write("dep.blot", library);
+    const source = try staticMaterializationSource(1);
+    defer a.free(source);
+    try fixture.write("main.blot", source);
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    var initial = try session.revise(io, fixture.path, null, .{});
+    defer initial.deinit(a);
+    try std.testing.expect(initial.result.diagnostic == null and initial.result.compiled.diagnostic == null);
+    const merged = try staticMaterializationAliasLibrary(true);
+    defer a.free(merged);
+    try fixture.write("dep.blot", merged);
+    var expected = try fresh(fixture, .{});
+    defer expected.deinit(a);
+    try std.testing.expect(expected.result.diagnostic == null and expected.result.compiled.diagnostic == null);
+    try std.testing.expect(!std.mem.eql(u8, initial.result.compiled.bytes, expected.result.compiled.bytes));
+    const before = Stamp.read(&session);
+    const pending = try ready(&session, fixture, .{});
+    defer pending.deinit();
+    try std.testing.expectEqualSlices(u8, expected.result.compiled.bytes, pending.result().?.result.compiled.bytes);
+    // Earlier semantic admission may already reject the changed producer.
+    // Require the new sharing and unchanged previous owner, not one counter.
+    try before.unchanged(&session);
+    pending.discard();
+    try before.unchanged(&session);
+}
+test "direct static capture materialization preserves fresh edit revert bytes and scalar evaluated query reuse" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    const library = try staticMaterializationLibrary();
+    defer a.free(library);
+    try fixture.write("dep.blot", library);
+    const source = try staticMaterializationSource(1);
+    defer a.free(source);
+    try fixture.write("main.blot", source);
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    var initial = try session.revise(io, fixture.path, null, .{});
+    defer initial.deinit(a);
+    try std.testing.expect(initial.result.diagnostic == null and initial.result.compiled.diagnostic == null);
+    for ([_]u8{ 2, 1 }) |offset| {
+        const changed = try staticMaterializationSource(offset);
+        defer a.free(changed);
+        try fixture.write("main.blot", changed);
+        var expected = try fresh(&fixture, .{});
+        defer expected.deinit(a);
+        try std.testing.expect(expected.result.diagnostic == null and expected.result.compiled.diagnostic == null);
+        const before = Stamp.read(&session);
+        const pending = try ready(&session, &fixture, .{});
+        defer pending.deinit();
+        try std.testing.expectEqualSlices(u8, expected.result.compiled.bytes, pending.result().?.result.compiled.bytes);
+        try std.testing.expect(pending.result().?.result.compiled.reuse.reused_named > 0);
+        try before.unchanged(&session);
+        try std.testing.expect(session.discard(pending));
+        try before.unchanged(&session);
+        const retry = try ready(&session, &fixture, .{});
+        defer retry.deinit();
+        try std.testing.expectEqualSlices(u8, expected.result.compiled.bytes, retry.result().?.result.compiled.bytes);
+        try before.unchanged(&session);
+        try std.testing.expect(session.commit(retry));
+        if (offset == 1) try std.testing.expectEqualSlices(u8, initial.result.compiled.bytes, expected.result.compiled.bytes);
+    }
+    // The fresh left caller publishes the Array before the old read query is
+    // considered. Replay must decline its duplicate data before publication.
+    const changed_order = try staticMaterializationBeforeReplay();
+    defer a.free(changed_order);
+    try fixture.write("main.blot", changed_order);
+    var expected_order = try fresh(&fixture, .{});
+    defer expected_order.deinit(a);
+    try std.testing.expect(expected_order.result.diagnostic == null and expected_order.result.compiled.diagnostic == null);
+    const before_order = Stamp.read(&session);
+    const pending_order = try ready(&session, &fixture, .{});
+    defer pending_order.deinit();
+    try std.testing.expectEqualSlices(u8, expected_order.result.compiled.bytes, pending_order.result().?.result.compiled.bytes);
+    try std.testing.expect(pending_order.result().?.result.compiled.reuse.reused_named > 0);
+    try before_order.unchanged(&session);
+    pending_order.discard();
+    try before_order.unchanged(&session);
+    try staticMaterializationMergedAliases(&fixture);
+}
+fn staticMaterializationFailure(allocator: std.mem.Allocator, session: *retained.Session, fixture: *Fixture, expected: *const partial.Result) !void {
+    const previous = session.allocator;
+    session.allocator = allocator;
+    defer session.allocator = previous;
+    const before = Stamp.read(session);
+    defer std.debug.assert(std.meta.eql(before, Stamp.read(session)));
+    const pending = try ready(session, fixture, .{});
+    defer pending.deinit();
+    try std.testing.expectEqualSlices(u8, expected.result.compiled.bytes, pending.result().?.result.compiled.bytes);
+    try std.testing.expect(pending.result().?.result.compiled.reuse.reused_named > 0);
+    pending.discard();
+}
+test "direct static capture materialization releases failed candidates without changing retained source owners" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    const library = try staticMaterializationLibrary();
+    defer a.free(library);
+    try fixture.write("dep.blot", library);
+    const source = try staticMaterializationSource(1);
+    defer a.free(source);
+    try fixture.write("main.blot", source);
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    var initial = try session.revise(io, fixture.path, null, .{});
+    defer initial.deinit(a);
+    try std.testing.expect(initial.result.diagnostic == null and initial.result.compiled.diagnostic == null);
+    const changed = try staticMaterializationSource(2);
+    defer a.free(changed);
+    try fixture.write("main.blot", changed);
+    var expected = try fresh(&fixture, .{});
+    defer expected.deinit(a);
+    try @import("../allocation_failures.zig").checkStandardAllocationFailures(a, staticMaterializationFailure, .{ &session, &fixture, &expected });
+    const changed_order = try staticMaterializationBeforeReplay();
+    defer a.free(changed_order);
+    try fixture.write("main.blot", changed_order);
+    var expected_order = try fresh(&fixture, .{});
+    defer expected_order.deinit(a);
+    try std.testing.expect(expected_order.result.diagnostic == null and expected_order.result.compiled.diagnostic == null);
+    try @import("../allocation_failures.zig").checkStandardAllocationFailures(a, staticMaterializationFailure, .{ &session, &fixture, &expected_order });
+}
+
 const unaffected_producer =
     \\const marker: U32 = 1
-    \\const factory = fn number => fn extra => number
+++ "\n" ++ query_factory_extra ++ "\n" ++
     \\const callback = factory 42
 ;
 const unaffected_query_main =
@@ -44,7 +247,7 @@ const catalog_producer =
 ;
 const catalog_consumer =
     \\import {Box, changed} from "./dep"
-    \\const factory = fn value => fn () => value
+++ "\n" ++ query_factory_unit ++ "\n" ++
     \\const boxed = factory (#Box 42)
     \\const listed = factory [41]
     \\const arrayed = factory #[43]
@@ -266,7 +469,7 @@ test "unaffected query revisions release every failed entry candidate and keep t
 test "unaffected query revisions keep List Array and nominal closure evidence distinct and reject changed collection interfaces" {
     const producer =
         \\data Box a = #Box a
-        \\const factory = fn value => fn () => value
+    ++ "\n" ++ query_factory_unit ++ "\n" ++
         \\const listed = factory [41]
         \\const arrayed = factory #[42]
         \\const boxed = factory (#Box 43)
@@ -307,7 +510,7 @@ test "unaffected query revisions keep List Array and nominal closure evidence di
     const previous = Stamp.read(&session);
     const wrong =
         \\data Box a = #Box a
-        \\const factory = fn value => fn () => value
+    ++ "\n" ++ query_factory_unit ++ "\n" ++
         \\const listed = factory #[41]
         \\const arrayed = factory #[42]
         \\const boxed = factory (#Box 43)
@@ -879,7 +1082,7 @@ const Stamp = struct {
 
 const project_query_source =
     \\import {marker} from "./dep"
-    \\const factory = fn number => fn extra => number
+++ "\n" ++ query_factory_extra ++ "\n" ++
     \\const callback = factory 42
     \\entry const schema: U32 = 7
     \\entry const answer = fn (extra: U32) -> U32 => callback extra
@@ -887,7 +1090,7 @@ const project_query_source =
 ;
 const project_query_edit =
     \\import {marker} from "./dep"
-    \\const factory = fn number => fn extra => number
+++ "\n" ++ query_factory_extra ++ "\n" ++
     \\const callback = factory 42
     \\entry const schema: U32 = 8
     \\entry const answer = fn (extra: U32) -> U32 => callback extra

@@ -80,6 +80,45 @@ discarding about 16 MB of images.
 - Certificate images are full structural images, not digests, so retained memory
   grows with program size.
 
+## Recreated-workload work audit — 20 October 2026
+
+Reanalysis of the qualified task-053 release `1b05518e…` covers 108 game
+observations across three strict parity rounds and 36 compiler/phase rows. It
+reproduces all 18 earlier candidate CPU medians and 126 counter distributions.
+The workload is the owner-approved recreated freeze, manifest
+`4689301ed5ef13f9cce244a474fbe353ebfeceeb072101c85f6663995e0b0728`; its absolute
+timings do not establish the lost original `f7be6e7` comparison.
+
+| Candidate operation | CPU median (min–max), ms | Functions optimized | Functions reused | Largest region, scopes |
+| ------------------- | -----------------------: | ------------------: | ---------------: | ---------------------: |
+| Literal edit        |      3,908 (3,399–7,733) |               3,047 |            1,008 |                  1,078 |
+| Literal revert      |      2,297 (2,141–4,216) |                   3 |            4,052 |                  1,078 |
+| Body edit           |      3,982 (3,704–4,405) |                 763 |            3,292 |                  6,276 |
+| Body revert         |      3,995 (3,083–4,837) |                  18 |            4,037 |                  6,276 |
+
+Each row has three samples. Frontend body elaboration and lowering are zero in
+all four rows. Literal edit and revert both emit 315 fresh named functions and
+reuse 1,767; body edit and revert both emit 388 and reuse 1,694. Reducing
+runtime reoptimization alone therefore does not account for the remaining edit
+CPU. The three-round timings are descriptive and separate from the passing
+preselected 15-pair CPU guard.
+
+Runtime matching records about 1.62–2.25 million work units for these
+operations, with one bounded matcher exhaustion on edits and none on reverts.
+This counter includes a bounded relocation attempt and a separate linear
+positional pass; exceeding one million is not evidence that the bounded attempt
+ignored its limit. Transitive callee checks protect inlining, lifetime and
+ownership facts. Their cost needs profiling before changing admission or its
+budget.
+
+Raw parity inputs remain in `build/bench/task053-catalog-package-parity/`; the
+audited report is `build/bench/task093-task053-retained-work-audit.json`,
+SHA-256 `06110a8a4c8c5d61d850c7f2bbaf4ab64f426d785247bccbb4811c7a53ae2647`.
+These counters measure work, not phase CPU. Solver and scratch requested bytes
+cover those owners only, not whole-compiler allocation or RSS. Task 093 still
+requires current attribution and explicit justification of remaining costs; task
+047's pending release measurements must be audited separately.
+
 ## Exact shared foreign owners — 15 October 2026
 
 Private retained validation now follows physically shared transitive Core

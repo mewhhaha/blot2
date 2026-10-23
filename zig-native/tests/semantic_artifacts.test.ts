@@ -13,9 +13,45 @@ const add_present = fn left => fn right => do try:
   use second <- right
   break first + second
 `;
+// Keep this synthetic factory above the source-inlining budget so restart
+// validation exercises a persisted, independently selected semantic receipt.
 const entrySource = (offset: string) =>
   `import * as lib from "./lib"
-const factory = fn number => fn extra => @u32.add number extra
+const factory = fn number => fn extra => do:
+  let query_copy_00 = extra
+  let query_copy_01 = query_copy_00
+  let query_copy_02 = query_copy_01
+  let query_copy_03 = query_copy_02
+  let query_copy_04 = query_copy_03
+  let query_copy_05 = query_copy_04
+  let query_copy_06 = query_copy_05
+  let query_copy_07 = query_copy_06
+  let query_copy_08 = query_copy_07
+  let query_copy_09 = query_copy_08
+  let query_copy_10 = query_copy_09
+  let query_copy_11 = query_copy_10
+  let query_copy_12 = query_copy_11
+  let query_copy_13 = query_copy_12
+  let query_copy_14 = query_copy_13
+  let query_copy_15 = query_copy_14
+  let query_copy_16 = query_copy_15
+  let query_copy_17 = query_copy_16
+  let query_copy_18 = query_copy_17
+  let query_copy_19 = query_copy_18
+  let query_copy_20 = query_copy_19
+  let query_copy_21 = query_copy_20
+  let query_copy_22 = query_copy_21
+  let query_copy_23 = query_copy_22
+  let query_copy_24 = query_copy_23
+  let query_copy_25 = query_copy_24
+  let query_copy_26 = query_copy_25
+  let query_copy_27 = query_copy_26
+  let query_copy_28 = query_copy_27
+  let query_copy_29 = query_copy_28
+  let query_copy_30 = query_copy_29
+  let query_copy_31 = query_copy_30
+  let query_copy_32 = query_copy_31
+  return @u32.add number query_copy_32
 const callback = factory ${offset}
 entry const answer = fn (extra: U32) -> U32 => callback extra
 entry const present = fn () => Maybe.unwrap_or 0 (lib.add_present (#Some 1) (#Some 2))
@@ -27,7 +63,13 @@ async function project() {
   await Deno.writeTextFile(`${directory}/main.blot`, entrySource("40"));
   const bundle = `${directory}/deps.blotdep`;
   const packed = await new Deno.Command(executable, {
-    args: ["dependencies", `${directory}/main.blot`, bundle, "--prelude", prelude],
+    args: [
+      "dependencies",
+      `${directory}/main.blot`,
+      bundle,
+      "--prelude",
+      prelude,
+    ],
     stdout: "piped",
     stderr: "piped",
   }).output();
@@ -96,7 +138,13 @@ Deno.test("dependency-loaded projects restart from persisted semantic owners and
       assert.equal(selected.gate_fresh, 1, JSON.stringify(selected));
       assert(selected.reused > 0, JSON.stringify(selected));
       assert.deepEqual(await run(built.bytes), [42, 3]);
-      for (const text of [entrySource("41"), entrySource("#Wrong"), entrySource("40")]) {
+      for (
+        const text of [
+          entrySource("41"),
+          entrySource("#Wrong"),
+          entrySource("40"),
+        ]
+      ) {
         const sources = { [entry]: text };
         const result = await restored.build({ sources });
         const fresh = await createZigProjectCompiler(options);
@@ -112,7 +160,9 @@ Deno.test("dependency-loaded projects restart from persisted semantic owners and
           await fresh.dispose();
         }
       }
-      const recovered = await restored.build({ sources: { [entry]: entrySource("40") } });
+      const recovered = await restored.build({
+        sources: { [entry]: entrySource("40") },
+      });
       assert(recovered.success);
       assert.deepEqual(await run(recovered.bytes), [42, 3]);
     } finally {

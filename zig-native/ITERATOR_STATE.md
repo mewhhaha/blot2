@@ -453,5 +453,471 @@ allocator requests per 4,096 inputs; direct nested loops make 40,954. Those
 counts include semantic buffers as well as remaining state. The scoped cursor
 change leaves these adapter counts exact. Results:
 `build/bench/task047-scoped-adapter-screen-v2/results.json`, SHA-256
-`d9e1812fa29ec43355b578dc9ea6c1d728ab021b340e806583c3e5f57021c691`. Main remains
-unchanged; Window and broader generic state are still open.
+`d9e1812fa29ec43355b578dc9ea6c1d728ab021b340e806583c3e5f57021c691`. The reviewed
+candidate is now in main's working tree for combined qualification; the latest
+committed compiler remains `4fda7c2`. Window and broader generic state are still
+open.
+
+## Evaluated fold calls and static scalar seeds, focused qualification
+
+A fully saturated call through an immutable evaluated named closure can retain
+its exact captured values while emitting the original source body. The bounded
+plan keeps the original semantic type/effect mappings, refines the complete
+source signature with the existing specializer, and checks each dynamic
+argument's actual layout. Dynamic arguments execute once in their written order.
+Partial, erased, universal, demand, factory, dictionary and exhausted plans keep
+ordinary calls. Unrecorded live evaluator handles require fresh executable code.
+Complete owned static reads/capture graphs keep the existing executable identity
+rules; handles do not become portable identities. Cursor and root authority
+rules stay unchanged.
+
+The combined development compiler is
+`f8711261195d3a139ff11b8e62c600adff240e2f266db3f656969348529f18d1`. At 4,096
+inputs the same 100-call allocation observer measures rounded bytes per call:
+
+| Adapter through a named fold | Qualified baseline | Candidate |
+| ---------------------------- | -----------------: | --------: |
+| Range                        |            983,136 |         0 |
+| Map                          |          1,573,056 |         0 |
+| Filter                       |          1,179,840 |         0 |
+| Take                         |            786,624 |         0 |
+| Take while                   |            885,120 |        48 |
+| Nested Window fold           |          3,406,944 | 2,227,872 |
+
+The take-while remainder is one setup object. Enumerate, zip and strict zip stay
+at zero. Window requests drop from 65,518 to 40,954; direct Window loops and
+length-only consumers still make 40,954 requests. This subtraction exposes the
+inner fold without eliminating the remaining Window state and buffers. The CPU-2
+diagnostic measures a Window ratio of 0.7848; tiny zero-allocation scalar
+timings do not establish precise speedup factors. The native compiler host is a
+safe/no-LLVM build, so its CPU cost is not compared with the LLVM baseline here.
+Report: `build/bench/task047-static-seed-adapter-screen/results.json`, SHA-256
+`71dab8725e9ef1cb2d3cef50a26730bf4f194ada89090b9470dddb146e737b60`.
+
+The broader reference test also found a baseline correctness bug. Ordinary
+static `List U32` and `List F32` seeds used a reference-element descriptor.
+Later leaf growth copied that classification and tried to retain numeric words.
+Both baseline and pre-fix candidate fail fresh instances at 1,024 or more
+elements; the retained raw report is
+`build/bench/task047-reference-fold-repro/results.json`, SHA-256
+`2ef859bd34f1e7fa02bcbedfd393a461228b56f4f37d8c387de04e8da1372296`. The scalar
+seed fix selects the existing scalar descriptor from the element's known layout
+role. Reference elements keep their reference descriptor. No pointer test or new
+acyclic flag is involved.
+
+Two new native laws pass complete fresh/retained OOM, replay, checkpoint,
+capture-edit and immutable-Core checks. The corrected combined compiler passes
+both-tier scalar/F32/reference tests through 4,096 elements, including
+pointer-looking integers, real reference children under pressure, aliases,
+effects and ordering. Twelve combined guest groups pass, including a strict
+zero-allocation budget for optimized named range/map/filter/take folds,
+all-width cursor snapshots, JSPI, Window pull order and outward exits. Focused
+artifacts are in `build/bench/task047-static-seed-focused/`.
+
+The implementation is working-tree work awaiting compiler cost and the complete
+LLVM gate. The causal byte control passes below. Final combined all-width
+comparisons and remaining Window/generic-state requirements still keep task 047
+open.
+
+The all-changes-off control now passes 14 fresh compilation observations across
+game, devtools and five frozen test entries. Six successful pairs reproduce both
+the qualified `1b05…` bytes and recorded hashes. Protocol keeps the same
+expected `non_exhaustive_match` rejection; it is not an executed passing game
+test. The control disables cursor-directory preparation and evaluated-call
+admission, and restores the qualified scalar-seed serializer. Its safe/no-LLVM
+compiler is `1b6acc26795fa7c9a3891f2348f6533d5eb16e52e44573276721d6a8b8708474`.
+The prototype source was restored exactly afterward. Results:
+`build/bench/task047-causal-control-parity/results.json`, SHA-256
+`7e7d751f389f7b297b129ac30c1e59d6686a42dc838c4c67d381a1b80160dbca`. This is a
+byte control across host build modes, with no native CPU comparison.
+
+The working-tree retained variant keeps the existing owned static-read/capture
+identity when complete, with fresh code for unrecorded values. Its strengthened
+native law now proves positive named-body reuse as well as exact same-source,
+captured-edit and checkpoint bytes through complete OOM. Both native batches,
+twelve combined guest groups and all 512 source modules plus the analyzer
+fixture pass. The immutable focused compiler is
+`debc8a40dae9f2a3a089ad6146d9aad07bedcdad5c4c0a5cc7fb1a30583db6fb` in
+`build/bench/task047-owned-static-focused/`.
+
+Both cold LLVM builds pass. The compiler is
+`cf00bb788518a6f28f38416fc75858e43ea82d1f53e06d412a6bac7c875b18a3`; its
+provisional binary is preserved in
+`build/bench/task047-owned-static-llvm-built/`. The native test executable is
+`a7bd1805ef4cee2013125ac15edbff72fed1c2412f35d86f54cadcf59b0ff12b`. The cold
+run, `run-88c1f7a9a8d65dfe`, was ended after the successful 77-minute native
+compilation to give execution a fresh budget. Its verified compilation journal
+and exact binary are preserved.
+
+The next run, `run-89672d89ec4b6759`, passes 48 smoke tests, then stops when a
+synthetic orchestration fixture's 30-second budget expires before its intended
+guest-failure case. That fixture now allows 120 seconds for cold Deno startup
+and module checking. All six focused recovery, invalidation, real deadline and
+descendant-cancellation laws pass. Compiler and guest sources stay unchanged.
+The complete gate, `run-5f526fff488d4497`, passes all 37 harness tests and
+reuses verified compilation, then fails two native archive fixtures. Their
+callback is now inlined, leaving no independently selected receipt; the semantic
+encoder correctly omits the optional archive. A focused control with the
+existing inlining switch disabled restores one complete receipt and passes the
+snapshot-cost law. The archive fixture repair and a default-inlining
+checkpoint/OOM control now pass all 16 archive laws plus their root harness.
+They cover generated origins, staging, package and nominal recipes, edited and
+failed sources, forged catalogs and receipts, member-authority omission and both
+staged control-flow helpers through complete allocation-failure sweeps. Only the
+test fixture disables inlining to retain an independent receipt; the
+default-mode checkpoint still omits the absent optional owner and preserves
+restart bytes. Focused evidence is preserved in
+`build/bench/task047-semantic-archive-fixture-focused/`. The repaired
+1,168-input manifest is
+`9e945a90b7af0d400d7df3533a71341643c1654335945394ff30c32a7ad28707`. The failed
+run's prior 1,168-input manifest is
+`aef2c3f1fca6a5e85f05d5a10d8ef47cc5b98c86fb1845e982020caf5f8c764d`. No full
+execution or release-cost pass is claimed yet.
+
+A preflight audit found the same receipt assumption in the component query
+tests. Its default-mode reproducer fails, and a dedicated private `emitQuery`
+fixture retains a selectable callee without changing the existing proof,
+diagnostic, fuel, quota, rollback or byte assertions. All 35 affected component
+laws plus their root harness pass, including complete allocation-failure sweeps.
+Evidence remains in `build/bench/task047-query-fixture-focused/`. The resulting
+1,168-input manifest is
+`f2f8a649ad24ae0e1266748efcd8b1e7eea7d5d991eed4c878845c1b159807c6`. The
+default-mode checkpoint and executed-Wasm controls remain separate. Both
+analyzers pass all 512 source files plus the fixture module at zero findings.
+Full forced LLVM run `run-14b15bf8959adf0b` passes 48 smoke tests, 37 harness
+tests and the release build, then stops at the native compilation budget:
+7,200.44 seconds, exit 124, with empty compiler stderr. No native laws or guests
+ran. The queued release measurements correctly refuse the missing successful
+gate. Evidence remains in `build/bench/task047-native-compile-budget-stop/`. Run
+`run-a534b7ef0e6f4916` retries the same frozen inputs with 21,600 seconds
+overall and 14,400 per host phase. Forced native execution, the 14 GiB memory
+guard and the separate compiler CPU acceptance limit of 1.05 stay unchanged. The
+retry's native compilation passes in 3,315.78 seconds with a cache miss; its new
+test binary is `b21b4a60…`. The complete native run reports 2,496 passes and
+eight failures, with no skips, leaks or logged errors. Seven laws require
+selected queries, and one requires a semantic checkpoint owner. Isolated
+controls confirm that the new inlining removes the catalog fixture's queries;
+adjusted fixtures restore the required queries and checkpoint owner. All seven
+previously failing retained laws, their allocation-failure checks and 27 other
+retained laws pass with larger synthetic identity bodies. All four module-token
+laws pass; only the checkpoint law disables named inlining to require a selected
+receipt. Existing assertions remain intact. One unchanged deliberately recursive
+law hits the documented NoLLVM host-stack limitation; the full LLVM run
+described below executes it successfully. Focused controls and exact source
+restoration are preserved in `build/bench/task047-retained-query-diagnosis/` and
+`build/bench/task047-retained-query-diagnosis-continuation/`.
+
+The two test fixtures are adopted in the 1,168-input manifest
+`c6a7ced0c81fcf2abb9e2edd3fe2417798d3223658f2918b1bb866753814d390`. Forced LLVM
+run `run-9b1ff45843040617` passes all 2,504 executed native laws, with zero
+skips, failures, leaks or logged errors; its binary is `d67e04f1…`. All 48 smoke
+and 37 harness checks pass. The guest phase stops at a canonical constructor
+regression. A separate complete guest inventory reports 1,583 passes and five
+failures: four local/imported constructor cases in sync/JSPI and a
+persisted-owner fixture whose tiny factory no longer selects a query. Full
+failed-run evidence and the complete inventory remain in
+`build/bench/task047-canonical-constructor-guest-failure/` and
+`build/bench/task047-c6a7-guest-inventory/`.
+
+The constructor control passes all eight affected guest laws when only the new
+named admission is disabled. Call-site instrumentation identifies optional
+closure inference while serializing a captured generic constructor. Ordinary
+callable templates already own its canonical source-arrow/payload adapter. The
+repaired admission reads the captured value graph and declines constructors,
+including those nested in aggregates or closures. It allocates nothing and is
+bounded at 65,536 visits and depth 128; exhaustion keeps the ordinary path. It
+changes no evaluator diagnostic, source scheme or semantic authority. A new
+native law checks direct and nested captures through fresh/retained/checkpoint
+allocation failures, replay and immutable Core. It and twelve targeted guest
+groups pass, including the positive zero-allocation folds. The dependency-loaded
+semantic-owner fixture keeps its original gate, byte, diagnostic and retry
+assertions with a synthetic factory above the source-inlining budget. Controls
+remain in `build/bench/task047-constructor-capture-guard-check/` and
+`build/bench/task047-semantic-guest-fixture-check/`.
+
+The repaired 1,168-input manifest is
+`5479c48b90446845458b799647bd6e99fc283742787f25a6a05c812723b1c104`. Both
+analyzers pass all 512 source files plus the fixture at zero findings. The new
+LLVM release `0d9ae259…` passes all 1,588 guest/client checks in the complete
+preflight. Forced full LLVM run `run-b7fcceb7d5946a70` passes all 2,505 native
+laws, with zero skips, failures, leaks or logged errors; its binary is
+`7d9f5921…`. Packaging passes, but the full guest phase stops on an uncaught
+Deno client shutdown race. The child's exit is already known to Deno while the
+client's status observer is pending, so the grace timer's kill throws
+`TypeError`. The client now recognizes that specific already-terminated error.
+A deterministic real-process control fails before the repair and passes after
+it; all 89 focused transport, client and body-cache checks pass with the gate's
+restricted environment permissions. The first broad-permission diagnostic had
+enabled disk persistence and invalidated fresh-work assertions; it remains
+preserved and supplies no qualification.
+
+The new 1,168-input manifest is
+`82150a7d7fcacc286671ecb8f0112bd9c3396994b1c4f9fda62006218f4790d9`.
+Only the Deno client and its transport regression change from the previous
+manifest; native compiler sources stay exact. Both analyzers pass again. All
+1,589 LLVM guest/client checks pass in the complete preflight. Forced full run
+`run-45256b95642aa16` then passes all 2,505 executed native laws, 1,589
+guest/client checks and 37 harness checks. Native skips, failures, leaks and
+logged errors are all zero. The compiler remains `0d9ae259…`; its immutable
+release and source pins are in `build/bench/task047-owned-static-release/`.
+The separate nested-constructor runtime control also passes all 2,000 sync/JSPI
+calls; baseline and guarded guests are byte-identical. Evidence remains in
+`build/bench/task047-client-shutdown-full-failure/`,
+`build/bench/task047-constructor-capture-execution.json` and
+`build/bench/task047-client-shutdown-preflight/`. Full correctness passes; the
+final compiler CPU and runtime measurements remain unqualified.
+
+The preselected seven-pair CPU identity control passes with paired median
+0.985210. The fifteen-pair comparison against qualified `1b05518e…` fails:
+paired median 1.059034 exceeds the unchanged 1.05 limit. Separate baseline and
+candidate medians are 8,602.6 and 8,547.3 ms, but those do not replace the
+paired criterion. The failed distributions and preselection are preserved in
+`build/bench/task047-cpu-guard-failure/`. Final retained parity, width/adapter
+and instruction qualification did not run after that failure.
+
+A separate diagnostic Callgrind pair preserves the frozen inputs and each
+compiler's recorded guest. Whole-process simulated instructions are
+25,233,755,782 → 25,252,341,031 (ratio 1.000737); build-only requested bytes are
+1,691,218,432 → 1,693,315,891 (ratio 1.001240). These measurements include
+different scopes and do not waive the CPU guard. The operation-row resolver
+accounts for about 8.6% of self instructions in both binaries, motivating the
+already planned P1 prototype. Its three native/OOM controls and actual storage
+size measurement pass. Reports are
+in `build/bench/task047-cpu-guard-failure-native-instructions/`. Compiler-generated
+symbol IDs differ between releases; the separate function-family report groups
+those IDs for cost attribution and grants no semantic correspondence.
+
+The P1 LLVM screen against the same current 047 source passes. Simulated
+instructions fall from 25,252,371,070 to 24,267,174,854 (ratio 0.960986), while
+requested build bytes rise from 1,693,315,891 to 1,693,364,323 (ratio 1.000029).
+Both emit exactly the current game Wasm and preserve all eleven selected work
+counters. Seven CPU identity pairs pass at median 0.946317; fifteen comparison
+pairs pass at median 0.914069, with wide individual spreads. These are the
+preselected P1 screen, not final combined qualification. Evidence remains in
+`build/bench/p1-refreshed-047-native-instructions/` and
+`build/bench/p1-refreshed-047-cpu-screen.json`.
+
+The initial cache was adopted into the working tree for full qualification. It adds
+128 bytes to `types.Store` (800 → 928), with no row or effect-store layout
+change. The new frozen manifest is
+`78ffcee39d5797770df6f7959611ca62f8286342233fa510f3a376325a380c1f`.
+Both analyzers, all 1,589 guests and the forced complete LLVM gate with the new
+native law are required. The subsequent final CPU comparison against qualified
+`1b05518e…` uses seven identity and 31 comparison pairs, fixed before any P1 CPU
+observation, at the unchanged 1.05 limit. Previous releases and the failed
+fifteen-pair 047 campaign remain unchanged. Final parity, runtime and instruction
+qualification remain open.
+
+That first P1 LLVM guest preflight passes 1,588 of 1,589 checks. The sole failure
+is `chain_generic N=64`: requested bytes 8,506,471 exceed its unchanged 8,505,963
+budget by 508 bytes. The full native gate and final CPU/runtime campaigns do
+not run. The binary, source and complete logs remain in
+`build/bench/task047-p1-preflight-failure/`; the budget is unchanged.
+
+The working tree now uses eight compact entries and the existing shared
+physical-epoch guard. Both updates to that shared epoch invalidate the closed
+generation first, so an unsynchronized physical edit declines and a refreshed
+generation cannot revive an old entry. Saturation still disables certificates.
+Actual `Store` size is 800 → 864 bytes, with row and effect-store layouts
+unchanged. All three focused native/OOM controls pass again. Matched development
+builds preserve bytes and selected work counters at N=32/64/128 and reduce N=64
+requested bytes by 4,832. Development and LLVM release allocator totals differ;
+that diagnostic does not qualify the release budget. The new LLVM guest
+preflight passes 1,588 checks and fails the same budget: 8,507,451 requested
+bytes exceed 8,505,963 by 1,488. Matched LLVM controls reproduce this result;
+allocation attribution remains open. Its instruction screen and complete gate
+have not run. The frozen source manifest
+is `a8c468ceaabeae2e503fb38c2e213da0a37f6624ed4e2a6b3fdae1b9ac8cf38b`.
+The complete failure evidence remains in
+`build/bench/task047-p1-packed-preflight-failure/`.
+
+Exact allocation traces now account for all requested bytes and all 27,302
+allocations in each of the three LLVM controls, with identical Wasm. The first
+cache adds 12,240 bytes; the smaller one adds 13,220. The extra requests come
+from the `CallSummaries` region pool and two checker Store copies. The smaller
+pool block can grow in place from 49,464 to 52,304 bytes, which also increases
+its next block. A pinned model of Arena/SMP/page growth reproduces every observed
+allocation and successful growth in all three controls. It predicts 3,060 extra
+bytes for four entries; the separate LLVM control below confirms that prediction.
+Raw evidence and the model are in `build/bench/p1-budget-allocator-trace-v3/`.
+
+The four-entry successor is now in the working tree for qualification. It changes
+only the fixed cache capacity; all existing proof guards and ordinary miss
+fallbacks remain. Three native/OOM controls pass again. Actual Store size is
+800 → 832 in Safe and 664 → 696 in Fast/LLVM. The old 800-byte baseline was a
+Safe measurement; the absolute sizes differ by build mode. Row and effect-store
+layouts remain unchanged within each mode. Its source manifest is
+`bb0c82137ef2bdf87710ea1ffed627a8f33c52f2d095c2b051730bc3834cffab`.
+Both analyzers and all 1,589 LLVM guests pass. The separate twelve-observation
+LLVM control at N=32/64/128 preserves bytes and selected work in all four hosts.
+N=64 requests 8,497,291 bytes, exactly 3,060 above the control and 8,672 below
+the unchanged budget. This confirms the model's prediction. The compiler is
+`ed48b8c1…`; its guest preflight and immutable binary are in
+`build/bench/task047-p1-four-preflight/` and
+`build/bench/task047-p1-four-preflight-release/`. The preselected instruction
+payoff screen also passes: whole-process simulated instructions fall from
+25,252,368,116 to 24,299,854,307 (ratio 0.962280), while requested build bytes
+change from 1,693,315,891 to 1,693,327,999 (ratio 1.00000715). Both compilers
+produce identical game Wasm and eleven selected work counters; allocation count
+stays 4,967,704. The exact source pins pass before and after. Reanalysis of
+those raw profiles accounts for every self instruction: `closedNodeHeight`
+saves 590,056,856 and `resolveOperationRow` saves 346,928,736. The grouped
+function report is cost attribution, not a semantic identity proof. Evidence
+remains in `build/bench/p1-four-entry-native-instructions/`. This one-pair
+instruction screen does not establish the compiler CPU guard. The complete forced LLVM
+gate `run-d9cd966e277337fc` passes **2,506 executed native laws, 1,589
+guest/client checks and 37 harness checks**, with zero native skips, failures,
+leaks or logged errors. Wall time is 2,387.497 s. Release `ed48b8c1…`, native
+suite `dd3c59f8…`, the exact manifest and report pins are preserved in
+`build/bench/task047-p1-four-owned-static-release/`.
+
+Guest files use concurrency one. The first four-file full run passed all native
+laws but stopped on the LSP completion's unchanged 250 ms wall deadline. All
+eight LSP tests then pass in isolation, all 1,589 guests pass with one file at a
+time, and the new complete forced gate above passes. No production deadline or
+test assertion changed. The failed run is preserved in
+`build/bench/task047-p1-four-lsp-deadline-full-failure/`; the scheduling diagnosis
+is in `build/bench/task047-p1-four-lsp-deadline-diagnosis/`.
+
+The next 74-sample control, with fourteen independent fresh-edited builds, fails
+with sixteen within-binary game parity errors: four edits differ from fresh
+builds, and their reverts differ from the original fresh build, for both the
+pre-P1 and four-entry compilers. Every phase still matches between those two
+compilers. These failures are preserved in
+`build/bench/task047-p1-four-retained-parity-failure/`; they are not covered by
+the declared cross-compiler output differences. The seven-phase LLVM probe
+confirms the last-qualified compiler passes and the candidate fails. A matched
+Safe/NoLLVM control disabling only evaluated named calls restores exact
+last-qualified bytes in all seven phases. Section inspection finds an extra
+24 bytes of static data after an edit/revert; serializer provenance is under
+investigation. These are causal diagnostics in
+`build/bench/task047-retained-byte-diagnosis/`, not an accepted feature removal.
+Final compiler CPU, parity and runtime qualification have not run.
+
+The read-only serializer/replay trace then identifies the exact correspondence:
+the old nominal value 29166 maps to current value 28400, its layout maps to 2488,
+and replay copies its record and wrapper at addresses 56176 and 56192. A rebuilt
+caller serializes that same current value/layout again at 56200 and 56216.
+Seeding the already-proved cache entry in a private control removes the entire
+24-byte difference and preserves all seven fresh/edit/revert hashes. This
+diagnostic does not cover missing layout proofs or conflicting replay aliases.
+
+The implemented repair instead makes an executable job fresh when it directly
+materializes a new static value outside a constant job. Graph equality alone
+does not recreate the serializer's sharing table. Constant jobs keep their
+existing path: replay serializes the current admitted graph before the caller
+continues. Scalar captures and calls that never materialize static data keep
+executable reuse; evaluated-call lowering and the zero-allocation folds remain
+enabled. No cache authority or alias comparison is widened.
+
+A public two-module Array repro adds twelve bytes after edit/revert before the
+repair. The repair restores exact fresh bytes and still reuses unaffected
+queries. Two native laws cover fresh/edit/revert bytes, positive scalar
+evaluated-call reuse, candidate discard and every allocation-failure point
+without changing retained source owners. Three guest checks cover both tiers,
+capture edits and execution, including the unchanged zero-adapter-allocation
+fold requirement. All pass in the focused Safe/NoLLVM run. An analyzer
+preflight caught two deprecated test-fixture allocator calls; those aliases
+were replaced with the supported API and both full analyzers now report zero.
+The new complete LLVM gate on manifest `50ad681b…` finishes with 2,507 native
+passes and one failure in the existing law requiring executable reuse of static
+captured value graphs. There are zero skips, leaks or logged errors. Both builds
+and 37 harness checks pass; the gate stops before guests. Total wall time is
+98.12 minutes, including 47.50-minute native compilation overlapping the
+36.46-minute release build, then 47.92-minute native execution. This fallback
+is unqualified despite the focused controls. Preserve the law and review a
+more precise repair. The owner requested a pause for scope/tool-efficiency
+review; all three queued follow-ups are canceled. The current failure is saved
+in `build/bench/task047-static-sharing-v2-native-failure/`. The planned
+162-sample parity screen, seven-identity/31-comparison CPU guard and final
+runtime qualification have not started. Evidence remains under
+`build/bench/task047-retained-byte-diagnosis/` and
+`build/bench/task047-static-materialization-focused/`.
+
+After the owner review, development always uses Zig's native backend without
+LLVM; final release builds and qualification use LLVM. The precise successor
+restores copied data's serialization bindings only after exact current value
+graphs and imported physical layouts match. Cache hits, conflicting aliases,
+missing proofs and mixed fresh aggregate children decline before data is
+copied. A serializer-derived capture-free closure first undergoes ordinary
+current specialization; its complete resulting graph must match before its
+binding is restored. This publishes no solved principal receipt from an erased
+field. The existing positive closure law now passes, extended through a second
+retained edit and complete allocation-failure/source-immutability sweeps.
+
+All eleven affected native laws pass, as do the extra caller-ordering/OOM and
+alias-edit cases, all three both-tier guests and both full analyzers. The seven
+game population/no-op/trivia/revert/literal-edit/revert/fresh-literal phases
+restore exact original fresh bytes. The repaired Safe/noLLVM compiler build
+takes 49.22 s; an unchanged rebuild takes 0.43 s. These are development checks,
+not final LLVM or CPU qualification. Frozen evidence is in
+`build/bench/task047-static-sharing-precise-development/` and
+`build/bench/task047-static-sharing-precise-preflight/`.
+
+The Window call-site diagnostic now passes all 21 operation/count cases. Its
+separate instrumented copy agrees with both an independent raw allocator counter
+and the original guest's allocation telemetry. At 4,096 inputs the physical
+sites total 40,954 requests. Source admission traces show that `Windows.next`
+(cost 55, depth 1) and its inner `Range.next` (cost 19, depth 2) are already
+inlined in the fold. Both diagnostic guests are byte-identical to the
+provisional LLVM guest. Reports remain in
+`build/bench/task047-window-sites-prequalification/`,
+`build/bench/task047-window-inline-diagnostic/` and
+`build/bench/task047-window-prequalification-summary.json`.
+
+The ownership-pass diagnostic also preserves exact guest bytes. Its 2,614 trace
+lines show that the children-mode result is rejected by the existing cost guard:
+the fold's outer loop removes three allocation sites but adds 16 root
+publications, and the inner loop removes two but adds 10. Direct nested loops
+remove two outer sites with the same publication increase. The compiler keeps
+its conservative fallback. Existing `pruneFieldRoots` already removes
+publications covered by zero, static or initial function-owned values; further
+alias or control-flow precision needs its own proof. Both diagnostic source
+files were restored exactly. See `build/bench/task047-window-sroa-diagnostic/`
+and `build/bench/task047-window-sroa-summary.json`. These are allocation and
+admission observations; final qualification and the remaining optimization are
+still required.
+
+An optional same-Safe-host retained-cost diagnostic was stopped after seven
+partial observations because each host build was too slow for a useful proxy.
+Its `incomplete.json` is preserved in
+`build/bench/task047-owned-static-retained-dev-screen/`; it supplies no CPU
+guard or speedup claim. The final LLVM compiler-cost and retained-output
+campaign remains required.
+
+
+### Window cost counterfactual, 21 October 2026
+
+The private cost-guard counterfactual passes all 88 optimized-tier semantic and
+allocation rows. Its LLVM baseline is the correctness-qualified `ed48b8c1…`;
+the diagnostic host uses Safe/NoLLVM and changes no ownership admission. Main
+sources stay unchanged and both temporary prototype files are restored exactly.
+The first attempt failed to compile its instrumentation and produced no runtime
+measurements; the corrected v2 data below remains a diagnostic, not an adopted
+optimization or whole-task qualification.
+
+At 4,096 inputs, all three Window forms reduce physical allocation requests from
+40,954 to 32,764 and rounded allocation traffic from 2,227,872 to 1,834,752 bytes
+per call. Committed memory stays at 128 KiB. Retains increase by 73,702 and
+releases by 65,512 per call; fewer allocations alone do not settle the tradeoff.
+
+| Window form | Baseline guest CPU, median ms | Counterfactual, median ms | Ratio |
+| --- | ---: | ---: | ---: |
+| Fold of window contents | 6.49800 | 7.17850 | 1.105 |
+| Nested loops | 5.75325 | 6.62050 | 1.151 |
+| Fold of window lengths | 5.02500 | 6.36525 | 1.267 |
+
+These are ratios of medians from 21 alternating guest CPU pairs per form, four
+calls per sample after eight warmups. Individual samples have wide outliers;
+this is a rejection screen, not a significance or native compiler CPU claim.
+The existing cost guard remains unchanged.
+
+Exact syntactic telemetry leaves outer/inner loop publication counts at 23/16
+after the established root-borrow pass, versus 7/6 before scalarization. Even
+with zero directly counted final allocation sites, those counts do not clear
+the unchanged rule. Intervening vector/reduction passes mean equal loop counts
+alone do not prove correspondence. No late lookahead or ownership relaxation is
+justified by this data. Root-borrow decline attribution and any narrower lifetime
+proof remain unimplemented. Raw source/binary/Wasm pins, 100-call allocation
+observations, all CPU samples and per-pass counts remain in
+`build/bench/task047-p1-four-window-preflight-counterfactual-v2/`.

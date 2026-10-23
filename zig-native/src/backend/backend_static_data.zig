@@ -7,7 +7,6 @@ const wasm = @import("wasm.zig");
 const core_eval = @import("../eval/core_eval.zig");
 const type_evidence = @import("../eval/type_evidence.zig");
 const layout = @import("layout.zig");
-const packed_layout = @import("packed_layout.zig");
 const heap = @import("../runtime/runtime_layout.zig");
 const code_artifacts = @import("../reuse/code_artifacts.zig");
 const Allocator = std.mem.Allocator;
@@ -95,7 +94,7 @@ pub const State = struct {
             return address;
         }
         if (input.tag == .array or input.tag == .list) {
-            if (packed_layout.rowWords(&g.representations.store, output.a) != 0) return g.decline(owner, .{ .start = 0, .end = 0 }, .unsupported);
+            if (try g.rowWords(output.a) != 0) return g.decline(owner, .{ .start = 0, .end = 0 }, .unsupported);
             var words: std.ArrayList(u32) = .empty;
             defer words.deinit(g.allocator);
             const count = g.evaluator.valueChildren(value).len;
@@ -224,6 +223,7 @@ pub const State = struct {
         if (depth >= 256) return g.decline(1, .{ .start = 0, .end = 0 }, .complexity);
         const shape = g.representations.store.node(ty);
         if (shape.tag == .owning) {
+            if (g.artifacts) |context| context.materializeStaticValue();
             const payload = try self.serialize(g, id, shape.a, depth + 1);
             const address = try g.module.dataObject(heap.Owning{ .payload = payload, .token = 0 });
             if (g.layoutRole(shape.a) == .reference) try self.dataValueReference(g, address, id, payload);
@@ -249,6 +249,7 @@ pub const State = struct {
             try g.module.demandResource(.static_data, address, true);
             return address;
         }
+        if (g.artifacts) |context| context.materializeStaticValue();
         if (info.kind == .package) {
             const address = try self.serializePackage(g, id, ty, depth);
             try self.cache.put(g.allocator, key, address);
@@ -268,7 +269,7 @@ pub const State = struct {
             return address;
         }
         if (info.kind == .array or info.kind == .list) {
-            const row_words = packed_layout.collectionRowWords(&g.representations.store, ty);
+            const row_words = try g.collectionRowWords(ty);
             if (row_words != 0) return self.serializePackedCollection(g, id, ty, depth, info, key, row_words);
         }
         return self.serializeAggregate(g, id, ty, depth, info, key);
@@ -402,6 +403,45 @@ pub const State = struct {
         try self.cache.put(g.allocator, key, address);
         return address;
     }
+    fn numericChild(g: anytype, value: core_eval.ValueId, ty: layout.Id, offset: u32) Error!core_eval.ValueId {
+        const node = g.representations.store.node(ty);
+        const values = g.evaluator.valueChildren(value);
+        if (node.tag == .nominal) {
+            if (offset != 4 or values.len != 1) return g.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
+            return values[0];
+        }
+        const index = offset / 4;
+        if (node.tag == .record) {
+            const fields = g.representations.store.children(ty);
+            if (index >= fields.len / 2) return g.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
+            const name = fields[index * 2];
+            for (g.evaluator.recordFieldNames(value), 0..) |field, slot| {
+                if (field == name and slot < values.len) return values[slot];
+            }
+            return g.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
+        }
+        if (node.tag != .product or index >= values.len) return g.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
+        return values[index];
+    }
+    fn serializeNumericRow(self: *State, g: anytype, row: core_eval.ValueId, plan: @import("numeric_rows.zig").Plan, depth: usize, words: *std.ArrayList(u32)) Error!void {
+        var values: [32]core_eval.ValueId = undefined;
+        values[0] = row;
+        for (plan.storage[1..plan.storage_count], 1..) |storage, index| {
+            const owner = storage.parent.?;
+            values[index] = try numericChild(g, values[owner], plan.storage[owner].layout, storage.offset);
+        }
+        for (plan.leaves[0..plan.leaf_count]) |leaf| {
+            const storage = plan.storage[leaf.owner];
+            const value = try numericChild(g, values[leaf.owner], storage.layout, leaf.offset);
+            const node = g.representations.store.node(storage.layout);
+            const fields = g.representations.store.children(storage.layout);
+            const child = if (node.tag == .nominal)
+                try g.nominalPayload((@as(u64, node.a) << 32) | node.b, storage.tag.?, storage.layout)
+            else
+                fields[if (node.tag == .record) leaf.offset / 2 + 1 else leaf.offset / 4];
+            try words.append(g.allocator, try self.serialize(g, value, child, depth + 1));
+        }
+    }
     fn serializePackedCollection(self: *State, g: anytype, id: core_eval.ValueId, ty: layout.Id, depth: usize, info: core_eval.ValueInfo, key: SerializedKey, row_words: u32) Error!u32 {
         var words: std.ArrayList(u32) = .empty;
         defer words.deinit(g.allocator);
@@ -409,7 +449,12 @@ pub const State = struct {
         const element = g.representations.store.node(ty).a;
         const row_tag = g.representations.store.node(element).tag;
         const fields = g.representations.store.children(element);
+        const nested = try g.nestedRow(element);
         for (g.evaluator.valueChildren(id)) |row| {
+            if (nested) |plan| {
+                try self.serializeNumericRow(g, row, plan, depth, &words);
+                continue;
+            }
             const values = g.evaluator.valueChildren(row);
             if (values.len != row_words) return g.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
             for (0..row_words) |i| {
@@ -498,7 +543,14 @@ pub const State = struct {
                 try leaves.append(g.allocator, chunk);
                 offset = end;
             }
-            const address = try lists.staticDescriptor(&g.module, info.len, leaves.items);
+            // Later writers derive leaf ownership from the descriptor, too.
+            // Scalar words must stay scalar when an immutable seed is copied
+            // or grown; their numeric bits never confer reference authority.
+            const element = g.representations.store.node(ty).a;
+            const address = if (g.layoutRole(element) == .scalar)
+                try lists.staticScalarDescriptor(&g.module, info.len, leaves.items, 1)
+            else
+                try lists.staticDescriptor(&g.module, info.len, leaves.items);
             try self.cache.put(g.allocator, key, address);
             return address;
         }

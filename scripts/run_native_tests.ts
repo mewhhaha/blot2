@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { type Phase, runPhase } from "./compiler_phase.ts";
 import { nativeTestRecords, verifyNativeSelection } from "./dev_check_areas.ts";
+import { nativeTestPartitions } from "./native_test_partitions.ts";
 
 type Interval = {
   shard: number;
@@ -66,6 +67,57 @@ export async function runNativeTests(options: {
   const binary = resolve(options.binary);
   const directory = resolve(options.directory);
   await Deno.mkdir(directory, { recursive: true });
+  const costs = new Map<string, number>();
+  let timingSource: string | null = null;
+  try {
+    const previous = JSON.parse(
+      await Deno.readTextFile(resolve(directory, "results.json")),
+    );
+    if (
+      previous.success && previous.allocation_failures === mode &&
+      Array.isArray(previous.phases)
+    ) {
+      for (const phase of previous.phases) {
+        if (phase.name === "inventory") continue;
+        for (
+          const record of nativeTestRecords(
+            await Deno.readTextFile(phase.stderr),
+          )
+        ) {
+          if (
+            record.status === "passed" && record.leaks === 0 &&
+            record.logged_errors === 0
+          ) {
+            costs.set(record.name, record.duration_ns);
+          }
+        }
+      }
+      if (costs.size) timingSource = "last-successful-run";
+    }
+  } catch {
+    // Missing, corrupt or moved history is only a lost scheduling hint.
+    costs.clear();
+  }
+  if (costs.size === 0 && mode === "full") {
+    try {
+      const baseline = JSON.parse(
+        await Deno.readTextFile(
+          new URL("./native_test_costs.json", import.meta.url),
+        ),
+      );
+      if (baseline.version === 1 && baseline.allocation_failures === "full") {
+        for (const [name, cost] of Object.entries(baseline.costs)) {
+          if (
+            typeof cost === "number" && Number.isSafeInteger(cost) && cost > 0
+          ) costs.set(name, cost);
+        }
+        if (costs.size) timingSource = "recorded-baseline";
+      }
+    } catch {
+      // An absent baseline is harmless; cold runs retain round-robin coverage.
+      costs.clear();
+    }
+  }
   const runDirectory = await Deno.makeTempDir({
     dir: directory,
     prefix: "run-",
@@ -83,6 +135,10 @@ export async function runNativeTests(options: {
     peak_active_shards: 0,
     phases: [] as Phase[],
     artifacts: [] as string[],
+    scheduling: "round-robin",
+    partitions: [] as string[][],
+    estimated_partition_ns: [] as number[],
+    timing_source: timingSource,
   };
   const controller = new AbortController();
   const abort = () => controller.abort(options.signal?.reason ?? "cancelled");
@@ -129,22 +185,37 @@ export async function runNativeTests(options: {
     ) {
       throw new Error("Native inventory is empty or duplicated");
     }
+    const plan = nativeTestPartitions(report.inventory, options.shards, costs);
+    report.scheduling = plan.weighted ? "prior-timings" : "round-robin";
+    report.partitions = plan.groups;
+    report.estimated_partition_ns = plan.estimated_ns;
     let failure: unknown;
     await Promise.allSettled(
       Array.from({ length: options.shards }, async (_, shard) => {
         try {
+          const expected = plan.groups[shard];
+          const physicalShard = plan.weighted ? 0 : shard;
+          const physicalShards = plan.weighted ? 1 : options.shards;
           const result = await execute(`shard-${shard}`, [
-            `--shard=${shard}`,
-            `--shards=${options.shards}`,
+            `--shard=${physicalShard}`,
+            `--shards=${physicalShards}`,
             `--allocation-failures=${mode}`,
+            "--fail-fast",
+            ...(plan.weighted ? expected.map((name) => `--test=${name}`) : []),
           ]);
           const log = await Deno.readTextFile(result.stderr);
-          const expected = report.inventory.filter((_, index) =>
-            index % options.shards === shard
-          );
           verifyNativeSelection(nativeTestRecords(log), expected, mode);
           report.intervals.push(
-            shardInterval(log, shard, options.shards, expected.length),
+            {
+              ...shardInterval(
+                log,
+                physicalShard,
+                physicalShards,
+                expected.length,
+              ),
+              shard,
+              shards: options.shards,
+            },
           );
         } catch (error) {
           failure ??= error;

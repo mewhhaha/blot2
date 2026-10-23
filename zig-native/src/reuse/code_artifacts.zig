@@ -382,6 +382,16 @@ pub const Context = struct {
     pub fn requireFreshCode(self: *Context) void {
         if (self.active_job != 0) self.jobs.items[self.active_job - 1].reusable = false;
     }
+    /// A static read proves the value graph, but replaying its bytes does not
+    /// restore the serializer's value/layout sharing table. Direct materializers
+    /// therefore rebuild unless an admitted static value graph can restore
+    /// those bindings during fragment replay. Constant jobs already replay by
+    /// serializing the current graph before their caller continues.
+    pub fn materializeStaticValue(self: *Context) void {
+        if (self.active_job == 0) return;
+        const job = &self.jobs.items[self.active_job - 1];
+        if (job.request != .constant and !job.hasStaticValues()) self.requireFreshCode();
+    }
     pub fn readInlineBody(self: *Context, target: core.BindingRef) Allocator.Error!void {
         if (self.active_job == 0) return;
         const reads = &self.jobs.items[self.active_job - 1].inline_bodies;
