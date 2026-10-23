@@ -43,8 +43,11 @@ Release compiler SHA-256:
 [Archived evidence](measurements/symbolic-journal-2026-10-23.tar.gz) contains the
 sanitized complete gate records, seven paired release measurements, earlier
 three-pair screen and native allocation/RSS screen. Reproduce the application
-comparison with `scripts/bench_compare.ts`; the archived result pins its inputs
-and options. The initial gate attempt ran out of disk space before native
+comparison with `deno task bench:compile --baseline BEFORE --candidate AFTER
+--snapshot SNAPSHOT --workload game,devtools,edit_suite,tests --runs 7
+--test-runs 1 --profile --restart-cache --guard-cpu --out OUTPUT`; the archived
+result pins its inputs and options. The evidence archive SHA-256 is
+`b9aec2b38fd68082b7e2dbddfa9cbef0647cd09273955a2e90a8a4f9e472ffcd`. The initial gate attempt ran out of disk space before native
 execution; the recorded successful gate followed removal of completed build
 caches. Its added harness diagnostic preserves child output on assertion failure.
 
