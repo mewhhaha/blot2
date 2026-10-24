@@ -9,23 +9,24 @@ Always use Zig 0.17.0 Safe/noLLVM for development and native tests. LLVM belongs
 to the actual release candidate. Keep compiler construction, test compilation,
 test execution, analysis and wrapper overhead as separate measurements.
 
-Current status: BT1's warm cache-hit target and BT3's observed development-cycle
-targets are met; BT2's incremental-mode experiment remains negative. The final
-[CT97/reuse/scratch candidate](zig-native/CT97_QUALIFICATION.md) passes affected
-static-sharing/type-effects checks in 16.10 / 3.94 s. Those are individual
-observations, not p95 claims. BT4's temporary scratch removes real allocations:
-33 exhaustive sweeps now require 37,930 scenario runs instead of 44,074. Its
-halved-law and paired whole-gate timing targets remain open. Complete native
-execution takes 584.26 s and the whole gate 634.83 s in this interval; these are
-not paired reductions from the previous 665.13 / 761.75 s gate.
+Current follow-up: [CT102](zig-native/CT102_QUALIFICATION.md) keeps ordinary
+Safe/noLLVM development builds. Its expanded static-sharing cycle passes in
+35.36 s: compiler build 2.57 s, complete native compilation 15.50 s, sampled
+native execution 0.91 s, with the additional retained-proof and executed-Wasm
+laws. Actual LLVM release construction takes 254.61 s. Full native execution
+takes 768.23 s and the complete gate 819.00 s. These individual intervals
+are not paired compiler-build or whole-gate improvements; no build hill closes
+from this batch. BT2 remains negative and BT4's previous scratch-size trials
+remain complete. The historical CT97 scratch reduction (44,074 → 37,930 exhaustive
+scenario runs) and its unresolved halving/whole-gate targets remain unchanged.
 
 | Hill                                                       | Evidence and next action                                                                                                                                                                                                                                                                | Acceptance target                                                                                                                                                                                                                |
 | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | BT1: preserve build-system caches                          | An empty-cache `zig build --help` takes about 56 s; the repeated invocation takes about 10 ms. The initial compiler artifact itself takes about 5 s. Keep a stable writable global/local cache across ordinary development cycles. Diagnose initial configuration/bootstrap separately. | No repeated bootstrap on unchanged inputs; unchanged compiler/native build commands below 0.1 s on this host. Cache hits must still depend on source/toolchain/configuration bytes.                                              |
 | BT2: choose incremental mode from measured edits           | Compare ordinary artifact caching with explicit `-fincremental` on three distinct leaf edits, checker edits, test-only edits and exact source reverts. The default already preserves cheap unchanged/test-only compiler builds.                                                         | Change a default only after at least seven alternating real-edit pairs improve the complete edit/check cycle by 15%, with no more than 10% regression for unchanged/test-only/revert cycles. Until then keep incremental opt-in. |
 | BT3: shorten the affected development cycle                | Compile the complete native inventory once and select laws at runtime; retain the explicit family, sampled fault policy and guest checks. Measure compiler build, native compile/run, identity scans, types and lint separately before removing work.                                   | Warm affected checks below 30 s and edited checks below 60 s on this host, while preserving complete inventory compilation and required laws. Collect 20 real cycles before making a p95 claim.                                  |
-| BT4: reduce exhaustive test cost without reducing coverage | Stack scratch reduces allocation scenarios by 13.9%; all fault positions in the resulting compiler still execute. Current native phase 584.26 s. The one-pair top-three screen is in the qualification record. Stop further scratch-size tuning after two bounded trials.               | Still open: halve combined top-three cost and show at least 5% paired whole-gate gain; then reprofile toward 480 s native. No sampled substitute for qualification.                                                              |
-| BT5: lower actual release construction cost                | Final LLVM release takes 196.47 s; the later gate uses that cached release. Release construction remains a separate cost. Collect a detailed Zig time report on the next necessary release.                                                                                             | First milestone below 150 s on this host/configuration, with identical behavior and no application CPU regression. Native unit tests remain Safe/noLLVM.                                                                         |
+| BT4: reduce exhaustive test cost without reducing coverage | Stack scratch reduces allocation scenarios by 13.9%; all fault positions in the resulting compiler still execute. CT97 native phase was 584.26 s; CT102 observes 768.23 s in a different interval. The one-pair top-three screen is in the CT97 qualification record. Stop further scratch-size tuning after two bounded trials. | Still open: halve combined top-three cost and show at least 5% paired whole-gate gain; then reprofile toward 480 s native. No sampled substitute for qualification. |
+| BT5: lower actual release construction cost                | Latest actual LLVM release takes 254.61 s (CT97 observed 196.47 s in a different interval); the later gate uses that cached release. Release construction remains a separate cost. Collect a detailed Zig time report on the next necessary release.                                                                                             | First milestone below 150 s on this host/configuration, with identical behavior and no application CPU regression. Native unit tests remain Safe/noLLVM.                                                                         |
 
 Run the isolated build measurement on Linux with Python 3.11+ and Zig 0.17.0:
 

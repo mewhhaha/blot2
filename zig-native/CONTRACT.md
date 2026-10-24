@@ -798,6 +798,17 @@ capacity before publication. The projected query certifies no runtime or staged
 value: ordinary evaluation still runs and reports errors. Executable admission
 uses its own source and captured-value checks.
 
+Closed call publications are optional memo outputs of that completed query.
+An individual proof that cannot be translated under the existing type/depth
+checks is omitted; its next use performs ordinary checking. This does not
+decline the independently admitted empty result or publish the old evidence ID.
+The next capture owns only successfully translated publications. Scalar and
+nominal inputs, complete source projection, result admission and atomic memo
+publication retain their checks. Principal statistics distinguish projected
+owner, result, missing-recording, dynamic-input, image and importer declines;
+`call_publications_declined` counts omitted memo outputs separately from query
+declines.
+
 The recorded region includes the independent summary jobs it drains: their
 reads, publications and consumed jobs pass through the same recorder, so their
 results are recorded work even when they publish no validated call. A job

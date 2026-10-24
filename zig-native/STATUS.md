@@ -1,5 +1,30 @@
 # Zig compiler status
 
+## Principal call-memo replay, 24 October 2026
+
+CT102 checkpoint, 24 October 2026: [qualified partial call-memo replay](CT102_QUALIFICATION.md)
+reduces retained literal-edit CPU by **25.1%** in seven alternating pairs against
+CT97. Literal-edit wall medians are 8.63 → 5.93 s; body edits remain about 6.83 s
+in the candidate. Shared-host load causes wide ranges; use the paired CPU
+comparison rather than interpreting independent wall medians as speedups.
+Fresh game/devtools and body-edit CPU guards pass, and every fresh/edit/revert/
+restart Wasm comparison is exact. The full gate passes 2,541 exhaustive native
+laws, 1,649 guest checks, 48 smoke checks and 57 tooling checks with zero Zig
+lint findings. Native execution takes 768.23 s and the full gate 819.00 s
+in this interval. The expanded development cycle takes 35.36 s.
+
+The change keeps a source/input-proven empty principal result while omitting
+optional call memo outputs that cannot pass the unchanged importer. Ordinary
+checking handles those calls. The largest literal-edit region is now reused;
+two large regions remain. A separate profile measures literal inference at
+5.22 → 3.20 s and body inference at about 5.13 s. First-edit checking takes
+0.92 s, later revisions about 0.07 s. Sub-second editing remains open; follow
+CT103 and CT104 in [the current queue](../COMPILE_HILLS.md). Concurrent text and
+guest-runtime changes remain preserved outside this isolated candidate. A separate
+sequence confirms 70–74 ms frontend checking for later unseen literal edits,
+but total rebuilds still take 4.67–4.98 s in that single profiled sequence.
+The qualified CT102 CLI and compiler are installed locally.
+
 ## Row traversal, retained reuse and scratch, 24 October 2026
 
 Seven alternating release pairs reduce fresh game CPU by **32.5%** against

@@ -1,41 +1,41 @@
 # Compile-time hills
 
-## Current queue: CT95–CT101 (24 October 2026)
+## Current queue: ordinary edits toward one second (24 October 2026)
 
-CT95, CT96 and **CT97 are complete**. The
-[latest qualification](zig-native/CT97_QUALIFICATION.md) records 32.5% less
-fresh-game CPU against CT96 (13.14 → 8.87 s medians), exact Wasm and the full
-compiler gate. Matching instrumented inference falls 9.93 → 6.23 s. The
-candidate is `build/bench/ct97/final-src/zig-native/zig-out/bin/blotc`.
+[CT102 is qualified](zig-native/CT102_QUALIFICATION.md): seven alternating pairs
+show **25.1% less literal-edit CPU** against CT97, with exact Wasm and full
+qualification. Candidate literal/body wall medians are 5.93 / 6.83 s, with wide
+shared-host ranges. Fresh game/devtools and body-edit CPU pass the 5% regression
+guard. The largest literal-edit principal region is reused, with 12,134 call
+proofs translated and 253 omitted for ordinary checking. No validation limit or
+source/input gate is weakened. Sub-second ordinary edits remain open.
 
-CT98's complete executable index now has sufficient bounded capacity and reuses
-thousands of functions. Literal/body edits use 40.7% / 43.1% less CPU and take
-7.63 / 6.56 s median wall. The 50% edit-CPU and four-second wall targets remain
-open. CT100 and those large retained principal regions are the next measured
-costs. CT99 remains deferred. CT101's 12 s CPU milestone is met; its 8 s
-milestone remains open. The [review](PERFORMANCE_REVIEW.md) preserves the
-preceding diagnosis and links these results. CT1–CT94 below are historical, not
-a queue to rerun.
+The user prioritizes ordinary edits and rebuilds. Separate the first edit after
+population from later previously unseen edits and from reverts. A single matched
+profile measures first-edit checking at 0.92 s / 6.55 million allocations, later
+checking at about 0.07 s, and remaining inference at 3.20 s for a literal edit /
+5.13 s for a body edit. A separate sequence of three unseen literal values
+confirms 74 / 70 ms checking on the second/third edits, but 4.98 / 4.67 s total
+wall and 3.33 / 3.12 s inference. All outputs match fresh controls. This is a
+single profiled sequence, not a latency distribution. Existing code replay alone
+does not remove the remaining inference.
 
-| Hill                                                           | Evidence and experiment                                                                                                                                                                                                                                                           | Acceptance target                                                                                                                                                                      |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CT95: trustworthy current measurements                         | Preserve all `pen.json` settings and frozen std; compare instrumented and ordinary builds; retain wall, process CPU, phase allocations, sampled CPU and output hashes.                                                                                                            | Current baseline recorded; every run rejects input drift and output/revert differences. Profiling is separate from throughput acceptance.                                              |
-| CT96: stop scanning every binding at ordinary call preparation | `prepareSpawnApplication` has 27.6% sampled self CPU. It scans every unit's bindings on each call and builds a module-pointer list on the positive path. Prepare immutable capability-presence/index data once per generator, retaining exact positive-path validation.           | At least 20% less fresh-game CPU in seven alternating unprofiled pairs; task preparation under 5% of sampled CPU. Exact Wasm and all task authority/capture/OOM laws preserved.        |
-| CT97: bound effect-row resolution in large inference regions   | Complete: retained prefixes and birth-checked empty-row shortcuts remove repeated chain walks; largest diagnostic store followed 402 million edges before the change.                                                                                                             | 32.5% less whole-build CPU and 37.3% less inference wall, exceeding 10% / 25% targets; chronology, rollback, multiplicity and OOM laws pass.                                           |
-| CT98: restore backend reuse for ordinary source edits          | The 4,096-record complete-index cap was the blocker; separate 16K-record / 8 MiB capacity restores hits. Literal/body CPU improves 40.7% / 43.1% in the combined candidate. Three large principal regions still run; trace exact input/image rejection before changing admission. | Still open: at least 50% cheaper literal/body CPU, then under 4 s wall. Current wall 7.63 / 6.56 s. Keep fresh/edit/revert/restart and rejection/recovery exact.                       |
-| CT99: reduce constant preparation after removing the scan      | Deferred: post-CT96 constant preparation is about 0.33 s, below eligibility. The earlier 5.08 s clock included nested preparation and is superseded for choosing this hill.                                                                                                       | Pursue only if residual eligible cost exceeds 10% of whole-build CPU; then reduce that cost by at least 30% and whole-build CPU by at least 5%. Keep task-086 separate.                |
-| CT100: reduce frontend allocation and repeated row work        | Final matched profile: check takes 1.28 s and requests 7,651,883 allocations. Attribute callers and copies against this candidate.                                                                                                                                                | At least 25% fewer checking allocations and 20% less check time, without whole-build CPU regression; distinguish cumulative bytes from peak RSS.                                       |
-| CT101: qualify the combined result and keep the costs visible  | Current fresh-game CPU 8.87 s; 12 s milestone met, 8 s milestone open.                                                                                                                                                                                                            | Seven unprofiled pairs, both entries with at most 5% unaffected CPU regression, exact retained/revert/restart outputs, full gate and zero lint. Current candidate passes these checks. |
+| Hill | Current evidence and next action | Acceptance target |
+| --- | --- | --- |
+| CT95–CT97: measurement, spawn preparation and effect rows | Complete; preserve the frozen workload/settings and the dated qualification records. | Do not rerun the historical program or weaken output/fault checks. |
+| CT98: ordinary edit reuse | Executable capacity is fixed; CT102 removes another literal-region rebuild. Body changes still rebuild the three large regions. | Original combined literal/body targets remain open: at least 50% cheaper than CT96, then under 4 s wall. Do not multiply ratios from different intervals into a new measured claim. |
+| CT99: constants | The matched literal profile spends 0.217 s in constant preparation. | Deferred until eligible cost exceeds 10% of whole-build CPU. |
+| CT100: first-edit and fresh frontend allocation | First literal edit still makes 6,553,820 checking allocations; later revisions check in about 70 ms. Attribute allocation callers and cutoff/replay work before changing ownership. | At least 25% fewer check allocations and 20% less check time, without whole-build CPU regression. Preserve current interface and invalidation checks. |
+| CT101: combined qualification | Fresh CPU is unchanged by CT102 within the guard. Previous 12 s milestone is met; the 8 s milestone remains open. | Seven paired comparisons, <=5% unaffected CPU regression, exact fresh/edit/revert/restart outputs, full exhaustive gate and zero lint. |
+| CT102: keep admitted results when optional memo outputs decline | Complete: the 128-level importer limit rejected one output and previously discarded the whole empty result. Omit only untranslatable memo outputs; keep their calls fresh. | Met: >=10% less literal CPU, <=5% unaffected regression, ownership/failure/execution laws and full gate. The disproved work-budget/height-cache prototype was removed. |
+| CT103: reuse the remaining principal regions | Literal region 20 returns nonempty row facts; region 24 lacks a complete input key. Body edits also fail the complete source image. Trace actual consumed call proofs and result ownership before extending either boundary. | At least 20% less retained edit CPU; progress toward both edit classes below 4 s. Require exact changed-type/effect/catalog rejection, errors/recovery, fresh parity and full OOM. |
+| CT104: attribute residual inference and reach the iteration budget | Candidate profiling finds `resolveOperationRow` / `closedHeight` at 7.04% / 6.00% self CPU and closure body evidence at 40.14% inclusive CPU. Count repeated queries and callers. The unseen-literal sequence passes; expand to unseen body edits before altering cache/index/inline policy. | First get both ordinary edit classes below 2 s, then below 1 s on a documented quiet host. Report CPU and wall distributions and preserve complete outputs and qualification. |
 
-Next, separate retained principal-region work from fresh frontend allocation.
-Capacity is no longer the executable-admission blocker. Constant preparation and
-assembly remain small compared with inference.
-
-For each experiment, write the hypothesis and acceptance threshold first. Keep
-failed candidates and their measurements separate from the accepted baseline. If
-two bounded experiments miss the whole-build target, stop that approach, record
-the result and move to the next measured cost. Update this queue after each
-accepted change rather than executing the historical 94 entries again.
+For each experiment, record the hypothesis and acceptance threshold first. If
+two bounded experiments miss the target, stop that approach and retain the
+negative evidence. Measure before widening semantic admission or adding
+parallelism. The [performance review](PERFORMANCE_REVIEW.md) explains the
+current boundaries. CT1–CT94 below are historical, not a queue to rerun.
 
 ## Historical program: CT1–CT94
 

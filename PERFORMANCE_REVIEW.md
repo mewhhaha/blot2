@@ -1,4 +1,50 @@
-# Performance hills after CT96
+# Performance hills toward sub-second edits
+
+[CT102 is qualified](zig-native/CT102_QUALIFICATION.md). Seven alternating pairs
+show **25.1% less retained literal-edit CPU** against CT97. The first saved call
+proof rejection was a depth bound (128), with 999,809 work units still available;
+the proposed shared-graph work-budget fix was therefore removed. Keeping the
+independently admitted empty result while omitting unsupported optional memo
+outputs removes the largest rebuilt literal-inference region. The original
+source, input, type/depth and executable checks stay in force.
+
+The single matched phase comparison measures literal inference at 5.22 → 3.20 s
+and backend time at 6.77 → 4.76 s. Two large principal regions remain (0.955 and
+0.493 s), and other inference work remains too. The body edit still runs the
+three large regions and takes about 5.13 s in inference. Its image has changed;
+CT102 provides no new body-source admission. The six projected decline counters
+now distinguish unsupported results, missing recordings, changed inputs/images,
+wrong owners and failed import preparation.
+
+Prioritize CT103's remaining principal result/input boundary and CT104's residual
+inference profile for ordinary iteration. A nonempty result needs owned type/row
+translation; a region that consumes earlier call proofs needs an exact recorded
+input key. Neither can be inferred safe merely from unchanged surface types.
+Keep changed-type/effect/catalog failures and ordinary fresh checking as oracles.
+
+Frontend checking needs a separate first-edit investigation: the first literal
+edit takes 0.918 s and 6,553,820 allocations, while subsequent revert/body checks
+take about 0.07 s. A separate diagnostic sequence of three unseen literal values
+confirms 74 / 70 ms checking on its second/third edits, with 156,683 allocations.
+Those rebuilds take 4.98 / 4.67 s wall, including 3.33 / 3.12 s inference, and
+match both the baseline and fresh edited outputs exactly. This single profiled
+sequence establishes the distinction for that body, not a latency distribution
+or general body-edit claim. Constants (0.217 s), lookup (0.420 s) and replay
+(0.068 s) are smaller measured costs; these scoped clocks must not be added to
+overlapping inference/region clocks.
+
+A CPU-weighted candidate profile of one literal edit and revert covers 99.69%
+of process CPU across 1,364 complete intervals, with no missing or truncated
+stacks. `resolveOperationRow` and `closedHeight` account for 7.04% and 6.00% self
+CPU. `ClosureRegion.bodyEvidenceMode` accounts for 40.14% inclusive CPU; inclusive
+rows overlap. Count repeated queries and attribute their callers before choosing
+a bounded type/row cache. The unweighted report includes idle worker stacks;
+use the archived `cpu-report.json` for this attribution.
+
+Sub-second ordinary edits are not achieved. Candidate literal/body wall medians
+are 5.93 / 6.83 s in the seven-pair run, with broad shared-host ranges. The
+completed full gate and raw measurements are linked above. The dated reviews
+below explain earlier decisions and are historical evidence.
 
 Follow-up, 24 October 2026:
 [CT97 and the reuse/scratch changes are qualified](zig-native/CT97_QUALIFICATION.md).

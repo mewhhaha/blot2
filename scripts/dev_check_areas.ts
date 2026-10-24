@@ -59,6 +59,8 @@ export const devCheckAreas = {
     description:
       "Static aggregate sharing, retained replay, admission and fault-policy laws.",
     native: [
+      "reuse.principal_input_tests.test.principal input replay omits declined memo outputs while owning accepted proofs through every allocation failure",
+      "reuse.principal_input_tests.test.principal input replay restores nominal and closed call publications across edits errors and recovery",
       "backend.layout.test.layout cache identity and semantic conversion preserve exact closed effect rows",
       "backend.layout.test.solved representation projection owns partial shapes without certifying open effects",
       "backend.wasm_sroa.test.scalar replacement owns scratch and output through every failed allocation",
@@ -89,6 +91,7 @@ export const devCheckAreas = {
       "allocation_failures.test.sampled allocation failures reject swallowed faults and propagate scenario failures",
     ],
     guests: [
+      "zig-native/tests/principal_replay_execution.test.ts",
       "zig-native/tests/evaluated_calls_execution.test.ts",
       "zig-native/tests/zig_project_protocol.test.ts",
       "zig-native/tests/zig_project_client.test.ts",

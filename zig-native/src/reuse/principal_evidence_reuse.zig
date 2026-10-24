@@ -20,6 +20,12 @@ pub const Stats = struct {
     persisted_declines: usize = 0,
     projected_empty_hits: usize = 0,
     projected_empty_declines: usize = 0,
+    projected_owner_declines: usize = 0,
+    projected_result_declines: usize = 0,
+    projected_unrecorded_declines: usize = 0,
+    projected_input_declines: usize = 0,
+    projected_image_declines: usize = 0,
+    projected_import_declines: usize = 0,
     input_image_checks: usize = 0,
     dependency_validations: usize = 0,
     reused_dependency_validations: usize = 0,
@@ -41,6 +47,7 @@ pub const Stats = struct {
     captured: usize = 0,
     fresh_regions: usize = 0,
     call_publications_replayed: usize = 0,
+    call_publications_declined: usize = 0,
 };
 pub const State = struct {
     allocator: Allocator,
@@ -158,8 +165,19 @@ pub const State = struct {
         var translated = try inputs.clone(self.allocator);
         var owned = true;
         defer if (owned) translated.deinit(self.allocator);
-        for (translated.call_publications) |*call|
-            call.evidence = (try self.graphs.?.importPrincipalCall(generator, call.target, call.evidence)) orelse return null;
+        // These are optional memo outputs of the completed query, not inputs
+        // to its result. An untranslatable proof stays absent: its next use
+        // performs ordinary checking. Never publish an old evidence ID.
+        var kept: usize = 0;
+        for (translated.call_publications) |call| {
+            const actual = (try self.graphs.?.importPrincipalCall(generator, call.target, call.evidence)) orelse {
+                self.stats.call_publications_declined += 1;
+                continue;
+            };
+            translated.call_publications[kept] = .{ .target = call.target, .evidence = actual };
+            kept += 1;
+        }
+        translated.call_publications = try self.allocator.realloc(translated.call_publications, kept);
         self.imported_inputs = translated;
         owned = false;
         return &self.imported_inputs.?;
@@ -193,25 +211,43 @@ pub const State = struct {
             const empty = proof.value.types.len == 0 and proof.value.rows.len == 0;
             if (!exact) {
                 if (generator.evaluator.units.ptr != self.gate.units.ptr or generator.evaluator.units.len != self.gate.units.len) {
+                    self.stats.projected_owner_declines += 1;
                     self.stats.projected_empty_declines += 1;
                     return null;
                 }
-                if (empty) if (proof.dependencies.inputs) |*inputs| if (inputs.matches(&generator.evaluator) and self.inputImageEqual()) {
-                    const current_inputs = (try self.currentInputs(generator, inputs)) orelse {
-                        self.stats.projected_empty_declines += 1;
-                        return null;
-                    };
-                    try current_inputs.publish(&generator.evaluator);
-                    self.last_inputs = current_inputs;
-                    self.stats.call_publications_replayed += current_inputs.call_publications.len;
-                    self.stats.projected_empty_hits += 1;
-                    self.stats.hits += 1;
-                    self.stats.empty_hits += 1;
-                    if (target.unit > self.old.cached_units) self.stats.fresh_unit_hits += 1;
-                    return .{ .types = &.{}, .rows = &.{} };
+                if (!empty) {
+                    self.stats.projected_result_declines += 1;
+                    self.stats.projected_empty_declines += 1;
+                    return null;
+                }
+                const inputs = if (proof.dependencies.inputs) |*inputs| inputs else {
+                    self.stats.projected_unrecorded_declines += 1;
+                    self.stats.projected_empty_declines += 1;
+                    return null;
                 };
-                self.stats.projected_empty_declines += 1;
-                return null;
+                if (!inputs.matches(&generator.evaluator)) {
+                    self.stats.projected_input_declines += 1;
+                    self.stats.projected_empty_declines += 1;
+                    return null;
+                }
+                if (!self.inputImageEqual()) {
+                    self.stats.projected_image_declines += 1;
+                    self.stats.projected_empty_declines += 1;
+                    return null;
+                }
+                const current_inputs = (try self.currentInputs(generator, inputs)) orelse {
+                    self.stats.projected_import_declines += 1;
+                    self.stats.projected_empty_declines += 1;
+                    return null;
+                };
+                try current_inputs.publish(&generator.evaluator);
+                self.last_inputs = current_inputs;
+                self.stats.call_publications_replayed += current_inputs.call_publications.len;
+                self.stats.projected_empty_hits += 1;
+                self.stats.hits += 1;
+                self.stats.empty_hits += 1;
+                if (target.unit > self.old.cached_units) self.stats.fresh_unit_hits += 1;
+                return .{ .types = &.{}, .rows = &.{} };
             }
             if (!empty) self.stats.nonempty_requests += 1;
             const solved: core_eval.SolvedEvidence = if (empty)

@@ -282,3 +282,50 @@ test "principal input replay owns read keys and preserves the prior capture at e
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, replayFailure, .{ &after, old, fresh.bytes });
     try std.testing.expectEqualSlices(u8, &stamp, &@import("code_artifacts.zig").stamp(old.metadata.principal_queries.records.items));
 }
+
+fn partialReplayFailure(allocator: std.mem.Allocator, fixture: *const Fixture, old: *const @import("artifact_capture.zig").Capture, expected: []const u8, accepted: usize) !void {
+    var candidate = try fixture.emitUsing(allocator, .{ .retain_artifacts = true, .principal_previous = old });
+    defer candidate.deinit(allocator);
+    try std.testing.expect(candidate.diagnostic == null);
+    try std.testing.expectEqual(@as(usize, 1), candidate.principal.projected_empty_hits);
+    try std.testing.expectEqual(@as(usize, 2), candidate.principal.call_publications_declined);
+    try std.testing.expectEqual(accepted, candidate.principal.call_publications_replayed);
+    try std.testing.expectEqualSlices(u8, expected, candidate.bytes);
+    const recorded = candidate.capture.?.metadata.principal_queries.records.items[0].dependencies.inputs.?;
+    try std.testing.expectEqual(accepted, recorded.call_publications.len);
+}
+
+test "principal input replay omits declined memo outputs while owning accepted proofs through every allocation failure" {
+    var before = try Fixture.init(nominal_prelude ++ " 2))\n");
+    defer before.deinit();
+    var after = try Fixture.init(nominal_prelude ++ " 4))\n");
+    defer after.deinit();
+    var initial = try before.emit(.{ .retain_artifacts = true });
+    defer initial.deinit(a);
+    try std.testing.expect(initial.diagnostic == null);
+    const key = &initial.capture.?.metadata.principal_queries.records.items[0].dependencies.inputs.?;
+    const accepted = key.call_publications.len;
+    try std.testing.expect(accepted > 0);
+    const target = key.call_publications[0].target;
+    const extended = try a.alloc(inputs.CallPublication, accepted + 2);
+    @memcpy(extended[0..accepted], key.call_publications);
+    // Invalid/non-function outputs must never become call proof authority.
+    // The independently proven empty result still has its exact image/inputs.
+    extended[accepted] = .{ .target = target, .evidence = 0 };
+    extended[accepted + 1] = .{ .target = target, .evidence = T.u32_type };
+    a.free(key.call_publications);
+    key.call_publications = extended;
+    var fresh = try after.emit(.{ .retain_artifacts = true });
+    defer fresh.deinit(a);
+    try std.testing.expect(fresh.diagnostic == null);
+    const stamp = @import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_queries.records.items);
+    try partialReplayFailure(a, &after, &initial.capture.?, fresh.bytes, accepted);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, partialReplayFailure, .{ &after, &initial.capture.?, fresh.bytes, accepted });
+    try std.testing.expectEqualSlices(u8, &stamp, &@import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_queries.records.items));
+    // All outputs may decline too, including the owning shrink to zero.
+    const declined = try a.dupe(inputs.CallPublication, key.call_publications[accepted..]);
+    a.free(key.call_publications);
+    key.call_publications = declined;
+    try partialReplayFailure(a, &after, &initial.capture.?, fresh.bytes, 0);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, partialReplayFailure, .{ &after, &initial.capture.?, fresh.bytes, @as(usize, 0) });
+}

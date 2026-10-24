@@ -1,5 +1,13 @@
 # Compile and compiler-build measurements
 
+Latest qualification: [CT102 principal replay](zig-native/CT102_QUALIFICATION.md).
+Seven alternating pairs show **25.1% less retained literal-edit CPU** against
+CT97, with exact outputs and unchanged fresh/body CPU within the 5% guard.
+Candidate literal/body wall medians are 5.93 / 6.83 s; the shared-host ranges are
+wide and sub-second editing remains open. The full gate passes 2,541 exhaustive
+native laws and 1,649 guest checks. First-edit checking and steady revisions
+are reported separately. The earlier measurements below remain historical.
+
 Latest follow-up:
 [CT97, executable reuse and temporary scratch](zig-native/CT97_QUALIFICATION.md).
 Seven alternating release pairs reduce fresh game CPU by **32.5%** against CT96;
