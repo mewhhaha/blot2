@@ -134,9 +134,15 @@ clocks; the private job-time sum overlaps dispatch and must not be added to it.
 `projected_image_declines` and `projected_import_declines`. Their sum is
 `projected_empty_declines`. `call_publications_declined` instead counts optional
 call memo outputs that could not be translated under the existing proof checks.
-Those calls are checked normally when needed; an independently admitted empty
-principal result can still be reused. `call_publications_replayed` counts only
-successfully translated and published proofs.
+Those calls are checked normally when needed; an independently admitted
+principal result can still be reused. `projected_nonempty_hits` counts imported
+type/row results, and `projected_source_hits` counts projected reuse admitted by
+complete observed declarations when the whole source image differs.
+`call_publications_replayed` counts translated call proofs;
+`summary_publications_replayed` and `summary_publications_declined` report
+completed-summary outputs separately. Summary memo judgments do not become
+global validated-call proofs. The legacy `projected_empty_declines` name remains
+the total for all projected-query declines, including nonempty results.
 
 The CLI and native project server automatically persist restart candidates under
 `$XDG_CACHE_HOME/blot` or `$HOME/.cache/blot` on Linux,

@@ -642,6 +642,16 @@ pub const Importer = struct {
     pub fn importPrincipalCall(self: *Importer, generator: anytype, reference: core.BindingRef, actual: u32) Allocator.Error!?u32 {
         return self.principalCall(generator, reference, actual) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else null;
     }
+    pub fn importPrincipalInput(self: *Importer, generator: anytype, actual: u32) Allocator.Error!?u32 {
+        return self.principalInput(generator, actual) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else null;
+    }
+    fn principalInput(self: *Importer, generator: anytype, actual: u32) Error!u32 {
+        try self.bind(generator);
+        var remaining: usize = 1_000_000;
+        try self.principalType(actual, 0, &remaining);
+        if (self.old.evaluator.evidence.view().node(actual).tag != .product) return error.Declined;
+        return self.semanticType(generator, actual, 0);
+    }
     fn principalCall(self: *Importer, generator: anytype, reference: core.BindingRef, actual: u32) Error!u32 {
         try self.bind(generator);
         const previous = try self.oldModule(reference.unit);

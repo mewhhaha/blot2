@@ -42,7 +42,7 @@ complete; missing projected observations still permits the original exact-source
 proof path. Recording declines any nonempty selected-implementation list. First
 source proof per target remains the publication policy, and retained lookup
 preserves the original first-target/options behavior. Exact-source,
-projected-empty, nonempty primitive and paired-graph import gates remain
+projected empty/nonempty, primitive and paired-graph import gates remain
 distinct. Only matching dynamic dependencies may carry projected
 inputs/publications into the new revision. The old principal proof list is
 replaced by owned records and the common position index.
@@ -57,8 +57,11 @@ lookup preserves wire order, including duplicate proofs. The original
 target/Options/input checks, type/row graph import, nominal memo validation,
 translated closed-call proofs and atomic publication remain required. Successful
 imports become new owner-local evidence, then enter the Context's principal
-table through normal recording. The version-2 wire projection and archive key
-remain unchanged; query-table serialization belongs to task 019.
+table through normal recording. Version six also owns positive/negative call
+reads, exact completed-summary inputs/results, optional summary publications and
+observed source declarations. Portable lookup still requires the complete image;
+the narrower declaration proof is used only for retained in-process queries.
+Older wire keys decline to normal compilation.
 
 Lazy index construction is private and transactional. OOM releases all partial
 records and permits retry on the same Reader. Saturation retains only the

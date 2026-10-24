@@ -109,12 +109,23 @@ const ClosedRow = struct {
     argument_height: u8 = 0,
     has_arguments: bool = false,
 };
+const OperationRow = struct {
+    row: Effects.Id = 0,
+    result: Effects.Id = 0,
+    at: Cursor = 0,
+    depth: usize = 0,
+    limit: usize = 0,
+    mutation: u64 = std.math.maxInt(u64),
+    effects: u64 = std.math.maxInt(u64),
+};
 
 pub const Store = struct {
     // Positive, solver-owned metadata. No allocation, frozen graph or row ABI
     // changes; both clocks prevent recycled IDs from reviving old proofs.
     use_closed_rows: bool = true,
     closed_rows: [4]ClosedRow = @splat(.{}),
+    use_operation_rows: bool = true,
+    operation_rows: [64]OperationRow = @splat(.{}),
     has_usage_types: bool = false,
     has_rank_types: bool = false,
     next_rigid_scope: u32 = 1,
@@ -1263,7 +1274,28 @@ pub const Store = struct {
             if (cached.has_arguments and depth + 1 + cached.argument_height > self.resolution_depth_limit) return error.TypeLimit;
             return id;
         }
-        var all_closed = row_.tail == .closed;
+        // Unresolved arguments cannot receive a closed certificate. Repeated
+        // queries within the exact same history can still reuse normalization.
+        // Writes and both rollback paths advance these non-recycled clocks.
+        const mutation = self.mutation_epoch;
+        const effects = self.effects.mutation_epoch;
+        const cacheable = self.use_operation_rows and self.use_resolution_cache and mutation != std.math.maxInt(u64) and effects != std.math.maxInt(u64);
+        const slot = id % self.operation_rows.len;
+        if (cacheable) {
+            const saved = self.operation_rows[slot];
+            if (saved.row == id and saved.at == at and saved.depth == depth and saved.limit == self.resolution_depth_limit and saved.mutation == mutation and saved.effects == effects) return saved.result;
+        }
+        const result = try self.resolveOperationArguments(id, at, depth);
+        if (cacheable and self.mutation_epoch == mutation and self.effects.mutation_epoch == effects) self.operation_rows[slot] = .{ .row = id, .result = result, .at = at, .depth = depth, .limit = self.resolution_depth_limit, .mutation = mutation, .effects = effects };
+        return result;
+    }
+    fn resolveOperationArguments(self: *Store, id: Effects.Id, at: Cursor, depth: usize) Error!Effects.Id {
+        const row_ = self.row(id);
+        // Resolving the row above already selects its chronological tail.
+        // This certificate covers only immutable operation arguments: an
+        // open tail does not make those arguments change. closedRowHeight
+        // separately requires a closed tail before certifying a whole type.
+        var all_closed = true;
         var argument_height: u8 = 0;
         var has_arguments = false;
         var labels: std.ArrayList(Effects.Label) = .empty;
@@ -2586,6 +2618,7 @@ const ClosedRowTests = struct {
             var store = try Store.initWithOptions(allocator, .{ .closed_graphs = true });
             defer store.deinit();
             store.use_closed_rows = enabled;
+            store.use_operation_rows = enabled;
             const argument = try store.array(u32_type);
             const label = try store.internOperation(.{ .unit = 7, .decl = 19 }, &.{argument});
             const row_ = try store.effects.row(&.{ label, label }, .closed);
@@ -2654,6 +2687,10 @@ const ClosedRowTests = struct {
             try std.testing.expectEqual(@as(u8, 0), store.closedRowHeight(open));
             _ = try store.resolveEffects(open, 0);
             try std.testing.expect(store.closedRow(open) == null);
+            const open_arguments = try store.effects.row(&.{store.rowLabels(first)[0]}, store.row(open).tail);
+            const normalized_open = try store.resolveEffects(open_arguments, 0);
+            try std.testing.expectEqual(@as(u8, 0), store.closedRowHeight(normalized_open));
+            try std.testing.expectEqual(enabled, store.closedRow(normalized_open) != null);
             const row_variable = store.row(open).tail.variable;
             const clock = store.cursor();
             try store.effects.appendVersionAt(row_variable, first, clock + 2);
@@ -2662,6 +2699,13 @@ const ClosedRowTests = struct {
             const new_view = try store.resolveEffects(open, clock + 3);
             try std.testing.expectEqual(u32_type, store.operationArguments(store.rowLabels(old_view)[0])[0]);
             try std.testing.expectEqual(f32_type, store.operationArguments(store.rowLabels(new_view)[0])[0]);
+            const prefixed_old = try store.resolveEffects(open_arguments, clock);
+            const prefixed_new = try store.resolveEffects(open_arguments, clock + 3);
+            // Keep the prefix and both repeated operations from the tail.
+            try std.testing.expectEqual(@as(usize, 3), store.rowLabels(prefixed_old).len);
+            try std.testing.expectEqual(@as(usize, 3), store.rowLabels(prefixed_new).len);
+            try std.testing.expectEqual(u32_type, store.operationArguments(store.rowLabels(prefixed_old)[1])[0]);
+            try std.testing.expectEqual(f32_type, store.operationArguments(store.rowLabels(prefixed_new)[1])[0]);
             const future = try store.resolveEffects(open, clock + 6);
             try std.testing.expect(store.row(future).tail == .variable);
             try std.testing.expectEqual(row_variable, store.row(future).tail.variable);
@@ -2680,4 +2724,45 @@ const ClosedRowTests = struct {
 test "closed row certificates preserve depth history physical edits instances and saturation through OOM" {
     try ClosedRowTests.scenario(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, ClosedRowTests.scenario, .{});
+}
+
+fn operationRowScenario(allocator: std.mem.Allocator) !void {
+    for ([_]bool{ true, false }) |enabled| {
+        var store = try Store.init(allocator);
+        defer store.deinit();
+        store.use_operation_rows = enabled;
+        const variable = try store.fresh();
+        const argument = try store.array(variable);
+        const label = try store.internSymbolicOperation(.{ .unit = 1, .decl = 1 }, &.{argument});
+        const row_ = try store.effects.row(&.{ label, label }, .closed);
+        const initial = try store.resolveEffects(row_, 0);
+        const visits = store.resolution_steps;
+        try std.testing.expect(visits > 0);
+        for (0..4) |_| try std.testing.expectEqual(initial, try store.resolveEffects(row_, 0));
+        try std.testing.expectEqual(enabled, store.resolution_steps == visits);
+        store.resolution_depth_limit = 1;
+        try std.testing.expectError(error.TypeLimit, store.resolveEffects(row_, 0));
+        store.resolution_depth_limit = 1024;
+        const point = store.mark();
+        try store.appendVersion(variable, u32_type);
+        try store.appendVersion(variable, f32_type);
+        for ([_]Id{ u32_type, f32_type }, 0..) |expected, at| {
+            const resolved = try store.resolveEffects(row_, @intCast(at));
+            const item = store.operationArguments(store.rowLabels(resolved)[0])[0];
+            try std.testing.expectEqual(expected, store.node(item).a);
+        }
+        store.rollback(point);
+        try std.testing.expectEqual(initial, try store.resolveEffects(row_, 0));
+        for ([_]bool{ true, false }) |types_clock| {
+            if (types_clock) store.mutation_epoch = std.math.maxInt(u64) else store.effects.mutation_epoch = std.math.maxInt(u64);
+            const before = store.resolution_steps;
+            for (0..2) |_| try std.testing.expectEqual(initial, try store.resolveEffects(row_, 0));
+            try std.testing.expect(store.resolution_steps > before);
+        }
+    }
+}
+
+test "operation row normalization preserves unresolved arguments histories depth rollback and saturated epochs through OOM" {
+    try operationRowScenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, operationRowScenario, .{});
 }

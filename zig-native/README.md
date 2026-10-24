@@ -50,21 +50,26 @@ performance measurements.
 
 Use `deno task bench:compiler-build --out build/bench/build-next` from the
 repository root to measure isolated cache initialization, compiler/native builds,
-source edits and reverts. The [current measurements](../COMPILE_MEASUREMENTS.md)
-record roughly 3.4 s real compiler edits and a 4.64 s warm development cycle.
+source edits and reverts. The [initial build measurements](../COMPILE_MEASUREMENTS.md)
+record roughly 3.4 s real compiler edits and a 4.64 s warm development cycle;
+the expanded development family below is measured separately.
 Keep ordinary writable Zig caches; explicit incremental mode did not improve
 the measured edit cycle. [Build hills](../BUILD_HILLS.md) track the remaining
 iteration and qualification costs separately from
 [application compile hills](../COMPILE_HILLS.md).
 
-[CT102 principal replay](CT102_QUALIFICATION.md) reduces retained literal-edit
-CPU by 25.1% against CT97 in seven alternating release pairs, with identical
-Wasm. Candidate literal/body wall medians are 5.93 / 6.83 s on the shared host;
-sub-second editing remains open. The full gate passes 2,541 exhaustive native
-laws and 1,649 guest checks. The expanded development cycle takes 35.36 s;
-full native execution takes 768.23 s. These are individual observations.
-The [review](../PERFORMANCE_REVIEW.md) separates first-edit frontend work from
-steady inference and records the next exact reuse boundaries to investigate.
+[Principal dependency reuse and row normalization](CT103_QUALIFICATION.md)
+reduce literal-edit CPU by 24.8%, body-edit CPU by 4.2% and fresh-game CPU by
+6.1% against `5412320` in seven alternating pairs, with identical Wasm. The
+literal edit reuses all 20 principal results; body edits still rebuild four
+regions. Shared-host literal/body wall medians are 7.60 / 12.46 s, with no body
+wall improvement. Sub-second editing remains open. The percentages belong to the
+pinned measured candidate. The final release also fixes portable restart replay,
+includes `faf3f78` and separately passes 2,551 exhaustive native laws and 1,654
+guest checks. The measured development cycle takes 26.05 s; its 3.59 s compiler
+build and 6.90 s native compilation are individual observations. The
+[review](../PERFORMANCE_REVIEW.md) separates first-edit frontend work from
+steady inference and records the remaining dependencies to investigate.
 
 `blotc build ENTRY OUTPUT.wasm --prelude std/prelude.blot --std-root std`
 compiles a project. `dependencies ENTRY OUTPUT.blotdep` produces reusable typed

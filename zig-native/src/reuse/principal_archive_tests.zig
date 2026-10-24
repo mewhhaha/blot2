@@ -316,6 +316,36 @@ test "portable principal archives validate envelopes typed sections ordinals and
     const nodes: u32 = @intCast(owner.evidence.nodes.len);
     const units: u32 = @intCast(owner.modules.len);
     const target = first.key.target;
+    {
+        var sources = [_]core.BindingRef{ target, target };
+        shape[0].dependencies.sources = &sources;
+        try principalRejects(error.InvalidArtifact, copy);
+        shape[0].dependencies.sources = sources[0..1];
+        shape[0].dependencies.source_complete = true;
+        try principalAccepts(copy);
+        shape[0].dependencies.sources = &.{};
+        try principalRejects(error.InvalidArtifact, copy);
+        shape[0] = first;
+    }
+    {
+        const call = first.dependencies.call_publications[0];
+        var reads = [_]inputs.CallRead{ .{ .target = call.target, .evidence = call.evidence, .present = true }, .{ .target = call.target, .evidence = call.evidence, .present = false } };
+        shape[0].dependencies.call_reads = &reads;
+        try principalRejects(error.InvalidArtifact, copy);
+        shape[0].dependencies.call_reads = reads[0..1];
+        shape[0].dependencies.empty_call_inputs = false;
+        try principalAccepts(copy);
+        reads[0].evidence = @import("../check/types.zig").u32_type;
+        try principalRejects(error.InvalidArtifact, copy);
+        shape[0] = first;
+        var summaries = [_]inputs.Summary{.{ .key = .{ .target = target, .inputs = call.evidence }, .result = call.evidence }};
+        shape[0].dependencies.summary_reads = &summaries;
+        // Argument graphs are products, never signatures or primitive IDs.
+        try principalRejects(error.InvalidArtifact, copy);
+        summaries[0].key.inputs = nodes;
+        try principalRejects(error.InvalidArtifact, copy);
+        shape[0] = first;
+    }
     for ([_]core.BindingRef{ .{ .unit = 0, .binding = target.binding }, .{ .unit = units + 1, .binding = target.binding }, .{ .unit = target.unit, .binding = 0 } }) |forged| {
         shape[0] = first;
         shape[0].key.target = forged;

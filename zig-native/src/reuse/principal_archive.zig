@@ -14,7 +14,7 @@ const A = std.mem.Allocator;
 const portable = @import("portable_query.zig");
 const T = @import("../check/types.zig");
 
-/// Version-three wire projection of complete principal query records. Unit,
+/// Wire projection of complete principal query records. Unit,
 /// binding and nominal ordinals name the archived source image; evidence IDs
 /// name the archive-owned graph. Lookup still matches the current image and
 /// imports every graph into the receiving owner.
@@ -29,7 +29,7 @@ pub const Snapshot = struct {
     evidence: types.Snapshot,
 };
 pub fn wireKey(compiler: format.Digest) format.Key {
-    return .{ .compiler = compiler, .settings = format.digest("blot-principal-archive-v5:selected-implementations"), .source = @splat(0), .dependencies = @splat(0) };
+    return .{ .compiler = compiler, .settings = format.digest("blot-principal-archive-v6:observed-source-call-summary-proofs"), .source = @splat(0), .dependencies = @splat(0) };
 }
 /// Only records with complete dynamic observations are portable. Exact-source
 /// proofs without them, selected judgments and local templates stay behind.
@@ -107,6 +107,9 @@ fn validRecord(a: A, seen: *std.AutoHashMapUnmanaged(u64, void), record: Record,
     for (record.result.rows) |mapping| if (mapping.evidence >= evidence.effects.rows.len or !try fresh(a, seen, mapping.variable)) return false;
     const observed = record.dependencies;
     seen.clearRetainingCapacity();
+    for (observed.sources) |source| if (!validBinding(source, units) or !try fresh(a, seen, bindingWord(source))) return false;
+    if (observed.source_complete and !seen.contains(bindingWord(record.key.target))) return false;
+    seen.clearRetainingCapacity();
     for (observed.scalar_reads) |read| if (!validBinding(read.target, units) or read.evidence > T.never or !try fresh(a, seen, bindingWord(read.target))) return false;
     seen.clearRetainingCapacity();
     // Nominal keys may name builtin identities outside the source image; the
@@ -119,9 +122,25 @@ fn validRecord(a: A, seen: *std.AutoHashMapUnmanaged(u64, void), record: Record,
     for (observed.plain_publications) |publication| if (!try fresh(a, &published, publication.key)) return false;
     var calls: std.AutoHashMapUnmanaged(inputs.CallPublication, void) = .empty;
     defer calls.deinit(a);
+    for (observed.call_reads) |read| {
+        if (!validBinding(read.target, units) or read.evidence == 0 or read.evidence >= nodes) return false;
+        if (evidence.node(read.evidence).tag != .function or !portable.closedEvidence(evidence, read.evidence)) return false;
+        if ((try calls.getOrPut(a, .{ .target = read.target, .evidence = read.evidence })).found_existing) return false;
+    }
+    calls.clearRetainingCapacity();
     for (observed.call_publications) |call| {
         if (!validBinding(call.target, units) or call.evidence == 0 or call.evidence >= nodes) return false;
         if ((try calls.getOrPut(a, call)).found_existing) return false;
+    }
+    var summaries: std.AutoHashMapUnmanaged(inputs.SummaryKey, void) = .empty;
+    defer summaries.deinit(a);
+    for ([_][]const inputs.Summary{ observed.summary_reads, observed.summary_publications }) |facts| {
+        summaries.clearRetainingCapacity();
+        for (facts) |fact| {
+            if (!validBinding(fact.key.target, units) or fact.key.inputs == 0 or fact.key.inputs >= nodes or fact.result == 0 or fact.result >= nodes) return false;
+            if (evidence.node(fact.key.inputs).tag != .product or evidence.node(fact.result).tag != .function or !portable.closedEvidence(evidence, fact.key.inputs) or !portable.closedEvidence(evidence, fact.result)) return false;
+            if ((try summaries.getOrPut(a, fact.key)).found_existing) return false;
+        }
     }
     return true;
 }
@@ -148,7 +167,7 @@ const PortableAdapter = struct {
     }
     pub fn bytes(record: PortableQueries.Record) usize {
         var total: usize = 0;
-        inline for (.{ "scalar_reads", "plain_reads", "plain_publications", "call_publications" }) |field| {
+        inline for (.{ "sources", "scalar_reads", "plain_reads", "plain_publications", "call_publications", "call_reads", "summary_reads", "summary_publications" }) |field| {
             const entries = @field(record.dependencies, field);
             total +|= entries.len *| @sizeOf(@TypeOf(entries[0]));
         }
@@ -226,7 +245,7 @@ pub const Reader = struct {
             const query = &self.query_table.records.items[position];
             const records = self.archive.snapshot.queries.records;
             if (query.key.record_count != records.len or query.value.ordinal >= records.len) continue;
-            if (!std.meta.eql(query.key.target, target) or !std.meta.eql(query.key.options, options) or !query.dependencies.matches(session)) continue;
+            if (!std.meta.eql(query.key.target, target) or !std.meta.eql(query.key.options, options) or !query.dependencies.matchesBase(session)) continue;
             const result = records[query.value.ordinal].result;
             if (!validTarget(self.units, target)) continue;
             var translated = try query.dependencies.clone(self.allocator);
@@ -234,6 +253,29 @@ pub const Reader = struct {
             defer if (owned) translated.deinit(self.allocator);
             var importer: Import = .{ .allocator = self.allocator, .source = self.archive.snapshot.evidence.view(), .target = &session.storage.evidence, .units = self.units, .names = self.names.? };
             defer importer.deinit();
+            var reads_valid = true;
+            for (translated.call_reads) |*read| {
+                if (!validTarget(self.units, read.target)) {
+                    reads_valid = false;
+                    break;
+                }
+                read.evidence = importer.typeId(read.evidence, 0) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    error.InvalidEvidence => {
+                        reads_valid = false;
+                        break;
+                    },
+                };
+                if (session.storage.evidence.node(read.evidence).tag != .function) {
+                    reads_valid = false;
+                    break;
+                }
+            }
+            if (reads_valid) reads_valid = try importSummaries(&importer, self.units, translated.summary_reads);
+            if (!reads_valid or !translated.matches(session)) {
+                self.stats.declined += 1;
+                continue;
+            }
             var solved = importer.importResult(&self.units[target.unit - 1], result.types, result.rows) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.InvalidEvidence => {
@@ -266,6 +308,18 @@ pub const Reader = struct {
                 self.stats.declined += 1;
                 continue;
             }
+            // Summary publications are optional memo outputs. Keep the admitted
+            // principal result when an output exceeds the portable importer;
+            // its next use performs ordinary checking. Required reads above
+            // still have to translate and match before any publication.
+            var kept: usize = 0;
+            for (translated.summary_publications) |summary| {
+                var fact = [_]inputs.Summary{summary};
+                if (!try importSummaries(&importer, self.units, &fact)) continue;
+                translated.summary_publications[kept] = fact[0];
+                kept += 1;
+            }
+            translated.summary_publications = try self.allocator.realloc(translated.summary_publications, kept);
             // Validate every nominal memo key before any memo publication. Its
             // absence/value was already checked by the dynamic input contract.
             for (translated.plain_publications) |publication| if (!validNominal(self.units, .{ .unit = @intCast(publication.key >> 32), .decl = @truncate(publication.key) })) {
@@ -288,6 +342,16 @@ pub const Reader = struct {
         return null;
     }
 };
+
+fn importSummaries(importer: *Import, units: []const core.Module, facts: []inputs.Summary) A.Error!bool {
+    for (facts) |*fact| {
+        if (!validTarget(units, fact.key.target)) return false;
+        fact.key.inputs = importer.typeId(fact.key.inputs, 0) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+        fact.result = importer.typeId(fact.result, 0) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+        if (importer.target.node(fact.key.inputs).tag != .product or importer.target.node(fact.result).tag != .function) return false;
+    }
+    return true;
+}
 fn validTarget(units: []const core.Module, target: core.BindingRef) bool {
     if (target.unit == 0 or target.unit > units.len) return false;
     const module = &units[target.unit - 1];

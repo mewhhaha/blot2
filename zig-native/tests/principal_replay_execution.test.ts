@@ -84,3 +84,123 @@ ${layers}
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+Deno.test("nonempty principal and recursive summary replay preserve body edits failures recovery and restarted execution", async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-principal-summary-",
+  });
+  const entry = `${directory}/main.blot`;
+  const source = (seed: number, operation = "add", unrelated = "sub") =>
+    `const local = fn value => @u32.${operation} value 1
+const subtract = fn value => @u32.sub value 2
+const unused = fn value => @u32.${unrelated} value 2
+const even: U32 -> U32 = fn value => if @u32.eq value 0 then 41 else odd (@u32.sub value 1)
+const odd: U32 -> U32 = fn value => if @u32.eq value 0 then 41 else even (@u32.sub value 1)
+entry const first: U32 where { type_rep U32 } = do:
+  let identity = fn value => value
+  break identity (@u32.div 8 ${seed})
+entry const second: U32 where { type_rep U32 } = local (even ${seed})
+entry const third: U32 where { type_rep U32 } = local (odd ${seed})
+`;
+  try {
+    await Deno.writeTextFile(entry, source(2));
+    for (const codegenTier of ["optimized", "development"] as const) {
+      const options = {
+        executable: Deno.args[0] ??
+          new URL("../zig-out/bin/blotc", import.meta.url).pathname,
+        entry,
+        prelude: null,
+        codegenTier,
+        codegenWorkers: 1,
+        cacheDirectory: `${directory}/cache-${codegenTier}`,
+      };
+      const retained = await createZigProjectCompiler(options);
+      try {
+        for (
+          const [revision, [seed, operation, unrelated]] of [
+            [2, "add", "sub"],
+            [4, "add", "sub"],
+            [4, "add", "add"],
+            [4, "sub", "add"],
+            [0, "add", "sub"],
+            [2, "add", "sub"],
+          ].entries()
+        ) {
+          const value = Number(seed);
+          const sources = {
+            [entry]: source(value, String(operation), String(unrelated)),
+          };
+          const built = await retained.build({ sources });
+          const fresh = await createZigProjectCompiler({
+            ...options,
+            cacheDirectory: false,
+          });
+          try {
+            const expected = await fresh.build({ sources });
+            if (value === 0) {
+              assert(!built.success && !expected.success);
+              assert.deepEqual(built.diagnostics, expected.diagnostics);
+              continue;
+            }
+            assert(built.success, JSON.stringify(built));
+            assert(expected.success, JSON.stringify(expected));
+            assert.deepEqual(built.bytes, expected.bytes);
+            const { instance } = await WebAssembly.instantiate(built.bytes);
+            for (
+              const [name, result] of Object.entries({
+                first: Math.floor(8 / value),
+                second: operation === "add" ? 42 : 40,
+                third: operation === "add" ? 42 : 40,
+              })
+            ) {
+              const exported = instance.exports[name];
+              assert.equal(
+                typeof exported === "function"
+                  ? exported()
+                  : (exported as WebAssembly.Global).value,
+                result,
+              );
+            }
+            if (revision === 1) {
+              const principals = built.stats.principals as Record<
+                string,
+                number
+              >;
+              assert(principals.projected_nonempty_hits > 0);
+              assert(principals.call_publications_replayed > 0);
+            }
+          } finally {
+            await fresh.dispose();
+          }
+        }
+      } finally {
+        await retained.dispose();
+      }
+      // A different output policy forces checkpoint compilation instead of
+      // returning the already persisted Wasm response.
+      const restarted = await createZigProjectCompiler({
+        ...options,
+        codegenWorkers: 4,
+      });
+      try {
+        const built = await restarted.build({});
+        assert(built.success, JSON.stringify(built));
+        assert(
+          (built.stats.principals as Record<string, number>).persisted_hits > 0,
+        );
+        const { instance } = await WebAssembly.instantiate(built.bytes);
+        const first = instance.exports.first;
+        assert.equal(
+          typeof first === "function"
+            ? first()
+            : (first as WebAssembly.Global).value,
+          4,
+        );
+      } finally {
+        await restarted.dispose();
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});

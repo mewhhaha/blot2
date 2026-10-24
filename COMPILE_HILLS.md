@@ -2,40 +2,37 @@
 
 ## Current queue: ordinary edits toward one second (24 October 2026)
 
-[CT102 is qualified](zig-native/CT102_QUALIFICATION.md): seven alternating pairs
-show **25.1% less literal-edit CPU** against CT97, with exact Wasm and full
-qualification. Candidate literal/body wall medians are 5.93 / 6.83 s, with wide
-shared-host ranges. Fresh game/devtools and body-edit CPU pass the 5% regression
-guard. The largest literal-edit principal region is reused, with 12,134 call
-proofs translated and 253 omitted for ordinary checking. No validation limit or
-source/input gate is weakened. Sub-second ordinary edits remain open.
+[The four CT103/CT104 changes are qualified](zig-native/CT103_QUALIFICATION.md).
+Seven alternating pairs against `5412320` show **24.8% less literal-edit CPU**,
+**4.2% less body-edit CPU**, and **6.1% less fresh-game CPU**, with exact
+outputs. Devtools is unchanged within the guard. All 20 literal principal
+results are reused; body edits reuse 16 and still rebuild four. Literal/body
+wall medians are 7.60 / 12.46 s on the loaded shared host. The body wall median
+is worse; CPU gains do not establish quiet-host latency. The final combined main
+build is separately qualified and installed; the report distinguishes both
+source pins.
 
-The user prioritizes ordinary edits and rebuilds. Separate the first edit after
-population from later previously unseen edits and from reverts. A single matched
-profile measures first-edit checking at 0.92 s / 6.55 million allocations, later
-checking at about 0.07 s, and remaining inference at 3.20 s for a literal edit /
-5.13 s for a body edit. A separate sequence of three unseen literal values
-confirms 74 / 70 ms checking on the second/third edits, but 4.98 / 4.67 s total
-wall and 3.33 / 3.12 s inference. All outputs match fresh controls. This is a
-single profiled sequence, not a latency distribution. Existing code replay alone
-does not remove the remaining inference.
+The user prioritizes ordinary edits and rebuilds. The clean unseen-edit sequence
+finds 2.96–3.18 s later literal builds and 6.20–7.62 s body builds, with exact
+fresh controls. Literal inference is still about 1.5 s; body inference is
+4.57–6.47 s. First-edit frontend checking is about 0.9 s, later checking about
+0.06–0.07 s. These single profiled observations are not latency distributions.
 
-| Hill | Current evidence and next action | Acceptance target |
-| --- | --- | --- |
-| CT95–CT97: measurement, spawn preparation and effect rows | Complete; preserve the frozen workload/settings and the dated qualification records. | Do not rerun the historical program or weaken output/fault checks. |
-| CT98: ordinary edit reuse | Executable capacity is fixed; CT102 removes another literal-region rebuild. Body changes still rebuild the three large regions. | Original combined literal/body targets remain open: at least 50% cheaper than CT96, then under 4 s wall. Do not multiply ratios from different intervals into a new measured claim. |
-| CT99: constants | The matched literal profile spends 0.217 s in constant preparation. | Deferred until eligible cost exceeds 10% of whole-build CPU. |
-| CT100: first-edit and fresh frontend allocation | First literal edit still makes 6,553,820 checking allocations; later revisions check in about 70 ms. Attribute allocation callers and cutoff/replay work before changing ownership. | At least 25% fewer check allocations and 20% less check time, without whole-build CPU regression. Preserve current interface and invalidation checks. |
-| CT101: combined qualification | Fresh CPU is unchanged by CT102 within the guard. Previous 12 s milestone is met; the 8 s milestone remains open. | Seven paired comparisons, <=5% unaffected CPU regression, exact fresh/edit/revert/restart outputs, full exhaustive gate and zero lint. |
-| CT102: keep admitted results when optional memo outputs decline | Complete: the 128-level importer limit rejected one output and previously discarded the whole empty result. Omit only untranslatable memo outputs; keep their calls fresh. | Met: >=10% less literal CPU, <=5% unaffected regression, ownership/failure/execution laws and full gate. The disproved work-budget/height-cache prototype was removed. |
-| CT103: reuse the remaining principal regions | Literal region 20 returns nonempty row facts; region 24 lacks a complete input key. Body edits also fail the complete source image. Trace actual consumed call proofs and result ownership before extending either boundary. | At least 20% less retained edit CPU; progress toward both edit classes below 4 s. Require exact changed-type/effect/catalog rejection, errors/recovery, fresh parity and full OOM. |
-| CT104: attribute residual inference and reach the iteration budget | Candidate profiling finds `resolveOperationRow` / `closedHeight` at 7.04% / 6.00% self CPU and closure body evidence at 40.14% inclusive CPU. Count repeated queries and callers. The unseen-literal sequence passes; expand to unseen body edits before altering cache/index/inline policy. | First get both ordinary edit classes below 2 s, then below 1 s on a documented quiet host. Report CPU and wall distributions and preserve complete outputs and qualification. |
+| Hill                                                      | Current evidence and next action                                                                                                                                                                                                   | Acceptance target                                                                                                                                                                 |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CT95–CT97: measurement, spawn preparation and effect rows | Complete; retain dated evidence and frozen workload/settings.                                                                                                                                                                      | Do not rerun the historical program or weaken output/fault checks.                                                                                                                |
+| CT98: ordinary edit reuse                                 | Capture capacity and literal principal reuse are fixed. Body edits still rebuild four regions.                                                                                                                                     | Combined literal/body targets remain open: at least 50% cheaper than CT96, then under 4 s wall. Do not multiply separate historical ratios.                                       |
+| CT99: constants                                           | Previously measured at 0.217 s in the CT102 literal profile. Reattribute if the residual profile changes.                                                                                                                          | Defer until eligible cost exceeds 10% of whole-build CPU.                                                                                                                         |
+| CT100: first-edit and fresh frontend allocation           | First edit still checks in about 0.9 s; later revisions in 60–70 ms. Attribute allocation callers and cutoff/replay work separately.                                                                                               | At least 25% fewer check allocations and 20% less check time, with no whole-build CPU regression.                                                                                 |
+| CT101: combined qualification                             | CT103 fresh game CPU falls 6.1%; devtools unchanged. Combined main passes its own full gate and strict output screen.                                                                                                              | Seven paired comparisons, <=5% unaffected CPU regression, exact outputs, full exhaustive gate and zero lint. Keep the 8 s fresh milestone open.                                   |
+| CT102: optional memo output declines                      | Complete: keep admitted results while omitted outputs receive ordinary checking.                                                                                                                                                   | Qualified >=10% literal CPU improvement against CT97; retain ownership and rejection laws.                                                                                        |
+| CT103: remaining principal regions                        | Nonempty import, exact call/summary observations and consumed-source admission implemented. Literal 18→20 hits; body 15→16. Trace the exact consumed declarations blocking the four remaining body regions before extending reuse. | Literal >=20% CPU target met (24.8%); body target missed (4.2%) and remains open. Require exact source/type/effect/catalog rejection, fresh parity, errors/recovery and full OOM. |
+| CT104: residual inference and iteration budget            | Bounded 64-slot exact-epoch operation-row cache implemented; simulation covers 12.55% of label visits. No isolated cache speedup claim. Attribute repeated summary/body work outside principal replay next.                        | Both ordinary edit classes below 2 s, then below 1 s on a documented quiet host. Both targets remain open. Report CPU and wall distributions.                                     |
 
-For each experiment, record the hypothesis and acceptance threshold first. If
-two bounded experiments miss the target, stop that approach and retain the
-negative evidence. Measure before widening semantic admission or adding
-parallelism. The [performance review](PERFORMANCE_REVIEW.md) explains the
-current boundaries. CT1–CT94 below are historical, not a queue to rerun.
+Record each experiment's hypothesis and threshold first. After two bounded
+misses, stop that approach and preserve negative evidence. Measure before
+widening semantic admission or adding parallelism. See
+[the performance review](PERFORMANCE_REVIEW.md). CT1–CT94 below are historical.
 
 ## Historical program: CT1–CT94
 

@@ -707,6 +707,11 @@ const CallSummaries = struct {
     result_principals: std.AutoHashMapUnmanaged(PrincipalGraph.Key, bool) = .empty,
     draining: bool = false,
 
+    fn observation(session: *const Session, key: Key, result: type_evidence.Id) ?principal_inputs.Summary {
+        if (key.lexical != 0 or key.expected_result != 0 or key.expected_signature != 0 or key.source_interface or !std.meta.eql(key.options, session.options)) return null;
+        return .{ .key = .{ .target = .{ .unit = session.unitId(key.target.unit), .binding = key.target.binding }, .inputs = key.inputs, .deferred_member = key.deferred_member }, .result = result };
+    }
+
     const Member = struct { index: usize, key: Key };
     const Edge = struct { from: u32, to: u32 };
     const Component = struct {
@@ -1286,6 +1291,9 @@ const CallSummaries = struct {
         // All member results are owned and complete before the allocation-free
         // commit. Joint jobs retain private judgments, not global proof facts.
         if (staged.items.len == 1 and !region.source_interface) try region.publishValidatedCalls();
+        if (session.principal_reads) |reads| for (staged.items) |result| {
+            if (observation(session, self.jobs.items[result.index].key, result.evidence)) |fact| try reads.summaryPublish(session.allocator, fact);
+        };
         if (staged.items.len > 1) session.component_members_published += staged.items.len;
         for (staged.items) |result| self.finish(session, result.index, result.evidence);
     }
@@ -3287,6 +3295,31 @@ pub const Session = struct {
         self.slot(resolved).state = .complete;
         return published;
     }
+    fn principalSummaryKey(self: *const Session, key: principal_inputs.SummaryKey) ?CallSummaries.Key {
+        if (key.target.unit == 0 or key.target.unit > self.units.len or key.target.binding == 0 or key.target.binding >= self.units[key.target.unit - 1].bindings.len) return null;
+        return .{ .target = .{ .unit = key.target.unit - 1, .binding = key.target.binding }, .inputs = key.inputs, .source_interface = false, .deferred_member = key.deferred_member, .options = self.options };
+    }
+    pub fn principalSummaryMatches(self: *const Session, fact: principal_inputs.Summary) bool {
+        const key = self.principalSummaryKey(fact.key) orelse return false;
+        const index = self.specializations.call_summaries.keys.get(key) orelse return false;
+        const job = self.specializations.call_summaries.jobs.items[index];
+        return job.state == .complete and job.result == fact.result;
+    }
+    pub fn reservePrincipalSummaries(self: *Session, count: usize) Allocator.Error!void {
+        try self.specializations.call_summaries.keys.ensureUnusedCapacity(self.allocator, @intCast(count));
+        try self.specializations.call_summaries.jobs.ensureUnusedCapacity(self.allocator, count);
+    }
+    /// The caller has proved the complete source/input key and translated both
+    /// graphs. These are closed memo judgments, never global call certificates.
+    pub fn publishPrincipalSummary(self: *Session, fact: principal_inputs.Summary) void {
+        const key = self.principalSummaryKey(fact.key) orelse return;
+        const summaries = &self.specializations.call_summaries;
+        // Preserve pending work and already-owned outcomes at this key.
+        if (summaries.keys.contains(key) or summaries.jobs.items.len >= self.options.max_values) return;
+        const index = summaries.jobs.items.len;
+        summaries.jobs.appendAssumeCapacity(.{ .key = key, .state = .complete, .result = fact.result });
+        summaries.keys.putAssumeCapacity(key, index);
+    }
     fn principalEvidence(self: *Session, resolved: Target, body: *const core.Body, binding_type: types.Id) Error!?SolvedEvidence {
         self.observeConstantInference();
         const principal_target: core.BindingRef = .{ .unit = self.unitId(resolved.unit), .binding = resolved.binding };
@@ -3298,10 +3331,11 @@ pub const Session = struct {
         };
         if (self.principal_provider != null) self.principal_regions += 1;
         self.principal_recordings += 1;
-        var reads: principal_inputs.Recorder = .{ .eligible = self.specializations.validated_calls.count() == 0, .max_reads = self.options.max_values, .serial = self.principal_recordings };
+        var reads: principal_inputs.Recorder = .{ .eligible = true, .empty_call_inputs = self.specializations.validated_calls.count() == 0, .root = principal_target, .max_reads = self.options.max_values, .serial = self.principal_recordings };
         defer reads.deinit(self.allocator);
         const previous_reads = self.principal_reads;
         const recording = self.principal_provider != null;
+        if (recording) try reads.source(self.allocator, principal_target);
         if (recording) self.principal_reads = &reads;
         defer self.principal_reads = previous_reads;
         var region = ClosureRegion.init(self) catch return error.OutOfMemory;
@@ -8451,8 +8485,8 @@ const ClosureRegion = struct {
             if (!self.retain_selected and !self.source_interface and self.session.options.reuse_validated_calls and definition != null and binding.kind == .global) {
                 const present = self.session.specializations.validated_calls.contains(.{ .target = target_, .evidence = known });
                 if (self.session.receipt_tape) |tape| try tape.call_reads.append(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding, .evidence = known, .present = present });
+                if (self.session.principal_reads) |reads| try reads.callRead(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding }, known, present);
                 if (present) {
-                    if (self.session.principal_reads) |reads| if (!reads.calls_seen.contains(.{ .target = .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding }, .evidence = known })) reads.invalidate(.call_read);
                     self.session.proofs.proof_reused += 1;
                     return;
                 }
@@ -8467,6 +8501,7 @@ const ClosureRegion = struct {
         // Import those requirements with fresh variables; do not recollect the
         // body or publish a closed call proof before its predicates are solved.
         if ((!self.source_interface or binding.scheme.obligations.len != 0) and !self.retain_selected and !self.complete_demand_bodies and definition != null and definition.?.is_function and binding.kind == .global and try self.checkedSchemeReusable(target_)) {
+            if (self.session.principal_reads) |reads| try reads.source(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
             if (binding.scheme.obligations.len != 0 and self.partial_principal and try self.retainOpenPrincipal(.{ .target = target_, .scope = caller, .node = body_root, .left = instantiated, .result = instantiated, .deferred_member = self.defer_members })) {
                 const start = self.scratch.summary_arguments.items.len;
                 if (arguments.len > std.math.maxInt(u32) - start) return error.TypeLimit;
@@ -9001,6 +9036,7 @@ const ClosureRegion = struct {
         return candidate;
     }
     fn collectInlineCall(self: *ClosureRegion, caller: u32, target_: Target, callee_type: types.Id, arguments: []const core.Id) RegionError!void {
+        if (self.session.principal_reads) |reads| try reads.source(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
         const module = &self.session.units[target_.unit];
         const binding = module.binding(target_.binding);
         const definition = module.body(target_.binding);
@@ -9281,7 +9317,13 @@ const ClosureRegion = struct {
                 };
                 // A job drained under this recorder is part of the recorded
                 // region: its reads, publications and consumed jobs are here.
-                if (!self.source_interface) if (self.session.principal_reads) |reads| if ((entry.recorded == 0 or entry.recorded != reads.serial) and !reads.calls_seen.contains(.{ .target = target, .evidence = entry.result })) reads.invalidate(.call_read);
+                if (!self.source_interface) if (self.session.principal_reads) |reads| if ((entry.recorded == 0 or entry.recorded != reads.serial) and !reads.calls_seen.contains(.{ .target = target, .evidence = entry.result })) {
+                    if (self.session.specializations.validated_calls.contains(.{ .target = constraint.target, .evidence = entry.result })) {
+                        try reads.callRead(self.session.allocator, target, entry.result, true);
+                    } else if (CallSummaries.observation(self.session, entry.key, entry.result)) |fact| {
+                        try reads.summaryRead(self.session.allocator, fact);
+                    } else reads.invalidate(.call_read);
+                };
                 _ = try self.admitSignature(constraint.left, try self.importEvidence(entry.result, 0));
                 self.scratch.constraints.items[index].solved = true;
                 self.session.counters.call_memo_hits += 1;
@@ -10056,6 +10098,10 @@ const ClosureRegion = struct {
             if (seen.count() >= self.session.options.max_values) return error.TypeLimit;
             try seen.put(self.scratch_allocator, graph.key, {});
             if (graph.untracked_reads) if (self.session.principal_reads) |reads| reads.invalidate(.call_read);
+            if (self.session.principal_reads) |reads| {
+                if (graph.foreign_sources) reads.source_complete = false;
+                for (graph.dependencies) |target_| try reads.source(self.session.allocator, target_);
+            }
             if (graph.untracked_reads or graph.foreign_sources) if (self.session.receipt_tape) |tape| {
                 tape.unknown = true;
             };
@@ -10420,6 +10466,7 @@ const ClosureRegion = struct {
         self.principal_only_used = true;
         try self.principalDependencies(graph, false);
         const source = self.scratch.sources.items[scope];
+        if (self.session.principal_reads) |reads| try reads.source(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
         if (self.session.receipt_tape) |tape| try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
         if (self.session.constant_recorder) |recorder| try recorder.source(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
         for (graph.actions) |action| switch (action) {
@@ -10525,6 +10572,12 @@ const ClosureRegion = struct {
         }
     }
     fn startCollection(self: *ClosureRegion, scope: u32, body: core.Id) RegionError!body_recipe.Walk {
+        if (self.session.principal_reads) |reads| {
+            const source = self.scratch.sources.items[scope];
+            if (source.binding != 0 and self.session.units[source.owner].binding(source.binding).kind == .global) {
+                try reads.source(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
+            } else if (self.session.unitId(source.owner) != reads.root.unit) reads.source_complete = false;
+        }
         if (!self.building_principal and body == self.scratch.sources.items[scope].body) try self.registerBodyScope(scope);
         const recipe = if (self.session.options.reuse_body_recipes) try self.session.specializations.body_recipes.get(self.session.allocator, self.session.units, .{ .owner = self.scratch.sources.items[scope].owner, .body = body, .callables = self.include_callables }, self.session.options.max_values) else null;
         // This immutable syntax classification precedes graph admission, so a
@@ -11733,6 +11786,7 @@ const ClosureRegion = struct {
         self.scratch.sources.items[scope].root = root;
     }
     fn callableScope(self: *ClosureRegion, target_: Target) RegionError!u32 {
+        if (self.session.principal_reads) |reads| try reads.source(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
         const module = &self.session.units[target_.unit];
         const body = module.body(target_.binding) orelse return error.UnresolvedType;
         const scope = try self.typeScope(target_.unit);

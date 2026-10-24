@@ -1,5 +1,50 @@
 # Performance hills toward sub-second edits
 
+Latest outcome, 24 October 2026:
+[CT103/CT104 implements all four selected changes](zig-native/CT103_QUALIFICATION.md).
+Seven alternating pairs against exact `5412320` reduce literal-edit CPU by
+24.8%, body-edit CPU by 4.2% and fresh-game CPU by 6.1%; devtools is essentially
+unchanged. Literal reuse rises from 18 to all 20 principal results, with one
+nonempty result and 4,400 completed-summary publications. Body reuse rises from
+15 to 16, leaving four fresh regions. Source, dynamic-input, ownership and
+bounded importer checks remain in force. Portable archives still require the
+complete source image; only retained reuse admits exact consumed declarations.
+
+The combined cache/reuse measurement meets the literal 20% target but misses the
+body 20% target. The 64-slot row-cache simulation covered 12.55% of label
+visits; that is diagnostic evidence, not an isolated CPU speedup for the cache.
+Shared-host body wall median worsens (10.86 → 12.46 s), so report CPU and wall
+separately. The profiled pair also crosses a large load change; its body phase
+ratio is not evidence of a 54% causal speedup.
+
+The next measured bottlenecks are the four body-edit regions and inference
+outside principal replay. The three largest body regions still collect about
+1.83 million, 0.94 million and 0.61 million nodes; their inputs are recorded
+now, but they still fail the source-admission checks. Literal builds have no
+fresh principal regions, yet ordinary entry/closure queries still revisit tens
+of thousands of nodes. Reusing principal results alone does not eliminate that
+later work. A clean sequence of three unseen literal and three unseen body edits
+matches both compilers and fresh controls. Later literals take 2.96–3.18 s
+total, including 1.48–1.51 s inference and 63–67 ms frontend checking. Body
+edits take 6.20–7.62 s, including 4.57–6.47 s inference. These are single
+profiled observations, not a latency distribution. First-edit checking still
+costs about 0.9 s; CT100 needs its own allocation attribution. Keep constants
+deferred until their measured share justifies the work.
+
+Next, trace which exact declarations invalidate the largest body regions and
+which summary/body queries repeat after all principal hits. Bound an experiment
+before widening admission; require changed-callee/type/effect errors, recovery,
+owner translation, full allocation failures and byte-identical fresh controls.
+Keep the body 20%, four/two-second and sub-second targets open. Do not combine
+ratios from different historical intervals into a claimed cumulative gain.
+
+The final installed build includes the concurrent `faf3f78` callback/diagnostic
+commit and the portable-summary output fix, with its own complete qualification
+and strict output screen. Performance percentages above belong to the pinned
+`5412320` comparison.
+
+## Historical CT102 analysis
+
 [CT102 is qualified](zig-native/CT102_QUALIFICATION.md). Seven alternating pairs
 show **25.1% less retained literal-edit CPU** against CT97. The first saved call
 proof rejection was a depth bound (128), with 999,809 work units still available;

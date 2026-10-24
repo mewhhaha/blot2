@@ -66,19 +66,21 @@ existing positive, rejection/recovery and ownership regressions plus guests.
 
 The [compile measurements](COMPILE_MEASUREMENTS.md) separate application compile
 cost from building and checking the compiler. The
-[latest optimization](zig-native/CT102_QUALIFICATION.md) reduces retained gdev
-literal-edit CPU by **25.1%** against CT97 in seven alternating pairs, with
-identical Wasm. Candidate literal/body wall medians are 5.93 / 6.83 s in this
-shared-host run; sub-second editing remains open. Fresh-build and body-edit CPU
-stay within the 5% regression guard. The full gate passes 2,541 exhaustive
-native laws and 1,649 guest checks. The expanded development cycle takes
-35.36 s, including a 2.57 s compiler build; native qualification takes
-768.23 s. These are individual cycle observations, not p95 estimates.
-Keep stable writable Zig caches; the measured incremental mode did not improve
-real edits. Use `deno task bench:compiler-build --out build/bench/build-next`
-for isolated build/edit/revert measurements. See the
-[compile hills](COMPILE_HILLS.md), [build hills](BUILD_HILLS.md) and
-[performance review](PERFORMANCE_REVIEW.md) for remaining costs and targets.
+[latest inference changes](zig-native/CT103_QUALIFICATION.md) reduce retained
+gdev literal-edit CPU by **24.8%**, body-edit CPU by **4.2%** and fresh-game CPU
+by **6.1%** against `5412320` in seven alternating pairs, with identical Wasm.
+Shared-host wall medians are 7.60 / 12.46 s for literal/body edits; body wall
+time does not improve. Sub-second editing remains open. These percentages use
+the pinned measured candidate. The final release also fixes portable restart
+replay, includes `faf3f78` and passes 2,551 exhaustive native laws and 1,654
+guest checks. The expanded development cycle takes 26.05 s, including a 3.59 s
+compiler build and 6.90 s complete native compilation. These are individual
+observations, not p95 estimates or paired compiler-build gains. Keep stable
+writable Zig caches; the measured incremental mode did not improve real edits.
+Use `deno task bench:compiler-build --out build/bench/build-next` for isolated
+build/edit/revert measurements. See the [compile hills](COMPILE_HILLS.md),
+[build hills](BUILD_HILLS.md) and [performance review](PERFORMANCE_REVIEW.md)
+for remaining costs and targets.
 
 For a smaller development check, run `deno task test:compiler:dev`. It checks
 the project protocol, client and inference-budget recovery against the

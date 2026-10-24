@@ -1,14 +1,24 @@
 # Compile and compiler-build measurements
 
-Latest qualification: [CT102 principal replay](zig-native/CT102_QUALIFICATION.md).
-Seven alternating pairs show **25.1% less retained literal-edit CPU** against
-CT97, with exact outputs and unchanged fresh/body CPU within the 5% guard.
-Candidate literal/body wall medians are 5.93 / 6.83 s; the shared-host ranges are
-wide and sub-second editing remains open. The full gate passes 2,541 exhaustive
-native laws and 1,649 guest checks. First-edit checking and steady revisions
-are reported separately. The earlier measurements below remain historical.
+Latest qualification:
+[CT103/CT104 inference reuse and row normalization](zig-native/CT103_QUALIFICATION.md).
+Seven alternating pairs against `5412320` show **24.8% less literal-edit CPU**,
+**4.2% less body-edit CPU**, and **6.1% less fresh-game CPU** with exact
+outputs. Devtools is effectively unchanged. Literal/body wall medians are 7.60 /
+12.46 s on the loaded shared host; the body wall median does not improve. The
+body 20% and sub-second targets remain open. First-edit checking and previously
+unseen later edits are reported separately. The final build also fixes portable
+restart replay, includes `faf3f78` and passes a separate 2,551-law exhaustive
+native gate, 1,654 guest checks, zero lint and exact frozen-output parity. That
+integration check is not a new performance comparison. The matching CLI and
+native compiler are installed.
 
-Latest follow-up:
+Historical CT102 qualification:
+[partial call-memo replay](zig-native/CT102_QUALIFICATION.md) showed 25.1% less
+literal CPU against CT97. Earlier measurements below retain their original
+baselines; their ratios are not cumulative current measurements.
+
+Historical follow-up:
 [CT97, executable reuse and temporary scratch](zig-native/CT97_QUALIFICATION.md).
 Seven alternating release pairs reduce fresh game CPU by **32.5%** against CT96;
 median build wall falls from **13.60 to 8.68 s**, with identical Wasm. The

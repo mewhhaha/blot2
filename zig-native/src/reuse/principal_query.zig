@@ -36,7 +36,7 @@ pub const Adapter = struct {
     }
     pub fn bytes(record: Table.Record) usize {
         var total: usize = 0;
-        if (record.dependencies.inputs) |observed| inline for (.{ "scalar_reads", "plain_reads", "plain_publications", "call_publications" }) |field| {
+        if (record.dependencies.inputs) |observed| inline for (.{ "sources", "scalar_reads", "plain_reads", "plain_publications", "call_publications", "call_reads", "summary_reads", "summary_publications" }) |field| {
             const entries = @field(observed, field);
             total +|= entries.len *| @sizeOf(@TypeOf(entries[0]));
         };

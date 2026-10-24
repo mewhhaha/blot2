@@ -69,6 +69,70 @@ test "principal input image retains inference while current staged literals chan
     try std.testing.expectEqualSlices(u8, initial.bytes, reverted.bytes);
 }
 
+fn nonemptyReplayFailure(allocator: std.mem.Allocator, fixture: *const Fixture, old: *const @import("artifact_capture.zig").Capture, expected: []const u8) !void {
+    var actual = try fixture.emitUsing(allocator, .{ .retain_artifacts = true, .principal_previous = old });
+    defer actual.deinit(allocator);
+    try std.testing.expect(actual.diagnostic == null);
+    try std.testing.expect(actual.principal.projected_nonempty_hits > 0);
+    try std.testing.expectEqualSlices(u8, expected, actual.bytes);
+}
+
+test "principal nonempty projected rows own translated results through edits reverts and allocation failures" {
+    const prefix = "entry const builder: U32 where { type_rep U32 } = do:\n  let local = fn value => value\n  break local ";
+    var before = try Fixture.init(prefix ++ "42\n");
+    defer before.deinit();
+    var after = try Fixture.init(prefix ++ "43\n");
+    defer after.deinit();
+    var initial = try before.emit(.{ .retain_artifacts = true });
+    defer initial.deinit(a);
+    try std.testing.expect(initial.diagnostic == null);
+    var fresh = try after.emit(.{});
+    defer fresh.deinit(a);
+    try std.testing.expect(fresh.diagnostic == null);
+    const stamp = @import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_queries.records.items);
+    try nonemptyReplayFailure(a, &after, &initial.capture.?, fresh.bytes);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, nonemptyReplayFailure, .{ &after, &initial.capture.?, fresh.bytes });
+    var edited = try after.emit(.{ .retain_artifacts = true, .principal_previous = &initial.capture.? });
+    defer edited.deinit(a);
+    try nonemptyReplayFailure(a, &before, &edited.capture.?, initial.bytes);
+    try std.testing.expectEqualSlices(u8, &stamp, &@import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_queries.records.items));
+}
+
+test "principal observed sources retain memo outputs across unrelated body edits and reject consumed source edits" {
+    // Establish both operation names before the edited declaration, so the
+    // negative case tests source admission with the same ordered namespace.
+    const operations = "const add = fn value => @u32.add value 2\nconst subtract = fn value => @u32.sub value 2\n";
+    const prefix = operations ++ "const local = fn value => @u32.add value 1\nentry const answer: U32 where { type_rep U32 } = local 41\n";
+    var before = try Fixture.init(prefix ++ "const unrelated = fn value => @u32.add value 2\n");
+    defer before.deinit();
+    var after = try Fixture.init(prefix ++ "const unrelated = fn value => @u32.sub value 2\n");
+    defer after.deinit();
+    var initial = try before.emit(.{ .retain_artifacts = true });
+    defer initial.deinit(a);
+    try std.testing.expect(initial.diagnostic == null);
+    const observed = initial.capture.?.metadata.principal_queries.records.items[0].dependencies.inputs.?;
+    try std.testing.expect(observed.source_complete and observed.sources.len > 0);
+    try std.testing.expect(!image.moduleEqual(&before.units[0], &after.units[0]));
+    var fresh = try after.emit(.{});
+    defer fresh.deinit(a);
+    var edited = try after.emit(.{ .retain_artifacts = true, .principal_previous = &initial.capture.? });
+    defer edited.deinit(a);
+    try std.testing.expect(edited.diagnostic == null);
+    try std.testing.expect(edited.principal.call_publications_replayed > 0);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, edited.bytes);
+    var changed = try Fixture.init(operations ++ "const local = fn value => @u32.sub value 1\nentry const answer: U32 where { type_rep U32 } = local 41\nconst unrelated = fn value => @u32.sub value 2\n");
+    defer changed.deinit();
+    var expected = try changed.emit(.{});
+    defer expected.deinit(a);
+    var declined = try changed.emit(.{ .retain_artifacts = true, .principal_previous = &edited.capture.? });
+    defer declined.deinit(a);
+    try std.testing.expect(declined.diagnostic == null);
+    try std.testing.expectEqual(@as(usize, 0), declined.principal.call_publications_replayed);
+    try std.testing.expect(declined.principal.fresh_regions > 0);
+    try std.testing.expect(declined.principal.projected_image_declines > 0);
+    try std.testing.expectEqualSlices(u8, expected.bytes, declined.bytes);
+}
+
 test "principal input image does not hide staged errors or change the last good capture" {
     var before = try Fixture.init("entry const answer: U32 where { type_rep U32 } = @u32.div 8 2\n");
     defer before.deinit();
@@ -126,6 +190,83 @@ test "principal input certificate preserves absent scalar reads and rejects exec
     try std.testing.expect(present.matches(&session));
     try session.specializations.validated_calls.put(a, .{ .target = .{ .unit = 0, .binding = target.binding }, .evidence = T.u32_type }, {});
     try std.testing.expect(!present.matches(&session));
+}
+
+fn callRecordingFailures(allocator: std.mem.Allocator) !void {
+    const target: core.BindingRef = .{ .unit = 1, .binding = 1 };
+    var reads: inputs.Recorder = .{ .eligible = true, .empty_call_inputs = false, .max_reads = 4 };
+    defer reads.deinit(allocator);
+    try reads.callRead(allocator, target, 6, false);
+    try reads.callRead(allocator, target, 7, true);
+    try reads.callPublish(allocator, target, 6);
+    try reads.callRead(allocator, target, 6, true);
+    var copied = try reads.key().?.clone(allocator);
+    defer copied.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 2), copied.call_reads.len);
+    try std.testing.expect(!copied.call_reads[0].present);
+    try std.testing.expect(copied.call_reads[1].present);
+    try std.testing.expectEqual(@as(usize, 1), copied.call_publications.len);
+    try reads.callRead(allocator, target, 7, false);
+    try std.testing.expect(reads.key() == null);
+    var bounded: inputs.Recorder = .{ .eligible = true, .empty_call_inputs = false, .max_reads = 1 };
+    defer bounded.deinit(allocator);
+    try bounded.callRead(allocator, target, 6, false);
+    try bounded.callRead(allocator, target, 7, false);
+    try std.testing.expect(bounded.key() == null);
+}
+
+test "principal call input recording preserves absence internal publications conflicts and allocation ownership" {
+    try callRecordingFailures(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, callRecordingFailures, .{});
+}
+
+fn summaryReplayFailures(allocator: std.mem.Allocator, fixture: *const Fixture) !void {
+    var session = try eval.Session.init(allocator, &fixture.units);
+    defer session.deinit();
+    const target: core.BindingRef = .{ .unit = 1, .binding = fixture.units[0].bodies[1].binding };
+    const signature = try session.storage.evidence.intern(.function, T.u32_type, T.u32_type, &.{});
+    const arguments = try session.storage.evidence.intern(.product, 0, 0, &.{T.u32_type});
+    const fact: inputs.Summary = .{ .key = .{ .target = target, .inputs = arguments }, .result = signature };
+    var reads: inputs.Recorder = .{ .eligible = true, .empty_call_inputs = false, .max_reads = 4 };
+    defer reads.deinit(allocator);
+    try reads.summaryRead(allocator, fact);
+    try reads.summaryRead(allocator, fact);
+    var key = try reads.key().?.clone(allocator);
+    defer key.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 1), key.summary_reads.len);
+    try std.testing.expect(!key.matches(&session));
+    var publications = [_]inputs.Summary{fact};
+    const output: inputs.Key = .{ .scalar_reads = &.{}, .summary_publications = &publications };
+    output.publish(&session) catch |err| {
+        try std.testing.expect(!session.principalSummaryMatches(fact));
+        try std.testing.expectEqual(@as(usize, 0), session.specializations.validated_calls.count());
+        return err;
+    };
+    try std.testing.expect(key.matches(&session));
+    try std.testing.expectEqual(@as(usize, 0), session.specializations.validated_calls.count());
+    key.summary_reads[0].key.deferred_member = true;
+    try std.testing.expect(!key.matches(&session));
+    key.summary_reads[0] = fact;
+    key.summary_reads[0].result = T.u32_type;
+    try std.testing.expect(!key.matches(&session));
+    // Replayed optional outputs preserve the current owner's existing result.
+    publications[0].result = T.u32_type;
+    try output.publish(&session);
+    try std.testing.expect(session.principalSummaryMatches(fact));
+    try reads.summaryPublish(allocator, fact);
+    try reads.summaryRead(allocator, fact);
+    try std.testing.expectEqual(@as(usize, 1), reads.summary_reads.items.len);
+    var changed = fact;
+    changed.result = T.u32_type;
+    try reads.summaryRead(allocator, changed);
+    try std.testing.expect(reads.key() == null);
+}
+
+test "principal summary replay requires exact inputs and results without publishing global certificates through OOM" {
+    var fixture = try Fixture.init("const local = fn value => @u32.add value 1\nentry const answer = local 41\n");
+    defer fixture.deinit();
+    try summaryReplayFailures(a, &fixture);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, summaryReplayFailures, .{&fixture});
 }
 
 fn recordingFailures(allocator: std.mem.Allocator) !void {

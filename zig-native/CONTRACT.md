@@ -787,23 +787,29 @@ reuse on saturation. Numeric handles remain scoped to their evidence/Context
 owners. See [REFINEMENT_QUERIES.md](REFINEMENT_QUERIES.md) for limits and
 qualification.
 
-A projected principal query may retain an empty type/row result across primitive
-literal edits only when its complete source input projection and recorded scalar
-type reads match. It must begin without validated-call proofs and perform no
-value evaluation, nested specialization or unrecorded runtime read. Nominal memo
-inputs retain absence, true and false separately; internal writes preserve the
-final value. Closed call publications are translated into the current evidence
-owner, with source-defined nominal/effect identities checked. Reserve all memo
-capacity before publication. The projected query certifies no runtime or staged
-value: ordinary evaluation still runs and reports errors. Executable admission
-uses its own source and captured-value checks.
+A projected principal query may retain empty or nonempty type/row results when
+its source inputs and dynamic observations match. Nonempty results are imported
+into the current owner under the existing bounded principal type/row checks.
+Source admission requires either the complete input projection, or a complete
+record of exact consumed declarations including the root. Both paths require
+the entire ordered type, nominal and effect catalog and producer namespace to
+match. Unknown foreign lexical sources decline the narrower path. No source
+certificate grants executable or value reuse.
+
+Call inputs record both presence and absence with owner-translated signatures.
+An initially empty validated-call table compactly proves all external negatives;
+otherwise each consumed lookup is recorded. Nominal memo inputs retain absence,
+true and false separately; internal writes preserve the final value. No value
+evaluation, nested specialization or unrecorded runtime read may enter the key.
+Reserve all memo capacity before publication. Ordinary evaluation still runs
+and reports errors; executable admission has its own source/value checks.
 
 Closed call publications are optional memo outputs of that completed query.
 An individual proof that cannot be translated under the existing type/depth
 checks is omitted; its next use performs ordinary checking. This does not
-decline the independently admitted empty result or publish the old evidence ID.
+decline the independently admitted result or publish the old evidence ID.
 The next capture owns only successfully translated publications. Scalar and
-nominal inputs, complete source projection, result admission and atomic memo
+nominal inputs, source admission, result admission and atomic memo
 publication retain their checks. Principal statistics distinguish projected
 owner, result, missing-recording, dynamic-input, image and importer declines;
 `call_publications_declined` counts omitted memo outputs separately from query
@@ -812,12 +818,27 @@ declines.
 The recorded region includes the independent summary jobs it drains: their
 reads, publications and consumed jobs pass through the same recorder, so their
 results are recorded work even when they publish no validated call. A job
-finished outside that recording is an unrecorded call read. A principal-graph
-description detaches the recorder but still reports its nominal memo reads and
-publications to it in order. Source scopes a graph collected from another unit
-are not dynamic reads for this key, which compares every module's source image;
-source receipts admit sources per binding and still treat such a graph as
-unknown.
+finished outside that recording must match a recorded ordinary call proof or
+an exact completed-summary key and result. Supported summary keys contain the
+source target, closed argument product, deferred-member mode and query options;
+lexical, result-directed and source-interface jobs decline this import. Joint
+recursive summaries remain completed memo judgments, never global validated-call
+certificates. Optional summary outputs are translated and may be omitted under
+the same ownership rule as call outputs. Portable principal archive version six
+owns these inputs and outputs and still requires the complete source image.
+Portable summary inputs must translate and match exactly. An unsupported
+optional summary output is omitted without discarding the admitted principal
+result; its next use performs ordinary checking. All allocation and required
+input failures retain their existing behavior.
+A principal-graph description detaches the recorder but reports nominal memo
+observations in order. Foreign lexical source scopes require the complete image.
+
+Operation-row normalization caches at most 64 answers per solver. Every lookup
+matches the resolved row, historical cursor, depth, depth limit, and both type
+and effect mutation epochs. Writes, physical edits and rollback invalidate those
+epochs; saturation disables reuse. The separate positive row certificate may
+cover immutable operation arguments beside an open tail, because tail resolution
+runs first. Only a closed tail can certify an entire closed type.
 
 Effect unification walks immutable label-span views. A left remainder keeps its
 chronological cursor; extracting a right label resets that cursor just as

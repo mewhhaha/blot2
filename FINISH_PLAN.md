@@ -10,28 +10,44 @@ comparison separate from allocation-free contract research.
 
 ## Execution checkpoint, 24 October 2026
 
-CT102 checkpoint, 24 October 2026: [qualified partial call-memo replay](zig-native/CT102_QUALIFICATION.md)
-reduces retained literal-edit CPU by **25.1%** in seven alternating pairs against
-CT97. Literal-edit wall medians are 8.63 → 5.93 s; body edits remain about 6.83 s
-in the candidate. Shared-host load causes wide ranges; use the paired CPU
-comparison rather than interpreting independent wall medians as speedups.
-Fresh game/devtools and body-edit CPU guards pass, and every fresh/edit/revert/
-restart Wasm comparison is exact. The full gate passes 2,541 exhaustive native
-laws, 1,649 guest checks, 48 smoke checks and 57 tooling checks with zero Zig
-lint findings. Native execution takes 768.23 s and the full gate 819.00 s
-in this interval. The expanded development cycle takes 35.36 s.
+CT103/CT104 checkpoint, 24 October 2026:
+[the four inference changes are qualified](zig-native/CT103_QUALIFICATION.md).
+Nonempty principal results, exact call/recursive-summary observations, consumed
+source declarations and bounded operation-row normalization are implemented.
+Seven alternating pairs against `5412320` show **24.8% less literal-edit CPU**,
+**4.2% less body-edit CPU** and **6.1% less fresh-game CPU**, with
+byte-identical fresh/edit/revert/restart outputs. Devtools stays effectively
+unchanged. Literal/body wall medians are 7.60 / 12.46 s on the loaded shared
+host; the body wall median does not improve. These CPU gains are medians of
+within-pair ratios.
 
-The change keeps a source/input-proven empty principal result while omitting
-optional call memo outputs that cannot pass the unchanged importer. Ordinary
-checking handles those calls. The largest literal-edit region is now reused;
-two large regions remain. A separate profile measures literal inference at
-5.22 → 3.20 s and body inference at about 5.13 s. First-edit checking takes
-0.92 s, later revisions about 0.07 s. Sub-second editing remains open; follow
-CT103 and CT104 in [the current queue](COMPILE_HILLS.md). Concurrent text and
-guest-runtime changes remain preserved outside this isolated candidate. A separate
-sequence confirms 70–74 ms frontend checking for later unseen literal edits,
-but total rebuilds still take 4.67–4.98 s in that single profiled sequence.
-The qualified CT102 CLI and compiler are installed locally.
+Literal edits reuse all 20 principal results; body edits reuse 16, leaving four
+fresh regions. Three unseen literal edits and three unseen body edits match
+fresh controls. Later literal edits take 2.96–3.18 s in that single diagnostic
+sequence, including about 1.5 s inference. The 20% body-CPU target, both edit
+classes below four/two seconds, and sub-second editing remain open. Continue
+with the remaining body-region dependencies and residual inference in
+[the current queue](COMPILE_HILLS.md); keep first-edit frontend work separate.
+
+The measured candidate passes 2,548 exhaustive native laws; its guest suite
+catches a lost restart-reuse optimization, fixed by omitting unsupported
+optional summary outputs while keeping all required-input checks. Main also
+advanced to `faf3f78` during measurement; the final combined release separately
+passes 2,551 exhaustive native laws, 1,654 guest checks, 48 smoke checks and 57
+tooling checks, with zero Zig lint findings and exact frozen-workload output
+parity against the measured candidate. Its full gate takes 623.68 s. Performance
+percentages belong to the pinned comparison; they do not attribute gains to the
+later callback/diagnostic changes or portable-output fix. The measured expanded
+development cycle takes 26.05 s with a 3.59 s compiler build and 6.90 s complete
+native compilation; these are individual observations, not p95 estimates.
+
+The combined CLI and compiler are installed at `~/.local/bin/blot` and `blotc`.
+Both resolve through PATH; outside-repository format/check/build, matched Wasm,
+the list example result 29 and the bundled guide pass. Native SHA-256:
+`0185500e446d59d6e813de8cecb3318bcc5983632043eb0129b8a64bad45ee9f`. Installation
+and rollback backups are recorded in `build/install/ct103/installed.json`.
+Preserve unrelated untracked `zig-native/build/` and `zig-out-modern/`. The
+dated checkpoints below are historical; do not rerun completed hills.
 
 The preceding CT97 batch: seven alternating release pairs reduce fresh game CPU by **32.5%** against CT96;
 median build wall falls from **13.60 to 8.68 s**, with identical Wasm.

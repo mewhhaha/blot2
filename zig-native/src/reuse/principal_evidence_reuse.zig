@@ -1,5 +1,5 @@
 //! A separate principal prepass importer. Ordinary artifact admission remains
-//! exact. Changed declarations never borrow old principal facts or values.
+//! exact. Observed source and dynamic inputs admit only principal facts.
 const std = @import("std");
 const core = @import("../check/core.zig");
 const core_eval = @import("../eval/core_eval.zig");
@@ -19,6 +19,8 @@ pub const Stats = struct {
     persisted_call_proofs: usize = 0,
     persisted_declines: usize = 0,
     projected_empty_hits: usize = 0,
+    projected_nonempty_hits: usize = 0,
+    projected_source_hits: usize = 0,
     projected_empty_declines: usize = 0,
     projected_owner_declines: usize = 0,
     projected_result_declines: usize = 0,
@@ -48,6 +50,8 @@ pub const Stats = struct {
     fresh_regions: usize = 0,
     call_publications_replayed: usize = 0,
     call_publications_declined: usize = 0,
+    summary_publications_replayed: usize = 0,
+    summary_publications_declined: usize = 0,
 };
 pub const State = struct {
     allocator: Allocator,
@@ -152,19 +156,38 @@ pub const State = struct {
         self.input_image_equal = true;
         return true;
     }
+    /// A complete observation may survive changes outside the declarations it
+    /// read. The gate still proves the entire ordered semantic catalog exact.
+    fn sourcesEqual(self: *const State, target: core.BindingRef, inputs: *const @import("principal_inputs.zig").Key) bool {
+        if (!self.gate.enabled or self.gate.constant_types or !inputs.source_complete) return false;
+        var root = false;
+        for (inputs.sources) |source| {
+            if (!self.gate.admitsLocalSource(source)) return false;
+            root = root or std.meta.eql(source, target);
+        }
+        return root;
+    }
     /// Retained evidence IDs belong to the old Snapshot. Re-intern every
     /// publication before publishing any of them or retaining the new key.
-    fn currentInputs(self: *State, generator: anytype, inputs: *const @import("principal_inputs.zig").Key) Allocator.Error!?*const @import("principal_inputs.zig").Key {
-        if (inputs.call_publications.len == 0) return inputs;
-        if (!self.inputImageEqual() or !try self.ensureGraphs()) return null;
+    fn currentInputs(self: *State, generator: anytype, target: core.BindingRef, inputs: *const @import("principal_inputs.zig").Key) Allocator.Error!?*const @import("principal_inputs.zig").Key {
+        if (inputs.call_publications.len == 0 and inputs.call_reads.len == 0 and inputs.summary_reads.len == 0 and inputs.summary_publications.len == 0) return inputs;
+        if ((!self.inputImageEqual() and !self.sourcesEqual(target, inputs)) or !try self.ensureGraphs()) return null;
         // This importer is private to principal type/row translation. The
-        // complete input projection proved every source type, nominal, effect
-        // and local ID equal, even when a nested literal changed. It grants no
+        // gate proved every source type, nominal and effect ID equal. The
+        // source observations separately prove the consumed bodies. It grants no
         // executable or value import; those use separate importers and gates.
         @memset(self.graphs.?.stable, true);
         var translated = try inputs.clone(self.allocator);
         var owned = true;
         defer if (owned) translated.deinit(self.allocator);
+        for (translated.call_reads) |*read| {
+            read.evidence = (try self.graphs.?.importPrincipalCall(generator, read.target, read.evidence)) orelse return null;
+        }
+        for (translated.summary_reads) |*read| {
+            read.key.inputs = (try self.graphs.?.importPrincipalInput(generator, read.key.inputs)) orelse return null;
+            read.result = (try self.graphs.?.importPrincipalCall(generator, read.key.target, read.result)) orelse return null;
+        }
+        if (!translated.matches(&generator.evaluator)) return null;
         // These are optional memo outputs of the completed query, not inputs
         // to its result. An untranslatable proof stays absent: its next use
         // performs ordinary checking. Never publish an old evidence ID.
@@ -178,6 +201,20 @@ pub const State = struct {
             kept += 1;
         }
         translated.call_publications = try self.allocator.realloc(translated.call_publications, kept);
+        kept = 0;
+        for (translated.summary_publications) |summary| {
+            const actual_inputs = (try self.graphs.?.importPrincipalInput(generator, summary.key.inputs)) orelse {
+                self.stats.summary_publications_declined += 1;
+                continue;
+            };
+            const result = (try self.graphs.?.importPrincipalCall(generator, summary.key.target, summary.result)) orelse {
+                self.stats.summary_publications_declined += 1;
+                continue;
+            };
+            translated.summary_publications[kept] = .{ .key = .{ .target = summary.key.target, .inputs = actual_inputs, .deferred_member = summary.key.deferred_member }, .result = result };
+            kept += 1;
+        }
+        translated.summary_publications = try self.allocator.realloc(translated.summary_publications, kept);
         self.imported_inputs = translated;
         owned = false;
         return &self.imported_inputs.?;
@@ -215,39 +252,54 @@ pub const State = struct {
                     self.stats.projected_empty_declines += 1;
                     return null;
                 }
-                if (!empty) {
-                    self.stats.projected_result_declines += 1;
-                    self.stats.projected_empty_declines += 1;
-                    return null;
-                }
                 const inputs = if (proof.dependencies.inputs) |*inputs| inputs else {
                     self.stats.projected_unrecorded_declines += 1;
                     self.stats.projected_empty_declines += 1;
                     return null;
                 };
-                if (!inputs.matches(&generator.evaluator)) {
+                if (!inputs.matchesBase(&generator.evaluator)) {
                     self.stats.projected_input_declines += 1;
                     self.stats.projected_empty_declines += 1;
                     return null;
                 }
-                if (!self.inputImageEqual()) {
+                const complete_image = self.inputImageEqual();
+                if (!complete_image and !self.sourcesEqual(target, inputs)) {
                     self.stats.projected_image_declines += 1;
                     self.stats.projected_empty_declines += 1;
                     return null;
                 }
-                const current_inputs = (try self.currentInputs(generator, inputs)) orelse {
+                const current_inputs = (try self.currentInputs(generator, target, inputs)) orelse {
                     self.stats.projected_import_declines += 1;
                     self.stats.projected_empty_declines += 1;
                     return null;
                 };
+                var solved: core_eval.SolvedEvidence = .{ .types = &.{}, .rows = &.{} };
+                if (!empty) {
+                    if (!try self.ensureGraphs()) {
+                        self.stats.projected_result_declines += 1;
+                        self.stats.projected_empty_declines += 1;
+                        return null;
+                    }
+                    // The gate proves source type and row ordinals exact.
+                    // The importer owns every translated result.
+                    @memset(self.graphs.?.stable, true);
+                    solved = (try self.graphs.?.importPrincipalEvidence(generator, target.unit, proof.value.types, proof.value.rows)) orelse {
+                        self.stats.projected_result_declines += 1;
+                        self.stats.projected_empty_declines += 1;
+                        return null;
+                    };
+                }
+                errdefer solved.deinit(self.allocator);
                 try current_inputs.publish(&generator.evaluator);
                 self.last_inputs = current_inputs;
                 self.stats.call_publications_replayed += current_inputs.call_publications.len;
-                self.stats.projected_empty_hits += 1;
+                self.stats.summary_publications_replayed += current_inputs.summary_publications.len;
+                if (empty) self.stats.projected_empty_hits += 1 else self.stats.projected_nonempty_hits += 1;
+                self.stats.projected_source_hits += @intFromBool(!complete_image);
                 self.stats.hits += 1;
-                self.stats.empty_hits += 1;
+                self.stats.empty_hits += @intFromBool(empty);
                 if (target.unit > self.old.cached_units) self.stats.fresh_unit_hits += 1;
-                return .{ .types = &.{}, .rows = &.{} };
+                return solved;
             }
             if (!empty) self.stats.nonempty_requests += 1;
             const solved: core_eval.SolvedEvidence = if (empty)
@@ -281,10 +333,11 @@ pub const State = struct {
                 var owned = solved;
                 owned.deinit(self.allocator);
             }
-            if (proof.dependencies.inputs) |*inputs| if (inputs.matches(&generator.evaluator)) if (try self.currentInputs(generator, inputs)) |current_inputs| {
+            if (proof.dependencies.inputs) |*inputs| if (inputs.matchesBase(&generator.evaluator)) if (try self.currentInputs(generator, target, inputs)) |current_inputs| {
                 try current_inputs.publish(&generator.evaluator);
                 self.last_inputs = current_inputs;
                 self.stats.call_publications_replayed += current_inputs.call_publications.len;
+                self.stats.summary_publications_replayed += current_inputs.summary_publications.len;
             };
             if (empty) self.stats.empty_hits += 1;
             self.stats.hits += 1;
