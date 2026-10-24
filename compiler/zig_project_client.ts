@@ -38,7 +38,7 @@ export type {
 } from "./native_assets.ts";
 
 export const maxFrameBytes = 64 * 1024 * 1024;
-const maxMetadataBytes = 1024 * 1024;
+const maxMetadataBytes = 16 * 1024 * 1024;
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export type ZigProjectStats = { [key: string]: Json };
 export interface ZigProjectBuildStats extends ZigProjectStats {
@@ -110,6 +110,8 @@ export interface ZigProjectCompilerOptions {
   profileBackend?: boolean;
   /** Collect bounded source-site demand lowering decisions. */
   explainDemands?: boolean;
+  /** Collect bounded allocation sites and array ownership decisions. */
+  explainAllocations?: boolean;
   /** Development skips optional scalar/vector passes; checking and cleanup remain. */
   codegenTier?: "optimized" | "development";
   /** Prototype: share identical internal machine bodies while keeping table slots. */
@@ -586,6 +588,14 @@ class ProjectProcess implements ZigProjectCompiler {
           ) {
             throw new ZigProjectProtocolError(
               "Compiler does not support native assets",
+            );
+          }
+          if (
+            open.explainAllocations === true &&
+            !capabilities.includes("allocation-explanations-v1")
+          ) {
+            throw new ZigProjectProtocolError(
+              "Compiler does not support allocation explanations",
             );
           }
           if (checkpoint && !this.#checkpoints) {
@@ -1116,6 +1126,7 @@ export async function createZigProjectCompiler(
     "dependencies",
     "profileBackend",
     "explainDemands",
+    "explainAllocations",
     "codegenTier",
     "shareMachineCode",
     "codegenWorkers",
@@ -1154,6 +1165,12 @@ export async function createZigProjectCompiler(
     typeof options.profileBackend !== "boolean"
   ) {
     throw new TypeError("profileBackend must be a boolean");
+  }
+  if (
+    options.explainAllocations !== undefined &&
+    typeof options.explainAllocations !== "boolean"
+  ) {
+    throw new TypeError("explainAllocations must be a boolean");
   }
   if (
     options.explainDemands !== undefined &&
@@ -1209,6 +1226,7 @@ export async function createZigProjectCompiler(
     ...(checkpoint ? { checkpoint: true } : {}),
     ...(options.profileBackend ? { profileBackend: true } : {}),
     ...(options.explainDemands ? { explainDemands: true } : {}),
+    ...(options.explainAllocations ? { explainAllocations: true } : {}),
     ...(options.codegenTier ? { codegenTier: options.codegenTier } : {}),
     ...(options.shareMachineCode ? { shareMachineCode: true } : {}),
     ...(options.codegenWorkers
@@ -1234,7 +1252,7 @@ export async function createZigProjectCompiler(
       JSON.stringify({ kind: "open", id: 1, version: 1, ...open }),
     )
       .length > maxMetadataBytes
-  ) throw new RangeError("Open metadata exceeds 1 MiB");
+  ) throw new RangeError("Open metadata exceeds 16 MiB");
   const cacheEnvironment: Record<string, string> = {};
   if (options.cacheDirectory !== undefined) {
     cacheEnvironment.BLOT_CACHE_DIR = options.cacheDirectory === false

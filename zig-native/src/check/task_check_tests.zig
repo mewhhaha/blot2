@@ -449,3 +449,50 @@ test "structured task named region helper preserves every failed allocation" {
     try namedRegionHelper(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, namedRegionHelper, .{});
 }
+
+fn dollarTaskScope(allocator: std.mem.Allocator) !void {
+    try law(allocator,
+        \\const scope = fn body => @task.scope body
+        \\const identity = fn value => value
+        \\entry const control = fn () => scope (fn outer => do:
+        \\  let first = *(identity 20)
+        \\  let second = scope (fn inner => do:
+        \\    let pending = *(identity 22)
+        \\    break |pending|)
+        \\  break @u32.add (|first|) second)
+    , null);
+    try law(allocator,
+        \\const identity = fn value => value
+        \\entry const answer = fn () => @task.scope $ fn group => do:
+        \\  let first = @task.spawn group $ fn () => 20
+        \\  let second = *(identity 22)
+        \\  let (a, b) = |(first, second)|
+        \\  break @u32.add a b
+    , null);
+    try law(allocator,
+        \\const scope = fn body => @task.scope body
+        \\const identity = fn value => value
+        \\entry const answer = fn () => scope $ fn outer => do:
+        \\  let first = *(identity 20)
+        \\  let second = scope $ fn inner => do:
+        \\    let pending = *(identity 22)
+        \\    break |pending|
+        \\  break @u32.add (|first|) second
+    , null);
+    try law(allocator, "entry const escaped = fn () => @task.scope $ fn group => group", .task_escape);
+    try law(allocator,
+        \\const identity = fn value => value
+        \\entry const escaped = fn () => @task.scope $ fn group => *(identity 42)
+    , .task_escape);
+    try law(allocator,
+        \\entry const doubled = fn () => @task.scope $ fn group => do:
+        \\  let pending = @task.spawn group $ fn () => 42
+        \\  let first = |pending|
+        \\  break @u32.add first (|pending|)
+    , .task_handle_consumed);
+}
+
+test "dollar application preserves task scope and ownership through OOM" {
+    try dollarTaskScope(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, dollarTaskScope, .{});
+}

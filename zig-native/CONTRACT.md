@@ -845,6 +845,12 @@ order, fixity and written evaluation order. Grammar keywords `froM`/`wherE` are
 private frontend markers; source accepts contextual `from`/`where` without
 reserving them everywhere.
 
+The default `$` parses to ordinary application at precedence zero, right
+associative. It does not route through a generic helper: primitive arity,
+scoped callbacks, demands and ownership therefore use the parenthesized call
+path. An explicit local or inherited `$` fixity still selects ordinary binary
+operator dispatch. The prelude does not override this default.
+
 Spark expansion retains an unbound `task_region` leaf until checking. It has no
 source spelling and resolves to the exact active task-scope parameter, including
 under local shadowing. Ordinary nested lambdas do not inherit that permission.

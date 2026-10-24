@@ -159,7 +159,7 @@ while (true) {
       data.setUint32(
         0,
         mode === "oversized-metadata"
-          ? 1048577
+          ? 16777217
           : mode === "truncated-metadata"
           ? 99
           : mode === "invalid-utf8"

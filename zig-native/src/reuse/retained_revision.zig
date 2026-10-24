@@ -30,6 +30,8 @@ const CachedOutput = struct {
     output_identity: ?[]u8 = null,
     bytes: []u8 = &.{},
     demand_lowering: ?@import("../backend/demand_lowering.zig").Snapshot = null,
+    allocation_emission: ?@import("../backend/allocation_emission.zig").Snapshot = null,
+    array_costs: ?@import("../backend/array_cost_explanation.zig").Snapshot = null,
     source_bytes: usize,
     modules: usize,
     policy: OutputPolicy,
@@ -42,6 +44,14 @@ const CachedOutput = struct {
             const copied = try report.clone(a);
             cached.demand_lowering = copied;
         }
+        if (result.result.compiled.allocation_emission) |report| {
+            const copied = try report.clone(a);
+            cached.allocation_emission = copied;
+        }
+        if (result.array_costs) |report| {
+            const copied = try report.clone(a);
+            cached.array_costs = copied;
+        }
         return cached;
     }
     fn deinit(self: *CachedOutput, a: Allocator) void {
@@ -49,9 +59,11 @@ const CachedOutput = struct {
         if (self.output_identity) |text| a.free(text);
         a.free(self.bytes);
         if (self.demand_lowering) |*report| report.deinit(a);
+        if (self.allocation_emission) |*report| report.deinit(a);
+        if (self.array_costs) |*report| report.deinit(a);
     }
-    fn matches(self: CachedOutput, entry: []const u8, identity: ?[]const u8, policy: OutputPolicy, explain_demands: bool) bool {
-        if ((self.demand_lowering != null) != explain_demands) return false;
+    fn matches(self: CachedOutput, entry: []const u8, identity: ?[]const u8, policy: OutputPolicy, explain_demands: bool, explain_allocations: bool) bool {
+        if ((self.demand_lowering != null) != explain_demands or (self.allocation_emission != null) != explain_allocations or (self.array_costs != null) != explain_allocations) return false;
         if (!std.mem.eql(u8, self.entry_request, entry) or !std.meta.eql(self.policy, policy)) return false;
         if (self.output_identity) |text| return if (identity) |other| std.mem.eql(u8, text, other) else false;
         return identity == null;
@@ -64,6 +76,14 @@ const CachedOutput = struct {
         if (self.demand_lowering) |report| {
             const copied = try report.clone(a);
             result.result.compiled.demand_lowering = copied;
+        }
+        if (self.allocation_emission) |report| {
+            const copied = try report.clone(a);
+            result.result.compiled.allocation_emission = copied;
+        }
+        if (self.array_costs) |report| {
+            const copied = try report.clone(a);
+            result.array_costs = copied;
         }
         return result;
     }
@@ -89,8 +109,8 @@ test "unchanged output owns demand explanations through result teardown and allo
             try std.testing.expectEqual(@as(usize, 3), report.omitted);
             try std.testing.expectEqual(@as(u32, 7), report.sites[0].span.start);
             try std.testing.expectEqual(@as(u64, 0), output.result.compiled.counters.demand_direct);
-            try std.testing.expect(cached.matches("main.blot", null, .{}, true));
-            try std.testing.expect(!cached.matches("main.blot", null, .{}, false));
+            try std.testing.expect(cached.matches("main.blot", null, .{}, true, false));
+            try std.testing.expect(!cached.matches("main.blot", null, .{}, false, false));
         }
     };
     try Law.run(std.testing.allocator);
@@ -351,6 +371,7 @@ pub const Session = struct {
     policy: Policy = .{},
     profile_backend: bool = false,
     explain_demands: bool = false,
+    explain_allocations: bool = false,
     checkpoint: ?@import("../backend/backend_checkpoint.zig").Checkpoint = null,
     /// Released when a compiled revision commits.
     restored: ?Restored = null,
@@ -408,7 +429,7 @@ pub const Session = struct {
         const current = &(self.current orelse return null);
         const output = current.output orelse return null;
         const prepared = &current.prepared;
-        if (output.demand_lowering != null or prepared.entry == 0 or prepared.entry > prepared.paths.len) return null;
+        if (output.demand_lowering != null or output.allocation_emission != null or prepared.entry == 0 or prepared.entry > prepared.paths.len) return null;
         const observed = try inputs.Persisted.capture(a, current.snapshot.view()) orelse return null;
         defer inputs.Persisted.releaseWire(a, observed);
         return try Restored.encodeWire(a, compiler, .{
@@ -462,7 +483,7 @@ pub const Session = struct {
         var snapshot = try inputs.Snapshot.initWithSources(a, io, options, sources);
         defer snapshot.deinit();
         const settings_key = settings(snapshot.options);
-        if (!std.mem.eql(u8, &restored.settings, &settings_key) or !restored.output.matches(entry_path, output_identity, self.policy, self.explain_demands)) return null;
+        if (!std.mem.eql(u8, &restored.settings, &settings_key) or !restored.output.matches(entry_path, output_identity, self.policy, self.explain_demands, self.explain_allocations)) return null;
         if (!try snapshot.entryPathEqualsPrevious(io, entry_path, restored.entry_canonical) or !try snapshot.equalsPrevious(io, restored.inputs.view())) return null;
         var emission = try restored.output.emission(a);
         errdefer emission.deinit(a);
@@ -897,11 +918,11 @@ pub const Session = struct {
             // tokens and adjacency) parses to the same program, so the last
             // output stands and the retained state is kept; later edits diff
             // against the last compiled sources. Settings must be unchanged.
-            const reusable = std.mem.eql(u8, &self.seed_settings, &settings_key) and output.matches(entry_path, output_identity, self.policy, self.explain_demands) and try snapshot.entryPathEqualsPrevious(io, entry_path, current.prepared.paths[current.prepared.entry - 1]);
+            const reusable = std.mem.eql(u8, &self.seed_settings, &settings_key) and output.matches(entry_path, output_identity, self.policy, self.explain_demands, self.explain_allocations) and try snapshot.entryPathEqualsPrevious(io, entry_path, current.prepared.paths[current.prepared.entry - 1]);
             const exact = reusable and admitted and try snapshot.entryEqualsPrevious(io, entry_path, current.prepared.paths[current.prepared.entry - 1], current.snapshot.view()) and try snapshot.equalsPrevious(io, current.snapshot.view());
             // Explained spans belong to the actual source bytes. Recompute
             // them after trivia changes rather than publishing old offsets.
-            if (exact or (!self.explain_demands and reusable and try snapshot.triviaEqualsPrevious(io, current.snapshot.view()))) {
+            if (exact or (!self.explain_demands and !self.explain_allocations and reusable and try snapshot.triviaEqualsPrevious(io, current.snapshot.view()))) {
                 var emission = try output.emission(a);
                 errdefer emission.deinit(a);
                 const candidate = try a.create(Candidate);
@@ -963,6 +984,7 @@ pub const Session = struct {
                         .io = io,
                         .profile_backend = self.profile_backend,
                         .explain_demands = self.explain_demands,
+                        .explain_allocations = self.explain_allocations,
                         .checkpoint = if (self.checkpoint) |*checkpoint| checkpoint else null,
                         .policy = self.policy,
                         .retain_artifacts = true,
@@ -1022,3 +1044,33 @@ pub const Session = struct {
         }
     }
 };
+
+test "unchanged output owns allocation explanations across teardown and OOM" {
+    const Law = struct {
+        fn run(a: Allocator) !void {
+            const AllocSite = @import("../backend/allocation_emission.zig").Site;
+            const ArraySite = @import("../backend/array_cost_explanation.zig").Site;
+            var original: partial.Result = .{ .result = .{ .compiled = .{ .bytes = try a.dupe(u8, "wasm") }, .stats = .{ .syntax_nodes = 0, .body_elaborations = 0, .body_lowerings = 0, .imported_schemes = 0 } } };
+            var original_alive = true;
+            defer if (original_alive) original.deinit(a);
+            const allocation_sites = try a.dupe(AllocSite, &.{.{ .unit = 1, .span = .{ .start = 7, .end = 9 }, .kind = .array_storage, .requested_bytes = 32 }});
+            original.result.compiled.allocation_emission = .{ .sites = allocation_sites, .omitted = 3 };
+            const array_sites = try a.dupe(ArraySite, &.{.{ .unit = 1, .span = .{ .start = 10, .end = 12 }, .decision = .reused }});
+            original.array_costs = .{ .sites = array_sites, .omitted = 4 };
+            var cached = try CachedOutput.init(a, "main.blot", null, &original, 1, .{});
+            defer cached.deinit(a);
+            original.deinit(a);
+            original_alive = false;
+            var output = try cached.emission(a);
+            defer output.deinit(a);
+            try std.testing.expectEqual(@as(?u32, 32), output.result.compiled.allocation_emission.?.sites[0].requested_bytes);
+            try std.testing.expectEqual(@as(usize, 3), output.result.compiled.allocation_emission.?.omitted);
+            try std.testing.expectEqual(@as(usize, 4), output.array_costs.?.omitted);
+            try std.testing.expectEqual(@as(u32, 10), output.array_costs.?.sites[0].span.start);
+            try std.testing.expect(cached.matches("main.blot", null, .{}, false, true));
+            try std.testing.expect(!cached.matches("main.blot", null, .{}, false, false));
+        }
+    };
+    try Law.run(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, Law.run, .{});
+}

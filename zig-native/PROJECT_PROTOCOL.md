@@ -61,7 +61,7 @@ Every message, in either direction, is one frame:
 | 8..8+M     | metadata: one JSON object, UTF-8                                  |
 | 8+M..8+M+P | payload: raw bytes (sources/assets, Wasm/resources or checkpoint) |
 
-- `M` is from 1 to 1,048,576, and `8 + M + P` is at most 67,108,864
+- `M` is from 1 to 16,777,216, and `8 + M + P` is at most 67,108,864
   (`maxFrameBytes`).
 - Lengths are checked before anything is allocated.
 - End of input is allowed only between frames; a partial header or body is an
@@ -314,6 +314,18 @@ the revision.
 recording attempts. Sites carry filename/truncation, unit, UTF8 byte span,
 lowering and reason. Reporting preserves executable bytes. See
 [DEMANDS.md](DEMANDS.md) for the decisions, bounds and retained span behavior.
+
+`explainAllocations: true` requires the advertised `allocation-explanations-v1`
+capability. It enables `allocationSites` and `arrayCosts` in successful build
+stats; both are null by default and otherwise contain `{sites, omitted}`.
+Each report is bounded to 16,384 sites with UTF8 source spans and filename
+truncation flags. The first reports emitted allocation calls, requested bytes
+when statically known, and emission counts. The second reports array edits as
+`reuse_eligible` or `copy_required` with the ownership proof's reason. These
+are compiler decisions before final optimization, not measured allocation
+traffic, live memory, or a recommended heap budget. Native asset projects use
+the same interface. Cached replies own their reports; trivia changes refresh
+source spans. Explained outputs are not persisted in the restart output cache.
 
 `phaseProfile` is empty unless the session opened with `profileBackend`. A
 profiled build reports `total_us`, the process's `peak_rss_kib` and exclusive

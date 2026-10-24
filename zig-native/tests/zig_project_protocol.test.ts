@@ -92,7 +92,7 @@ async function host() {
     const view = new DataView(bytes.buffer);
     const metadataLength = view.getUint32(0, true);
     const payloadLength = view.getUint32(4, true);
-    ok(metadataLength > 0 && metadataLength <= 1048576);
+    ok(metadataLength > 0 && metadataLength <= 16777216);
     ok(8 + metadataLength + payloadLength <= 67108864);
     const metadata = JSON.parse(decoder.decode(await exact(metadataLength)));
     object(metadata);
@@ -128,6 +128,7 @@ async function host() {
     "backend-checkpoints",
     "native-assets-v1",
     "editor-completion-v1",
+    "allocation-explanations-v1",
   ]);
   return {
     entry,
@@ -268,6 +269,8 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
     fields(built.metadata.stats, [
       "nativeWorkSteps",
       "demandLowering",
+      "allocationSites",
+      "arrayCosts",
       "sourceBytes",
       "freshModules",
       "cachedModules",
@@ -845,7 +848,7 @@ const invalid: {
   {
     name: "oversized metadata",
     error: "FrameTooLarge",
-    bytes: () => header(1048577),
+    bytes: () => header(16777217),
   },
   {
     name: "oversized frame",

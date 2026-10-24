@@ -403,8 +403,12 @@ entry const conditional = fn () => do:
 Default precedence, weakest first: `$` (0), `|>` (5), `||` (20), `&&` (25),
 comparisons `== != < <= > >=` (30), bitwise `|` (40), `^` (45), `&` (50), shifts
 `<< >>` (55), `+ -` (60), `* / %` (70), then application. `$`, `&&`, and `||`
-associate right; comparisons are non-associative; the others associate left.
-`f $ g x` means `f (g x)` and does not delay evaluation. Backticks call ordinary
+associate right; comparisons are non-associative; the others associate left. The
+default `f $ g x` is application syntax for `f (g x)`, with identical
+evaluation, demand and scoped-callback checks. It works without the prelude,
+including `@task.scope $ fn group => do:` and
+`@task.spawn group $ fn () => ...`. An explicit fixity declaration for `$`
+overrides this default with an ordinary operator call. Backticks call ordinary
 functions infix. Declare custom fixities before other declarations:
 `infixl 60 (++) = combine`, `infixr 50 (**) = power`, or
 `infix 30 (~=) = close`. A backtick function can also have a fixity declaration.
@@ -1577,10 +1581,10 @@ its handle and waits for cleanup. Scope exit joins remaining children before
 releasing the group. Groups, handles and views cannot escape their region.
 
 ```blot
-entry const answer = fn () => @task.scope (fn group => do:
-  let left = @task.spawn group (fn () => 20)
-  let right = @task.spawn group (fn () => 22)
-  break @u32.add (@task.join left) (@task.join right))
+entry const answer = fn () => @task.scope $ fn group => do:
+  let left = @task.spawn group $ fn () => 20
+  let right = @task.spawn group $ fn () => 22
+  break @u32.add (@task.join left) (@task.join right)
 ```
 
 Within a checked task-scope callback, `*(function argument)` sparks a
@@ -1597,9 +1601,9 @@ in the child. Effectful arguments must be bound explicitly before sparking.
 
 ```blot
 const add22 = fn value => @u32.add value 22
-entry const answer = fn () => @task.scope (fn group => do:
+entry const answer = fn () => @task.scope $ fn group => do:
   let pending = *(add22 20)
-  return |pending|)
+  return |pending|
 ```
 
 An ordinary scope wrapper may expose the primitive without adding syntax:
@@ -1607,9 +1611,9 @@ An ordinary scope wrapper may expose the primitive without adding syntax:
 ```blot
 const scope = fn body => @task.scope body
 const add22 = fn value => @u32.add value 22
-entry const answer = fn () => scope (fn group => do:
+entry const answer = fn () => scope $ fn group => do:
   let pending = *(add22 20)
-  return |pending|)
+  return |pending|
 ```
 
 The callback accepts every fresh group region, and its result and effects must
@@ -1621,10 +1625,10 @@ An explicit spawn helper can forward the selected group and one action:
 
 ```blot
 const launch = fn group => fn action => @task.spawn group action
-entry const answer = fn () => scope (fn group => do:
+entry const answer = fn () => scope $ fn group => do:
   let here = launch group
-  let pending = here (fn () => 42)
-  return |pending|)
+  let pending = here $ fn () => 42
+  return |pending|
 ```
 
 Direct aliases, renamed imports and stored partial calls preserve this exact
@@ -1639,9 +1643,9 @@ or renamed binding:
 ```blot
 const add22 = fn value => @u32.add value 22
 const await = fn source => |source|
-entry const answer = fn () => @task.scope (fn group => do:
+entry const answer = fn () => @task.scope $ fn group => do:
   let pending = *(add22 20)
-  return await pending)
+  return await pending
 ```
 
 The helper consumes the same affine handle as direct `|pending|` and returns the
@@ -1657,12 +1661,12 @@ not recursively interpret payload values as more receivers.
 
 ```blot
 const await = fn source => |source|
-entry const answer = fn () => @task.scope (fn group => do:
-  let first = @task.spawn group (fn () => 20)
-  let second = @task.spawn group (fn () => 22)
+entry const answer = fn () => @task.scope $ fn group => do:
+  let first = @task.spawn group $ fn () => 20
+  let second = @task.spawn group $ fn () => 22
   let receivers = (first, second)
   let (left, right) = await receivers
-  return @u32.add left right)
+  return @u32.add left right
 ```
 
 An inferred generic receiver helper must be a direct receive or an alias of one.

@@ -15,6 +15,20 @@ const relay = fn body => scope body
 const wrap = fn () => fn body => scope body
 const identity = fn value => value
 const curried = identity (wrap ())
+entry const dollar_scope = fn () => @task.scope $ fn group => do:
+  let left = @task.spawn group $ fn () => 20
+  let right = *(add22 0)
+  let (a, b) = |(left, right)|
+  return @u32.add a b
+entry const dollar_wrapper = fn () => region $ fn group => do:
+  let pending = *(add22 20)
+  return |pending|
+entry const dollar_nested = fn () => @task.scope $ fn outer => do:
+  let left = *(add22 0)
+  let right = region $ fn inner => do:
+    let pending = *(add22 20)
+    return |pending|
+  return @u32.add (|left|) right
 entry const answer = fn () => @task.scope (fn group => do:
   let left = *(add22 20)
   let right = @task.spawn group (fn () => 0)
@@ -108,6 +122,9 @@ Deno.test("spark and receive use explicit task scopes in both tiers", async () =
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(build.bytes, { asynchronous });
           try {
+            for (const [entry, expected] of [["dollar_scope", 42], ["dollar_wrapper", 42], ["dollar_nested", 64]] as const) {
+              assert.equal(asynchronous ? await guest.callAsync(entry, null) : guest.call(entry, null), expected);
+            }
             if (asynchronous) {
               assert.equal(await guest.callAsync("answer", null), 42);
               assert.equal(await guest.callAsync("branch", true), 42);

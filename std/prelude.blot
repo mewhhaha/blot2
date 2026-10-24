@@ -1,6 +1,5 @@
 // The bootstrap prelude is ordinary Blot source. @u32.* and @f32.* are primitives.
 // Operators use ordinary functions with compile-time associated dispatch.
-infixr 0 ($) = apply
 infixr 20 (||) = or
 infixr 25 (&&) = and
 infixl 5 (|>) = pipe

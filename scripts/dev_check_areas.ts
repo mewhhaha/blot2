@@ -25,6 +25,7 @@ export const devCheckAreas = {
     guests: [
       "compiler/task_runtime.test.ts",
       "zig-native/tests/task_surface_execution.test.ts",
+      "zig-native/tests/allocation_project_execution.test.ts",
       "zig-native/tests/task_execution.test.ts",
     ],
     guestFilters: {} as Record<string, string>,
@@ -108,6 +109,9 @@ export const devCheckAreas = {
     "description":
       "Lexer/parser structure, recovery, immutable trees and allocation ownership.",
     "native": [
+      "parse.parser_tests.test.default dollar groups application while explicit fixities retain operator dispatch through OOM",
+      "check.task_check_tests.test.dollar application preserves task scope and ownership through OOM",
+      "reuse.retained_revision.test.unchanged output owns allocation explanations across teardown and OOM",
       "parse.lexer_tests.test.flat tokens preserve longest matches and source byte spans",
       "parse.lexer_tests.test.invalid layout, private markers, strings and Unicode report diagnostics",
       "parse.lexer_tests.test.all lexer allocation failures release tokens, trivia and scratch",
@@ -120,6 +124,8 @@ export const devCheckAreas = {
     ],
     "guests": [
       "compiler/syntax.test.ts",
+      "zig-native/tests/task_surface_execution.test.ts",
+      "zig-native/tests/dollar_application_execution.test.ts",
       "zig-native/tests/annotation_arity_execution.test.ts",
     ],
     "guestFilters": {} as Record<string, string>,

@@ -2,7 +2,7 @@
 //! Bounds are checked before allocating or touching compiler revision state.
 const std = @import("std");
 pub const max_frame_bytes: usize = 64 * 1024 * 1024;
-pub const max_metadata_bytes: usize = 1024 * 1024;
+pub const max_metadata_bytes: usize = 16 * 1024 * 1024;
 pub const max_revision: u64 = (1 << 53) - 1;
 
 pub const RequestFrame = struct {

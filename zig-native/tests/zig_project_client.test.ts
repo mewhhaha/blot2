@@ -260,6 +260,8 @@ Deno.test("Zig project client keeps lexical alias roots through retargeting and 
         executable,
         entry,
         prelude: null,
+        // This law measures explicit dependency admission, not restart reuse.
+        cacheDirectory: false,
         imports: { "lib/": link },
       };
     const identity = await verified(directory);

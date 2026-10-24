@@ -5,7 +5,8 @@ const core = @import("../check/core.zig");
 const wasm = @import("wasm.zig");
 const identity = @import("runtime_identity.zig");
 
-pub const max_sites = 256;
+// Keep reports bounded while covering a complete asset-heavy application.
+pub const max_sites = 16384;
 pub const Kind = enum { closure_storage, constructor_storage, aggregate_storage, boxed_constant, call_materialization, array_storage, other_materialization };
 pub const Site = struct {
     filename: [160]u8 = @splat(0),
@@ -33,6 +34,9 @@ pub const Site = struct {
 pub const Snapshot = struct {
     sites: []Site = &.{},
     omitted: usize = 0,
+    pub fn clone(self: Snapshot, allocator: std.mem.Allocator) std.mem.Allocator.Error!Snapshot {
+        return .{ .sites = try allocator.dupe(Site, self.sites), .omitted = self.omitted };
+    }
     pub fn deinit(self: *Snapshot, allocator: std.mem.Allocator) void {
         allocator.free(self.sites);
         self.* = .{};

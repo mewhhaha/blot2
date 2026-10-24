@@ -10,7 +10,7 @@ const Tag = token.Tag;
 const Error = std.mem.Allocator.Error || error{Syntax};
 const Fixity = struct { symbol: symbols.Symbol, precedence: u32, association: u32, named: bool, inherited: bool = false };
 pub const InheritedFixity = struct { operator: symbols.Symbol, precedence: u32, association: u32, named: bool };
-const Operator = struct { symbol: symbols.Symbol, precedence: u32, association: u32, span: ast.Span, known: bool, named: bool };
+const Operator = struct { symbol: symbols.Symbol, precedence: u32, association: u32, span: ast.Span, known: bool, named: bool, application: bool = false };
 
 pub fn parse(allocator: std.mem.Allocator, source: []const u8, tokens: []const token.Token, pool: *symbols.Pool) std.mem.Allocator.Error!ast.Tree {
     return parseWithFixities(allocator, source, tokens, pool, &.{});
@@ -905,6 +905,12 @@ const Parser = struct {
             break :blk value;
         } else try self.intern(self.text(t));
         const found = self.lookupFixity(symbol, named);
+        // The default dollar is a grouping form, not a higher-order apply.
+        // Keep primitive arity, scoped callbacks and demand checking on the
+        // exact same application tree as `f (argument)`. An explicit fixity
+        // still selects the caller's ordinary operator implementation.
+        if (found == null and !named and std.mem.eql(u8, self.pool.get(symbol), "$"))
+            return .{ .symbol = symbol, .precedence = 0, .association = 1, .known = true, .named = false, .application = true, .span = span };
         return .{ .symbol = symbol, .precedence = if (found) |f| f.precedence else 0, .association = if (found) |f| f.association else 0, .known = found != null, .named = named, .span = span };
     }
     fn infix(self: *Parser) Error!Id {
@@ -963,9 +969,13 @@ const Parser = struct {
     fn reduce(self: *Parser, values: *std.ArrayList(Id), op: Operator) Error!void {
         const rhs = values.pop().?;
         const lhs = values.pop().?;
-        const id = try self.add(.binary, op.symbol, lhs, rhs, self.tree.span(lhs).start);
+        const id = if (op.application) grouped: {
+            const argument = try self.add(.group, rhs, 0, 0, self.tree.span(rhs).start);
+            self.tree.spans.items[argument].end = self.tree.span(rhs).end;
+            break :grouped try self.add(.apply, lhs, argument, 0, self.tree.span(lhs).start);
+        } else try self.add(.binary, op.symbol, lhs, rhs, self.tree.span(lhs).start);
         self.tree.spans.items[id].end = self.tree.span(rhs).end;
-        try self.tree.operator_origins.append(self.allocator, .{ .node = id, .span = op.span });
+        if (!op.application) try self.tree.operator_origins.append(self.allocator, .{ .node = id, .span = op.span });
         try values.append(self.allocator, id);
     }
     fn prefix(self: *Parser) Error!Id {

@@ -5,7 +5,8 @@ const std = @import("std");
 const core = @import("../check/core.zig");
 const owned = @import("owned_arrays.zig");
 
-pub const max_sites = 256;
+// Keep reports bounded while covering a complete asset-heavy application.
+pub const max_sites = 16384;
 pub const Site = struct {
     filename: [160]u8 = @splat(0),
     filename_len: u8 = 0,
@@ -29,6 +30,9 @@ pub const Site = struct {
 pub const Snapshot = struct {
     sites: []Site = &.{},
     omitted: usize = 0,
+    pub fn clone(self: Snapshot, allocator: std.mem.Allocator) std.mem.Allocator.Error!Snapshot {
+        return .{ .sites = try allocator.dupe(Site, self.sites), .omitted = self.omitted };
+    }
     pub fn deinit(self: *Snapshot, allocator: std.mem.Allocator) void {
         allocator.free(self.sites);
         self.* = .{};

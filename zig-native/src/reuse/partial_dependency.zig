@@ -19,6 +19,7 @@ const entry_cutoff = @import("entry_frontend_cutoff.zig");
 const parallel_lowering = @import("../check/parallel_lowering.zig");
 
 pub const Result = struct {
+    array_costs: ?@import("../backend/array_cost_explanation.zig").Snapshot = null,
     result: consumer.Result,
     diagnostic_filename: ?[]u8 = null,
     related_filename: ?[]u8 = null,
@@ -32,6 +33,7 @@ pub const Result = struct {
     portable: bool = false,
     pub fn deinit(self: *Result, a: Allocator) void {
         self.result.deinit(a);
+        if (self.array_costs) |*report| report.deinit(a);
         if (self.diagnostic_filename) |path| a.free(path);
         if (self.related_filename) |path| a.free(path);
         self.origins.deinit(a);
@@ -138,6 +140,8 @@ pub const Prepared = struct {
         actual.diagnostic_source_mode = self.source_mode;
         var compiled = try backend.compileWithOptions(a, self.units, self.entry, actual);
         errdefer compiled.deinit(a);
+        var array_costs: ?@import("../backend/array_cost_explanation.zig").Snapshot = if (options.explain_allocations) try @import("../backend/array_cost_explanation.zig").analyze(a, self.units, self.paths, self.entry, self.prelude) else null;
+        errdefer if (array_costs) |*report| report.deinit(a);
         var filename: ?[]u8 = null;
         errdefer if (filename) |path| a.free(path);
         var related_filename: ?[]u8 = null;
@@ -153,7 +157,7 @@ pub const Prepared = struct {
                 related_filename = try a.dupe(u8, self.paths[location.unit - 1]);
             }
         }
-        return .{ .result = .{ .compiled = compiled, .stats = self.stats }, .diagnostic_filename = filename, .related_filename = related_filename, .origins = origins, .source_bytes = self.source_bytes, .fresh_modules = self.units.len - self.cachedCount(), .cached_modules = self.cachedCount() };
+        return .{ .array_costs = array_costs, .result = .{ .compiled = compiled, .stats = self.stats }, .diagnostic_filename = filename, .related_filename = related_filename, .origins = origins, .source_bytes = self.source_bytes, .fresh_modules = self.units.len - self.cachedCount(), .cached_modules = self.cachedCount() };
     }
 };
 

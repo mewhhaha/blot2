@@ -685,3 +685,25 @@ test "quantified packages retain sorted binders evidence and exact lexical openi
         try std.testing.expect(tree.diagnostics.items.len != 0);
     }
 }
+
+fn dollarApplication(allocator: std.mem.Allocator) !void {
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parsed(allocator, "const answer = outer first $ inner $ value\n", &pool);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    const root = tree.node(tree.valueDecl(tree.roots.items[0]).body);
+    try std.testing.expectEqual(ast.Tag.apply, root.tag);
+    try std.testing.expectEqual(ast.Tag.apply, tree.node(root.a).tag);
+    try std.testing.expectEqual(ast.Tag.group, tree.node(root.b).tag);
+    try std.testing.expectEqual(ast.Tag.apply, tree.node(tree.node(root.b).a).tag);
+    var custom = try parsed(allocator, "infixr 0 ($) = choose\nconst choose = fn a b => a\nconst answer = 1 $ 2\n", &pool);
+    defer custom.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), custom.diagnostics.items.len);
+    try std.testing.expectEqual(ast.Tag.binary, custom.node(custom.valueDecl(custom.roots.items[2]).body).tag);
+}
+
+test "default dollar groups application while explicit fixities retain operator dispatch through OOM" {
+    try dollarApplication(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, dollarApplication, .{});
+}

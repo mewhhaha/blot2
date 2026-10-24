@@ -25,7 +25,9 @@ test "Zig project frame limits count both payload and header before allocation" 
     try std.testing.expectError(error.FrameTooLarge, checkLengths(max_metadata_bytes, max_frame_bytes - 7 - max_metadata_bytes));
     try std.testing.expectError(error.FrameTooLarge, checkLengths(max_metadata_bytes + 1, 0));
     try std.testing.expectError(error.FrameTooLarge, checkLengths(0, 0));
-    var over = std.Io.Reader.fixed(&.{ 1, 0, 16, 0, 0, 0, 0, 0 });
+    var over_header: [8]u8 = @splat(0);
+    std.mem.writeInt(u32, over_header[0..4], @intCast(max_metadata_bytes + 1), .little);
+    var over = std.Io.Reader.fixed(&over_header);
     try std.testing.expectError(error.FrameTooLarge, readRequest(std.testing.failing_allocator, &over));
     var payload = std.Io.Reader.fixed(&.{ 2, 0, 0, 0, 1, 0, 0, 0 });
     try std.testing.expectError(error.RequestPayloadUnsupported, readRequest(std.testing.failing_allocator, &payload));
