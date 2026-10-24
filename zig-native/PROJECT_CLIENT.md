@@ -144,6 +144,22 @@ completed-summary outputs separately. Summary memo judgments do not become
 global validated-call proofs. The legacy `projected_empty_declines` name remains
 the total for all projected-query declines, including nonempty results.
 
+`stats.principals.source_declines` reports up to eight first failed source
+observations, with target/source unit and binding IDs and an exact decline reason.
+Unused slots have reason `none`; module-image observations use source binding
+zero. These diagnostics do not decide admission. Frontend cutoff statistics also
+report the first mismatching unit, changed interface-field bit mask, binding
+counts, remaining correspondence budget and comparison progress.
+
+`stats.workCounters.normalization` counts region-solver row requests, closed and
+epoch cache hits, argument rows/labels/arguments inspected, changed rows, fallback
+certificate evictions and operation-interner requests/candidates/argument tests.
+These are work counts, not elapsed time or cache hardware events; frontend type
+stores are excluded. `lexical_region_candidates` records the candidate volume of
+the former whole-region variable scan, while `lexical_scope_candidates` counts
+visits through the source-scope index. Their difference is avoided scan work,
+not a measured speedup percentage.
+
 The CLI and native project server automatically persist restart candidates under
 `$XDG_CACHE_HOME/blot` or `$HOME/.cache/blot` on Linux,
 `$HOME/Library/Caches/blot` on macOS, and `%LOCALAPPDATA%/Blot` on Windows.

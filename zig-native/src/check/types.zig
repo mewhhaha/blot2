@@ -103,6 +103,7 @@ const ProjectionResolution = struct { root: Id, at: Cursor, depth: u32 };
 const OperationKey = struct { identity: NominalIdentity, instance: NominalIdentity, arity: u32 };
 const OperationChain = struct { first: Effects.Label, last: Effects.Label };
 const OperationLink = struct { next: Effects.Label = none, previous: Effects.Label = none };
+const RowCertificate = struct { generation: u16 = 0, argument_height: u8 = 0, has_arguments: bool = false };
 const ClosedRow = struct {
     row: Effects.Id = 0,
     generation: u16 = 0,
@@ -124,6 +125,10 @@ pub const Store = struct {
     // changes; both clocks prevent recycled IDs from reviving old proofs.
     use_closed_rows: bool = true,
     closed_rows: [4]ClosedRow = @splat(.{}),
+    // Dense, solver-owned positive certificates avoid collision-driven walks
+    // on large rows. Growth happens only at the fallible resolver boundary;
+    // infallible construction can still use the tiny inline fallback.
+    closed_row_index: std.ArrayList(RowCertificate) = .empty,
     use_operation_rows: bool = true,
     operation_rows: [64]OperationRow = @splat(.{}),
     has_usage_types: bool = false,
@@ -148,6 +153,7 @@ pub const Store = struct {
     /// Deterministic work counter: type nodes visited by occurs checks. It is
     /// never rolled back or consulted by solving, so pooled stores accumulate.
     occurs_steps: u64 = 0,
+    normalization: @import("../work_counters.zig").Normalization = .{},
     /// Test-only normalizer visits, independent of cache admission and rollback.
     resolution_steps: u64 = 0,
     occurs_seen: std.ArrayList(u32) = .empty,
@@ -201,6 +207,7 @@ pub const Store = struct {
         self.associated_equations.deinit(self.allocator);
         self.composites.deinit(self.allocator);
         self.occurs_seen.deinit(self.allocator);
+        self.closed_row_index.deinit(self.allocator);
         self.effects.deinit();
         self.operations.deinit(self.allocator);
         self.operation_chains.deinit(self.allocator);
@@ -265,12 +272,21 @@ pub const Store = struct {
         // Both synchronizeClosedGraphs and rollback advance the generation
         // before adopting a changed physical epoch; old entries cannot revive.
         if (!self.use_closed_rows or !self.use_closed_graphs or self.closed_generation == std.math.maxInt(u16) or self.effects.physical_epoch == std.math.maxInt(u64) or self.closed_effect_physical_epoch != self.effects.physical_epoch) return null;
-        const value = self.closed_rows[id % self.closed_rows.len];
+        const value: ClosedRow = if (id < self.closed_row_index.items.len) value: {
+            const proof = self.closed_row_index.items[id];
+            break :value .{ .row = id, .generation = proof.generation, .argument_height = proof.argument_height, .has_arguments = proof.has_arguments };
+        } else self.closed_rows[id % self.closed_rows.len];
         return if (value.row == id and value.generation == self.closed_generation) value else null;
     }
     fn saveClosedRow(self: *Store, id: Effects.Id, height: u8, has_arguments: bool) void {
         if (!self.use_closed_rows or !self.use_closed_graphs or self.closed_generation == std.math.maxInt(u16) or self.effects.physical_epoch == std.math.maxInt(u64) or self.closed_effect_physical_epoch != self.effects.physical_epoch) return;
-        self.closed_rows[id % self.closed_rows.len] = .{ .row = id, .generation = self.closed_generation, .argument_height = height, .has_arguments = has_arguments };
+        if (id < self.closed_row_index.items.len) {
+            self.closed_row_index.items[id] = .{ .generation = self.closed_generation, .argument_height = height, .has_arguments = has_arguments };
+            return;
+        }
+        const slot = &self.closed_rows[id % self.closed_rows.len];
+        if (slot.generation == self.closed_generation and slot.row != id) self.normalization.closed_row_evictions += 1;
+        slot.* = .{ .row = id, .generation = self.closed_generation, .argument_height = height, .has_arguments = has_arguments };
     }
     fn closedRowHeight(self: *Store, id: Effects.Id) u8 {
         const r = self.effects.node(id);
@@ -1264,11 +1280,22 @@ pub const Store = struct {
         return self.resolveOperationRow(effect_row, at, 0);
     }
     fn resolveOperationRow(self: *Store, root: Effects.Id, at: Cursor, depth: usize) Error!Effects.Id {
+        self.normalization.row_requests += 1;
         if (depth >= 1024) return error.TypeLimit;
         const id = self.effects.resolve(root, at) catch |err| return effectError(err);
         const row_ = self.row(id);
         if (row_.labels.len == 0) return id;
+        if (self.use_closed_rows and self.use_closed_graphs and id >= self.closed_row_index.items.len) {
+            const previous = self.closed_row_index.items.len;
+            try self.closed_row_index.resize(self.allocator, self.effects.rows.items.len);
+            @memset(self.closed_row_index.items[previous..], .{});
+            // Preserve fallback proofs already built during type construction.
+            for (self.closed_rows) |value| if (value.row >= previous and value.row < self.closed_row_index.items.len) {
+                self.closed_row_index.items[value.row] = .{ .generation = value.generation, .argument_height = value.argument_height, .has_arguments = value.has_arguments };
+            };
+        }
         if (self.closedRow(id)) |cached| {
+            self.normalization.closed_row_hits += 1;
             // No-argument operations have no argument-depth check in the
             // ordinary resolver. A row height alone cannot express that case.
             if (cached.has_arguments and depth + 1 + cached.argument_height > self.resolution_depth_limit) return error.TypeLimit;
@@ -1283,13 +1310,17 @@ pub const Store = struct {
         const slot = id % self.operation_rows.len;
         if (cacheable) {
             const saved = self.operation_rows[slot];
-            if (saved.row == id and saved.at == at and saved.depth == depth and saved.limit == self.resolution_depth_limit and saved.mutation == mutation and saved.effects == effects) return saved.result;
+            if (saved.row == id and saved.at == at and saved.depth == depth and saved.limit == self.resolution_depth_limit and saved.mutation == mutation and saved.effects == effects) {
+                self.normalization.epoch_row_hits += 1;
+                return saved.result;
+            }
         }
         const result = try self.resolveOperationArguments(id, at, depth);
         if (cacheable and self.mutation_epoch == mutation and self.effects.mutation_epoch == effects) self.operation_rows[slot] = .{ .row = id, .result = result, .at = at, .depth = depth, .limit = self.resolution_depth_limit, .mutation = mutation, .effects = effects };
         return result;
     }
     fn resolveOperationArguments(self: *Store, id: Effects.Id, at: Cursor, depth: usize) Error!Effects.Id {
+        self.normalization.argument_rows += 1;
         const row_ = self.row(id);
         // Resolving the row above already selects its chronological tail.
         // This certificate covers only immutable operation arguments: an
@@ -1304,6 +1335,8 @@ pub const Store = struct {
         for (0..row_.labels.len) |index| {
             const label = self.effects.list(row_.labels)[index];
             const operation_ = self.operation(label);
+            self.normalization.labels += 1;
+            self.normalization.arguments += operation_.arguments.len;
             var closed = operation_.instance.unit != 0 or operation_.instance.decl == 0;
             for (self.list(operation_.arguments)) |argument| {
                 has_arguments = true;
@@ -1344,6 +1377,7 @@ pub const Store = struct {
             if (all_closed) self.saveClosedRow(id, argument_height, has_arguments);
             return id;
         }
+        self.normalization.changed_rows += 1;
         return self.effects.rowAt(labels.items, row_.tail, row_.cursor) catch |err| return effectError(err);
     }
     pub fn row(self: *const Store, id: Effects.Id) Effects.Row {
@@ -1390,6 +1424,7 @@ pub const Store = struct {
         return self.internResolvedOperation(identity, instance, resolved.items, symbolic);
     }
     fn internResolvedOperation(self: *Store, identity: NominalIdentity, instance: NominalIdentity, resolved: []const Id, symbolic: bool) Error!Effects.Label {
+        self.normalization.interner_requests += 1;
         const point = self.mark();
         errdefer self.rollback(point);
         try self.linkOperations();
@@ -1398,9 +1433,14 @@ pub const Store = struct {
         if (resolved.len <= std.math.maxInt(u32)) if (self.operation_chains.get(.{ .identity = identity, .instance = instance, .arity = @intCast(resolved.len) })) |chain| {
             var index = chain.first;
             while (index != none) : (index = self.operation_links.items[index].next) {
+                self.normalization.interner_candidates += 1;
                 const old = self.list(self.operations.items[index].arguments);
                 var same = true;
-                for (old, resolved) |a, b| same = same and try self.equalGraph(a, b, symbolic);
+                for (old, resolved) |a, b| {
+                    if (!same) break;
+                    self.normalization.interner_arguments += 1;
+                    same = try self.equalGraph(a, b, symbolic);
+                }
                 if (same) return index;
             }
         };
@@ -1463,6 +1503,24 @@ pub const Store = struct {
         return self.equalGraph(left, right, true);
     }
     fn equalGraph(self: *const Store, left: Id, right: Id, symbolic: bool) Error!bool {
+        // Most operation-chain candidates disagree at the root. Avoid setting
+        // up graph traversal for those exact negatives. Projection stores keep
+        // the ordinary path because every visited pair owns budget accounting.
+        if (!self.has_projections) {
+            if (symbolic and left == right) return true;
+            const l = self.node(left);
+            const r = self.node(right);
+            if (l.tag != r.tag) return false;
+            switch (l.tag) {
+                .absent, .bound => return false,
+                .unit, .boolean, .u32, .f32, .never => return true,
+                .nominal, .instance_selection, .type_constructor => if (l.a != r.a or l.b != r.b) return false,
+                else => {},
+            }
+        }
+        return self.equalGraphWalk(left, right, symbolic);
+    }
+    fn equalGraphWalk(self: *const Store, left: Id, right: Id, symbolic: bool) Error!bool {
         var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
         const scratch_allocator = scratch.allocator();
@@ -2556,7 +2614,7 @@ const OperationIndexTests = struct {
             const old = store.list(candidate.arguments);
             if (old.len != resolved.len) continue;
             var same = true;
-            for (old, resolved) |a, b| same = same and try store.equalGraph(a, b, symbolic);
+            for (old, resolved) |a, b| same = same and try store.equalGraphWalk(a, b, symbolic);
             if (same) return @intCast(index);
         }
         return null;
@@ -2625,6 +2683,14 @@ const ClosedRowTests = struct {
             try std.testing.expectEqual(@as(u8, 3), store.closedRowHeight(row_));
             _ = try store.functionWithEffects(unit, u32_type, row_);
             for (0..3) |_| try std.testing.expectEqual(row_, try store.resolveEffects(row_, 0));
+            var many: [17]Effects.Id = undefined;
+            for (&many) |*value| {
+                value.* = try store.effects.row(&.{ label, label }, .closed);
+                _ = try store.resolveEffects(value.*, 0);
+            }
+            const visits = store.normalization.argument_rows;
+            for (many) |value| try std.testing.expectEqual(value, try store.resolveEffects(value, 0));
+            if (enabled) try std.testing.expectEqual(visits, store.normalization.argument_rows);
             store.resolution_depth_limit = 3;
             try std.testing.expectEqual(row_, try store.resolveOperationRow(row_, 0, 0));
             store.resolution_depth_limit = 2;

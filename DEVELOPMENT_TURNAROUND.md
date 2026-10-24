@@ -1,5 +1,13 @@
 # Five-minute development feedback
 
+The latest [CT105 static-sharing cycle](zig-native/CT105_QUALIFICATION.md)
+passes in 21.28 s: 3.31 s development compiler construction, 5.91 s complete
+2,555-law native compilation and 0.77 s sampled native execution, followed by
+selected guests and local analysis. The separately qualified exhaustive gate
+takes 674.30 s (625.86 s native execution). These are individual host
+observations, not paired build gains or p95. The older timings below retain
+their original regression families and conditions.
+
 The [CT96 task-family edit cycle](zig-native/CT96_QUALIFICATION.md) passes in
 14.54 s, including complete native compilation, 17 native laws, 27 guest checks
 and local analysis. Full qualification still needs 665 s of native execution on
@@ -12,9 +20,9 @@ edits take about 3.4 s, native compilation about 5.5 s, and two warm
 `check:dev --area type-effects` cycles pass in 4.71 / 4.64 s. Empty-cache Zig
 build-system initialization alone costs 56 s, so retain stable writable caches.
 Explicit incremental mode shows no useful real-edit gain in the three-cycle
-screen and regresses cache hits. The [build hills](BUILD_HILLS.md) separate cache
-initialization, edit/check cycles and exhaustive qualification; full native
-execution remains the largest gate cost at 596 s.
+screen and regresses cache hits. The [build hills](BUILD_HILLS.md) separate
+cache initialization, edit/check cycles and exhaustive qualification; full
+native execution remains the largest gate cost at 596 s.
 
 Run `deno task check:dev --area static-sharing` from the repository root. In the
 cloud environment, activate the pinned tools and avoid waiting behind a heavy
@@ -34,13 +42,13 @@ artifacts.
 
 - Compile the complete native inventory with Zig's backend, then select existing
   laws at runtime. LLVM is reserved for the actual release compiler.
-- The published static-sharing family runs 16 native laws: aggregate parity and
-  rejection, physical sharing, descriptor relocation, the positive static
-  closure replay contract, all eight operation-admission laws, and two
-  fault-policy laws.
-- Run 45 protocol, budget-recovery and selected client edit/error/recovery
-  tests. JUnit validation requires every selected file/name to actually execute
-  and pass.
+- The current static-sharing family selects 52 native laws, covering aggregate
+  parity and rejection, persistent roots, principal observations, portable
+  archives, closure replay, effect-row normalization and fault-policy behavior.
+  `--list-areas` and the run's exact selection are authoritative.
+- Run the selected protocol, budget-recovery and client edit/error/recovery
+  guest tests. JUnit validation requires every selected file/name to actually
+  execute and pass.
 - Run formatting, type checks and local Zig analysis. Broad lint changes batch
   pending files into directory scans; cache reuse still checks
   tool/configuration and transitive contents.

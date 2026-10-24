@@ -64,23 +64,29 @@ incomplete check as passed. See
 `type-effects`, `body-checking`, `numeric-aggregates` or `tasks`; each runs
 existing positive, rejection/recovery and ownership regressions plus guests.
 
-The [compile measurements](COMPILE_MEASUREMENTS.md) separate application compile
-cost from building and checking the compiler. The
-[latest inference changes](zig-native/CT103_QUALIFICATION.md) reduce retained
-gdev literal-edit CPU by **24.8%**, body-edit CPU by **4.2%** and fresh-game CPU
-by **6.1%** against `5412320` in seven alternating pairs, with identical Wasm.
-Shared-host wall medians are 7.60 / 12.46 s for literal/body edits; body wall
-time does not improve. Sub-second editing remains open. These percentages use
-the pinned measured candidate. The final release also fixes portable restart
-replay, includes `faf3f78` and passes 2,551 exhaustive native laws and 1,654
-guest checks. The expanded development cycle takes 26.05 s, including a 3.59 s
-compiler build and 6.90 s complete native compilation. These are individual
-observations, not p95 estimates or paired compiler-build gains. Keep stable
-writable Zig caches; the measured incremental mode did not improve real edits.
-Use `deno task bench:compiler-build --out build/bench/build-next` for isolated
-build/edit/revert measurements. See the [compile hills](COMPILE_HILLS.md),
-[build hills](BUILD_HILLS.md) and [performance review](PERFORMANCE_REVIEW.md)
-for remaining costs and targets.
+The [latest performance changes](zig-native/CT105_QUALIFICATION.md) reduce
+frozen gdev fresh-build CPU by **13.3%**, body-edit CPU by **12.9%** and
+literal-edit CPU by **3.3%** against `5cfb411` in seven alternating release
+pairs, with identical Wasm. Shared-host wall medians are 8.33 s fresh, 4.16 s
+first literal, 3.10 s literal revert and 5.42 s body edit. The 10% literal-CPU
+and sub-second editing targets remain open. Scope indexing, row certificates,
+worklist masks, exact frontend indexes and cache fixes remove repeated work;
+four body regions and first-edit graph correspondence still need attention. The
+report records memory costs, unseen/fresh controls, exhaustive qualification and
+the disposition of all 50 observations in the preceding
+[CPU/memory audit](PERFORMANCE_REVIEW.md#current-cpu-memory-and-algorithm-audit--24-october-2026).
+
+The matching release CLI and native compiler are installed locally. The expanded
+Safe/noLLVM development cycle takes 21.28 s, including a 3.31 s compiler build
+and 5.91 s complete native compilation. These are individual observations, not
+p95 estimates or paired compiler-build gains. Keep stable writable Zig caches;
+the measured incremental mode did not improve real edits. Use
+`deno task bench:compiler-build --out build/bench/build-next` for isolated
+build/edit/revert measurements. The
+[compile measurements](COMPILE_MEASUREMENTS.md),
+[compile hills](COMPILE_HILLS.md), [build hills](BUILD_HILLS.md) and
+[performance review](PERFORMANCE_REVIEW.md) separate completed work from the
+remaining targets.
 
 For a smaller development check, run `deno task test:compiler:dev`. It checks
 the project protocol, client and inference-budget recovery against the

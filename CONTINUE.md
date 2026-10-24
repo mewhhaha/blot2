@@ -1,6 +1,38 @@
 # Continue here
 
-CT103/CT104 checkpoint, 24 October 2026:
+CT105 checkpoint, 24 October 2026:
+[solver scans, row certificates and exact catalog indexes are qualified](zig-native/CT105_QUALIFICATION.md).
+Seven alternating release pairs against `5cfb411` reduce fresh-game CPU by
+**13.3%**, body-edit CPU by **12.9%** and first-literal CPU by **3.3%**.
+Devtools stays within the 5% guard. All strict fresh/edit/revert/restart Wasm
+pins and unseen-edit fresh controls pass. Shared-host wall medians are 8.33 /
+4.16 / 3.10 / 5.42 s for fresh / first literal / literal revert / body. The 10%
+literal target, two-second edits and sub-second editing remain open.
+
+Per-scope links remove region-wide type-variable scans; dense four-byte row
+certificates cut fresh argument visits by 62%. Sorted evidence hits, pending
+worklist masks, cache update/failed-plan fixes and removal of a redundant
+allocator mutex are implemented. Principal keys own anonymous/module source
+observations (archive v7). Frontend identity indexes reach graph correspondence
+with budget remaining; the first edit still checks 22 modules. Three body
+principals reject module 42's changed input image; one rejects source 42:35's
+identity. Keep these exact checks. Residual query work, lookup/encoding and
+allocation/working-set attribution remain in [the queue](COMPILE_HILLS.md).
+
+The final gate passes 2,555 exhaustive native laws, the complete guest/tooling
+suite and zero Zig lint findings in 674.30 s (625.86 s native execution). The
+expanded sampled development cycle passes in 21.28 s (3.31 s compiler, 5.91 s
+native compilation); it does not replace the exhaustive gate and is not a paired
+build-speed claim. The qualified CLI and native compiler are installed at
+`~/.local/bin/blot` and `blotc`; external format/check/build, exact Wasm, answer
+29 and bundled guide pass. Native SHA-256:
+`0eadf4bb1a0cc7448f59156091a7287e2456aedfd4b31452197a0a3437a1da78`.
+Installation/rollback records are in `build/install/ct105/installed.json`. Raw
+evidence and the audit disposition table are linked from the qualification
+record. Preserve unrelated untracked `zig-native/build/` and `zig-out-modern/`.
+The checkpoints below retain their original baselines and installation history.
+
+Historical CT103/CT104 checkpoint, 24 October 2026:
 [the four inference changes are qualified](zig-native/CT103_QUALIFICATION.md).
 Nonempty principal results, exact call/recursive-summary observations, consumed
 source declarations and bounded operation-row normalization are implemented.

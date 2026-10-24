@@ -1,6 +1,39 @@
 # Compile and compiler-build measurements
 
-Latest qualification:
+Latest qualification, 24 October 2026:
+[CT105 solver scans, normalization and catalog costs](zig-native/CT105_QUALIFICATION.md).
+Seven alternating pairs against `5cfb411` show **13.3% less fresh-game CPU**,
+**12.9% less body-edit CPU** and **3.3% less first-literal CPU**, with exact
+Wasm and unaffected devtools. The 10% literal target misses; sub-second edits
+remain open. Shared-host wall medians are 8.33 s fresh, 4.16 s first literal,
+3.10 s literal revert and 5.42 s body edit. The report includes distributions,
+source and binary pins, phase/work counters, memory costs, unseen/fresh/restart
+controls and the full gate (674.30 s). Final native/CLI installation is
+verified.
+
+The matching profiled pair reduces fresh inference from 5.760 to 4.648 s and
+body inference from 4.051 to 3.356 s; literal-revert inference remains 1.259 s.
+Dense row certificates remove repeated arguments while adding solver-local
+memory: largest region live bytes rise 185.37 → 195.25 MB. Current RSS, lifetime
+peaks and logical allocation requests are reported separately. The 21.28 s
+Safe/noLLVM development cycle includes 3.31 s compiler and 5.91 s full native
+compilation. These are observations, not paired build gains or p95. Historical
+numbers below preserve their original scope.
+
+Pre-CT105 diagnostic refresh, 24 October 2026:
+[CPU, memory and algorithm audit](PERFORMANCE_REVIEW.md#current-cpu-memory-and-algorithm-audit--24-october-2026).
+The then-installed unchanged release measures 7.902 s fresh game, 3.666 s first
+literal edit, 2.709 s literal revert and 5.461 s body edit in three unprofiled
+pairs. A separate unseen-edit sequence has later literals at 2.727 / 2.872 s.
+Inference remains 1.37 s for literal revert and 4.08 s for the body edit under
+phase profiling. One thread owns 90–97% of CPU; later literal/body hardware
+samples retire about 36.9 / 74.4 billion instructions on that thread. The review
+records 50 observations, allocation/RSS evidence, remaining measurement gaps and
+five next experiments. These are diagnostics of that baseline, not new speedup
+percentages or a compiler qualification. The historical paired comparison below
+keeps its original scope.
+
+Historical qualification:
 [CT103/CT104 inference reuse and row normalization](zig-native/CT103_QUALIFICATION.md).
 Seven alternating pairs against `5412320` show **24.8% less literal-edit CPU**,
 **4.2% less body-edit CPU**, and **6.1% less fresh-game CPU** with exact
@@ -30,9 +63,9 @@ spawn contract presence once per compilation reduces fresh game CPU by 28.6% in
 seven alternating release pairs (17.24 → 12.16 s median build wall), with
 identical Wasm. The measurements below preserve the preceding baseline and its
 original profiling evidence; use the follow-up record for the optimized
-candidate.
-The [post-CT96 review](PERFORMANCE_REVIEW.md) updates the next hills with caller
-attribution, retained-admission analysis and 33 new exhaustive sweep profiles.
+candidate. The [post-CT96 review](PERFORMANCE_REVIEW.md) updates the next hills
+with caller attribution, retained-admission analysis and 33 new exhaustive sweep
+profiles.
 
 23 October 2026 baseline. This identified repeated whole-program scans in
 `prepareSpawnApplication`, owning **27.6% of sampled CPU**, as the first

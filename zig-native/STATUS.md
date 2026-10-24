@@ -1,8 +1,18 @@
 # Zig compiler status
 
-## Principal dependency reuse and row normalization, 24 October 2026
+## Solver scans, row certificates and frontend indexes, 24 October 2026
 
-CT103/CT104 checkpoint, 24 October 2026:
+[CT105 is qualified and installed](CT105_QUALIFICATION.md).
+The audit follow-up removes repeated solver/scoping/cache work and indexes exact
+frontend identities. Seven pairs against `5cfb411` reduce fresh-game CPU 13.3%,
+body-edit CPU 12.9% and first-literal CPU 3.3%; outputs and the full 2,555-law
+exhaustive native/guest gate pass with zero lint. The 10% literal target misses.
+Four body regions, first-edit graph correspondence, two-second/sub-second edits
+and the broader completion requirements below remain open. Continue from
+[CT106–CT108](../COMPILE_HILLS.md), preserving exact dependency checks. The
+[continuation record](../CONTINUE.md) pins the installed binaries and evidence.
+
+Historical CT103/CT104 checkpoint, 24 October 2026:
 [the four inference changes are qualified](CT103_QUALIFICATION.md). Nonempty
 principal results, exact call/recursive-summary observations, consumed source
 declarations and bounded operation-row normalization are implemented. Seven

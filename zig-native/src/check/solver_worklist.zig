@@ -13,6 +13,7 @@ const Link = struct { key: u64, item: u32, previous: u32 = none, next: u32 = non
 pub const Queue = struct {
     entries: std.ArrayList(Entry) = .empty,
     ready: std.ArrayList(u64) = .empty,
+    pending: std.ArrayList(u64) = .empty,
     links: std.ArrayList(Link) = .empty,
     heads: std.AutoHashMapUnmanaged(u64, u32) = .empty,
     free: u32 = none,
@@ -28,6 +29,7 @@ pub const Queue = struct {
     pub fn deinit(self: *Queue, a: Allocator) void {
         self.entries.deinit(a);
         self.ready.deinit(a);
+        self.pending.deinit(a);
         self.links.deinit(a);
         self.heads.deinit(a);
         self.* = undefined;
@@ -35,8 +37,11 @@ pub const Queue = struct {
     pub fn add(self: *Queue, a: Allocator, required: bool) Allocator.Error!void {
         const index = self.entries.items.len;
         try self.ready.ensureTotalCapacity(a, (index + 64) / 64);
+        try self.pending.ensureTotalCapacity(a, (index + 64) / 64);
         try self.entries.append(a, .{ .required = required });
         if (index / 64 == self.ready.items.len) self.ready.appendAssumeCapacity(0);
+        if (index / 64 == self.pending.items.len) self.pending.appendAssumeCapacity(0);
+        self.pending.items[index / 64] |= @as(u64, 1) << @intCast(index % 64);
         self.remaining += 1;
         self.required += @intFromBool(required);
         self.enqueue(index);
@@ -62,11 +67,14 @@ pub const Queue = struct {
             }
             if (entry.waiting) self.waiting -= 1;
             self.ready.items[index / 64] &= ~(@as(u64, 1) << @intCast(index % 64));
+            self.pending.items[index / 64] &= ~(@as(u64, 1) << @intCast(index % 64));
         }
         self.entries.shrinkRetainingCapacity(len);
     }
     pub fn wakeAll(self: *Queue) void {
-        for (self.entries.items, 0..) |entry, index| if (!entry.done) self.enqueue(index);
+        // The pending mask preserves source order without revisiting every
+        // completed entry whenever a rollback or fallback wakes the queue.
+        for (self.ready.items, self.pending.items) |*ready, pending| ready.* |= pending;
     }
     /// Earlier IDs remain queued for the next pass. Later IDs run in this pass.
     pub fn take(self: *Queue, start: usize) ?usize {
@@ -93,6 +101,7 @@ pub const Queue = struct {
         self.setWaiting(index, false);
         self.clearWatches(index);
         self.entries.items[index].done = true;
+        self.pending.items[index / 64] &= ~(@as(u64, 1) << @intCast(index % 64));
         self.remaining -= 1;
         self.required -= @intFromBool(self.entries.items[index].required);
         self.ready.items[index / 64] &= ~(@as(u64, 1) << @intCast(index % 64));
@@ -328,6 +337,20 @@ fn queueScenario(a: Allocator) !void {
     queue.complete(2);
     try std.testing.expectEqual(@as(usize, 0), queue.remaining);
     try std.testing.expectEqual(@as(u32, 0), queue.heads.count());
+    // Rollback/truncation and later reuse cross a bitset word boundary. A
+    // broad wake must never resurrect completed or discarded obligations.
+    for (0..67) |_| try queue.add(a, true);
+    for (3..70) |index| if (index % 3 == 0) queue.complete(index);
+    queue.truncate(65);
+    while (queue.take(0)) |_| {}
+    queue.wakeAll();
+    for (3..65) |index| if (index % 3 != 0) try std.testing.expectEqual(@as(?usize, index), queue.take(0));
+    try std.testing.expectEqual(null, queue.take(0));
+    for (0..3) |_| try queue.add(a, false);
+    queue.complete(66);
+    queue.wakeAll();
+    for (3..68) |index| if (index % 3 != 0) try std.testing.expectEqual(@as(?usize, index), queue.take(0));
+    try std.testing.expectEqual(null, queue.take(0));
 }
 
 test "variable worklist coalesces writes preserves source rounds and revokes rollback watches" {

@@ -793,7 +793,11 @@ into the current owner under the existing bounded principal type/row checks.
 Source admission requires either the complete input projection, or a complete
 record of exact consumed declarations including the root. Both paths require
 the entire ordered type, nominal and effect catalog and producer namespace to
-match. Unknown foreign lexical sources decline the narrower path. No source
+match. Anonymous and local observations without a named declaration retain the
+complete principal input image of their source module. Unknown observations
+still decline the narrower path. A graph whose builder proves all non-root
+scopes contain imported types only can use the exact semantic-catalog gate;
+source receipts keep their existing foreign-source rejection. No source
 certificate grants executable or value reuse.
 
 Call inputs record both presence and absence with owner-translated signatures.
@@ -824,21 +828,28 @@ source target, closed argument product, deferred-member mode and query options;
 lexical, result-directed and source-interface jobs decline this import. Joint
 recursive summaries remain completed memo judgments, never global validated-call
 certificates. Optional summary outputs are translated and may be omitted under
-the same ownership rule as call outputs. Portable principal archive version six
+the same ownership rule as call outputs. Portable principal archive version seven
 owns these inputs and outputs and still requires the complete source image.
 Portable summary inputs must translate and match exactly. An unsupported
 optional summary output is omitted without discarding the admitted principal
 result; its next use performs ordinary checking. All allocation and required
 input failures retain their existing behavior.
 A principal-graph description detaches the recorder but reports nominal memo
-observations in order. Foreign lexical source scopes require the complete image.
+observations in order. Owned module observations are unique, bounded and validated
+before archive exposure. Exact named-source results may remain valid independently
+of these broader observations; unverified memo outputs are neither replayed nor
+carried into the next capture.
 
 Operation-row normalization caches at most 64 answers per solver. Every lookup
 matches the resolved row, historical cursor, depth, depth limit, and both type
 and effect mutation epochs. Writes, physical edits and rollback invalidate those
 epochs; saturation disables reuse. The separate positive row certificate may
 cover immutable operation arguments beside an open tail, because tail resolution
-runs first. Only a closed tail can certify an entire closed type.
+runs first. Only a closed tail can certify an entire closed type. Positive row
+certificates use a solver-owned dense index grown at the fallible resolution
+boundary. Infallible construction uses a four-entry fallback. Generation and
+physical-epoch checks invalidate both stores on rollback or mutation; recycled
+row IDs cannot restore discarded proofs. The sidecar is released with the solver.
 
 Effect unification walks immutable label-span views. A left remainder keeps its
 chronological cursor; extracting a right label resets that cursor just as

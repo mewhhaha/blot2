@@ -138,24 +138,38 @@ pub const Store = struct {
     }
     pub fn internRowWithFormal(self: *Store, values: []const Label, formal: u32) Error!Id {
         if (values.len == 0 and formal == 0) return 0;
+        var ordered = true;
+        var previous: Label = 0;
+        for (values) |label| {
+            if (label == 0 or label >= self.operations.items.len) return error.TypeMismatch;
+            ordered = ordered and previous <= label;
+            previous = label;
+        }
+        // Imported canonical rows commonly keep their order. A hit accepts
+        // the borrowed span without copying. A miss still takes an owned copy
+        // before growing label storage, which may own the input span itself.
+        if (ordered) if (self.findRow(values, formal, std.hash.Wyhash.hash(formal, std.mem.sliceAsBytes(values)))) |known| return known;
         var scratch_buffer: [256]u8 align(@alignOf(usize)) = undefined;
         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
         const allocator = scratch.allocator();
         const owned = try allocator.dupe(Label, values);
         defer allocator.free(owned);
-        for (owned) |label| if (label == 0 or label >= self.operations.items.len) return error.TypeMismatch;
-        std.mem.sortUnstable(Label, owned, {}, std.sort.asc(Label));
+        if (!ordered) std.mem.sortUnstable(Label, owned, {}, std.sort.asc(Label));
         // Repeated operations are observable in row unification. Do not dedup.
         return self.internRowFormalHashed(owned, formal, std.hash.Wyhash.hash(formal, std.mem.sliceAsBytes(owned)));
     }
     fn internRowHashed(self: *Store, values: []const Label, fingerprint: u64) Error!Id {
         return self.internRowFormalHashed(values, 0, fingerprint);
     }
-    fn internRowFormalHashed(self: *Store, values: []const Label, formal: u32, fingerprint: u64) Error!Id {
+    fn findRow(self: *const Store, values: []const Label, formal: u32, fingerprint: u64) ?Id {
         var candidate = self.row_buckets.get(fingerprint) orelse 0;
         while (candidate != 0) : (candidate = self.row_next.items[candidate]) {
             if (self.rows.items[candidate].formal == formal and std.mem.eql(Label, self.view().rowLabels(candidate), values)) return candidate;
         }
+        return null;
+    }
+    fn internRowFormalHashed(self: *Store, values: []const Label, formal: u32, fingerprint: u64) Error!Id {
+        if (self.findRow(values, formal, fingerprint)) |known| return known;
         if (self.rows.items.len >= std.math.maxInt(u32) or values.len > std.math.maxInt(u32) or self.labels.items.len > std.math.maxInt(u32) - values.len) return error.EvidenceLimit;
         const bucket = try self.row_buckets.getOrPut(self.allocator, fingerprint);
         if (!bucket.found_existing) bucket.value_ptr.* = 0;
@@ -181,6 +195,13 @@ fn ownershipScenario(allocator: Allocator) !void {
     const row = try store.internRow(&.{ floating, first, first });
     try std.testing.expectEqual(row, try store.internRow(&.{ first, floating, first }));
     try std.testing.expect(row != try store.internRow(&.{ first, floating }));
+    // A canonical input may borrow the very label buffer a new formal row
+    // grows. Hits and misses both retain multiplicity and the original owner.
+    for (1..17) |formal| {
+        const qualified = try store.internRowWithFormal(store.view().rowLabels(row), @intCast(formal));
+        try std.testing.expectEqualSlices(Label, &.{ first, first, floating }, store.view().rowLabels(qualified));
+        try std.testing.expectEqual(qualified, try store.internRowWithFormal(store.view().rowLabels(qualified), @intCast(formal)));
+    }
     var snapshot = try store.copyOwned(allocator);
     defer snapshot.deinit(allocator);
     for (0..128) |i| _ = try store.internOperation(.{ .unit = 8, .decl = @intCast(i + 1) }, snapshot.view().operationArguments(first));

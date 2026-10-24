@@ -10,8 +10,8 @@
 //! by the peak live bytes of each class. Blocks above the largest class are
 //! mapped directly and unmapped at free, as in SmpAllocator.
 //!
-//! Every operation takes one short lock. Concurrent jobs are expected to keep
-//! their own outer lock (`memory.shareable` answers false for this heap).
+//! Small allocation/free operations take one short lock. Concurrent jobs may
+//! use this allocator directly; `memory.shareable` recognizes its vtable.
 const std = @import("std");
 const Alignment = std.mem.Alignment;
 const PageAllocator = std.heap.PageAllocator;
@@ -33,6 +33,9 @@ pub const Heap = struct {
 
     pub fn allocator(self: *Heap) std.mem.Allocator {
         return .{ .ptr = self, .vtable = &vtable };
+    }
+    pub fn isAllocator(a: std.mem.Allocator) bool {
+        return a.vtable == &vtable;
     }
     const vtable: std.mem.Allocator.VTable = .{ .alloc = alloc, .resize = resize, .remap = remap, .free = free };
 

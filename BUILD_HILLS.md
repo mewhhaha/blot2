@@ -9,7 +9,17 @@ Always use Zig 0.17.0 Safe/noLLVM for development and native tests. LLVM belongs
 to the actual release candidate. Keep compiler construction, test compilation,
 test execution, analysis and wrapper overhead as separate measurements.
 
-Current follow-up: [CT103/CT104](zig-native/CT103_QUALIFICATION.md) keeps
+Current follow-up: [CT105](zig-native/CT105_QUALIFICATION.md) preserves
+Safe/noLLVM and runtime native selection. Its affected development cycle passes
+in 21.28 s: compiler build 3.31 s, full 2,555-test inventory compilation 5.91 s,
+sampled execution 0.77 s. The exhaustive final gate takes 674.30 s, including
+625.86 s native execution across four isolated shards. The actual LLVM release
+is built separately; the later gate reuses that artifact. These are individual
+observations, not paired compiler-build improvements. No BT hill closes; stable
+caches, 20-cycle latency measurement, exhaustive-test cost and LLVM construction
+remain separate work.
+
+Historical follow-up: [CT103/CT104](zig-native/CT103_QUALIFICATION.md) keeps
 Safe/noLLVM development and native tests. Its expanded static-sharing cycle
 passes in 26.05 s: compiler build 3.59 s, complete native compilation 6.90 s,
 sampled native execution 0.87 s. The measured actual LLVM release takes 234.85

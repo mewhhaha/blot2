@@ -25,6 +25,8 @@ pub const TrackedAllocator = struct {
 /// backing allocator.
 pub fn shareable(a: std.mem.Allocator) bool {
     if (a.vtable == std.heap.smp_allocator.vtable or a.vtable == std.heap.page_allocator.vtable) return true;
+    if (@import("session_heap.zig").Heap.isAllocator(a)) return true;
+    if (@import("../phase_profile.zig").CountingAllocator.backingOf(a)) |backing| return shareable(backing);
     if (builtin.is_test and a.vtable == std.testing.allocator.vtable) return true;
     if (a.vtable == &Meter(.shared).vtable) return shareable(@as(*TrackedAllocator, @ptrCast(@alignCast(a.ptr))).backing);
     return false;

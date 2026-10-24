@@ -470,3 +470,56 @@ test "principal input replay omits declined memo outputs while owning accepted p
     try partialReplayFailure(a, &after, &initial.capture.?, fresh.bytes, 0);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, partialReplayFailure, .{ &after, &initial.capture.?, fresh.bytes, @as(usize, 0) });
 }
+
+fn sourceUnitOwnershipScenario(allocator: std.mem.Allocator) !void {
+    var reads: inputs.Recorder = .{ .eligible = true, .max_reads = 2 };
+    defer reads.deinit(allocator);
+    const root: core.BindingRef = .{ .unit = 1, .binding = 7 };
+    try reads.source(allocator, root);
+    try reads.sourceUnit(allocator, 2);
+    try reads.source(allocator, root);
+    try reads.sourceUnit(allocator, 2);
+    try std.testing.expect(reads.source_complete);
+    var key = try reads.key().?.clone(allocator);
+    defer key.deinit(allocator);
+    reads.sources.items[0].binding = 9;
+    reads.source_units.items[0] = 3;
+    try std.testing.expectEqual(root, key.sources[0]);
+    try std.testing.expectEqualSlices(u32, &.{2}, key.source_units);
+    try reads.sourceUnit(allocator, 4);
+    try std.testing.expect(!reads.source_complete);
+    try std.testing.expect(key.source_complete);
+}
+test "principal anonymous module observations own their inputs and permit duplicates at the observation bound through OOM" {
+    try sourceUnitOwnershipScenario(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, sourceUnitOwnershipScenario, .{});
+}
+
+test "principal anonymous module dependencies reject memo replay after unrelated body changes" {
+    const prefix = "const add = fn value => @u32.add value 2\nconst sub = fn value => @u32.sub value 2\nconst local = fn value => @u32.add value 1\nentry const answer: U32 where { type_rep U32 } = local 41\n";
+    const suffix = "const changed = fn value => ";
+    var before = try Fixture.init(prefix ++ suffix ++ "@u32.add value 2\n");
+    defer before.deinit();
+    var after = try Fixture.init(prefix ++ suffix ++ "@u32.sub value 2\n");
+    defer after.deinit();
+    var initial = try before.emit(.{ .retain_artifacts = true });
+    defer initial.deinit(a);
+    try std.testing.expect(initial.diagnostic == null);
+    for (initial.capture.?.metadata.principal_queries.records.items) |*record| {
+        if (record.dependencies.inputs) |*observed| {
+            a.free(observed.source_units);
+            observed.source_units = &.{};
+            observed.source_units = try a.dupe(u32, &.{1});
+        }
+    }
+    var fresh = try after.emit(.{});
+    defer fresh.deinit(a);
+    var edited = try after.emit(.{ .retain_artifacts = true, .principal_previous = &initial.capture.? });
+    defer edited.deinit(a);
+    try std.testing.expect(edited.diagnostic == null);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, edited.bytes);
+    // Exact named-source results may remain valid independently. Their memo
+    // outputs must not replay or carry a broader unverified module observation.
+    try std.testing.expectEqual(@as(usize, 0), edited.principal.call_publications_replayed);
+    try std.testing.expectEqual(.module_image, edited.principal.source_declines[0].reason);
+}

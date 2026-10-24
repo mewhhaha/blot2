@@ -93,11 +93,13 @@ pub fn appendChildren(work: anytype, allocator: Allocator, module: *const core.M
 
 pub const Cache = struct {
     recipes: std.AutoHashMapUnmanaged(Key, *Recipe) = .empty,
+    declined_limits: std.AutoHashMapUnmanaged(Key, usize) = .empty,
     requests: usize = 0,
     builds: usize = 0,
     planned_visits: usize = 0,
     replayed_visits: usize = 0,
     declined_walks: usize = 0,
+    reused_declines: usize = 0,
 
     pub fn deinit(self: *Cache, allocator: Allocator) void {
         var entries = self.recipes.valueIterator();
@@ -106,6 +108,7 @@ pub const Cache = struct {
             allocator.destroy(entry.*);
         }
         self.recipes.deinit(allocator);
+        self.declined_limits.deinit(allocator);
     }
     fn build(recipe: *Recipe, allocator: Allocator, module: *const core.Module, key: Key, limit: usize) PlanError!void {
         var work: Pending = .{ .limit = limit };
@@ -139,6 +142,11 @@ pub const Cache = struct {
             self.declined_walks += 1;
             return null;
         }
+        if (self.declined_limits.get(key)) |known| if (limit <= known) {
+            self.declined_walks += 1;
+            self.reused_declines += 1;
+            return null;
+        };
         const recipe = try allocator.create(Recipe);
         recipe.* = .{};
         errdefer {
@@ -147,6 +155,9 @@ pub const Cache = struct {
         }
         build(recipe, allocator, &units[key.owner], key, limit) catch |err| switch (err) {
             error.PlanLimit => {
+                // A larger request may succeed later; only an equal or
+                // smaller walk bound can reuse this immutable-source decline.
+                try self.declined_limits.put(allocator, key, limit);
                 recipe.deinit(allocator);
                 allocator.destroy(recipe);
                 self.declined_walks += 1;

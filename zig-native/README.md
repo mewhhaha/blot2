@@ -58,18 +58,17 @@ the measured edit cycle. [Build hills](../BUILD_HILLS.md) track the remaining
 iteration and qualification costs separately from
 [application compile hills](../COMPILE_HILLS.md).
 
-[Principal dependency reuse and row normalization](CT103_QUALIFICATION.md)
-reduce literal-edit CPU by 24.8%, body-edit CPU by 4.2% and fresh-game CPU by
-6.1% against `5412320` in seven alternating pairs, with identical Wasm. The
-literal edit reuses all 20 principal results; body edits still rebuild four
-regions. Shared-host literal/body wall medians are 7.60 / 12.46 s, with no body
-wall improvement. Sub-second editing remains open. The percentages belong to the
-pinned measured candidate. The final release also fixes portable restart replay,
-includes `faf3f78` and separately passes 2,551 exhaustive native laws and 1,654
-guest checks. The measured development cycle takes 26.05 s; its 3.59 s compiler
-build and 6.90 s native compilation are individual observations. The
-[review](../PERFORMANCE_REVIEW.md) separates first-edit frontend work from
-steady inference and records the remaining dependencies to investigate.
+[CT105 solver scans, row certificates and exact frontend indexes](CT105_QUALIFICATION.md)
+reduce fresh-game CPU by 13.3%, body-edit CPU by 12.9% and first-literal CPU by
+3.3% against `5cfb411` in seven alternating pairs, with identical Wasm. Shared-host
+wall medians are 8.33 s fresh, 4.16 s first literal, 3.10 s literal revert and
+5.42 s body edit. The 10% literal target and sub-second editing remain open.
+The final release passes 2,555 exhaustive native laws, the full guest/tooling
+suite and zero Zig lint findings, and both local tools are installed. The
+sampled development cycle takes 21.28 s, including 3.31 s compiler construction
+and 5.91 s complete native compilation; these are individual observations.
+The [review](../PERFORMANCE_REVIEW.md) records the memory tradeoff and remaining
+four body rebuilds, first-edit graph mismatch and non-inference costs.
 
 `blotc build ENTRY OUTPUT.wasm --prelude std/prelude.blot --std-root std`
 compiles a project. `dependencies ENTRY OUTPUT.blotdep` produces reusable typed

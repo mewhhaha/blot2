@@ -75,9 +75,18 @@ pub const Map = struct {
     }
 };
 
+pub const Progress = struct {
+    stage: enum { eligibility, public_index, public_match, nominals, constructors, contracts, implementations, graph, checked } = .eligibility,
+    binding: u32 = 0,
+    other: u32 = 0,
+    unnamed: bool = false,
+    kind: PI.Kind = .global,
+};
 pub const Targets = struct {
+    progress: ?*Progress = null,
     units: []const ?Map = &.{},
     methods: ?methods.Sources = null,
+    comparisons_left: ?*usize = null,
     pub fn changes(self: Targets) bool {
         for (self.units) |map| if (map) |value| if (value.changes()) return true;
         return false;
@@ -107,10 +116,42 @@ fn visible(value: PI.Binding) bool {
     return !value.private and (value.kind == .global or value.kind == .external);
 }
 
+const BindingKey = struct {
+    name: u32,
+    kind: PI.Kind,
+    target: PI.ExternalTarget = .{ .unit = 0, .binding = 0 },
+    fn current(binding: PI.Binding) ?BindingKey {
+        if (binding.name != 0) return .{ .name = binding.name, .kind = binding.kind, .target = if (binding.kind == .external) binding.external orelse .{ .unit = 0, .binding = 0 } else .{ .unit = 0, .binding = 0 } };
+        if (binding.kind != .external) return null;
+        return .{ .name = 0, .kind = binding.kind, .target = binding.external orelse return null };
+    }
+};
+
+const CatalogKey = struct { name: u32, identity: PI.Identity };
+const CatalogIndex = std.AutoHashMapUnmanaged(CatalogKey, u32);
+const ConstructorKey = struct { parent: u32, tag: u32 };
+fn namedCatalogIndex(a: A, entries: anytype, sentinel: bool, remaining: *usize) A.Error!?CatalogIndex {
+    var result: CatalogIndex = .empty;
+    var published = false;
+    defer if (!published) result.deinit(a);
+    for (entries, 0..) |entry, index| {
+        if ((sentinel and index == 0) or entry.private) continue;
+        if (remaining.* == 0) return null;
+        remaining.* -= 1;
+        const slot = try result.getOrPut(a, .{ .name = entry.name, .identity = entry.identity });
+        if (slot.found_existing) return null;
+        slot.value_ptr.* = @intCast(index);
+    }
+    published = true;
+    return result;
+}
+
 /// Inputs must already be admitted immutable principal interfaces in the same
 /// exact symbol/unit namespace. Failure publishes neither a partial map nor a
 /// semantic equality claim. Unsupported authority-bearing catalogs decline.
 pub fn compare(a: A, left: *const PI.Interface, right: *const PI.Interface, targets: Targets) A.Error!?Map {
+    if (targets.progress) |value| value.* = .{};
+    if (targets.comparisons_left) |remaining| remaining.* = 65_536;
     if (left.unit != right.unit or left.bindings.len > 65_536 or right.bindings.len > 65_536) return null;
     if (left.has_rank_contracts or right.has_rank_contracts or left.has_usage_contracts or right.has_usage_contracts or left.has_numeric_proofs or right.has_numeric_proofs) return null;
     inline for (.{ "proof_contracts", "selected_proofs", "selected_members", "selected_edges" }) |field| {
@@ -136,68 +177,102 @@ pub fn compare(a: A, left: *const PI.Interface, right: *const PI.Interface, targ
     defer a.free(used);
     @memset(used, false);
     var comparisons: usize = 65_536;
-    for (left.bindings, 0..) |old, index| {
-        if (index == 0) continue;
-        if (!visible(old)) continue;
-        if (old.name == 0 and (old.kind != .external or old.external == null)) return null;
-        var matched: ?u32 = null;
-        for (right.bindings, 0..) |current, next| {
-            if (comparisons == 0) return null;
-            comparisons -= 1;
-            if (next == 0 or !visible(current) or old.name != current.name or old.kind != current.kind) continue;
-            // Shared imported schemes have no exposed spelling. Their exact
-            // original public producer target, not an ordinal, identifies them.
-            if (old.name == 0) {
-                const target = targets.target(old.external.?) orelse return null;
-                if (current.external == null or !std.meta.eql(target, current.external.?)) continue;
+    defer if (targets.comparisons_left) |remaining| {
+        remaining.* = comparisons;
+    };
+    // Index exact public identities once. Duplicate identities still decline;
+    // the graph and contract checks below remain the semantic admission gate.
+    var public: std.AutoHashMapUnmanaged(BindingKey, u32) = .empty;
+    defer public.deinit(a);
+    if (targets.progress) |value| value.stage = .public_index;
+    for (right.bindings, 0..) |current, index| {
+        if (index == 0 or !visible(current)) continue;
+        if (comparisons == 0) return null;
+        comparisons -= 1;
+        const key = BindingKey.current(current) orelse return null;
+        const entry = try public.getOrPut(a, key);
+        if (entry.found_existing) {
+            if (targets.progress) |value| {
+                value.binding = @intCast(index);
+                value.other = entry.value_ptr.*;
+                value.unnamed = key.name == 0;
+                value.kind = key.kind;
             }
-            if (matched != null or used[next]) return null;
-            matched = @intCast(next);
+            // Several imported scheme slots can name the same original
+            // producer. Preserve their exact local slots only when both
+            // immutable catalogs already agree on those producer identities.
+            // Named ambiguity and moved duplicate slots still decline.
+            if (key.name != 0 or left.bindings.len != right.bindings.len or !std.meta.eql(key, BindingKey.current(left.bindings[index]) orelse return null)) return null;
+            const prior = entry.value_ptr.*;
+            if (prior != unmapped and !std.meta.eql(key, BindingKey.current(left.bindings[prior]) orelse return null)) return null;
+            entry.value_ptr.* = unmapped;
+            continue;
         }
-        const next = matched orelse return null;
+        entry.value_ptr.* = @intCast(index);
+    }
+    if (targets.progress) |value| value.stage = .public_match;
+    for (left.bindings, 0..) |old, index| {
+        if (index == 0 or !visible(old)) continue;
+        if (comparisons == 0) return null;
+        comparisons -= 1;
+        if (targets.progress) |value| value.binding = @intCast(index);
+        var key = BindingKey.current(old) orelse return null;
+        // Imported schemes retain their original producer, translated through
+        // an admitted relocation. Several producers can expose one spelling.
+        if (old.kind == .external and old.external != null) key.target = targets.target(key.target) orelse return null;
+        const found = public.get(key) orelse return null;
+        const next: u32 = if (found == unmapped) next: {
+            if (index >= right.bindings.len or !std.meta.eql(key, BindingKey.current(right.bindings[index]) orelse return null)) return null;
+            break :next @intCast(index);
+        } else found;
+        if (used[next]) return null;
         used[next] = true;
         map.bindings[index] = next;
     }
     for (right.bindings, used, 0..) |value, matched, index| if (index != 0 and visible(value) and !matched) return null;
 
+    if (targets.progress) |value| value.stage = .nominals;
     map.nominals = try a.alloc(u32, left.nominals.len);
     @memset(map.nominals, 0);
     const nominal_used = try a.alloc(bool, right.nominals.len);
     defer a.free(nominal_used);
     @memset(nominal_used, false);
+    var nominals_index = (try namedCatalogIndex(a, right.nominals, true, &comparisons)) orelse return null;
+    defer nominals_index.deinit(a);
     for (left.nominals, 0..) |old, index| {
         if (index == 0 or old.private) continue;
-        var matched: ?u32 = null;
-        for (right.nominals, 0..) |current, next| {
-            if (comparisons == 0) return null;
-            comparisons -= 1;
-            if (next == 0 or current.private or old.name != current.name or !std.meta.eql(old.identity, current.identity)) continue;
-            if (matched != null or nominal_used[next]) return null;
-            matched = @intCast(next);
-        }
-        const next = matched orelse return null;
+        if (comparisons == 0) return null;
+        comparisons -= 1;
+        const next = nominals_index.get(.{ .name = old.name, .identity = old.identity }) orelse return null;
+        if (nominal_used[next]) return null;
         nominal_used[next] = true;
         map.nominals[index] = next;
     }
     for (right.nominals, nominal_used, 0..) |value, matched, index| if (index != 0 and !value.private and !matched) return null;
+    if (targets.progress) |value| value.stage = .constructors;
     map.constructors = try a.alloc(u32, left.constructors.len);
     @memset(map.constructors, 0);
     const constructor_used = try a.alloc(bool, right.constructors.len);
     defer a.free(constructor_used);
     @memset(constructor_used, false);
+    var constructor_index: std.AutoHashMapUnmanaged(ConstructorKey, u32) = .empty;
+    defer constructor_index.deinit(a);
+    for (right.constructors, 0..) |current, index| {
+        if (index == 0 or current.nominal == 0 or right.nominals[current.nominal].private) continue;
+        if (comparisons == 0) return null;
+        comparisons -= 1;
+        const slot = try constructor_index.getOrPut(a, .{ .parent = current.nominal, .tag = current.tag });
+        if (slot.found_existing) return null;
+        slot.value_ptr.* = @intCast(index);
+    }
     for (left.constructors, 0..) |old, index| {
         if (index == 0 or old.nominal == 0 or old.nominal >= map.nominals.len or left.nominals[old.nominal].private) continue;
         const parent = map.nominals[old.nominal];
         if (parent == 0) return null;
-        var matched: ?u32 = null;
-        for (right.constructors, 0..) |current, next| {
-            if (comparisons == 0) return null;
-            comparisons -= 1;
-            if (next == 0 or current.nominal != parent or current.tag != old.tag) continue;
-            if (matched != null or constructor_used[next]) return null;
-            matched = @intCast(next);
-        }
-        const next = matched orelse return null;
+        if (comparisons == 0) return null;
+        comparisons -= 1;
+        const next = constructor_index.get(.{ .parent = parent, .tag = old.tag }) orelse return null;
+        if (constructor_used[next]) return null;
         constructor_used[next] = true;
         map.constructors[index] = next;
     }
@@ -206,44 +281,40 @@ pub fn compare(a: A, left: *const PI.Interface, right: *const PI.Interface, targ
     }
 
     if (!privateContractsOnly(left) or !privateContractsOnly(right)) {
+        if (targets.progress) |value| value.stage = .contracts;
         map.contracts = try a.alloc(u32, left.contracts.len);
         @memset(map.contracts, unmapped);
         const contract_used = try a.alloc(bool, right.contracts.len);
         defer a.free(contract_used);
         @memset(contract_used, false);
+        var contracts_index = (try namedCatalogIndex(a, right.contracts, false, &comparisons)) orelse return null;
+        defer contracts_index.deinit(a);
         for (left.contracts, 0..) |old, index| {
             if (old.private) continue;
-            var matched: ?u32 = null;
-            for (right.contracts, 0..) |current, next| {
-                if (comparisons == 0) return null;
-                comparisons -= 1;
-                if (current.private or old.name != current.name or !std.meta.eql(old.identity, current.identity)) continue;
-                if (matched != null or contract_used[next]) return null;
-                matched = @intCast(next);
-            }
-            const next = matched orelse return null;
+            if (comparisons == 0) return null;
+            comparisons -= 1;
+            const next = contracts_index.get(.{ .name = old.name, .identity = old.identity }) orelse return null;
+            if (contract_used[next]) return null;
             contract_used[next] = true;
             map.contracts[index] = next;
         }
         for (right.contracts, contract_used) |value, matched| if (!value.private and !matched) return null;
     }
 
+    if (targets.progress) |value| value.stage = .implementations;
     map.implementations = try a.alloc(u32, left.implementations.len);
     @memset(map.implementations, unmapped);
     const implementation_used = try a.alloc(bool, right.implementations.len);
     defer a.free(implementation_used);
     @memset(implementation_used, false);
+    var implementations_index = (try namedCatalogIndex(a, right.implementations, false, &comparisons)) orelse return null;
+    defer implementations_index.deinit(a);
     for (left.implementations, 0..) |old, index| {
         if (old.private) continue;
-        var matched: ?u32 = null;
-        for (right.implementations, 0..) |current, next| {
-            if (comparisons == 0) return null;
-            comparisons -= 1;
-            if (current.private or old.name != current.name or !std.meta.eql(old.identity, current.identity)) continue;
-            if (matched != null or implementation_used[next]) return null;
-            matched = @intCast(next);
-        }
-        const next = matched orelse return null;
+        if (comparisons == 0) return null;
+        comparisons -= 1;
+        const next = implementations_index.get(.{ .name = old.name, .identity = old.identity }) orelse return null;
+        if (implementation_used[next]) return null;
         implementation_used[next] = true;
         map.implementations[index] = next;
         const current = right.implementations[next];
@@ -293,6 +364,7 @@ pub fn compare(a: A, left: *const PI.Interface, right: *const PI.Interface, targ
     }
     for (right.implementations, implementation_used) |value, matched| if (!value.private and !matched) return null;
 
+    if (targets.progress) |value| value.stage = .graph;
     var graph = (try graphs.Match.init(a, &left.graph, &right.graph)) orelse return null;
     defer graph.deinit();
     var checker: Checker = .{ .left = left, .right = right, .graph = &graph, .map = map, .targets = targets };
@@ -307,6 +379,7 @@ pub fn compare(a: A, left: *const PI.Interface, right: *const PI.Interface, targ
     };
     map.qualifications = try checker.qualifications.toOwnedSlice(a);
     std.mem.sort(Qualification, map.qualifications, {}, Qualification.less);
+    if (targets.progress) |value| value.stage = .checked;
     published = true;
     return map;
 }
@@ -680,6 +753,71 @@ test "frontend relocation public slot maps own private insertion and reject chan
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, bindingMapScenario, .{});
 }
 
+fn wideBindingMapScenario(a: A) !void {
+    var nodes = [_]T.Node{ .{ .tag = .absent }, .{ .tag = .u32 }, .{ .tag = .f32 } };
+    const inert: PI.Binding = .{ .private = true, .name = 0, .kind = .global, .named_function = false, .ty = 0, .scheme = .{}, .external = null };
+    var before: [301]PI.Binding = @splat(inert);
+    var after: [302]PI.Binding = @splat(inert);
+    for (1..before.len) |i| {
+        before[i] = .{ .name = @intCast(i), .kind = .global, .named_function = false, .ty = 1, .scheme = .{ .root = 1 }, .external = null };
+        after[after.len - i] = before[i];
+    }
+    const inert_nominal: PI.Nominal = .{ .private = true, .identity = .{ .unit = 0, .decl = 0 }, .name = 0, .parameters = .{}, .variables = .{} };
+    var old_nominals: [301]PI.Nominal = @splat(inert_nominal);
+    var new_nominals = old_nominals;
+    for (1..old_nominals.len) |i| {
+        old_nominals[i] = .{ .identity = .{ .unit = 1, .decl = @intCast(i) }, .name = @intCast(i), .parameters = .{}, .variables = .{}, .alias = 1 };
+        new_nominals[old_nominals.len - i] = old_nominals[i];
+    }
+    const old: PI.Interface = .{
+        .unit = 1,
+        .graph = .{ .nodes = &nodes, .extra = &.{}, .rows = &.{}, .labels = &.{}, .operations = &.{}, .row_variable_count = 0 },
+        .patterns = .{ .nodes = &.{}, .extra = &.{} },
+        .bindings = &before,
+        .obligations = &.{},
+        .obligation_spans = &.{},
+        .nominals = &old_nominals,
+        .constructors = &.{},
+        .effect_families = &.{},
+        .effect_templates = &.{},
+        .associated = &.{},
+    };
+    var current = old;
+    current.bindings = &after;
+    current.nominals = &new_nominals;
+    var remaining: usize = 0;
+    var map = (try compare(a, &old, &current, .{ .comparisons_left = &remaining })) orelse return error.MissingBindingMap;
+    defer map.deinit(a);
+    try std.testing.expect(remaining > 60_000);
+    for (1..before.len) |i| try std.testing.expectEqual(@as(?u32, @intCast(after.len - i)), map.binding(@intCast(i)));
+    for (1..old_nominals.len) |i| try std.testing.expectEqual(@as(?u32, @intCast(old_nominals.len - i)), map.catalog(.nominal, @intCast(i)));
+    // The former quadratic walk exhausted its budget before reaching the last
+    // entries. All of them must now be checked, including negative cases.
+    new_nominals[1].alias = 2;
+    var changed_alias = try compare(a, &old, &current, .{});
+    defer if (changed_alias) |*value| value.deinit(a);
+    try std.testing.expect(changed_alias == null);
+    new_nominals[1].alias = 1;
+    after[2].ty = 2;
+    var changed = try compare(a, &old, &current, .{});
+    defer if (changed) |*value| value.deinit(a);
+    try std.testing.expect(changed == null);
+    after[2].ty = 1;
+    after[2].name = after[3].name;
+    var duplicate = try compare(a, &old, &current, .{});
+    defer if (duplicate) |*value| value.deinit(a);
+    try std.testing.expect(duplicate == null);
+    after[2].name = 999;
+    var missing = try compare(a, &old, &current, .{});
+    defer if (missing) |*value| value.deinit(a);
+    try std.testing.expect(missing == null);
+}
+
+test "frontend relocation indexes wide reordered catalogs and rejects late changes duplicates and missing names through OOM" {
+    try wideBindingMapScenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, wideBindingMapScenario, .{});
+}
+
 fn publicContractMapScenario(a: A) !void {
     var old_nodes = [_]T.Node{ .{ .tag = .absent }, .{ .tag = .u32 }, .{ .tag = .array, .a = 1 } };
     var new_nodes = old_nodes;
@@ -809,6 +947,43 @@ fn sharedCalleeMapScenario(a: A) !void {
     var formal = try compare(a, &old, &current, targets);
     defer if (formal) |*value| value.deinit(a);
     try std.testing.expect(formal == null);
+    old_goals[0].identity.unit = 1;
+    before[1] = callee;
+    var stable = before;
+    current = old;
+    current.bindings = &stable;
+    var duplicates = (try compare(a, &old, &current, .{})) orelse return error.MissingStableImportedSlots;
+    defer duplicates.deinit(a);
+    try std.testing.expectEqual(@as(?u32, 1), duplicates.binding(1));
+    try std.testing.expectEqual(@as(?u32, 2), duplicates.binding(2));
+    stable[1].ty = 1;
+    var changed_duplicate = try compare(a, &old, &current, .{});
+    defer if (changed_duplicate) |*value| value.deinit(a);
+    try std.testing.expect(changed_duplicate == null);
+    stable[1] = callee;
+    stable[1].external.?.binding = 3;
+    var changed_producer = try compare(a, &old, &current, .{});
+    defer if (changed_producer) |*value| value.deinit(a);
+    try std.testing.expect(changed_producer == null);
+    // The same imported spelling may identify different original producers.
+    // Those targets, and the caller's relocated callee edge, remain exact.
+    before[1].name = 8;
+    before[1].external.?.binding = 4;
+    before[2].name = 8;
+    stable = before;
+    stable[1] = before[2];
+    stable[2] = before[1];
+    new_goals = old_goals;
+    new_goals[0].identity.decl = 1;
+    current.obligations = &new_goals;
+    var named_imports = (try compare(a, &old, &current, .{})) orelse return error.MissingNamedProducerMap;
+    defer named_imports.deinit(a);
+    try std.testing.expectEqual(@as(?u32, 2), named_imports.binding(1));
+    try std.testing.expectEqual(@as(?u32, 1), named_imports.binding(2));
+    stable[1].external.?.binding = 4;
+    var ambiguous = try compare(a, &old, &current, .{});
+    defer if (ambiguous) |*value| value.deinit(a);
+    try std.testing.expect(ambiguous == null);
 }
 
 test "frontend relocation shared public callee schemes retain original targets and reject formal or private substitutions through OOM" {

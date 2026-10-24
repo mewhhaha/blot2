@@ -60,7 +60,7 @@ pub const Cache = struct {
         std.debug.assert(self.generation != 0 and self.generation != std.math.maxInt(u32));
         // No current-epoch result is evicted. Retain a spare quarter of slots
         // so probing always reaches an empty slot, including after rollback.
-        if (self.count >= self.entries.len - self.entries.len / 4) try self.grow(allocator);
+        if (self.entries.len == 0) try self.grow(allocator);
         var slot = index(root, self.entries.len - 1);
         while (self.entries[slot].generation == self.generation) {
             if (self.entries[slot].root == root) {
@@ -68,6 +68,13 @@ pub const Cache = struct {
                 return;
             }
             slot = (slot + 1) & (self.entries.len - 1);
+        }
+        // Replacing a current answer requires no storage, even at the growth
+        // threshold. Only a genuinely new root needs a larger table.
+        if (self.count >= self.entries.len - self.entries.len / 4) {
+            try self.grow(allocator);
+            slot = index(root, self.entries.len - 1);
+            while (self.entries[slot].generation == self.generation) slot = (slot + 1) & (self.entries.len - 1);
         }
         self.entries[slot] = .{ .generation = self.generation, .root = root, .result = result };
         self.count += 1;
@@ -108,6 +115,9 @@ test "failed cache growth preserves all published answers and allows a later suc
     for (0..6) |index_| try cache.put(failing.allocator(), @intCast(index_), @intCast(index_ + 1));
     const high_water = cache.high_water;
     failing.fail_index = failing.alloc_index;
+    try cache.put(failing.allocator(), 2, 91);
+    try std.testing.expectEqual(@as(?u32, 91), cache.get(2));
+    try cache.put(failing.allocator(), 2, 3);
     try std.testing.expectError(error.OutOfMemory, cache.put(failing.allocator(), 1000000, 0));
     try std.testing.expectEqual(high_water, cache.high_water);
     for (0..6) |index_| try std.testing.expectEqual(@as(?u32, @intCast(index_ + 1)), cache.get(@intCast(index_)));

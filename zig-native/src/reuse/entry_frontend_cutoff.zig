@@ -25,7 +25,7 @@ pub const Previous = struct {
     imports: []const Import,
 };
 pub const Color = enum { unknown, green, green_storage, red };
-pub const Stats = struct { comparison_hits: usize = 0, offered: usize = 0, source_matches: usize = 0, namespace_matches: usize = 0, compared: usize = 0, interfaces_changed: usize = 0, surfaces_changed: usize = 0, storage_rechecks: usize = 0, reused: usize = 0 };
+pub const Stats = struct { comparison_hits: usize = 0, offered: usize = 0, source_matches: usize = 0, namespace_matches: usize = 0, compared: usize = 0, interfaces_changed: usize = 0, surfaces_changed: usize = 0, storage_rechecks: usize = 0, reused: usize = 0, interface_changed_unit: u32 = 0, interface_changed_fields: u64 = 0, interface_old_bindings: usize = 0, interface_new_bindings: usize = 0, interface_first_binding: usize = 0, interface_comparisons_left: usize = 0, interface_progress: binding_relocation.Progress = .{} };
 
 /// A successful previous entry and its seed must belong to the same retained
 /// revision. The caller proves that ownership pair before offering this view.
@@ -228,8 +228,26 @@ fn compareInterface(a: Allocator, source: *const project.Project, checked: anyty
             return false;
         }
         var methods: @import("frontend_method_sources.zig").Context(@TypeOf(old.core), @TypeOf(current.checked)) = .{ .before = &old.core, .after = &current.checked, .names = &source.symbols };
-        mapping = try binding_relocation.compare(a, &old.interface, &published, .{ .units = checked.binding_maps, .methods = methods.view() });
+        var comparisons_left: usize = 0;
+        var progress: binding_relocation.Progress = .{};
+        mapping = try binding_relocation.compare(a, &old.interface, &published, .{ .units = checked.binding_maps, .methods = methods.view(), .comparisons_left = &comparisons_left, .progress = &progress });
         if (mapping == null) {
+            if (stats.interface_changed_unit == 0) {
+                stats.interface_changed_unit = unit;
+                stats.interface_comparisons_left = comparisons_left;
+                stats.interface_progress = progress;
+                stats.interface_old_bindings = old.interface.bindings.len;
+                stats.interface_new_bindings = published.bindings.len;
+                inline for (@typeInfo(PI.Interface).@"struct".field_names, 0..) |field, index| {
+                    if (!equal(@field(old.interface, field), @field(published, field))) stats.interface_changed_fields |= @as(u64, 1) << index;
+                }
+                for (0..@min(old.interface.bindings.len, published.bindings.len)) |index| {
+                    if (!equal(old.interface.bindings[index], published.bindings[index])) {
+                        stats.interface_first_binding = index;
+                        break;
+                    }
+                }
+            }
             stats.interfaces_changed += 1;
             return false;
         }

@@ -2,7 +2,22 @@
 //! increments on existing evaluator and solver structs: no clocks, allocation,
 //! identity or semantic decision reads them, so a budget can assert on them
 //! without wall-time noise. A retained revision counts only the work it ran.
+pub const Normalization = struct {
+    row_requests: u64 = 0,
+    closed_row_hits: u64 = 0,
+    epoch_row_hits: u64 = 0,
+    argument_rows: u64 = 0,
+    labels: u64 = 0,
+    arguments: u64 = 0,
+    changed_rows: u64 = 0,
+    closed_row_evictions: u64 = 0,
+    interner_requests: u64 = 0,
+    interner_candidates: u64 = 0,
+    interner_arguments: u64 = 0,
+};
 pub const Counters = struct {
+    /// Region solver work only; frontend type stores are counted separately.
+    normalization: Normalization = .{},
     ragged_runtime_regions: u64 = 0,
     ragged_staged_regions: u64 = 0,
     ragged_probe_visits: u64 = 0,
@@ -92,6 +107,10 @@ pub const Counters = struct {
     principal_graph_deferred: u64 = 0,
     /// Capture scopes projected while selecting interfaces for lexical keys.
     lexical_interface_projections: u64 = 0,
+    /// Former region-wide lexical scan candidates and entries actually visited
+    /// through the scope index. Both preserve the same insertion-order bound.
+    lexical_region_candidates: u64 = 0,
+    lexical_scope_candidates: u64 = 0,
     /// Calls selected before emission, by shape, and the closures applied to
     /// arguments past a selected callee's parameters.
     resolved_bodies: u64 = 0,
@@ -116,7 +135,9 @@ pub const Counters = struct {
     parameter_role_functions: u64 = 0,
     pub fn merge(self: *Counters, other: Counters) void {
         inline for (@typeInfo(Counters).@"struct".field_names) |name| {
-            if (comptime @import("std").mem.startsWith(u8, name, "max_")) {
+            if (comptime @import("std").mem.eql(u8, name, "normalization")) {
+                inline for (@typeInfo(Normalization).@"struct".field_names) |field| @field(self.normalization, field) +|= @field(other.normalization, field);
+            } else if (comptime @import("std").mem.startsWith(u8, name, "max_")) {
                 @field(self, name) = @max(@field(self, name), @field(other, name));
             } else @field(self, name) +|= @field(other, name);
         }

@@ -2,6 +2,27 @@
 
 ## Current queue: ordinary edits toward one second (24 October 2026)
 
+[CT105 is qualified](zig-native/CT105_QUALIFICATION.md): scope scans, row
+certificates, worklist wakeups, evidence sorting, cache updates, failed recipe
+plans and exact frontend indexes are implemented. Seven alternating pairs
+against `5cfb411` show 13.3% less fresh-game CPU, 12.9% less body-edit CPU and
+3.3% less first-literal CPU. Devtools stays within the guard, strict outputs and
+unseen fresh controls pass, and the exhaustive gate passes. The 10% literal CPU
+target misses; two-second and sub-second ordinary edits remain open.
+
+Prioritize (1) exact module-image/source-identity dependencies blocking four
+body principals and residual queries after all 20 literal hits, (2) unit 42's
+first frontend graph mismatch after indexed catalogs succeed, (3) remaining 9.81
+million literal-revert interner candidates and 35.99 million row arguments, then
+(4) lookup/encoding and allocation capacity. Preserve the negative results:
+faster catalog lookup still checks 22 modules first, and more complete source
+observations alone do not grant body reuse. The
+[50-observation audit](PERFORMANCE_REVIEW.md#current-cpu-memory-and-algorithm-audit--24-october-2026)
+and its CT105 disposition distinguish demonstrated costs from hypotheses.
+
+The comparison and diagnostic sequence below are historical CT103/CT104
+evidence.
+
 [The four CT103/CT104 changes are qualified](zig-native/CT103_QUALIFICATION.md).
 Seven alternating pairs against `5412320` show **24.8% less literal-edit CPU**,
 **4.2% less body-edit CPU**, and **6.1% less fresh-game CPU**, with exact
@@ -28,6 +49,13 @@ fresh controls. Literal inference is still about 1.5 s; body inference is
 | CT102: optional memo output declines                      | Complete: keep admitted results while omitted outputs receive ordinary checking.                                                                                                                                                   | Qualified >=10% literal CPU improvement against CT97; retain ownership and rejection laws.                                                                                        |
 | CT103: remaining principal regions                        | Nonempty import, exact call/summary observations and consumed-source admission implemented. Literal 18→20 hits; body 15→16. Trace the exact consumed declarations blocking the four remaining body regions before extending reuse. | Literal >=20% CPU target met (24.8%); body target missed (4.2%) and remains open. Require exact source/type/effect/catalog rejection, fresh parity, errors/recovery and full OOM. |
 | CT104: residual inference and iteration budget            | Bounded 64-slot exact-epoch operation-row cache implemented; simulation covers 12.55% of label visits. No isolated cache speedup claim. Attribute repeated summary/body work outside principal replay next.                        | Both ordinary edit classes below 2 s, then below 1 s on a documented quiet host. Both targets remain open. Report CPU and wall distributions.                                     |
+
+| New hill                                              | Evidence and next action                                                                                                                                                         | Acceptance target                                                                                                          |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| CT105: repeated solver scans and normalization        | Qualified fresh/body CPU reductions; dense certificates lower argument work with about 9.88 MB additional peak region storage. Literal gain is 3.3%.                             | Fresh/body benefit retained; combined >=10% literal/body target remains open.                                              |
+| CT106: residual queries and exact source observations | Four body regions still fail source module/identity checks; literal revert still creates 2,422 regions. Trace equivalent query inputs and the specific changed source subgraphs. | >=20% body CPU and >=10% later-literal CPU reduction, exact fresh/error/restart parity, bounded retention, full OOM.       |
+| CT107: frontend graph correspondence                  | Exact producer/catalog indexes leave 60,950 comparisons, then unit 42 declines in graph checking. Record the first graph pair and ownership reason.                              | First-edit check allocations -25% and checking time -20%; no weakening of graph/contract admission.                        |
+| CT108: remaining non-inference floor                  | Literal revert retains about 363 ms lookup and 1.34 s outside inference. Attribute candidate/anchor repeats, optimized-body clones, encoding and transport.                      | Both ordinary edit classes below 2 s, then 1 s, in seven quiet-host pairs with instructions/CPU/wall/current RSS controls. |
 
 Record each experiment's hypothesis and threshold first. After two bounded
 misses, stop that approach and preserve negative evidence. Measure before

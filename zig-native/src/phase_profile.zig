@@ -169,7 +169,14 @@ pub const CountingAllocator = struct {
     profile: ?*Profile = null,
 
     pub fn allocator(self: *CountingAllocator) std.mem.Allocator {
-        return .{ .ptr = self, .vtable = &.{ .alloc = alloc, .resize = resize, .remap = remap, .free = free } };
+        return .{ .ptr = self, .vtable = &vtable };
+    }
+    const vtable: std.mem.Allocator.VTable = .{ .alloc = alloc, .resize = resize, .remap = remap, .free = free };
+    /// This wrapper's counters are atomic. Its backing allocator still decides
+    /// whether concurrent jobs may call through it without an outer lock.
+    pub fn backingOf(a: std.mem.Allocator) ?std.mem.Allocator {
+        if (a.vtable != &vtable) return null;
+        return @as(*CountingAllocator, @ptrCast(@alignCast(a.ptr))).backing;
     }
     /// The profile must outlive the attachment; detach before releasing it.
     pub fn attach(self: *CountingAllocator, profile: *Profile) void {

@@ -305,6 +305,10 @@ const PrincipalGraph = struct {
     /// Collected source scopes outside the target's unit. Principal input
     /// keys compare every module's source image; source receipts do not.
     foreign_sources: bool = false,
+    /// The graph builder proved every non-root scope contains only imported
+    /// types, never a body, binding or evaluated value. Principal admission
+    /// separately requires the complete exact type/semantic catalogs.
+    foreign_types_only: bool = false,
 
     fn nodeCount(self: *const PrincipalGraph) usize {
         return self.types.nodes.items.len + self.types.effects.rows.items.len + self.types.operations.items.len;
@@ -566,21 +570,25 @@ test "recorded principal regions keep input keys over foreign graph sources" {
     const graph = try principalQueryTestGraph(a, .{ .target = .{ .unit = 0, .binding = 1 }, .source_interface = false, .deferred_member = false, .options = .{} }, true);
     defer graph.deinit(a);
     graph.foreign_sources = true;
-    for ([_]bool{ false, true }) |untracked| {
-        graph.untracked_reads = untracked;
-        var reads: principal_inputs.Recorder = .{ .eligible = true, .max_reads = 8, .serial = 1 };
-        defer reads.deinit(a);
-        var tape: receipt.Tape = .{};
-        defer tape.deinit(a);
-        session.principal_reads = &reads;
-        session.receipt_tape = &tape;
-        defer {
-            session.principal_reads = null;
-            session.receipt_tape = null;
+    for ([_]bool{ false, true }) |types_only| {
+        graph.foreign_types_only = types_only;
+        for ([_]bool{ false, true }) |untracked| {
+            graph.untracked_reads = untracked;
+            var reads: principal_inputs.Recorder = .{ .eligible = true, .max_reads = 8, .serial = 1 };
+            defer reads.deinit(a);
+            var tape: receipt.Tape = .{};
+            defer tape.deinit(a);
+            session.principal_reads = &reads;
+            session.receipt_tape = &tape;
+            defer {
+                session.principal_reads = null;
+                session.receipt_tape = null;
+            }
+            try region.principalDependencies(graph, false);
+            try std.testing.expectEqual(!untracked, reads.eligible);
+            try std.testing.expect(tape.unknown);
+            if (!untracked) try std.testing.expectEqual(types_only, reads.source_complete);
         }
-        try region.principalDependencies(graph, false);
-        try std.testing.expectEqual(!untracked, reads.eligible);
-        try std.testing.expect(tape.unknown);
     }
 }
 fn principalQueryTestRecord(cache: anytype, session: *Session, key: PrincipalGraph.Key, plain: ?bool) !*PrincipalGraph {
@@ -3294,6 +3302,15 @@ pub const Session = struct {
         self.slot(resolved).value = published;
         self.slot(resolved).state = .complete;
         return published;
+    }
+    fn observePrincipalSource(self: *Session, owner: usize, binding: core.BindingId) Allocator.Error!void {
+        const reads = self.principal_reads orelse return;
+        if (owner >= self.units.len or binding == 0 or binding >= self.units[owner].bindings.len) {
+            reads.source_complete = false;
+            return;
+        }
+        const unit = self.unitId(owner);
+        if (self.units[owner].binding(binding).kind == .global) try reads.source(self.allocator, .{ .unit = unit, .binding = binding }) else try reads.sourceUnit(self.allocator, unit);
     }
     fn principalSummaryKey(self: *const Session, key: principal_inputs.SummaryKey) ?CallSummaries.Key {
         if (key.target.unit == 0 or key.target.unit > self.units.len or key.target.binding == 0 or key.target.binding >= self.units[key.target.unit - 1].bindings.len) return null;
@@ -6491,14 +6508,14 @@ const ClosureRegion = struct {
             self.frames.deinit(allocator);
         }
     };
-    const Source = struct { origin: ?SourceLocation = null, implementation_context: ?u32 = null, binding: core.BindingId = 0, value: ValueId, owner: usize, root: types.Id = 0, body: core.Id = 0, closed_rows: types.List = .{}, body_collected: bool = false, import_parent: ?u32 = null, import_binders: types.List = .{} };
+    const Source = struct { variable_first: u32 = std.math.maxInt(u32), variable_last: u32 = std.math.maxInt(u32), origin: ?SourceLocation = null, implementation_context: ?u32 = null, binding: core.BindingId = 0, value: ValueId, owner: usize, root: types.Id = 0, body: core.Id = 0, closed_rows: types.List = .{}, body_collected: bool = false, import_parent: ?u32 = null, import_binders: types.List = .{} };
     const Import = struct { scope: u32, ty: types.Id };
     const RowImport = struct { scope: u32, row: types.Effects.Id };
     const LabelImport = struct { scope: u32, label: types.Effects.Label };
     const RowVariable = struct { scope: u32, variable: u32 };
     const RowParameter = struct { owner: usize, parameter: u32 };
     const CompletedDemand = struct { scope: u32, node: core.Id, body: core.Id, root: types.Id };
-    const Variable = struct { source: Import, region: types.Id };
+    const Variable = struct { source: Import, region: types.Id, next: u32 = std.math.maxInt(u32) };
     const Edge = struct { parent: u32, child: u32, slot: u32, formal: types.Id };
     const DataAlias = struct { instance: types.Id, principal: types.Id, solved: bool = false };
     const CallKey = struct { owner: usize, binding: core.BindingId, evidence: type_evidence.Id, caller: u32 = 0 };
@@ -6622,6 +6639,7 @@ const ClosureRegion = struct {
     code_projection: ?CodeProjection = null,
     /// Pooled solvers keep their occurs counter; this region owns the delta.
     occurs_base: u64 = 0,
+    normalization_base: @import("../work_counters.zig").Normalization = .{},
     importing_evidence: bool = false,
 
     const NormalizationKey = struct { root: types.Id, types: u64, rows: u64 };
@@ -6639,6 +6657,7 @@ const ClosureRegion = struct {
         var region: ClosureRegion = .{ .session = session, .current_origin = session.specialization_origin, .timing = timing, .solver = try types.Store.initWithOptions(solver_allocator orelse arena.solverAllocator(), .{ .closed_graphs = true }), .scratch_allocator = allocator, .arena = arena };
         region.scratch.projection_cache.allocator = allocator;
         region.occurs_base = region.solver.occurs_steps;
+        region.normalization_base = region.solver.normalization;
         if (session.inquiry_regions == 0 and session.semantic_job_budget == null) {
             session.summary_transitions = 0;
             session.summary_exhausted = false;
@@ -6658,6 +6677,7 @@ const ClosureRegion = struct {
         counters.region_scopes += self.scratch.sources.items.len;
         counters.max_region_scopes = @max(counters.max_region_scopes, self.scratch.sources.items.len);
         counters.occurs_steps += self.solver.occurs_steps - self.occurs_base;
+        inline for (@typeInfo(@TypeOf(self.normalization_base)).@"struct".field_names) |name| @field(counters.normalization, name) += @field(self.solver.normalization, name) - @field(self.normalization_base, name);
         if (self.timing) |scope| if (self.scratch.sources.items.len != 0 and scope.owner.clock.io != null) {
             const elapsed = scope.elapsedUs();
             if (elapsed >= 1000) {
@@ -7748,7 +7768,7 @@ const ClosureRegion = struct {
         } else try self.scratch.imported.put(self.scratch_allocator, key, result);
         // Lexical loan regions remain in the import map for exact semantic
         // checks. They are not type substitutions or physical code parameters.
-        if (node.tag == .variable or (node.tag == .bound and node.b == 0) or node.tag == .projection) try self.scratch.variables.append(self.scratch_allocator, .{ .source = key, .region = result });
+        if (node.tag == .variable or (node.tag == .bound and node.b == 0) or node.tag == .projection) try self.appendVariable(.{ .source = key, .region = result });
         if (node.tag == .projection) try self.projection_scopes.put(self.session.allocator, result, scope);
         return result;
     }
@@ -7816,6 +7836,8 @@ const ClosureRegion = struct {
             const owned = if (formal) |binder| std.mem.findScalar(types.Id, source.list(self.scratch.sources.items[scope].import_binders), binder) != null else false;
             if (!owned) return self.importRowVariable(parent, variable);
         }
+        const key: RowVariable = .{ .scope = scope, .variable = variable };
+        if (self.scratch.row_variables.get(key)) |known| return known;
         if (formal) |binder| {
             if (binder == 0 or binder >= source.nodes.len) return error.UnresolvedType;
             const leaf = source.node(binder);
@@ -7829,8 +7851,6 @@ const ClosureRegion = struct {
             }
             if (owners != 1) return error.UnresolvedType;
         } else if (variable >= source.effects.variable_count) return error.UnresolvedType;
-        const key: RowVariable = .{ .scope = scope, .variable = variable };
-        if (self.scratch.row_variables.get(key)) |known| return known;
         var fresh: types.Effects.Id = undefined;
         if (formal) |binder| fresh = try self.solver.rowType(try self.importType(scope, binder, 0)) else fresh = try self.solver.freshEffects();
         try self.scratch.row_variables.put(self.scratch_allocator, key, fresh);
@@ -8501,7 +8521,7 @@ const ClosureRegion = struct {
         // Import those requirements with fresh variables; do not recollect the
         // body or publish a closed call proof before its predicates are solved.
         if ((!self.source_interface or binding.scheme.obligations.len != 0) and !self.retain_selected and !self.complete_demand_bodies and definition != null and definition.?.is_function and binding.kind == .global and try self.checkedSchemeReusable(target_)) {
-            if (self.session.principal_reads) |reads| try reads.source(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
+            try self.session.observePrincipalSource(target_.unit, target_.binding);
             if (binding.scheme.obligations.len != 0 and self.partial_principal and try self.retainOpenPrincipal(.{ .target = target_, .scope = caller, .node = body_root, .left = instantiated, .result = instantiated, .deferred_member = self.defer_members })) {
                 const start = self.scratch.summary_arguments.items.len;
                 if (arguments.len > std.math.maxInt(u32) - start) return error.TypeLimit;
@@ -9036,7 +9056,7 @@ const ClosureRegion = struct {
         return candidate;
     }
     fn collectInlineCall(self: *ClosureRegion, caller: u32, target_: Target, callee_type: types.Id, arguments: []const core.Id) RegionError!void {
-        if (self.session.principal_reads) |reads| try reads.source(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
+        try self.session.observePrincipalSource(target_.unit, target_.binding);
         const module = &self.session.units[target_.unit];
         const binding = module.binding(target_.binding);
         const definition = module.body(target_.binding);
@@ -9469,14 +9489,26 @@ const ClosureRegion = struct {
         self.scratch.sources.items[scope].binding = qualifier;
         return scope;
     }
+    fn appendVariable(self: *ClosureRegion, variable: Variable) Allocator.Error!void {
+        const index: u32 = @intCast(self.scratch.variables.items.len);
+        try self.scratch.variables.append(self.scratch_allocator, variable);
+        const source = &self.scratch.sources.items[variable.source.scope];
+        if (source.variable_last != std.math.maxInt(u32)) self.scratch.variables.items[source.variable_last].next = index else source.variable_first = index;
+        source.variable_last = index;
+    }
     fn shareLexical(self: *ClosureRegion, scope: u32, caller: u32, scheme: types.Scheme) RegionError!void {
-        const module = &self.session.units[self.scratch.sources.items[scope].owner];
-        // Existing records never change; imports only append. Fix the initial
-        // length and reload each record by value after any intervening growth.
+        const source = self.scratch.sources.items[scope];
+        const module = &self.session.units[source.owner];
+        // Per-scope links keep the original insertion order. The bound excludes
+        // imports appended by unification, as the former whole-region scan did.
         const variable_count = self.scratch.variables.items.len;
-        for (0..variable_count) |index| {
+        self.session.counters.lexical_region_candidates += variable_count;
+        var index = source.variable_first;
+        while (index < variable_count) {
             const variable = self.scratch.variables.items[index];
-            if (variable.source.scope != scope or std.mem.findScalar(types.Id, module.types.list(scheme.variables), variable.source.ty) != null) continue;
+            index = variable.next;
+            self.session.counters.lexical_scope_candidates += 1;
+            if (std.mem.findScalar(types.Id, module.types.list(scheme.variables), variable.source.ty) != null) continue;
             // Projections also occupy this table for physical result mapping.
             // Their argument variables own lexical sharing; a projection of a
             // quantified argument belongs to each independent call instance.
@@ -9860,6 +9892,7 @@ const ClosureRegion = struct {
         const buffers = copy_meter.allocator();
         graph.untracked_reads = dependencies.unknown or dependencies.nested or dependencies.call_reads.items.len != 0 or dependencies.views.items.len != 0;
         for (region.scratch.sources.items) |source| graph.foreign_sources = graph.foreign_sources or source.owner != key.target.unit;
+        graph.foreign_types_only = true;
         graph.dependencies = try buffers.dupe(core.BindingRef, dependencies.sources.items);
         graph.plain_reads = try buffers.dupe(receipt.PlainFact, dependencies.plain_facts.items);
         var copy: principal_type_graph.NormalizedCopy = .{ .allocator = buffers, .source = &region.solver, .destination = &graph.types, .max_depth = self.session.options.max_type_depth, .max_nodes = self.session.options.max_values };
@@ -10099,7 +10132,7 @@ const ClosureRegion = struct {
             try seen.put(self.scratch_allocator, graph.key, {});
             if (graph.untracked_reads) if (self.session.principal_reads) |reads| reads.invalidate(.call_read);
             if (self.session.principal_reads) |reads| {
-                if (graph.foreign_sources) reads.source_complete = false;
+                if (graph.foreign_sources and !graph.foreign_types_only) reads.source_complete = false;
                 for (graph.dependencies) |target_| try reads.source(self.session.allocator, target_);
             }
             if (graph.untracked_reads or graph.foreign_sources) if (self.session.receipt_tape) |tape| {
@@ -10466,7 +10499,7 @@ const ClosureRegion = struct {
         self.principal_only_used = true;
         try self.principalDependencies(graph, false);
         const source = self.scratch.sources.items[scope];
-        if (self.session.principal_reads) |reads| try reads.source(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
+        try self.session.observePrincipalSource(source.owner, source.binding);
         if (self.session.receipt_tape) |tape| try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
         if (self.session.constant_recorder) |recorder| try recorder.source(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
         for (graph.actions) |action| switch (action) {
@@ -10576,7 +10609,7 @@ const ClosureRegion = struct {
             const source = self.scratch.sources.items[scope];
             if (source.binding != 0 and self.session.units[source.owner].binding(source.binding).kind == .global) {
                 try reads.source(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
-            } else if (self.session.unitId(source.owner) != reads.root.unit) reads.source_complete = false;
+            } else if (self.session.unitId(source.owner) != reads.root.unit) try reads.sourceUnit(self.session.allocator, self.session.unitId(source.owner));
         }
         if (!self.building_principal and body == self.scratch.sources.items[scope].body) try self.registerBodyScope(scope);
         const recipe = if (self.session.options.reuse_body_recipes) try self.session.specializations.body_recipes.get(self.session.allocator, self.session.units, .{ .owner = self.scratch.sources.items[scope].owner, .body = body, .callables = self.include_callables }, self.session.options.max_values) else null;
@@ -11786,7 +11819,7 @@ const ClosureRegion = struct {
         self.scratch.sources.items[scope].root = root;
     }
     fn callableScope(self: *ClosureRegion, target_: Target) RegionError!u32 {
-        if (self.session.principal_reads) |reads| try reads.source(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
+        try self.session.observePrincipalSource(target_.unit, target_.binding);
         const module = &self.session.units[target_.unit];
         const body = module.body(target_.binding) orelse return error.UnresolvedType;
         const scope = try self.typeScope(target_.unit);
@@ -12896,6 +12929,27 @@ fn bodyRecipeQuotaScenario(allocator: Allocator, module: *const core.Module, roo
         try expectRecipeSolverEqual(&reference, &replay);
     }
     try std.testing.expect(replay_session.specializations.body_recipes.declined_walks > 0);
+}
+fn recipeRetryScenario(allocator: Allocator, module: *const core.Module, root: core.Id) !void {
+    var cache: body_recipe.Cache = .{};
+    defer cache.deinit(allocator);
+    const key: body_recipe.Key = .{ .owner = 0, .body = root, .callables = true };
+    try std.testing.expectEqual(null, try cache.get(allocator, &.{module.*}, key, 1));
+    try std.testing.expectEqual(null, try cache.get(allocator, &.{module.*}, key, 1));
+    try std.testing.expectEqual(@as(usize, 1), cache.reused_declines);
+    const recipe = (try cache.get(allocator, &.{module.*}, key, 16)) orelse return error.TestUnexpectedResult;
+    try std.testing.expect(recipe.visits.items.len > 1);
+    try std.testing.expectEqual(null, try cache.get(allocator, &.{module.*}, key, 1));
+    try std.testing.expectEqual(recipe, (try cache.get(allocator, &.{module.*}, key, 16)).?);
+}
+test "declined body recipes retry larger bounds and preserve later small-quota rejection through OOM" {
+    var module = try bodyRecipeLower("entry const answer = @u32.add 1 2");
+    defer module.deinit(std.testing.allocator);
+    const root = for (module.bodies) |body| {
+        if (body.exported) break body.root;
+    } else return error.TestUnexpectedResult;
+    try recipeRetryScenario(std.testing.allocator, &module, root);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, recipeRetryScenario, .{ &module, root });
 }
 test "body recipes decline bounded wide walks and preserve cached low-quota prefix error order" {
     const allocator = std.testing.allocator;

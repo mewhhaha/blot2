@@ -40,8 +40,15 @@ pub const LockedAllocator = struct {
 test "jobs share a concurrent allocator directly and lock any other" {
     var shared: LockedAllocator = .{ .backing = std.heap.smp_allocator, .io = std.testing.io };
     try std.testing.expectEqual(std.heap.smp_allocator.vtable, shared.allocator().vtable);
+    var heap: @import("../runtime/session_heap.zig").Heap = .{};
+    var counted: @import("../phase_profile.zig").CountingAllocator = .{ .backing = heap.allocator() };
+    var profiled: LockedAllocator = .{ .backing = counted.allocator(), .io = std.testing.io };
+    try std.testing.expectEqual(counted.allocator().vtable, profiled.allocator().vtable);
     var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
     var locked: LockedAllocator = .{ .backing = failing.allocator(), .io = std.testing.io };
+    var counted_failure: @import("../phase_profile.zig").CountingAllocator = .{ .backing = failing.allocator() };
+    var wrapped_failure: LockedAllocator = .{ .backing = counted_failure.allocator(), .io = std.testing.io };
+    try std.testing.expect(wrapped_failure.allocator().ptr == @as(*anyopaque, @ptrCast(&wrapped_failure)));
     const a = locked.allocator();
     try std.testing.expect(a.ptr == @as(*anyopaque, @ptrCast(&locked)));
     const bytes = try a.alloc(u8, 16);

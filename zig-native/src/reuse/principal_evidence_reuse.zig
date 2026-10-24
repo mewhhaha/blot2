@@ -12,6 +12,11 @@ const gate = @import("principal_reuse_gate.zig");
 const code_artifacts = @import("code_artifacts.zig");
 const Allocator = std.mem.Allocator;
 
+pub const SourceDecline = struct {
+    target: core.BindingRef = .{ .unit = 0, .binding = 0 },
+    source: core.BindingRef = .{ .unit = 0, .binding = 0 },
+    reason: enum { none, disabled, constant_types, incomplete, identity, changed_source, module_image, missing_root } = .none,
+};
 pub const Stats = struct {
     persisted_requests: usize = 0,
     persisted_hits: usize = 0,
@@ -52,6 +57,9 @@ pub const Stats = struct {
     call_publications_declined: usize = 0,
     summary_publications_replayed: usize = 0,
     summary_publications_declined: usize = 0,
+    /// Bounded first failed source observation per principal lookup. These
+    /// diagnostics never grant or revoke admission.
+    source_declines: [8]SourceDecline = @splat(.{}),
 };
 pub const State = struct {
     allocator: Allocator,
@@ -158,14 +166,29 @@ pub const State = struct {
     }
     /// A complete observation may survive changes outside the declarations it
     /// read. The gate still proves the entire ordered semantic catalog exact.
-    fn sourcesEqual(self: *const State, target: core.BindingRef, inputs: *const @import("principal_inputs.zig").Key) bool {
-        if (!self.gate.enabled or self.gate.constant_types or !inputs.source_complete) return false;
+    fn sourceDeclined(self: *State, detail: SourceDecline) bool {
+        for (&self.stats.source_declines) |*slot| {
+            if (std.meta.eql(slot.target, detail.target)) return false;
+            if (slot.reason == .none) {
+                slot.* = detail;
+                break;
+            }
+        }
+        return false;
+    }
+    fn sourcesEqual(self: *State, target: core.BindingRef, inputs: *const @import("principal_inputs.zig").Key) bool {
+        if (!self.gate.enabled) return self.sourceDeclined(.{ .target = target, .reason = .disabled });
+        if (self.gate.constant_types) return self.sourceDeclined(.{ .target = target, .reason = .constant_types });
+        if (!inputs.source_complete) return self.sourceDeclined(.{ .target = target, .reason = .incomplete });
+        for (inputs.source_units) |unit| {
+            if (unit == 0 or unit > self.gate.units.len or !@import("principal_input_image.zig").moduleEqual(self.old.metadata.pools.?.modules[unit - 1].module, &self.gate.units[unit - 1])) return self.sourceDeclined(.{ .target = target, .source = .{ .unit = unit, .binding = 0 }, .reason = .module_image });
+        }
         var root = false;
         for (inputs.sources) |source| {
-            if (!self.gate.admitsLocalSource(source)) return false;
+            if (!self.gate.admitsLocalSource(source)) return self.sourceDeclined(.{ .target = target, .source = source, .reason = if (self.gate.admitsCallIdentity(source)) .changed_source else .identity });
             root = root or std.meta.eql(source, target);
         }
-        return root;
+        return root or self.sourceDeclined(.{ .target = target, .reason = .missing_root });
     }
     /// Retained evidence IDs belong to the old Snapshot. Re-intern every
     /// publication before publishing any of them or retaining the new key.
