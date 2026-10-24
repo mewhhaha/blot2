@@ -1,5 +1,10 @@
 # CT109 disposition of all 86 review proposals
 
+Follow-up: [CT110](zig-native/CT110_QUALIFICATION.md) adds shared effect-list
+proofs, temporary buffers and bounded admission work. Its measured latency gains
+are modest; inferred-requirement principals, repeated solves and graph matching
+remain. The architectural qualifications in this CT109 ledger still apply.
+
 This extends [CT106](COMPILER_CT106_WORK.md) against the original
 [86-proposal review](COMPILER_REVIEW_CT105.md). The review includes conditional
 experiments and alternative architectures, not 86 mandatory optimizations.

@@ -223,8 +223,10 @@ the cache is written, but on Linux a detached writer process already holds the
 key's lock, so an immediate `dispose()` still leaves restart candidates: the
 next compiler's open waits (at most 10 s) for that write and then loads it. A
 killed writer leaves the previous file, if any. Other platforms write before
-replying. Later edits avoid cache writes; `close()` saves the latest committed
-revision the same way. Failed edits never replace the last successful
+replying. Later edits avoid cache writes; `close()` publishes the latest committed
+revision before acknowledging when it has changed. `dispose()` does not join
+detached writers. A caller that owns a temporary cache directory must wait for
+its cache-key locks before deleting it. Failed edits never replace the last successful
 checkpoint. The cache also holds the saved revision's Wasm and every input it
 read: a restarted compiler whose first build has exactly those inputs and the
 same settings returns that Wasm without compiling (`attemptStats.restored_output`).

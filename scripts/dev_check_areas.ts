@@ -59,6 +59,10 @@ export const devCheckAreas = {
     description:
       "Static aggregate sharing, retained replay, admission and fault-policy laws.",
     native: [
+      "reuse.principal_input_tests.test.checked requirement observations retain transitive headers through body edits and allocation failures",
+      "reuse.principal_type_graph.test.principal graph temporary buffers preserve nested aliases across stack heap boundaries and OOM",
+      "reuse.principal_reuse_gate_tests.test.checked requirement interfaces reject changed producer flags requirement kinds and diagnostic positions",
+      "check.effects_tests.test.row rebuilding shares immutable borrowed spans across growth rollback and allocation failures",
       "reuse.zig_project_frames_tests.test.segmented project replies preserve binary framing and reject total size before publication",
       "eval.scheme_membership.test.large scheme memberships preserve owner identity duplicates bounds and allocation failures",
       "backend.optimized_bodies_tests.test.encoded body storage caps allocated capacity as well as payload bytes",

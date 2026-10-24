@@ -17,7 +17,7 @@ const absent = std.math.maxInt(u32);
 const value_template = @import("source_value_template.zig");
 const Error = Allocator.Error || error{ InvalidFunctionReference, InvalidGlobalReference, ModuleTooLarge, Declined };
 const Address = struct { original: u32, actual: u32, len: u32, owner: u32 };
-pub const Stats = struct { graph_imports: importer.OwnerCensus = .{}, static_graph_scratch: @import("source_value_template.zig").ScratchStats = .{}, static_graph_scratch_bytes: usize = 0, candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0, reused_scalar_constants: usize = 0, reused_aggregate_constants: usize = 0 };
+pub const Stats = struct { graph_imports: importer.OwnerCensus = .{}, static_graph_scratch: @import("source_value_template.zig").ScratchStats = .{}, static_graph_scratch_bytes: usize = 0, request_checks: usize = 0, request_hits: usize = 0, candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0, reused_scalar_constants: usize = 0, reused_aggregate_constants: usize = 0 };
 /// An admitted aggregate constant child: the current request and the old
 /// serialized root address that the retained caller's operands name.
 const AggregateConstant = struct { request: artifacts.Request, root: u32 };
@@ -29,6 +29,9 @@ pub const State = struct {
     starts: []u64,
     ends: []u64,
     blocked: []bool,
+    /// Positive structural imports for this old capture and bound generator.
+    /// Dynamic constant/capture reads and complete job admission stay live.
+    requests_admitted: []bool,
     functions: []u32,
     signatures: []u32,
     /// First old emission record declaring each signature ID, or absent.
@@ -78,6 +81,9 @@ pub const State = struct {
         errdefer a.free(ends);
         const blocked = try a.alloc(bool, starts.len);
         errdefer a.free(blocked);
+        const requests_admitted = try a.alloc(bool, starts.len);
+        errdefer a.free(requests_admitted);
+        @memset(requests_admitted, false);
         @memset(starts, std.math.maxInt(u64));
         @memset(ends, 0);
         @memset(blocked, false);
@@ -143,13 +149,14 @@ pub const State = struct {
         };
         const imports = try slots(a, import_count);
         errdefer a.free(imports);
-        return .{ .allocator = a, .old = old, .importer = graphs, .starts = starts, .ends = ends, .blocked = blocked, .functions = functions, .signatures = signatures, .signature_records = signature_records, .imports = imports, .globals = try slots(a, global_count), .arena = arena, .lists = lists, .host = host, .enabled = selection_stable, .serialized_roots = roots, .serialized_order = serialized_order };
+        return .{ .allocator = a, .old = old, .importer = graphs, .starts = starts, .ends = ends, .blocked = blocked, .requests_admitted = requests_admitted, .functions = functions, .signatures = signatures, .signature_records = signature_records, .imports = imports, .globals = try slots(a, global_count), .arena = arena, .lists = lists, .host = host, .enabled = selection_stable, .serialized_roots = roots, .serialized_order = serialized_order };
     }
     pub fn deinit(self: *State) void {
         self.importer.deinit();
         self.allocator.free(self.starts);
         self.allocator.free(self.ends);
         self.allocator.free(self.blocked);
+        self.allocator.free(self.requests_admitted);
         self.allocator.free(self.functions);
         self.allocator.free(self.signatures);
         self.allocator.free(self.signature_records);
@@ -417,9 +424,25 @@ pub const State = struct {
                     .list_address_unchecked, .list_set_unchecked, .list_snapshot, .host_retain, .host_release, .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance, .list_concat, .list_slice, .list_join, .list_cut, .list_directory, .list_leaf_count, .list_write_leaves => true,
                     else => false,
                 };
-                break :blk try self.importer.importRequest(g, self.old.metadata.jobs.items[function.owner - 1].request) != null;
+                break :blk try self.admitJobRequest(g, function.owner);
             },
         };
+    }
+    fn admitJobRequest(self: *State, g: anytype, id: u32) Allocator.Error!bool {
+        self.stats.request_checks += 1;
+        if (id == 0 or id > self.requests_admitted.len) return false;
+        if (self.requests_admitted[id - 1] and self.importer.generator_owner == @intFromPtr(g)) {
+            self.stats.request_hits += 1;
+            return true;
+        }
+        const request = self.old.metadata.jobs.items[id - 1].request;
+        if (try self.importer.importRequest(g, request) == null) return false;
+        self.requests_admitted[id - 1] = switch (request) {
+            .named => true,
+            .closure => |key| key.static_values == 0,
+            else => false,
+        };
+        return true;
     }
     fn knownGlobal(self: *const State, id: u32, requests: ?u32) bool {
         if (self.arena) |value| inline for (Arena.global_fields) |field| {
@@ -519,8 +542,9 @@ pub const State = struct {
                         m = self.metaAt(self.ends[child - 1] + 1) - 1;
                         continue;
                     }
-                    const request = if (child_job.request == .constant) try self.scalarConstantRequest(g, child_job) else try self.importer.importRequest(g, child_job.request);
-                    if (request == null) return false;
+                    if (child_job.request == .constant) {
+                        if (try self.scalarConstantRequest(g, child_job) == null) return false;
+                    } else if (!try self.admitJobRequest(g, child)) return false;
                 },
                 else => {},
             }

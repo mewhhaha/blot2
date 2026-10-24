@@ -287,16 +287,19 @@ Deno.test("checked interface principal reuse executes changed bodies and preserv
     prefix: "blot-checked-interface-",
   });
   const entry = `${directory}/main.blot`;
-  const source = (operation: string, operand: number) =>
+  const source = (operation: string, operand: number, required = false) =>
     `const add = fn (x: U32) -> U32 => @u32.add x 1
 const sub = fn (x: U32) -> U32 => @u32.sub x 1
 const div = fn (x: U32) -> U32 => @u32.div x 1
-const local = fn (x: U32) -> U32 => @u32.${operation} x ${operand}
+const local${required ? ": U32 -> U32 where { type_rep U32 }" : ""} = fn (x: U32) -> U32 => @u32.${operation} x ${operand}
 entry const answer: U32 where { type_rep U32 } = local 41
 `;
   try {
     await Deno.writeTextFile(entry, source("add", 1));
-    for (const codegenTier of ["optimized", "development"] as const) {
+    for (const [codegenTier, required] of [
+      ["optimized", false], ["development", false],
+      ["optimized", true], ["development", true],
+    ] as const) {
       const options = {
         executable: Deno.args[0] ??
           new URL("../zig-out/bin/blotc", import.meta.url).pathname,
@@ -317,7 +320,7 @@ entry const answer: U32 where { type_rep U32 } = local 41
             ["add", 1, 42],
           ] as const).entries()
         ) {
-          const sources = { [entry]: source(operation, operand) };
+          const sources = { [entry]: source(operation, operand, required) };
           const result = await retained.build({ sources });
           const fresh = await createZigProjectCompiler(options);
           try {

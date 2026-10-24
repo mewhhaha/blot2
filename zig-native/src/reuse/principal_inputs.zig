@@ -16,7 +16,8 @@ pub const Key = struct {
     empty_call_inputs: bool = true,
     source_complete: bool = false,
     sources: []const core.BindingRef = &.{},
-    /// Only a freshly checked, obligation-free scheme was consumed.
+    /// A checked scheme was consumed; transitive requirement headers are
+    /// separately observed even when a producer has no explicit leaves.
     interfaces: []const core.BindingRef = &.{},
     /// Anonymous/local bodies without a named declaration observation retain
     /// the complete principal input image of their source module instead.

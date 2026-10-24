@@ -2695,9 +2695,17 @@ const CompileRun = struct {
                 result.reuse.static_graph_scratch = scratch.stats;
                 result.reuse.static_graph_scratch_bytes = scratch.payloadBytes();
             }
+            if (state.match_scratch) |scratch| {
+                inline for (@typeInfo(@TypeOf(scratch.stats)).@"struct".field_names) |field| {
+                    @field(result.reuse.static_graph_scratch, field) += @field(scratch.stats, field);
+                }
+                result.reuse.static_graph_scratch_bytes += scratch.payloadBytes();
+            }
             result.reuse.reused_named = state.stats.reused_named;
             result.reuse.reused_closures = state.stats.reused_closures;
             result.reuse.candidates = state.stats.candidates;
+            result.reuse.request_checks = state.stats.request_checks;
+            result.reuse.request_hits = state.stats.request_hits;
             result.reuse.declined = state.stats.declined;
             result.reuse.reused_scalar_constants = state.stats.reused_scalar_constants;
             result.reuse.reused_aggregate_constants = state.stats.reused_aggregate_constants;

@@ -93,11 +93,8 @@ pub const Store = struct {
     }
     pub fn row(self: *Store, labels: []const Label, tail: Tail) Error!Id {
         if (labels.len == 0 and tail == .closed) return 0;
-        if (labels.len > none - self.labels.items.len) return error.EffectLimit;
-        const start = self.labels.items.len;
-        errdefer self.labels.shrinkRetainingCapacity(start);
-        // An imported/rebuilt row may borrow this side array. Preserve an index
-        // across growth instead of reading a pointer into its previous buffer.
+        // Labels in this owner are immutable. Rebuilt rows can share their
+        // span while retaining independent tails and historical cursors.
         const source_address = @intFromPtr(labels.ptr);
         const own_address = @intFromPtr(self.labels.items.ptr);
         const borrowed: ?usize = if (labels.len != 0 and source_address >= own_address and
@@ -107,8 +104,12 @@ pub const Store = struct {
             (source_address - own_address) / @sizeOf(Label)
         else
             null;
+        if (borrowed) |index| return self.add(.{ .labels = .{ .start = @intCast(index), .len = @intCast(labels.len) }, .tail = tail });
+        if (labels.len > none - self.labels.items.len) return error.EffectLimit;
+        const start = self.labels.items.len;
+        errdefer self.labels.shrinkRetainingCapacity(start);
         try self.labels.ensureUnusedCapacity(self.allocator, labels.len);
-        self.labels.appendSliceAssumeCapacity(if (borrowed) |index| self.labels.items[index..][0..labels.len] else labels);
+        self.labels.appendSliceAssumeCapacity(labels);
         return self.add(.{ .labels = .{ .start = @intCast(start), .len = @intCast(labels.len) }, .tail = tail });
     }
     pub fn rowAt(self: *Store, labels: []const Label, tail: Tail, at: Cursor) Error!Id {

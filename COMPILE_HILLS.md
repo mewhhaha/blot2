@@ -1,6 +1,36 @@
 # Compile-time hills
 
-## Current queue: ordinary edits toward one second (24 October 2026)
+## Current queue: ordinary edits toward one second (25 October 2026)
+
+[CT110](zig-native/CT110_QUALIFICATION.md) passes seven release pairs against
+CT109: paired CPU improves 2.9% fresh, 4.4% literal and 3.0% body. Wall medians
+are 7.335 / 3.034 / 5.035 s. Exact output pins, independent fresh controls, CPU
+guards and the full gate pass. Literal effect-list visits fall 86%, while peak
+RSS and inference-region counts remain essentially unchanged. The ordinary-edit
+acceptance targets, two-second goal and sub-second goal remain open.
+
+The four selected areas now have implementations and measured outcomes:
+
+1. Checked requirement headers are observed transitively. The remaining three
+   body misses have inferred requirements, so hits stay 17/20. Narrower reuse
+   needs proof of that inferred computation; do not waive body dependencies.
+2. Shared-label-span certificates remove repeated operation scans. Literal and
+   body edits still open 2,934 and 7,216 inference regions. Refinement and
+   specialization reuse remain the larger architectural target.
+3. Rebuilt rows share immutable labels; graph-copy and scheme-import scratch use
+   small stack buffers with heap fallback. Measure solver construction and
+   allocation traffic before another allocator-policy experiment.
+4. Structural job admission memoizes successful imports. Capture preparation is
+   batched, but its source-plan cache has zero gdev calls. The fragment matcher
+   still visits roughly four million positions; its statistics are now exposed.
+
+The [work record](COMPILER_CT110_WORK.md) preserves two unsuccessful partial-row
+cache trials and the guest cleanup failure. Keep strict outputs, retained/fresh
+controls and exact owner/depth/rollback checks for the next candidate. The
+[86-proposal ledger](COMPILER_CT109_LEDGER.md) still distinguishes partial and
+conditional architecture work from implemented optimizations.
+
+## Historical CT109 queue (24 October 2026)
 
 The [CT109 qualification](zig-native/CT109_QUALIFICATION.md) passes seven
 alternating release pairs against CT106 with exact outputs. Paired CPU changes

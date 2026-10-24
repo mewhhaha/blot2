@@ -1,5 +1,20 @@
 # Five-minute development feedback
 
+[CT110](zig-native/CT110_QUALIFICATION.md) passes the expanded 99-law / 56-guest
+selected development cycle in 25.54 s, including complete Safe/noLLVM compilation
+of 2,576 native laws. Full native compilation takes 9.70 s and exhaustive
+execution 1,228.48 s across two shards. The LLVM release builds in 318.80 s while
+native execution overlaps. These are observations, not paired build gains; the
+previous CT109 run below used four shards.
+
+The first full gate passes native execution but finds a guest cache-directory
+cleanup race. The fixture now waits for detached writer locks. A verified
+native resume completes guests/local checks in 51.06 s; that excludes the
+already completed exhaustive execution and is not a 51-second full gate.
+Final qualification passes all 1,656 guests and zero Zig lint findings.
+
+Historical CT109 iteration measurements:
+
 [CT109](zig-native/CT109_QUALIFICATION.md) expands the static-sharing family
 to 95 native laws. Its last complete selected cycle passes in 25.73 s; this is
 one shared-host observation, not a paired construction speedup. Final exhaustive
@@ -23,7 +38,7 @@ sequence verifies every source restoration, compiler identity and inventory.
 These are observed distributions on a shared host, not paired build speedups or
 universal latency bounds. Full release qualification remains separate.
 
-The actual LLVM release trace spends 220.88 of 227.76 s in emission. Keep
+The historical LLVM release trace spends 220.88 of 227.76 s in emission. Keep
 Safe/noLLVM for development and the complete native inventory; focus next on
 native compilation, the measured guest cost and LLVM emission. The deep guest
 fixture is already just above its required 128-level boundary. Correct build

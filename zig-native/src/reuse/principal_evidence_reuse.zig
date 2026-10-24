@@ -22,9 +22,11 @@ pub const SourceDecline = struct {
     source_point: u32 = 0,
     interface_observation: bool = false,
     binding_requirements: u32 = 0,
+    inferred_requirements: u32 = 0,
+    callee_requirements: u32 = 0,
     body_requirements: u32 = 0,
     pub fn jsonStringify(self: *const SourceDecline, stream: *std.json.Stringify) std.Io.Writer.Error!void {
-        try stream.write(.{ .target = self.target, .source = self.source, .reason = self.reason, .identity_failure = self.identity_failure, .source_name = std.mem.sliceTo(&self.source_name_utf8, 0), .source_name_truncated = self.source_name_truncated, .source_point = self.source_point, .interface_observation = self.interface_observation, .binding_requirements = self.binding_requirements, .body_requirements = self.body_requirements });
+        try stream.write(.{ .target = self.target, .source = self.source, .reason = self.reason, .identity_failure = self.identity_failure, .source_name = std.mem.sliceTo(&self.source_name_utf8, 0), .source_name_truncated = self.source_name_truncated, .source_point = self.source_point, .interface_observation = self.interface_observation, .binding_requirements = self.binding_requirements, .body_requirements = self.body_requirements, .inferred_requirements = self.inferred_requirements, .callee_requirements = self.callee_requirements });
     }
 };
 pub const Stats = struct {
@@ -190,6 +192,10 @@ pub const State = struct {
                     if (detail.source.binding != 0 and detail.source.binding < module.bindings.len) {
                         slot.source_point = module.sourceNamePoint(detail.source.binding);
                         slot.binding_requirements = module.binding(detail.source.binding).scheme.obligations.len;
+                        const requirements = module.binding(detail.source.binding).scheme.obligations;
+                        for (module.obligations[requirements.start..][0..requirements.len]) |requirement| {
+                            if (requirement.kind == .callee_use) slot.callee_requirements += 1 else if (!requirement.explicit) slot.inferred_requirements += 1;
+                        }
                         if (module.body(detail.source.binding)) |body| {
                             slot.body_requirements = body.scheme.obligations.len;
                             if (@import("declaration_origins.zig").name(module, body.*)) |name| {

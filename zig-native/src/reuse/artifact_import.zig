@@ -25,6 +25,8 @@ const OperationScope = enum { unchecked, admitted, declined };
 /// Work within one exact old-pools/destination owner. Hit counts describe the
 /// existing cross-call memo, not permission to share maps with other owners.
 pub const Census = struct {
+    static_plan_inspections: usize = 0,
+    static_plan_hits: usize = 0,
     semantic_queries: usize = 0,
     semantic_hits: usize = 0,
     semantic_nodes: usize = 0,
@@ -76,6 +78,10 @@ pub const Importer = struct {
     /// These IDs belong to this Importer's old and current evaluator owners.
     value_anchors: std.AutoHashMapUnmanaged(u32, u32) = .empty,
     static_scratch: ?*@import("source_value_template.zig").QueryScratch = null,
+    // Source-only plans borrow this exact immutable pools/gate pair. Current
+    // values and alias topology are still matched on every request.
+    static_plans: std.AutoHashMapUnmanaged(u32, @import("source_value_template.zig").Plan) = .empty,
+    static_plan_nodes: usize = 0,
     operation_labels: ?[]u32 = null,
     operation_scopes: ?[]OperationScope = null,
     /// Known-layout ceilings of the current generator's layout store.
@@ -199,6 +205,9 @@ pub const Importer = struct {
         self.row_keys.deinit(self.allocator);
         self.captures.deinit(self.allocator);
         self.value_anchors.deinit(self.allocator);
+        var plans = self.static_plans.valueIterator();
+        while (plans.next()) |plan| plan.deinit(self.allocator);
+        self.static_plans.deinit(self.allocator);
         if (self.static_scratch) |scratch| {
             scratch.deinit();
             self.allocator.destroy(scratch);
@@ -371,15 +380,36 @@ pub const Importer = struct {
         const after = g.representations.static_keys.get(current_id);
         if (before.len != after.len or before.len == 0) return false;
         const gate = if (self.code_gate) |*owned| &owned.semantic else return false;
-        const roots = try self.allocator.alloc(u32, before.len);
-        defer self.allocator.free(roots);
-        for (before, after, roots) |old, current, *root| {
+        var root_buffer: [256]u8 align(@alignOf(usize)) = undefined;
+        var root_storage: std.heap.BufferFirstAllocator = .init(&root_buffer, self.allocator);
+        const root_allocator = root_storage.allocator();
+        const count = std.math.mul(usize, before.len, 2) catch return false;
+        const roots = try root_allocator.alloc(u32, count);
+        defer root_allocator.free(roots);
+        const old_roots = roots[0..before.len];
+        const current_roots = roots[before.len..];
+        for (before, after, old_roots, current_roots) |old, current, *old_root, *current_root| {
             if (old.variable != current.variable) return false;
-            root.* = old.value;
+            old_root.* = old.value;
+            current_root.* = current.value;
         }
-        const inspection = try @import("source_value_template.zig").Plan.inspectRootsWithRows(self.allocator, self.old, gate, roots, .source_declared);
-        var plan = inspection.plan orelse return false;
-        defer plan.deinit(self.allocator);
+        var temporary: ?@import("source_value_template.zig").Plan = null;
+        defer if (temporary) |*plan| plan.deinit(self.allocator);
+        const plan = if (self.static_plans.getPtr(old_id)) |known| found: {
+            self.census.static_plan_hits += 1;
+            break :found known;
+        } else inspected: {
+            self.census.static_plan_inspections += 1;
+            const inspection = try @import("source_value_template.zig").Plan.inspectRootsWithRows(self.allocator, self.old, gate, old_roots, .source_declared);
+            temporary = inspection.plan orelse return false;
+            if (self.static_plans.count() < 64 and temporary.?.order.len <= 65_536 - self.static_plan_nodes) {
+                try self.static_plans.put(self.allocator, old_id, temporary.?);
+                self.static_plan_nodes += temporary.?.order.len;
+                temporary = null;
+                break :inspected self.static_plans.getPtr(old_id).?;
+            }
+            break :inspected &temporary.?;
+        };
         // Reuse the existing exact-owner scratch protocol. Only touched
         // anchors/positions are cleared between independent static keys; no
         // correspondence from a declined key is authority for a later key.
@@ -389,10 +419,8 @@ pub const Importer = struct {
             self.static_scratch = scratch;
         }
         const scratch = self.static_scratch.?;
-        const anchors = scratch.begin(&plan, g) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
-        for (before, after) |old, current| {
-            if (!(plan.matchIntoWithScratch(g, self, old.value, current.value, anchors, scratch) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false)) return false;
-        }
+        const anchors = scratch.begin(plan, g) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+        if (!(plan.matchRootsIntoWithScratch(g, self, old_roots, current_roots, anchors, scratch) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false)) return false;
         return self.recordValueAnchorIds(anchors, scratch.anchor_ids.items);
     }
     fn staticKey(self: *Importer, g: anytype, id: u32) Error!u32 {

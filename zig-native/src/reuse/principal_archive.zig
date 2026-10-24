@@ -29,7 +29,7 @@ pub const Snapshot = struct {
     evidence: types.Snapshot,
 };
 pub fn wireKey(compiler: format.Digest) format.Key {
-    return .{ .compiler = compiler, .settings = format.digest("blot-principal-archive-v8:checked-interface-source-module-call-summary-proofs"), .source = @splat(0), .dependencies = @splat(0) };
+    return .{ .compiler = compiler, .settings = format.digest("blot-principal-archive-v9:transitive-checked-requirement-source-module-call-summary-proofs"), .source = @splat(0), .dependencies = @splat(0) };
 }
 /// Only records with complete dynamic observations are portable. Exact-source
 /// proofs without them, selected judgments and local templates stay behind.

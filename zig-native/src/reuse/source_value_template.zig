@@ -784,6 +784,12 @@ pub const Plan = struct {
         return true;
     }
     pub fn matchIntoWithScratch(self: *const Plan, g: anytype, graphs: *importer.Importer, old_root: u32, current_root: u32, mapped: []u32, scratch: *QueryScratch) Error!bool {
+        return self.matchRootsIntoWithScratch(g, graphs, &.{old_root}, &.{current_root}, mapped, scratch);
+    }
+    /// Prepare a multi-root graph once. Each root retains its own depth walk;
+    /// shared anchors enforce aliases and are rolled back if any root declines.
+    pub fn matchRootsIntoWithScratch(self: *const Plan, g: anytype, graphs: *importer.Importer, old_roots: []const u32, current_roots: []const u32, mapped: []u32, scratch: *QueryScratch) Error!bool {
+        if (old_roots.len == 0 or old_roots.len != current_roots.len) return false;
         try scratch.bind(self, g);
         if (self.gate.source_pools == null or self.gate.source_pools.? != self.pools or graphs.old != self.pools or !graphs.enabled or graphs.unit_map.len != self.gate.units.len or graphs.units.ptr != self.gate.units.ptr or graphs.units.len != self.gate.units.len) return error.Declined;
         for (graphs.unit_map, 1..) |unit, index| if (unit != index) return error.Declined;
@@ -811,11 +817,21 @@ pub const Plan = struct {
             if (inverse[current] == 0) scratch.inverse_ids.appendAssumeCapacity(current);
             inverse[current] = old;
         }
-        if (!try self.matchesAnchor(g, graphs, positions, semantic, mapped, candidate, inverse, old_root, current_root, 0, &scratch.inverse_ids)) return false;
-        for (self.order) |old| if (candidate[old] != 0) {
-            if (mapped[old] == 0) scratch.anchor_ids.appendAssumeCapacity(old);
-            mapped[old] = candidate[old];
+        const anchors_before = scratch.anchor_ids.items.len;
+        var matched = false;
+        defer if (!matched) {
+            for (scratch.anchor_ids.items[anchors_before..]) |old| mapped[old] = 0;
+            scratch.anchor_ids.shrinkRetainingCapacity(anchors_before);
         };
+        for (old_roots, current_roots) |old_root, current_root| {
+            if (!try self.matchesAnchor(g, graphs, positions, semantic, mapped, candidate, inverse, old_root, current_root, 0, &scratch.inverse_ids)) return false;
+            for (self.order) |old| if (candidate[old] != 0) {
+                if (mapped[old] == 0) scratch.anchor_ids.appendAssumeCapacity(old);
+                mapped[old] = candidate[old];
+                candidate[old] = 0;
+            };
+        }
+        matched = true;
         return true;
     }
     pub fn materialize(self: *const Plan, g: anytype) Error!eval.ValueId {

@@ -1,5 +1,40 @@
 # Continue here
 
+CT110 is qualified and installed. See [qualification](zig-native/CT110_QUALIFICATION.md)
+and [the work record](COMPILER_CT110_WORK.md). Seven unprofiled release pairs
+against CT109 reduce paired CPU 2.9% fresh, 4.4% literal and 3.0% body; wall
+medians are 7.335 / 3.034 / 5.035 s. Literal/body reverts improve 4.6% / 3.8%.
+Strict outputs, independent fresh controls and both fresh CPU guards pass.
+
+The compiler shares immutable effect lists and their argument proofs, narrows
+checked-header observations transitively, uses temporary stack buffers and
+memoizes successful structural job imports. Operation visits fall 86% for
+literal edits, but most removed visits were cheap certificate hits. Region
+counts remain 2,934 / 7,216 for literal/body edits; body principal hits remain
+17/20. The three remaining misses depend on inferred requirements. Fragment
+matching still visits about four million positions. Allocation traffic and
+peak RSS are essentially unchanged. Two-second/sub-second goals remain open.
+
+The full gate passes 2,576 exhaustive native laws, 1,656 guests, 48 smoke and
+57 tooling tests, with zero Zig lint findings. The selected 99-law / 56-guest
+development cycle takes 25.54 s. First full qualification finds a resource-test
+cache-directory cleanup race after native execution passes. The fixture now
+joins detached writer locks; the resumed gate verifies the exact native evidence
+and completes in 51.06 s. That excludes the 1,228.48 s exhaustive native run
+(two shards). Preserve the failed run and resume journal as evidence.
+
+Three held-out pairs and all 44 independent Wasm executions pass. Native SHA-256:
+`b0ebc5ecf07f962665fcc3cf879f5e955eb07f1341a0f2b5b8d783b963228dd2`.
+Both local tools pass external format/check/build, exact output, runtime answer
+29 and bundled-guide checks. Installation/rollback records are in
+`build/install/ct110/installed.json`. The 1,003 qualified inputs are pinned in
+`build/bench/ct110/final-pins.json`. Preserve the frozen 554-file workload,
+workspace-backed TMPDIR and unrelated untracked `zig-native/build/` and
+`zig-out-modern/`. Do not rerun the previous 86-item program; use the updated
+[performance queue](COMPILE_HILLS.md) and keep conditional architectures explicit.
+
+Historical CT109 checkpoint, 24 October 2026:
+
 CT109 is qualified and installed after the request to finish the remaining
 performance proposals. See [qualification](zig-native/CT109_QUALIFICATION.md),
 [the work record](COMPILER_CT109_WORK.md) and the

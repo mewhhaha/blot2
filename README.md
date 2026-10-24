@@ -64,38 +64,38 @@ incomplete check as passed. See
 `type-effects`, `body-checking`, `numeric-aggregates` or `tasks`; each runs
 existing positive, rejection/recovery and ownership regressions plus guests.
 
-The [CT109 qualification](zig-native/CT109_QUALIFICATION.md) adds bounded
-optimizer, reference-count verdict and encoded-body reuse, narrower checked
-interface observations, stable declaration origins and smaller validation
-workspaces. Seven alternating release pairs against CT106 pass exact outputs:
-literal-revert CPU falls **11.5%** and body-revert CPU falls **7.5%**. First-literal
-CPU is effectively unchanged; body-edit CPU falls 2.5%. Shared-host wall medians
-are **3.26 s** for the first literal and **5.38 s** for a body edit. Two-second
-and sub-second ordinary edits remain open.
+The [CT110 qualification](zig-native/CT110_QUALIFICATION.md) shares immutable
+effect lists and their argument proofs, reduces temporary graph allocations,
+and memoizes successful structural job imports. Seven alternating release pairs
+against CT109 pass exact outputs and fresh CPU guards: fresh CPU falls **2.9%**,
+literal-edit CPU **4.4%**, and body-edit CPU **3.0%**. Shared-host wall medians
+are **7.34 s** fresh, **3.03 s** for a literal edit and **5.03 s** for a body edit.
+Two-second and sub-second ordinary edits remain open.
 
 All eight previously “Remaining” proposals have implementations or measured
 trials. The [86-item ledger](COMPILER_CT109_LEDGER.md) distinguishes those from
-partial and conditional architectures. Rejected cache experiments are preserved
-in [the work record](COMPILER_CT109_WORK.md). Segmented asset replies lower
-server edit HWM by about 18 MiB on the two-asset fixture; full output and exact
-ownership checks remain mandatory.
+partial and conditional architectures. The [CT110 work record](COMPILER_CT110_WORK.md)
+preserves two more rejected cache experiments. Literal operation-list visits
+fall 86%, but inference-region counts and the three expensive body-principal
+misses remain unchanged. Peak RSS is effectively flat; a work-count reduction
+does not imply the same percentage improvement in latency or memory.
 
-The full gate passes 2,573 exhaustive native laws, 1,656 guests, 48 smoke tests
-and 57 tooling tests, with zero Zig lint findings. Three held-out pairs and 44
-independent Wasm executions pass. The 200-distinct-edit memory series passes
-232 requests and sampled fresh controls. The qualified CLI and native compiler
-are installed locally, with external format/check/build and runtime checks.
+The full gate passes 2,576 exhaustive native laws, 1,656 guests, 48 smoke tests
+and 57 tooling tests, with zero Zig lint findings. A guest-fixture cleanup race
+is fixed by joining detached cache writers before removing their directory.
+The selected Safe/noLLVM development cycle passes in **25.54 s** with 99 native
+laws and 56 guests; this is one observation, not a paired build speedup.
 
-The earlier [CT106 qualification](zig-native/CT106_QUALIFICATION.md) records its
-separate 19.1% first-literal CPU improvement against CT105. Twenty complete
-selected edit/check cycles measure 25.35 s median and 27.64 s observed p95, with
-source/identity restoration verified. The latest CT109 selected development
-check takes 25.73 s; this is not a paired compiler-build speedup claim.
+The earlier [CT109 qualification](zig-native/CT109_QUALIFICATION.md) records
+its bounded optimizer/RC/encoded-body reuse and 200-distinct-edit memory series.
+[CT106](zig-native/CT106_QUALIFICATION.md) records its separate 19.1% first-literal
+CPU gain and 20-cycle development distribution (25.35 s median, 27.64 s observed
+p95). Those historical comparisons retain their own baselines and source pins.
 
 Use `deno task check:dev --area static-sharing` for Safe/noLLVM development and
 `deno task test:compiler` for complete qualification. Compiler identity now
 recomputes build configuration after a stale-digest bug was reproduced; normal
-compiled-artifact caches remain reusable. The actual LLVM release trace spends
+compiled-artifact caches remain reusable. The historical LLVM release trace spends
 220.88 of 227.76 seconds in emission. The
 [experiment tools](scripts/bench/README.md),
 [compile measurements](COMPILE_MEASUREMENTS.md),

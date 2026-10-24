@@ -2223,6 +2223,17 @@ test "query graph scratch clears declined alias candidates and rejects changed l
     defer scratch.deinit();
     var anchors = try scratch.begin(&plan, &g);
     try std.testing.expect(try plan.matchIntoWithScratch(&g, &maps, plan.root, fresh, anchors, &scratch));
+    const expected_anchors = try a.dupe(u32, anchors);
+    defer a.free(expected_anchors);
+    anchors = try scratch.begin(&plan, &g);
+    // A later root can contradict an earlier successful one. Publish none of
+    // that batch, then retry with two aliases of the same complete root.
+    try std.testing.expect(!try plan.matchRootsIntoWithScratch(&g, &maps, &.{ plan.root, plan.root }, &.{ fresh, current_read }, anchors, &scratch));
+    for (anchors) |value| try std.testing.expectEqual(@as(u32, 0), value);
+    const positions_before = scratch.stats.plan_positions;
+    try std.testing.expect(try plan.matchRootsIntoWithScratch(&g, &maps, &.{ plan.root, plan.root }, &.{ fresh, fresh }, anchors, &scratch));
+    try std.testing.expectEqualSlices(u32, expected_anchors, anchors);
+    try std.testing.expectEqual(plan.order.len, scratch.stats.plan_positions - positions_before);
     const initialized = scratch.stats.initialized_slots;
     const sizes = sourceRowPublicationSizes(&g);
     const slots = artifacts.stamp(g.evaluator.slots);

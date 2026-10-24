@@ -316,18 +316,27 @@ pub const Gate = struct {
     }
 
     /// The collector consumed only these checked facts. No body, value,
-    /// executable fragment or unresolved requirement is admitted by this proof.
+    /// executable fragment is admitted by this proof. Requirement producers
+    /// have separate observations; their exact public headers must also pass.
     pub fn admitsCheckedInterface(self: *const Gate, target: core.BindingRef) bool {
         if (self.constant_types or !self.admitsCallIdentity(target)) return false;
         const old = self.source_pools.?.modules[target.unit - 1].module;
         const current = &self.units[target.unit - 1];
         const before = old.body(target.binding).?;
         const after = current.body(target.binding).?;
-        const left = old.binding(target.binding).scheme;
-        const right = current.binding(target.binding).scheme;
-        return before.is_function and after.is_function and left.obligations.len == 0 and right.obligations.len == 0 and
-            before.scheme.obligations.len == 0 and after.scheme.obligations.len == 0 and equal(left, right) and
-            equal(old.types.list(before.closed_rows), current.types.list(after.closed_rows));
+        const left = old.binding(target.binding);
+        const right = current.binding(target.binding);
+        // The gate already proves the whole type/catalog graph. Compare the
+        // fields used to instantiate headers, including the explicit-leaf bit
+        // consulted before descending into a producer's requirements.
+        if (!before.is_function or !after.is_function or !equal(left.scheme, right.scheme) or
+            left.has_explicit != right.has_explicit or before.parameters.len != after.parameters.len or
+            !equal(old.types.list(left.public_variables), current.types.list(right.public_variables)) or
+            !equal(old.types.list(left.public_rows), current.types.list(right.public_rows)) or
+            !equal(old.types.list(before.closed_rows), current.types.list(after.closed_rows))) return false;
+        // Retained residual constraints may carry requirement diagnostics.
+        // Unlike catalog equality, this proof keeps their locations exact.
+        return equal(old.obligations[left.scheme.obligations.start..][0..left.scheme.obligations.len], current.obligations[right.scheme.obligations.start..][0..right.scheme.obligations.len]);
     }
 
     /// A closure root of a structural unit, or one reached by the exact

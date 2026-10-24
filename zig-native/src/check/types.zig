@@ -283,15 +283,25 @@ pub const Store = struct {
             const proof = self.closed_row_index.items[id];
             break :value .{ .row = id, .generation = proof.generation, .argument_height = proof.argument_height, .has_arguments = proof.has_arguments };
         } else self.closed_rows[id % self.closed_rows.len];
-        return if (value.row == id and value.generation == self.closed_generation) value else null;
+        if (value.row == id and value.generation == self.closed_generation) return value;
+        // Effect resolution can publish a new chronological row header while
+        // sharing the same immutable label span. Its argument proof survives
+        // that header change; the tail is still resolved before this lookup.
+        const labels = self.row(id).labels;
+        const shared = self.closed_rows[spanSlot(labels)];
+        if (shared.generation != self.closed_generation or shared.row >= self.effects.rows.items.len) return null;
+        const old = self.row(shared.row).labels;
+        return if (old.start == labels.start and old.len == labels.len) .{ .row = id, .generation = shared.generation, .argument_height = shared.argument_height, .has_arguments = shared.has_arguments } else null;
+    }
+    fn spanSlot(labels: Effects.List) usize {
+        return (labels.start ^ (labels.start >> 8) ^ labels.len) % 4;
     }
     fn saveClosedRow(self: *Store, id: Effects.Id, height: u8, has_arguments: bool) void {
         if (!self.use_closed_rows or !self.use_closed_graphs or self.closed_generation == std.math.maxInt(u16) or self.effects.physical_epoch == std.math.maxInt(u64) or self.closed_effect_physical_epoch != self.effects.physical_epoch) return;
         if (id < self.closed_row_index.items.len) {
             self.closed_row_index.items[id] = .{ .generation = self.closed_generation, .argument_height = height, .has_arguments = has_arguments };
-            return;
         }
-        const slot = &self.closed_rows[id % self.closed_rows.len];
+        const slot = &self.closed_rows[spanSlot(self.row(id).labels)];
         if (slot.generation == self.closed_generation and slot.row != id) self.normalization.closed_row_evictions += 1;
         slot.* = .{ .row = id, .generation = self.closed_generation, .argument_height = height, .has_arguments = has_arguments };
     }
@@ -2939,6 +2949,14 @@ const ClosedRowTests = struct {
             try std.testing.expectEqual(@as(u8, 3), store.closedRowHeight(row_));
             _ = try store.functionWithEffects(unit, u32_type, row_);
             for (0..3) |_| try std.testing.expectEqual(row_, try store.resolveEffects(row_, 0));
+            const open_tail = try store.freshEffects();
+            const header = try store.effects.row(&.{ label, label }, store.row(open_tail).tail);
+            _ = try store.resolveEffects(header, 0);
+            const argument_visits = store.normalization.argument_rows;
+            const historical = try store.resolveEffects(header, 1);
+            try std.testing.expect(header != historical);
+            try std.testing.expectEqualDeep(store.row(header).labels, store.row(historical).labels);
+            if (enabled) try std.testing.expectEqual(argument_visits, store.normalization.argument_rows);
             var many: [17]Effects.Id = undefined;
             for (&many) |*value| {
                 value.* = try store.effects.row(&.{ label, label }, .closed);

@@ -179,6 +179,31 @@ test "checked interface observations preserve principal inference while staged b
     try checkedInterfaceReplay(a, &before, &edited.capture.?, initial.bytes);
 }
 
+test "checked requirement observations retain transitive headers through body edits and allocation failures" {
+    const prefix = "const add = fn (x: U32) -> U32 => @u32.add x 1\nconst sub = fn (x: U32) -> U32 => @u32.sub x 1\nconst local: U32 -> U32 where { type_rep U32 } = fn x => ";
+    const suffix = " x 1\nconst wrapper: U32 -> U32 where { type_rep U32 } = fn x => local x\nentry const answer: U32 where { type_rep U32 } = wrapper 41\n";
+    var before = try Fixture.init(prefix ++ "@u32.add" ++ suffix);
+    defer before.deinit();
+    var after = try Fixture.init(prefix ++ "@u32.sub" ++ suffix);
+    defer after.deinit();
+    var initial = try before.emit(.{ .retain_artifacts = true });
+    defer initial.deinit(a);
+    try std.testing.expect(initial.diagnostic == null);
+    var requirement_reads: usize = 0;
+    for (initial.capture.?.metadata.principal_queries.records.items) |record| if (record.dependencies.inputs) |observed| {
+        for (observed.interfaces) |source| if (before.units[source.unit - 1].binding(source.binding).scheme.obligations.len != 0) {
+            requirement_reads += 1;
+        };
+    };
+    try std.testing.expect(requirement_reads > 0);
+    var expected = try after.emit(.{});
+    defer expected.deinit(a);
+    try std.testing.expect(expected.diagnostic == null);
+    try std.testing.expect(!std.mem.eql(u8, initial.bytes, expected.bytes));
+    try checkedInterfaceReplay(a, &after, &initial.capture.?, expected.bytes);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, checkedInterfaceReplay, .{ &after, &initial.capture.?, expected.bytes });
+}
+
 test "principal input image does not hide staged errors or change the last good capture" {
     var before = try Fixture.init("entry const answer: U32 where { type_rep U32 } = @u32.div 8 2\n");
     defer before.deinit();

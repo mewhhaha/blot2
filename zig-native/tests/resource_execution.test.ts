@@ -489,6 +489,29 @@ Deno.test("resource owned cleanup contracts survive imported bodies portable che
     }
   } finally {
     await compiler.dispose();
+    // Linux restart writers intentionally outlive dispose(). Join their key
+    // locks before deleting the directory, as restart_cache.test.ts does.
+    await settleCacheWriters(`${directory}/cache`);
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+async function settleCacheWriters(directory: string): Promise<void> {
+  try {
+    for await (const entry of Deno.readDir(directory)) {
+      const path = `${directory}/${entry.name}`;
+      if (entry.isDirectory) await settleCacheWriters(path);
+      else if (entry.isFile && entry.name.endsWith(".lock")) {
+        const file = await Deno.open(path, { read: true });
+        try {
+          await file.lock(false);
+          await file.unlock();
+        } finally {
+          file.close();
+        }
+      }
+    }
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotFound)) throw error;
+  }
+}

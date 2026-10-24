@@ -390,11 +390,14 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
                 return result;
             }
             const node = self.source.node(root);
+            var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
+            var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+            const temporary = scratch.allocator();
             const result = switch (node.tag) {
                 .bound, .rigid => return error.TypeLimit,
                 .forall, .existential => blk: {
-                    const binders = try self.allocator.alloc(T.Id, node.c);
-                    defer self.allocator.free(binders);
+                    const binders = try temporary.alloc(T.Id, node.c);
+                    defer temporary.free(binders);
                     for (binders, 0..) |*binder, index| {
                         const binder_source = self.source.list(.{ .start = node.b, .len = node.c })[index];
                         const leaf = self.source.node(binder_source);
@@ -403,8 +406,8 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
                         try self.types.put(self.allocator, binder_source, binder.*);
                     }
                     const body = try self.ty(node.a, depth + 1);
-                    const goals = try self.allocator.dupe(T.Obligation, self.source.quantifierGoals(root));
-                    defer self.allocator.free(goals);
+                    const goals = try temporary.dupe(T.Obligation, self.source.quantifierGoals(root));
+                    defer temporary.free(goals);
                     for (goals) |*goal| {
                         inline for (.{ "ty", "other", "result", "signature" }) |field| @field(goal.*, field) = try self.ty(@field(goal.*, field), depth + 1);
                         goal.source = 0;
@@ -429,8 +432,8 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
                 .state_provider => try self.destination.stateProvider(try self.ty(node.a, depth + 1), try self.ty(node.b, depth + 1), try self.ty(node.c, depth + 1)),
                 .type_constructor => try self.destination.typeConstructor(.{ .unit = node.a, .decl = node.b }),
                 .record => blk: {
-                    const fields = try self.allocator.alloc(T.Field, node.b);
-                    defer self.allocator.free(fields);
+                    const fields = try temporary.alloc(T.Field, node.b);
+                    defer temporary.free(fields);
                     for (fields, 0..) |*field, index| {
                         const old = self.source.recordField(node, index);
                         field.* = .{ .name = old.name, .ty = try self.ty(old.ty, depth + 1) };
@@ -439,8 +442,8 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
                 },
                 .product, .nominal, .projection, .instance_selection => blk: {
                     const children = if (node.tag == .nominal or node.tag == .projection or node.tag == .instance_selection) self.source.nominalArguments(node) else self.source.list(.{ .start = node.a, .len = node.b });
-                    const copied = try self.allocator.alloc(T.Id, children.len);
-                    defer self.allocator.free(copied);
+                    const copied = try temporary.alloc(T.Id, children.len);
+                    defer temporary.free(copied);
                     for (children, copied) |child, *value| value.* = try self.ty(child, depth + 1);
                     if (node.tag == .instance_selection) break :blk try self.destination.instanceSelection(.{ .unit = node.a, .decl = node.b }, copied);
                     if (node.tag == .projection) break :blk try self.destination.projection(.{ .unit = node.a, .decl = node.b }, self.source.projectionMember(node), copied);
@@ -469,8 +472,11 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
             const root = original;
             const source = self.source.row(root);
             const old_labels = self.source.rowLabels(root);
-            const copied = try self.allocator.alloc(T.Effects.Label, old_labels.len);
-            defer self.allocator.free(copied);
+            var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
+            var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+            const temporary = scratch.allocator();
+            const copied = try temporary.alloc(T.Effects.Label, old_labels.len);
+            defer temporary.free(copied);
             for (old_labels, copied) |operation_label, *value| value.* = try self.label(operation_label, depth + 1);
             const result = switch (source.tail) {
                 .closed => self.destination.effects.row(copied, .closed) catch |err| return T.effectError(err),
@@ -500,8 +506,11 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
             try self.charge();
             const operation = self.source.operation(original);
             const old = self.source.operationArguments(original);
-            const arguments = try self.allocator.alloc(T.Id, old.len);
-            defer self.allocator.free(arguments);
+            var scratch_buffer: [64]u8 align(@alignOf(usize)) = undefined;
+            var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+            const temporary = scratch.allocator();
+            const arguments = try temporary.alloc(T.Id, old.len);
+            defer temporary.free(arguments);
             for (old, arguments) |argument, *value| value.* = try self.ty(argument, depth + 1);
             var instance = operation.instance;
             if (instance.unit == 0 and instance.decl != 0) instance.decl = try self.ty(instance.decl, depth + 1);
@@ -510,6 +519,39 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
             return result;
         }
     };
+}
+
+fn temporaryCopyLaw(allocator: std.mem.Allocator) !void {
+    var source = try T.Store.init(allocator);
+    defer source.deinit();
+    var destination = try T.Store.init(allocator);
+    defer destination.deinit();
+    const shared = try source.fresh();
+    // Exercise both sides of each stack/heap boundary, with nested arrays
+    // live together. Destination publication must never retain their storage.
+    var arguments: [33]T.Id = @splat(shared);
+    var fields: [17]T.Field = undefined;
+    var labels: [33]T.Effects.Label = undefined;
+    for ([_]usize{ 1, 16, 17, 32, 33 }) |count| {
+        const product = try source.product(arguments[0..count]);
+        for (&fields, 0..) |*field, i| field.* = .{ .name = @intCast(i + 1), .ty = product };
+        const record = try source.record(fields[0..@min(count, fields.len)]);
+        for (&labels, 0..) |*label, i| label.* = try source.internSymbolicOperation(.{ .unit = 7, .decl = @intCast(i + 1) }, arguments[0..count]);
+        const row = try source.effects.row(labels[0..count], .closed);
+        const root = try source.functionWithEffects(record, shared, row);
+        var copy: Copy = .{ .allocator = allocator, .source = &source, .destination = &destination, .max_depth = 64, .max_nodes = 1024 };
+        defer copy.deinit();
+        const result = try copy.ty(root, 0);
+        try std.testing.expect(try matchesOpen(allocator, &source, root, &destination, result, 64, 4096));
+        const arrow = destination.node(result);
+        const field = destination.recordField(destination.node(arrow.a), 0);
+        const tuple = destination.node(field.ty);
+        for (destination.list(.{ .start = tuple.a, .len = tuple.b })) |value| try std.testing.expectEqual(arrow.b, value);
+    }
+}
+test "principal graph temporary buffers preserve nested aliases across stack heap boundaries and OOM" {
+    try temporaryCopyLaw(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, temporaryCopyLaw, .{});
 }
 
 test "principal type graph imports fresh binders and preserves nested aliases and effect identities" {

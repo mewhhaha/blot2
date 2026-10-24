@@ -1,5 +1,26 @@
 # Compile and compiler-build measurements
 
+The [CT110 qualification](zig-native/CT110_QUALIFICATION.md) passes seven
+alternating release pairs against CT109, exact outputs, fresh CPU guards and
+the complete compiler gate. Paired CPU falls 2.9% fresh, 4.4% on literal edits
+and 3.0% on body edits. Wall medians are 7.335 / 3.034 / 5.035 s respectively.
+Literal/body reverts improve 4.6% / 3.8%; devtools remains within its guard.
+
+Sharing immutable effect lists and their proofs removes 86% of literal-edit
+operation visits. Inference still opens 2,934 literal / 7,216 body regions,
+and body principal hits stay 17/20. Peak RSS is effectively flat. The report
+separates these work counts from latency, allocation requests and retained
+memory. Two-second and sub-second ordinary edits remain open.
+
+The final selected development cycle takes 25.54 s (99 native laws, 56 guests,
+complete 2,576-law native compilation). Full qualification executes all native
+laws with exhaustive faults, plus 1,656 guests, 48 smoke and 57 tooling tests;
+final Zig lint has zero findings. A cache-writer cleanup race in a guest fixture
+is fixed without changing compiler behavior or assertions. See the work record
+for the failed run and exact verified native resume.
+
+Historical CT109 qualification, 24 October 2026:
+
 The [CT109 qualification](zig-native/CT109_QUALIFICATION.md) passes seven
 alternating release pairs against CT106, exact outputs and the full compiler
 gate. Paired CPU changes are first literal -0.6%, literal revert -11.5%, body

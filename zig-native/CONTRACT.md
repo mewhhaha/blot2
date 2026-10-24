@@ -833,13 +833,37 @@ certificate grants executable or value reuse.
 
 Principal source observations distinguish a collected body from a consumed
 checked interface. Only the collector's existing checked-scheme branch may
-record the latter, and only when both binding and body schemes have no
-obligations. Admission proves the same unique callable origin, exact schemes,
-closed rows, flags and semantic catalogs in freshly checked Core. A body read
+record the latter. It observes the entire transitive requirement-header graph,
+including producers without explicit leaves. Admission proves the same unique
+callable origin, exact schemes, public binders, closed rows, flags, requirement
+diagnostic locations and semantic catalogs in freshly checked Core. A body read
 remains independently authoritative even when the same declaration also has an
 interface read. Interface equality never admits old executable code, evaluated
-values or outstanding requirements. Both observation kinds own bounded storage;
-principal archive key v8 includes and validates the interface records.
+values or bypass solving outstanding requirements. Both observation kinds own
+bounded storage; principal archive key v9 includes the transitive interface
+records. The recorder's deduplicated output is also its bounded traversal queue.
+Unprojected external alias chains decline this optional observation proof.
+
+Closed operation-argument certificates may follow an exact immutable label span
+across different chronological row headers. The existing four fallback slots
+carry this correspondence; no new allocation or approximate content match is
+involved. Tails resolve first and argument depth limits remain live. Physical
+writes, rollback and generation saturation revoke the certificates as before.
+Rebuilt effect rows may share a label slice already owned by the same store.
+Each receives its own row header, tail and cursor; external slices are copied.
+Rollback discards later headers and spans without changing surviving rows.
+
+Executable admission memoizes successful structural imports of named requests
+and closures without static captures, by old job ID within one exact importer
+and destination generator. It never memoizes failure or complete job admission.
+Static reads, constants, captures, operands and publication checks remain live.
+Capture matching prepares a multi-root graph once, checks every current value
+with shared alias maps and independent per-root depth walks, and retains new
+anchors only after all roots succeed. Decline and OOM roll back new anchors.
+Source-only capture plans are bounded to 64 plans / 65,536 value positions in
+one exact importer/gate pair; they never cache a current-value match. Graph-copy
+temporary buffers fall back to the heap above their stack capacity, and only
+destination-owned arrays survive publication.
 
 Declaration projection reuses one generation-tagged visited workspace per module
 pair. Declines and OOM cannot leak visited marks into the next scan; generation

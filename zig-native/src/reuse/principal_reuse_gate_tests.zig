@@ -59,6 +59,38 @@ test "call identity follows unique owned declaration names across source movemen
     try std.testing.expect(!ambiguous.admitsCheckedInterface(later));
 }
 
+test "checked requirement interfaces reject changed producer flags requirement kinds and diagnostic positions" {
+    const source = "entry const local: U32 -> U32 where { type_rep U32 } = fn x => @u32.add x 1\n";
+    var before = try Fixture.init(a, &.{source});
+    defer before.deinit(a);
+    var pinned = try Pinned.init(a, &before);
+    defer pinned.deinit(a);
+    var after = try Fixture.init(a, &.{source});
+    defer after.deinit(a);
+    const local = target(&after.units[0], "local");
+    const module = &after.units[0];
+    const binding = &module.bindings[local.binding];
+    try std.testing.expect(binding.scheme.obligations.len > 0);
+    var same = try Gate.init(a, &pinned.pools, after.units, after.names.view());
+    defer same.deinit();
+    try std.testing.expect(same.admitsCheckedInterface(local));
+    binding.has_explicit = !binding.has_explicit;
+    var flags = try Gate.init(a, &pinned.pools, after.units, after.names.view());
+    defer flags.deinit();
+    try std.testing.expect(!flags.admitsCheckedInterface(local));
+    binding.has_explicit = !binding.has_explicit;
+    const obligation = &module.obligations[binding.scheme.obligations.start];
+    obligation.span.start += 1;
+    var position = try Gate.init(a, &pinned.pools, after.units, after.names.view());
+    defer position.deinit();
+    try std.testing.expect(!position.admitsCheckedInterface(local));
+    obligation.span.start -= 1;
+    obligation.explicit = !obligation.explicit;
+    var requirement = try Gate.init(a, &pinned.pools, after.units, after.names.view());
+    defer requirement.deinit();
+    try std.testing.expect(!requirement.admitsCheckedInterface(local));
+}
+
 test "declaration projection workspace isolates declined scans generation rollover and allocation failure" {
     const source =
         \\entry const earlier = fn (x: U32) -> U32 => @u32.add x 1

@@ -132,14 +132,32 @@ test "inference retains repeated operations while reflection returns a distinct 
     try std.testing.expectEqualSlices(E.Label, &.{ 3, 8 }, labels);
 }
 
-test "row rebuilding preserves borrowed label spans across buffer growth" {
-    var store = try E.Store.init(std.testing.allocator);
+fn borrowedRows(allocator: std.mem.Allocator) !void {
+    var store = try E.Store.init(allocator);
     defer store.deinit();
     var labels: [1024]E.Label = undefined;
     for (&labels, 0..) |*label, index| label.* = @intCast(index);
     const original = try store.row(&labels, .closed);
-    const copied = try store.row(store.list(store.node(original).labels), .closed);
+    const copied = try store.rowAt(store.list(store.node(original).labels), .closed, 9);
+    try std.testing.expect(copied != original);
+    try std.testing.expectEqual(store.node(original).labels, store.node(copied).labels);
+    try std.testing.expectEqual(@as(usize, labels.len), store.labels.items.len);
+    try std.testing.expectEqual(@as(E.Cursor, 0), store.node(original).cursor);
+    try std.testing.expectEqual(@as(E.Cursor, 9), store.node(copied).cursor);
     try std.testing.expectEqualSlices(E.Label, &labels, store.list(store.node(copied).labels));
+    const point = store.mark();
+    const section = try store.row(store.list(store.node(original).labels)[17..33], .closed);
+    try std.testing.expectEqual(store.node(original).labels.start + 17, store.node(section).labels.start);
+    // Force the side array to grow, then roll back both new spans and headers.
+    const old_capacity = store.labels.capacity;
+    while (store.labels.items.len <= old_capacity) _ = try store.row(&labels, .closed);
+    try std.testing.expectEqualSlices(E.Label, labels[17..33], store.list(store.node(section).labels));
+    store.rollback(point);
+    const retried = try store.rowAt(store.list(store.node(original).labels)[17..33], .closed, 12);
+    try std.testing.expectEqual(section, retried);
+    try std.testing.expectEqual(@as(usize, labels.len), store.labels.items.len);
+    try std.testing.expectEqualSlices(E.Label, labels[17..33], store.list(store.node(retried).labels));
+    try std.testing.expectEqual(@as(E.Cursor, 9), store.node(copied).cursor);
     const variable = try store.fresh();
     const open = try store.row(&.{7}, store.node(variable).tail);
     const replaced = try store.substitute(open, store.node(variable).tail.variable, original);
@@ -148,6 +166,11 @@ test "row rebuilding preserves borrowed label spans across buffer growth" {
     defer store.allocator.free(free);
     try std.testing.expectEqualSlices(u32, &.{store.node(variable).tail.variable}, free);
     try std.testing.expectError(error.EffectMismatch, store.operationSet(open));
+}
+
+test "row rebuilding shares immutable borrowed spans across growth rollback and allocation failures" {
+    try borrowedRows(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, borrowedRows, .{});
 }
 
 test "generated row histories match sequential replacement at every cursor" {

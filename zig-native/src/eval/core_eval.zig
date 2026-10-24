@@ -8591,11 +8591,10 @@ const ClosureRegion = struct {
         // body or publish a closed call proof before its predicates are solved.
         if ((!self.source_interface or binding.scheme.obligations.len != 0) and !self.retain_selected and !self.complete_demand_bodies and definition != null and definition.?.is_function and binding.kind == .global and try self.checkedSchemeReusable(target_)) {
             // This branch consumes the freshly checked scheme, not its body.
-            // Requirements may depend on producers: retain full observations
-            // unless both the binding and body schemes are obligation-free.
-            if (binding.scheme.obligations.len == 0 and definition.?.scheme.obligations.len == 0) {
-                if (self.session.principal_reads) |reads| try reads.interface(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
-            } else try self.session.observePrincipalSource(target_.unit, target_.binding);
+            // Requirement producers are checked headers too. Record the entire
+            // reachable header graph, even when checkedRequirements hit its
+            // session cache or a producer currently has no explicit leaves.
+            try self.observeCheckedScheme(target_);
             if (binding.scheme.obligations.len != 0 and self.partial_principal and try self.retainOpenPrincipal(.{ .target = target_, .scope = caller, .node = body_root, .left = instantiated, .result = instantiated, .deferred_member = self.defer_members })) {
                 const start = self.scratch.summary_arguments.items.len;
                 if (arguments.len > std.math.maxInt(u32) - start) return error.TypeLimit;
@@ -8647,6 +8646,32 @@ const ClosureRegion = struct {
             return;
         }
         try self.collectInlineCall(caller, target_, callee_type, arguments);
+    }
+    fn observeCheckedScheme(self: *ClosureRegion, target_: Target) RegionError!void {
+        const reads = self.session.principal_reads orelse return;
+        var next = reads.interfaces.items.len;
+        try reads.interface(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
+        // The recorder's bounded, deduplicated output doubles as a worklist.
+        // No region-local graph or second set of allocations is needed.
+        while (reads.eligible and reads.source_complete and next < reads.interfaces.items.len) : (next += 1) {
+            const source = reads.interfaces.items[next];
+            const owner = self.session.unitIndex(source.unit) orelse return error.UnresolvedType;
+            const module = &self.session.units[owner];
+            const scheme = module.binding(source.binding).scheme;
+            for (module.obligations[scheme.obligations.start..][0..scheme.obligations.len]) |requirement| {
+                if (requirement.kind != .callee_use) continue;
+                const original = try self.session.target(owner, .{ .unit = requirement.identity.unit, .binding = requirement.identity.decl });
+                const child = try self.schemeTarget(owner, requirement.identity);
+                // An alias chain needs its own source projection. Observing
+                // only its final producer would omit a retargeted alias.
+                if (!std.meta.eql(original, child)) {
+                    reads.source_complete = false;
+                    return;
+                }
+                try reads.interface(self.session.allocator, .{ .unit = self.session.unitId(child.unit), .binding = child.binding });
+                if (!reads.eligible or !reads.source_complete) break;
+            }
+        }
     }
     fn checkedSchemeReusable(self: *ClosureRegion, target_: Target) RegionError!bool {
         const module = &self.session.units[target_.unit];
@@ -8928,8 +8953,11 @@ const ClosureRegion = struct {
         if (product.tag != .product or product.b != header.mask.len) return error.UnresolvedType;
         // Resolution may grow the solver's side arrays. Keep an owned copy of
         // the slot handles, and use exact live IDs rather than alpha equality.
-        const instance = try self.scratch_allocator.dupe(types.Id, self.solver.list(.{ .start = product.a, .len = product.b }));
-        defer self.scratch_allocator.free(instance);
+        var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.scratch_allocator);
+        const temporary = scratch.allocator();
+        const instance = try temporary.dupe(types.Id, self.solver.list(.{ .start = product.a, .len = product.b }));
+        defer temporary.free(instance);
         var parts: std.ArrayList(u32) = .empty;
         defer parts.deinit(self.scratch_allocator);
         for (instance, header.mask, 0..) |operand, consumed, slot| {
@@ -8990,8 +9018,11 @@ const ClosureRegion = struct {
         const binding = module.binding(use.target.binding);
         const product = self.solver.node(try self.solver.resolve(use.left, 0));
         if (product.tag != .product or product.b != binding.public_variables.len + binding.public_rows.len) return error.UnresolvedType;
-        const instance = try self.scratch_allocator.dupe(types.Id, self.solver.list(.{ .start = product.a, .len = product.b }));
-        defer self.scratch_allocator.free(instance);
+        var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.scratch_allocator);
+        const temporary = scratch.allocator();
+        const instance = try temporary.dupe(types.Id, self.solver.list(.{ .start = product.a, .len = product.b }));
+        defer temporary.free(instance);
         var copy: principal_type_graph.FrozenCopy = .{ .allocator = self.scratch_allocator, .source = &module.types, .destination = &self.solver, .max_depth = self.session.options.max_type_depth, .max_nodes = self.session.options.max_values };
         errdefer copy.deinit();
         for (module.types.list(binding.public_variables), instance[0..binding.public_variables.len]) |variable, actual| {
