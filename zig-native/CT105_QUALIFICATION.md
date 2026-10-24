@@ -223,9 +223,12 @@ keeps those distinctions explicit; this batch does not claim to close all 50.
 | 50 | Repeat the affected development cycle and full gate. Retain Safe/noLLVM, complete inventory compilation and runtime selection. No paired compiler-build improvement claim. |
 
 The first-edit frontend finding spans observations 2, 4 and 28: indexed
-correspondence removes quadratic budget exhaustion, then reaches a real graph
-comparison decline. Both this decline and the four body rebuilds remain in the
-next measurement queue.
+correspondence removes quadratic budget exhaustion, then reaches a graph-stage
+decline. The [subsequent review](../COMPILER_REVIEW_CT105.md) clarifies that this
+does not establish a semantic mismatch. Its debugger probe rules out the graph
+size cap for the observed case, while the exact declining branch remains
+unknown. Both this decline and the four body rebuilds remain in the next
+measurement queue.
 
 ## Verification and installation
 

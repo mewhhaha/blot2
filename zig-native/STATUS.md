@@ -12,6 +12,12 @@ and the broader completion requirements below remain open. Continue from
 [CT106–CT108](../COMPILE_HILLS.md), preserving exact dependency checks. The
 [continuation record](../CONTINUE.md) pins the installed binaries and evidence.
 
+The [post-CT105 review](../COMPILER_REVIEW_CT105.md) adds 86 suggestions and
+six ranked experiments on the unchanged installed compiler, with new phase,
+stack, memory-cycle and graph-size evidence. It corrects the earlier inference
+that a graph-stage decline established a semantic mismatch. No compiler code
+or qualification status changed during the review.
+
 Historical CT103/CT104 checkpoint, 24 October 2026:
 [the four inference changes are qualified](CT103_QUALIFICATION.md). Nonempty
 principal results, exact call/recursive-summary observations, consumed source

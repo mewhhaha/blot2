@@ -1,5 +1,14 @@
 # Performance hills toward sub-second edits
 
+## Post-CT105 review — 24 October 2026
+
+The [new 86-suggestion review](COMPILER_REVIEW_CT105.md) covers algorithms,
+memory, CPU execution, reuse, parallelism, output and compiler build time on
+unchanged `a0645de`. It includes fresh phase/stack measurements, a 40-build
+memory cycle, a frontend graph-size probe and six ranked experiments. The
+installed compiler still matches the qualified release. The earlier audit
+below describes the preceding binary and retains its original measurements.
+
 ## CT105 implementation and qualification — 24 October 2026
 
 [CT105](zig-native/CT105_QUALIFICATION.md) implements the supported scope-scan,
@@ -12,8 +21,10 @@ and full qualification. The literal 10% target misses. Fresh/body solver live
 peaks grow about 9.88 MB; the report includes complete allocation and RSS
 evidence.
 
-The first-edit comparison now reaches a real graph mismatch with budget
-remaining. Four body regions still rebuild on exact source-image/identity
+The first-edit comparison now reaches a graph-stage decline with binding/catalog
+budget remaining. This does not establish a semantic mismatch: see the new
+review's graph-size probe and remaining decline-reason ambiguity. Four body
+regions still rebuild on exact source-image/identity
 differences. Literal-revert inference is 1.259 s and the non-inference floor is
 still about 1.34 s in the matched profile. Sub-second edits require further
 work. All 50 audit observations have an explicit disposition in the

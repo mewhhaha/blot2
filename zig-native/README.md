@@ -67,8 +67,11 @@ The final release passes 2,555 exhaustive native laws, the full guest/tooling
 suite and zero Zig lint findings, and both local tools are installed. The
 sampled development cycle takes 21.28 s, including 3.31 s compiler construction
 and 5.91 s complete native compilation; these are individual observations.
-The [review](../PERFORMANCE_REVIEW.md) records the memory tradeoff and remaining
-four body rebuilds, first-edit graph mismatch and non-inference costs.
+The [post-CT105 review](../COMPILER_REVIEW_CT105.md) records 86 further
+suggestions, fresh CPU stacks and a 40-build memory cycle. Four body rebuilds,
+first-edit graph correspondence and non-inference costs remain. The graph-size
+cap is ruled out for the observed comparison; its exact decline reason is
+still unknown.
 
 `blotc build ENTRY OUTPUT.wasm --prelude std/prelude.blot --std-root std`
 compiles a project. `dependencies ENTRY OUTPUT.blotdep` produces reusable typed

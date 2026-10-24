@@ -1,5 +1,14 @@
 # Compile and compiler-build measurements
 
+Latest diagnostic review, 24 October 2026:
+[post-CT105 CPU, memory, algorithm and architecture review](COMPILER_REVIEW_CT105.md).
+Three profiling-off/on pairs of the same installed release measure unprofiled
+wall medians of 6.878 s fresh, 3.786 s first literal, 2.580 s literal revert and
+4.816 s body edit. CPU-weighted stacks, five eight-state memory cycles and a
+targeted graph-size probe are archived with source/binary pins. All outputs
+match strict existing hashes. This is a review of unchanged `a0645de`, not a
+new optimization comparison, compiler build measurement or qualification.
+
 Latest qualification, 24 October 2026:
 [CT105 solver scans, normalization and catalog costs](zig-native/CT105_QUALIFICATION.md).
 Seven alternating pairs against `5cfb411` show **13.3% less fresh-game CPU**,

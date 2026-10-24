@@ -76,6 +76,14 @@ report records memory costs, unseen/fresh controls, exhaustive qualification and
 the disposition of all 50 observations in the preceding
 [CPU/memory audit](PERFORMANCE_REVIEW.md#current-cpu-memory-and-algorithm-audit--24-october-2026).
 
+The [post-CT105 compiler review](COMPILER_REVIEW_CT105.md) ranks 86 further
+suggestions across algorithms, memory, CPU execution, reuse, architecture and
+compiler build time. Fresh diagnostics of the unchanged installed release put
+literal revert at 2.58 s and body edit at 4.82 s; these are three-run observations,
+not new optimization gains. The review includes CPU stacks, a 40-build memory
+cycle and six next experiments. Frontend graph decline is not yet evidence of
+a semantic mismatch; a debugger probe rules out its graph-size cap.
+
 The matching release CLI and native compiler are installed locally. The expanded
 Safe/noLLVM development cycle takes 21.28 s, including a 3.31 s compiler build
 and 5.91 s complete native compilation. These are individual observations, not

@@ -1,5 +1,23 @@
 # Continue here
 
+Post-CT105 review, 24 October 2026:
+[86 compiler performance suggestions](COMPILER_REVIEW_CT105.md), with six
+ranked experiments and archived evidence. Implementation `a0645de` is pushed;
+the installed compiler and all compiler source bytes are unchanged. The new
+three-pair diagnostic medians are 6.878 s fresh, 3.786 s first literal, 2.580 s
+literal revert and 4.816 s body edit. These are not new speedup claims.
+Five cycles over seven source texts settle around 419–482 MiB post-build RSS;
+this does not bound a session of distinct edits. Literal non-inference work
+still takes 1.326 s in the same-profile subtraction.
+
+Start by recording the exact frontend graph-decline reason and query-chain
+costs, then trial operation-interner discrimination and narrower body-region
+dependencies. The graph-size probe sees 20,178 versus 20,179 type nodes, below
+the 65,536 cap; the exact declining branch remains unknown. Earlier wording
+that inferred a semantic mismatch was too strong. Preserve the qualified
+compiler, full verification rules and unrelated untracked directories. This
+review introduces no compiler implementation changes.
+
 CT105 checkpoint, 24 October 2026:
 [solver scans, row certificates and exact catalog indexes are qualified](zig-native/CT105_QUALIFICATION.md).
 Seven alternating release pairs against `5cfb411` reduce fresh-game CPU by

@@ -19,6 +19,13 @@ observations, not paired compiler-build improvements. No BT hill closes; stable
 caches, 20-cycle latency measurement, exhaustive-test cost and LLVM construction
 remain separate work.
 
+The [post-CT105 review, suggestions 75–80](COMPILER_REVIEW_CT105.md#building-and-verifying-the-compiler--7580)
+prioritizes representative edit-cycle distributions, detailed timing on the
+next necessary LLVM build, measured generic-instantiation costs and fewer
+production allocations in exhaustive fault laws. No compiler build was repeated
+for that review. Current four-shard timing spread is roughly 581–626 s, limiting
+the gain available from balancing alone; preserve complete qualification.
+
 Historical follow-up: [CT103/CT104](zig-native/CT103_QUALIFICATION.md) keeps
 Safe/noLLVM development and native tests. Its expanded static-sharing cycle
 passes in 26.05 s: compiler build 3.59 s, complete native compilation 6.90 s,

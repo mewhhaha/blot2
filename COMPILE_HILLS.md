@@ -12,13 +12,22 @@ target misses; two-second and sub-second ordinary edits remain open.
 
 Prioritize (1) exact module-image/source-identity dependencies blocking four
 body principals and residual queries after all 20 literal hits, (2) unit 42's
-first frontend graph mismatch after indexed catalogs succeed, (3) remaining 9.81
+first frontend graph-stage decline after indexed catalogs succeed, (3) remaining 9.81
 million literal-revert interner candidates and 35.99 million row arguments, then
 (4) lookup/encoding and allocation capacity. Preserve the negative results:
 faster catalog lookup still checks 22 modules first, and more complete source
 observations alone do not grant body reuse. The
 [50-observation audit](PERFORMANCE_REVIEW.md#current-cpu-memory-and-algorithm-audit--24-october-2026)
 and its CT105 disposition distinguish demonstrated costs from hypotheses.
+
+The [post-CT105 review](COMPILER_REVIEW_CT105.md) adds 86 suggestions and six
+bounded experiments without changing the compiler. A GDB probe rules out the
+65,536 graph-size cap for the observed first-edit comparison; depth/work limits,
+unsupported nodes, sharing correspondence and content differences still need
+distinct reasons. The unchanged release has a 1.326 s literal non-inference
+remainder in fresh diagnostics. Use the review's query-chain, interner,
+dependency and allocation measurements to choose implementation work; do not
+interpret the new quieter timings as another speedup.
 
 The comparison and diagnostic sequence below are historical CT103/CT104
 evidence.
