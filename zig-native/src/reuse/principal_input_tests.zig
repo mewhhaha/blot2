@@ -124,6 +124,19 @@ test "principal observed sources retain memo outputs across unrelated body edits
     defer changed.deinit();
     var expected = try changed.emit(.{});
     defer expected.deinit(a);
+    // This fixture consumes only the checked local interface. Verify that
+    // explicitly recording the stronger body dependency still revokes replay.
+    var local: core.BindingRef = .{ .unit = 1, .binding = 0 };
+    for (after.units[0].bodies) |body| if (std.mem.eql(u8, after.units[0].name(body.declaration_name), "local")) {
+        local.binding = body.binding;
+    };
+    try std.testing.expect(local.binding != 0);
+    const key = &edited.capture.?.metadata.principal_queries.records.items[0].dependencies.inputs.?;
+    const sources = try a.alloc(core.BindingRef, key.sources.len + 1);
+    @memcpy(sources[0..key.sources.len], key.sources);
+    sources[key.sources.len] = local;
+    a.free(key.sources);
+    key.sources = sources;
     var declined = try changed.emit(.{ .retain_artifacts = true, .principal_previous = &edited.capture.? });
     defer declined.deinit(a);
     try std.testing.expect(declined.diagnostic == null);
@@ -131,6 +144,39 @@ test "principal observed sources retain memo outputs across unrelated body edits
     try std.testing.expect(declined.principal.fresh_regions > 0);
     try std.testing.expect(declined.principal.projected_image_declines > 0);
     try std.testing.expectEqualSlices(u8, expected.bytes, declined.bytes);
+}
+
+fn checkedInterfaceReplay(allocator: std.mem.Allocator, fixture: *const Fixture, old: *const @import("artifact_capture.zig").Capture, expected: []const u8) !void {
+    var result = try fixture.emitUsing(allocator, .{ .retain_artifacts = true, .principal_previous = old });
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.principal.projected_empty_hits + result.principal.projected_nonempty_hits > 0);
+    try std.testing.expectEqualSlices(u8, expected, result.bytes);
+}
+test "checked interface observations preserve principal inference while staged body edits execute current code through OOM" {
+    const prefix = "const add = fn (x: U32) -> U32 => @u32.add x 1\nconst sub = fn (x: U32) -> U32 => @u32.sub x 1\nconst local = fn (x: U32) -> U32 => ";
+    const suffix = " x 1\nentry const answer: U32 where { type_rep U32 } = local 41\n";
+    var before = try Fixture.init(prefix ++ "@u32.add" ++ suffix);
+    defer before.deinit();
+    var after = try Fixture.init(prefix ++ "@u32.sub" ++ suffix);
+    defer after.deinit();
+    var initial = try before.emit(.{ .retain_artifacts = true });
+    defer initial.deinit(a);
+    try std.testing.expect(initial.diagnostic == null);
+    var interface_reads: usize = 0;
+    for (initial.capture.?.metadata.principal_queries.records.items) |record| if (record.dependencies.inputs) |observed| {
+        interface_reads += observed.interfaces.len;
+    };
+    try std.testing.expect(interface_reads > 0);
+    var expected = try after.emit(.{});
+    defer expected.deinit(a);
+    try std.testing.expect(expected.diagnostic == null);
+    try std.testing.expect(!std.mem.eql(u8, initial.bytes, expected.bytes));
+    try checkedInterfaceReplay(a, &after, &initial.capture.?, expected.bytes);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, checkedInterfaceReplay, .{ &after, &initial.capture.?, expected.bytes });
+    var edited = try after.emit(.{ .retain_artifacts = true, .principal_previous = &initial.capture.? });
+    defer edited.deinit(a);
+    try checkedInterfaceReplay(a, &before, &edited.capture.?, initial.bytes);
 }
 
 test "principal input image does not hide staged errors or change the last good capture" {
@@ -472,11 +518,13 @@ test "principal input replay omits declined memo outputs while owning accepted p
 }
 
 fn sourceUnitOwnershipScenario(allocator: std.mem.Allocator) !void {
-    var reads: inputs.Recorder = .{ .eligible = true, .max_reads = 2 };
+    var reads: inputs.Recorder = .{ .eligible = true, .max_reads = 3 };
     defer reads.deinit(allocator);
     const root: core.BindingRef = .{ .unit = 1, .binding = 7 };
     try reads.source(allocator, root);
     try reads.sourceUnit(allocator, 2);
+    try reads.interface(allocator, .{ .unit = 1, .binding = 8 });
+    try reads.interface(allocator, .{ .unit = 1, .binding = 8 });
     try reads.source(allocator, root);
     try reads.sourceUnit(allocator, 2);
     try std.testing.expect(reads.source_complete);
@@ -484,6 +532,8 @@ fn sourceUnitOwnershipScenario(allocator: std.mem.Allocator) !void {
     defer key.deinit(allocator);
     reads.sources.items[0].binding = 9;
     reads.source_units.items[0] = 3;
+    reads.interfaces.items[0].binding = 10;
+    try std.testing.expectEqual(@as(u32, 8), key.interfaces[0].binding);
     try std.testing.expectEqual(root, key.sources[0]);
     try std.testing.expectEqualSlices(u32, &.{2}, key.source_units);
     try reads.sourceUnit(allocator, 4);

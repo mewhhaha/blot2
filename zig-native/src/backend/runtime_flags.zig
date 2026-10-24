@@ -9,7 +9,7 @@ pub const Facts = struct {
     root_mode: u32,
     rc_admitted: bool,
 
-    fn wide(self: Facts) bool {
+    pub fn wide(self: Facts) bool {
         const arena = self.module.arena orelse return false;
         if (self.module.globals.items[arena.rc_enabled].bits & @import("../runtime/shared_rc.zig").shaped_mode != 0) return true;
         for (self.module.exports.items) |item| {

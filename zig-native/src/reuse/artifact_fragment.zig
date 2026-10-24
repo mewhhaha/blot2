@@ -17,7 +17,7 @@ const absent = std.math.maxInt(u32);
 const value_template = @import("source_value_template.zig");
 const Error = Allocator.Error || error{ InvalidFunctionReference, InvalidGlobalReference, ModuleTooLarge, Declined };
 const Address = struct { original: u32, actual: u32, len: u32, owner: u32 };
-pub const Stats = struct { candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0, reused_scalar_constants: usize = 0, reused_aggregate_constants: usize = 0 };
+pub const Stats = struct { graph_imports: importer.OwnerCensus = .{}, static_graph_scratch: @import("source_value_template.zig").ScratchStats = .{}, static_graph_scratch_bytes: usize = 0, candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0, reused_scalar_constants: usize = 0, reused_aggregate_constants: usize = 0 };
 /// An admitted aggregate constant child: the current request and the old
 /// serialized root address that the retained caller's operands name.
 const AggregateConstant = struct { request: artifacts.Request, root: u32 };

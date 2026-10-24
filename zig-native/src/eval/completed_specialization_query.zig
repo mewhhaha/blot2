@@ -46,10 +46,12 @@ pub const Stats = struct {
     shared_gate_bytes: usize = 0,
     plan_inspections: usize = 0,
     plan_cache_hits: usize = 0,
+    source_validation_checks: usize = 0,
+    source_validation_hits: usize = 0,
     graph_scratch: graph.ScratchStats = .{},
 };
 const selected_query = @import("selected_query.zig");
-const CachedPlan = struct { checked: bool = false, plan: ?graph.Plan = null };
+const CachedPlan = struct { checked: bool = false, plan: ?graph.Plan = null, source_admitted: ?bool = null };
 pub const State = struct {
     allocator: Allocator,
     old: *const capture.Capture,
@@ -238,7 +240,15 @@ pub const State = struct {
                 continue;
             }
             if (timing) |scope| scope.change(.query_source);
-            if (!self.gate.admitsReceipt(record)) {
+            // Only source admission is immutable in this exact owner pair.
+            // Options, resource budgets and all observed values/proofs still
+            // pass their current checks on every inquiry, including absences.
+            const cached_source = &self.plans.?[position].source_admitted;
+            if (cached_source.* == null) {
+                self.stats.source_validation_checks += 1;
+                cached_source.* = self.gate.admitsReceipt(record);
+            } else self.stats.source_validation_hits += 1;
+            if (!cached_source.*.?) {
                 self.reject(.source);
                 continue;
             }

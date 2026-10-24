@@ -5221,7 +5221,8 @@ fn lexicalDemandScenario(allocator: std.mem.Allocator, module: *const core.Modul
         try std.testing.expect(session.suspensionCached(captures[index]) == null);
         const examined = session.specializations.canonical_specializations.examined_words;
         try std.testing.expectEqual(@as(?lexical_inputs.Inputs, null), try session.specializations.canonical_specializations.key(&session, ready));
-        try std.testing.expect(session.specializations.canonical_specializations.examined_words > examined);
+        try std.testing.expectEqual(examined, session.specializations.canonical_specializations.examined_words);
+        try std.testing.expect(session.counters.canonical_specialization_prefiltered > 0);
         identifiers[index] = try keys.intern(allocator, &session, ready, &selected) orelse return error.ExpectedCompleteCaptureInputs;
     }
     try std.testing.expect(identifiers[0] != identifiers[1]);

@@ -85,6 +85,7 @@ test "optimized bodies survive unrelated edits and keep immutable owned results"
     try std.testing.expectEqualSlices(u8, fresh, edited);
     try std.testing.expectEqual(@as(usize, 1), stats.reused);
     try std.testing.expectEqual(@as(usize, 1), stats.optimized);
+    try std.testing.expectEqual(@as(usize, 1), stats.encoded_reused);
     module.functions.items[second].instructions.items[1].operand = 1;
     var reverted: retained.Capture = .{ .allocator = a };
     defer reverted.deinit();
@@ -93,6 +94,108 @@ test "optimized bodies survive unrelated edits and keep immutable owned results"
     defer a.free(original);
     try std.testing.expectEqualSlices(u8, before, original);
     try std.testing.expectEqual(@as(usize, 2), stats.reused);
+    try std.testing.expectEqual(@as(usize, 2), stats.encoded_reused);
+}
+
+fn encodedContexts(a: std.mem.Allocator) !void {
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    const first = try module.addFunction(&.{}, .i32);
+    const second = try module.addFunction(&.{}, .i32);
+    try module.emit(first, .{ .op = .i32_const, .operand = 1 });
+    try module.emit(second, .{ .op = .call, .operand = first });
+    _ = try module.addGlobal(.u32, 0, false);
+    var old: retained.Capture = .{ .allocator = a };
+    defer old.deinit();
+    var stats: retained.Stats = .{};
+    const original = try assemble(a, &module, null, &old, &stats);
+    defer a.free(original);
+    for (0..4) |change| {
+        switch (change) {
+            0 => {},
+            1 => module.globals.items[0].bits = 1,
+            2 => {
+                _ = try module.importFunction("host", "new", &.{}, .none);
+            },
+            3 => {
+                const extra = try module.addFunction(&.{}, .i32);
+                try module.emit(extra, .{ .op = .i32_const, .operand = 1 });
+            },
+            else => unreachable,
+        }
+        var current: retained.Capture = .{ .allocator = a };
+        defer current.deinit();
+        stats = .{};
+        const actual = try assemble(a, &module, &old, &current, &stats);
+        defer a.free(actual);
+        const fresh = try module.assemble();
+        defer a.free(fresh);
+        try std.testing.expectEqualSlices(u8, fresh, actual);
+        if (change == 0) try std.testing.expect(stats.encoded_reused == 2 and stats.encoded_reused_bytes != 0) else try std.testing.expectEqual(@as(usize, 0), stats.encoded_reused);
+    }
+}
+test "encoded body reuse preserves changed physical indexes globals imports and allocation failures" {
+    try encodedContexts(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, encodedContexts, .{});
+}
+
+test "optimizer captures above the generic query record limit remain sealed and reuse exact bodies" {
+    const a = std.testing.allocator;
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    for (0..4097) |i| {
+        const id = try module.addFunction(&.{}, .i32);
+        try module.emit(id, .{ .op = .i32_const, .operand = @intCast(i) });
+    }
+    var old: retained.Capture = .{ .allocator = a };
+    defer old.deinit();
+    var stats: retained.Stats = .{};
+    const original = try assemble(a, &module, null, &old, &stats);
+    defer a.free(original);
+    try std.testing.expect(stats.query_complete);
+    try std.testing.expectEqual(@as(usize, 4097), stats.query_records);
+    try std.testing.expectEqual(@as(usize, 0), stats.query_saturated);
+    var current: retained.Capture = .{ .allocator = a };
+    defer current.deinit();
+    stats = .{};
+    const actual = try assemble(a, &module, &old, &current, &stats);
+    defer a.free(actual);
+    try std.testing.expectEqualSlices(u8, original, actual);
+    try std.testing.expectEqual(@as(usize, 4097), stats.reused);
+    try std.testing.expectEqual(@as(usize, 4097), stats.encoded_reused);
+}
+
+test "retained ownership verdicts require exact helper roles and fresh final bodies" {
+    const a = std.testing.allocator;
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    _ = try module.ensureArena();
+    const first = try module.addTypedFunction(&.{}, .i32, .scalar);
+    const second = try module.addTypedFunction(&.{}, .i32, .scalar);
+    try module.emit(first, .{ .op = .i32_const, .operand = 1 });
+    try module.emit(second, .{ .op = .i32_const, .operand = 2 });
+    var old: retained.Capture = .{ .allocator = a };
+    defer old.deinit();
+    var stats: retained.Stats = .{};
+    const original = try assemble(a, &module, null, &old, &stats);
+    defer a.free(original);
+    try std.testing.expectEqual(@as(usize, 2), stats.rc_checked);
+    module.functions.items[second].instructions.items[0].operand = 3;
+    var current: retained.Capture = .{ .allocator = a };
+    defer current.deinit();
+    stats = .{};
+    const actual = try assemble(a, &module, &old, &current, &stats);
+    defer a.free(actual);
+    const fresh = try module.assemble();
+    defer a.free(fresh);
+    try std.testing.expectEqualSlices(u8, fresh, actual);
+    try std.testing.expectEqual(@as(usize, 1), stats.rc_reused);
+    try std.testing.expectEqual(@as(usize, 1), stats.rc_checked);
+    var matcher = try retained.Matcher.init(a, &old, &current);
+    defer matcher.deinit();
+    try std.testing.expectEqual(false, matcher.rcUnproven(first).?);
+    current.fixture_helpers = .{ first, first, first };
+    try std.testing.expect(matcher.rcUnproven(first) == null);
 }
 
 test "executable optimizer queries decline unsealed and saturated results without changing fresh bytes" {
@@ -715,4 +818,31 @@ fn fallbackReuse(a: std.mem.Allocator) !void {
 test "late ordinary fallback reuses matching plain bodies while retaining owning storage through OOM" {
     try fallbackReuse(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, fallbackReuse, .{});
+}
+
+test "encoded body storage caps allocated capacity as well as payload bytes" {
+    const a = std.testing.allocator;
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    const id = try module.addFunction(&.{}, .i32);
+    try module.emit(id, .{ .op = .i32_const, .operand = 1 });
+    var capture: retained.Capture = .{ .allocator = a };
+    defer capture.deinit();
+    var stats: retained.Stats = .{};
+    const output = try assemble(a, &module, null, &capture, &stats);
+    defer a.free(output);
+    capture.encoded.clearRetainingCapacity();
+    const limit = 8 * 1024 * 1024;
+    const payload = try a.alloc(u8, limit);
+    defer a.free(payload);
+    @memset(payload, 17);
+    try capture.recordEncoded(id, payload[0 .. limit - 1]);
+    try std.testing.expect(capture.encoded.capacity <= limit);
+    try capture.recordEncoded(id, payload[0..1]);
+    try std.testing.expectEqual(@as(usize, limit), capture.encoded.items.len);
+    try std.testing.expect(capture.encoded.capacity <= limit);
+    const previous = capture.entries.items[id].encoded;
+    try capture.recordEncoded(id, payload[0..1]);
+    try std.testing.expectEqual(previous, capture.entries.items[id].encoded);
+    try std.testing.expectEqual(@as(usize, limit), capture.encoded.items.len);
 }

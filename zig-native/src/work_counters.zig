@@ -6,6 +6,22 @@ pub const Normalization = struct {
     row_requests: u64 = 0,
     closed_row_hits: u64 = 0,
     epoch_row_hits: u64 = 0,
+    epoch_row_probes: u64 = 0,
+    epoch_row_collisions: u64 = 0,
+    epoch_row_stale: u64 = 0,
+    epoch_row_context_misses: u64 = 0,
+    epoch_row_publications: u64 = 0,
+    composite_probes: u64 = 0,
+    composite_hits: u64 = 0,
+    composite_collisions: u64 = 0,
+    composite_stale_dependencies: u64 = 0,
+    composite_future_clock_misses: u64 = 0,
+    composite_frontier_declines: u64 = 0,
+    composite_publications: u64 = 0,
+    free_type_queries: u64 = 0,
+    free_type_visits: u64 = 0,
+    free_row_queries: u64 = 0,
+    free_row_visits: u64 = 0,
     argument_rows: u64 = 0,
     labels: u64 = 0,
     arguments: u64 = 0,
@@ -18,10 +34,22 @@ pub const Normalization = struct {
     interner_rebuilds: u64 = 0,
     closed_operation_hits: u64 = 0,
     argument_height_checks: u64 = 0,
+    pub fn merge(self: *Normalization, other: Normalization) void {
+        inline for (@typeInfo(Normalization).@"struct".field_names) |field| @field(self, field) +|= @field(other, field);
+    }
+};
+pub const SchemeMembership = struct {
+    prepares: u64 = 0,
+    small: u64 = 0,
+    hits: u64 = 0,
+    publications: u64 = 0,
+    saturated: u64 = 0,
+    indexed_items: u64 = 0,
 };
 pub const Counters = struct {
     /// Region solver work only; frontend type stores are counted separately.
     normalization: Normalization = .{},
+    scheme_membership: SchemeMembership = .{},
     ragged_runtime_regions: u64 = 0,
     ragged_staged_regions: u64 = 0,
     ragged_probe_visits: u64 = 0,
@@ -64,6 +92,7 @@ pub const Counters = struct {
     /// Session-local canonical requests and complete proofs reconstructed around
     /// the current captures without opening a new inference region.
     canonical_specialization_queries: u64 = 0,
+    canonical_specialization_prefiltered: u64 = 0,
     canonical_specialization_lookups: u64 = 0,
     canonical_specialization_candidates: u64 = 0,
     canonical_specialization_hits: u64 = 0,
@@ -155,8 +184,8 @@ pub const Counters = struct {
     parameter_role_functions: u64 = 0,
     pub fn merge(self: *Counters, other: Counters) void {
         inline for (@typeInfo(Counters).@"struct".field_names) |name| {
-            if (comptime @import("std").mem.eql(u8, name, "normalization")) {
-                inline for (@typeInfo(Normalization).@"struct".field_names) |field| @field(self.normalization, field) +|= @field(other.normalization, field);
+            if (comptime @typeInfo(@TypeOf(@field(self.*, name))) == .@"struct") {
+                inline for (@typeInfo(@TypeOf(@field(self.*, name))).@"struct".field_names) |field| @field(@field(self.*, name), field) +|= @field(@field(other, name), field);
             } else if (comptime @import("std").mem.startsWith(u8, name, "max_")) {
                 @field(self, name) = @max(@field(self, name), @field(other, name));
             } else @field(self, name) +|= @field(other, name);

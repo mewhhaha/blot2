@@ -1841,6 +1841,8 @@ fn pairedQueryFailure(allocator: Allocator, fixture: *const Fixture, old: *const
     try std.testing.expectEqual(@as(usize, 2), state.stats.reused);
     try std.testing.expectEqual(@as(usize, 1), state.stats.owner_importers);
     try std.testing.expect(state.stats.plan_cache_hits > 0);
+    try std.testing.expect(state.stats.source_validation_checks > 0);
+    try std.testing.expect(state.stats.source_validation_hits > 0);
     const table = &old.metadata.specialization_queries;
     var ordered = table.candidates(@import("../eval/selected_query.zig").Adapter.fingerprint(table.records.items[0].key), .oldest_first);
     try std.testing.expectEqual(@as(?u32, 0), ordered.next());

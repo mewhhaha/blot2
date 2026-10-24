@@ -43,6 +43,9 @@ pub const Cache = struct {
         const entry = &self.entries[slot(root, at)];
         return if (entry.root == root and entry.at == at) &entry.record else null;
     }
+    pub fn occupied(self: *const Cache, root: u32, at: u32) bool {
+        return self.entries.len != 0 and self.entries[slot(root, at)].root != 0;
+    }
     pub fn put(self: *Cache, allocator: std.mem.Allocator, root: u32, at: u32, record: Record) std.mem.Allocator.Error!void {
         if (self.entries.len == 0) {
             const entries = try allocator.alloc(Entry, 16);

@@ -64,23 +64,33 @@ incomplete check as passed. See
 `type-effects`, `body-checking`, `numeric-aggregates` or `tasks`; each runs
 existing positive, rejection/recovery and ownership regressions plus guests.
 
-The [CT106 qualification](zig-native/CT106_QUALIFICATION.md) records **19.1%
-less first-literal-edit CPU** against CT105 in seven alternating release pairs,
-with identical Wasm. First-literal wall median falls from 3.62 to **2.91 s**;
-fresh CPU improves 2.4%, body CPU is effectively unchanged and literal-revert
-CPU rises 3.5%. These are shared-host observations. Body-edit, two-second and
-sub-second targets remain open.
+The [CT109 qualification](zig-native/CT109_QUALIFICATION.md) adds bounded
+optimizer, reference-count verdict and encoded-body reuse, narrower checked
+interface observations, stable declaration origins and smaller validation
+workspaces. Seven alternating release pairs against CT106 pass exact outputs:
+literal-revert CPU falls **11.5%** and body-revert CPU falls **7.5%**. First-literal
+CPU is effectively unchanged; body-edit CPU falls 2.5%. Shared-host wall medians
+are **3.26 s** for the first literal and **5.38 s** for a body edit. Two-second
+and sub-second ordinary edits remain open.
 
-Exact frontend correspondence now checks one module on the first edit instead
-of 22. Bounded operation indexes/certificates, lexical links and import scratch
-remove repeated work. The report includes 200 distinct edits, allocator/CPU
-attribution, exhaustive qualification and rejected experiments. All 86 review
-suggestions have a [disposition](COMPILER_CT106_WORK.md); conditional alternatives
-and unfinished architectural work are explicit.
+All eight previously “Remaining” proposals have implementations or measured
+trials. The [86-item ledger](COMPILER_CT109_LEDGER.md) distinguishes those from
+partial and conditional architectures. Rejected cache experiments are preserved
+in [the work record](COMPILER_CT109_WORK.md). Segmented asset replies lower
+server edit HWM by about 18 MiB on the two-asset fixture; full output and exact
+ownership checks remain mandatory.
 
-The qualified CLI and native compiler are installed locally. Twenty complete
-selected edit/check cycles measure 25.35 s median and 27.64 s observed p95,
-with source/identity restoration verified. These are shared-host observations.
+The full gate passes 2,573 exhaustive native laws, 1,656 guests, 48 smoke tests
+and 57 tooling tests, with zero Zig lint findings. Three held-out pairs and 44
+independent Wasm executions pass. The 200-distinct-edit memory series passes
+232 requests and sampled fresh controls. The qualified CLI and native compiler
+are installed locally, with external format/check/build and runtime checks.
+
+The earlier [CT106 qualification](zig-native/CT106_QUALIFICATION.md) records its
+separate 19.1% first-literal CPU improvement against CT105. Twenty complete
+selected edit/check cycles measure 25.35 s median and 27.64 s observed p95, with
+source/identity restoration verified. The latest CT109 selected development
+check takes 25.73 s; this is not a paired compiler-build speedup claim.
 
 Use `deno task check:dev --area static-sharing` for Safe/noLLVM development and
 `deno task test:compiler` for complete qualification. Compiler identity now

@@ -335,7 +335,7 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
         for (paths[0..paths_initialized]) |path| a.free(path);
         a.free(paths);
     };
-    var stats: consumer.Stats = .{ .syntax_nodes = 0, .body_elaborations = checked.body_elaborations, .body_lowerings = 0, .imported_schemes = checked.imported_schemes };
+    var stats: consumer.Stats = .{ .syntax_nodes = 0, .body_elaborations = checked.body_elaborations, .body_lowerings = 0, .imported_schemes = checked.imported_schemes, .normalization = checked.normalization };
     var lowered = try lowerFresh(a, source, &checked);
     defer if (lowered) |*batch| batch.deinit();
     for (source.units.items, units, paths, 1..) |*unit, *ir, *path, id| {

@@ -1,6 +1,39 @@
 # Continue here
 
-CT106 qualified and installed, 24 October 2026:
+CT109 is qualified and installed after the request to finish the remaining
+performance proposals. See [qualification](zig-native/CT109_QUALIFICATION.md),
+[the work record](COMPILER_CT109_WORK.md) and the
+[current 86-item ledger](COMPILER_CT109_LEDGER.md). All eight previously
+“Remaining” entries have implementations or measured experiments. Partial and
+conditional architecture work remains explicit; do not claim every architecture
+or the two-second/sub-second goals is complete.
+
+Seven alternating release pairs against CT106 pass all exact output and fresh
+CPU guards. Literal/body revert CPU improves 11.5%/7.5%; first-literal CPU is
+effectively unchanged and body CPU improves only 2.5%. First-literal/body wall
+medians are 3.261/5.377 s. All 44 held-out Wasm executions and the 232-request /
+200-distinct-edit memory series pass. Final idle RSS is 521 MiB, with no swap
+or major faults. Mapping growth at edit 159 remains unattributed; this run does
+not prove indefinite memory bounds.
+
+Candidate 10 passes the full gate (`run-d644cc958a2cea54`) in 711.82 s: 2,573
+exhaustive native laws, 1,656 guests, 48 smoke tests and 57 tooling tests. Lint
+has zero findings. The native compiler SHA-256 is
+`6b9ed919a48f4d98b7faaedee3ac25cd87e931601189eb1d1d4239fbd3842b1c`.
+Both `~/.local/bin/blot` and `blotc` pass external format/check/build, exact Wasm,
+answer 29 and bundled-guide checks. Installation and rollback records are in
+`build/install/ct109/installed.json`; 1,003 source/test/client/tool inputs are
+pinned. Failed gates and rejected caches are preserved in the evidence archive.
+
+The remaining body principals are 17/20 hits: consumed sources have two/seven
+requirements and must not be treated as obligation-free interfaces. Preserve
+those exact checks. Further inference reuse needs precise requirement/proof
+observations or a separate incremental-constraint design. Keep the frozen
+554-file workload, strict Wasm pins, isolated sibling fixtures and
+workspace-backed TMPDIR. Preserve unrelated untracked `zig-native/build/` and
+`zig-out-modern/`.
+
+Historical CT106 qualified and installed, 24 October 2026:
 [qualification and measurements](zig-native/CT106_QUALIFICATION.md),
 [all 86 dispositions](COMPILER_CT106_WORK.md).
 Seven alternating pairs against CT105 reduce first-literal CPU 19.1% (3.62 →

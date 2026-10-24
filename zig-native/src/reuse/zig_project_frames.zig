@@ -67,12 +67,20 @@ pub fn readRequest(a: std.mem.Allocator, reader: *std.Io.Reader) !?[]u8 {
 /// The caller checks/encodes metadata before committing a candidate. Any I/O
 /// failure after commit is terminal for the owned process and its session.
 pub fn write(writer: *std.Io.Writer, metadata: []const u8, payload: []const u8) !void {
-    try checkLengths(metadata.len, payload.len);
+    return writeParts(writer, metadata, &.{payload});
+}
+
+/// Borrow independently owned payload segments through the final flush. The
+/// wire format is unchanged, and every size is checked before writing a byte.
+pub fn writeParts(writer: *std.Io.Writer, metadata: []const u8, parts: []const []const u8) !void {
+    var payload: usize = 0;
+    for (parts) |part| payload = std.math.add(usize, payload, part.len) catch return error.FrameTooLarge;
+    try checkLengths(metadata.len, payload);
     var header: [8]u8 = undefined;
     std.mem.writeInt(u32, header[0..4], @intCast(metadata.len), .little);
-    std.mem.writeInt(u32, header[4..8], @intCast(payload.len), .little);
+    std.mem.writeInt(u32, header[4..8], @intCast(payload), .little);
     try writer.writeAll(&header);
     try writer.writeAll(metadata);
-    try writer.writeAll(payload);
+    for (parts) |part| try writer.writeAll(part);
     try writer.flush();
 }

@@ -172,6 +172,32 @@ exclusive work categories. Entering one pauses the previous category;
 `lookup_us` therefore excludes these stages. All work categories sit inside
 the enclosing backend clock and must not be added to that clock again.
 
+With `profileBackend`, `backendTiming.work.region_callers` attributes inclusive
+region wall time, scope/node counts and solver/scratch requested allocations to
+up to 32 compiler call sites, with explicit overflow. Nested regions overlap. On
+Linux, `backendTiming.work.thread_cpu_us` records exclusive user-plus-kernel CPU
+time of the coordinating thread by phase; it is `null` when unavailable.
+`runtimeOptimization.worker_timings` gives each backend worker's relative
+start/finish wall time, optional thread CPU microseconds, jobs and instructions.
+Worker CPU is separate from coordinator CPU; inclusive and exclusive clocks must
+not be added together. No detailed clocks run without profiling.
+
+`sourceValidation` exposes gate validation and declaration-projection work,
+counting original owners once rather than adding shared leases. Optimizer stats
+include query sealing/capacity, RC verdict reuse and encoded-body bytes reused.
+Normalization counters distinguish row/composite probes, collisions and
+invalidation causes; free-variable query/visit counters remain after a low-hit
+summary-cache trial was rejected. Static-key scratch statistics describe
+initialized versus touched positions, not process residency. Bounded source
+rejection details include owned UTF-8 declaration names, current byte points,
+requirement counts and whether the rejected observation consumed an interface.
+
+`backend.graph_imports` attributes semantic/row memo queries, hits, newly
+imported nodes and copied list words to principal, completed-query and fragment
+owners. These are deterministic work counts; map hits within one owner do not
+establish identity across import owners. `canonical_specialization_prefiltered`
+counts direct unsupported capture kinds rejected before canonical key building.
+
 With `profileBackend`, `stats.sessionHeap` reports small-block slab capacity,
 free and unused capacity, and rounded allocated capacity by class. Otherwise it
 is `null`. The snapshot precedes revision publication and can include both old

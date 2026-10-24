@@ -21,26 +21,143 @@ fn equalSlice(comptime T: type, old: []const T, current: []const T, list: core.L
     return result;
 }
 
+fn shiftedPoint(old: u32, current: u32, shift: i64) bool {
+    return (old == 0 and current == 0) or @as(i64, current) - @as(i64, old) == shift;
+}
+/// Only diagnostic positions move. Every non-position field remains exact;
+/// inconsistent movement within a declaration conservatively declines.
+fn normalizePositions(comptime Item: type, old: *Item, current: Item, shift: i64) Error!void {
+    if (Item == core.Span) {
+        if (old.start == 0 and old.end == 0 and current.start == 0 and current.end == 0) return;
+        if (@as(i64, current.start) - @as(i64, old.start) != shift or @as(i64, current.end) - @as(i64, old.end) != shift) return error.Changed;
+        old.* = current;
+    } else if (comptime @typeInfo(Item) == .@"struct") {
+        inline for (@typeInfo(Item).@"struct".field_names) |field| {
+            if (comptime std.mem.eql(u8, field, "diagnostic_point")) {
+                if (!shiftedPoint(@field(old.*, field), @field(current, field), shift)) return error.Changed;
+                @field(old.*, field) = @field(current, field);
+            } else try normalizePositions(@TypeOf(@field(old.*, field)), &@field(old.*, field), @field(current, field), shift);
+        }
+    }
+}
+
+/// Scratch belongs to one immutable module pair. Generations avoid clearing
+/// entire module-sized visited tables for each small declaration. No proof or
+/// source owner survives this workspace, and every scan starts a fresh epoch.
+pub const Workspace = struct {
+    allocator: Allocator,
+    nodes: []u32,
+    bindings: []u32,
+    patterns: []u32,
+    projections: []u32,
+    generation: u32 = 0,
+    scans: usize = 0,
+    visits: usize = 0,
+    work: std.ArrayList(Work) = .empty,
+    pub fn init(a: Allocator, old: *const core.Module) Allocator.Error!Workspace {
+        const nodes = try a.alloc(u32, old.nodes.len);
+        errdefer a.free(nodes);
+        const bindings = try a.alloc(u32, old.bindings.len);
+        errdefer a.free(bindings);
+        const patterns = try a.alloc(u32, old.patterns.len);
+        errdefer a.free(patterns);
+        const projections = try a.alloc(u32, old.projections.len);
+        var result: Workspace = .{ .allocator = a, .nodes = nodes, .bindings = bindings, .patterns = patterns, .projections = projections };
+        result.clear();
+        return result;
+    }
+    fn clear(self: *Workspace) void {
+        @memset(self.nodes, 0);
+        @memset(self.bindings, 0);
+        @memset(self.patterns, 0);
+        @memset(self.projections, 0);
+        self.generation = 0;
+    }
+    pub fn capacityBytes(self: *const Workspace) usize {
+        return (self.nodes.len + self.bindings.len + self.patterns.len + self.projections.len) * @sizeOf(u32) + self.work.capacity * @sizeOf(Work);
+    }
+    pub fn deinit(self: *Workspace) void {
+        self.allocator.free(self.nodes);
+        self.allocator.free(self.bindings);
+        self.allocator.free(self.patterns);
+        self.allocator.free(self.projections);
+        self.work.deinit(self.allocator);
+        self.* = undefined;
+    }
+    pub fn definitionEqual(self: *Workspace, old: *const core.Module, current: *const core.Module, binding: u32, closures: ?*std.ArrayList(u32), constant_types: bool) Allocator.Error!bool {
+        return self.run(old, current, binding, closures, constant_types, 0, null, &.{});
+    }
+    /// Origins were proved unique by the caller for this exact module pair.
+    /// They permit only translating positions; IDs, graph edges and payloads
+    /// remain exact and no executable validity is established here.
+    pub fn definitionEqualWithOrigins(self: *Workspace, old: *const core.Module, current: *const core.Module, binding: u32, closures: ?*std.ArrayList(u32), constant_types: bool, origins: []const bool) Allocator.Error!bool {
+        return self.run(old, current, binding, closures, constant_types, 0, null, if (binding < origins.len and origins[binding]) origins else &.{});
+    }
+    fn run(self: *Workspace, old: *const core.Module, current: *const core.Module, binding: u32, closures: ?*std.ArrayList(u32), constant_types: bool, expression: core.Id, reached: ?*std.ArrayList(core.Id), origins: []const bool) Allocator.Error!bool {
+        if (binding == 0 and expression == 0) return false;
+        std.debug.assert(self.nodes.len == old.nodes.len and self.bindings.len == old.bindings.len and self.patterns.len == old.patterns.len and self.projections.len == old.projections.len);
+        if (self.generation == std.math.maxInt(u32)) self.clear();
+        self.generation += 1;
+        self.scans += 1;
+        self.work.clearRetainingCapacity();
+        var scan: Scan = .{ .allocator = self.allocator, .old = old, .current = current, .nodes = self.nodes, .bindings = self.bindings, .patterns = self.patterns, .projections = self.projections, .work = &self.work, .generation = self.generation, .closures = closures, .constant_types = constant_types };
+        scan.origins = origins;
+        if (origins.len != 0) scan.source_shift = @as(i64, current.sourceNamePoint(binding)) - @as(i64, old.sourceNamePoint(binding));
+        defer self.visits += scan.visits;
+        if (expression != 0) {
+            scan.node(expression) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+            scan.drain() catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+        } else scan.run(binding) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+        if (reached) |ids| for (self.nodes, 0..) |seen, id| {
+            if (seen == self.generation) try ids.append(self.allocator, @intCast(id));
+        };
+        return true;
+    }
+};
+
 const Scan = struct {
     allocator: Allocator,
     old: *const core.Module,
     current: *const core.Module,
-    nodes: []bool,
-    bindings: []bool,
-    patterns: []bool,
-    projections: []bool,
-    work: std.ArrayList(Work) = .empty,
+    nodes: []u32,
+    bindings: []u32,
+    patterns: []u32,
+    projections: []u32,
+    generation: u32,
+    visits: usize = 0,
+    work: *std.ArrayList(Work),
     closures: ?*std.ArrayList(u32) = null,
     constant_types: bool = false,
+    origins: []const bool = &.{},
+    source_shift: i64 = 0,
+    fn bindingShift(self: *const Scan, id: usize) i64 {
+        if (self.old.bindings[id].kind != .global) return self.source_shift;
+        if (id >= self.origins.len or !self.origins[id]) return 0;
+        return @as(i64, self.current.sourceNamePoint(@intCast(id))) - @as(i64, self.old.sourceNamePoint(@intCast(id)));
+    }
+    fn projectedSlice(self: *const Scan, comptime Item: type, old: []const Item, current: []const Item, list: core.List) Error![]const Item {
+        if (self.origins.len == 0) return equalSlice(Item, old, current, list);
+        if (list.start > old.len or list.len > old.len - list.start or list.start > current.len or list.len > current.len - list.start) return error.Changed;
+        const result = old[list.start..][0..list.len];
+        for (result, current[list.start..][0..list.len]) |before, after| {
+            var normalized = before;
+            try normalizePositions(Item, &normalized, after, self.source_shift);
+            if (!std.meta.eql(normalized, after)) return error.Changed;
+        }
+        return result;
+    }
     fn projectedItem(self: *const Scan, comptime Item: type, left: []const Item, right: []const Item, id: usize) Error!Item {
-        if (!self.constant_types) return equalItem(Item, left, right, id);
+        if (!self.constant_types and self.origins.len == 0) return equalItem(Item, left, right, id);
         if (id >= left.len or id >= right.len) return error.Changed;
         var normalized = left[id];
+        if (self.origins.len != 0) try normalizePositions(Item, &normalized, right[id], if (Item == core.Binding) self.bindingShift(id) else self.source_shift);
         if (comptime @typeInfo(Item) == .@"struct" and @hasField(Item, "ty")) {
+            if (!self.constant_types and normalized.ty != right[id].ty) return error.Changed;
             if (!equalConstantType(self.old.types, normalized.ty, self.current.types, right[id].ty)) return error.Changed;
             normalized.ty = right[id].ty;
         }
         if (comptime @typeInfo(Item) == .@"struct" and @hasField(Item, "scheme")) {
+            if (!self.constant_types and normalized.scheme.root != right[id].scheme.root) return error.Changed;
             if (!equalConstantType(self.old.types, normalized.scheme.root, self.current.types, right[id].scheme.root)) return error.Changed;
             normalized.scheme.root = right[id].scheme.root;
         }
@@ -61,9 +178,10 @@ const Scan = struct {
         // Node, binding and pattern zero are absent. Projection zero is real.
         if (id == 0 and item != .projection) return;
         if (id >= seen.len) return error.Changed;
-        if (seen[id]) return;
-        seen[id] = true;
+        if (seen[id] == self.generation) return;
         try self.work.append(self.allocator, item);
+        seen[id] = self.generation;
+        self.visits += 1;
     }
     fn node(self: *Scan, id: u32) Error!void {
         try self.enqueue(.{ .node = id });
@@ -78,7 +196,7 @@ const Scan = struct {
         try self.enqueue(.{ .projection = id });
     }
     fn words(self: *const Scan, list: core.List) Error![]const u32 {
-        return equalSlice(u32, self.old.extra, self.current.extra, list);
+        return self.projectedSlice(u32, self.old.extra, self.current.extra, list);
     }
     fn children(self: *Scan, list: core.List) Error!void {
         for (try self.words(list)) |id| try self.node(id);
@@ -90,7 +208,7 @@ const Scan = struct {
         if (ref.unit == 0 or ref.unit == self.old.unit) try self.binding(ref.binding);
     }
     fn carries(self: *Scan, list: core.List) Error!void {
-        for (try equalSlice(core.LoopCarry, self.old.loop_carries, self.current.loop_carries, list)) |carry| {
+        for (try self.projectedSlice(core.LoopCarry, self.old.loop_carries, self.current.loop_carries, list)) |carry| {
             try self.binding(carry.incoming);
             try self.binding(carry.iteration);
             try self.binding(carry.backedge);
@@ -124,7 +242,7 @@ const Scan = struct {
             _ = try self.projectedItem(u32, self.old.dispatch_signatures, self.current.dispatch_signatures, id);
         if (self.old.merge_ranges.len != 0 or self.current.merge_ranges.len != 0) {
             const list = try self.projectedItem(core.List, self.old.merge_ranges, self.current.merge_ranges, id);
-            for (try equalSlice(core.Merge, self.old.merges, self.current.merges, list)) |merge| {
+            for (try self.projectedSlice(core.Merge, self.old.merges, self.current.merges, list)) |merge| {
                 try self.node(merge.node);
                 try self.binding(merge.result);
                 try self.binding(merge.then_binding);
@@ -135,7 +253,7 @@ const Scan = struct {
         switch (n.tag) {
             .contract_method => {
                 _ = try equalItem(core.MemberTemplate, self.old.member_templates, self.current.member_templates, n.a);
-                for (try equalSlice(core.Id, self.old.extra, self.current.extra, .{ .start = n.b, .len = n.c })) |child| try self.node(child);
+                for (try self.projectedSlice(core.Id, self.old.extra, self.current.extra, .{ .start = n.b, .len = n.c })) |child| try self.node(child);
             },
             .task, .resource_acquire, .resource_release, .usage_share, .resource_scope, .usage_read, .usage_borrow, .package_pack, .package_unpack, .invalid => return error.Changed,
             .constant, .panic, .constructor_function, .type_constructor => {},
@@ -219,7 +337,7 @@ const Scan = struct {
                 try self.node(value.return_target);
                 try self.bindingList(value.completion_state_bindings);
                 try self.carries(value.carries);
-                for (try equalSlice(core.RequestArm, self.old.request_arms, self.current.request_arms, value.arms)) |arm| {
+                for (try self.projectedSlice(core.RequestArm, self.old.request_arms, self.current.request_arms, value.arms)) |arm| {
                     try self.node(arm.callback);
                     try self.node(arm.selector);
                 }
@@ -238,10 +356,10 @@ const Scan = struct {
             .match => {
                 const value = try self.projectedItem(core.MatchInfo, self.old.matches, self.current.matches, n.a);
                 try self.children(value.inputs);
-                for (try equalSlice(core.MatchArm, self.old.match_arms, self.current.match_arms, value.arms)) |arm| {
+                for (try self.projectedSlice(core.MatchArm, self.old.match_arms, self.current.match_arms, value.arms)) |arm| {
                     try self.node(arm.body);
                     try self.node(arm.guard);
-                    for (try equalSlice(core.PatternRow, self.old.pattern_rows, self.current.pattern_rows, arm.rows)) |row|
+                    for (try self.projectedSlice(core.PatternRow, self.old.pattern_rows, self.current.pattern_rows, arm.rows)) |row|
                         for (try self.words(row.patterns)) |pattern_| try self.pattern(pattern_);
                 }
             },
@@ -251,7 +369,7 @@ const Scan = struct {
                 try self.node(value.value);
                 try self.binding(value.self_binding);
                 for (try self.words(value.path)) |projection_| try self.projection(projection_);
-                for (try equalSlice(core.UpdateStep, self.old.update_steps, self.current.update_steps, value.selectors)) |step| switch (step.kind) {
+                for (try self.projectedSlice(core.UpdateStep, self.old.update_steps, self.current.update_steps, value.selectors)) |step| switch (step.kind) {
                     .field => try self.projection(step.projection),
                     .index => try self.node(step.index),
                 };
@@ -275,13 +393,13 @@ const Scan = struct {
         if (binding_.kind != .global or binding_.body_id == 0) return error.Changed;
         const body = try self.projectedItem(core.Body, self.old.bodies, self.current.bodies, binding_.body_id);
         const recipe = try self.projectedItem(core.DeclarationDependencies, self.old.declaration_dependencies, self.current.declaration_dependencies, binding_.body_id);
-        for (try equalSlice(core.BindingRef, self.old.dependency_references, self.current.dependency_references, recipe.references)) |ref| try self.reference(ref);
-        _ = try equalSlice(core.DependencyMember, self.old.dependency_members, self.current.dependency_members, recipe.members);
+        for (try self.projectedSlice(core.BindingRef, self.old.dependency_references, self.current.dependency_references, recipe.references)) |ref| try self.reference(ref);
+        _ = try self.projectedSlice(core.DependencyMember, self.old.dependency_members, self.current.dependency_members, recipe.members);
         try self.node(recipe.runtime_metadata);
         try self.binding(binding_id);
         try self.node(binding_.initializer);
         try self.node(body.root);
-        for (try equalSlice(core.Parameter, self.old.parameters, self.current.parameters, body.parameters)) |parameter| try self.binding(parameter.binding);
+        for (try self.projectedSlice(core.Parameter, self.old.parameters, self.current.parameters, body.parameters)) |parameter| try self.binding(parameter.binding);
         try self.drain();
     }
     fn drain(self: *Scan) Error!void {
@@ -289,8 +407,9 @@ const Scan = struct {
             .node => |id| try self.scanNode(id),
             .binding => |id| {
                 const value = try self.projectedItem(core.Binding, self.old.bindings, self.current.bindings, id);
-                if (self.old.sourceNamePoint(id) != self.current.sourceNamePoint(id)) return error.Changed;
-                if (self.old.runtimeNamePoint(id) != self.current.runtimeNamePoint(id)) return error.Changed;
+                const shift = if (self.origins.len != 0) self.bindingShift(id) else 0;
+                if (!shiftedPoint(self.old.sourceNamePoint(id), self.current.sourceNamePoint(id), shift)) return error.Changed;
+                if (!shiftedPoint(self.old.runtimeNamePoint(id), self.current.runtimeNamePoint(id), shift)) return error.Changed;
                 // The dependency fixed point covers named producer bodies.
                 // Lexical initializers are part of this declaration's closure.
                 if (value.kind == .local or value.kind == .parameter) try self.node(value.initializer);
@@ -308,7 +427,7 @@ const Scan = struct {
             },
             .projection => |id| {
                 const p = try self.projectedItem(core.Projection, self.old.projections, self.current.projections, id);
-                _ = try equalSlice(core.ProjectionVariant, self.old.projection_variants, self.current.projection_variants, p.variants);
+                _ = try self.projectedSlice(core.ProjectionVariant, self.old.projection_variants, self.current.projection_variants, p.variants);
             },
         };
     }
@@ -340,29 +459,9 @@ pub fn expressionNodes(a: Allocator, old: *const core.Module, current: *const co
     return try reached.toOwnedSlice(a);
 }
 fn definitionMode(a: Allocator, old: *const core.Module, current: *const core.Module, binding: u32, closures: ?*std.ArrayList(u32), constant_types: bool, expression: core.Id, reached: ?*std.ArrayList(core.Id)) Allocator.Error!bool {
-    if (binding == 0 and expression == 0) return false;
-    const nodes = try a.alloc(bool, old.nodes.len);
-    defer a.free(nodes);
-    const bindings = try a.alloc(bool, old.bindings.len);
-    defer a.free(bindings);
-    const patterns = try a.alloc(bool, old.patterns.len);
-    defer a.free(patterns);
-    const projections = try a.alloc(bool, old.projections.len);
-    defer a.free(projections);
-    @memset(nodes, false);
-    @memset(bindings, false);
-    @memset(patterns, false);
-    @memset(projections, false);
-    var scan: Scan = .{ .allocator = a, .old = old, .current = current, .nodes = nodes, .bindings = bindings, .patterns = patterns, .projections = projections, .closures = closures, .constant_types = constant_types };
-    defer scan.work.deinit(a);
-    if (expression != 0) {
-        scan.node(expression) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
-        scan.drain() catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
-    } else scan.run(binding) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
-    if (reached) |ids| for (nodes, 0..) |seen, id| {
-        if (seen) try ids.append(a, @intCast(id));
-    };
-    return true;
+    var workspace = try Workspace.init(a, old);
+    defer workspace.deinit();
+    return workspace.run(old, current, binding, closures, constant_types, expression, reached, &.{});
 }
 
 /// Constant-only alias proof; no variable, nominal, callable or projection ID

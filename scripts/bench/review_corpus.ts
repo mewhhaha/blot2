@@ -61,6 +61,22 @@ function deepClosure(depth: number): SyntheticProgram {
     },
   };
 }
+function quantified(width: number): SyntheticProgram {
+  const fields = Array.from({ length: width }, (_, i) => `f${i}`);
+  return {
+    name: "review_quantified",
+    size: width,
+    source: `entry const seed: U32 where { type_rep U32 } = do:
+  let keep = fn (value: {${
+      fields.map((name, i) => `${name}: a${i}`).join(", ")
+    }}) => value
+  let value = keep {${fields.map((name) => `${name}: 7`).join(", ")}}
+  break @u32.add value.f0 value.f${width - 1}
+entry const main = fn (x: U32) => @u32.add x seed
+`,
+    edit: { search: "f0: 7", replace: "f0: 8" },
+  };
+}
 function modules(count: number): SyntheticProject {
   const files: Record<string, string> = {
     "m0.blot": "const step = fn (x: U32) => @u32.add x 1\n",
@@ -88,6 +104,8 @@ function modules(count: number): SyntheticProject {
   };
 }
 export const reviewPrograms: readonly SyntheticProgram[] = [
+  quantified(32),
+  quantified(64),
   wideRecord(32),
   wideRecord(128),
   wideEffects(16),

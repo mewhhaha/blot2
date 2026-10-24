@@ -3034,13 +3034,13 @@ const Builder = struct {
                 }
             }
             self.scratch.ast_map[introduction] = root;
-            var export_name: core.Name = .{};
-            if (declaration.exported) {
-                const bytes = self.source.names.get(value.name);
-                export_name = .{ .start = @intCast(self.tables.name_bytes.items.len), .len = @intCast(bytes.len) };
-                try self.tables.name_bytes.appendSlice(self.allocator, bytes);
-            }
-            try self.tables.bodies.append(self.allocator, .{ .binding = @intCast(index), .root = root, .parameters = .{ .start = start, .len = @intCast(self.tables.parameters.items.len - start) }, .scheme = self.tables.bindings.items[index].scheme, .closed_rows = certificates[index], .span = self.source.tree.span(value.declaration), .export_name = export_name, .exported = declaration.exported, .runtime = declaration.runtime, .is_function = function });
+            // Own the spelling of unexported declarations too. Source offsets
+            // are diagnostic coordinates and move after unrelated body edits.
+            const bytes = self.source.names.get(value.name);
+            const declaration_name: core.Name = .{ .start = @intCast(self.tables.name_bytes.items.len), .len = @intCast(bytes.len) };
+            try self.tables.name_bytes.appendSlice(self.allocator, bytes);
+            const export_name: core.Name = if (declaration.exported) declaration_name else .{};
+            try self.tables.bodies.append(self.allocator, .{ .binding = @intCast(index), .root = root, .parameters = .{ .start = start, .len = @intCast(self.tables.parameters.items.len - start) }, .scheme = self.tables.bindings.items[index].scheme, .closed_rows = certificates[index], .span = self.source.tree.span(value.declaration), .declaration_name = declaration_name, .export_name = export_name, .exported = declaration.exported, .runtime = declaration.runtime, .is_function = function });
             self.tables.bindings.items[index].body_id = body_id;
             try self.tables.source_names.append(self.allocator, .{ .binding = @intCast(index), .point = self.source.tree.valueNamePoint(value.declaration) orelse self.source.tree.span(value.declaration).start });
             if (declaration.runtime) try self.tables.runtime_names.append(self.allocator, .{ .binding = @intCast(index), .point = self.source.tree.runtimeNamePoint(value.declaration) orelse self.source.tree.span(value.declaration).start });

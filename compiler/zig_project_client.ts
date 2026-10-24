@@ -241,6 +241,9 @@ function buildStats(value: unknown): ZigProjectBuildStats {
       "attemptStats",
     ]
   ) stats(object[field], `stats ${field}`);
+  if (object.sourceValidation !== undefined) {
+    stats(object.sourceValidation, "stats sourceValidation");
+  }
   if (typeof object.restartCacheLoaded !== "boolean") {
     throw new ZigProjectProtocolError("Invalid stats restartCacheLoaded");
   }

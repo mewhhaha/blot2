@@ -255,6 +255,10 @@ fn performImports(imports: *importer.Importer, inputs: Inputs, fixture: *const F
     const physical = try required("physical", try imports.importLayout(g, inputs.physical));
     try std.testing.expectEqualSlices(u32, &.{ fixture.right, 4, fixture.left, 3 }, g.representations.store.children(physical));
     const semantic = try required("semantic", try imports.importEvidence(g, inputs.semantic));
+    try std.testing.expectEqual(@as(?u32, semantic), try imports.importEvidence(g, inputs.semantic));
+    // An already memoized result still belongs to this exact generator owner.
+    var other_owner = g.*;
+    try std.testing.expectEqual(@as(?u32, null), try imports.importEvidence(&other_owner, inputs.semantic));
     // Semantic ordering follows the CURRENT symbol namespace, unlike physical slots.
     try std.testing.expectEqualSlices(u32, &.{ fixture.left, 3, fixture.right, 4 }, g.evaluator.storage.evidence.children(semantic));
     const first = try required("first_state", try imports.importLayout(g, inputs.first_state));

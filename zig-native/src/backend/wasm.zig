@@ -100,6 +100,7 @@ pub const AssemblyOptions = struct {
     rejection: ?*OwnershipFailure = null,
     io: ?std.Io = null,
     workers: u8 = 1,
+    profile: bool = false,
     tier: @import("../compilation_tier.zig").Tier = .optimized,
     share_machine_code: bool = false,
     /// Experimental scalar patch linker. Imported tables are never initialized
@@ -1062,11 +1063,12 @@ pub const Module = struct {
         var unproven_function: ?u32 = null;
         if (self.arena == null) ownership_fallback = .no_arena else if (self.public_arena and !passes.roots) ownership_fallback = .public_arena else if (self.host_references != null and !passes.roots) ownership_fallback = .host_references else if (self.imports.items.len != 0 and !passes.roots) ownership_fallback = .imports else if (self.start != null and !passes.roots) ownership_fallback = .initializer;
         if (ownership_fallback == .none and (self.mutable_static or (self.static_fields.items.len != 0 and !passes.roots))) ownership_fallback = .static_sequence_cache;
-        var parallel = try @import("runtime_parallel.zig").Batch.run(self.allocator, options.io, &passes, if (matcher) |*matches| matches else null, options.workers, ownership_fallback == .none);
+        var parallel = try @import("runtime_parallel.zig").Batch.run(self.allocator, options.io, &passes, if (matcher) |*matches| matches else null, options.workers, ownership_fallback == .none, options.profile);
         defer if (parallel) |*batch| batch.deinit();
         if (options.stats) |stats| if (parallel) |batch| {
             stats.workers = batch.workers;
             stats.parallel_jobs = batch.jobs;
+            stats.worker_timings = batch.timings;
         };
         const Prepared = struct { body: ?ir.Body = null, borrowed: bool = false };
         const bodies = try self.allocator.alloc(Prepared, self.functions.items.len);
@@ -1084,8 +1086,14 @@ pub const Module = struct {
                 if (reused) stats.reused += 1 else stats.optimized += 1;
             }
             if (ownership_fallback == .none and !passes.runtimeHelper(function)) {
-                const unproven = if (parallel) |*batch| batch.unproven(id) else null;
-                if (unproven orelse try self.rcUnproven(function, bodies[id].body, &passes)) {
+                const cached = if (matcher) |*matches| matches.rcUnproven(id) else null;
+                const prepared = cached orelse (if (parallel) |*batch| batch.unproven(id) else null);
+                const unproven = prepared orelse try self.rcUnproven(function, bodies[id].body, &passes);
+                if (options.current) |current| current.entries.items[id].rc_unproven = unproven;
+                if (options.stats) |stats| {
+                    if (cached != null) stats.rc_reused += 1 else stats.rc_checked += 1;
+                }
+                if (unproven) {
                     ownership_fallback = .unproven_body;
                     unproven_function = @intCast(id);
                 }
@@ -1274,11 +1282,34 @@ pub const Module = struct {
             payload.clear();
         }
         if (self.functions.items.len != 0) {
+            const encoding: @import("optimized_bodies.zig").Encoding = .{
+                .functions = self.functions.items.len,
+                .unique = code.unique,
+                .imports = import_count,
+                .globals = self.globals.items.len,
+                .signatures = self.signatures.items.len,
+                .root_mode = root_mode,
+                .rc_admitted = rc_admitted,
+                .wide = flags.wide(),
+                .retire = self.resourceRetireImport(),
+            };
+            const encoding_same = if (matcher) |*matches| matches.encodingSame(encoding, code.indexes) else false;
+            if (options.current) |current| try current.recordEncoding(encoding, code.indexes);
             try payload.uleb(@intCast(code.unique));
             var body = Bytes.init(self.allocator);
             defer body.deinit();
             for (self.functions.items, 0..) |function, id| {
                 if (!code.emits(id)) continue;
+                if (encoding_same) if (matcher.?.encodedBody(id)) |cached| {
+                    try payload.uleb(@intCast(cached.len));
+                    try payload.raw(cached);
+                    if (options.current) |current| try current.recordEncoded(id, cached);
+                    if (options.stats) |stats| {
+                        stats.encoded_reused += 1;
+                        stats.encoded_reused_bytes += cached.len;
+                    }
+                    continue;
+                };
                 body.clear();
                 const optimized = bodies[id].body;
                 const locals = if (optimized) |owned| owned.locals.items else function.locals.items;
@@ -1299,6 +1330,7 @@ pub const Module = struct {
                     try encodeInstruction(&body, encoded, code.unique, self.functions.items.len, self.globals.items.len, self.signatures.items.len, import_count);
                 }
                 try body.byte(0x0b);
+                if (options.current) |current| try current.recordEncoded(id, body.items());
                 try payload.uleb(@intCast(body.items().len));
                 try payload.raw(body.items());
             }
@@ -1307,6 +1339,10 @@ pub const Module = struct {
             if (options.current) |current| try current.sealQueries();
             if (options.stats) |stats| if (options.current) |current| {
                 stats.retained_bytes = current.bytes();
+                stats.query_records = current.queries.records.items.len;
+                stats.query_complete = current.queries_complete;
+                stats.query_saturated = current.queries.saturated;
+                stats.query_capacity_bytes = current.queries.capacity_bytes;
             };
         }
         if (self.arena != null and self.data.items.len != 0) {

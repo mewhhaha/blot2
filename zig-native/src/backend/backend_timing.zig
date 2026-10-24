@@ -46,8 +46,23 @@ pub const Region = struct {
         try stream.write(.{ .file = std.mem.sliceTo(&self.file_utf8, 0), .file_truncated = self.file_truncated, .offset = self.offset, .unit = self.unit, .binding = self.binding, .body = self.body, .scopes = self.scopes, .nodes = self.nodes, .us = self.us, .principal = self.principal, .rejected = self.rejected, .input_calls = self.input_calls, .recorded_inputs = self.recorded_inputs, .output_types = self.output_types, .output_rows = self.output_rows });
     }
 };
+/// User plus kernel CPU of the coordinating thread, exclusive by work phase.
+/// Worker CPU is reported separately. Availability is explicit on other hosts.
+pub const ThreadCpu = struct {
+    values: [@typeInfo(Work.Phase).@"enum".field_names.len]u64 = @splat(0),
+    pub fn jsonStringify(self: *const ThreadCpu, stream: *std.json.Stringify) std.Io.Writer.Error!void {
+        try stream.beginObject();
+        inline for (@typeInfo(Work.Phase).@"enum".field_names, 0..) |name, index| {
+            try stream.objectField(name);
+            try stream.write(self.values[index]);
+        }
+        try stream.endObject();
+    }
+};
 pub const WorkStats = struct {
     regions: [8]Region = @splat(.{}),
+    region_callers: RegionCensus = .{},
+    thread_cpu_us: ?ThreadCpu = null,
     lookup_us: u64 = 0,
     query_prepare_us: u64 = 0,
     query_scan_us: u64 = 0,
@@ -86,11 +101,49 @@ pub const WorkStats = struct {
         try stream.endObject();
     }
 };
+pub const RegionCaller = struct { function: []const u8 = "", line: u32 = 0 };
+pub const RegionCost = struct {
+    /// Descriptors are comptime constants with compiler-process lifetime,
+    /// including when this census is copied into a result snapshot.
+    caller: *const RegionCaller = &.{},
+    regions: u64 = 0,
+    /// Inclusive region wall time: nested regions overlap and cannot be added
+    /// to the exclusive inference clock. Allocation totals have distinct owners.
+    inclusive_us: u64 = 0,
+    scopes: u64 = 0,
+    nodes: u64 = 0,
+    solver_bytes: u64 = 0,
+    scratch_bytes: u64 = 0,
+    solver_allocations: u64 = 0,
+    scratch_allocations: u64 = 0,
+};
+pub const RegionCensus = struct {
+    entries: [32]RegionCost = @splat(.{}),
+    overflow: RegionCost = .{ .caller = &.{ .function = "overflow" } },
+    pub fn add(self: *RegionCensus, cost: RegionCost) void {
+        const slot = for (&self.entries) |*entry| {
+            if (entry.regions == 0 or (entry.caller.line == cost.caller.line and std.mem.eql(u8, entry.caller.function, cost.caller.function))) break entry;
+        } else &self.overflow;
+        if (slot.regions == 0 and slot != &self.overflow) slot.caller = cost.caller;
+        inline for (@typeInfo(RegionCost).@"struct".field_names) |field| {
+            if (comptime !std.mem.eql(u8, field, "caller")) @field(slot, field) +|= @field(cost, field);
+        }
+    }
+    pub fn jsonStringify(self: *const RegionCensus, stream: *std.json.Stringify) std.Io.Writer.Error!void {
+        try stream.beginArray();
+        for (self.entries) |entry| if (entry.regions != 0) try stream.write(entry);
+        if (self.overflow.regions != 0) try stream.write(self.overflow);
+        try stream.endArray();
+    }
+};
 pub const Work = struct {
     pub const Phase = enum { other, lookup, query_prepare, query_scan, query_source, query_import, query_match, query_validate, query_publish, replay, specialization, constants, principals, interfaces, startup, layouts, evaluation, inference, semantic_coordination, semantic_dispatch, semantic_publication };
     clock: Clock = .{ .io = null, .previous = null },
+    cpu_clock: Clock = .{ .io = null, .previous = null, .kind = .cpu_thread },
+    cpu_nanos: [@typeInfo(Phase).@"enum".field_names.len]u64 = @splat(0),
     active: Phase = .other,
     regions: [8]Region = @splat(.{}),
+    region_callers: RegionCensus = .{},
     nanos: [@typeInfo(Phase).@"enum".field_names.len]u64 = @splat(0),
     semantic_job_nanos: u64 = 0,
     pub const Scope = struct {
@@ -115,9 +168,14 @@ pub const Work = struct {
     };
     fn account(self: *Work) void {
         self.nanos[@backingInt(self.active)] += self.clock.lapNanos();
+        self.cpu_nanos[@backingInt(self.active)] += self.cpu_clock.lapNanos();
     }
     pub fn snapshot(self: *const Work) WorkStats {
-        var result: WorkStats = .{ .regions = self.regions, .semantic_job_sum_us = self.semantic_job_nanos / std.time.ns_per_us };
+        var result: WorkStats = .{ .regions = self.regions, .region_callers = self.region_callers, .semantic_job_sum_us = self.semantic_job_nanos / std.time.ns_per_us };
+        if (self.cpu_clock.io != null) {
+            result.thread_cpu_us = .{};
+            for (self.cpu_nanos, &result.thread_cpu_us.?.values) |nanos, *us| us.* = nanos / std.time.ns_per_us;
+        }
         inline for (@typeInfo(Phase).@"enum".field_names) |field| {
             if (comptime !std.mem.eql(u8, field, "other")) {
                 const phase = @field(Phase, field);
@@ -146,15 +204,19 @@ pub const Work = struct {
 pub const Clock = struct {
     io: ?std.Io,
     previous: ?std.Io.Timestamp,
+    kind: std.Io.Clock = .awake,
     pub fn init(io: ?std.Io) Clock {
-        return .{ .io = io, .previous = if (io) |value| std.Io.Clock.awake.now(value) else null };
+        return initKind(io, .awake);
+    }
+    pub fn initKind(io: ?std.Io, kind: std.Io.Clock) Clock {
+        return .{ .io = io, .kind = kind, .previous = if (io) |value| kind.now(value) else null };
     }
     pub fn lap(self: *Clock) u64 {
         return self.lapNanos() / std.time.ns_per_us;
     }
     pub fn lapNanos(self: *Clock) u64 {
         const io = self.io orelse return 0;
-        const current = std.Io.Clock.awake.now(io);
+        const current = self.kind.now(io);
         const elapsed = self.previous.?.durationTo(current).toNanoseconds();
         self.previous = current;
         return @intCast(@max(0, elapsed));

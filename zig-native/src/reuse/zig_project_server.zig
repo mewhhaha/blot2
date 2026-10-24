@@ -403,6 +403,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                 .backend = result.result.compiled.reuse,
                 .optimization = result.result.compiled.optimization,
                 .runtimeOptimization = result.result.compiled.runtime_optimization,
+                .sourceValidation = result.result.compiled.source_validation,
                 .backendTiming = result.result.compiled.timing,
                 .phaseProfile = if (profile) |*owner| owner.record() else phase_profile.Record{},
                 .sessionHeap = if (profile != null) @import("../runtime/session_heap.zig").Heap.snapshot(a) else null,
@@ -421,8 +422,8 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                 .cachedModules = result.cached_modules,
                 .attemptStats = candidate.stats,
             };
-            var assembled: std.ArrayList(u8) = .empty;
-            defer assembled.deinit(a);
+            var payload_parts: std.ArrayList([]const u8) = .empty;
+            defer payload_parts.deinit(a);
             var ranges: std.ArrayList(AssetRange) = .empty;
             defer ranges.deinit(a);
             var dependencies: std.ArrayList(AssetDependency) = .empty;
@@ -475,13 +476,14 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                 return operationFailure(a, writer, opened, id, "response_limit", "Build reply exceeds protocol limits", candidate.stats);
             };
             if (assets) |snapshot| {
-                try assembled.ensureTotalCapacity(a, payload_size);
-                assembled.appendSliceAssumeCapacity(result.result.compiled.bytes);
-                for (snapshot.resources.items) |resource| assembled.appendSliceAssumeCapacity(resource.bytes);
+                try payload_parts.ensureTotalCapacity(a, snapshot.resources.items.len + 1);
+                payload_parts.appendAssumeCapacity(result.result.compiled.bytes);
+                for (snapshot.resources.items) |resource| payload_parts.appendAssumeCapacity(resource.bytes);
             }
-            const payload = if (assets != null) assembled.items else result.result.compiled.bytes;
-            // Both owners transfer only after the entire reply has been encoded
-            // and bounded. Neither commit allocates or performs I/O.
+            const wasm_bytes = result.result.compiled.bytes;
+            // Metadata and all segment lengths are encoded/bounded before
+            // either owner transfers. Commits retain the borrowed Wasm/asset
+            // bytes through the final write; neither commit allocates or does IO.
             if (!opened.session.commit(candidate)) return error.InvalidCandidate;
             if (assets) |snapshot| {
                 opened.assets.?.commit(snapshot);
@@ -491,7 +493,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
             // the reply and encodes after it; a kill after the reply loses
             // nothing, since the next open waits for the writer.
             if (opened.session.revisions == 1) opened.persist(io, false);
-            try frames.write(writer, metadata, payload);
+            if (payload_parts.items.len != 0) try frames.writeParts(writer, metadata, payload_parts.items) else try frames.write(writer, metadata, wasm_bytes);
         },
     }
 }

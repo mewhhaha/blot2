@@ -8,6 +8,7 @@ const lifetimes = @import("wasm_lifetimes.zig");
 const executable = @import("../reuse/executable_query.zig");
 const A = std.mem.Allocator;
 
+pub const WorkerTiming = struct { cpu_us: ?u64 = null, jobs: usize = 0, instructions: usize = 0, started_us: u64 = 0, finished_us: u64 = 0 };
 pub const Stats = struct {
     tier: @import("../compilation_tier.zig").Tier = .optimized,
     functions: usize = 0,
@@ -18,6 +19,12 @@ pub const Stats = struct {
     shared: usize = 0,
     workers: usize = 1,
     parallel_jobs: usize = 0,
+    /// Final-body ownership verdicts consumed in source order. Workers may
+    /// compute later verdicts which a preceding failure makes unnecessary.
+    rc_reused: usize = 0,
+    rc_checked: usize = 0,
+    encoded_reused: usize = 0,
+    encoded_reused_bytes: usize = 0,
     retained_bytes: usize = 0,
     /// Stores that contradict an allocation's checked word roles (see
     /// `wasm_lifetimes.Summaries.role_conflicts`).
@@ -26,6 +33,12 @@ pub const Stats = struct {
     match_candidates: usize = 0,
     match_work: usize = 0,
     match_budget_exhausted: usize = 0,
+    query_records: usize = 0,
+    query_complete: bool = false,
+    query_saturated: usize = 0,
+    query_capacity_bytes: usize = 0,
+    /// Profiling-only wall intervals relative to dispatch, not per-thread CPU.
+    worker_timings: ?[16]WorkerTiming = null,
 };
 const Entry = struct {
     source: ir.Function,
@@ -34,6 +47,8 @@ const Entry = struct {
     owned_result_bytes: ?u32,
     output: ?ir.Body = null,
     output_ready: bool = false,
+    rc_unproven: ?bool = null,
+    encoded: struct { start: usize = 0, len: usize = 0 } = .{},
 
     fn deinit(self: *Entry, a: A) void {
         a.free(self.source.parameters);
@@ -43,6 +58,19 @@ const Entry = struct {
     }
 };
 
+/// Exact physical emission environment. This is separate from semantic and
+/// optimizer correspondence: equivalent relocated functions need new bytes.
+pub const Encoding = struct {
+    functions: usize,
+    unique: usize,
+    imports: u32,
+    globals: usize,
+    signatures: usize,
+    root_mode: u32,
+    rc_admitted: bool,
+    wide: bool,
+    retire: ?u32,
+};
 pub const Import = struct {
     module: []u8,
     name: []u8,
@@ -64,11 +92,19 @@ pub const Capture = struct {
     imports: std.ArrayList(Import) = .empty,
     globals: std.ArrayList(wasm.Global) = .empty,
     arena: ?wasm.Arena = null,
+    cohorts: ?@import("../runtime/cohort_runtime.zig").Runtime = null,
+    fixture_helpers: ?[3]u32 = null,
     /// Exact freshly constructed preparation context; never semantic authority.
     regions: ?@import("../runtime/region_runtime.zig").Prepared = null,
     providers: std.ArrayList(@import("provider_modes.zig").Mode) = .empty,
-    queries: executable.OptimizerTable = .{},
+    // A normal large application already has 8,550 physical functions. The
+    // generic 4,096-record limit made its whole optimizer capture unsealed.
+    // Keep explicit bounded storage, including peak index growth capacity.
+    queries: executable.OptimizerTable = .{ .limits = .{ .records = 16384, .retained_capacity = 8 * 1024 * 1024 } },
     queries_complete: bool = false,
+    encoding: ?Encoding = null,
+    encoding_indexes: []u32 = &.{},
+    encoded: std.ArrayList(u8) = .empty,
 
     pub fn deinit(self: *Capture) void {
         if (self.regions) |regions| {
@@ -76,6 +112,8 @@ pub const Capture = struct {
             self.allocator.free(regions.scopes);
         }
         self.queries.deinit(self.allocator);
+        self.allocator.free(self.encoding_indexes);
+        self.encoded.deinit(self.allocator);
         for (self.entries.items) |*entry| entry.deinit(self.allocator);
         for (self.signatures.items) |signature| self.allocator.free(signature.parameters);
         self.entries.deinit(self.allocator);
@@ -102,6 +140,8 @@ pub const Capture = struct {
     pub fn recordInputs(self: *Capture, module: *const wasm.Module, summaries: *const lifetimes.Summaries) A.Error!void {
         std.debug.assert(self.entries.items.len == 0 and self.signatures.items.len == 0);
         self.arena = module.arena;
+        self.cohorts = module.cohorts;
+        self.fixture_helpers = module.fixture_helpers;
         try self.captureRegions(module.regions);
         try self.entries.ensureTotalCapacity(self.allocator, module.functions.items.len);
         for (module.functions.items, summaries.functions) |function, summary| {
@@ -130,6 +170,21 @@ pub const Capture = struct {
         std.debug.assert(self.entries.items[id].output == null);
         self.entries.items[id].output = if (body_result) |body| try cloneBody(self.allocator, body) else null;
         self.entries.items[id].output_ready = true;
+    }
+    pub fn recordEncoding(self: *Capture, context: Encoding, indexes: []const u32) A.Error!void {
+        const owned = try self.allocator.dupe(u32, indexes);
+        self.allocator.free(self.encoding_indexes);
+        self.encoding_indexes = owned;
+        self.encoding = context;
+    }
+    pub fn recordEncoded(self: *Capture, id: usize, bytes_: []const u8) A.Error!void {
+        const limit = 8 * 1024 * 1024;
+        if (bytes_.len > limit - self.encoded.items.len) return;
+        const start = self.encoded.items.len;
+        const needed = start + bytes_.len;
+        if (self.encoded.capacity < needed) try self.encoded.ensureTotalCapacityPrecise(self.allocator, @min(limit, std.ArrayList(u8).growCapacity(needed)));
+        self.encoded.appendSliceAssumeCapacity(bytes_);
+        self.entries.items[id].encoded = .{ .start = start, .len = bytes_.len };
     }
     pub fn output(self: *const Capture, id: usize) ?ir.Body {
         return self.entries.items[id].output;
@@ -196,7 +251,7 @@ pub const Capture = struct {
         for (self.signatures.items) |signature| count += signature.parameters.len;
         for (self.imports.items) |item| count += item.module.len + item.name.len;
         if (self.regions) |regions| count += regions.plan.members.len * @sizeOf(@import("../runtime/region_runtime.zig").Member) + regions.scopes.len * @sizeOf(@import("../runtime/region_runtime.zig").Scope);
-        return count + self.queries.owned_bytes + self.queries.capacity_bytes;
+        return count + self.queries.owned_bytes + self.queries.capacity_bytes + self.encoding_indexes.len * @sizeOf(u32) + self.encoded.capacity;
     }
 };
 
@@ -306,6 +361,33 @@ pub const Matcher = struct {
     }
     pub fn output(self: *const Matcher, id: usize) ?ir.Body {
         return self.relocated[id] orelse self.old.output(self.prior_ids[id].?);
+    }
+    /// The optimizer correspondence already proves the body, referenced call
+    /// summaries, signatures, globals and region plan. RC classification also
+    /// consumes helper roles not needed by every optimizer pass. Keep these
+    /// exact, including physical IDs; a relocated helper can simply replan.
+    pub fn rcUnproven(self: *const Matcher, id: usize) ?bool {
+        const prior = self.prior_ids[id] orelse return null;
+        if (!std.meta.eql(self.old.arena, self.current.arena) or
+            !std.meta.eql(self.old.cohorts, self.current.cohorts) or
+            !std.meta.eql(self.old.fixture_helpers, self.current.fixture_helpers)) return null;
+        return self.old.entries.items[prior].rc_unproven;
+    }
+    pub fn encodingSame(self: *const Matcher, context: Encoding, indexes: []const u32) bool {
+        const previous = self.old.encoding orelse return false;
+        if (!std.meta.eql(previous, context) or !std.meta.eql(self.old.arena, self.current.arena) or
+            !std.mem.eql(u32, self.old.encoding_indexes, indexes) or self.old.globals.items.len != self.current.globals.items.len) return false;
+        // Lowering reads mutable/type bits of reserved globals in addition to
+        // the operand references which optimizer matching already checked.
+        for (self.old.globals.items, self.current.globals.items) |left, right| if (!std.meta.eql(left, right)) return false;
+        return true;
+    }
+    pub fn encodedBody(self: *const Matcher, id: usize) ?[]const u8 {
+        const prior = self.prior_ids[id] orelse return null;
+        if (prior != id or !self.same[id] or self.relocated[id] != null) return null;
+        const span = self.old.entries.items[id].encoded;
+        if (span.len == 0) return null;
+        return self.old.encoded.items[span.start..][0..span.len];
     }
     fn importSame(self: *const Matcher, before: u32, after: u32) bool {
         if (before >= self.old.imports.items.len or after >= self.current.imports.items.len) return false;

@@ -79,6 +79,7 @@ pub const CheckedProject = struct {
     diagnostics: []Diagnostic = &.{},
     body_elaborations: usize = 0,
     imported_schemes: usize = 0,
+    normalization: @import("../work_counters.zig").Normalization = .{},
     entry_cutoff: entry_cutoff.Stats = .{},
     module_cutoff: entry_cutoff.Stats = .{},
     reused_modules: []bool = &.{},
@@ -677,6 +678,7 @@ const Engine = struct {
             transferred = true;
             self.result.body_elaborations += checked.body_elaborations;
             self.result.imported_schemes += checked.imported_schemes;
+            self.result.normalization.merge(checked.types.normalization);
         }
     }
     fn appendDiagnostics(self: *Engine, unit: project.UnitId, diagnostics: []const check.Diagnostic) !void {

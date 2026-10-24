@@ -468,6 +468,18 @@ and every completed lifetime summary. Each old call target must map consistently
 to one current target. Rewrite only an owned output copy; ambiguity or bounded
 proof exhaustion declines reuse.
 
+Optimizer captures have their own bounded 16,384-record / 8 MiB query index;
+generic query tables retain their smaller budgets. An unsealed or saturated
+index still falls back to ordinary preparation. A retained final-body RC verdict
+also requires exact arena, cohort and fixture-helper roles in addition to the
+complete optimizer correspondence; module-level ownership admission still runs.
+Encoded function bodies occupy one owned buffer whose payload and allocated
+capacity are capped at 8 MiB. Reuse requires
+an unchanged physical body and ordinal, exact function-index mapping, globals,
+section counts, root/RC/wide lowering modes and resource-retirement import.
+Every other body encodes normally and complete section publication remains
+unchanged. These RC/encoding caches are absent from restart archives.
+
 Compilation tiers belong to the session and to optimized captures. Development
 mode may omit scalar replacement and automatic vectorization, but never
 checking, evaluation or required cleanup. Cross-tier optimized bodies cannot be
@@ -480,10 +492,12 @@ emission never bypasses qualification or prevents a separated identity from
 reusing its exact prepared output. An absent output still requires preparation.
 
 Concurrent optimization borrows only immutable functions and fully prepared
-lifetime summaries. Each worker owns a bounded reusable scratch arena and clones
-surviving output into the synchronized parent allocator. Every job joins before
-output publication, failure cleanup or owner destruction. Small workloads stay
-serial. Scheduling cannot change emitted bytes or cache validity.
+lifetime summaries. A compact queue contains only outstanding optimizer or RC
+jobs, ordered by descending instruction count with deterministic ordinal ties.
+Each worker owns a bounded reusable scratch arena and clones surviving output
+into the synchronized parent allocator. Every job joins before output
+publication, failure cleanup or owner destruction. Small workloads stay serial.
+Scheduling cannot change emitted bytes or cache validity.
 
 The experimental optimizer archive stores owned portable values, never native
 pointers or allocator capacities. Compiler identity, bounded decoding and a
@@ -797,19 +811,48 @@ A projected principal query may retain empty or nonempty type/row results when
 its source inputs and dynamic observations match. Nonempty results are imported
 into the current owner under the existing bounded principal type/row checks.
 Source admission requires either the complete input projection, or a complete
-record of exact consumed declarations including the root. Both paths require
-the entire ordered type, nominal and effect catalog and producer namespace to
-match. A bounded Session-owned containment index may attribute a nested closure,
+record of exact consumed declarations including the root. Both paths require the
+entire ordered type, nominal and effect catalog and producer namespace to match.
+A bounded Session-owned containment index may attribute a nested closure,
 suspension or local binding to its exact containing global declaration. It
 confers no equality authority: replay still validates that declaration, its
 catalog and dynamic observations. Ambiguous ownership, incomplete walks and
 unknown observations retain the complete principal input image of their source
-module. Declaration identity checks compare that declaration's source position;
-movement of unrelated declarations alone does not invalidate it. Unknown observations
+module. Named declaration origins use unique owned spellings within an already
+paired unit and the same binding ordinal. Duplicate names or moved ordinals
+decline. An unchanged declaration may translate all diagnostic positions by its
+origin's byte delta, including nested parameters, captures, patterns and field
+projections. Every graph ID, edge, payload, type and non-position metadata field
+remains exact. Inconsistent relative movement declines. Legacy nameless Cores
+retain exact positions. This correspondence authorizes principal-source proof
+only; whole-module executable admission remains separate. Unknown observations
 still decline the narrower path. A graph whose builder proves all non-root
 scopes contain imported types only can use the exact semantic-catalog gate;
 source receipts keep their existing foreign-source rejection. No source
 certificate grants executable or value reuse.
+
+Principal source observations distinguish a collected body from a consumed
+checked interface. Only the collector's existing checked-scheme branch may
+record the latter, and only when both binding and body schemes have no
+obligations. Admission proves the same unique callable origin, exact schemes,
+closed rows, flags and semantic catalogs in freshly checked Core. A body read
+remains independently authoritative even when the same declaration also has an
+interface read. Interface equality never admits old executable code, evaluated
+values or outstanding requirements. Both observation kinds own bounded storage;
+principal archive key v8 includes and validates the interface records.
+
+Declaration projection reuses one generation-tagged visited workspace per module
+pair. Declines and OOM cannot leak visited marks into the next scan; generation
+exhaustion clears the tables before reuse. Static-key matching uses the existing
+source-value query scratch and its exact owner/generator/session/gate/policy
+guards, clearing touched entries on success, decline and OOM. Region-local
+scheme membership indexes copy/sort immutable lists above 16 IDs, keyed by Core
+owner and list span, bounded to 64 lists / 16,384 IDs. Small lists and saturated
+admission retain linear membership and caller ownership.
+
+The completed-query plan table may memoize only immutable source admission for
+its exact old/current owner pair. Every query still checks configuration,
+resource limits, current values, dynamic proofs and negative observations.
 
 Call inputs record both presence and absence with owner-translated signatures.
 An initially empty validated-call table compactly proves all external negatives;
@@ -839,7 +882,7 @@ source target, closed argument product, deferred-member mode and query options;
 lexical, result-directed and source-interface jobs decline this import. Joint
 recursive summaries remain completed memo judgments, never global validated-call
 certificates. Optional summary outputs are translated and may be omitted under
-the same ownership rule as call outputs. Portable principal archive version seven
+the same ownership rule as call outputs. Portable principal archive version eight
 owns these inputs and outputs and still requires the complete source image.
 Portable summary inputs must translate and match exactly. An unsupported
 optional summary output is omitted without discarding the admitted principal
@@ -1439,3 +1482,11 @@ ownership authority for an arbitrary erased value. Function creation journals
 the resulting physical role. Aggregates, Array/List literals and constructor
 payloads stop emission after a checked Never operand, preserving the eager
 prefix before that operand.
+
+## Project reply ownership
+
+Project replies may borrow independently owned Wasm and asset byte segments. The
+whole frame length and encoded metadata are validated before either candidate
+commits. Both commits retain segment owners through the final flush; post-commit
+IO failure remains terminal. The wire format and binary offsets are unchanged;
+no combined payload-sized allocation is required on the asset path.

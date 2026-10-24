@@ -65,11 +65,15 @@ export function costSummary(samples: CostSample[]) {
     const backends = group.map((s) =>
       s.stats.backendTiming as Record<string, unknown> | undefined
     );
-    const clocks = (records: (Record<string, unknown> | undefined)[]) => {
+    const clocks = (
+      records: (Record<string, unknown> | undefined)[],
+      all = false,
+    ) => {
       if (!records.every((v) => v !== undefined)) return null;
       return Object.fromEntries(
         Object.keys(records[0]!).filter((k) =>
-          k.endsWith("_us") && k !== "semantic_job_sum_us"
+          (all || k.endsWith("_us")) && k !== "semantic_job_sum_us" &&
+          k !== "thread_cpu_us"
         ).map((
           key,
         ) => [key, spread(records.map((r) => Number(r![key]) / 1000))]),
@@ -88,6 +92,15 @@ export function costSummary(samples: CostSample[]) {
       // Child clocks: do not add these to backend or whole-build clocks.
       backend_work_wall_ms: clocks(
         backends.map((b) => b?.work as Record<string, unknown> | undefined),
+      ),
+      // Exclusive coordinator thread CPU; workers report their own intervals.
+      backend_work_thread_cpu_ms: clocks(
+        backends.map((b) =>
+          (b?.work as Record<string, unknown> | undefined)?.thread_cpu_us as
+            | Record<string, unknown>
+            | undefined ?? undefined
+        ),
+        true,
       ),
     };
   });

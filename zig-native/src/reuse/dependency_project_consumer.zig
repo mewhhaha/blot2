@@ -245,7 +245,7 @@ fn lowerEntry(a: Allocator, io: std.Io, entry_identity: []const u8, source: []co
         const issue = ir.diagnostics[0];
         return rejected(a, entry, "lower", @tagName(issue.code), issue.span, issue.message());
     }
-    const stats: consumer.Stats = .{ .syntax_nodes = tree.nodes.items.len - 1, .body_elaborations = checked.body_elaborations, .body_lowerings = ir.body_lowerings, .imported_schemes = checked.imported_schemes };
+    const stats: consumer.Stats = .{ .syntax_nodes = tree.nodes.items.len - 1, .body_elaborations = checked.body_elaborations, .body_lowerings = ir.body_lowerings, .imported_schemes = checked.imported_schemes, .normalization = checked.types.normalization };
     transferred = true;
     return .{ .ready = .{ .ir = ir, .stats = stats } };
 }

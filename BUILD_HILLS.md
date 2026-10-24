@@ -9,6 +9,17 @@ Always use Zig 0.17.0 Safe/noLLVM for development and native tests. LLVM belongs
 to the actual release candidate. Keep compiler construction, test compilation,
 test execution, analysis and wrapper overhead as separate measurements.
 
+[CT109](zig-native/CT109_QUALIFICATION.md) expands the static-sharing family
+to 95 native laws. Its last complete selected cycle passes in 25.73 s; this is
+one shared-host observation, not a paired construction speedup. Final exhaustive
+qualification compiles all 2,573 native laws with Safe/noLLVM in 8.63 s and
+executes them in 651.07 s (four shards, 630–651 s). The full gate takes 711.82 s
+and includes 1,656 guests; its already built LLVM release is reused. Development
+selection and complete release qualification remain separate.
+
+The CT106 distribution below retains its original 78-law selection and source
+pins; it is historical evidence, not the current selection count.
+
 [CT106](zig-native/CT106_QUALIFICATION.md) measures 20 complete Safe/noLLVM
 static-sharing edit/check cycles: **25.35 s median**,
 **27.64 s observed p95**, **27.78 s maximum**.

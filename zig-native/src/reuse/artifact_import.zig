@@ -22,6 +22,20 @@ const EvidenceKey = struct { id: u32, owner: u32 = 0, mappings: bool = false };
 const SubstitutionKey = struct { id: u32, owner: u32 };
 const OperationScope = enum { unchecked, admitted, declined };
 
+/// Work within one exact old-pools/destination owner. Hit counts describe the
+/// existing cross-call memo, not permission to share maps with other owners.
+pub const Census = struct {
+    semantic_queries: usize = 0,
+    semantic_hits: usize = 0,
+    semantic_nodes: usize = 0,
+    semantic_child_words: usize = 0,
+    row_queries: usize = 0,
+    row_hits: usize = 0,
+    row_nodes: usize = 0,
+    row_argument_words: usize = 0,
+};
+pub const OwnerCensus = struct { principals: Census = .{}, queries: Census = .{}, fragments: Census = .{} };
+
 pub const Solved = struct {
     mappings: []layout.Mapping,
     rows: []layout.RowMapping,
@@ -37,6 +51,7 @@ pub const Solved = struct {
 const ExpressionKey = struct { unit: u32, root: core.Id };
 pub const Importer = struct {
     allocator: Allocator,
+    census: Census = .{},
     old: *const artifacts.Pools,
     units: []const core.Module,
     names: ?identity.Metadata = null,
@@ -60,6 +75,7 @@ pub const Importer = struct {
     /// Correspondence proved by complete static value/evidence/capture graphs.
     /// These IDs belong to this Importer's old and current evaluator owners.
     value_anchors: std.AutoHashMapUnmanaged(u32, u32) = .empty,
+    static_scratch: ?*@import("source_value_template.zig").QueryScratch = null,
     operation_labels: ?[]u32 = null,
     operation_scopes: ?[]OperationScope = null,
     /// Known-layout ceilings of the current generator's layout store.
@@ -183,6 +199,10 @@ pub const Importer = struct {
         self.row_keys.deinit(self.allocator);
         self.captures.deinit(self.allocator);
         self.value_anchors.deinit(self.allocator);
+        if (self.static_scratch) |scratch| {
+            scratch.deinit();
+            self.allocator.destroy(scratch);
+        }
         self.knowledge.deinit(self.allocator);
         if (self.operation_labels) |labels| self.allocator.free(labels);
         if (self.operation_scopes) |scopes| self.allocator.free(scopes);
@@ -360,13 +380,20 @@ pub const Importer = struct {
         const inspection = try @import("source_value_template.zig").Plan.inspectRootsWithRows(self.allocator, self.old, gate, roots, .source_declared);
         var plan = inspection.plan orelse return false;
         defer plan.deinit(self.allocator);
-        const anchors = try self.allocator.alloc(u32, self.old.evaluator.values.len);
-        defer self.allocator.free(anchors);
-        @memset(anchors, 0);
-        for (before, after) |old, current| {
-            if (!(plan.matchInto(g, self, old.value, current.value, anchors) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false)) return false;
+        // Reuse the existing exact-owner scratch protocol. Only touched
+        // anchors/positions are cleared between independent static keys; no
+        // correspondence from a declined key is authority for a later key.
+        if (self.static_scratch == null) {
+            const scratch = try self.allocator.create(@import("source_value_template.zig").QueryScratch);
+            scratch.* = .{ .allocator = g.evaluator.allocator };
+            self.static_scratch = scratch;
         }
-        return self.recordValueAnchors(anchors);
+        const scratch = self.static_scratch.?;
+        const anchors = scratch.begin(&plan, g) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+        for (before, after) |old, current| {
+            if (!(plan.matchIntoWithScratch(g, self, old.value, current.value, anchors, scratch) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false)) return false;
+        }
+        return self.recordValueAnchorIds(anchors, scratch.anchor_ids.items);
     }
     fn staticKey(self: *Importer, g: anytype, id: u32) Error!u32 {
         if (id == 0) return 0;
@@ -828,8 +855,12 @@ pub const Importer = struct {
     }
     fn semanticType(self: *Importer, g: anytype, id: u32, depth: usize) Error!u32 {
         if (depth >= depth_limit or id == 0 or id >= self.old.evaluator.evidence.nodes.len) return error.Declined;
+        self.census.semantic_queries += 1;
         const key: EvidenceKey = .{ .id = id };
-        if (self.semantic.get(key)) |mapped| return mapped;
+        if (self.semantic.get(key)) |mapped| {
+            self.census.semantic_hits += 1;
+            return mapped;
+        }
         const n = self.old.evaluator.evidence.nodes[id];
         var a = n.a;
         var b = n.b;
@@ -887,13 +918,19 @@ pub const Importer = struct {
         else
             g.evaluator.storage.evidence.internWithEffects(n.tag, a, b, c, values.items) catch |err| return convert(err);
         try self.semantic.put(self.allocator, key, mapped);
+        self.census.semantic_nodes += 1;
+        self.census.semantic_child_words += values.items.len;
         return mapped;
     }
     fn row(self: *Importer, g: anytype, domain: Domain, id: u32, depth: usize) Error!u32 {
         if (depth >= depth_limit) return error.Declined;
         if (domain == .layout and id == layout.unknown_row) return layout.unknown_row;
+        self.census.row_queries += 1;
         const key: RowKey = .{ .domain = domain, .id = id };
-        if (self.rows.get(key)) |mapped| return mapped;
+        if (self.rows.get(key)) |mapped| {
+            self.census.row_hits += 1;
+            return mapped;
+        }
         const source = if (domain == .layout) self.old.layouts.effects.view() else self.old.evaluator.evidence.effects.view();
         if (id >= source.rows.len) return error.Declined;
         const span = source.rows[id];
@@ -912,6 +949,7 @@ pub const Importer = struct {
             const operation = source.operations[label];
             if (operation.instance.unit != 0 or operation.instance.decl != 0) return error.Declined;
             const old_args = try bounded(u32, source.arguments, operation.arguments.start, operation.arguments.len);
+            self.census.row_argument_words += old_args.len;
             var owner: u32 = undefined;
             if (operation.identity.unit == 0) {
                 if (operation.identity.decl != 1 or old_args.len != 0) return error.Declined;
@@ -927,6 +965,7 @@ pub const Importer = struct {
         const store = if (domain == .layout) &g.representations.store.effects else &g.evaluator.storage.evidence.effects;
         const mapped = store.internRow(imported.items) catch |err| return convert(err);
         try self.rows.put(self.allocator, key, mapped);
+        self.census.row_nodes += 1;
         return mapped;
     }
     fn oldModule(self: *const Importer, owner: u32) Error!*const core.Module {

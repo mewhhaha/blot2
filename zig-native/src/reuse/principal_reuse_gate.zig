@@ -28,6 +28,9 @@ pub const Gate = struct {
     enabled: bool = false,
     dependency_validations: usize = 0,
     reused_dependency_validations: usize = 0,
+    projection_scans: usize = 0,
+    projection_visits: usize = 0,
+    projection_workspace_peak_bytes: usize = 0,
     dependencies_validated: bool = false,
     validation_symbols: usize = 0,
     validation_names: ?identity.View = null,
@@ -45,6 +48,7 @@ pub const Gate = struct {
     offsets: []const usize,
     dirty: []const bool,
     local_dirty: []const bool,
+    call_origins: []const bool,
     storage: *Storage,
 
     // Immutable after construction. Each semantic consumer owns a lease;
@@ -57,6 +61,9 @@ pub const Gate = struct {
         var result = self.*;
         result.dependency_validations = 0;
         result.reused_dependency_validations = 0;
+        result.projection_scans = 0;
+        result.projection_visits = 0;
+        result.projection_workspace_peak_bytes = 0;
         return result;
     }
 
@@ -106,10 +113,13 @@ pub const Gate = struct {
         const local_dirty = try allocator.alloc(bool, offsets[units.len]);
         errdefer allocator.free(local_dirty);
         @memset(local_dirty, true);
+        const call_origins = try allocator.alloc(bool, offsets[units.len]);
+        errdefer allocator.free(call_origins);
+        @memset(call_origins, false);
         const storage = try allocator.create(Storage);
         errdefer allocator.destroy(storage);
         storage.* = .{};
-        var result: Gate = .{ .constant_types = constant_types, .storage = storage, .allocator = allocator, .source_pools = old, .units = units, .structural_units = structural_units, .certified_images = certified_images, .closure_owners = closure_owners, .closure_offsets = closure_offsets, .offsets = offsets, .dirty = dirty, .local_dirty = local_dirty };
+        var result: Gate = .{ .constant_types = constant_types, .storage = storage, .allocator = allocator, .source_pools = old, .units = units, .structural_units = structural_units, .certified_images = certified_images, .closure_owners = closure_owners, .closure_offsets = closure_offsets, .offsets = offsets, .dirty = dirty, .local_dirty = local_dirty, .call_origins = call_origins };
 
         if (!old.project_identity or old.identity == null or names == null or old.modules.len != units.len or units.len == 0 or units.len >= std.math.maxInt(u32)) return result;
         // Artifact/query records below use one-based catalog positions. The
@@ -189,6 +199,9 @@ pub const Gate = struct {
         result.dependencies_validated = true;
         result.validation_symbols = current.symbols.len;
         result.validation_names = current;
+        for (units, old.modules, 0..) |*module, pin, unit| {
+            try @import("declaration_origins.zig").mark(allocator, pin.module, module, call_origins[offsets[unit]..offsets[unit + 1]]);
+        }
         // All source declarations must have complete bodies. Imported aliases
         // must resolve to such a declaration, never a lexical or absent target.
         for (units, 0..) |module, unit| for (module.bindings[1..], 1..) |binding, id| switch (binding.kind) {
@@ -214,10 +227,17 @@ pub const Gate = struct {
                 // Whole-module executable reuse stays disabled. An exact
                 // declaration projection may retain only its principal proof.
                 @memset(dirty[offsets[unit]..offsets[unit + 1]], true);
+                var workspace = try projection.Workspace.init(allocator, pin.module);
+                defer workspace.deinit();
+                defer {
+                    result.projection_scans += workspace.scans;
+                    result.projection_visits += workspace.visits;
+                    result.projection_workspace_peak_bytes = @max(result.projection_workspace_peak_bytes, workspace.capacityBytes());
+                }
                 for (module.bindings[1..], 1..) |binding, id| {
                     reached.clearRetainingCapacity();
                     const same = switch (binding.kind) {
-                        .global => try definitionEqual(allocator, pin.module, &module, @intCast(id), &reached, constant_types),
+                        .global => try workspace.definitionEqualWithOrigins(pin.module, &module, @intCast(id), &reached, constant_types, call_origins[offsets[unit]..offsets[unit + 1]]),
                         .external => id < pin.module.bindings.len and std.meta.eql(pin.module.bindings[id], binding),
                         .local, .parameter => false,
                     };
@@ -295,6 +315,21 @@ pub const Gate = struct {
         return !self.local_dirty[self.offsets[unit] + target.binding];
     }
 
+    /// The collector consumed only these checked facts. No body, value,
+    /// executable fragment or unresolved requirement is admitted by this proof.
+    pub fn admitsCheckedInterface(self: *const Gate, target: core.BindingRef) bool {
+        if (self.constant_types or !self.admitsCallIdentity(target)) return false;
+        const old = self.source_pools.?.modules[target.unit - 1].module;
+        const current = &self.units[target.unit - 1];
+        const before = old.body(target.binding).?;
+        const after = current.body(target.binding).?;
+        const left = old.binding(target.binding).scheme;
+        const right = current.binding(target.binding).scheme;
+        return before.is_function and after.is_function and left.obligations.len == 0 and right.obligations.len == 0 and
+            before.scheme.obligations.len == 0 and after.scheme.obligations.len == 0 and equal(left, right) and
+            equal(old.types.list(before.closed_rows), current.types.list(after.closed_rows));
+    }
+
     /// A closure root of a structural unit, or one reached by the exact
     /// projection of a declaration whose own source and identity are admitted.
     /// The same catalog index then names the same lexical closure.
@@ -310,7 +345,7 @@ pub const Gate = struct {
     pub fn admitsCallIdentity(self: *const Gate, target: core.BindingRef) bool {
         return self.callIdentityFailure(target) == .none;
     }
-    pub const IdentityFailure = enum { none, disabled, bounds, kind, binding_type, source_position, body, scheme_root, scheme, flags };
+    pub const IdentityFailure = enum { none, disabled, bounds, kind, binding_type, source_position, declaration_origin, body, scheme_root, scheme, flags };
     pub fn callIdentityFailure(self: *const Gate, target: core.BindingRef) IdentityFailure {
         if (!self.enabled) return .disabled;
         if (target.unit == 0 or target.unit > self.units.len or target.binding == 0) return .bounds;
@@ -323,12 +358,15 @@ pub const Gate = struct {
         if (left.ty != right.ty) {
             if (!self.constant_types or !projection.equalConstantType(old.types, left.ty, current.types, right.ty)) return .binding_type;
         }
-        // Source positions identify this declaration. Positions belonging to
-        // unrelated declarations may move after an edit elsewhere in the unit.
-        // Local source/receipt admission still checks every observed body.
-        if (old.sourceNamePoint(target.binding) != current.sourceNamePoint(target.binding)) return .source_position;
         const before = old.body(target.binding) orelse return .body;
         const after = current.body(target.binding) orelse return .body;
+        // Named declarations need an unambiguous origin in this exact paired
+        // unit and binding ordinal. Legacy synthetic Cores without owned names
+        // retain the conservative source-position check. Neither path grants
+        // body, capture, observation or executable validity.
+        if (before.declaration_name.len != 0 or after.declaration_name.len != 0) {
+            if (!self.call_origins[self.offsets[target.unit - 1] + target.binding]) return .declaration_origin;
+        } else if (old.sourceNamePoint(target.binding) != current.sourceNamePoint(target.binding)) return .source_position;
         var scheme = before.scheme;
         if (scheme.root != after.scheme.root) {
             if (!self.constant_types or !projection.equalConstantType(old.types, scheme.root, current.types, after.scheme.root)) return .scheme_root;
@@ -361,6 +399,7 @@ pub const Gate = struct {
             self.allocator.free(self.offsets);
             self.allocator.free(self.dirty);
             self.allocator.free(self.local_dirty);
+            self.allocator.free(self.call_origins);
             self.allocator.destroy(self.storage);
         }
         self.* = undefined;
@@ -741,11 +780,6 @@ fn duplicateTypeTail(left: core.Types, right: core.Types) bool {
         }
     }
     return true;
-}
-
-fn definitionEqual(a: Allocator, old: *const core.Module, current: *const core.Module, binding: u32, closures: ?*std.ArrayList(u32), constant_types: bool) Allocator.Error!bool {
-    if (constant_types) return projection.constantDefinitionEqualCollecting(a, old, current, binding, closures);
-    return projection.definitionEqualCollecting(a, old, current, binding, closures);
 }
 
 test "constant type tail proof rejects new shapes variables and malformed aliases" {

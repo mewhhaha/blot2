@@ -858,23 +858,46 @@ pub const Store = struct {
     fn compositeWindow(self: *Store, root: Id, at: Cursor) Error!Id {
         const enabled = self.use_composite_cache and
             resolution_cache.stamp(self.mutation_epoch) != null and resolution_cache.stamp(self.effects.mutation_epoch) != null;
-        if (enabled and self.composites.entries.len != 0 and self.composites.activate(self.closed_generation, self.effects.physical_epoch)) if (self.composites.get(root, at)) |certificate| {
-            if (self.validResolution(certificate)) return certificate.result;
-        };
+        if (enabled) if (self.compositeResult(root, at)) |result| return result;
         const before_nodes = self.nodes.items.len;
         const result = try self.resolveDepth(root, at, 0);
         // An unchanged query cannot acquire fresh retained storage. Existing
         // slots may retain its frontier without any additional allocation.
         if (enabled and (result != root or self.composites.entries.len != 0) and self.nodes.items.len - before_nodes >= self.composite_min_growth and self.composites.activate(self.closed_generation, self.effects.physical_epoch)) {
-            if (self.resolutionDependencies(result)) |certificate| try self.composites.put(self.allocator, root, at, certificate);
+            try self.saveComposite(root, at, result);
         }
         return result;
     }
-    fn validResolution(self: *const Store, certificate: *const composite_cache.Record) bool {
-        if (certificate.future_clock) |clock| if (clock != self.cursor()) return false;
+    fn compositeResult(self: *Store, root: Id, at: Cursor) ?Id {
+        self.normalization.composite_probes += 1;
+        if (self.composites.entries.len == 0 or !self.composites.activate(self.closed_generation, self.effects.physical_epoch)) return null;
+        const certificate = self.composites.get(root, at) orelse {
+            if (self.composites.occupied(root, at)) self.normalization.composite_collisions += 1;
+            return null;
+        };
+        if (!self.validResolution(certificate)) return null;
+        self.normalization.composite_hits += 1;
+        return certificate.result;
+    }
+    fn saveComposite(self: *Store, root: Id, at: Cursor, result: Id) Error!void {
+        const certificate = self.resolutionDependencies(result) orelse {
+            self.normalization.composite_frontier_declines += 1;
+            return;
+        };
+        try self.composites.put(self.allocator, root, at, certificate);
+        self.normalization.composite_publications += 1;
+    }
+    fn validResolution(self: *Store, certificate: *const composite_cache.Record) bool {
+        if (certificate.future_clock) |clock| if (clock != self.cursor()) {
+            self.normalization.composite_future_clock_misses += 1;
+            return false;
+        };
         for (certificate.dependencies[0..certificate.count]) |dependency| {
             const last = if (dependency.effect) self.effects.variables.items[dependency.variable].last else self.variables.items[dependency.variable].last;
-            if (last != dependency.last) return false;
+            if (last != dependency.last) {
+                self.normalization.composite_stale_dependencies += 1;
+                return false;
+            }
         }
         return true;
     }
@@ -983,12 +1006,9 @@ pub const Store = struct {
         // An empty table cannot answer a query. Defer physical certificate
         // checks until lookup or a costly normalization can use them.
         const composite = self.use_composite_cache;
-        if (composite and self.composites.entries.len != 0 and self.composites.activate(self.closed_generation, self.effects.physical_epoch)) if (self.composites.get(root, at)) |certificate| {
-            if (self.validResolution(certificate)) {
-                const result = certificate.result;
-                if (result != root or root < self.resolved.high_water) try self.resolved.put(self.allocator, root, result);
-                return result;
-            }
+        if (composite) if (self.compositeResult(root, at)) |result| {
+            if (result != root or root < self.resolved.high_water) try self.resolved.put(self.allocator, root, result);
+            return result;
         };
         const before_nodes = self.nodes.items.len;
         const result = try self.resolveDepth(root, at, 0);
@@ -1003,7 +1023,7 @@ pub const Store = struct {
         // An unchanged query must not acquire fresh retained storage.
         if (result == root and root >= self.resolved.high_water) return result;
         try self.resolved.put(self.allocator, root, result);
-        if (composite and self.nodes.items.len - before_nodes >= self.composite_min_growth and self.composites.activate(self.closed_generation, self.effects.physical_epoch)) if (self.resolutionDependencies(result)) |certificate| try self.composites.put(self.allocator, root, at, certificate);
+        if (composite and self.nodes.items.len - before_nodes >= self.composite_min_growth and self.composites.activate(self.closed_generation, self.effects.physical_epoch)) try self.saveComposite(root, at, result);
         return result;
     }
     fn resolveDepth(self: *Store, root: Id, at: Cursor, depth: usize) Error!Id {
@@ -1338,14 +1358,23 @@ pub const Store = struct {
         const cacheable = self.use_operation_rows and self.use_resolution_cache and mutation != std.math.maxInt(u64) and effects != std.math.maxInt(u64);
         const slot = id % self.operation_rows.len;
         if (cacheable) {
+            self.normalization.epoch_row_probes += 1;
             const saved = self.operation_rows[slot];
             if (saved.row == id and saved.at == at and saved.depth == depth and saved.limit == self.resolution_depth_limit and saved.mutation == mutation and saved.effects == effects) {
                 self.normalization.epoch_row_hits += 1;
                 return saved.result;
             }
+            if (saved.row != id) {
+                if (saved.row != 0) self.normalization.epoch_row_collisions += 1;
+            } else if (saved.mutation != mutation or saved.effects != effects) {
+                self.normalization.epoch_row_stale += 1;
+            } else self.normalization.epoch_row_context_misses += 1;
         }
         const result = try self.resolveOperationArguments(id, at, depth);
-        if (cacheable and self.mutation_epoch == mutation and self.effects.mutation_epoch == effects) self.operation_rows[slot] = .{ .row = id, .result = result, .at = at, .depth = depth, .limit = self.resolution_depth_limit, .mutation = mutation, .effects = effects };
+        if (cacheable and self.mutation_epoch == mutation and self.effects.mutation_epoch == effects) {
+            self.operation_rows[slot] = .{ .row = id, .result = result, .at = at, .depth = depth, .limit = self.resolution_depth_limit, .mutation = mutation, .effects = effects };
+            self.normalization.epoch_row_publications += 1;
+        }
         return result;
     }
     fn resolveOperationArguments(self: *Store, id: Effects.Id, at: Cursor, depth: usize) Error!Effects.Id {
@@ -1981,10 +2010,12 @@ pub const Store = struct {
         // contains no free type or row variable. Resolution has checked depth.
         if (bounded and (resolved <= never or self.closedHeight(resolved) != 0)) return &.{};
         if (bounded and self.node(resolved).tag == .variable) return self.allocator.dupe(Id, &.{resolved});
+        self.normalization.free_type_queries += 1;
         try pending.append(temporary, resolved);
         var seen: std.AutoHashMapUnmanaged(Id, void) = .empty;
         defer seen.deinit(temporary);
         while (pending.pop()) |id| {
+            self.normalization.free_type_visits += 1;
             if (self.has_projections) try self.chargeProjection();
             if (bounded and self.closedHeight(id) != 0) continue;
             const entry = try seen.getOrPut(temporary, id);
@@ -2296,6 +2327,7 @@ pub const Store = struct {
             const selected = self.head(root, 0);
             if (selected <= never or self.node(selected).tag == .variable or self.node(selected).tag == .type_constructor) return &.{};
         }
+        self.normalization.free_row_queries += 1;
         // Only the worklist and visited set borrow this buffer. Returned
         // variable IDs always use the Store allocator; large graphs spill.
         var scratch_bytes: [1024]u8 align(@alignOf(usize)) = undefined;
@@ -2313,6 +2345,7 @@ pub const Store = struct {
         defer seen.deinit(temporary);
         try pending.append(temporary, .{ .id = root, .at = 0 });
         while (pending.pop()) |work| {
+            self.normalization.free_row_visits += 1;
             if (self.has_projections) try self.chargeProjection();
             if (work.depth >= 1024) return error.TypeLimit;
             var id = work.id;

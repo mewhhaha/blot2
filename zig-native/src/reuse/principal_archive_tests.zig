@@ -328,6 +328,18 @@ test "portable principal archives validate envelopes typed sections ordinals and
         shape[0] = first;
     }
     {
+        var interfaces = [_]core.BindingRef{ target, target };
+        shape[0].dependencies.interfaces = &interfaces;
+        try principalRejects(error.InvalidArtifact, copy);
+        shape[0].dependencies.interfaces = interfaces[0..1];
+        try principalAccepts(copy);
+        interfaces[0].unit = 0;
+        try principalRejects(error.InvalidArtifact, copy);
+        interfaces[0].unit = units + 1;
+        try principalRejects(error.InvalidArtifact, copy);
+        shape[0] = first;
+    }
+    {
         var source_units = [_]u32{ target.unit, target.unit };
         shape[0].dependencies.source_units = &source_units;
         try principalRejects(error.InvalidArtifact, copy);

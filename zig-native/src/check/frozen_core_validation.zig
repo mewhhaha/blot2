@@ -605,6 +605,7 @@ const Bounds = struct {
             try self.span(value.span);
             try range(self.m.parameters.len, value.parameters.start, value.parameters.len);
             try range(self.m.names.len, value.export_name.start, value.export_name.len);
+            try range(self.m.names.len, value.declaration_name.start, value.declaration_name.len);
             if (id == 0) try require(value.binding == 0 and value.root == 0 and value.parameters.len == 0 and !value.exported and !value.runtime and !value.is_function);
             if (id != 0) try require(self.m.bindings[value.binding].body_id == id);
             if (id != 0) try require(std.meta.eql(value.scheme, self.m.bindings[value.binding].scheme));

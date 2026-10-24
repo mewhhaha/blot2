@@ -20,11 +20,11 @@ refinement, dependency or budget eligibility checks. Worker counts must be
 between one and sixteen.
 
 `--workload review` explicitly selects a held-out matrix of wide
-records/effects, deep closures, a shared diamond, 32 producer modules plus an
-entry, and a small program. Each has a body edit and fresh/revert controls. It
-is separate from the historical budget corpus selected by `synthetic` or `all`;
-individual `review_*` names can also be selected. Public generators live in
-`review_corpus.ts`.
+records/effects, 32- and 64-variable generic schemes, deep closures, a shared
+diamond, 32 producer modules plus an entry, and a small program. Each has a body
+edit and fresh/revert controls. It is separate from the historical budget corpus
+selected by `synthetic` or `all`; individual `review_*` names can also be
+selected. Public generators live in `review_corpus.ts`.
 
 ## Long retained sessions
 
@@ -101,3 +101,23 @@ edit/check cycles in a disposable checkout with frozen sibling corpus fixtures.
 It groups leaf, checker and test-only edits, restores every input, and reports
 the initial check and group restoration checks separately. Set `ZIG_ANALYZER`
 first. Its p95 is the observed sample percentile, not a universal latency bound.
+
+### Asset reply copying
+
+`deno run --allow-all scripts/bench/asset_reply.ts --baseline OLD --candidate NEW
+--out NEW_DIRECTORY --runs 5 --asset-mib 8`
+compares alternating compiler pairs with two binary reference assets. It
+measures end-to-end client build latency and compiler process CPU/RSS for fresh,
+unchanged, source-edit and revert requests. Every asset has an independent
+byte-hash oracle, every guest executes, and compiler/output identities are
+checked. Compiler RSS excludes client RSS; startup is outside request timing.
+Use a fresh output directory and run without competing local builds. The
+asset-only segment optimization does not imply a copy saving for ordinary
+Wasm-only responses.
+
+Profiled backend reports include an inclusive per-caller region census,
+exclusive coordinator thread CPU on Linux and separate backend worker CPU/finish
+times. `costSummary` keeps `backend_work_thread_cpu_ms` separate from wall
+clocks. Nested region times overlap; do not sum them. Profiling may add
+significant clock overhead, so throughput decisions require unprofiled
+alternating pairs.

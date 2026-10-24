@@ -54,3 +54,20 @@ test "source overlay framing owns metadata and payload and rejects truncated bin
     var input = std.Io.Reader.fixed(&.{ 2, 0, 0, 0, 4, 0, 0, 0, '{', '}', 0, 97, 115 });
     try std.testing.expectError(error.TruncatedFrame, readRequestFrame(a, &input));
 }
+
+test "segmented project replies preserve binary framing and reject total size before publication" {
+    var buffer: [16]u8 = undefined;
+    var output = std.Io.Writer.fixed(&buffer);
+    try production.writeParts(&output, "{}", &.{ &.{ 0, 97 }, &.{}, &.{ 115, 109 }, &.{ 255, 0 } });
+    var input = std.Io.Reader.fixed(output.buffered());
+    var frame = (try readRequestFrame(std.testing.allocator, &input)).?;
+    defer frame.deinit(std.testing.allocator);
+    try std.testing.expectEqualStrings("{}", frame.metadata());
+    try std.testing.expectEqualSlices(u8, &.{ 0, 97, 115, 109, 255, 0 }, frame.payload());
+    var rejected = std.Io.Writer.fixed(&buffer);
+    const inaccessible: [*]const u8 = @ptrFromInt(4096);
+    try std.testing.expectError(error.FrameTooLarge, production.writeParts(&rejected, "{}", &.{ inaccessible[0..max_frame_bytes], &.{1} }));
+    try std.testing.expectEqual(@as(usize, 0), rejected.buffered().len);
+    try std.testing.expectError(error.FrameTooLarge, production.writeParts(&rejected, "{}", &.{ inaccessible[0 .. std.math.maxInt(usize) / 2 + 1], inaccessible[0 .. std.math.maxInt(usize) / 2 + 1] }));
+    try std.testing.expectEqual(@as(usize, 0), rejected.buffered().len);
+}

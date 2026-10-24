@@ -14,7 +14,7 @@ const Allocator = std.mem.Allocator;
 const syntax = @import("../parse/syntax_diagnostics.zig");
 const token = @import("../parse/token.zig");
 
-pub const Stats = struct { syntax_nodes: usize, body_elaborations: usize, body_lowerings: usize, imported_schemes: usize };
+pub const Stats = struct { syntax_nodes: usize, body_elaborations: usize, body_lowerings: usize, imported_schemes: usize, normalization: @import("../work_counters.zig").Normalization = .{} };
 /// Failure metadata is snapped while frontend owners are live. JSON details
 /// contain the actual evidence, independently owned after frontend teardown.
 pub const Publication = struct {
@@ -184,6 +184,6 @@ pub fn compile(allocator: Allocator, source: []const u8, pool: *symbols.Pool, de
     const elaborations: usize = checked.body_elaborations;
     const lowerings: usize = ir.body_lowerings;
     const imported_schemes: usize = checked.imported_schemes;
-    const stats: Stats = .{ .syntax_nodes = tree.nodes.items.len - 1, .body_elaborations = elaborations, .body_lowerings = lowerings, .imported_schemes = imported_schemes };
+    const stats: Stats = .{ .syntax_nodes = tree.nodes.items.len - 1, .body_elaborations = elaborations, .body_lowerings = lowerings, .imported_schemes = imported_schemes, .normalization = checked.types.normalization };
     return .{ .compiled = try backend.compile(allocator, &.{ ir, dependency.core }, 1), .stats = stats };
 }

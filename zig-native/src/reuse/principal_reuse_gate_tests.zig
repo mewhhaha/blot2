@@ -12,7 +12,7 @@ const dependencies = @import("declaration_dependencies.zig");
 const Gate = @import("principal_reuse_gate.zig").Gate;
 const a = std.testing.allocator;
 
-test "call identity ignores unrelated source positions but rejects its own movement and changed source" {
+test "call identity follows unique owned declaration names across source movement without admitting changed bodies" {
     const source =
         \\entry const earlier = fn (x: U32) -> U32 => @u32.add x 1
         \\entry const edited = fn (x: U32) -> U32 => @u32.add x 2
@@ -36,12 +36,88 @@ test "call identity ignores unrelated source positions but rejects its own movem
     try std.testing.expect(gate.admitsLocalSource(earlier));
     try std.testing.expect(gate.admitsCallIdentity(edited));
     try std.testing.expect(!gate.admitsLocalSource(edited));
-    try std.testing.expectEqual(Gate.IdentityFailure.source_position, gate.callIdentityFailure(later));
+    try std.testing.expect(gate.admitsCheckedInterface(edited));
+    try std.testing.expect(!gate.admits(edited));
+    try std.testing.expect(gate.admitsCallIdentity(later));
+    try std.testing.expect(gate.admitsLocalSource(later));
+    try std.testing.expect(!gate.admits(later));
     var moved = try Fixture.init(a, &.{"\n" ++ source});
     defer moved.deinit(a);
     var shifted = try Gate.init(a, &pinned.pools, moved.units, moved.names.view());
     defer shifted.deinit();
-    try std.testing.expectEqual(Gate.IdentityFailure.source_position, shifted.callIdentityFailure(earlier));
+    try std.testing.expect(shifted.admitsCallIdentity(earlier));
+    try std.testing.expect(shifted.admitsLocalSource(earlier));
+    var duplicate = try Fixture.init(a, &.{source});
+    defer duplicate.deinit(a);
+    const first_body = duplicate.units[0].bindings[earlier.binding].body_id;
+    const last_body = duplicate.units[0].bindings[later.binding].body_id;
+    duplicate.units[0].bodies[last_body].declaration_name = duplicate.units[0].bodies[first_body].declaration_name;
+    var ambiguous = try Gate.init(a, &pinned.pools, duplicate.units, duplicate.names.view());
+    defer ambiguous.deinit();
+    try std.testing.expectEqual(Gate.IdentityFailure.declaration_origin, ambiguous.callIdentityFailure(earlier));
+    try std.testing.expectEqual(Gate.IdentityFailure.declaration_origin, ambiguous.callIdentityFailure(later));
+    try std.testing.expect(!ambiguous.admitsCheckedInterface(later));
+}
+
+test "declaration projection workspace isolates declined scans generation rollover and allocation failure" {
+    const source =
+        \\entry const earlier = fn (x: U32) -> U32 => @u32.add x 1
+        \\entry const edited = fn (x: U32) -> U32 => @u32.add x 2
+    ;
+    var before = try Fixture.init(a, &.{source});
+    defer before.deinit(a);
+    const changed = try std.mem.replaceOwned(u8, a, source, "@u32.add x 2", "@u32.add x 9");
+    defer a.free(changed);
+    var after = try Fixture.init(a, &.{changed});
+    defer after.deinit(a);
+    const earlier = target(&before.units[0], "earlier").binding;
+    const edited = target(&before.units[0], "edited").binding;
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, projectionWorkspaceLaw, .{ &before.units[0], &after.units[0], earlier, edited });
+}
+fn projectionWorkspaceLaw(allocator: std.mem.Allocator, old: *const core.Module, current: *const core.Module, earlier: u32, edited: u32) !void {
+    var workspace = try @import("declaration_projection.zig").Workspace.init(allocator, old);
+    defer workspace.deinit();
+    try std.testing.expect(try workspace.definitionEqual(old, current, earlier, null, false));
+    try std.testing.expect(!try workspace.definitionEqual(old, current, edited, null, false));
+    try std.testing.expect(try workspace.definitionEqual(old, current, earlier, null, false));
+    workspace.generation = std.math.maxInt(u32);
+    try std.testing.expect(try workspace.definitionEqual(old, current, earlier, null, false));
+    try std.testing.expect(!try workspace.definitionEqual(old, current, edited, null, false));
+}
+
+test "relative declaration projection preserves captures and rejects inconsistent positions through OOM" {
+    const source =
+        \\entry const read = fn (value: { left: U32, right: U32 }) -> U32 => do:
+        \\  let inner = fn (x: U32) => @u32.add x value.left
+        \\  break inner value.right
+    ;
+    var before = try Fixture.init(a, &.{source});
+    defer before.deinit(a);
+    var pinned = try Pinned.init(a, &before);
+    defer pinned.deinit(a);
+    var after = try Fixture.init(a, &.{"// 雪\n" ++ source});
+    defer after.deinit(a);
+    try relativeProjectionLaw(a, &pinned, &after, true);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, relativeProjectionLaw, .{ &pinned, &after, true });
+    const module = &after.units[0];
+    const read = target(module, "read");
+    const parameter = module.bodyParameters(module.body(read.binding).?)[0].binding;
+    module.bindings[parameter].span.end += 1;
+    try relativeProjectionLaw(a, &pinned, &after, false);
+    module.bindings[parameter].span.end -= 1;
+    try std.testing.expect(module.projections.len != 0);
+    module.projections[0].diagnostic_point += 1;
+    try relativeProjectionLaw(a, &pinned, &after, false);
+    module.projections[0].diagnostic_point -= 1;
+    try relativeProjectionLaw(a, &pinned, &after, true);
+}
+fn relativeProjectionLaw(allocator: std.mem.Allocator, pinned: *const Pinned, after: *const Fixture, expected: bool) !void {
+    var gate = try Gate.init(allocator, &pinned.pools, after.units, after.names.view());
+    defer gate.deinit();
+    try std.testing.expect(gate.enabled and !gate.structural_units[0]);
+    const read = target(&after.units[0], "read");
+    try std.testing.expectEqual(expected, gate.admitsLocalSource(read));
+    try std.testing.expect(!gate.admits(read));
 }
 
 const Fixture = struct {
@@ -1369,7 +1445,7 @@ test "closure roots in an edited module follow their owner's exact projection" {
     try std.testing.expect(gate.admitsClosure(1, closureIn(&after.units[0], changed, "entry const other", "entry const helper")));
 }
 
-test "shifted source positions keep the catalog while shifted declarations are revoked" {
+test "shifted declaration origins preserve exact relative bodies and revoke changed payloads" {
     const source =
         \\// a short comment
         \\entry const early: U32 = 1
@@ -1392,8 +1468,8 @@ test "shifted source positions keep the catalog while shifted declarations are r
     defer gate.deinit();
     try std.testing.expect(gate.enabled and !gate.structural_units[0]);
     try std.testing.expect(!gate.admitsLocalSource(target(&after.units[0], "early")));
-    try std.testing.expect(!gate.admitsLocalSource(target(&after.units[0], "doubled")));
-    try std.testing.expect(!gate.admitsLocalSource(target(&after.units[0], "late")));
+    try std.testing.expect(gate.admitsLocalSource(target(&after.units[0], "doubled")));
+    try std.testing.expect(gate.admitsLocalSource(target(&after.units[0], "late")));
 }
 
 test "foreign-only certificates require actual package callers and gates recheck changed pure helper bodies" {

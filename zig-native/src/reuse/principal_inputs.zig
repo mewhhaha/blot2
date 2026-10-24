@@ -16,6 +16,8 @@ pub const Key = struct {
     empty_call_inputs: bool = true,
     source_complete: bool = false,
     sources: []const core.BindingRef = &.{},
+    /// Only a freshly checked, obligation-free scheme was consumed.
+    interfaces: []const core.BindingRef = &.{},
     /// Anonymous/local bodies without a named declaration observation retain
     /// the complete principal input image of their source module instead.
     source_units: []const u32 = &.{},
@@ -29,6 +31,8 @@ pub const Key = struct {
     pub fn clone(self: Key, a: Allocator) Allocator.Error!Key {
         const sources = try a.dupe(core.BindingRef, self.sources);
         errdefer a.free(sources);
+        const interfaces = try a.dupe(core.BindingRef, self.interfaces);
+        errdefer a.free(interfaces);
         const source_units = try a.dupe(u32, self.source_units);
         errdefer a.free(source_units);
         const scalar_reads = try a.dupe(ScalarRead, self.scalar_reads);
@@ -43,10 +47,11 @@ pub const Key = struct {
         errdefer a.free(call_reads);
         const summary_reads = try a.dupe(Summary, self.summary_reads);
         errdefer a.free(summary_reads);
-        return .{ .empty_call_inputs = self.empty_call_inputs, .source_complete = self.source_complete, .sources = sources, .source_units = source_units, .scalar_reads = scalar_reads, .plain_reads = plain_reads, .plain_publications = plain_publications, .call_publications = call_publications, .call_reads = call_reads, .summary_reads = summary_reads, .summary_publications = try a.dupe(Summary, self.summary_publications) };
+        return .{ .empty_call_inputs = self.empty_call_inputs, .source_complete = self.source_complete, .sources = sources, .interfaces = interfaces, .source_units = source_units, .scalar_reads = scalar_reads, .plain_reads = plain_reads, .plain_publications = plain_publications, .call_publications = call_publications, .call_reads = call_reads, .summary_reads = summary_reads, .summary_publications = try a.dupe(Summary, self.summary_publications) };
     }
     pub fn deinit(self: *Key, a: Allocator) void {
         a.free(self.sources);
+        a.free(self.interfaces);
         a.free(self.source_units);
         a.free(self.scalar_reads);
         a.free(self.plain_reads);
@@ -114,6 +119,8 @@ pub const Recorder = struct {
     root: core.BindingRef = .{ .unit = 0, .binding = 0 },
     sources: std.ArrayList(core.BindingRef) = .empty,
     sources_seen: std.AutoHashMapUnmanaged(core.BindingRef, void) = .empty,
+    interfaces: std.ArrayList(core.BindingRef) = .empty,
+    interfaces_seen: std.AutoHashMapUnmanaged(core.BindingRef, void) = .empty,
     source_units: std.ArrayList(u32) = .empty,
     source_units_seen: std.AutoHashMapUnmanaged(u32, void) = .empty,
     /// Session-unique and nonzero for a recorder attached to a session.
@@ -135,6 +142,8 @@ pub const Recorder = struct {
     pub fn deinit(self: *Recorder, a: Allocator) void {
         self.sources.deinit(a);
         self.sources_seen.deinit(a);
+        self.interfaces.deinit(a);
+        self.interfaces_seen.deinit(a);
         self.source_units.deinit(a);
         self.source_units_seen.deinit(a);
         self.reads.deinit(a);
@@ -272,7 +281,7 @@ pub const Recorder = struct {
     pub fn source(self: *Recorder, a: Allocator, target: core.BindingRef) Allocator.Error!void {
         if (!self.eligible or !self.source_complete) return;
         if (self.sources_seen.contains(target)) return;
-        if (target.unit == 0 or target.binding == 0 or self.sources.items.len + self.source_units.items.len >= self.max_reads) {
+        if (target.unit == 0 or target.binding == 0 or self.sources.items.len + self.source_units.items.len + self.interfaces.items.len >= self.max_reads) {
             self.source_complete = false;
             return;
         }
@@ -280,9 +289,19 @@ pub const Recorder = struct {
         try self.sources_seen.put(a, target, {});
         self.sources.appendAssumeCapacity(target);
     }
+    pub fn interface(self: *Recorder, a: Allocator, target: core.BindingRef) Allocator.Error!void {
+        if (!self.eligible or !self.source_complete or self.interfaces_seen.contains(target)) return;
+        if (target.unit == 0 or target.binding == 0 or self.sources.items.len + self.source_units.items.len + self.interfaces.items.len >= self.max_reads) {
+            self.source_complete = false;
+            return;
+        }
+        try self.interfaces.ensureUnusedCapacity(a, 1);
+        try self.interfaces_seen.put(a, target, {});
+        self.interfaces.appendAssumeCapacity(target);
+    }
     pub fn sourceUnit(self: *Recorder, a: Allocator, unit: u32) Allocator.Error!void {
         if (!self.eligible or !self.source_complete or self.source_units_seen.contains(unit)) return;
-        if (unit == 0 or self.sources.items.len + self.source_units.items.len >= self.max_reads) {
+        if (unit == 0 or self.sources.items.len + self.source_units.items.len + self.interfaces.items.len >= self.max_reads) {
             self.source_complete = false;
             return;
         }
@@ -292,6 +311,6 @@ pub const Recorder = struct {
     }
     /// The borrowed key lives only until the next record or recorder teardown.
     pub fn key(self: *const Recorder) ?Key {
-        return if (self.eligible) .{ .empty_call_inputs = self.empty_call_inputs, .source_complete = self.source_complete, .sources = self.sources.items, .source_units = self.source_units.items, .scalar_reads = self.reads.items, .plain_reads = self.plain_reads.items, .plain_publications = self.plain_publications.items, .call_publications = self.call_publications.items, .call_reads = self.call_reads.items, .summary_reads = self.summary_reads.items, .summary_publications = self.summary_publications.items } else null;
+        return if (self.eligible) .{ .empty_call_inputs = self.empty_call_inputs, .source_complete = self.source_complete, .sources = self.sources.items, .interfaces = self.interfaces.items, .source_units = self.source_units.items, .scalar_reads = self.reads.items, .plain_reads = self.plain_reads.items, .plain_publications = self.plain_publications.items, .call_publications = self.call_publications.items, .call_reads = self.call_reads.items, .summary_reads = self.summary_reads.items, .summary_publications = self.summary_publications.items } else null;
     }
 };

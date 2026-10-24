@@ -29,7 +29,7 @@ pub const Snapshot = struct {
     evidence: types.Snapshot,
 };
 pub fn wireKey(compiler: format.Digest) format.Key {
-    return .{ .compiler = compiler, .settings = format.digest("blot-principal-archive-v7:observed-source-module-call-summary-proofs"), .source = @splat(0), .dependencies = @splat(0) };
+    return .{ .compiler = compiler, .settings = format.digest("blot-principal-archive-v8:checked-interface-source-module-call-summary-proofs"), .source = @splat(0), .dependencies = @splat(0) };
 }
 /// Only records with complete dynamic observations are portable. Exact-source
 /// proofs without them, selected judgments and local templates stay behind.
@@ -110,6 +110,8 @@ fn validRecord(a: A, seen: *std.AutoHashMapUnmanaged(u64, void), record: Record,
     for (observed.sources) |source| if (!validBinding(source, units) or !try fresh(a, seen, bindingWord(source))) return false;
     if (observed.source_complete and !seen.contains(bindingWord(record.key.target))) return false;
     seen.clearRetainingCapacity();
+    for (observed.interfaces) |source| if (!validBinding(source, units) or !try fresh(a, seen, bindingWord(source))) return false;
+    seen.clearRetainingCapacity();
     for (observed.source_units) |unit| if (unit == 0 or unit > units or !try fresh(a, seen, unit)) return false;
     seen.clearRetainingCapacity();
     for (observed.scalar_reads) |read| if (!validBinding(read.target, units) or read.evidence > T.never or !try fresh(a, seen, bindingWord(read.target))) return false;
@@ -169,7 +171,7 @@ const PortableAdapter = struct {
     }
     pub fn bytes(record: PortableQueries.Record) usize {
         var total: usize = 0;
-        inline for (.{ "sources", "scalar_reads", "plain_reads", "plain_publications", "call_publications", "call_reads", "summary_reads", "summary_publications" }) |field| {
+        inline for (.{ "interfaces", "sources", "source_units", "scalar_reads", "plain_reads", "plain_publications", "call_publications", "call_reads", "summary_reads", "summary_publications" }) |field| {
             const entries = @field(record.dependencies, field);
             total +|= entries.len *| @sizeOf(@TypeOf(entries[0]));
         }

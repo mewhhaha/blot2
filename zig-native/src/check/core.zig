@@ -71,7 +71,7 @@ pub const RuntimeName = struct { binding: BindingId, point: u32 };
 pub const DeclarationDependencies = struct { references: List = .{}, members: List = .{}, runtime_metadata: Id = 0 };
 pub const DependencyMember = struct { name: u32 = 0, operator: T.Operator = .none };
 pub const ErasedDeclarationReference = struct { node: Id, target: BindingRef };
-pub const Body = struct { binding: BindingId = 0, root: Id = 0, parameters: List = .{}, scheme: T.Scheme = .{}, closed_rows: T.List = .{}, span: Span = .{ .start = 0, .end = 0 }, export_name: Name = .{}, exported: bool = false, runtime: bool = false, is_function: bool = false };
+pub const Body = struct { binding: BindingId = 0, root: Id = 0, parameters: List = .{}, scheme: T.Scheme = .{}, closed_rows: T.List = .{}, span: Span = .{ .start = 0, .end = 0 }, declaration_name: Name = .{}, export_name: Name = .{}, exported: bool = false, runtime: bool = false, is_function: bool = false };
 pub const CallInfo = struct { target: BindingRef, callee_type: T.Id };
 pub const DictionaryUse = struct { node: Id, binding: BindingId, opening: BindingId, introduction: Id = 0, quantifier: T.Id, goal: u32, member: u32 };
 pub const DictionaryGiven = struct { opening: BindingId, introduction: Id = 0, quantifier: T.Id, goal: u32, arguments: T.List };

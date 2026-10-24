@@ -2453,6 +2453,7 @@ const CompileRun = struct {
         if (!self.options.ragged_builders) self.generator.ragged_probe_limit = 0;
         self.generator.evaluator.ragged_probe_limit = self.generator.ragged_probe_limit;
         self.generator.work_timing.clock = .init(if (self.options.profile_backend) self.options.io else null);
+        self.generator.work_timing.cpu_clock = .initKind(if (self.options.profile_backend and @import("builtin").os.tag == .linux) self.options.io else null, .cpu_thread);
         self.generator.evaluator.timing = if (self.options.profile_backend) &self.generator.work_timing else null;
         // The replay gate destroys all mutable compiler state before materialization.
         if (self.recording) self.generator.artifacts = &self.metadata;
@@ -2592,7 +2593,7 @@ const CompileRun = struct {
         const checkpoint_optimized = if (self.options.checkpoint) |checkpoint| if (checkpoint.optimizer) |*owned| owned else null else null;
         const optimized_previous = retained_optimized orelse checkpoint_optimized;
         var rejection: wasm.OwnershipFailure = .{};
-        const emitted = assembled_module.assembleCheckedWithOptions(.{ .rejection = &rejection, .io = self.options.io, .workers = self.options.policy.codegen_workers, .tier = self.options.policy.codegen_tier, .share_machine_code = self.options.policy.share_machine_code, .previous = optimized_previous, .current = if (self.optimized) |*owned| owned else null, .stats = &runtime_optimization }) catch |err| switch (err) {
+        const emitted = assembled_module.assembleCheckedWithOptions(.{ .rejection = &rejection, .io = self.options.io, .workers = self.options.policy.codegen_workers, .profile = self.options.profile_backend, .tier = self.options.policy.codegen_tier, .share_machine_code = self.options.policy.share_machine_code, .previous = optimized_previous, .current = if (self.optimized) |*owned| owned else null, .stats = &runtime_optimization }) catch |err| switch (err) {
             error.IncompleteOwnership => {
                 var location: Diagnostic = .{ .unit = self.entry, .span = .{ .start = 0, .end = 0 }, .code = .ownership_unproved };
                 if (rejection.function) |failed| {
@@ -2677,12 +2678,23 @@ const CompileRun = struct {
             if (record.member != null) result.completed_queries.member_recorded += 1;
         };
         result.reuse = self.generator.work;
+        if (self.principal_state) |state| if (state.graphs) |maps| {
+            result.reuse.graph_imports.principals = maps.census;
+        };
+        if (self.query_state) |state| if (state.semantic) |maps| {
+            result.reuse.graph_imports.queries = maps.census;
+        };
+        if (self.retained) |state| result.reuse.graph_imports.fragments = state.importer.census;
         result.refinements = self.generator.refinement_stats;
         result.query_tables.canonical = self.generator.evaluator.specializations.canonical_specializations.table.storage();
         if (self.persisted_principals) |*reader| result.query_tables.portable_principal = reader.storage();
         result.query_tables.source_description = self.generator.evaluator.principalQueryStorage().source_description;
         result.query_tables.open_residual = self.generator.evaluator.principalQueryStorage().open_residual;
         if (self.retained) |state| {
+            if (state.importer.static_scratch) |scratch| {
+                result.reuse.static_graph_scratch = scratch.stats;
+                result.reuse.static_graph_scratch_bytes = scratch.payloadBytes();
+            }
             result.reuse.reused_named = state.stats.reused_named;
             result.reuse.reused_closures = state.stats.reused_closures;
             result.reuse.candidates = state.stats.candidates;

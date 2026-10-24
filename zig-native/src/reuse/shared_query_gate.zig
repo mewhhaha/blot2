@@ -20,5 +20,6 @@ pub fn share(allocator: std.mem.Allocator, old: *const artifacts.Pools, units: [
 
 /// Logical bytes of the shared validation input (count once per owner).
 pub fn validationBytes(gate: *const Gate) usize {
-    return gate.structural_units.len * @sizeOf(bool) + gate.offsets.len * @sizeOf(usize) + gate.dirty.len * @sizeOf(bool);
+    return (gate.structural_units.len + gate.certified_images.len + gate.dirty.len + gate.local_dirty.len + gate.call_origins.len) * @sizeOf(bool) +
+        (gate.offsets.len + gate.closure_offsets.len) * @sizeOf(usize) + gate.closure_owners.len * @sizeOf(u32);
 }

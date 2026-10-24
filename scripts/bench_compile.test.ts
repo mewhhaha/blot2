@@ -176,6 +176,7 @@ Deno.test("bench: phase coverage uses elapsed wall and rejects missing or overla
           inference_us: 600,
           constants_us: 200,
           semantic_job_sum_us: 2000,
+          thread_cpu_us: { inference: 400, constants: 100 },
         },
       },
     },
@@ -184,6 +185,8 @@ Deno.test("bench: phase coverage uses elapsed wall and rejects missing or overla
   assert.equal(summary.cpu_ms.median, 4);
   assert.equal(summary.backend_work_wall_ms?.inference_us.median, 0.6);
   assert(!Object.hasOwn(summary.backend_work_wall_ms!, "semantic_job_sum_us"));
+  assert(!Object.hasOwn(summary.backend_work_wall_ms!, "thread_cpu_us"));
+  assert.equal(summary.backend_work_thread_cpu_ms?.inference.median, 0.4);
 });
 
 Deno.test("bench: frozen pen settings preserve budget, standard library and explicit text assets", async () => {

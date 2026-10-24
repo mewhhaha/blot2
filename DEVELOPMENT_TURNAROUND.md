@@ -1,5 +1,16 @@
 # Five-minute development feedback
 
+[CT109](zig-native/CT109_QUALIFICATION.md) expands the static-sharing family
+to 95 native laws. Its last complete selected cycle passes in 25.73 s; this is
+one shared-host observation, not a paired construction speedup. Final exhaustive
+qualification compiles all 2,573 native laws with Safe/noLLVM in 8.63 s and
+executes them in 651.07 s (four shards, 630–651 s). The full gate takes 711.82 s
+and includes 1,656 guests; its already built LLVM release is reused. Development
+selection and complete release qualification remain separate.
+
+The CT106 distribution below retains its original 78-law selection and source
+pins; it is historical evidence, not the current selection count.
+
 [CT106](zig-native/CT106_QUALIFICATION.md) measures 20 complete Safe/noLLVM
 static-sharing edit/check cycles: **25.35 s median**,
 **27.64 s observed p95**, **27.78 s maximum**.
@@ -55,9 +66,10 @@ artifacts.
 
 - Compile the complete native inventory with Zig's backend, then select existing
   laws at runtime. LLVM is reserved for the actual release compiler.
-- The current static-sharing family selects 78 native laws, covering aggregate
+- The current static-sharing family selects 95 native laws, covering aggregate
   parity and rejection, persistent roots, principal observations, portable
-  archives, closure replay, effect-row normalization and fault-policy behavior.
+  archives, closure replay, checked interfaces, bounded backend reuse, effect-row
+  normalization and fault-policy behavior.
   `--list-areas` and the run's exact selection are authoritative.
 - Run the selected protocol, budget-recovery and client edit/error/recovery
   guest tests. JUnit validation requires every selected file/name to actually

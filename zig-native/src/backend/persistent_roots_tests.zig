@@ -616,6 +616,8 @@ fn staticCaptureReplay(allocator: std.mem.Allocator, fixture: *const Fixture, pr
     try std.testing.expectEqualSlices(u8, expected, result.bytes);
     try std.testing.expect(result.reuse.reused_named > 0);
     try std.testing.expectEqual(@as(usize, 0), result.reuse.fresh_closures);
+    try std.testing.expect(result.reuse.static_graph_scratch.match_calls > 0);
+    try std.testing.expect(result.reuse.static_graph_scratch_bytes > 0);
 }
 test "static captured value graphs admit executable closure replay independently of principal mappings" {
     var before = try Fixture.initSource(static_capture_source);

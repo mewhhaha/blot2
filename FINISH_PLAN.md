@@ -10,6 +10,25 @@ comparison separate from allocation-free contract research.
 
 ## Execution checkpoint, 24 October 2026
 
+The [CT109 qualification](zig-native/CT109_QUALIFICATION.md) passes seven
+alternating release pairs against CT106, exact outputs and the full compiler
+gate. Paired CPU changes are first literal -0.6%, literal revert -11.5%, body
+-2.5% and body revert -7.5%; fresh game/devtools remain within the 5% guards.
+First-literal/body wall medians are 3.261/5.377 s. Reverts improve, while the
+ordinary-edit, two-second and sub-second targets remain open.
+
+The candidate passes 2,573 exhaustive native laws, 1,656 guests, 44 independent
+held-out Wasm executions and 232 requests over 200 distinct edits. Post-session
+RSS is 521 MiB. The [86-item ledger](COMPILER_CT109_LEDGER.md) records implemented
+work, rejected experiments and still-open architectural designs. The qualified
+CLI and native compiler are installed locally; raw evidence and limits are
+linked from the qualification record.
+
+The broader language and upstream-issue requirements below remain open; this
+performance follow-up does not close unrelated completion work.
+
+Historical CT106 checkpoint, 24 October 2026:
+
 The [CT106 qualification](zig-native/CT106_QUALIFICATION.md) records **19.1%
 less first-literal-edit CPU** against CT105 in seven alternating release pairs,
 with identical Wasm. First-literal wall median falls from 3.62 to **2.91 s**;

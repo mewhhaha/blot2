@@ -2,27 +2,36 @@
 
 ## Current queue: ordinary edits toward one second (24 October 2026)
 
-The [CT106 qualification](zig-native/CT106_QUALIFICATION.md) records **19.1%
-less first-literal-edit CPU** against CT105 in seven alternating release pairs,
-with identical Wasm. First-literal wall median falls from 3.62 to **2.91 s**;
-fresh CPU improves 2.4%, body CPU is effectively unchanged and literal-revert
-CPU rises 3.5%. These are shared-host observations. Body-edit, two-second and
-sub-second targets remain open.
+The [CT109 qualification](zig-native/CT109_QUALIFICATION.md) passes seven
+alternating release pairs against CT106 with exact outputs. Paired CPU changes
+are fresh +0.1%, first literal -0.6%, literal revert -11.5%, body -2.5%, body
+revert -7.5% and devtools -1.2%. First-literal/body wall medians are 3.261/5.377 s
+on the shared host. Reverts improve; the first-literal/body acceptance targets,
+two-second goal and sub-second goal remain open.
 
-Exact frontend correspondence now checks one module on the first edit instead
-of 22. Bounded operation indexes/certificates, lexical links and import scratch
-remove repeated work. The report includes 200 distinct edits, allocator/CPU
-attribution, exhaustive qualification and rejected experiments. All 86 review
-suggestions have a [disposition](COMPILER_CT106_WORK.md); conditional alternatives
-and unfinished architectural work are explicit.
+CT109 adds bounded optimizer/RC/encoded-body reuse, unique declaration origins
+with exact relative-position proof, checked-interface observations, scratch
+reuse and segmented asset replies. Body principal hits rise from 16/20 to 17/20;
+three consumed-source dependencies remain. `walk_material` has two requirements
+and `haul_all_observed` seven, so neither can use the obligation-free interface
+proof. Exact requirement/proof observations or incremental inference need a
+separate design; weakening source admission is not a valid optimization.
 
-Next work is (1) stable origins for the four body-principal declines,
-(2) residual query validation/import and the later-literal regression, and
-(3) complete-output emission costs. The first-edit failure was incidental
-immutable-constructor sharing, now fixed without weakening variable injectivity.
-Selected-query key changes did not reduce candidate counts. Finer arena bins
-and write coalescing were rejected. The 0.8-second non-inference milestone is
-not met; deeper caching remains conditional on exact ownership/provenance.
+The import census finds about four million executable semantic-import queries
+but only 734 new nodes. A hot-cache trial avoids most map lookups but does not
+establish an ordinary-edit benefit and is removed. Free-variable summaries and
+row/composite policy trials also fail to earn adoption. Cross-owner sharing,
+resumable inference and a unified dependency query service remain conditional.
+All 86 proposals have a [current disposition](COMPILER_CT109_LEDGER.md); the
+[work record](COMPILER_CT109_WORK.md) preserves failed gates and negative trials.
+
+The complete gate passes 2,573 exhaustive native laws and 1,656 guests. The
+200-distinct-edit memory series and local installation checks also pass. The native
+allocation-budget regression was repaired by smaller per-region storage, not a
+larger budget. Keep frozen workloads and unprofiled paired guards. Inclusive
+region clocks and exclusive phase CPU explain work; they are not throughput
+results. The earlier [CT106 report](zig-native/CT106_QUALIFICATION.md) retains its
+separate first-edit gain and compiler-iteration measurements.
 
 The comparison and diagnostic sequence below are historical CT103/CT104
 evidence.

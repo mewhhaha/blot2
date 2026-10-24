@@ -565,7 +565,7 @@ test "recorded principal regions keep input keys over foreign graph sources" {
     const a = std.testing.allocator;
     var session = try Session.init(a, &.{});
     defer session.deinit();
-    var region = try ClosureRegion.init(&session);
+    var region = try ClosureRegion.initAt(&session, @src());
     defer region.deinit();
     const graph = try principalQueryTestGraph(a, .{ .target = .{ .unit = 0, .binding = 1 }, .source_interface = false, .deferred_member = false, .options = .{} }, true);
     defer graph.deinit(a);
@@ -1223,7 +1223,7 @@ const CallSummaries = struct {
             const job = self.jobs.items[index];
             if (job.state == .queued) {
                 const region = try self.regions.create(session.allocator);
-                region.* = ClosureRegion.init(session) catch |err| {
+                region.* = ClosureRegion.initAt(session, @src()) catch |err| {
                     self.regions.destroy(region);
                     return err;
                 };
@@ -1783,7 +1783,7 @@ pub const Session = struct {
         if (canonical != null) self.receipt_tape = &tape;
         defer self.receipt_tape = previous_tape;
         try self.storage.specialized_closures.ensureUnusedCapacity(self.allocator, 1);
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         const inferred: ?ValueId = if (entry_interface)
             region.inferEntry(value_) catch |err| return self.evidenceFailure(owner, span, err)
@@ -1875,7 +1875,7 @@ pub const Session = struct {
         if (recording) self.receipt_tape = &tape;
         defer self.receipt_tape = previous_tape;
         if (recording and self.retain_specialization_receipts) try self.retained.specialization_receipts.ensureUnusedCapacity(self.allocator, 1);
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         const specialized = region.specialize(value_, expected) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
@@ -1962,7 +1962,7 @@ pub const Session = struct {
         const resolved = try self.external(try self.target(null, reference));
         const module = &self.units[resolved.unit];
         const body = module.body(resolved.binding) orelse return self.fail(resolved.unit, module.binding(resolved.binding).span, .unsupported);
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         return region.sourceInterface(resolved, body) catch |err| {
             if (err == error.OutOfMemory or !region.principal_only_used) return self.evidenceFailure(resolved.unit, body.span, err);
@@ -1972,7 +1972,7 @@ pub const Session = struct {
             const sharing = self.reuse_principal_graphs;
             self.reuse_principal_graphs = false;
             defer self.reuse_principal_graphs = sharing;
-            var ordinary = ClosureRegion.init(self) catch return error.OutOfMemory;
+            var ordinary = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
             defer ordinary.deinit();
             return ordinary.sourceInterface(resolved, body) catch |failed| return self.evidenceFailure(resolved.unit, body.span, failed);
         };
@@ -2047,7 +2047,7 @@ pub const Session = struct {
         const body = module.body(target_.binding) orelse return false;
         if (module.binding(target_.binding).kind != .global) return false;
         if (body.runtime and !body.is_function) return false;
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         if (!(region.firstOrderArrow(expected) catch |err| return self.evidenceFailure(target_.unit, module.span(body.root), err))) return false;
         var solved = region.bodyEvidenceFull(target_.unit, body.root, module.binding(target_.binding).ty, body.closed_rows, body.scheme, .{ .semantic = expected }, &.{}, &.{}) catch |err| return self.evidenceFailure(target_.unit, module.span(body.root), err);
@@ -2068,7 +2068,7 @@ pub const Session = struct {
         const target_ = try self.external(try self.target(null, reference));
         const module = &self.units[target_.unit];
         const body = module.body(target_.binding) orelse return self.fail(target_.unit, module.binding(target_.binding).span, .unsupported);
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         region.retain_selected = true;
         var solved = region.bodyEvidenceMode(target_.unit, body.root, module.binding(target_.binding).ty, body.closed_rows, body.scheme, .{ .semantic = 0 }, &.{}, &.{}, true) catch |err| switch (err) {
@@ -2215,7 +2215,7 @@ pub const Session = struct {
         const module = &self.units[owner];
         if (catalog >= module.closures.len) return self.fail(owner, .{ .start = 0, .end = 0 }, .unsupported);
         const closure = module.closures[catalog];
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         return region.closureEvidence(owner, closure, .{ .semantic = expected }, seeds) catch |err| return self.evidenceFailure(owner, module.span(closure.body), err);
     }
@@ -2224,7 +2224,7 @@ pub const Session = struct {
         const module = &self.units[owner];
         if (catalog >= module.closures.len) return self.fail(owner, .{ .start = 0, .end = 0 }, .unsupported);
         const closure = module.closures[catalog];
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         return region.closureEvidence(owner, closure, .{ .code = .{ .view = expectations, .id = expected } }, seeds) catch |err| return self.evidenceFailure(owner, module.span(closure.body), err);
     }
@@ -2233,7 +2233,7 @@ pub const Session = struct {
         const module = &self.units[owner];
         if (catalog >= module.closures.len) return self.fail(owner, .{ .start = 0, .end = 0 }, .unsupported);
         const closure = module.closures[catalog];
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         return region.closureEvidenceFull(owner, closure, .{ .code = .{ .view = expectations, .id = expected } }, seeds, row_seeds) catch |err| return self.evidenceFailure(owner, module.span(closure.body), err);
     }
@@ -2245,7 +2245,7 @@ pub const Session = struct {
         const module = &self.units[owner];
         if (catalog >= module.closures.len) return self.fail(owner, .{ .start = 0, .end = 0 }, .unsupported);
         const closure_ = module.closures[catalog];
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         return region.closureEvidenceCaptures(owner, closure_, .{ .code = .{ .view = expectations, .id = expected } }, seeds, row_seeds, captures, projection) catch |err| return self.evidenceFailure(owner, module.span(closure_.body), err);
     }
@@ -2254,7 +2254,7 @@ pub const Session = struct {
         const module = &self.units[owner];
         if (catalog >= module.closures.len) return self.fail(owner, .{ .start = 0, .end = 0 }, .unsupported);
         const closure = module.closures[catalog];
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         return region.closureEvidenceFull(owner, closure, .{ .semantic = expected }, seeds, row_seeds) catch |err| return self.evidenceFailure(owner, module.span(closure.body), err);
     }
@@ -2283,7 +2283,7 @@ pub const Session = struct {
         return result;
     }
     fn solveEvidenceOwnedCodeInner(self: *Session, owner: usize, body: core.Id, root: types.Id, closed_rows: types.List, scheme: types.Scheme, expected: ClosureRegion.Expected, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping, projection: ?CodeProjection) Error!SolvedEvidence {
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         region.code_projection = projection;
         return region.bodyEvidenceFull(owner, body, root, closed_rows, scheme, expected, seeds, row_seeds) catch |err| {
@@ -2717,7 +2717,7 @@ pub const Session = struct {
     }
     fn matchCovariantTypeInner(self: *Session, owner: usize, source: core.Id, producer: usize, ty: types.Id, actual: type_evidence.Id, mappings: *std.ArrayList(type_evidence.Mapping), rows: *std.ArrayList(type_evidence.RowMapping)) Error!bool {
         if (try self.matchType(owner, source, producer, ty, actual, mappings, rows)) return true;
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         var solved = region.covariantEvidence(producer, ty, actual, mappings.items, rows.items) catch |err| switch (err) {
             error.TypeMismatch, error.InfiniteType, error.EffectMismatch, error.InfiniteEffect => return false,
@@ -3394,7 +3394,7 @@ pub const Session = struct {
         if (recording) try reads.source(self.allocator, principal_target);
         if (recording) self.principal_reads = &reads;
         defer self.principal_reads = previous_reads;
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         defer region.profile_rejected = reads.rejected;
         region.profile_principal = true;
@@ -3406,7 +3406,7 @@ pub const Session = struct {
                 const sharing = self.reuse_principal_graphs;
                 self.reuse_principal_graphs = false;
                 defer self.reuse_principal_graphs = sharing;
-                var fallback = ClosureRegion.init(self) catch return error.OutOfMemory;
+                var fallback = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
                 defer fallback.deinit();
                 break :ordinary fallback.bodyEvidenceMode(resolved.unit, body.root, binding_type, body.closed_rows, body.scheme, .{ .semantic = 0 }, &.{}, &.{}, true) catch |failed| switch (failed) {
                     error.UnresolvedType => return null,
@@ -5137,7 +5137,7 @@ pub const Session = struct {
         const previous_trace = self.member_trace;
         if (recording) self.member_trace = &member_trace;
         defer self.member_trace = previous_trace;
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         const selected = region.arrayMember(target_, receiver, expected) catch |err| return self.evidenceFailure(owner, self.units[owner].span(source), err);
         if (recording) {
@@ -5743,7 +5743,7 @@ pub const Session = struct {
     }
     fn validateSchemeInner(self: *Session, owner: usize, source: core.Id, scheme: types.Scheme, frame: *Frame, allow_remaining: bool) Error!void {
         if (!self.hasExplicitScheme(owner, scheme)) return;
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
+        var region = ClosureRegion.initAt(self, @src()) catch return error.OutOfMemory;
         defer region.deinit();
         const scope = region.typeScope(owner) catch |err| return self.evidenceFailure(owner, self.units[owner].span(source), err);
         if (self.has_implementations) region.current_implementation_context = self.implementationUseContext(owner, source);
@@ -6590,6 +6590,7 @@ const ClosureRegion = struct {
         projection_cache: @import("../reuse/projection_cache.zig").Cache = .{},
         evidence_import_cache: @import("evidence_import_cache.zig").Cache = .{},
         closed_source_cache: @import("closed_source_types.zig").Cache = .{},
+        scheme_memberships: @import("scheme_membership.zig").Cache = .{},
         sources: std.ArrayList(Source) = .empty,
         imported: std.AutoHashMapUnmanaged(Import, types.Id) = .empty,
         imported_rows: std.AutoHashMapUnmanaged(RowImport, types.Effects.Id) = .empty,
@@ -6678,17 +6679,21 @@ const ClosureRegion = struct {
     principal_result_job: bool = false,
     code_expectation_remaining: usize = 0,
     code_projection: ?CodeProjection = null,
-    /// Pooled solvers keep their occurs counter; this region owns the delta.
-    occurs_base: u64 = 0,
-    normalization_base: @import("../work_counters.zig").Normalization = .{},
+    profile_caller: *const @import("../backend/backend_timing.zig").RegionCaller = &.{},
     importing_evidence: bool = false,
 
     const NormalizationKey = struct { root: types.Id, types: u64, rows: u64 };
 
     fn init(session: *Session) types.Error!ClosureRegion {
-        return initWithSolverAllocator(session, null);
+        return initAt(session, @src());
+    }
+    fn initAt(session: *Session, comptime caller: std.lang.SourceLocation) types.Error!ClosureRegion {
+        return initWithSolverAllocatorAt(session, null, caller);
     }
     fn initWithSolverAllocator(session: *Session, solver_allocator: ?Allocator) types.Error!ClosureRegion {
+        return initWithSolverAllocatorAt(session, solver_allocator, @src());
+    }
+    fn initWithSolverAllocatorAt(session: *Session, solver_allocator: ?Allocator, comptime caller: std.lang.SourceLocation) types.Error!ClosureRegion {
         session.observeConstantInference();
         const timing = if (session.timing) |work| work.enter(.inference) else null;
         errdefer if (timing) |scope| scope.deinit();
@@ -6697,8 +6702,7 @@ const ClosureRegion = struct {
         const allocator = arena.scratchAllocator();
         var region: ClosureRegion = .{ .session = session, .current_origin = session.specialization_origin, .timing = timing, .solver = try types.Store.initWithOptions(solver_allocator orelse arena.solverAllocator(), .{ .closed_graphs = true }), .scratch_allocator = allocator, .arena = arena };
         region.scratch.projection_cache.allocator = allocator;
-        region.occurs_base = region.solver.occurs_steps;
-        region.normalization_base = region.solver.normalization;
+        region.profile_caller = comptime &.{ .function = caller.fn_name, .line = caller.line };
         if (session.inquiry_regions == 0 and session.semantic_job_budget == null) {
             session.summary_transitions = 0;
             session.summary_exhausted = false;
@@ -6707,6 +6711,8 @@ const ClosureRegion = struct {
         return region;
     }
     fn deinit(self: *ClosureRegion) void {
+        const scopes = self.scratch.sources.items.len;
+        const nodes = self.solver.nodes.items.len;
         self.rank_evidence_frames.deinit(self.scratch_allocator);
         self.projection_scopes.deinit(self.session.allocator);
         self.normalization_memo.deinit(self.session.allocator);
@@ -6717,11 +6723,13 @@ const ClosureRegion = struct {
         counters.inference_regions += 1;
         counters.region_scopes += self.scratch.sources.items.len;
         counters.max_region_scopes = @max(counters.max_region_scopes, self.scratch.sources.items.len);
-        counters.occurs_steps += self.solver.occurs_steps - self.occurs_base;
+        // Arena pooling retains backing memory, never the solver. This region
+        // owns a fresh Store and contributes its counters exactly once.
+        counters.occurs_steps += self.solver.occurs_steps;
         if (self.scratch.worklists) |work| {
             inline for (.{ "subscriber_visits", "retained_watches", "refreshed_watches", "ready_word_scans" }) |field| @field(counters, "worklist_" ++ field) += @field(work.constraints, field) + @field(work.aliases, field);
         }
-        inline for (@typeInfo(@TypeOf(self.normalization_base)).@"struct".field_names) |name| @field(counters.normalization, name) += @field(self.solver.normalization, name) - @field(self.normalization_base, name);
+        counters.normalization.merge(self.solver.normalization);
         if (self.timing) |scope| if (self.scratch.sources.items.len != 0 and scope.owner.clock.io != null) {
             const elapsed = scope.elapsedUs();
             if (elapsed >= 1000) {
@@ -6744,6 +6752,17 @@ const ClosureRegion = struct {
         counters.scratch_allocations += self.arena.scratch_meter.counts.allocations;
         counters.max_solver_live_bytes = @max(counters.max_solver_live_bytes, self.arena.solver_meter.counts.peak_bytes);
         counters.max_scratch_live_bytes = @max(counters.max_scratch_live_bytes, self.arena.scratch_meter.counts.peak_bytes);
+        if (self.timing) |scope| scope.owner.region_callers.add(.{
+            .caller = self.profile_caller,
+            .regions = 1,
+            .inclusive_us = scope.elapsedUs(),
+            .scopes = scopes,
+            .nodes = nodes,
+            .solver_bytes = self.arena.solver_meter.counts.allocated_bytes,
+            .scratch_bytes = self.arena.scratch_meter.counts.allocated_bytes,
+            .solver_allocations = self.arena.solver_meter.counts.allocations,
+            .scratch_allocations = self.arena.scratch_meter.counts.allocations,
+        });
         self.session.regions.region_arena_pool.give(self.arena);
         self.scratch = undefined;
     }
@@ -8571,7 +8590,12 @@ const ClosureRegion = struct {
         // Import those requirements with fresh variables; do not recollect the
         // body or publish a closed call proof before its predicates are solved.
         if ((!self.source_interface or binding.scheme.obligations.len != 0) and !self.retain_selected and !self.complete_demand_bodies and definition != null and definition.?.is_function and binding.kind == .global and try self.checkedSchemeReusable(target_)) {
-            try self.session.observePrincipalSource(target_.unit, target_.binding);
+            // This branch consumes the freshly checked scheme, not its body.
+            // Requirements may depend on producers: retain full observations
+            // unless both the binding and body schemes are obligation-free.
+            if (binding.scheme.obligations.len == 0 and definition.?.scheme.obligations.len == 0) {
+                if (self.session.principal_reads) |reads| try reads.interface(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
+            } else try self.session.observePrincipalSource(target_.unit, target_.binding);
             if (binding.scheme.obligations.len != 0 and self.partial_principal and try self.retainOpenPrincipal(.{ .target = target_, .scope = caller, .node = body_root, .left = instantiated, .result = instantiated, .deferred_member = self.defer_members })) {
                 const start = self.scratch.summary_arguments.items.len;
                 if (arguments.len > std.math.maxInt(u32) - start) return error.TypeLimit;
@@ -9549,6 +9573,10 @@ const ClosureRegion = struct {
     fn shareLexical(self: *ClosureRegion, scope: u32, caller: u32, scheme: types.Scheme) RegionError!void {
         const source = self.scratch.sources.items[scope];
         const module = &self.session.units[source.owner];
+        const memberships = &self.scratch.scheme_memberships;
+        const variables = try memberships.prepare(self.scratch_allocator, &self.session.counters.scheme_membership, source.owner, scheme.variables, module.types.list(scheme.variables));
+        const quantified_rows = try memberships.prepare(self.scratch_allocator, &self.session.counters.scheme_membership, source.owner, scheme.row_variables, module.types.list(scheme.row_variables));
+        const closed_rows = try memberships.prepare(self.scratch_allocator, &self.session.counters.scheme_membership, source.owner, source.closed_rows, module.types.list(source.closed_rows));
         // Per-scope links keep the original insertion order. The bound excludes
         // imports appended by unification, as the former whole-region scan did.
         const variable_count = self.scratch.variables.items.len;
@@ -9558,7 +9586,7 @@ const ClosureRegion = struct {
             const variable = self.scratch.variables.items[index];
             index = variable.next;
             self.session.counters.lexical_scope_candidates += 1;
-            if (std.mem.findScalar(types.Id, module.types.list(scheme.variables), variable.source.ty) != null) continue;
+            if (variables.contains(variable.source.ty)) continue;
             // Projections also occupy this table for physical result mapping.
             // Their argument variables own lexical sharing; a projection of a
             // quantified argument belongs to each independent call instance.
@@ -9576,7 +9604,7 @@ const ClosureRegion = struct {
             row_index = entry.next;
             self.session.counters.lexical_row_scope_candidates += 1;
             const variable = entry.source.variable;
-            if (std.mem.findScalar(types.Id, module.types.list(scheme.row_variables), variable) != null or std.mem.findScalar(types.Id, module.types.list(source.closed_rows), variable) != null) continue;
+            if (quantified_rows.contains(variable) or closed_rows.contains(variable)) continue;
             try self.solver.unifyEffects(entry.region, try self.importRowVariable(caller, variable));
         }
     }
@@ -9865,7 +9893,7 @@ const ClosureRegion = struct {
             self.session.owned_diagnostic_message = message;
             self.session.diagnostic = diagnostic;
         }
-        var region = try ClosureRegion.initWithSolverAllocator(self.session, a);
+        var region = try ClosureRegion.initWithSolverAllocatorAt(self.session, a, @src());
         defer region.deinit();
         region.building_principal = true;
         region.source_interface = key.source_interface;

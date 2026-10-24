@@ -10,6 +10,7 @@ const executable = resolve(
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const statObjects = [
+  "sourceValidation",
   "frontend",
   "backend",
   "optimization",

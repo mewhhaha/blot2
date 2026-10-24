@@ -49,12 +49,18 @@ pub const Record = queries.OwnedRecord(.source_validation, validation.ContextIma
 pub const Stats = struct {
     dependency_validations: usize = 0,
     reused_dependency_validations: usize = 0,
+    projection_scans: usize = 0,
+    projection_visits: usize = 0,
+    projection_workspace_peak_bytes: usize = 0,
     retained: queries.Storage = .{},
     /// Module images copied from the previous certificate, not re-serialized.
     reused_images: usize = 0,
     pub fn observe(self: *Stats, gate: anytype) void {
         self.dependency_validations += gate.dependency_validations;
         self.reused_dependency_validations += gate.reused_dependency_validations;
+        self.projection_scans += gate.projection_scans;
+        self.projection_visits += gate.projection_visits;
+        self.projection_workspace_peak_bytes = @max(self.projection_workspace_peak_bytes, gate.projection_workspace_peak_bytes);
     }
 };
 

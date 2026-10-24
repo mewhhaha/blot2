@@ -281,3 +281,87 @@ entry const third: U32 where { type_rep U32 } = local (odd ${seed})
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+Deno.test("checked interface principal reuse executes changed bodies and preserves errors and recovery", async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-checked-interface-",
+  });
+  const entry = `${directory}/main.blot`;
+  const source = (operation: string, operand: number) =>
+    `const add = fn (x: U32) -> U32 => @u32.add x 1
+const sub = fn (x: U32) -> U32 => @u32.sub x 1
+const div = fn (x: U32) -> U32 => @u32.div x 1
+const local = fn (x: U32) -> U32 => @u32.${operation} x ${operand}
+entry const answer: U32 where { type_rep U32 } = local 41
+`;
+  try {
+    await Deno.writeTextFile(entry, source("add", 1));
+    for (const codegenTier of ["optimized", "development"] as const) {
+      const options = {
+        executable: Deno.args[0] ??
+          new URL("../zig-out/bin/blotc", import.meta.url).pathname,
+        entry,
+        prelude: null,
+        codegenTier,
+        codegenWorkers: 1,
+        cacheDirectory: false as const,
+      };
+      const retained = await createZigProjectCompiler(options);
+      try {
+        for (
+          const [revision, [operation, operand, answer]] of ([
+            ["add", 1, 42],
+            ["sub", 1, 40],
+            ["div", 0, null],
+            ["sub", 2, 39],
+            ["add", 1, 42],
+          ] as const).entries()
+        ) {
+          const sources = { [entry]: source(operation, operand) };
+          const result = await retained.build({ sources });
+          const fresh = await createZigProjectCompiler(options);
+          try {
+            const expected = await fresh.build({ sources });
+            assert.equal(result.success, expected.success);
+            if (answer === null) {
+              assert(!result.success && !expected.success);
+              assert.deepEqual(result.diagnostics, expected.diagnostics);
+              assert.equal(
+                result.diagnostics[0].code,
+                "integer_divide_by_zero",
+              );
+              continue;
+            }
+            assert(result.success && expected.success, JSON.stringify(result));
+            assert.deepEqual(result.bytes, expected.bytes);
+            const { instance } = await WebAssembly.instantiate(result.bytes);
+            const actual = instance.exports.answer;
+            assert.equal(
+              typeof actual === "function"
+                ? actual()
+                : (actual as WebAssembly.Global).value,
+              answer,
+            );
+            if (revision === 1) {
+              const principals = result.stats.principals as Record<
+                string,
+                number
+              >;
+              assert(
+                principals.projected_empty_hits +
+                    principals.projected_nonempty_hits > 0,
+              );
+              assert.equal(principals.fresh_regions, 0);
+            }
+          } finally {
+            await fresh.dispose();
+          }
+        }
+      } finally {
+        await retained.dispose();
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});

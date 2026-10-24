@@ -99,6 +99,15 @@ pub const Cache = struct {
     pub fn key(self: *Cache, session: anytype, value: u32) Allocator.Error!?inputs.Inputs {
         if (!self.eligible(session, value)) return null;
         session.counters.canonical_specialization_queries += 1;
+        // These direct captures were already rejected after constructing the
+        // complete key. Decline before copying a graph we cannot replay.
+        for (session.valueChildren(value)) |child| switch (session.valueInfo(child).kind) {
+            .scalar, .product, .record, .nominal, .array, .list, .cursor, .closure => {},
+            else => {
+                session.counters.canonical_specialization_prefiltered += 1;
+                return null;
+            },
+        };
         var examined: usize = 0;
         defer self.examined_words += examined;
         var result = try inputs.buildCanonicalBudget(session.allocator, session, value, session.options.max_children - self.examined_words, &examined) orelse return null;

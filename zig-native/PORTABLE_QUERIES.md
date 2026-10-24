@@ -18,8 +18,15 @@ query kind and schema.
 
 | Claim                      | Kind         | Schema | Archive                                                      |
 | -------------------------- | ------------ | -----: | ------------------------------------------------------------ |
-| `principal_complete_proof` | `principal`  |      1 | [principal archive](src/reuse/principal_archive.zig), key v3 |
+| `principal_complete_proof` | `principal`  |      1 | [principal archive](src/reuse/principal_archive.zig), key v8 |
 | `optimizer_output`         | `executable` |      1 | [optimizer capture](src/reuse/optimized_archive.zig), key v2 |
+
+The current principal archive key is v8. Its input key owns separate checked
+interface observations, exact local body observations and whole-module images.
+The narrow interface proof is defined in [CONTRACT.md](CONTRACT.md); it grants no executable
+reuse. Decode rejects duplicate/out-of-range interface references and accounts
+for both interface and module observation payloads. Older wire keys are cache
+misses. Historical measurements below retain their original schema context.
 
 Decoding requires the exact header. A different section version reports
 `UnsupportedVersion`; a different kind, schema or claim reports

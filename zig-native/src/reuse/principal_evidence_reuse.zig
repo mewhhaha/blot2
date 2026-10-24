@@ -17,6 +17,15 @@ pub const SourceDecline = struct {
     source: core.BindingRef = .{ .unit = 0, .binding = 0 },
     reason: enum { none, disabled, constant_types, incomplete, identity, changed_source, module_image, missing_root } = .none,
     identity_failure: gate.Gate.IdentityFailure = .none,
+    source_name_utf8: [96]u8 = @splat(0),
+    source_name_truncated: bool = false,
+    source_point: u32 = 0,
+    interface_observation: bool = false,
+    binding_requirements: u32 = 0,
+    body_requirements: u32 = 0,
+    pub fn jsonStringify(self: *const SourceDecline, stream: *std.json.Stringify) std.Io.Writer.Error!void {
+        try stream.write(.{ .target = self.target, .source = self.source, .reason = self.reason, .identity_failure = self.identity_failure, .source_name = std.mem.sliceTo(&self.source_name_utf8, 0), .source_name_truncated = self.source_name_truncated, .source_point = self.source_point, .interface_observation = self.interface_observation, .binding_requirements = self.binding_requirements, .body_requirements = self.body_requirements });
+    }
 };
 pub const Stats = struct {
     persisted_requests: usize = 0,
@@ -37,6 +46,9 @@ pub const Stats = struct {
     input_image_checks: usize = 0,
     dependency_validations: usize = 0,
     reused_dependency_validations: usize = 0,
+    projection_scans: usize = 0,
+    projection_visits: usize = 0,
+    projection_workspace_peak_bytes: usize = 0,
     graph_importers_initialized: usize = 0,
     graph_importers_prepared: usize = 0,
     empty_hits: usize = 0,
@@ -80,7 +92,7 @@ pub const State = struct {
     pub fn init(allocator: Allocator, old: *const capture.Capture, units: []const core.Module, names: ?identity.View, stamps: ?*code_artifacts.ModuleStamps) Allocator.Error!State {
         var admission = try gate.Gate.initWithStamps(allocator, &old.metadata.pools.?, units, names, stamps);
         errdefer admission.deinit();
-        const result: State = .{ .allocator = allocator, .old = old, .gate = admission, .names = names, .stats = .{ .dependency_validations = admission.dependency_validations, .reused_dependency_validations = admission.reused_dependency_validations } };
+        const result: State = .{ .allocator = allocator, .old = old, .gate = admission, .names = names, .stats = .{ .dependency_validations = admission.dependency_validations, .reused_dependency_validations = admission.reused_dependency_validations, .projection_scans = admission.projection_scans, .projection_visits = admission.projection_visits, .projection_workspace_peak_bytes = admission.projection_workspace_peak_bytes } };
         return result;
     }
     /// Reuse this query's already validated namespace and catalog. No importer
@@ -173,6 +185,22 @@ pub const State = struct {
             if (slot.reason == .none) {
                 slot.* = detail;
                 if (detail.reason == .identity) slot.identity_failure = self.gate.callIdentityFailure(detail.source);
+                if (detail.source.unit != 0 and detail.source.unit <= self.gate.units.len) {
+                    const module = &self.gate.units[detail.source.unit - 1];
+                    if (detail.source.binding != 0 and detail.source.binding < module.bindings.len) {
+                        slot.source_point = module.sourceNamePoint(detail.source.binding);
+                        slot.binding_requirements = module.binding(detail.source.binding).scheme.obligations.len;
+                        if (module.body(detail.source.binding)) |body| {
+                            slot.body_requirements = body.scheme.obligations.len;
+                            if (@import("declaration_origins.zig").name(module, body.*)) |name| {
+                                var len = @min(name.len, slot.source_name_utf8.len);
+                                while (len != 0 and !std.unicode.utf8ValidateSlice(name[0..len])) len -= 1;
+                                @memcpy(slot.source_name_utf8[0..len], name[0..len]);
+                                slot.source_name_truncated = len != name.len;
+                            }
+                        }
+                    }
+                }
                 break;
             }
         }
@@ -184,6 +212,9 @@ pub const State = struct {
         if (!inputs.source_complete) return self.sourceDeclined(.{ .target = target, .reason = .incomplete });
         for (inputs.source_units) |unit| {
             if (unit == 0 or unit > self.gate.units.len or !@import("principal_input_image.zig").moduleEqual(self.old.metadata.pools.?.modules[unit - 1].module, &self.gate.units[unit - 1])) return self.sourceDeclined(.{ .target = target, .source = .{ .unit = unit, .binding = 0 }, .reason = .module_image });
+        }
+        for (inputs.interfaces) |source| {
+            if (!self.gate.admitsCheckedInterface(source)) return self.sourceDeclined(.{ .target = target, .source = source, .interface_observation = true, .reason = if (self.gate.admitsCallIdentity(source)) .changed_source else .identity });
         }
         var root = false;
         for (inputs.sources) |source| {
