@@ -73,6 +73,11 @@ fn dependencies(allocator: std.mem.Allocator, source: [:0]const u8, path: []cons
     }
 }
 pub fn digest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize, use_llvm: ?bool) ![32]u8 {
+    // Zig 0.17's retained configuration has been observed to reuse an older
+    // digest despite the declared content dependencies below. Recompute this
+    // small configuration step until that boundary is reliable. Compilation
+    // and generated-file caches remain reusable; source identity must not.
+    b.graph.poisonCache();
     var hash = std.crypto.hash.Blake3.init(.{});
     framed(&hash, "blotc compiler source identity v3");
     framed(&hash, builtin.zig_version_string);

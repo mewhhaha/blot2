@@ -1842,7 +1842,7 @@ fn pairedQueryFailure(allocator: Allocator, fixture: *const Fixture, old: *const
     try std.testing.expectEqual(@as(usize, 1), state.stats.owner_importers);
     try std.testing.expect(state.stats.plan_cache_hits > 0);
     const table = &old.metadata.specialization_queries;
-    var ordered = table.candidates(@import("../eval/selected_query.zig").fingerprint(table.records.items[0].key.source), .oldest_first);
+    var ordered = table.candidates(@import("../eval/selected_query.zig").Adapter.fingerprint(table.records.items[0].key), .oldest_first);
     try std.testing.expectEqual(@as(?u32, 0), ordered.next());
     try std.testing.expectEqual(@as(?u32, 1), ordered.next());
     try std.testing.expect(ordered.next() == null);

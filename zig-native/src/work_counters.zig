@@ -14,6 +14,10 @@ pub const Normalization = struct {
     interner_requests: u64 = 0,
     interner_candidates: u64 = 0,
     interner_arguments: u64 = 0,
+    interner_linked: u64 = 0,
+    interner_rebuilds: u64 = 0,
+    closed_operation_hits: u64 = 0,
+    argument_height_checks: u64 = 0,
 };
 pub const Counters = struct {
     /// Region solver work only; frontend type stores are counted separately.
@@ -47,6 +51,12 @@ pub const Counters = struct {
 
     semantic_component_batches: u64 = 0,
     semantic_component_jobs: u64 = 0,
+    semantic_component_attempts: u64 = 0,
+    semantic_component_no_io: u64 = 0,
+    semantic_component_disabled: u64 = 0,
+    semantic_component_recording: u64 = 0,
+    semantic_component_observing: u64 = 0,
+    semantic_component_exhausted: u64 = 0,
     /// Admitted worker capacity, including the coordinator; not overlap or CPUs.
     max_semantic_component_workers: u64 = 0,
     /// Inference regions opened (ClosureRegion lifetimes, including split children).
@@ -54,6 +64,8 @@ pub const Counters = struct {
     /// Session-local canonical requests and complete proofs reconstructed around
     /// the current captures without opening a new inference region.
     canonical_specialization_queries: u64 = 0,
+    canonical_specialization_lookups: u64 = 0,
+    canonical_specialization_candidates: u64 = 0,
     canonical_specialization_hits: u64 = 0,
     /// Logical successful client growth inside region arenas; these overlap
     /// backing `memory` totals and must never be added to them.
@@ -98,6 +110,10 @@ pub const Counters = struct {
     /// examined across them.
     solver_passes: u64 = 0,
     solver_constraint_visits: u64 = 0,
+    worklist_subscriber_visits: u64 = 0,
+    worklist_retained_watches: u64 = 0,
+    worklist_refreshed_watches: u64 = 0,
+    worklist_ready_word_scans: u64 = 0,
     /// Type nodes visited by occurs checks in region solvers.
     occurs_steps: u64 = 0,
     /// Owned principal graphs described, imported into a region instead of
@@ -105,12 +121,16 @@ pub const Counters = struct {
     principal_graph_builds: u64 = 0,
     principal_graph_imports: u64 = 0,
     principal_graph_deferred: u64 = 0,
+    principal_containing_sources: u64 = 0,
+    principal_module_sources: u64 = 0,
     /// Capture scopes projected while selecting interfaces for lexical keys.
     lexical_interface_projections: u64 = 0,
     /// Former region-wide lexical scan candidates and entries actually visited
     /// through the scope index. Both preserve the same insertion-order bound.
     lexical_region_candidates: u64 = 0,
     lexical_scope_candidates: u64 = 0,
+    lexical_row_region_candidates: u64 = 0,
+    lexical_row_scope_candidates: u64 = 0,
     /// Calls selected before emission, by shape, and the closures applied to
     /// arguments past a selected callee's parameters.
     resolved_bodies: u64 = 0,

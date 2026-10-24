@@ -34,6 +34,8 @@ pub const Stats = struct {
     values_imported: usize = 0,
     plain_revalidated: usize = 0,
     enumerated_records: usize = 0,
+    longest_bucket: usize = 0,
+    empty_buckets: usize = 0,
     root_preflight_declined: usize = 0,
     owner_importers: usize = 0,
     prepared_importers: usize = 0,
@@ -171,6 +173,8 @@ pub const State = struct {
         return slot.state == .complete and g.evaluator.memberReceiptEligible(target);
     }
     fn lookupQuery(self: *State, g: anytype, member_target: ?core.BindingRef, input: u32, expected: u32, exact_position: ?u32) Allocator.Error!?u32 {
+        const timing = if (g.evaluator.timing) |work| work.enter(.query_prepare) else null;
+        defer if (timing) |scope| scope.deinit();
         defer self.stats.graph_scratch = self.graph_scratch.stats;
         self.stats.lookups += 1;
         if (!self.gate.enabled or g.evaluator.units.ptr != self.gate.units.ptr or g.evaluator.units.len != self.gate.units.len or self.allocator.ptr != g.evaluator.allocator.ptr or self.allocator.vtable != g.evaluator.allocator.vtable) return null;
@@ -201,8 +205,14 @@ pub const State = struct {
         self.session_owner = @intFromPtr(&g.evaluator);
         try self.index();
         const table = &self.old.metadata.specialization_queries;
-        var cursor = table.candidates(selected_query.fingerprint(current_source), .oldest_first);
-        while (cursor.next()) |position| {
+        var cursor = table.candidates(selected_query.fingerprint(current_source, g.evaluator.options, g.evaluator.depth), .oldest_first);
+        defer {
+            self.stats.longest_bucket = @max(self.stats.longest_bucket, cursor.inspected);
+            self.stats.empty_buckets += @intFromBool(cursor.inspected == 0);
+        }
+        while (true) {
+            if (timing) |scope| scope.change(.query_scan);
+            const position = cursor.next() orelse break;
             if (exact_position) |exact| if (position != exact) continue;
             const record = &table.records.items[position].dependencies;
             self.stats.enumerated_records += 1;
@@ -227,6 +237,7 @@ pub const State = struct {
                 self.reject(.resource);
                 continue;
             }
+            if (timing) |scope| scope.change(.query_source);
             if (!self.gate.admitsReceipt(record)) {
                 self.reject(.source);
                 continue;
@@ -236,6 +247,7 @@ pub const State = struct {
                 self.reject(.input);
                 continue;
             }
+            if (timing) |scope| scope.change(.query_import);
             const maps = try self.pairedImporter();
             if (!maps.enabled) {
                 self.reject(.source);
@@ -250,6 +262,7 @@ pub const State = struct {
                 self.reject(.domain);
                 continue;
             };
+            if (timing) |scope| scope.change(.query_match);
             const anchors = self.graph_scratch.begin(plan, g) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.Declined => {
@@ -300,6 +313,7 @@ pub const State = struct {
                     continue;
                 }
             }
+            if (timing) |scope| scope.change(.query_validate);
             var valid = true;
             for (record.scalar_reads) |read| {
                 const module = &self.gate.units[read.target.unit - 1];
@@ -421,6 +435,7 @@ pub const State = struct {
                 self.reject(.plain);
                 continue;
             }
+            if (timing) |scope| scope.change(.query_publish);
             // Prepare all semantic keys and map capacity before graph publication.
             const view_evidence = try self.allocator.alloc(u32, record.views.len);
             defer self.allocator.free(view_evidence);

@@ -1,6 +1,76 @@
 import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 
+Deno.test("retained nested source owners preserve unrelated edits consumed closures suspensions and error recovery", async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-source-owner-" });
+  const entry = `${directory}/main.blot`;
+  const library = `${directory}/library.blot`;
+  const source = (divisor: number, unused: number) =>
+    `const force = fn ~(value: U32) => @force value
+const make = fn (seed: U32) => do:
+  let captured = fn (value: U32) => @u32.div (@u32.add seed (force value)) ${divisor}
+  break captured
+const unrelated = fn (value: U32) => @u32.add value ${unused}
+`;
+  try {
+    await Deno.writeTextFile(
+      entry,
+      'import { make } from "./library"\nentry const answer: U32 where { type_rep U32 } = (make 6) 2\n',
+    );
+    await Deno.writeTextFile(library, source(2, 1));
+    for (const codegenTier of ["optimized", "development"] as const) {
+      const options = {
+        executable: Deno.args[0] ??
+          new URL("../zig-out/bin/blotc", import.meta.url).pathname,
+        entry,
+        prelude: null,
+        codegenTier,
+        codegenWorkers: 1,
+        cacheDirectory: false as const,
+      };
+      const retained = await createZigProjectCompiler(options);
+      try {
+        for (
+          const [divisor, unused] of [[2, 1], [2, 7], [4, 7], [0, 7], [2, 1]]
+        ) {
+          const sources = { [library]: source(divisor, unused) };
+          const result = await retained.build({ sources });
+          const fresh = await createZigProjectCompiler(options);
+          try {
+            const expected = await fresh.build({ sources });
+            assert.equal(result.success, expected.success);
+            if (divisor === 0) {
+              assert(!result.success && !expected.success);
+              assert.deepEqual(result.diagnostics, expected.diagnostics);
+              assert.equal(
+                result.diagnostics[0].code,
+                "integer_divide_by_zero",
+              );
+              continue;
+            }
+            assert(result.success && expected.success, JSON.stringify(result));
+            assert.deepEqual(result.bytes, expected.bytes);
+            const { instance } = await WebAssembly.instantiate(result.bytes);
+            const answer = instance.exports.answer;
+            assert.equal(
+              typeof answer === "function"
+                ? answer()
+                : (answer as WebAssembly.Global).value,
+              8 / divisor,
+            );
+          } finally {
+            await fresh.dispose();
+          }
+        }
+      } finally {
+        await retained.dispose();
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 Deno.test("retained principal results omit deep optional call proofs and preserve edits errors recovery and execution", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-principal-depth-" });
   const entry = `${directory}/main.blot`;
@@ -198,6 +268,13 @@ entry const third: U32 where { type_rep U32 } = local (odd ${seed})
         );
       } finally {
         await restarted.dispose();
+        // Its first revision may leave a detached writer. Reopening the same
+        // key joins that writer before the outer temporary-directory removal.
+        const settled = await createZigProjectCompiler({
+          ...options,
+          codegenWorkers: 4,
+        });
+        await settled.close();
       }
     }
   } finally {

@@ -25,6 +25,10 @@ pub const Queue = struct {
     type_generation: u16 = 0,
     row_generation: u64 = 0,
     clock: types.Cursor = 0,
+    subscriber_visits: u64 = 0,
+    retained_watches: u64 = 0,
+    refreshed_watches: u64 = 0,
+    ready_word_scans: u64 = 0,
 
     pub fn deinit(self: *Queue, a: Allocator) void {
         self.entries.deinit(a);
@@ -82,6 +86,7 @@ pub const Queue = struct {
         if (word >= self.ready.items.len) return null;
         var bits = self.ready.items[word] & (@as(u64, std.math.maxInt(u64)) << @intCast(start % 64));
         while (bits == 0) {
+            self.ready_word_scans += 1;
             word += 1;
             if (word >= self.ready.items.len) return null;
             bits = self.ready.items[word];
@@ -109,6 +114,7 @@ pub const Queue = struct {
     fn wake(self: *Queue, key: u64) void {
         var cursor = self.heads.get(key) orelse return;
         while (cursor != none) {
+            self.subscriber_visits += 1;
             const link = self.links.items[cursor];
             self.enqueue(link.item);
             cursor = link.next;
@@ -176,11 +182,35 @@ pub const Queue = struct {
             // Watch discovery cannot become an earlier authoritative error.
             else => frontier.overflow = true,
         };
+        self.refreshed_watches += 1;
+        if (self.sameWatches(index, &frontier, external_input, broad or frontier.overflow)) {
+            self.retained_watches += 1;
+            return;
+        }
         self.clearWatches(index);
         if (broad or frontier.overflow) {
             try self.watchKey(a, index, any_write);
         } else for (frontier.keys[0..frontier.len]) |key| try self.watchKey(a, index, key);
         if (external_input) try self.watchKey(a, index, external);
+    }
+    fn sameWatches(self: *const Queue, index: usize, frontier: *const Frontier, external_input: bool, broad: bool) bool {
+        var cursor = self.entries.items[index].head;
+        if (external_input) {
+            if (cursor == none or self.links.items[cursor].key != external) return false;
+            cursor = self.links.items[cursor].owner_next;
+        }
+        if (broad) {
+            if (cursor == none or self.links.items[cursor].key != any_write) return false;
+            cursor = self.links.items[cursor].owner_next;
+        } else {
+            var remaining = frontier.len;
+            while (remaining != 0) {
+                remaining -= 1;
+                if (cursor == none or self.links.items[cursor].key != frontier.keys[remaining]) return false;
+                cursor = self.links.items[cursor].owner_next;
+            }
+        }
+        return cursor == none;
     }
 };
 
@@ -199,6 +229,10 @@ const Frontier = struct {
     }
     fn collect(self: *Frontier, store: *types.Store, roots: []const types.Id) types.Error!void {
         var stack: [256]types.Id = undefined;
+        // Exact direct-mapped entries need no allocation. Collisions merely
+        // repeat work; they never suppress a dependency. Projection-bearing
+        // walks preserve their ordinary per-visit budget accounting.
+        var seen: [64]types.Id = @splat(0);
         if (roots.len > stack.len) {
             self.overflow = true;
             return;
@@ -207,14 +241,19 @@ const Frontier = struct {
         var len = roots.len;
         var visited: usize = 0;
         while (len != 0 and !self.overflow) {
+            len -= 1;
+            const root = stack[len];
+            if (root == 0) continue;
+            if (!store.has_projections) {
+                const slot = (root *% 0x9e3779b9) >> 26;
+                if (seen[slot] == root) continue;
+                seen[slot] = root;
+            }
             if (visited == 1024) {
                 self.overflow = true;
                 return;
             }
             visited += 1;
-            len -= 1;
-            const root = stack[len];
-            if (root == 0) continue;
             const node = store.node(try store.resolve(root, 0));
             if (node.tag == .variable) {
                 self.add(@as(u64, node.a) * 2);
@@ -292,6 +331,20 @@ const Frontier = struct {
     }
 };
 
+test "watch frontier deduplicates shared DAGs without losing their unresolved variable" {
+    const a = std.testing.allocator;
+    var store = try types.Store.initWithOptions(a, .{ .closed_graphs = true });
+    defer store.deinit();
+    const variable = try store.fresh();
+    var root = variable;
+    for (0..12) |_| root = try store.product(&.{ root, root });
+    var frontier: Frontier = .{};
+    try frontier.collect(&store, &.{root});
+    try std.testing.expect(!frontier.overflow);
+    try std.testing.expectEqual(@as(usize, 1), frontier.len);
+    try std.testing.expectEqual(@as(u64, store.node(variable).a) * 2, frontier.keys[0]);
+}
+
 fn queueScenario(a: Allocator) !void {
     var store = try types.Store.initWithOptions(a, .{ .closed_graphs = true });
     defer store.deinit();
@@ -305,6 +358,8 @@ fn queueScenario(a: Allocator) !void {
     queue.observe(&store);
     while (queue.take(0)) |_| {}
     try queue.watch(a, &store, 0, &.{root}, false, false);
+    try queue.watch(a, &store, 0, &.{root}, false, false);
+    try std.testing.expectEqual(@as(u64, 1), queue.retained_watches);
     try queue.watch(a, &store, 1, &.{second}, false, false);
     try queue.watch(a, &store, 2, &.{}, true, false);
     const unrelated = try store.fresh();

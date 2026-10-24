@@ -275,6 +275,7 @@ the reference client rejects an empty or invalid module.
     "runtimeOptimization": {},
     "backendTiming": {},
     "phaseProfile": {},
+    "sessionHeap": null,
     "workCounters": {},
     "principals": {},
     "refinements": {},
@@ -334,9 +335,18 @@ profiled build reports `total_us`, the process's `peak_rss_kib` and exclusive
 Each phase is `{us, requested_bytes, allocations, rss_growth_kib}`: session
 allocator requests charged while it was active, and how far it raised peak RSS.
 
+`sessionHeap` is null without profiling or when the server uses a different
+allocator. Otherwise it observes the process heap before revision publication:
+`slab_bytes`, `free_bytes`, `unused_bytes`, `live_class_bytes`, `complete`, and
+the same capacities by size class. Live class bytes are rounded allocated
+capacity, including overlapping old and pending revision owners. They are not
+requested bytes or post-build RSS. Directly mapped large allocations are outside
+this observation. Free-list traversal takes the heap lock only for this
+profiling observation; ordinary allocation/free operations gain no traversal.
+
 The objects are measurements for people, and their insides are not part of the
 contract. The reference client validates the four integers as nonnegative safe
-integers, all ten named objects as objects, and `restartCacheLoaded` as a
+integers, the required named statistic objects as objects, and `restartCacheLoaded` as a
 boolean. It refuses `const_steps` and `remaining_steps` anywhere in `stats`
 (source fuel, which this protocol does not support), and it validates the Wasm
 before accepting it.

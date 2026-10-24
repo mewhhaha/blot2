@@ -1,6 +1,52 @@
 # Continue here
 
-Post-CT105 review, 24 October 2026:
+CT106 qualified and installed, 24 October 2026:
+[qualification and measurements](zig-native/CT106_QUALIFICATION.md),
+[all 86 dispositions](COMPILER_CT106_WORK.md).
+Seven alternating pairs against CT105 reduce first-literal CPU 19.1% (3.62 →
+2.91 s wall median). Fresh CPU improves 2.4%, body CPU is effectively unchanged,
+and literal-revert CPU rises 3.5%. Both fresh guards pass; ordinary body,
+two-second and sub-second targets remain open. Keep the frozen 554-file workload
+and strict Wasm pins when comparing another candidate.
+
+Final native SHA-256:
+`7d7ea08313e865a633ec9be2acc0347bc1560490ce8caca82e96df1c5b2dba69`.
+Identity-file SHA-256:
+`c6f01a199871b66d90fb24354c1d165bfff7bdc10323ea83c7c92cc8964a004f`.
+Installed CLI SHA-256:
+`0fc44a8d4be387868f9cf95df10300039b8e9bb8a472567e73909d2cd3ce6410`.
+Installation and rollback records: `build/install/ct106/installed.json`.
+
+Full qualification passes 2,564 exhaustive native laws, 1,655 guests, 48 smoke
+checks and 57 tooling checks. The final guest pass resumes exact verified native
+evidence; its ~52 s is not the complete gate cost (native execution 648.72 s).
+Twenty complete development cycles pass: 25.35 s median, 27.64 s observed p95,
+78 selected native laws and 55 guests, zero lint, every source restored. Failed
+cache-teardown attempts, the moving-gdev input rejection and the full-/tmp
+attempt remain preserved and are not passes. The isolated qualified checkout
+uses frozen sibling fixtures and workspace-backed temporary storage.
+
+The first frontend edit checks one module instead of 22. Operation interner
+candidates fall from 90.45M to 0.74M; actual argument-height checks fall to 1.79M.
+Four body principals still fail their own source-position check after two
+narrowing attempts. Preserve exact provenance. Query-key changes did not reduce
+candidate counts. Finer arena bins, notification coalescing, semantic-worker
+default changes and host-native CPU targeting did not earn adoption.
+
+A 200-distinct-edit sequence passes 232 requests with 12 sampled fresh controls.
+Follow-up profiled windows show fixed small-heap/virtual capacity while RSS
+rises, supporting residency changes during that window, not an indefinite
+memory bound. All-thread PMU and CPU-set screens, nine held-out structural
+programs, 36 runtime executions and the actual Zig timing trace are archived.
+LLVM emission is about 97% of the measured release build.
+
+Remaining work is explicit in the ledger: stable declaration origins, residual
+query validation/import, cache/membership ablations, backend planning/encoding
+reuse and broader allocator/phase attribution. These are not claimed complete.
+Preserve unrelated `zig-native/build/` and `zig-out-modern/`. Do not rerun the
+historical program or report failed acceptance targets as completed hills.
+
+Historical post-CT105 review, 24 October 2026:
 [86 compiler performance suggestions](COMPILER_REVIEW_CT105.md), with six
 ranked experiments and archived evidence. Implementation `a0645de` is pushed;
 the installed compiler and all compiler source bytes are unchanged. The new

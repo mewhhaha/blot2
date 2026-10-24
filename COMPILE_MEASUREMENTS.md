@@ -1,6 +1,20 @@
 # Compile and compiler-build measurements
 
-Latest diagnostic review, 24 October 2026:
+The [CT106 qualification](zig-native/CT106_QUALIFICATION.md) records **19.1%
+less first-literal-edit CPU** against CT105 in seven alternating release pairs,
+with identical Wasm. First-literal wall median falls from 3.62 to **2.91 s**;
+fresh CPU improves 2.4%, body CPU is effectively unchanged and literal-revert
+CPU rises 3.5%. These are shared-host observations. Body-edit, two-second and
+sub-second targets remain open.
+
+Exact frontend correspondence now checks one module on the first edit instead
+of 22. Bounded operation indexes/certificates, lexical links and import scratch
+remove repeated work. The report includes 200 distinct edits, allocator/CPU
+attribution, exhaustive qualification and rejected experiments. All 86 review
+suggestions have a [disposition](COMPILER_CT106_WORK.md); conditional alternatives
+and unfinished architectural work are explicit.
+
+Historical CT105 diagnostic review, 24 October 2026:
 [post-CT105 CPU, memory, algorithm and architecture review](COMPILER_REVIEW_CT105.md).
 Three profiling-off/on pairs of the same installed release measure unprofiled
 wall medians of 6.878 s fresh, 3.786 s first literal, 2.580 s literal revert and
@@ -9,7 +23,7 @@ targeted graph-size probe are archived with source/binary pins. All outputs
 match strict existing hashes. This is a review of unchanged `a0645de`, not a
 new optimization comparison, compiler build measurement or qualification.
 
-Latest qualification, 24 October 2026:
+Historical CT105 qualification, 24 October 2026:
 [CT105 solver scans, normalization and catalog costs](zig-native/CT105_QUALIFICATION.md).
 Seven alternating pairs against `5cfb411` show **13.3% less fresh-game CPU**,
 **12.9% less body-edit CPU** and **3.3% less first-literal CPU**, with exact

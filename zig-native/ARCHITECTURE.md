@@ -240,6 +240,10 @@ regions as `backend_timing.work`, and whole-build exclusive phase clocks (load,
 lex, parse, check, lower, freeze, validation, backend and the rest) with each
 phase's requested bytes, allocation count and peak-RSS growth as `phase_profile`
 (`phaseProfile`). The counting allocator is inserted only for profiled builds.
+Profiled project replies also expose `sessionHeap`: small-slab capacity, free
+capacity, unused tails and rounded allocated capacity by size class, sampled
+before publication while both revision owners can still be alive. It excludes
+direct large mappings and is distinct from RSS and requested allocation bytes.
 Detailed clocks are disabled by default so profiling does not tax ordinary hot
 paths: an unprofiled record omits `work` and publishes an empty phase profile.
 Deterministic work counters (`work_counters` in CLI stats, `workCounters` in the

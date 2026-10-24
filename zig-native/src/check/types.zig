@@ -100,9 +100,9 @@ pub fn effectError(err: Effects.Error) Error {
 }
 
 const ProjectionResolution = struct { root: Id, at: Cursor, depth: u32 };
-const OperationKey = struct { identity: NominalIdentity, instance: NominalIdentity, arity: u32 };
+const OperationKey = struct { identity: NominalIdentity, instance: NominalIdentity, arity: u32, shape: u64 };
 const OperationChain = struct { first: Effects.Label, last: Effects.Label };
-const OperationLink = struct { next: Effects.Label = none, previous: Effects.Label = none };
+const OperationLink = struct { next: Effects.Label = none, previous: Effects.Label = none, shape: u64 = 0 };
 const RowCertificate = struct { generation: u16 = 0, argument_height: u8 = 0, has_arguments: bool = false };
 const ClosedRow = struct {
     row: Effects.Id = 0,
@@ -129,6 +129,9 @@ pub const Store = struct {
     // on large rows. Growth happens only at the fallible resolver boundary;
     // infallible construction can still use the tiny inline fallback.
     closed_row_index: std.ArrayList(RowCertificate) = .empty,
+    // Rows often repeat the same operation argument vector. Positive facts
+    // belong to this solver generation, independently of row storage sharing.
+    closed_operation_index: std.ArrayList(RowCertificate) = .empty,
     use_operation_rows: bool = true,
     operation_rows: [64]OperationRow = @splat(.{}),
     has_usage_types: bool = false,
@@ -178,6 +181,9 @@ pub const Store = struct {
     /// Interning appends and rollback truncates; other writers only append.
     operation_chains: std.AutoHashMapUnmanaged(OperationKey, OperationChain) = .empty,
     operation_links: std.ArrayList(OperationLink) = .empty,
+    use_operation_shapes: bool = true,
+    operation_shape_generation: u16 = 0,
+    operation_shape_enabled: bool = false,
     quantifier_goals: std.ArrayList(QuantifierGoals) = .empty,
     quantifier_obligations: std.ArrayList(Obligation) = .empty,
 
@@ -208,6 +214,7 @@ pub const Store = struct {
         self.composites.deinit(self.allocator);
         self.occurs_seen.deinit(self.allocator);
         self.closed_row_index.deinit(self.allocator);
+        self.closed_operation_index.deinit(self.allocator);
         self.effects.deinit();
         self.operations.deinit(self.allocator);
         self.operation_chains.deinit(self.allocator);
@@ -288,6 +295,15 @@ pub const Store = struct {
         if (slot.generation == self.closed_generation and slot.row != id) self.normalization.closed_row_evictions += 1;
         slot.* = .{ .row = id, .generation = self.closed_generation, .argument_height = height, .has_arguments = has_arguments };
     }
+    fn closedOperation(self: *const Store, label: Effects.Label) ?RowCertificate {
+        if (!self.use_closed_rows or !self.use_closed_graphs or self.closed_generation == std.math.maxInt(u16) or self.effects.physical_epoch == std.math.maxInt(u64) or self.closed_effect_physical_epoch != self.effects.physical_epoch or label >= self.closed_operation_index.items.len) return null;
+        const proof = self.closed_operation_index.items[label];
+        return if (proof.generation == self.closed_generation) proof else null;
+    }
+    fn saveClosedOperation(self: *Store, label: Effects.Label, height: u8, has_arguments: bool) void {
+        if (!self.use_closed_rows or !self.use_closed_graphs or self.closed_generation == std.math.maxInt(u16) or self.effects.physical_epoch == std.math.maxInt(u64) or self.closed_effect_physical_epoch != self.effects.physical_epoch or label >= self.closed_operation_index.items.len) return;
+        self.closed_operation_index.items[label] = .{ .generation = self.closed_generation, .argument_height = height, .has_arguments = has_arguments };
+    }
     fn closedRowHeight(self: *Store, id: Effects.Id) u8 {
         const r = self.effects.node(id);
         if (r.tail != .closed) return 0;
@@ -297,14 +313,22 @@ pub const Store = struct {
         var has_arguments = false;
         for (self.effects.list(r.labels)) |label| {
             if (label >= self.operations.items.len) return 0;
+            if (self.closedOperation(label)) |proof| {
+                height = @max(height, proof.argument_height);
+                has_arguments = has_arguments or proof.has_arguments;
+                continue;
+            }
             const instance = self.operations.items[label].instance;
             if (instance.unit == 0 and instance.decl != 0) return 0;
+            var operation_height: u8 = 0;
             for (self.list(self.operations.items[label].arguments)) |arg| {
                 has_arguments = true;
                 const argument_height = self.closedHeight(arg);
                 if (argument_height == 0) return 0;
                 height = @max(height, argument_height);
+                operation_height = @max(operation_height, argument_height);
             }
+            self.saveClosedOperation(label, operation_height, self.operations.items[label].arguments.len != 0);
         }
         self.saveClosedRow(id, height, has_arguments);
         if (height == std.math.maxInt(u8)) return 0;
@@ -795,6 +819,11 @@ pub const Store = struct {
     }
     fn replacement(self: *const Store, index: u32, at: Cursor) ?Version {
         var version = self.variables.items[index].first;
+        if (version == none) return null;
+        const first = self.versions.items[version];
+        if (first.position >= at) return first;
+        if (self.versions.items[self.variables.items[index].last].position < at) return null;
+        version = first.next;
         while (version != none) : (version = self.versions.items[version].next) {
             const value = self.versions.items[version];
             if (value.position >= at) return value;
@@ -1321,6 +1350,11 @@ pub const Store = struct {
     }
     fn resolveOperationArguments(self: *Store, id: Effects.Id, at: Cursor, depth: usize) Error!Effects.Id {
         self.normalization.argument_rows += 1;
+        if (self.use_closed_rows and self.use_closed_graphs and self.closed_operation_index.items.len < self.operations.items.len) {
+            const before = self.closed_operation_index.items.len;
+            try self.closed_operation_index.resize(self.allocator, self.operations.items.len);
+            @memset(self.closed_operation_index.items[before..], .{});
+        }
         const row_ = self.row(id);
         // Resolving the row above already selects its chronological tail.
         // This certificate covers only immutable operation arguments: an
@@ -1337,16 +1371,28 @@ pub const Store = struct {
             const operation_ = self.operation(label);
             self.normalization.labels += 1;
             self.normalization.arguments += operation_.arguments.len;
+            if (self.closedOperation(label)) |proof| {
+                self.normalization.closed_operation_hits += 1;
+                has_arguments = has_arguments or proof.has_arguments;
+                argument_height = @max(argument_height, proof.argument_height);
+                if (proof.has_arguments and depth + 1 + proof.argument_height > self.resolution_depth_limit) return error.TypeLimit;
+                if (changed) labels.appendAssumeCapacity(label);
+                continue;
+            }
             var closed = operation_.instance.unit != 0 or operation_.instance.decl == 0;
+            var operation_height: u8 = 0;
             for (self.list(operation_.arguments)) |argument| {
                 has_arguments = true;
                 const height = self.closedHeight(argument);
+                self.normalization.argument_height_checks += 1;
                 argument_height = @max(argument_height, height);
+                operation_height = @max(operation_height, height);
                 if (height == 0) closed = false;
                 if (height != 0 and depth + 1 + height > self.resolution_depth_limit) return error.TypeLimit;
             }
             all_closed = all_closed and closed;
             if (closed) {
+                self.saveClosedOperation(label, operation_height, operation_.arguments.len != 0);
                 if (changed) labels.appendAssumeCapacity(label);
                 continue;
             }
@@ -1430,7 +1476,7 @@ pub const Store = struct {
         try self.linkOperations();
         // Only candidates sharing identity, instance and arity can match; the
         // chain visits them in index order, so the oldest equal one wins.
-        if (resolved.len <= std.math.maxInt(u32)) if (self.operation_chains.get(.{ .identity = identity, .instance = instance, .arity = @intCast(resolved.len) })) |chain| {
+        if (resolved.len <= std.math.maxInt(u32)) if (self.operation_chains.get(.{ .identity = identity, .instance = instance, .arity = @intCast(resolved.len), .shape = self.operationShape(resolved) })) |chain| {
             var index = chain.first;
             while (index != none) : (index = self.operation_links.items[index].next) {
                 self.normalization.interner_candidates += 1;
@@ -1450,25 +1496,70 @@ pub const Store = struct {
         try self.operations.append(self.allocator, .{ .identity = identity, .arguments = span, .instance = instance });
         return id;
     }
+    /// A bounded structural prefilter, never an equality proof. It excludes
+    /// graph ordinals, record order and closedness metadata. Equal symbolic or
+    /// closed arguments therefore select the same bucket even when allocated
+    /// independently. Projections retain ordinary per-pair budget accounting.
+    fn operationShape(self: *const Store, arguments: []const Id) u64 {
+        if (!self.operation_shape_enabled) return 0;
+        var hash: u64 = arguments.len;
+        for (arguments[0..@min(arguments.len, 4)]) |argument| hash = mixShape(hash, self.operationTypeShape(argument, 2));
+        return hash;
+    }
+    fn mixShape(left: u64, right: u64) u64 {
+        return (left ^ right) *% 0x9e3779b97f4a7c15 +% 0x85ebca6b;
+    }
+    fn operationTypeShape(self: *const Store, id: Id, depth: usize) u64 {
+        const n = self.node(id);
+        var hash: u64 = @backingInt(n.tag);
+        switch (n.tag) {
+            .variable, .nominal, .type_constructor, .instance_selection => hash = mixShape(mixShape(hash, n.a), n.b),
+            .rigid, .instance_version => hash = mixShape(mixShape(mixShape(hash, n.a), n.b), n.c),
+            .record, .product => hash = mixShape(hash, n.b),
+            .usage => hash = mixShape(mixShape(hash, n.b), @intFromBool(n.c != 0)),
+            .scoped => hash = mixShape(mixShape(hash, n.b), if (n.b != 0) n.c else 0),
+            else => {},
+        }
+        if (depth == 0) return hash;
+        switch (n.tag) {
+            .array, .list, .cursor, .resolver, .demand, .provider, .usage, .scoped => hash = mixShape(hash, self.operationTypeShape(n.a, depth - 1)),
+            .function => {
+                hash = mixShape(hash, self.operationTypeShape(n.a, depth - 1));
+                hash = mixShape(hash, self.operationTypeShape(n.b, depth - 1));
+            },
+            // These children are ordered. Record fields deliberately are not.
+            .product => for (self.list(.{ .start = n.a, .len = @min(n.b, 2) })) |child| {
+                hash = mixShape(hash, self.operationTypeShape(child, depth - 1));
+            },
+            else => {},
+        }
+        return hash;
+    }
     /// Links every operation appended since the last call into its chain.
     fn linkOperations(self: *Store) Error!void {
+        const enabled = self.use_operation_shapes and !self.has_projections and self.closed_generation != std.math.maxInt(u16);
         // Slot 0 is never interned; a shrink outside rollback relinks.
-        if (self.operation_links.items.len > self.operations.items.len) {
+        if (self.operation_links.items.len > self.operations.items.len or self.operation_shape_generation != self.closed_generation or self.operation_shape_enabled != enabled) {
+            self.normalization.interner_rebuilds += 1;
             self.operation_chains.clearRetainingCapacity();
             self.operation_links.clearRetainingCapacity();
         }
+        self.operation_shape_generation = self.closed_generation;
+        self.operation_shape_enabled = enabled;
         if (self.operation_links.items.len == 0) try self.operation_links.append(self.allocator, .{});
         while (self.operation_links.items.len < self.operations.items.len) {
+            self.normalization.interner_linked += 1;
             const index: Effects.Label = @intCast(self.operation_links.items.len);
             const operation_ = self.operations.items[index];
             try self.operation_links.ensureUnusedCapacity(self.allocator, 1);
-            const entry = try self.operation_chains.getOrPut(self.allocator, .{ .identity = operation_.identity, .instance = operation_.instance, .arity = operation_.arguments.len });
+            const shape = self.operationShape(self.list(operation_.arguments));
+            const entry = try self.operation_chains.getOrPut(self.allocator, .{ .identity = operation_.identity, .instance = operation_.instance, .arity = operation_.arguments.len, .shape = shape });
             if (entry.found_existing) {
                 self.operation_links.items[entry.value_ptr.last].next = index;
-                self.operation_links.appendAssumeCapacity(.{ .previous = entry.value_ptr.last });
+                self.operation_links.appendAssumeCapacity(.{ .previous = entry.value_ptr.last, .shape = shape });
                 entry.value_ptr.last = index;
             } else {
-                self.operation_links.appendAssumeCapacity(.{});
+                self.operation_links.appendAssumeCapacity(.{ .shape = shape });
                 entry.value_ptr.* = .{ .first = index, .last = index };
             }
         }
@@ -1482,7 +1573,7 @@ pub const Store = struct {
         while (self.operation_links.items.len > @max(length, 1)) {
             const index: Effects.Label = @intCast(self.operation_links.items.len - 1);
             const operation_ = self.operations.items[index];
-            const key: OperationKey = .{ .identity = operation_.identity, .instance = operation_.instance, .arity = operation_.arguments.len };
+            const key: OperationKey = .{ .identity = operation_.identity, .instance = operation_.instance, .arity = operation_.arguments.len, .shape = self.operation_links.items[index].shape };
             const chain = self.operation_chains.getPtr(key).?;
             std.debug.assert(chain.last == index);
             const previous = self.operation_links.pop().?.previous;
@@ -1508,6 +1599,7 @@ pub const Store = struct {
         // the ordinary path because every visited pair owns budget accounting.
         if (!self.has_projections) {
             if (symbolic and left == right) return true;
+            if (!symbolic and left == right and self.closedHeight(left) != 0) return true;
             const l = self.node(left);
             const r = self.node(right);
             if (l.tag != r.tag) return false;
@@ -1521,6 +1613,10 @@ pub const Store = struct {
         return self.equalGraphWalk(left, right, symbolic);
     }
     fn equalGraphWalk(self: *const Store, left: Id, right: Id, symbolic: bool) Error!bool {
+        // A positive certificate proves acyclic closed descendants. It is safe
+        // to reuse visited pairs there; uncertified closed graphs retain the
+        // ordinary walk and its rejection of cyclic/open inputs.
+        const shared_closed = !symbolic and !self.has_projections and self.closedHeight(left) != 0 and self.closedHeight(right) != 0;
         var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
         const scratch_allocator = scratch.allocator();
@@ -1543,7 +1639,7 @@ pub const Store = struct {
             // Closed equality must inspect each leaf even for identical roots.
             // Associated selections can share exponentially many paths to that
             // leaf, so visit each pair once without treating identity as proof.
-            if (symbolic or self.has_projections) {
+            if (symbolic or self.has_projections or shared_closed) {
                 if (few_count < few.len) {
                     const repeated = for (few[0..few_count]) |prior| {
                         if (prior.a == pair.a and prior.b == pair.b) break true;
@@ -1581,13 +1677,8 @@ pub const Store = struct {
                     if (symbolic) {
                         if (!std.meta.eql(ar.tail, br.tail) or ar.cursor != br.cursor) return false;
                     } else if (ar.tail != .closed or br.tail != .closed) return false;
-                    if (ar.labels.len != br.labels.len) return false;
+                    if (!try equalLabelMultisets(scratch_allocator, self.effects.list(ar.labels), self.effects.list(br.labels))) return false;
                     for (self.effects.list(ar.labels)) |label| {
-                        var ac: usize = 0;
-                        var bc: usize = 0;
-                        for (self.effects.list(ar.labels)) |v| ac += @intFromBool(v == label);
-                        for (self.effects.list(br.labels)) |v| bc += @intFromBool(v == label);
-                        if (ac != bc) return false;
                         for (self.operationArguments(label)) |argument| try pending.append(scratch_allocator, .{ .a = argument, .b = argument });
                         const instance = self.operation(label).instance;
                         if (instance.unit == 0 and instance.decl != 0) try pending.append(scratch_allocator, .{ .a = instance.decl, .b = instance.decl });
@@ -1620,8 +1711,23 @@ pub const Store = struct {
                 },
                 .record => {
                     if (a.b != b.b) return false;
+                    var fields: std.AutoHashMapUnmanaged(u32, Id) = .empty;
+                    defer fields.deinit(scratch_allocator);
+                    if (b.b > 16) {
+                        try fields.ensureTotalCapacity(scratch_allocator, b.b);
+                        for (0..b.b) |j| {
+                            const other = self.recordField(b, j);
+                            const entry = fields.getOrPutAssumeCapacity(other.name);
+                            // Preserve the reference walk's first-match rule.
+                            if (!entry.found_existing) entry.value_ptr.* = other.ty;
+                        }
+                    }
                     for (0..a.b) |i| {
                         const field = self.recordField(a, i);
+                        if (b.b > 16) {
+                            try pending.append(scratch_allocator, .{ .a = field.ty, .b = fields.get(field.name) orelse return false });
+                            continue;
+                        }
                         var found: ?Id = null;
                         for (0..b.b) |j| {
                             const other = self.recordField(b, j);
@@ -1635,6 +1741,33 @@ pub const Store = struct {
                 },
                 else => {},
             }
+        }
+        return true;
+    }
+    fn equalLabelMultisets(allocator: std.mem.Allocator, left: []const Effects.Label, right: []const Effects.Label) std.mem.Allocator.Error!bool {
+        if (left.len != right.len) return false;
+        if (std.mem.eql(Effects.Label, left, right)) return true;
+        if (left.len <= 16) {
+            for (left) |label| {
+                var before: usize = 0;
+                var after: usize = 0;
+                for (left) |value| before += @intFromBool(value == label);
+                for (right) |value| after += @intFromBool(value == label);
+                if (before != after) return false;
+            }
+            return true;
+        }
+        var counts: std.AutoHashMapUnmanaged(Effects.Label, usize) = .empty;
+        defer counts.deinit(allocator);
+        for (left) |label| {
+            const entry = try counts.getOrPut(allocator, label);
+            if (!entry.found_existing) entry.value_ptr.* = 0;
+            entry.value_ptr.* += 1;
+        }
+        for (right) |label| {
+            const count = counts.getPtr(label) orelse return false;
+            if (count.* == 0) return false;
+            count.* -= 1;
         }
         return true;
     }
@@ -2670,6 +2803,96 @@ test "operation chains intern exactly the oldest equal operation through rollbac
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, OperationIndexTests.histories, .{});
 }
 
+fn operationShapesScenario(a: std.mem.Allocator) !void {
+    var store = try Store.initWithOptions(a, .{ .closed_graphs = true });
+    defer store.deinit();
+    const operation_: NominalIdentity = .{ .unit = 7, .decl = 9 };
+    var labels: [24]Effects.Label = undefined;
+    for (&labels, 0..) |*label, index| {
+        const ty = try store.nominal(.{ .unit = 3, .decl = @intCast(index + 1) }, &.{});
+        label.* = try OperationIndexTests.intern(&store, operation_, .{ .unit = 0, .decl = 0 }, &.{ty}, false);
+    }
+    const candidates = store.normalization.interner_candidates;
+    const duplicate = try store.nominal(.{ .unit = 3, .decl = 24 }, &.{});
+    try std.testing.expectEqual(labels[23], try OperationIndexTests.intern(&store, operation_, .{ .unit = 0, .decl = 0 }, &.{duplicate}, false));
+    try std.testing.expectEqual(candidates + 1, store.normalization.interner_candidates);
+    // Record order is not semantic equality, and physical list mutation must
+    // rebuild the index before any obsolete bucket can hide an equal entry.
+    const first = try store.record(&.{ .{ .name = 3, .ty = u32_type }, .{ .name = 7, .ty = f32_type } });
+    const second = try store.record(&.{ .{ .name = 7, .ty = f32_type }, .{ .name = 3, .ty = u32_type } });
+    const label = try OperationIndexTests.intern(&store, operation_, .{ .unit = 0, .decl = 0 }, &.{first}, false);
+    try std.testing.expectEqual(label, try OperationIndexTests.intern(&store, operation_, .{ .unit = 0, .decl = 0 }, &.{second}, false));
+    const tuple = try store.product(&.{u32_type});
+    const tuple_label = try OperationIndexTests.intern(&store, operation_, .{ .unit = 0, .decl = 0 }, &.{tuple}, false);
+    const point = store.mark();
+    _ = try OperationIndexTests.intern(&store, operation_, .{ .unit = 0, .decl = 0 }, &.{boolean}, false);
+    store.rollback(point);
+    const n = store.node(tuple);
+    store.replaceListItem(.{ .start = n.a, .len = n.b }, 0, f32_type);
+    const changed = try store.product(&.{f32_type});
+    try std.testing.expectEqual(tuple_label, try OperationIndexTests.intern(&store, operation_, .{ .unit = 0, .decl = 0 }, &.{changed}, false));
+    store.closed_generation = std.math.maxInt(u16);
+    try std.testing.expectEqual(tuple_label, try OperationIndexTests.intern(&store, operation_, .{ .unit = 0, .decl = 0 }, &.{changed}, false));
+}
+
+test "operation argument shapes preserve structural equality physical edits rollback saturation and allocation failures" {
+    try operationShapesScenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, operationShapesScenario, .{});
+}
+
+test "closed equality visits shared certified DAG pairs without accepting open or cyclic graphs" {
+    var store = try Store.initWithOptions(std.testing.allocator, .{ .closed_graphs = true });
+    defer store.deinit();
+    var left = u32_type;
+    var right = u32_type;
+    for (0..22) |_| {
+        left = try store.product(&.{ left, left });
+        right = try store.product(&.{ right, right });
+    }
+    try std.testing.expect(try store.equalClosed(left, right));
+    const open = try store.fresh();
+    try std.testing.expect(!try store.equalClosed(open, open));
+    const cycle = try store.product(&.{u32_type});
+    const node_ = store.node(cycle);
+    store.replaceListItem(.{ .start = node_.a, .len = node_.b }, 0, cycle);
+    try std.testing.expectError(error.TypeLimit, store.equalClosed(cycle, cycle));
+}
+
+fn wideEqualityScenario(a: std.mem.Allocator) !void {
+    var store = try Store.initWithOptions(a, .{ .closed_graphs = true });
+    defer store.deinit();
+    var fields: [32]Field = undefined;
+    var reversed: [32]Field = undefined;
+    for (&fields, 0..) |*field, index| field.* = .{ .name = @intCast(index + 1), .ty = if (index % 2 == 0) u32_type else boolean };
+    for (fields, 0..) |field, index| reversed[fields.len - index - 1] = field;
+    const left = try store.record(&fields);
+    const right = try store.record(&reversed);
+    try std.testing.expect(try store.equalClosed(left, right));
+    reversed[0].ty = f32_type;
+    try std.testing.expect(!try store.equalClosed(left, try store.record(&reversed)));
+    reversed[0] = fields[fields.len - 1];
+    reversed[0].name = 99;
+    try std.testing.expect(!try store.equalClosed(left, try store.record(&reversed)));
+    var labels: [24]Effects.Label = undefined;
+    for (&labels, 0..) |*label, index| label.* = try store.internOperation(.{ .unit = 7, .decl = @intCast(index % 8 + 1) }, &.{u32_type});
+    var reverse_labels: [24]Effects.Label = undefined;
+    for (labels, 0..) |label, index| reverse_labels[labels.len - index - 1] = label;
+    const first = try store.functionWithEffects(u32_type, u32_type, try store.effects.row(&labels, .closed));
+    const second = try store.functionWithEffects(u32_type, u32_type, try store.effects.row(&reverse_labels, .closed));
+    try std.testing.expect(try store.equalClosed(first, second));
+    reverse_labels[0] = labels[0];
+    const changed = try store.functionWithEffects(u32_type, u32_type, try store.effects.row(&reverse_labels, .closed));
+    try std.testing.expect(!try store.equalClosed(first, changed));
+    const open = try store.internSymbolicOperation(.{ .unit = 7, .decl = 9 }, &.{try store.fresh()});
+    const open_row = try store.effects.row(&.{open}, .closed);
+    const open_function = try store.functionWithEffects(u32_type, u32_type, open_row);
+    try std.testing.expect(!try store.equalClosed(open_function, open_function));
+}
+test "wide equality preserves reordered fields duplicate effect multiplicities and open arguments through OOM" {
+    try wideEqualityScenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, wideEqualityScenario, .{});
+}
+
 const ClosedRowTests = struct {
     fn scenario(allocator: std.mem.Allocator) !void {
         for ([_]bool{ true, false }) |enabled| {
@@ -2689,6 +2912,7 @@ const ClosedRowTests = struct {
                 _ = try store.resolveEffects(value.*, 0);
             }
             const visits = store.normalization.argument_rows;
+            if (enabled) try std.testing.expect(store.normalization.closed_operation_hits > 0) else try std.testing.expectEqual(@as(u64, 0), store.normalization.closed_operation_hits);
             for (many) |value| try std.testing.expectEqual(value, try store.resolveEffects(value, 0));
             if (enabled) try std.testing.expectEqual(visits, store.normalization.argument_rows);
             store.resolution_depth_limit = 3;

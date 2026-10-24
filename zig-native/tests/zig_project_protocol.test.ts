@@ -276,6 +276,7 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
       "cachedModules",
       "restartCacheLoaded",
       "restartCacheWrite",
+      "sessionHeap",
       ...statObjects,
     ]);
     for (
@@ -289,6 +290,7 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
     for (const key of statObjects) object(built.metadata.stats[key]);
     equal(built.metadata.stats.restartCacheLoaded, false);
     equal(built.metadata.stats.demandLowering, null);
+    equal(built.metadata.stats.sessionHeap, null);
     let id = 3;
     for (
       const source of [
@@ -399,8 +401,16 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
         const first = source.indexOf("#True");
         const second = source.indexOf("#True", first + 1);
         equal(explanation.contexts, [
-          { kind: "left_operand", path: peer.entry, span: { start: first, end: first + 5 } },
-          { kind: "right_operand", path: peer.entry, span: { start: second, end: second + 5 } },
+          {
+            kind: "left_operand",
+            path: peer.entry,
+            span: { start: first, end: first + 5 },
+          },
+          {
+            kind: "right_operand",
+            path: peer.entry,
+            span: { start: second, end: second + 5 },
+          },
         ]);
         const { contexts: _contexts, ...withoutContexts } = explanation;
         equal(withoutContexts, {

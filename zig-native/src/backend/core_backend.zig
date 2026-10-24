@@ -2657,6 +2657,7 @@ const CompileRun = struct {
         result.optimization.region_requests = self.generator.evaluator.regions.region_arena_pool.stats.requested;
         result.optimization.region_reused = self.generator.evaluator.regions.region_arena_pool.stats.reused;
         result.optimization.region_retained_bytes = self.generator.evaluator.regions.region_arena_pool.stats.retained_bytes;
+        result.optimization.region_arena = self.generator.evaluator.regions.region_arena_pool.stats;
         result.optimization.evidence_import_requests = self.generator.evaluator.evidence_import_requests;
         result.optimization.evidence_import_reused = self.generator.evaluator.evidence_import_reused;
         result.optimization.closed_source_imports = self.generator.evaluator.closed_source_imports;

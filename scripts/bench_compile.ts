@@ -30,6 +30,7 @@
 // test entry in turn in one session, as pen's test workers do (CT90).
 import { parseArgs } from "node:util";
 import { costSummary } from "./bench/costs.ts";
+import { reviewPrograms, reviewProjects } from "./bench/review_corpus.ts";
 import { snapshotFiles, verifySnapshotFiles } from "./bench/snapshot.ts";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -58,11 +59,12 @@ import {
 
 const repo = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
-  [--runs 5] [--workload all|gdev|game|devtools|tests|synthetic|NAME,...]
+  [--runs 5] [--workload all|gdev|game|devtools|tests|synthetic|review|NAME,...]
   [--test-runs 1] [--no-retained] [--profile] [--out DIR] [--snapshot DIR]
   [--allow-wasm-diff] [--write-hashes] [--write-manifest] [--restart-cache]
   [--shared-session] [--guard-cpu] [--codegen-workers 4]
   [--candidate-profile] [--manifest FILE] [--hashes FILE] [--scenarios NAMES]
+  [--semantic-workers N] [--candidate-semantic-workers N]
 
   --baseline/--candidate  blotc executables. Pass one binary twice to measure noise.
   --workload              comma-separated: gdev entries (game, devtools), every
@@ -93,6 +95,8 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
                           if the median candidate/baseline CPU ratio exceeds 1.05.
                           Output-difference declarations never waive this guard.
   --codegen-workers       pin both compilers to 1..16 codegen workers (default 4).
+  --semantic-workers      opt both variants into 1..16 semantic workers.
+  --candidate-semantic-workers  override the candidate for a worker-policy comparison.
 Results: build/tmp/bench/<timestamp>/{results.json,samples.jsonl}.`;
 
 const { values: args } = parseArgs({
@@ -117,6 +121,8 @@ const { values: args } = parseArgs({
     "shared-session": { type: "boolean", default: false },
     "guard-cpu": { type: "boolean", default: false },
     "codegen-workers": { type: "string", default: "4" },
+    "semantic-workers": { type: "string" },
+    "candidate-semantic-workers": { type: "string" },
     help: { type: "boolean", default: false },
   },
 });
@@ -132,6 +138,13 @@ const snapshotRoot = resolve(
   args.snapshot ?? `${repo}/build/bench/gdev-snapshot`,
 );
 const codegenWorkers = Number(args["codegen-workers"]);
+const semanticWorkers = args["semantic-workers"] === undefined
+  ? undefined
+  : Number(args["semantic-workers"]);
+const candidateSemanticWorkers =
+  args["candidate-semantic-workers"] === undefined
+    ? semanticWorkers
+    : Number(args["candidate-semantic-workers"]);
 
 type Hash = string;
 async function sha256(bytes: Uint8Array<ArrayBuffer>): Promise<Hash> {
@@ -311,6 +324,9 @@ async function openSession(
   const compiler = await createZigProjectCompiler({
     ...sessionOptions(variant.executable, workload),
     codegenWorkers,
+    semanticWorkers: variant.name === "candidate"
+      ? candidateSemanticWorkers
+      : semanticWorkers,
     cacheDirectory,
     ...((args.profile ||
         (args["candidate-profile"] && variant.name === "candidate"))
@@ -505,6 +521,19 @@ async function main(): Promise<number> {
     throw new Error("--codegen-workers must be an integer in 1..16");
   }
   await Deno.mkdir(out, { recursive: true });
+  for (
+    const [name, count] of [
+      ["semantic-workers", semanticWorkers],
+      ["candidate-semantic-workers", candidateSemanticWorkers],
+    ] as const
+  ) {
+    if (
+      count !== undefined &&
+      (!Number.isInteger(count) || count < 1 || count > 16)
+    ) {
+      throw new Error(`--${name} must be an integer in 1..16`);
+    }
+  }
 
   const variants: Variant[] = await Promise.all(
     (["baseline", "candidate"] as const).map(async (name) => {
@@ -568,6 +597,17 @@ async function main(): Promise<number> {
   }
   if (chosen("all", "synthetic", editSuite.name)) {
     workloads.push(await projectWorkload(editSuite, out));
+  }
+  // Explicit opt-in: the historical budget corpus and "all" keep their scope.
+  for (const program of reviewPrograms) {
+    if (chosen("review", program.name, `${program.name}_${program.size}`)) {
+      workloads.push(await syntheticWorkload(program, out));
+    }
+  }
+  for (const project of reviewProjects) {
+    if (chosen("review", project.name)) {
+      workloads.push(await projectWorkload(project, out));
+    }
   }
   if (!workloads.length) {
     throw new Error(`No workload matches --workload ${args.workload}`);
@@ -1015,6 +1055,8 @@ async function main(): Promise<number> {
           os: Deno.build.os,
           cpus,
           codegen_workers: codegenWorkers,
+          semantic_workers: semanticWorkers ?? null,
+          candidate_semantic_workers: candidateSemanticWorkers ?? null,
           load_start: loadStart,
           load_end: loadEnd,
         },

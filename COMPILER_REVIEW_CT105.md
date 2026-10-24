@@ -1,5 +1,10 @@
 # Compiler performance review after CT105
 
+Follow-up: [CT106 qualification](zig-native/CT106_QUALIFICATION.md) and the
+[86-item experiment ledger](COMPILER_CT106_WORK.md) record the implementation,
+measurements, rejected trials and remaining work. The review below describes
+the CT105 baseline.
+
 24 October 2026. **The next substantial gains should come from avoiding repeated
 semantic work, narrowing reuse lookups, and reducing transient graph copying.**
 The compiler remains mostly serial on this workload. Allocation churn is large;

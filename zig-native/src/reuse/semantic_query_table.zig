@@ -213,11 +213,16 @@ pub fn Table(comptime Adapter: type) type {
             fingerprint: u64,
             bytes: usize,
         };
+        /// An allocation-free lower-bound check before a caller copies an
+        /// optional payload. prepare remains the final exact capacity gate.
+        pub fn canAdmit(self: *const Self, minimum_bytes: usize) bool {
+            return self.records.items.len < @min(self.limits.records, std.math.maxInt(u32)) and minimum_bytes <= self.limits.owned_bytes -| self.owned_bytes;
+        }
         pub fn prepare(self: *Self, a: A, candidate: *const Candidate) A.Error!?Prepared {
             const record = candidate.record orelse return null;
             if (!Adapter.complete(record)) return null;
             const bytes = Adapter.bytes(record);
-            if (self.records.items.len >= @min(self.limits.records, std.math.maxInt(u32)) or bytes > self.limits.owned_bytes -| self.owned_bytes) {
+            if (!self.canAdmit(bytes)) {
                 self.saturated +|= 1;
                 return null;
             }

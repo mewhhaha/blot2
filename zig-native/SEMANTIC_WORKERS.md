@@ -6,7 +6,31 @@ the private path, including explicit one-worker mode. This record keeps
 performance policy separate from the
 [semantic ownership rules](SEMANTIC_JOBS.md).
 
-## Measurements and owners
+## CT106 policy screen, 24 October 2026
+
+Three alternating pairs per policy compare the same final CT106 release with
+semantic workers disabled versus two or four workers. All frozen fresh, retained
+and independent fresh-control outputs match the strict Wasm pins. These are
+shared-host screening runs, not seven-pair optimization qualifications.
+
+| Candidate policy | Fresh game CPU | First literal CPU | Literal revert CPU | Body edit CPU | Fresh devtools CPU |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 2 workers | -0.5% | +1.4% | +2.9% | +2.4% | +3.7% |
+| 4 workers | +2.6% | +2.0% | +2.7% | +0.7% | +5.4% |
+
+Percentages are medians of within-pair process-CPU ratios. Neither policy
+establishes an ordinary-edit improvement. Four workers also exceed the 5%
+devtools guard. The serial default remains unchanged.
+
+Both policies admit 281 component jobs in 14 fresh-game batches. The two-worker
+run records 14,372 attempts: 9,863 decline during proof recording and 4,405 lack
+worker I/O in their private context. Default-policy attempts are all disabled.
+Independent selected-query parallel jobs remain zero. The maximum worker count
+reports admitted batch capacity, not simultaneous useful execution. Parallel
+proof recording needs a deterministic ownership/publication design; increasing
+worker count does not remove that prerequisite.
+
+## Historical task-013 measurements and owners
 
 Fresh native CLI measurements use child user plus system CPU from Linux
 `getrusage(RUSAGE_CHILDREN)`. Wall time covers process creation through captured

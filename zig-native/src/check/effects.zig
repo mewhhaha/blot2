@@ -147,6 +147,12 @@ pub const Store = struct {
     }
     fn replacementIndex(self: *const Store, variable: u32, at: Cursor) ?u32 {
         var index = self.variables.items[variable].first;
+        if (index == none) return null;
+        if (self.versions.items[index].position >= at) return index;
+        // Chronological lookup asks for the first successor, not the newest
+        // replacement. A future cursor has none; avoid scanning its history.
+        if (self.versions.items[self.variables.items[variable].last].position < at) return null;
+        index = self.versions.items[index].next;
         while (index != none) : (index = self.versions.items[index].next) {
             const write = self.versions.items[index];
             if (write.position >= at) return index;

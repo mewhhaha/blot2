@@ -58,20 +58,26 @@ the measured edit cycle. [Build hills](../BUILD_HILLS.md) track the remaining
 iteration and qualification costs separately from
 [application compile hills](../COMPILE_HILLS.md).
 
-[CT105 solver scans, row certificates and exact frontend indexes](CT105_QUALIFICATION.md)
-reduce fresh-game CPU by 13.3%, body-edit CPU by 12.9% and first-literal CPU by
-3.3% against `5cfb411` in seven alternating pairs, with identical Wasm. Shared-host
-wall medians are 8.33 s fresh, 4.16 s first literal, 3.10 s literal revert and
-5.42 s body edit. The 10% literal target and sub-second editing remain open.
-The final release passes 2,555 exhaustive native laws, the full guest/tooling
-suite and zero Zig lint findings, and both local tools are installed. The
-sampled development cycle takes 21.28 s, including 3.31 s compiler construction
-and 5.91 s complete native compilation; these are individual observations.
-The [post-CT105 review](../COMPILER_REVIEW_CT105.md) records 86 further
-suggestions, fresh CPU stacks and a 40-build memory cycle. Four body rebuilds,
-first-edit graph correspondence and non-inference costs remain. The graph-size
-cap is ruled out for the observed comparison; its exact decline reason is
-still unknown.
+The [CT106 qualification](CT106_QUALIFICATION.md) records **19.1%
+less first-literal-edit CPU** against CT105 in seven alternating release pairs,
+with identical Wasm. First-literal wall median falls from 3.62 to **2.91 s**;
+fresh CPU improves 2.4%, body CPU is effectively unchanged and literal-revert
+CPU rises 3.5%. These are shared-host observations. Body-edit, two-second and
+sub-second targets remain open.
+
+Exact frontend correspondence now checks one module on the first edit instead
+of 22. Bounded operation indexes/certificates, lexical links and import scratch
+remove repeated work. The report includes 200 distinct edits, allocator/CPU
+attribution, exhaustive qualification and rejected experiments. All 86 review
+suggestions have a [disposition](../COMPILER_CT106_WORK.md); conditional alternatives
+and unfinished architectural work are explicit.
+
+The matching CLI and native compiler are installed locally. The final gate
+passes 2,564 exhaustive native laws, 1,655 guest checks,
+48 smoke checks and 57 tooling checks. Four body principals still require
+stronger source-origin correspondence. See the
+[development-cycle measurements](../DEVELOPMENT_TURNAROUND.md) and
+[measurement tools](../scripts/bench/README.md).
 
 `blotc build ENTRY OUTPUT.wasm --prelude std/prelude.blot --std-root std`
 compiles a project. `dependencies ENTRY OUTPUT.blotdep` produces reusable typed

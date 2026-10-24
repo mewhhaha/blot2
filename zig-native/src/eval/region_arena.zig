@@ -5,7 +5,23 @@ const std = @import("std");
 const A = std.mem.Allocator;
 const Alignment = std.mem.Alignment;
 pub const limit = 64 * 1024 * 1024;
-pub const Stats = struct { requested: usize = 0, reused: usize = 0, retained_bytes: usize = 0 };
+pub const Costs = struct {
+    large_requested_bytes: usize = 0,
+    large_provided_bytes: usize = 0,
+    large_fresh_bytes: usize = 0,
+    large_reused_bytes: usize = 0,
+    large_remap_growth_bytes: usize = 0,
+    small_padding_bytes: usize = 0,
+};
+pub const Stats = struct {
+    requested: usize = 0,
+    reused: usize = 0,
+    retained_bytes: usize = 0,
+    max_capacity: usize = 0,
+    oversized_discards: usize = 0,
+    discarded_bytes: usize = 0,
+    costs: Costs = .{},
+};
 const Block = struct {
     next: ?*Block = null,
     capacity: usize,
@@ -41,6 +57,7 @@ pub const Arena = struct {
     tail: ?*Block = null,
     current: ?*Block = null,
     capacity: usize = 0,
+    costs: Costs = .{},
     large: ?*Large = null,
     available: [bin_count]?*Large = @splat(null),
     // The Arena is heap-stable and exclusively leased. These adapters measure
@@ -49,6 +66,7 @@ pub const Arena = struct {
     scratch_meter: @import("../runtime/memory.zig").TrackedAllocator = undefined,
 
     fn beginLease(self: *Arena) void {
+        self.costs = .{};
         self.solver_meter = .{ .backing = self.allocator() };
         self.scratch_meter = .{ .backing = self.allocator() };
     }
@@ -94,6 +112,7 @@ pub const Arena = struct {
         while (cursor) |block| : (cursor = block.next) {
             const start = block.position(alignment) orelse return null;
             if (start > block.capacity or len > block.capacity - start) continue;
+            self.costs.small_padding_bytes += start - block.used;
             block.used = start + len;
             self.current = block;
             const result = block.bytes().ptr + @sizeOf(Block) + start;
@@ -113,6 +132,7 @@ pub const Arena = struct {
         self.current = block;
         self.capacity = total;
         const start = block.position(alignment).?;
+        self.costs.small_padding_bytes += start;
         block.used = start + len;
         const result = memory + @sizeOf(Block) + start;
         header(result).* = .{ .large = null };
@@ -129,6 +149,7 @@ pub const Arena = struct {
         const bin = std.math.log2_int(usize, capacity);
         const block = if (self.available[bin]) |available| reused: {
             self.available[bin] = available.free_next;
+            self.costs.large_reused_bytes += available.capacity;
             break :reused available;
         } else created: {
             const total = std.math.add(usize, self.capacity, capacity) catch return null;
@@ -138,10 +159,13 @@ pub const Arena = struct {
             if (self.large) |first| first.previous = new;
             self.large = new;
             self.capacity = total;
+            self.costs.large_fresh_bytes += capacity;
             break :created new;
         };
         const start = std.mem.alignForward(usize, @intFromPtr(block) + @sizeOf(Large) + @sizeOf(Header), align_bytes);
         const result: [*]u8 = @ptrFromInt(start);
+        self.costs.large_requested_bytes += len;
+        self.costs.large_provided_bytes += block.capacity;
         header(result).* = .{ .large = block };
         return result;
     }
@@ -172,6 +196,7 @@ pub const Arena = struct {
         const offset = @intFromPtr(memory.ptr) - @intFromPtr(block);
         const needed = std.math.add(usize, len, offset) catch return null;
         const capacity = std.math.ceilPowerOfTwo(usize, needed) catch return null;
+        const growth = capacity - block.capacity;
         const total = std.math.add(usize, self.capacity - block.capacity, capacity) catch return null;
         const moved = self.backing.rawRemap(block.bytes(), .of(Large), capacity, ret) orelse return null;
         const next: *Large = @ptrCast(@alignCast(moved));
@@ -180,6 +205,7 @@ pub const Arena = struct {
         if (next.previous) |previous| previous.next = next else self.large = next;
         if (next.next) |following| following.previous = next;
         self.capacity = total;
+        self.costs.large_remap_growth_bytes += growth;
         const result = moved + offset;
         header(result).* = .{ .large = next };
         return result;
@@ -233,7 +259,11 @@ pub const Pool = struct {
         return arena;
     }
     pub fn give(self: *Pool, arena: *Arena) void {
+        self.stats.max_capacity = @max(self.stats.max_capacity, arena.capacity);
+        inline for (@typeInfo(Costs).@"struct".field_names) |field| @field(self.stats.costs, field) += @field(arena.costs, field);
         if (!self.matches(arena.backing) or arena.capacity > limit) {
+            self.stats.oversized_discards += @intFromBool(arena.capacity > limit);
+            self.stats.discarded_bytes += arena.capacity;
             arena.deinit();
             return;
         }

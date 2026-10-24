@@ -1,6 +1,20 @@
 # Performance hills toward sub-second edits
 
-## Post-CT105 review — 24 October 2026
+The [CT106 qualification](zig-native/CT106_QUALIFICATION.md) records **19.1%
+less first-literal-edit CPU** against CT105 in seven alternating release pairs,
+with identical Wasm. First-literal wall median falls from 3.62 to **2.91 s**;
+fresh CPU improves 2.4%, body CPU is effectively unchanged and literal-revert
+CPU rises 3.5%. These are shared-host observations. Body-edit, two-second and
+sub-second targets remain open.
+
+Exact frontend correspondence now checks one module on the first edit instead
+of 22. Bounded operation indexes/certificates, lexical links and import scratch
+remove repeated work. The report includes 200 distinct edits, allocator/CPU
+attribution, exhaustive qualification and rejected experiments. All 86 review
+suggestions have a [disposition](COMPILER_CT106_WORK.md); conditional alternatives
+and unfinished architectural work are explicit.
+
+## Historical post-CT105 review — 24 October 2026
 
 The [new 86-suggestion review](COMPILER_REVIEW_CT105.md) covers algorithms,
 memory, CPU execution, reuse, parallelism, output and compiler build time on

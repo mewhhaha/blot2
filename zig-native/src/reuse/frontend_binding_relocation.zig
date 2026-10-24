@@ -76,6 +76,7 @@ pub const Map = struct {
 };
 
 pub const Progress = struct {
+    graph: graphs.Diagnostic = .{},
     stage: enum { eligibility, public_index, public_match, nominals, constructors, contracts, implementations, graph, checked } = .eligibility,
     binding: u32 = 0,
     other: u32 = 0,
@@ -365,8 +366,15 @@ pub fn compare(a: A, left: *const PI.Interface, right: *const PI.Interface, targ
     for (right.implementations, implementation_used) |value, matched| if (!value.private and !matched) return null;
 
     if (targets.progress) |value| value.stage = .graph;
-    var graph = (try graphs.Match.init(a, &left.graph, &right.graph)) orelse return null;
+    var graph = (try graphs.Match.init(a, &left.graph, &right.graph)) orelse {
+        if (targets.progress) |value| value.graph.reason = .size_limit;
+        return null;
+    };
     defer graph.deinit();
+    defer if (targets.progress) |value| {
+        value.graph = graph.diagnostic;
+        value.graph.remaining = graph.remaining;
+    };
     var checker: Checker = .{ .left = left, .right = right, .graph = &graph, .map = map, .targets = targets };
     if (left.implementations.len != 0 or right.implementations.len != 0) {
         checker.remaining = 4096;
@@ -375,7 +383,10 @@ pub fn compare(a: A, left: *const PI.Interface, right: *const PI.Interface, targ
     defer checker.qualifications.deinit(a);
     checker.check() catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
-        error.Declined => return null,
+        error.Declined => {
+            if (graph.diagnostic.reason == .none) graph.diagnostic.reason = .catalog;
+            return null;
+        },
     };
     map.qualifications = try checker.qualifications.toOwnedSlice(a);
     std.mem.sort(Qualification, map.qualifications, {}, Qualification.less);

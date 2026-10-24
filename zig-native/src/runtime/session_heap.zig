@@ -21,6 +21,18 @@ const slab_len: usize = @max(std.heap.page_size_max, 64 * 1024);
 const min_class = std.math.log2(@sizeOf(usize));
 const class_count = std.math.log2(slab_len) - min_class;
 
+pub const ClassStats = struct { block_bytes: usize, slabs: usize, free_bytes: usize = 0, unused_bytes: usize = 0, live_class_bytes: usize = 0 };
+pub const Stats = struct {
+    // Rounded small-allocation capacity only; directly mapped large blocks
+    // and the process's other mappings are outside this observation.
+    slab_bytes: usize = 0,
+    free_bytes: usize = 0,
+    unused_bytes: usize = 0,
+    live_class_bytes: usize = 0,
+    complete: bool = true,
+    classes: [class_count]ClassStats = undefined,
+};
+
 pub const Heap = struct {
     mutex: std.atomic.Mutex = .unlocked,
     /// Next unused block of each class in its newest slab; a multiple of
@@ -30,12 +42,39 @@ pub const Heap = struct {
     frees: [class_count]usize = @splat(0),
     /// Slabs mapped so far; they are never unmapped.
     slabs: usize = 0,
+    class_slabs: [class_count]usize = @splat(0),
 
     pub fn allocator(self: *Heap) std.mem.Allocator {
         return .{ .ptr = self, .vtable = &vtable };
     }
     pub fn isAllocator(a: std.mem.Allocator) bool {
         return a.vtable == &vtable;
+    }
+    /// Profiling-only traversal, performed after compiler workers have joined.
+    /// No allocation/free hot-path counters or extra retained pointers.
+    pub fn snapshot(a: std.mem.Allocator) ?Stats {
+        if (!isAllocator(a)) return null;
+        const self: *Heap = @ptrCast(@alignCast(a.ptr));
+        self.lock();
+        defer self.unlock();
+        var result: Stats = .{ .slab_bytes = self.slabs * slab_len };
+        for (&result.classes, 0..) |*entry, class| {
+            entry.* = .{ .block_bytes = blockSize(class), .slabs = self.class_slabs[class] };
+            const capacity = entry.slabs * slab_len;
+            const tail = self.next[class] % slab_len;
+            if (tail != 0) entry.unused_bytes = slab_len - tail;
+            var cursor = self.frees[class];
+            while (cursor != 0 and entry.free_bytes < capacity) {
+                entry.free_bytes += entry.block_bytes;
+                cursor = @as(*const usize, @ptrFromInt(cursor)).*;
+            }
+            if (cursor != 0 or entry.free_bytes + entry.unused_bytes > capacity) result.complete = false;
+            entry.live_class_bytes = capacity -| entry.free_bytes -| entry.unused_bytes;
+            result.free_bytes += entry.free_bytes;
+            result.unused_bytes += entry.unused_bytes;
+            result.live_class_bytes += entry.live_class_bytes;
+        }
+        return result;
     }
     const vtable: std.mem.Allocator.VTable = .{ .alloc = alloc, .resize = resize, .remap = remap, .free = free };
 
@@ -65,6 +104,7 @@ pub const Heap = struct {
         // Slab alignment lets the remainder test above find a slab's end.
         const slab = PageAllocator.map(slab_len, .fromByteUnits(slab_len)) orelse return null;
         self.slabs += 1;
+        self.class_slabs[class] += 1;
         self.next[class] = @intFromPtr(slab) + size;
         return slab;
     }
@@ -121,6 +161,16 @@ test "freed blocks return to their class and are reused before any new slab" {
     a.free(again);
     a.free(second);
     a.free(other);
+    const empty = Heap.snapshot(a).?;
+    try std.testing.expect(empty.complete);
+    try std.testing.expectEqual(@as(usize, 0), empty.live_class_bytes);
+    try std.testing.expectEqual(empty.slab_bytes, empty.free_bytes + empty.unused_bytes);
+    const live = try a.alloc(u8, 24);
+    defer a.free(live);
+    const occupied = Heap.snapshot(a).?;
+    try std.testing.expectEqual(@as(usize, 32), occupied.live_class_bytes);
+    try std.testing.expectEqual(empty.slab_bytes, occupied.slab_bytes);
+    try std.testing.expect(Heap.snapshot(std.testing.allocator) == null);
 }
 
 test "blocks above the largest class are mapped directly and keep their bytes across remaps" {

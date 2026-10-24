@@ -308,25 +308,34 @@ pub const Gate = struct {
     /// Identity alone permits comparing a freshly established closed judgment.
     /// It never admits an old body, call proof, value or executable fragment.
     pub fn admitsCallIdentity(self: *const Gate, target: core.BindingRef) bool {
-        if (!self.enabled or target.unit == 0 or target.unit > self.units.len or target.binding == 0) return false;
+        return self.callIdentityFailure(target) == .none;
+    }
+    pub const IdentityFailure = enum { none, disabled, bounds, kind, binding_type, source_position, body, scheme_root, scheme, flags };
+    pub fn callIdentityFailure(self: *const Gate, target: core.BindingRef) IdentityFailure {
+        if (!self.enabled) return .disabled;
+        if (target.unit == 0 or target.unit > self.units.len or target.binding == 0) return .bounds;
         const current = &self.units[target.unit - 1];
         const old = self.source_pools.?.modules[target.unit - 1].module;
-        if (target.binding >= current.bindings.len or target.binding >= old.bindings.len) return false;
+        if (target.binding >= current.bindings.len or target.binding >= old.bindings.len) return .bounds;
         const left = old.binding(target.binding);
         const right = current.binding(target.binding);
-        if (left.kind != .global or right.kind != .global) return false;
+        if (left.kind != .global or right.kind != .global) return .kind;
         if (left.ty != right.ty) {
-            if (!self.constant_types or !projection.equalConstantType(old.types, left.ty, current.types, right.ty)) return false;
+            if (!self.constant_types or !projection.equalConstantType(old.types, left.ty, current.types, right.ty)) return .binding_type;
         }
-        if (!equal(old.source_names, current.source_names)) return false;
-        const before = old.body(target.binding) orelse return false;
-        const after = current.body(target.binding) orelse return false;
+        // Source positions identify this declaration. Positions belonging to
+        // unrelated declarations may move after an edit elsewhere in the unit.
+        // Local source/receipt admission still checks every observed body.
+        if (old.sourceNamePoint(target.binding) != current.sourceNamePoint(target.binding)) return .source_position;
+        const before = old.body(target.binding) orelse return .body;
+        const after = current.body(target.binding) orelse return .body;
         var scheme = before.scheme;
         if (scheme.root != after.scheme.root) {
-            if (!self.constant_types or !projection.equalConstantType(old.types, scheme.root, current.types, after.scheme.root)) return false;
+            if (!self.constant_types or !projection.equalConstantType(old.types, scheme.root, current.types, after.scheme.root)) return .scheme_root;
             scheme.root = after.scheme.root;
         }
-        return before.runtime == after.runtime and before.is_function == after.is_function and equal(scheme, after.scheme);
+        if (before.runtime != after.runtime or before.is_function != after.is_function) return .flags;
+        return if (equal(scheme, after.scheme)) .none else .scheme;
     }
 
     pub fn admitsRefinement(self: *const Gate, record: anytype) bool {

@@ -189,6 +189,12 @@ write watches. Every queue buffer and owner is released with its region,
 including partially allocated state. See
 [indexed inference work](INDEXED_SOLVER.md).
 
+Watcher discovery may deduplicate exact node IDs in a bounded local table;
+collisions repeat work and never omit a dependency. An unchanged ordered watch
+frontier keeps its existing links, including external and broad-write watches.
+Type and row-variable lexical indexes belong to one region and scope. Sharing
+walks the entries present at entry, even if unification appends new entries.
+
 Within one inference region, copies of the same closed semantic evidence may
 share solver nodes. Keys include request depth; changing the depth limit revokes
 the cache. Closed evidence contains no solver variables, so substitutions do not
@@ -793,8 +799,13 @@ into the current owner under the existing bounded principal type/row checks.
 Source admission requires either the complete input projection, or a complete
 record of exact consumed declarations including the root. Both paths require
 the entire ordered type, nominal and effect catalog and producer namespace to
-match. Anonymous and local observations without a named declaration retain the
-complete principal input image of their source module. Unknown observations
+match. A bounded Session-owned containment index may attribute a nested closure,
+suspension or local binding to its exact containing global declaration. It
+confers no equality authority: replay still validates that declaration, its
+catalog and dynamic observations. Ambiguous ownership, incomplete walks and
+unknown observations retain the complete principal input image of their source
+module. Declaration identity checks compare that declaration's source position;
+movement of unrelated declarations alone does not invalidate it. Unknown observations
 still decline the narrower path. A graph whose builder proves all non-root
 scopes contain imported types only can use the exact semantic-catalog gate;
 source receipts keep their existing foreign-source rejection. No source
@@ -850,6 +861,36 @@ certificates use a solver-owned dense index grown at the fallible resolution
 boundary. Infallible construction uses a four-entry fallback. Generation and
 physical-epoch checks invalidate both stores on rollback or mutation; recycled
 row IDs cannot restore discarded proofs. The sidecar is released with the solver.
+
+Positive operation-argument certificates share the same generation and physical
+epoch guards. They record maximum closed argument height and whether arguments
+exist; no-argument operations retain their distinct depth behavior. Operations
+with symbolic instances or unresolved arguments cannot acquire these proofs.
+The sidecar grows only at a fallible resolver boundary and does not escape its
+solver. Historical type/effect lookup still selects the first successor at or
+after a cursor; checking the last write may prove there is no successor.
+
+Operation interning uses bounded structural argument fingerprints only to select
+candidate chains. Exact equality and oldest-match priority remain authoritative.
+Physical mutation and rollback revoke the index generation; projections and
+saturated generations keep the ordinary comparison path. Closed DAG equality
+may deduplicate visited pairs only after positive closure certificates exclude
+open and cyclic graphs. Wide record lookup retains first matching field names,
+and effect equality preserves operation multiplicities and argument checks.
+
+Frontend graph correspondence distinguishes constructor storage sharing from
+binder identity. Equal immutable constructors and rows may have different
+physical sharing; type variables and row variables still require injective
+correspondence. Work/depth bounds, catalog checks and exact node contents remain
+required. A frontend match grants no executable-artifact authority.
+
+Selected-query fingerprints include source, options and depth; cross-owner input
+and expected handles remain graph comparisons. Session-local canonical keys may
+also discriminate mode and expected handles in their own owner. A lower-bound
+admission check may avoid allocating an optional replay payload, while final
+capacity checks and real allocation failures retain their original behavior.
+Temporary import arrays may use bounded stack scratch; interned evidence and
+published results always copy into their durable destination owner.
 
 Effect unification walks immutable label-span views. A left remainder keeps its
 chronological cursor; extracting a right label resets that cursor just as

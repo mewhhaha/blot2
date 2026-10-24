@@ -45,6 +45,7 @@ pub const Stats = struct {
     split_declined: usize = 0,
     region_reused: usize = 0,
     region_retained_bytes: usize = 0,
+    region_arena: @import("../eval/region_arena.zig").Stats = .{},
 };
 pub const Store = struct {
     entries: std.AutoHashMapUnmanaged(core.BindingRef, Facts) = .empty,

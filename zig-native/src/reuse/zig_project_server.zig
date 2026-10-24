@@ -405,6 +405,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                 .runtimeOptimization = result.result.compiled.runtime_optimization,
                 .backendTiming = result.result.compiled.timing,
                 .phaseProfile = if (profile) |*owner| owner.record() else phase_profile.Record{},
+                .sessionHeap = if (profile != null) @import("../runtime/session_heap.zig").Heap.snapshot(a) else null,
                 .workCounters = result.result.compiled.counters,
                 .demandLowering = result.result.compiled.demand_lowering,
                 .allocationSites = result.result.compiled.allocation_emission,

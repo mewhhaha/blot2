@@ -750,8 +750,11 @@ pub const Importer = struct {
         if (depth >= depth_limit or id == 0 or id >= self.old.layouts.nodes.len) return error.Declined;
         if (self.layouts.get(id)) |mapped| return mapped;
         const n = self.old.layouts.nodes[id];
+        var scratch_bytes: [256]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_bytes, self.allocator);
+        const temporary = scratch.allocator();
         var values: std.ArrayList(u32) = .empty;
-        defer values.deinit(self.allocator);
+        defer values.deinit(temporary);
         var a = n.a;
         var b = n.b;
         var c = n.c;
@@ -775,6 +778,7 @@ pub const Importer = struct {
             .product, .record, .nominal => {
                 if (n.tag != .nominal and n.c != 0) return error.Declined;
                 const children = try shapeChildren(self.old.layouts, id);
+                try values.ensureTotalCapacityPrecise(temporary, children.len);
                 if (n.tag == .nominal) {
                     a = try self.nominal(a, b);
                     b = try self.nominalDeclaration(b);
@@ -782,7 +786,7 @@ pub const Importer = struct {
                     a = 0;
                     b = 0;
                 }
-                for (children, 0..) |child, i| try values.append(self.allocator, if (n.tag == .record and i % 2 == 0) try self.symbol(child) else try self.shape(g, child, depth + 1));
+                for (children, 0..) |child, i| try values.append(temporary, if (n.tag == .record and i % 2 == 0) try self.symbol(child) else try self.shape(g, child, depth + 1));
                 if (n.tag == .record) try uniqueFields(values.items);
                 c = 0;
             },
@@ -830,14 +834,18 @@ pub const Importer = struct {
         var a = n.a;
         var b = n.b;
         var c = n.c;
+        var scratch_bytes: [256]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_bytes, self.allocator);
+        const temporary = scratch.allocator();
         var values: std.ArrayList(u32) = .empty;
-        defer values.deinit(self.allocator);
+        defer values.deinit(temporary);
         switch (n.tag) {
             .projection, .scoped, .forall, .existential, .bound, .usage, .absent, .erased_proof => return error.Declined,
             .unit, .boolean, .u32, .f32, .never => if (a != 0 or b != 0 or c != 0) return error.Declined,
             .product, .record, .nominal => {
                 if (n.tag != .nominal and n.c != 0) return error.Declined;
                 const children = try evidenceChildren(self.old.evaluator.evidence.view(), id);
+                try values.ensureTotalCapacityPrecise(temporary, children.len);
                 if (n.tag == .nominal) {
                     a = try self.semanticNominal(a, b);
                     b = try self.nominalDeclaration(b);
@@ -845,7 +853,7 @@ pub const Importer = struct {
                     a = 0;
                     b = 0;
                 }
-                for (children, 0..) |child, i| try values.append(self.allocator, if (n.tag == .record and i % 2 == 0) try self.symbol(child) else try self.semanticType(g, child, depth + 1));
+                for (children, 0..) |child, i| try values.append(temporary, if (n.tag == .record and i % 2 == 0) try self.symbol(child) else try self.semanticType(g, child, depth + 1));
                 if (n.tag == .record) try uniqueFields(values.items);
                 c = 0;
             },
@@ -891,10 +899,14 @@ pub const Importer = struct {
         const span = source.rows[id];
         const labels = try bounded(u32, source.labels, span.start, span.len);
         if (id == 0 and labels.len != 0) return error.Declined;
+        var scratch_bytes: [256]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_bytes, self.allocator);
+        const temporary = scratch.allocator();
         var imported: std.ArrayList(u32) = .empty;
-        defer imported.deinit(self.allocator);
+        defer imported.deinit(temporary);
+        try imported.ensureTotalCapacityPrecise(temporary, labels.len);
         var arguments: std.ArrayList(u32) = .empty;
-        defer arguments.deinit(self.allocator);
+        defer arguments.deinit(temporary);
         for (labels) |label| {
             if (label == 0 or label >= source.operations.len) return error.Declined;
             const operation = source.operations[label];
@@ -906,10 +918,11 @@ pub const Importer = struct {
                 owner = 0;
             } else owner = if (domain == .semantic) try self.semanticNominal(operation.identity.unit, operation.identity.decl) else try self.nominal(operation.identity.unit, operation.identity.decl);
             arguments.clearRetainingCapacity();
-            for (old_args) |argument| try arguments.append(self.allocator, if (domain == .layout) try self.shape(g, argument, depth + 1) else try self.semanticType(g, argument, depth + 1));
+            try arguments.ensureTotalCapacityPrecise(temporary, old_args.len);
+            for (old_args) |argument| try arguments.append(temporary, if (domain == .layout) try self.shape(g, argument, depth + 1) else try self.semanticType(g, argument, depth + 1));
             const store = if (domain == .layout) &g.representations.store.effects else &g.evaluator.storage.evidence.effects;
             const new_label = store.internOperation(.{ .unit = owner, .decl = operation.identity.decl }, arguments.items) catch |err| return convert(err);
-            try imported.append(self.allocator, new_label);
+            try imported.append(temporary, new_label);
         }
         const store = if (domain == .layout) &g.representations.store.effects else &g.evaluator.storage.evidence.effects;
         const mapped = store.internRow(imported.items) catch |err| return convert(err);

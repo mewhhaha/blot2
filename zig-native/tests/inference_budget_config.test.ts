@@ -39,6 +39,9 @@ Deno.test("runtime inference configuration binds identity and preserves the prod
       explicit.dispose(),
       bounded.dispose(),
     ]);
+    // Reopening this cache key joins any detached writer before teardown.
+    const settled = await createZigProjectCompiler(options);
+    await settled.close();
     await Deno.remove(directory, { recursive: true });
   }
 });

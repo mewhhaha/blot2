@@ -49,6 +49,13 @@ pub const Region = struct {
 pub const WorkStats = struct {
     regions: [8]Region = @splat(.{}),
     lookup_us: u64 = 0,
+    query_prepare_us: u64 = 0,
+    query_scan_us: u64 = 0,
+    query_source_us: u64 = 0,
+    query_import_us: u64 = 0,
+    query_match_us: u64 = 0,
+    query_validate_us: u64 = 0,
+    query_publish_us: u64 = 0,
     replay_us: u64 = 0,
     specialization_us: u64 = 0,
     constants_us: u64 = 0,
@@ -80,7 +87,7 @@ pub const WorkStats = struct {
     }
 };
 pub const Work = struct {
-    pub const Phase = enum { other, lookup, replay, specialization, constants, principals, interfaces, startup, layouts, evaluation, inference, semantic_coordination, semantic_dispatch, semantic_publication };
+    pub const Phase = enum { other, lookup, query_prepare, query_scan, query_source, query_import, query_match, query_validate, query_publish, replay, specialization, constants, principals, interfaces, startup, layouts, evaluation, inference, semantic_coordination, semantic_dispatch, semantic_publication };
     clock: Clock = .{ .io = null, .previous = null },
     active: Phase = .other,
     regions: [8]Region = @splat(.{}),
@@ -98,6 +105,12 @@ pub const Work = struct {
         pub fn deinit(self: Scope) void {
             self.owner.account();
             self.owner.active = self.previous;
+        }
+        /// Move an existing scope between exclusive work stages while keeping
+        /// its original parent. Nested scopes still restore this stage.
+        pub fn change(self: Scope, phase: Phase) void {
+            self.owner.account();
+            self.owner.active = phase;
         }
     };
     fn account(self: *Work) void {

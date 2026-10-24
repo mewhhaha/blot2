@@ -860,8 +860,27 @@ const CallSummaries = struct {
         return result;
     }
     fn parallelReady(self: *CallSummaries, session: *Session) ClosureRegion.RegionError!bool {
-        const io = session.semantic_io orelse return false;
-        if (session.semantic_component_workers == 0 or session.receipt_tape != null or session.recordingConstant() or session.principal_reads != null or session.refinement_observation != null or session.summary_exhausted) return false;
+        session.counters.semantic_component_attempts += 1;
+        const io = session.semantic_io orelse {
+            session.counters.semantic_component_no_io += 1;
+            return false;
+        };
+        if (session.semantic_component_workers == 0) {
+            session.counters.semantic_component_disabled += 1;
+            return false;
+        }
+        if (session.receipt_tape != null or session.recordingConstant() or session.principal_reads != null) {
+            session.counters.semantic_component_recording += 1;
+            return false;
+        }
+        if (session.refinement_observation != null) {
+            session.counters.semantic_component_observing += 1;
+            return false;
+        }
+        if (session.summary_exhausted) {
+            session.counters.semantic_component_exhausted += 1;
+            return false;
+        }
         const coordination = if (session.timing) |timing| timing.enter(.semantic_coordination) else null;
         defer if (coordination) |scope| scope.deinit();
         const a = session.allocator;
@@ -1309,6 +1328,7 @@ const CallSummaries = struct {
 
 const RegionStorage = struct {
     region_arena_pool: region_arena.Pool,
+    principal_source_owners: @import("source_owners.zig").Cache = .{},
     callable_definitions: std.AutoHashMapUnmanaged(ClosureRegion.DefinitionKey, core.BindingId) = .empty,
     callable_definition_units: std.AutoHashMapUnmanaged(usize, void) = .empty,
     fn init(allocator: Allocator) RegionStorage {
@@ -1316,6 +1336,7 @@ const RegionStorage = struct {
     }
     fn deinit(self: *RegionStorage, allocator: Allocator) void {
         self.region_arena_pool.deinit();
+        self.principal_source_owners.deinit(allocator);
         self.callable_definitions.deinit(allocator);
         self.callable_definition_units.deinit(allocator);
     }
@@ -1352,6 +1373,7 @@ const RetainedRecords = struct {
 };
 
 pub const Session = struct {
+    dense_unit_ids: bool = false,
     retained: RetainedRecords = .{},
     specializations: SpecializationCaches = .{},
     regions: RegionStorage,
@@ -1494,9 +1516,11 @@ pub const Session = struct {
         errdefer allocator.free(node_offsets);
         var has_implementations = false;
         var has_generative_sources = false;
+        var dense_unit_ids = true;
         var binding_count: usize = 0;
         var node_count: usize = 0;
         for (units, 0..) |module, index| {
+            dense_unit_ids = dense_unit_ids and (module.unit == 0 or module.unit == index + 1);
             has_implementations = has_implementations or module.implementations.len != 0 or module.member_templates.len != 0;
             has_generative_sources = has_generative_sources or @import("../reuse/source_value_template.zig").moduleGenerative(&module);
             binding_offsets[index] = binding_count;
@@ -1550,7 +1574,7 @@ pub const Session = struct {
                 for (0..payload.b) |field| field_locations.putAssumeCapacity(.{ .family = first.family, .tag = constructor.tag, .name = module.types.recordField(payload, field).name }, .{ .field = @intCast(field), .len = payload.b });
             }
         }
-        return .{ .associated_remaining = @import("../inference_limits.zig").configured(), .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .node_count = node_count, .field_locations = field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = has_implementations, .has_generative_sources = has_generative_sources };
+        return .{ .associated_remaining = @import("../inference_limits.zig").configured(), .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = units, .dense_unit_ids = dense_unit_ids, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .node_count = node_count, .field_locations = field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = has_implementations, .has_generative_sources = has_generative_sources };
     }
     /// A private session over exactly `parent.units`. The facts Session.init
     /// derives from those immutable units (the implementation and generative
@@ -1563,7 +1587,7 @@ pub const Session = struct {
         @memset(slots, .{});
         var storage = try value_storage.Store.init(allocator);
         errdefer storage.deinit(allocator);
-        return .{ .associated_remaining = @import("../inference_limits.zig").configured(), .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = parent.units, .providers = provider_chain.Store.init(allocator), .binding_offsets = parent.binding_offsets, .node_offsets = parent.node_offsets, .slots = slots, .node_count = parent.node_count, .borrowed_tables = true, .field_locations = parent.field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = parent.has_implementations, .has_generative_sources = parent.has_generative_sources };
+        return .{ .associated_remaining = @import("../inference_limits.zig").configured(), .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = parent.units, .dense_unit_ids = parent.dense_unit_ids, .providers = provider_chain.Store.init(allocator), .binding_offsets = parent.binding_offsets, .node_offsets = parent.node_offsets, .slots = slots, .node_count = parent.node_count, .borrowed_tables = true, .field_locations = parent.field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = parent.has_implementations, .has_generative_sources = parent.has_generative_sources };
     }
     pub fn deinit(self: *Session) void {
         self.retained.deinit(self.allocator);
@@ -2770,6 +2794,13 @@ pub const Session = struct {
         try self.storage.row_mappings.appendSlice(self.allocator, mappings);
         return .{ .start = start, .len = @intCast(mappings.len) };
     }
+    /// Dense project catalogs are proved once. General Session callers retain
+    /// first-match lookup for explicit/non-dense unit identities.
+    pub fn unitIndex(self: *const Session, unit: u32) ?usize {
+        if (self.dense_unit_ids and unit != 0) return if (unit <= self.units.len) unit - 1 else null;
+        for (self.units, 0..) |module, index| if (module.unit == unit or (module.unit == 0 and index + 1 == unit)) return index;
+        return null;
+    }
     fn unitId(self: *const Session, index: usize) u32 {
         return if (self.units[index].unit != 0) self.units[index].unit else @intCast(index + 1);
     }
@@ -3310,7 +3341,15 @@ pub const Session = struct {
             return;
         }
         const unit = self.unitId(owner);
-        if (self.units[owner].binding(binding).kind == .global) try reads.source(self.allocator, .{ .unit = unit, .binding = binding }) else try reads.sourceUnit(self.allocator, unit);
+        if (self.units[owner].binding(binding).kind == .global) {
+            try reads.source(self.allocator, .{ .unit = unit, .binding = binding });
+        } else if (try self.regions.principal_source_owners.binding(self.allocator, self.units, owner, binding, self.options.max_values)) |declaration| {
+            try reads.source(self.allocator, .{ .unit = unit, .binding = declaration });
+            self.counters.principal_containing_sources += 1;
+        } else {
+            try reads.sourceUnit(self.allocator, unit);
+            self.counters.principal_module_sources += 1;
+        }
     }
     fn principalSummaryKey(self: *const Session, key: principal_inputs.SummaryKey) ?CallSummaries.Key {
         if (key.target.unit == 0 or key.target.unit > self.units.len or key.target.binding == 0 or key.target.binding >= self.units[key.target.unit - 1].bindings.len) return null;
@@ -6508,11 +6547,12 @@ const ClosureRegion = struct {
             self.frames.deinit(allocator);
         }
     };
-    const Source = struct { variable_first: u32 = std.math.maxInt(u32), variable_last: u32 = std.math.maxInt(u32), origin: ?SourceLocation = null, implementation_context: ?u32 = null, binding: core.BindingId = 0, value: ValueId, owner: usize, root: types.Id = 0, body: core.Id = 0, closed_rows: types.List = .{}, body_collected: bool = false, import_parent: ?u32 = null, import_binders: types.List = .{} };
+    const Source = struct { row_first: u32 = std.math.maxInt(u32), row_last: u32 = std.math.maxInt(u32), variable_first: u32 = std.math.maxInt(u32), variable_last: u32 = std.math.maxInt(u32), origin: ?SourceLocation = null, implementation_context: ?u32 = null, binding: core.BindingId = 0, value: ValueId, owner: usize, root: types.Id = 0, body: core.Id = 0, closed_rows: types.List = .{}, body_collected: bool = false, import_parent: ?u32 = null, import_binders: types.List = .{} };
     const Import = struct { scope: u32, ty: types.Id };
     const RowImport = struct { scope: u32, row: types.Effects.Id };
     const LabelImport = struct { scope: u32, label: types.Effects.Label };
     const RowVariable = struct { scope: u32, variable: u32 };
+    const ImportedRowVariable = struct { source: RowVariable, region: types.Effects.Id, next: u32 = std.math.maxInt(u32) };
     const RowParameter = struct { owner: usize, parameter: u32 };
     const CompletedDemand = struct { scope: u32, node: core.Id, body: core.Id, root: types.Id };
     const Variable = struct { source: Import, region: types.Id, next: u32 = std.math.maxInt(u32) };
@@ -6555,6 +6595,7 @@ const ClosureRegion = struct {
         imported_rows: std.AutoHashMapUnmanaged(RowImport, types.Effects.Id) = .empty,
         imported_labels: std.AutoHashMapUnmanaged(LabelImport, types.Effects.Label) = .empty,
         row_variables: std.AutoHashMapUnmanaged(RowVariable, types.Effects.Id) = .empty,
+        row_variable_entries: std.ArrayList(ImportedRowVariable) = .empty,
         row_parameters: std.AutoHashMapUnmanaged(RowParameter, u32) = .empty,
         evidence_rows: std.AutoHashMapUnmanaged(u32, types.Effects.Id) = .empty,
         evidence_labels: std.AutoHashMapUnmanaged(u32, types.Effects.Label) = .empty,
@@ -6677,6 +6718,9 @@ const ClosureRegion = struct {
         counters.region_scopes += self.scratch.sources.items.len;
         counters.max_region_scopes = @max(counters.max_region_scopes, self.scratch.sources.items.len);
         counters.occurs_steps += self.solver.occurs_steps - self.occurs_base;
+        if (self.scratch.worklists) |work| {
+            inline for (.{ "subscriber_visits", "retained_watches", "refreshed_watches", "ready_word_scans" }) |field| @field(counters, "worklist_" ++ field) += @field(work.constraints, field) + @field(work.aliases, field);
+        }
         inline for (@typeInfo(@TypeOf(self.normalization_base)).@"struct".field_names) |name| @field(counters.normalization, name) += @field(self.solver.normalization, name) - @field(self.normalization_base, name);
         if (self.timing) |scope| if (self.scratch.sources.items.len != 0 and scope.owner.clock.io != null) {
             const elapsed = scope.elapsedUs();
@@ -7853,7 +7897,13 @@ const ClosureRegion = struct {
         } else if (variable >= source.effects.variable_count) return error.UnresolvedType;
         var fresh: types.Effects.Id = undefined;
         if (formal) |binder| fresh = try self.solver.rowType(try self.importType(scope, binder, 0)) else fresh = try self.solver.freshEffects();
+        try self.scratch.row_variable_entries.ensureUnusedCapacity(self.scratch_allocator, 1);
         try self.scratch.row_variables.put(self.scratch_allocator, key, fresh);
+        const index: u32 = @intCast(self.scratch.row_variable_entries.items.len);
+        self.scratch.row_variable_entries.appendAssumeCapacity(.{ .source = key, .region = fresh });
+        const owner_scope = &self.scratch.sources.items[scope];
+        if (owner_scope.row_last != std.math.maxInt(u32)) self.scratch.row_variable_entries.items[owner_scope.row_last].next = index else owner_scope.row_first = index;
+        owner_scope.row_last = index;
         return fresh;
     }
     fn importEvidence(self: *ClosureRegion, actual: type_evidence.Id, depth: usize) RegionError!types.Id {
@@ -9515,15 +9565,20 @@ const ClosureRegion = struct {
             if (module.types.node(variable.source.ty).tag == .projection) continue;
             try self.unify(variable.region, try self.importType(caller, variable.source.ty, 0));
         }
-        var rows: std.ArrayList(RowVariable) = .empty;
-        defer rows.deinit(self.session.allocator);
-        var iterator = self.scratch.row_variables.iterator();
-        while (iterator.next()) |entry| {
-            const key = entry.key_ptr.*;
-            if (key.scope != scope or std.mem.findScalar(types.Id, module.types.list(scheme.row_variables), key.variable) != null or std.mem.findScalar(types.Id, module.types.list(self.scratch.sources.items[scope].closed_rows), key.variable) != null) continue;
-            try rows.append(self.session.allocator, key);
+        // Links retain numeric keys, so unification may grow either the map
+        // or the arrays without invalidating an iterator. Only entries present
+        // at entry participate, matching the former two-stage collection.
+        const row_count = self.scratch.row_variable_entries.items.len;
+        self.session.counters.lexical_row_region_candidates += row_count;
+        var row_index = source.row_first;
+        while (row_index < row_count) {
+            const entry = self.scratch.row_variable_entries.items[row_index];
+            row_index = entry.next;
+            self.session.counters.lexical_row_scope_candidates += 1;
+            const variable = entry.source.variable;
+            if (std.mem.findScalar(types.Id, module.types.list(scheme.row_variables), variable) != null or std.mem.findScalar(types.Id, module.types.list(source.closed_rows), variable) != null) continue;
+            try self.solver.unifyEffects(entry.region, try self.importRowVariable(caller, variable));
         }
-        for (rows.items) |row| try self.solver.unifyEffects(self.scratch.row_variables.get(row).?, try self.importRowVariable(caller, row.variable));
     }
     fn formalCallback(self: *ClosureRegion, scope: u32, reference: core.BindingRef) ?u32 {
         const source = self.scratch.sources.items[scope];
@@ -10609,7 +10664,16 @@ const ClosureRegion = struct {
             const source = self.scratch.sources.items[scope];
             if (source.binding != 0 and self.session.units[source.owner].binding(source.binding).kind == .global) {
                 try reads.source(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
-            } else if (self.session.unitId(source.owner) != reads.root.unit) try reads.sourceUnit(self.session.allocator, self.session.unitId(source.owner));
+            } else if (self.session.unitId(source.owner) != reads.root.unit) {
+                const unit = self.session.unitId(source.owner);
+                if (try self.session.regions.principal_source_owners.node(self.session.allocator, self.session.units, source.owner, body, self.session.options.max_values)) |declaration| {
+                    try reads.source(self.session.allocator, .{ .unit = unit, .binding = declaration });
+                    self.session.counters.principal_containing_sources += 1;
+                } else {
+                    try reads.sourceUnit(self.session.allocator, unit);
+                    self.session.counters.principal_module_sources += 1;
+                }
+            }
         }
         if (!self.building_principal and body == self.scratch.sources.items[scope].body) try self.registerBodyScope(scope);
         const recipe = if (self.session.options.reuse_body_recipes) try self.session.specializations.body_recipes.get(self.session.allocator, self.session.units, .{ .owner = self.scratch.sources.items[scope].owner, .body = body, .callables = self.include_callables }, self.session.options.max_values) else null;
@@ -13240,6 +13304,119 @@ fn solverCapacityExportsScenario(backing: Allocator) !void {
     solved.deinit(allocator);
     solved_alive = false;
     try std.testing.expectEqual(@as(usize, 0), tracked.counts.live_bytes);
+}
+
+fn lexicalRowIndexScenario(a: Allocator, module: *const core.Module) !void {
+    var session = try Session.init(a, &.{module.*});
+    defer session.deinit();
+    var region = try ClosureRegion.init(&session);
+    defer region.deinit();
+    try std.testing.expect(module.types.effects.variable_count != 0);
+    for (0..3) |_| try region.scratch.sources.append(region.scratch_allocator, .{ .owner = 0, .value = 0 });
+    const callee = try region.importRowVariable(1, 0);
+    const unrelated = try region.importRowVariable(2, 0);
+    try region.shareLexical(1, 0, .{});
+    const caller = try region.importRowVariable(0, 0);
+    const current_callee = region.solver.row(try region.solver.resolveEffects(callee, 0));
+    const current_caller = region.solver.row(try region.solver.resolveEffects(caller, 0));
+    const current_unrelated = region.solver.row(try region.solver.resolveEffects(unrelated, 0));
+    try std.testing.expect(std.meta.eql(current_callee.tail, current_caller.tail));
+    try std.testing.expect(!std.meta.eql(current_callee.tail, current_unrelated.tail));
+    try std.testing.expectEqual(@as(u64, 1), session.counters.lexical_row_scope_candidates);
+    try std.testing.expectEqual(@as(u64, 2), session.counters.lexical_row_region_candidates);
+}
+
+test "lexical row scope index preserves unrelated binders and imports appended during sharing through OOM" {
+    var module = try bodyRecipeLower("const apply = fn f => fn value => f value\nentry const answer = 7");
+    defer module.deinit(std.testing.allocator);
+    try lexicalRowIndexScenario(std.testing.allocator, &module);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, lexicalRowIndexScenario, .{&module});
+}
+
+fn principalSourceOwnerScenario(a: Allocator, module: *const core.Module) !void {
+    var session = try Session.init(a, &.{module.*});
+    defer session.deinit();
+    var reads: principal_inputs.Recorder = .{ .eligible = true, .max_reads = 256, .root = .{ .unit = 2, .binding = 1 } };
+    defer reads.deinit(a);
+    session.principal_reads = &reads;
+    defer session.principal_reads = null;
+    var found = false;
+    for (module.bindings, 0..) |binding, id| {
+        if (binding.kind != .local or binding.initializer == 0) continue;
+        const owner = (try session.regions.principal_source_owners.binding(a, session.units, 0, @intCast(id), session.options.max_values)) orelse return error.TestUnexpectedResult;
+        try std.testing.expect(module.binding(owner).kind == .global);
+        try session.observePrincipalSource(0, @intCast(id));
+        try std.testing.expect(reads.sources_seen.contains(.{ .unit = 1, .binding = owner }));
+        found = true;
+    }
+    try std.testing.expect(found);
+    try std.testing.expectEqual(@as(usize, 0), reads.source_units.items.len);
+    var has_suspension = false;
+    for (module.nodes) |node| has_suspension = has_suspension or node.tag == .suspend_;
+    try std.testing.expect(has_suspension);
+    for (module.closures) |closure| {
+        if (closure.body == 0) continue;
+        const owner = (try session.regions.principal_source_owners.node(a, session.units, 0, closure.body, session.options.max_values)) orelse return error.TestUnexpectedResult;
+        try std.testing.expect(module.binding(owner).kind == .global);
+    }
+    var bounded: @import("source_owners.zig").Cache = .{};
+    defer bounded.deinit(a);
+    try std.testing.expect((try bounded.node(a, session.units, 0, 1, 1)) == null);
+    // Shared physical nodes cannot grant one declaration ownership when two
+    // declarations reach them. Such inputs keep the whole-module fallback.
+    var shared = module.*;
+    shared.bodies = try a.dupe(core.Body, module.bodies);
+    defer a.free(shared.bodies);
+    var reached: [2]usize = undefined;
+    var count: usize = 0;
+    for (shared.bodies, 0..) |body, index| {
+        if (body.root == 0 or body.binding == 0) continue;
+        reached[count] = index;
+        count += 1;
+        if (count == reached.len) break;
+    }
+    try std.testing.expectEqual(@as(usize, 2), count);
+    const shared_root = shared.bodies[reached[0]].root;
+    shared.bodies[reached[1]].root = shared_root;
+    var ambiguous: @import("source_owners.zig").Cache = .{};
+    defer ambiguous.deinit(a);
+    try std.testing.expect((try ambiguous.node(a, &.{shared}, 0, shared_root, session.options.max_values)) == null);
+}
+
+fn unitIndexScenario(a: Allocator, module: *const core.Module) !void {
+    for ([_][2]u32{ .{ 1, 2 }, .{ 0, 2 }, .{ 7, 3 }, .{ 7, 7 }, .{ 0, 0 } }) |ids| {
+        var units = [_]core.Module{ module.*, module.* };
+        for (&units, ids) |*item, id| item.unit = id;
+        var session = try Session.init(a, &units);
+        defer session.deinit();
+        for ([_]u32{ 0, 1, 2, 3, 7, 9999 }) |unit| {
+            const expected: ?usize = for (units, 0..) |item, index| {
+                if (item.unit == unit or (item.unit == 0 and index + 1 == unit)) break index;
+            } else null;
+            try std.testing.expectEqual(expected, session.unitIndex(unit));
+        }
+    }
+}
+test "Session unit lookup preserves dense implicit sparse and duplicate first owner identities through OOM" {
+    var module = try bodyRecipeLower("entry const answer = 7");
+    defer module.deinit(std.testing.allocator);
+    try unitIndexScenario(std.testing.allocator, &module);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, unitIndexScenario, .{&module});
+}
+
+test "principal source containment owns nested closures and local reads with bounded allocation failure cleanup" {
+    var module = try bodyRecipeLower(
+        \\const first = fn (x: U32) => do:
+        \\  let captured = fn (y: U32) => @u32.add x y
+        \\  break captured
+        \\const second = fn (x: U32) => @u32.sub x 1
+        \\const force = fn ~(value: U32) => @force value
+        \\entry const delayed = force (@u32.add 1 2)
+        \\entry const answer = 7
+    );
+    defer module.deinit(std.testing.allocator);
+    try principalSourceOwnerScenario(std.testing.allocator, &module);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, principalSourceOwnerScenario, .{&module});
 }
 test "region arena exports own projected evidence across region ID recycling teardown and OOM" {
     try solverCapacityExportsScenario(std.testing.allocator);

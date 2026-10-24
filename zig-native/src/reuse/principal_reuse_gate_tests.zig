@@ -12,6 +12,38 @@ const dependencies = @import("declaration_dependencies.zig");
 const Gate = @import("principal_reuse_gate.zig").Gate;
 const a = std.testing.allocator;
 
+test "call identity ignores unrelated source positions but rejects its own movement and changed source" {
+    const source =
+        \\entry const earlier = fn (x: U32) -> U32 => @u32.add x 1
+        \\entry const edited = fn (x: U32) -> U32 => @u32.add x 2
+        \\entry const later = fn (x: U32) -> U32 => @u32.add x 3
+    ;
+    var before = try Fixture.init(a, &.{source});
+    defer before.deinit(a);
+    var pinned = try Pinned.init(a, &before);
+    defer pinned.deinit(a);
+    const changed = try std.mem.replaceOwned(u8, a, source, "@u32.add x 2", "@u32.add x 20");
+    defer a.free(changed);
+    var after = try Fixture.init(a, &.{changed});
+    defer after.deinit(a);
+    var gate = try Gate.init(a, &pinned.pools, after.units, after.names.view());
+    defer gate.deinit();
+    try std.testing.expect(gate.enabled);
+    try std.testing.expect(!@import("../structural.zig").equal(before.units[0].source_names, after.units[0].source_names));
+    const earlier = target(&after.units[0], "earlier");
+    const edited = target(&after.units[0], "edited");
+    const later = target(&after.units[0], "later");
+    try std.testing.expect(gate.admitsLocalSource(earlier));
+    try std.testing.expect(gate.admitsCallIdentity(edited));
+    try std.testing.expect(!gate.admitsLocalSource(edited));
+    try std.testing.expectEqual(Gate.IdentityFailure.source_position, gate.callIdentityFailure(later));
+    var moved = try Fixture.init(a, &.{"\n" ++ source});
+    defer moved.deinit(a);
+    var shifted = try Gate.init(a, &pinned.pools, moved.units, moved.names.view());
+    defer shifted.deinit();
+    try std.testing.expectEqual(Gate.IdentityFailure.source_position, shifted.callIdentityFailure(earlier));
+}
+
 const Fixture = struct {
     units: []core.Module,
     names: identity.Metadata,

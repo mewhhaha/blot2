@@ -339,6 +339,10 @@ entry const run = fn (seed: U32) => do:
     }
   } finally {
     await compiler.dispose();
+    // dispose aborts the server; its detached cache writer may still own the
+    // directory. Opening the same key waits for that writer before teardown.
+    const settled = await createZigProjectCompiler(cached);
+    await settled.close();
     await Deno.remove(directory, { recursive: true });
   }
 });

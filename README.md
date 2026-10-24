@@ -64,37 +64,34 @@ incomplete check as passed. See
 `type-effects`, `body-checking`, `numeric-aggregates` or `tasks`; each runs
 existing positive, rejection/recovery and ownership regressions plus guests.
 
-The [latest performance changes](zig-native/CT105_QUALIFICATION.md) reduce
-frozen gdev fresh-build CPU by **13.3%**, body-edit CPU by **12.9%** and
-literal-edit CPU by **3.3%** against `5cfb411` in seven alternating release
-pairs, with identical Wasm. Shared-host wall medians are 8.33 s fresh, 4.16 s
-first literal, 3.10 s literal revert and 5.42 s body edit. The 10% literal-CPU
-and sub-second editing targets remain open. Scope indexing, row certificates,
-worklist masks, exact frontend indexes and cache fixes remove repeated work;
-four body regions and first-edit graph correspondence still need attention. The
-report records memory costs, unseen/fresh controls, exhaustive qualification and
-the disposition of all 50 observations in the preceding
-[CPU/memory audit](PERFORMANCE_REVIEW.md#current-cpu-memory-and-algorithm-audit--24-october-2026).
+The [CT106 qualification](zig-native/CT106_QUALIFICATION.md) records **19.1%
+less first-literal-edit CPU** against CT105 in seven alternating release pairs,
+with identical Wasm. First-literal wall median falls from 3.62 to **2.91 s**;
+fresh CPU improves 2.4%, body CPU is effectively unchanged and literal-revert
+CPU rises 3.5%. These are shared-host observations. Body-edit, two-second and
+sub-second targets remain open.
 
-The [post-CT105 compiler review](COMPILER_REVIEW_CT105.md) ranks 86 further
-suggestions across algorithms, memory, CPU execution, reuse, architecture and
-compiler build time. Fresh diagnostics of the unchanged installed release put
-literal revert at 2.58 s and body edit at 4.82 s; these are three-run observations,
-not new optimization gains. The review includes CPU stacks, a 40-build memory
-cycle and six next experiments. Frontend graph decline is not yet evidence of
-a semantic mismatch; a debugger probe rules out its graph-size cap.
+Exact frontend correspondence now checks one module on the first edit instead
+of 22. Bounded operation indexes/certificates, lexical links and import scratch
+remove repeated work. The report includes 200 distinct edits, allocator/CPU
+attribution, exhaustive qualification and rejected experiments. All 86 review
+suggestions have a [disposition](COMPILER_CT106_WORK.md); conditional alternatives
+and unfinished architectural work are explicit.
 
-The matching release CLI and native compiler are installed locally. The expanded
-Safe/noLLVM development cycle takes 21.28 s, including a 3.31 s compiler build
-and 5.91 s complete native compilation. These are individual observations, not
-p95 estimates or paired compiler-build gains. Keep stable writable Zig caches;
-the measured incremental mode did not improve real edits. Use
-`deno task bench:compiler-build --out build/bench/build-next` for isolated
-build/edit/revert measurements. The
+The qualified CLI and native compiler are installed locally. Twenty complete
+selected edit/check cycles measure 25.35 s median and 27.64 s observed p95,
+with source/identity restoration verified. These are shared-host observations.
+
+Use `deno task check:dev --area static-sharing` for Safe/noLLVM development and
+`deno task test:compiler` for complete qualification. Compiler identity now
+recomputes build configuration after a stale-digest bug was reproduced; normal
+compiled-artifact caches remain reusable. The actual LLVM release trace spends
+220.88 of 227.76 seconds in emission. The
+[experiment tools](scripts/bench/README.md),
 [compile measurements](COMPILE_MEASUREMENTS.md),
 [compile hills](COMPILE_HILLS.md), [build hills](BUILD_HILLS.md) and
-[performance review](PERFORMANCE_REVIEW.md) separate completed work from the
-remaining targets.
+[turnaround measurements](DEVELOPMENT_TURNAROUND.md) keep construction,
+verification and application performance separate.
 
 For a smaller development check, run `deno task test:compiler:dev`. It checks
 the project protocol, client and inference-budget recovery against the

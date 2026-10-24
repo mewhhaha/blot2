@@ -33,8 +33,11 @@ pub const Importer = struct {
         const node = self.source.node(id);
         if (!self.allow_scoped and (node.tag == .scoped or (node.tag == .usage and node.c != 0))) return error.TypeMismatch;
         const children = self.source.children(id);
-        const copied = try self.allocator.dupe(u32, children);
-        defer self.allocator.free(copied);
+        var scratch_bytes: [128]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_bytes, self.allocator);
+        const temporary = scratch.allocator();
+        const copied = try temporary.dupe(u32, children);
+        defer temporary.free(copied);
         for (copied, 0..) |*child, index| {
             if (node.tag != .record or index % 2 != 0) child.* = try self.ty(child.*, depth + 1);
         }
@@ -79,8 +82,11 @@ pub const Importer = struct {
         if (self.rows.get(id)) |known| return known;
         try self.charge();
         const original = self.source.effects.rowLabels(id);
-        const copied = try self.allocator.alloc(u32, original.len);
-        defer self.allocator.free(copied);
+        var scratch_bytes: [128]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_bytes, self.allocator);
+        const temporary = scratch.allocator();
+        const copied = try temporary.alloc(u32, original.len);
+        defer temporary.free(copied);
         for (original, copied) |old, *new| new.* = try self.label(old, depth + 1);
         const old_formal = self.source.effects.rows[id].formal;
         const formal = if (old_formal == 0) 0 else try self.ty(old_formal, depth + 1);
@@ -95,8 +101,11 @@ pub const Importer = struct {
         const operation = self.source.effects.operation(id);
         if (!self.allow_scoped and (operation.instance.unit != 0 or operation.instance.decl != 0)) return error.TypeMismatch;
         const original = self.source.effects.operationArguments(id);
-        const copied = try self.allocator.alloc(u32, original.len);
-        defer self.allocator.free(copied);
+        var scratch_bytes: [128]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_bytes, self.allocator);
+        const temporary = scratch.allocator();
+        const copied = try temporary.alloc(u32, original.len);
+        defer temporary.free(copied);
         for (original, copied) |old, *new| new.* = try self.ty(old, depth + 1);
         const result = try self.destination.effects.internOperationInstance(operation.identity, copied, operation.instance);
         try self.labels.put(self.allocator, id, result);

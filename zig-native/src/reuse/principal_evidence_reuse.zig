@@ -16,6 +16,7 @@ pub const SourceDecline = struct {
     target: core.BindingRef = .{ .unit = 0, .binding = 0 },
     source: core.BindingRef = .{ .unit = 0, .binding = 0 },
     reason: enum { none, disabled, constant_types, incomplete, identity, changed_source, module_image, missing_root } = .none,
+    identity_failure: gate.Gate.IdentityFailure = .none,
 };
 pub const Stats = struct {
     persisted_requests: usize = 0,
@@ -171,6 +172,7 @@ pub const State = struct {
             if (std.meta.eql(slot.target, detail.target)) return false;
             if (slot.reason == .none) {
                 slot.* = detail;
+                if (detail.reason == .identity) slot.identity_failure = self.gate.callIdentityFailure(detail.source);
                 break;
             }
         }

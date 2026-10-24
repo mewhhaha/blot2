@@ -150,6 +150,9 @@ Unused slots have reason `none`; module-image observations use source binding
 zero. These diagnostics do not decide admission. Frontend cutoff statistics also
 report the first mismatching unit, changed interface-field bit mask, binding
 counts, remaining correspondence budget and comparison progress.
+Graph declines additionally identify the reason, first type/row pair, tags,
+depth and remaining work. Equal immutable nodes may have different sharing;
+type and row variables still require injective correspondence.
 
 `stats.workCounters.normalization` counts region-solver row requests, closed and
 epoch cache hits, argument rows/labels/arguments inspected, changed rows, fallback
@@ -159,6 +162,23 @@ stores are excluded. `lexical_region_candidates` records the candidate volume of
 the former whole-region variable scan, while `lexical_scope_candidates` counts
 visits through the source-scope index. Their difference is avoided scan work,
 not a measured speedup percentage.
+
+Normalization also separates reused operation certificates from actual argument
+height checks. Worklist counters record retained/refreshed frontiers, subscriber
+visits and empty ready-word scans; lexical counters distinguish type and row
+variables. Query counters expose bucket lengths, candidates and canonical hits.
+The optional query prepare/scan/source/import/match/validate/publish clocks are
+exclusive work categories. Entering one pauses the previous category;
+`lookup_us` therefore excludes these stages. All work categories sit inside
+the enclosing backend clock and must not be added to that clock again.
+
+With `profileBackend`, `stats.sessionHeap` reports small-block slab capacity,
+free and unused capacity, and rounded allocated capacity by class. Otherwise it
+is `null`. The snapshot precedes revision publication and can include both old
+and pending owners. It excludes directly mapped large blocks and is neither
+process RSS nor post-build live memory. Arena request, backing-capacity and
+reuse/remap counters describe different layers and must not be summed as
+independent physical allocations. See [experiment tools](../scripts/bench/README.md).
 
 The CLI and native project server automatically persist restart candidates under
 `$XDG_CACHE_HOME/blot` or `$HOME/.cache/blot` on Linux,

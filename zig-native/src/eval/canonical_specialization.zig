@@ -75,8 +75,12 @@ pub const Cache = struct {
     pub fn deinit(self: *Cache, a: Allocator) void {
         self.table.deinit(a);
     }
-    fn hash(self: *const Cache, words: []const u64) u64 {
-        return if (self.force_collision) 0 else std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(words));
+    fn hash(self: *const Cache, words: []const u64, expected: u32, mode: Mode, options: eval.Options, depth: usize) u64 {
+        if (self.force_collision) return 0;
+        var value = std.hash.Wyhash.init(0);
+        value.update(std.mem.sliceAsBytes(words));
+        std.hash.autoHash(&value, .{ expected, mode, options, depth });
+        return value.final();
     }
     pub fn eligible(self: *const Cache, session: anytype, value: u32) bool {
         // Nested inquiries, unusual quotas and incomplete observation modes
@@ -118,6 +122,17 @@ pub const Cache = struct {
             proof.values_added *| 4 +| proof.children_added +| proof.sources.len *| 2 +| proof.scalar_reads.len *| 3 +|
             proof.call_reads.len *| 4 +| proof.call_publications.len *| 4 +| proof.views.len *| 4 +| proof.plain_facts.len *| 3;
         if (size > session.options.max_children -| self.retained_words) return;
+        var minimum_bytes = receipt.ownedBytes(proof);
+        inline for (.{ "words", "values", "mappings", "rows", "slots" }) |field| {
+            const values = @field(input, field);
+            minimum_bytes +|= values.len *| @sizeOf(@TypeOf(values[0]));
+        }
+        minimum_bytes +|= proof.values_added *| (@sizeOf(eval.ValueInfo) + 2 * @sizeOf(u32));
+        minimum_bytes +|= proof.children_added *| @sizeOf(u32);
+        if (!self.table.canAdmit(minimum_bytes)) {
+            self.table.saturated +|= 1;
+            return;
+        }
         for (session.storage.values.items[proof.values_before..]) |value| switch (value.kind) {
             .scalar, .product, .record, .nominal, .array, .list, .cursor, .closure => {},
             // Creation and mutable demand/provider state need a stronger plan.
@@ -138,7 +153,7 @@ pub const Cache = struct {
                 try fixed.append(a, id);
         }
         result.fixed = try fixed.toOwnedSlice(a);
-        var builder = Table.begin(a, .{ .mode = mode, .input = owned_input, .fingerprint_ = self.hash(input.words), .expected = proof.expected, .options = proof.options, .depth = proof.depth });
+        var builder = Table.begin(a, .{ .mode = mode, .input = owned_input, .fingerprint_ = self.hash(input.words, proof.expected, mode, proof.options, proof.depth), .expected = proof.expected, .options = proof.options, .depth = proof.depth });
         owns_input = false;
         defer builder.abort();
         builder.read(try proof.clone(a));
@@ -151,8 +166,10 @@ pub const Cache = struct {
         self.retained_words += size;
     }
     pub fn lookup(self: *Cache, session: anytype, input: *const inputs.Inputs, expected: u32, mode: Mode) Allocator.Error!?u32 {
-        var cursor = self.table.candidates(self.hash(input.words), .oldest_first);
+        session.counters.canonical_specialization_lookups += 1;
+        var cursor = self.table.candidates(self.hash(input.words, expected, mode, session.options, session.depth), .oldest_first);
         while (cursor.next()) |position| {
+            session.counters.canonical_specialization_candidates += 1;
             const entry = &self.table.records.items[position];
             const proof = &entry.dependencies;
             if (entry.key.mode != mode or proof.expected != expected or proof.depth != session.depth or
@@ -175,6 +192,7 @@ fn mapped(anchors: std.AutoHashMapUnmanaged(u32, u32), proof: *const receipt.Rec
 }
 
 fn unitIndex(session: anytype, unit: u32) ?usize {
+    if (comptime @hasDecl(@TypeOf(session.*), "unitIndex")) return session.unitIndex(unit);
     for (session.units, 0..) |module, index| if (module.unit == unit or (module.unit == 0 and index + 1 == unit)) return index;
     return null;
 }

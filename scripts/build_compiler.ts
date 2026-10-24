@@ -9,6 +9,7 @@ import {
 const directory = new URL("../zig-native/", import.meta.url);
 let development = false;
 let incremental = false;
+let timeReport = false;
 let fixtures: CompilerFixture[] | undefined;
 let jobs: number | undefined;
 for (let index = 0; index < Deno.args.length; index++) {
@@ -17,6 +18,8 @@ for (let index = 0; index < Deno.args.length; index++) {
     development = true;
   } else if (argument === "--incremental") {
     incremental = true;
+  } else if (argument === "--time-report") {
+    timeReport = true;
   } else if (argument.startsWith("--fixtures=")) {
     fixtures ??= [];
     fixtures.push(
@@ -62,6 +65,8 @@ if (development) {
   args.push("-Doptimize=fast", "-Dllvm=true");
 }
 if (incremental) args.push("-fincremental");
+// Zig deliberately forces a rebuild for this report; keep it opt-in.
+if (timeReport) args.push("--time-report");
 if (jobs !== undefined) args.push(`-j${jobs}`);
 args.push("--summary", "all");
 const result = await new Deno.Command("zig", {

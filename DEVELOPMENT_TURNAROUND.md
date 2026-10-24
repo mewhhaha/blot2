@@ -1,12 +1,25 @@
 # Five-minute development feedback
 
-The latest [CT105 static-sharing cycle](zig-native/CT105_QUALIFICATION.md)
-passes in 21.28 s: 3.31 s development compiler construction, 5.91 s complete
-2,555-law native compilation and 0.77 s sampled native execution, followed by
-selected guests and local analysis. The separately qualified exhaustive gate
-takes 674.30 s (625.86 s native execution). These are individual host
-observations, not paired build gains or p95. The older timings below retain
-their original regression families and conditions.
+[CT106](zig-native/CT106_QUALIFICATION.md) measures 20 complete Safe/noLLVM
+static-sharing edit/check cycles: **25.35 s median**,
+**27.64 s observed p95**, **27.78 s maximum**.
+Leaf/checker compiler construction medians are 4.29/4.88 s; the test-only cached
+compiler build is 0.36 s. Complete native compilation takes 7.20–8.03 s by edit
+class, and guest smoke about 9.7–9.9 s. Every cycle compiles all 2,564 native
+laws, runs the same 78-law sampled family and 55 guests, and passes local checks.
+The first failed teardown sequence is excluded and preserved; the completed
+sequence verifies every source restoration, compiler identity and inventory.
+These are observed distributions on a shared host, not paired build speedups or
+universal latency bounds. Full release qualification remains separate.
+
+The actual LLVM release trace spends 220.88 of 227.76 s in emission. Keep
+Safe/noLLVM for development and the complete native inventory; focus next on
+native compilation, the measured guest cost and LLVM emission. The deep guest
+fixture is already just above its required 128-level boundary. Correct build
+identity recomputation preserves compiled-artifact caches and fixes the observed
+stale digest. [Experiment tools](scripts/bench/README.md) document reproduction.
+
+Historical development measurements follow.
 
 The [CT96 task-family edit cycle](zig-native/CT96_QUALIFICATION.md) passes in
 14.54 s, including complete native compilation, 17 native laws, 27 guest checks
@@ -42,7 +55,7 @@ artifacts.
 
 - Compile the complete native inventory with Zig's backend, then select existing
   laws at runtime. LLVM is reserved for the actual release compiler.
-- The current static-sharing family selects 52 native laws, covering aggregate
+- The current static-sharing family selects 78 native laws, covering aggregate
   parity and rejection, persistent roots, principal observations, portable
   archives, closure replay, effect-row normalization and fault-policy behavior.
   `--list-areas` and the run's exact selection are authoritative.

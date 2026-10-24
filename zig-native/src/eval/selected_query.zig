@@ -12,9 +12,13 @@ pub fn source(value: eval.ClosureValue) Source {
 pub fn memberSource(target: @import("../check/core.zig").BindingRef) Source {
     return .{ .unit = target.unit, .identity = target.binding, .origin = .named, .applied = 0, .member = true };
 }
-pub fn fingerprint(value: Source) u64 {
+pub fn fingerprint(value: Source, options: eval.Options, depth: usize) u64 {
     var hash = std.hash.Wyhash.init(0);
     std.hash.autoHash(&hash, value);
+    // These fields compare exactly across owners. Input and expected handles
+    // do not: their graph import remains the authority for an actual hit.
+    std.hash.autoHash(&hash, options);
+    std.hash.autoHash(&hash, depth);
     return hash.final();
 }
 const Key = struct {
@@ -35,7 +39,7 @@ pub const Adapter = struct {
     pub const Dependencies = receipt.Record;
     pub const Result = @import("selected_query.zig").Result;
     pub fn fingerprint(key: @This().Key) u64 {
-        return @import("selected_query.zig").fingerprint(key.source);
+        return @import("selected_query.zig").fingerprint(key.source, key.options, key.depth);
     }
     pub fn complete(record: Table.Record) bool {
         const proof = record.dependencies;
