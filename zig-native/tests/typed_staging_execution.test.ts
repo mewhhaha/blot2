@@ -4,6 +4,24 @@ import {
   equal,
 } from "./compile_helpers.ts";
 import { strict as assert } from "node:assert";
+import { rm } from "node:fs/promises";
+
+// A detached Linux restart-cache writer may publish files after dispose.
+// Deno does not currently honor Node rm maxRetries, so bound the retry here.
+async function removeFixture(directory: string) {
+  for (let attempt = 0;; attempt++) {
+    try {
+      await rm(directory, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (
+        !(error instanceof Error) || !("code" in error) ||
+        error.code !== "ENOTEMPTY" || attempt >= 400
+      ) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+}
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
@@ -232,7 +250,7 @@ entry const answer = fn (value: U32) => (@code.emit generated) value
     }
   } finally {
     await compiler.dispose();
-    await Deno.remove(directory, { recursive: true });
+    await removeFixture(directory);
   }
 });
 
@@ -353,7 +371,7 @@ entry const answer = fn (argument: U32) => do:
     }
   } finally {
     await compiler.dispose();
-    await Deno.remove(directory, { recursive: true });
+    await removeFixture(directory);
   }
 });
 
@@ -564,7 +582,7 @@ const float_callable = @code.quote (fn (value: F32) => read (#Packet {shadow: 9.
       }
     } finally {
       await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
+      await removeFixture(directory);
     }
   });
 }
@@ -673,7 +691,7 @@ entry const answer = fn (value: U32) => (@code.emit generated) value
     }
   } finally {
     await compiler.dispose();
-    await Deno.remove(directory, { recursive: true });
+    await removeFixture(directory);
   }
 });
 
@@ -765,7 +783,7 @@ const description = @code.describe generated
     }
   } finally {
     await retained.dispose();
-    await Deno.remove(directory, { recursive: true });
+    await removeFixture(directory);
   }
 });
 
@@ -886,6 +904,6 @@ const choice = @code.quote #Left {value: #True, left: 1}
       }
     }
   } finally {
-    await Deno.remove(directory, { recursive: true });
+    await removeFixture(directory);
   }
 });

@@ -59,6 +59,7 @@ export const devCheckAreas = {
     description:
       "Static aggregate sharing, retained replay, admission and fault-policy laws.",
     native: [
+      "backend.wasm.test.arena allocation collection and static roots release every failed compiler allocation",
       "reuse.principal_input_tests.test.principal input replay omits declined memo outputs while owning accepted proofs through every allocation failure",
       "reuse.principal_input_tests.test.principal input replay restores nominal and closed call publications across edits errors and recovery",
       "backend.layout.test.layout cache identity and semantic conversion preserve exact closed effect rows",
@@ -91,6 +92,7 @@ export const devCheckAreas = {
       "allocation_failures.test.sampled allocation failures reject swallowed faults and propagate scenario failures",
     ],
     guests: [
+      "zig-native/tests/arena.test.ts",
       "zig-native/tests/principal_replay_execution.test.ts",
       "zig-native/tests/evaluated_calls_execution.test.ts",
       "zig-native/tests/zig_project_protocol.test.ts",
@@ -151,6 +153,7 @@ export const devCheckAreas = {
     "description":
       "Retained body reuse, interface invalidation, relocation and failed-revision recovery.",
     "native": [
+      "reuse.dependency_interface_tests.test.text literal capability shapes agree with scalar arrays at immutable admission",
       "reuse.body_check_cache_tests.test.body check cache copied owners survive allocation failures and unchanged revisions",
       "reuse.body_check_cache_tests.test.body check cache ownership survives all allocation failures",
       "reuse.body_check_cache_tests.test.body check cache relocates generic principal binders and independently specializes consumers",
@@ -161,6 +164,7 @@ export const devCheckAreas = {
       "reuse.body_check_cache_tests.test.body check cache user operation rows reject unknown ambiguous and malformed catalog authority",
     ],
     "guests": [
+      "zig-native/tests/runtime_text_execution.test.ts",
       "zig-native/tests/body_check_cache.test.ts",
     ],
     "guestFilters": {

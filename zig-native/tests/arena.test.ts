@@ -63,6 +63,17 @@ Deno.test("linear arena grows and resets without overwriting static values", asy
     equal(count(0), 0);
     equal(capacity(0), 4);
     for (let handle = 0; handle < 4; handle++) equal(cleared(handle), 1);
+    // The profiling hook must name the exact internal allocator, not the
+    // public ownership wrapper (which misses guest-internal allocations).
+    equal(raw.instance.exports["blot:allocation"], raw.instance.exports.raw_allocator_witness);
+    const allocation = raw.instance.exports["blot:allocation"] as CallableFunction;
+    const first = allocation(32);
+    const second = allocation(32);
+    equal(first > 0 && second > first, true);
+    const memory = new DataView((raw.instance.exports["blot:memory"] as WebAssembly.Memory).buffer);
+    memory.setUint32(first, 42, true);
+    memory.setUint32(second, 99, true);
+    equal(memory.getUint32(first, true), 42);
     const allocate = raw.instance.exports["blot:allocate"] as CallableFunction;
     let trapped = false;
     try { allocate(0xffffffff); } catch (error) { trapped = error instanceof WebAssembly.RuntimeError; }

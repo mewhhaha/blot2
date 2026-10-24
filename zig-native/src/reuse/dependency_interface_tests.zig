@@ -1374,6 +1374,42 @@ const nullary_shape_producer =
     \\  #Some payload => payload
     \\  #None => #None
 ;
+
+const text_shape_producer =
+    \\const unicode = fn unused => "世界🙂"
+    \\const empty = fn unused => ""
+    \\const escaped = fn unused => "\n\t"
+;
+fn textShapeArtifactLaw(allocator: std.mem.Allocator) !void {
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tokens = try lexer.lex(allocator, text_shape_producer);
+    defer tokens.deinit(allocator);
+    var tree = try parser.parse(allocator, text_shape_producer, tokens.tokens.items, &pool);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var shapes: @import("../check/capability_contracts.zig").Store = .{};
+    defer shapes.deinit(allocator);
+    const expected = [_]u32{ 3, 0, 2 };
+    var count: usize = 0;
+    for (tree.nodes.items, 0..) |node, index| {
+        if (node.tag != .lambda) continue;
+        // Unicode scalars, including escapes, match Core's array representation.
+        const root = (try @import("../check/capability_contract_source.zig").derive(allocator, &shapes, &tree, &pool, @intCast(index), .{ .inputs = 1 })).?;
+        const shape = shapes.nodes.items[root];
+        try std.testing.expectEqual(.product, shape.tag);
+        try std.testing.expectEqual(expected[count], shape.b);
+        count += 1;
+    }
+    try std.testing.expectEqual(expected.len, count);
+    const bytes = try artifact(allocator, text_shape_producer);
+    defer allocator.free(bytes);
+}
+test "text literal capability shapes agree with scalar arrays at immutable admission" {
+    try textShapeArtifactLaw(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, textShapeArtifactLaw, .{});
+}
+
 test "owned result shapes retain nullary constructor wrappers at immutable admission" {
     const a = std.testing.allocator;
     const bytes = try artifact(a, nullary_shape_producer);

@@ -113,7 +113,15 @@ Only modules with array arguments/results (including callback signatures) export
 takes an i32 byte count and returns an aligned i32 pointer. Reset takes an
 ignored i32 and returns the first dynamic arena byte. Arrays use a little-endian
 U32 length followed by contiguous 32-bit words, with F32 values stored as
-IEEE-754 bits. Memory grows on demand through the Wasm32 address space, subject
+IEEE-754 bits. Modules with an arena also export `blot:allocation`, the raw
+`(i32 bytes) -> i32 pointer` allocator used internally, for development tools to
+instrument. This is not a host input allocation API: use `blot:allocate` to
+publish ownership. The hook includes recycled arena requests and runtime
+metadata; grouped allocations count their physical backing allocation, not each
+logical object. Static data and allocations removed by optimization do not
+reach it. Requested bytes exclude arena headers and size-class rounding; they
+measure traffic, not live or peak memory. Normal execution adds no counters.
+Memory grows on demand through the Wasm32 address space, subject
 to the engine's available memory. Allocation overflow and failed growth trap.
 The adapter checks typed-array kinds, lengths, aligned pointers and ranges; it
 acquires fresh memory views after allocation and guest execution because either

@@ -1199,7 +1199,7 @@ pub const Module = struct {
             try output.section(6, payload.items());
             payload.clear();
         }
-        try payload.uleb(@intCast(self.exports.items.len + @as(usize, if (self.public_arena) 2 else 0) + @intFromBool(self.public_arena or options.export_memory or self.taskImportNamed("open") != null) + @intFromBool(options.export_function_table) + @as(usize, if (self.arena != null) 8 else 0) + @as(usize, if (roots_admitted) 3 else 0) + @intFromBool(roots_admitted and self.host_references != null)));
+        try payload.uleb(@intCast(self.exports.items.len + @as(usize, if (self.public_arena) 2 else 0) + @intFromBool(self.public_arena or options.export_memory or self.taskImportNamed("open") != null) + @intFromBool(options.export_function_table) + @as(usize, if (self.arena != null) 9 else 0) + @as(usize, if (roots_admitted) 3 else 0) + @intFromBool(roots_admitted and self.host_references != null)));
         for (self.exports.items) |item| {
             try payload.name(item.name);
             try payload.byte(if (item.global) 3 else 0);
@@ -1218,6 +1218,13 @@ pub const Module = struct {
             try payload.name("blot:reset");
             try payload.byte(0);
             try payload.uleb(code.function(if (roots_admitted) self.arena.?.root_public_reset else self.arena.?.reset) + import_count);
+        }
+        // Profilers instrument this raw allocator, including recycled blocks.
+        // It is not the ownership-publishing host allocation entry point.
+        if (self.arena) |arena| {
+            try payload.name("blot:allocation");
+            try payload.byte(0);
+            try payload.uleb(code.function(arena.allocate) + import_count);
         }
         if (roots_admitted) if (self.host_references) |references| {
             try payload.name("blot:rc_host_refs");

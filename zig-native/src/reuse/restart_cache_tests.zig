@@ -285,3 +285,29 @@ test "restart cache: a synchronous save over the limit is reported too" {
     try std.testing.expect(!fixture.file.save(io, null, &empty));
     try std.testing.expect(!fixture.file.readReport(io).?.over_limit);
 }
+
+test "restart cache: joined publication supersedes a detached writer before returning" {
+    if (!cache.detached_writes) return error.SkipZigTest;
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    var earlier = try Gate.init("old");
+    defer earlier.deinit();
+    earlier.output = "+old";
+    try std.testing.expectEqual(cache.Persisted.detached, fixture.file.persist(io, earlier.producer()));
+    _ = try earlier.writer();
+    try std.testing.expect(!fixture.file.settleWithin(io, 5));
+    var latest = try Gate.init("committed");
+    defer latest.deinit();
+    latest.output = "+output";
+    try latest.open(1);
+    try earlier.open(1);
+    try std.testing.expectEqual(cache.Persisted.written, fixture.file.persistJoined(io, latest.producer()));
+    // No settling helper: completion is part of the joined call's contract.
+    const checkpoint = fixture.published().?;
+    defer a.free(checkpoint);
+    try std.testing.expectEqualStrings("committed", checkpoint);
+    const output = try std.Io.Dir.cwd().readFileAlloc(io, fixture.file.output_path, a, .limited(cache.maximum_bytes));
+    defer a.free(output);
+    try std.testing.expectEqualStrings("committed+output", output);
+    for (fixture.file.partial_paths) |partial| try std.testing.expect(!Fixture.exists(partial));
+}

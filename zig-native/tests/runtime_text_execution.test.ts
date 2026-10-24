@@ -1,6 +1,55 @@
 import { strict as assert } from "node:assert";
 import { decodeText, encodeText } from "../../compiler/text.ts";
 import { compileAndRun } from "./compile_helpers.ts";
+import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
+import { instantiateGuest } from "../../compiler/guest.ts";
+
+// One-shot emission did not freeze dependency capability contracts and missed
+// this source/Core disagreement. Exercise the retained path used by Pen.
+Deno.test("retained text modules preserve literal capability shapes through edits and restart", async () => {
+  const root = new URL("../../", import.meta.url);
+  const directory = await Deno.makeTempDir({ dir: new URL("build/", root).pathname, prefix: "retained-text-" });
+  const entry = `${directory}/main.blot`;
+  const words = `${directory}/words.blot`;
+  const original = 'const words = fn value => if value then "Hi, 世界🙂" else ""\n';
+  await Deno.writeTextFile(words, original);
+  await Deno.writeTextFile(entry, `
+import * as text from "std/text"
+import * as words from "./words"
+entry const answer = fn () => text.concat (words.words #True) (text.format #False)
+`);
+  try {
+    for (const codegenTier of ["development", "optimized"] as const) {
+      const options = {
+        executable: Deno.args[0] ?? new URL("zig-native/zig-out/bin/blotc", root),
+        entry, prelude: new URL("std/prelude.blot", root), stdRoot: new URL("std/", root),
+        codegenTier, cacheDirectory: false as const,
+      };
+      const compiler = await createZigProjectCompiler(options);
+      let checkpoint: Uint8Array<ArrayBuffer>;
+      try {
+        for (const [source, expected] of [[original, "Hi, 世界🙂false"],
+          ['const words = fn value => if value then "x" else "\\n"\n', "xfalse"],
+          [original, "Hi, 世界🙂false"]]) {
+          const result = await compiler.build({ sources: { [words]: source } });
+          assert(result.success, JSON.stringify(result));
+          const guest = await instantiateGuest(result.bytes);
+          try { assert.equal(decodeText(guest.call("answer", null) as Uint32Array), expected); }
+          finally { guest.dispose(); }
+        }
+        checkpoint = await compiler.exportCheckpoint();
+      } finally { await compiler.dispose(); }
+      const restored = await createZigProjectCompiler({ ...options, checkpoint });
+      try {
+        const result = await restored.build();
+        assert(result.success, JSON.stringify(result));
+        const guest = await instantiateGuest(result.bytes);
+        try { assert.equal(decodeText(guest.call("answer", null) as Uint32Array), "Hi, 世界🙂false"); }
+        finally { guest.dispose(); }
+      } finally { await restored.dispose(); }
+    }
+  } finally { await Deno.remove(directory, { recursive: true }); }
+});
 
 Deno.test("runtime text literals, formatting, collections and host adapters preserve Unicode scalars", async () => {
   await compileAndRun(

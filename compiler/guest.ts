@@ -557,6 +557,11 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
       (version >= 3) !== (state[0] === 2 && state[1] === 2)
     ) throw new GuestError("invalid_abi", "Invalid ownership section");
     if (state[2] !== 1) {
+      // Optional raw-allocator identity for development instrumentation. Older
+      // modules remain valid; unknown exports and wrong export kinds still fail.
+      if (actualExports.some((entry) => entry.name === "blot:allocation")) {
+        declare("blot:allocation", "function");
+      }
       for (const counter of ["leases", "retains", "releases", "destroyed"]) {
         declare(`blot:rc_${counter}`, "global");
       }

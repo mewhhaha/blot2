@@ -212,12 +212,14 @@ const OpenProject = struct {
     /// Starts saving the committed revision. Where writes are detached, the
     /// writer holds the cache lock when this returns, so the caller can reply
     /// at once and a later open still waits for the complete file.
-    fn persist(self: *OpenProject, io: Io) void {
+    fn persist(self: *OpenProject, io: Io, joined: bool) void {
         // A restored revision is already what the cache holds.
         if (self.saved_revision == self.session.revisions or self.session.current == null) return;
         const file = &(self.cache_file orelse return);
         const encoding: CheckpointEncoding = .{ .session = &self.session, .compiler = file.compiler };
-        switch (file.persist(io, .{ .context = &encoding, .encode = CheckpointEncoding.encode })) {
+        const producer: restart_cache.Producer = .{ .context = &encoding, .encode = CheckpointEncoding.encode };
+        const result = if (joined) file.persistJoined(io, producer) else file.persist(io, producer);
+        switch (result) {
             .failed => {},
             .written, .detached => self.saved_revision = self.session.revisions,
         }
@@ -483,7 +485,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
             // Where writes are detached, the writer holds the cache lock before
             // the reply and encodes after it; a kill after the reply loses
             // nothing, since the next open waits for the writer.
-            if (opened.session.revisions == 1) opened.persist(io);
+            if (opened.session.revisions == 1) opened.persist(io, false);
             try frames.write(writer, metadata, payload);
         },
     }
@@ -648,7 +650,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
                 }
                 if (request.kind == .close) {
                     if (request.sources.len != 0 or request.assetSources.len != 0 or frame.payload().len != 0) return error.InvalidRequest;
-                    owner.persist(io);
+                    owner.persist(io, true);
                     try reply(a, writer, .{ .kind = "close", .id = request.id, .epoch = epoch, .revision = owner.session.revisions }, &.{});
                     return;
                 }

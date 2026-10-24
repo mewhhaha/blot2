@@ -93,7 +93,17 @@ const Builder = struct {
                 if (environment.get(value.a) == null) if (self.functions) |functions| if (functions.lookup(functions.context, ungrouped)) |header| return self.store.callable(self.allocator, header, 0);
                 return self.name(value.a, environment, false);
             },
-            .integer, .float, .string, .boolean, .unit => return 0,
+            .integer, .float, .boolean, .unit => return 0,
+            .string => {
+                // Runtime Text lowers to an Array U32. Preserve its scalar-row
+                // shape exactly as an authored array of integer literals does;
+                // frozen Core reconstructs that same product independently.
+                const count = std.unicode.utf8CountCodepoints(self.pool.get(value.a)) catch return error.Unavailable;
+                var children: [2048]u32 = undefined;
+                if (count > children.len) return error.CapabilityAnalysisLimit;
+                @memset(children[0..count], 0);
+                return self.store.aggregate(self.allocator, .product, children[0..count]);
+            },
             .constructor_ref => return self.store.append(self.allocator, .{ .tag = .wrapped }),
             .type_witness => return self.store.append(self.allocator, .{ .tag = .wrapped, .a = try self.expression(value.a, environment, depth + 1) }),
             .field => {

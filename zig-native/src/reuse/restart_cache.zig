@@ -222,6 +222,19 @@ pub const File = struct {
         }
         if (!held and !acquire(io, lock, .exclusive, wait_limit_ms)) return .failed;
         defer lock.unlock(io);
+        return self.writeLocked(io, lock, producer);
+    }
+    /// A graceful close publishes its latest revision before acknowledging.
+    /// Joining the previous writer and writing under the same exclusive lock
+    /// prevents a loader overtaking a detached writer queued behind that one.
+    pub fn persistJoined(self: *const File, io: Io, producer: Producer) Persisted {
+        const lock = self.openLock(io) orelse return .failed;
+        defer lock.close(io);
+        if (!acquire(io, lock, .exclusive, wait_limit_ms)) return .failed;
+        defer lock.unlock(io);
+        return self.writeLocked(io, lock, producer);
+    }
+    fn writeLocked(self: *const File, io: Io, lock: Io.File, producer: Producer) Persisted {
         var report: Report = .{};
         var written = true;
         var produced: ?[]u8 = null;
@@ -246,7 +259,7 @@ pub const File = struct {
     /// Requires the exclusive lock: only its holder touches partial files.
     fn publish(self: *const File, io: Io, part: Part, bytes: []const u8) bool {
         const cwd = Io.Dir.cwd();
-        const partial_path = self.partial_paths[@intFromEnum(part)];
+        const partial_path = self.partial_paths[@backingInt(part)];
         {
             const partial = cwd.createFile(io, partial_path, .{}) catch return false;
             defer partial.close(io);
@@ -306,7 +319,7 @@ pub const File = struct {
         return written;
     }
     fn publishRaw(self: *const File, part: Part, bytes: []const u8) bool {
-        const partial_path = self.partial_paths[@intFromEnum(part)];
+        const partial_path = self.partial_paths[@backingInt(part)];
         const flags: linux.O = .{ .ACCMODE = .WRONLY, .CREAT = true, .TRUNC = true, .CLOEXEC = true };
         const fd = linux.openat(linux.AT.FDCWD, partial_path, flags, 0o644);
         if (linux.errno(fd) != .SUCCESS) return false;

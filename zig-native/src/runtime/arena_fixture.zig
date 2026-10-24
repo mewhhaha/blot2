@@ -99,6 +99,7 @@ pub fn main(init: std.process.Init) !void {
 
 fn lifetimeFixtures(module: *wasm.Module, tracing: @import("fixture_tracing.zig").Tracing) !void {
     const arena = module.arena.?;
+    try module.exportFunction(arena.allocate, "raw_allocator_witness", .u32, .u32);
     // A larger-than-SROA temporary is borrowed through an interior address.
     // This loop contains no collection calls: bounded memory comes from the
     // ownership pass, including both normal and early-return paths.
