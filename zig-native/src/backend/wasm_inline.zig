@@ -1,4 +1,4 @@
-//! Expose small straight-line allocation producers to scalar replacement.
+//! Expose bounded scalar readers and allocation producers to scalar replacement.
 //! This consumes the complete direct callee body, already part of optimized
 //! body reuse identity. No source names or collection-specific calls participate.
 const std = @import("std");
@@ -227,8 +227,20 @@ pub fn expands(module: *const wasm.Module, id: u32) bool {
     return returnedParameter(module, id) != null or admitted(module, &module.functions.items[id]) or framed(module, id);
 }
 
+fn checkedReader(body: *const ir.Function) bool {
+    if (body.entry or !@import("scalar_consumer.zig").check(body)) return false;
+    var reference = false;
+    for (0..body.parameters.len) |parameter| {
+        if (parameter != body.provider_parameter and body.parameterRole(parameter) == .reference) reference = true;
+    }
+    if (!reference) return false;
+    for (body.instructions.items) |inst| if (inst.op == .i32_load or inst.op == .f32_load) return true;
+    return false;
+}
+
 fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
     const arena = module.arena orelse return false;
+    if (checkedReader(body)) return true;
     if (body.result != .i32 or body.codeLength() > 96 or body.codeLength() == 0) return false;
     if (body.parameters.len > 64 or body.locals.items.len > 64 - body.parameters.len) return false;
     const count = body.parameters.len + body.locals.items.len;
@@ -239,6 +251,7 @@ fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
     var writes = false;
     var calls = false;
     var forwarded_reader = false;
+    var forwarded_producer = false;
     for (body.instructions.items, 0..) |inst, i| switch (inst.op) {
         .local_get => if (inst.operand >= count or !defined[inst.operand]) {
             // A fresh call zeroes its locals. Do not reuse a loop's old value.
@@ -269,15 +282,25 @@ fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
             calls = true;
             if (inst.operand == arena.mark_acyclic) continue;
             if (!arena.isAllocation(inst.operand)) {
-                // A global callable can add one direct adapter between a
-                // structural argument and its scalar reader. Admit that
-                // adapter only when the target has the existing leaf-reader
-                // proof; the second bounded inline step exposes its loads.
-                if (forwarded_reader or inst.operand >= module.functions.items.len) return false;
+                // A callable may add one forwarding adapter to a checked
+                // scalar reader or allocation producer. The second bounded
+                // inline step exposes that leaf without widening its budget.
+                if (forwarded_reader or forwarded_producer or inst.operand >= module.functions.items.len) return false;
                 const target = &module.functions.items[inst.operand];
-                if (target.result_role != .scalar or target.result != body.result or !admitted(module, target)) return false;
-                for (target.instructions.items) |inner| if (inner.op == .call or inner.op == .call_indirect or inner.op == .call_import) return false;
-                forwarded_reader = true;
+                const producer = target.result_role == .reference and body.result_role == .reference;
+                if ((!producer and target.result_role != .scalar) or target.result != body.result) return false;
+                // Inspect the leaf before recursively asking for its facts.
+                // This bounds forwarding and rejects recursive call cycles.
+                var produces = false;
+                for (target.instructions.items) |inner| {
+                    if (inner.op == .call_indirect or inner.op == .call_import) return false;
+                    if (inner.op != .call) continue;
+                    if (!producer or (!arena.isAllocation(inner.operand) and inner.operand != arena.mark_acyclic)) return false;
+                    produces = produces or arena.isAllocation(inner.operand);
+                }
+                if ((producer and !produces) or !admitted(module, target)) return false;
+                forwarded_reader = !producer;
+                forwarded_producer = producer;
                 continue;
             }
             if (i == 0) return false;
@@ -299,7 +322,8 @@ fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
     // A small scalar reader of a checked reference parameter can be exposed
     // to caller-local scalar replacement. A freshly constructed record then
     // need not escape merely to pass its fields through this call.
-    return (allocations != 0 and allocations <= 4 and !forwarded_reader) or
+    return (allocations != 0 and allocations <= 4 and !forwarded_reader and !forwarded_producer) or
+        (allocations == 0 and forwarded_producer and !body.entry and !writes) or
         (allocations == 0 and !body.entry and body.result_role == .scalar and body.parameters.len != 0 and body.parameterRole(0) == .reference and (reads_reference or forwarded_reader) and !writes and body.codeLength() <= 48 and (!calls or forwarded_reader));
 }
 
@@ -333,6 +357,56 @@ fn scalarRecordReader(a: A) !void {
 test "direct callable adapter to scalar record reader exposes caller allocation to scalar replacement" {
     try scalarRecordReader(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, scalarRecordReader, .{});
+}
+
+fn forwardedNumericProducer(a: A) !void {
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    const arena = try module.ensureArena();
+    const producer = try module.addTypedFunction(&.{.i32}, .i32, .reference);
+    try module.setParameterRoles(producer, ir.packParameterRoles(&.{.scalar}));
+    const row = try module.addLocal(producer, .i32);
+    var fields: [9]u32 = undefined;
+    for (&fields, 0..) |*field, i| {
+        field.* = try module.addLocal(producer, .i32);
+        try module.emitSlice(producer, &.{ .{ .op = .local_get }, .{ .op = .i32_const, .operand = @intCast(i) }, .{ .op = .i32_add }, .{ .op = .local_set, .operand = field.* } });
+    }
+    var annotations: [ir.max_annotations]ir.Instruction = undefined;
+    try module.emitSlice(producer, ir.annotations(&.{}, .scalar, &annotations));
+    try module.emitSlice(producer, &.{ .{ .op = .i32_const, .operand = 36 }, .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = row } });
+    for (fields, 0..) |field, i| try module.emitSlice(producer, &.{ .{ .op = .local_get, .operand = row }, .{ .op = .local_get, .operand = field }, .{ .op = .i32_store, .operand = @intCast(i * 4) } });
+    try module.emit(producer, .{ .op = .local_get, .operand = row });
+    try std.testing.expect(module.functions.items[producer].codeLength() <= 96);
+    try std.testing.expect(admitted(&module, &module.functions.items[producer]));
+    const wrapper = try module.addTypedFunction(&.{ .i32, .i32, .i32 }, .i32, .reference);
+    try module.setParameterRoles(wrapper, ir.packParameterRoles(&.{ .reference, .scalar, .reference }));
+    try module.emitSlice(wrapper, &.{ .{ .op = .local_get, .operand = 1 }, .{ .op = .call, .operand = producer } });
+    try std.testing.expect(admitted(&module, &module.functions.items[wrapper]));
+    const caller = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+    try module.setParameterRoles(caller, ir.packParameterRoles(&.{.scalar}));
+    try module.emitSlice(caller, &.{ .{ .op = .i32_const }, .{ .op = .local_get }, .{ .op = .i32_const }, .{ .op = .call, .operand = wrapper }, .{ .op = .i32_load } });
+    var expanded = (try run(a, &module, &module.functions.items[caller])).?;
+    defer expanded.deinit(a);
+    var view = module.functions.items[caller];
+    view.instructions = expanded.instructions;
+    view.locals = expanded.locals;
+    var scalar = (try @import("wasm_sroa.zig").run(a, &module, &view)).?;
+    defer scalar.deinit(a);
+    for (scalar.instructions.items) |inst| if (inst.op == .call) try std.testing.expect(!arena.isAllocation(inst.operand));
+    // Forwarding is bounded at one leaf; recursive or effectful adapters stay calls.
+    module.functions.items[wrapper].instructions.items[1].operand = wrapper;
+    try std.testing.expect(!admitted(&module, &module.functions.items[wrapper]));
+    module.functions.items[wrapper].instructions.items[1].operand = producer;
+    const imported = try module.importFunction("host", "produce", &.{.i32}, .i32);
+    module.functions.items[producer].instructions.items[1] = .{ .op = .call_import, .operand = imported };
+    try std.testing.expect(!admitted(&module, &module.functions.items[wrapper]));
+    for (0..96) |_| try module.emit(producer, .{ .op = .nop });
+    try std.testing.expect(!admitted(&module, &module.functions.items[producer]));
+}
+
+test "numeric producer adapters expose scalar storage while rejecting recursive effectful and unbounded bodies" {
+    try forwardedNumericProducer(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, forwardedNumericProducer, .{});
 }
 
 // A bounded private scalar-result source callee may expose an environment
@@ -563,6 +637,14 @@ fn inlineAllocations(a: A, module: *const wasm.Module, source: *const ir.Functio
             if (facts.frames(module, inst.operand)) {
                 try emitFramed(a, module, &result, callee, base, source.parameters.len, facts);
                 continue;
+            }
+            if (checkedReader(callee)) {
+                const zeroes = @import("scalar_consumer.zig").zeroes(callee);
+                for (callee.locals.items, 0..) |machine, index| {
+                    if (zeroes & (@as(u64, 1) << @intCast(callee.parameters.len + index)) == 0) continue;
+                    try result.emit(a, if (machine == .f32) .f32_const else .i32_const, 0);
+                    try result.emit(a, .local_set, base + @as(u32, @intCast(callee.parameters.len + index)));
+                }
             }
             for (callee.instructions.items) |instruction| {
                 var copy = instruction;

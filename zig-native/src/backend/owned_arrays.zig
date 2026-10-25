@@ -7,6 +7,7 @@ const State = struct {
     first: core.BindingId = 0,
     second: core.BindingId = 0,
     consume: core.Id = 0,
+    first_consume: core.Id = 0,
     consumers: u32 = 0,
     last_read: core.Id = 0,
     escaped: bool = false,
@@ -78,6 +79,9 @@ pub const Proof = struct {
         }
         for (module.nodes, 0..) |node, i| {
             const id: core.Id = @intCast(i);
+            // Identity generation can share this storage even when the result
+            // escapes. Neither version may license an exclusive update.
+            if (@import("identity_array.zig").analyze(units, unit_id, id)) |plan| states[plan.binding].escaped = true;
             switch (node.tag) {
                 .update => if (receiver(units, unit_id, id)) |binding| {
                     consume(&states[binding], id);
@@ -244,7 +248,14 @@ pub const Proof = struct {
             if (consumed_refs[i]) continue;
             if (read_refs[i] != 0) states[ref.binding].last_read = @max(states[ref.binding].last_read, read_refs[i]) else states[ref.binding].escaped = true;
         }
+        // Two updates in disjoint arms consume one dynamic version. Keep
+        // reads conservative: both consumers must follow the last borrowed
+        // read, and aliases/escapes retain their ordinary rejection paths.
+        var alternative_budget: usize = 65536;
         for (states) |*state| {
+            if (state.consumers == 2 and state.last_read < @min(state.first_consume, state.consume) and
+                exclusiveConsumers(module, state.first_consume, state.consume, &alternative_budget))
+                state.consumers = 1;
             state.owned = (state.origin or state.transfer) and !state.escaped and state.consumers == 1 and state.last_read < state.consume;
             state.anchored = state.origin;
         }
@@ -295,6 +306,7 @@ pub const Proof = struct {
     }
 };
 fn consume(state: *State, id: core.Id) void {
+    if (state.consumers == 0) state.first_consume = id;
     state.consumers += 1;
     state.consume = id;
 }
@@ -579,6 +591,38 @@ fn consumedInside(module: *const core.Module, root: core.Id, consumer: core.Id, 
         else => false,
     };
 }
+fn withinBudget(module: *const core.Module, root: core.Id, consumer: core.Id, budget: *usize, depth: usize) bool {
+    if (root == 0 or consumer == 0 or depth >= 64 or budget.* == 0) return false;
+    budget.* -= 1;
+    if (root == consumer) return true;
+    const node = module.node(root);
+    return switch (node.tag) {
+        .block, .suite => blk: {
+            for (module.children(root)) |child| if (withinBudget(module, child, consumer, budget, depth + 1)) break :blk true;
+            break :blk false;
+        },
+        .bind => withinBudget(module, node.b, consumer, budget, depth + 1),
+        .return_ => withinBudget(module, node.a, consumer, budget, depth + 1),
+        .loop => withinBudget(module, module.loopInfo(root).body, consumer, budget, depth + 1),
+        .if_stmt, .match => if (branchBodies(module, root)) |branch|
+            withinBudget(module, branch.then, consumer, budget, depth + 1) or withinBudget(module, branch.otherwise, consumer, budget, depth + 1)
+        else
+            false,
+        else => false,
+    };
+}
+fn exclusiveConsumers(module: *const core.Module, first: core.Id, second: core.Id, budget: *usize) bool {
+    if (first == 0 or second == 0 or first == second) return false;
+    for (module.nodes, 0..) |_, i| {
+        if (budget.* == 0) return false;
+        budget.* -= 1;
+        if (branchBodies(module, @intCast(i))) |branch| {
+            if ((withinBudget(module, branch.then, first, budget, 0) and withinBudget(module, branch.otherwise, second, budget, 0)) or
+                (withinBudget(module, branch.otherwise, first, budget, 0) and withinBudget(module, branch.then, second, budget, 0))) return true;
+        }
+    }
+    return false;
+}
 fn excludesLater(module: *const core.Module, exit_id: core.Id, consumer: core.Id) bool {
     if (consumer <= exit_id) return false;
     const exit_ = module.node(exit_id);
@@ -603,6 +647,7 @@ fn receiver(units: []const core.Module, unit_id: u32, id: core.Id) ?core.Binding
     return ref.binding;
 }
 fn fresh(units: []const core.Module, unit_id: u32, id: core.Id, depth: usize) bool {
+    if (@import("identity_array.zig").analyze(units, unit_id, id) != null) return false;
     if (depth >= 32) return false;
     const module = &units[unit_id - 1];
     const node = module.node(id);
@@ -619,6 +664,9 @@ fn fresh(units: []const core.Module, unit_id: u32, id: core.Id, depth: usize) bo
         },
         .array_op => switch (module.arrayOperation(id)) {
             .fill, .generate, .set, .append, .prepend, .convert, .simd_store => true,
+            // Array slicing/concatenation always allocate a new outer buffer.
+            // List slices may share tree nodes and keep the conservative path.
+            .slice, .concat => module.types.node(node.ty).tag == .array,
             else => false,
         },
         .update => true,

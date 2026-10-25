@@ -272,6 +272,27 @@ See [sources, sizes and methodology](benchmarks/idiomatic/README.md),
 [compiler qualification](zig-native/CT116_QUALIFICATION.md). Reproduce with
 `deno task bench:idiomatic --rounds 5 --samples 31 --out build/bench/my-run`.
 
+## Runtime boundary benchmarks
+
+The runtime repairs remove temporary numeric boxes across bounded constructor
+and selected-reader paths, load indexed scalar fields directly, and share exact
+identity-generated immutable arrays. The same-engine release comparison uses 31
+alternating samples on the host described above:
+
+| Kernel                                            | CT116 milliseconds | Candidate milliseconds | Retired objects before → after |
+| ------------------------------------------------- | -----------------: | ---------------------: | -----------------------------: |
+| Selected nine-field reader, 2000 rows × 100 scans |            15.4794 |                 1.1187 |                    404,001 → 1 |
+| Indexed scalar read, 2000 rows × 100 scans        |             2.0659 |                 0.1819 |                      4,001 → 1 |
+| Imported nine-field construction, 2000 rows       |             0.1526 |                 0.0060 |                      4,001 → 1 |
+| Reference scratch, 512 closures × 2000 iterations |            26.2337 |                 0.0486 |                    6,513 → 513 |
+
+These are isolated kernels, with compilation and code-size costs reported
+separately. The combined module grows 6.3%; unknown callbacks retain owned
+materialization. Optional variants and record/map/flatten fusion remain open.
+See
+[qualification and raw measurements](zig-native/RUNTIME_BOUNDARIES_QUALIFICATION.md)
+and [reproduction commands](benchmarks/runtime-boundaries/README.md).
+
 ## Structured tasks
 
 Spark `*(function argument)` starts an invocation in the checked enclosing task

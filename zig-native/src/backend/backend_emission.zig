@@ -3507,28 +3507,27 @@ pub const Owner = struct {
     fn packedProjection(self: *Emitter, id: core.Id, depth: usize) Error!bool {
         const g = self.generator;
         const source = g.unit(self.unit_id);
-        const projected = source.node(id);
-        const value = source.node(projected.a);
+        var origin = source.node(id).a;
+        var remaining: usize = 16;
+        while (source.node(origin).tag == .project and remaining != 0) : (remaining -= 1) origin = source.node(origin).a;
+        const value = source.node(origin);
         if (value.tag != .array_op) return false;
-        const op = source.arrayOperation(projected.a);
+        const op = source.arrayOperation(origin);
         if (op != .get and op != .cursor_value) return false;
-        const operands = source.children(projected.a);
+        const operands = source.children(origin);
         const input = try self.codeLayout(source.typeOf(operands[0]), source.span(id));
         const collection = if (op == .cursor_value) g.representations.store.node(input).a else input;
         const words = try g.collectionRowWords(collection);
         if (words == 0) return false;
         const row = g.representations.store.node(collection).a;
-        if (packed_layout.rowWords(&g.representations.store, row) == 0) return false;
-        const metadata = source.projection(projected.b);
-        if (metadata.nominal.decl != 0) return false;
-        const field: u32 = if (g.representations.store.node(row).tag == .record) blk: {
-            const fields = g.representations.store.children(row);
-            for (0..words) |i| if (fields[i * 2] == metadata.field) break :blk @intCast(i);
-            return false;
+        const field: u32 = if (try g.nestedRow(row)) |plan| blk: {
+            const offset = row_projection_uses.numericExpressionOffset(source, id, origin, &g.representations.store, &plan) orelse return false;
+            break :blk offset / 4;
         } else blk: {
-            const variants = source.projectionVariants(projected.b);
-            if (variants.len != 1 or variants[0].field >= words) return false;
-            break :blk variants[0].field;
+            const projected = source.node(id);
+            if (origin != projected.a) return false;
+            const offset = row_projection_uses.fieldOffset(source, projected.b, &g.representations.store, row) orelse return false;
+            break :blk offset / 4;
         };
         var container = try self.capture(operands[0], depth);
         const cursor = if (op == .cursor_value) container else null;
@@ -7015,6 +7014,7 @@ pub const Owner = struct {
             }
         }
         const arrow = prepared.arrow.?;
+        if (try self.selectedNumericCall(id, arrow, depth)) return;
         g.evaluator.counters.prepared_indirect_calls += 1;
         const callee = try self.capture(n.a, depth);
         const argument = try self.capture(n.b, depth);
@@ -7029,6 +7029,94 @@ pub const Owner = struct {
         try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
         try g.module.emit(self.function_id, ir.callResult(g.layoutRole(arrow.result)));
         try self.emit(.call_indirect, signature);
+    }
+    // These are guarded optimization candidates, not dispatch authority. A
+    // changed capture, unresolved alias or unlisted target keeps the original
+    // indirect call. No closure descriptor or public calling convention changes.
+    fn numericCallTargets(self: *Emitter, id: core.Id, targets: *[4]u32, count: *usize, budget: *usize) Error!void {
+        if (id == 0 or budget.* == 0 or count.* == targets.len or self.body == null) return;
+        budget.* -= 1;
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const node = source.node(id);
+        if (node.tag == .if_value) {
+            try self.numericCallTargets(node.b, targets, count, budget);
+            return self.numericCallTargets(node.c, targets, count, budget);
+        }
+        var template: Template = undefined;
+        if (node.tag == .closure) {
+            if (!self.body.?.entries.contains(id) or self.body.?.get(id) != .template) return;
+            const prepared = self.body.?.get(id).template;
+            if (prepared.static_key != null) return;
+            template = prepared.metadata;
+        } else if (node.tag == .reference) {
+            const reference = source.reference(id);
+            if (reference.unit == 0 or reference.unit == self.unit_id) {
+                const binding = source.binding(reference.binding);
+                if (binding.kind != .global and binding.kind != .external) return self.numericCallTargets(binding.initializer, targets, count, budget);
+            }
+            if (!self.isCallableTemplate(id)) return;
+            const owner = if (reference.unit == 0) self.unit_id else reference.unit;
+            const body = g.unit(owner).body(reference.binding) orelse return;
+            if (!body.is_function) return;
+            template = try self.newTemplate(id);
+        } else return;
+        const ty = try self.codeLayout(source.typeOf(id), source.span(id));
+        if (g.representations.store.node(ty).tag != .function) return;
+        const target = try self.templateFunction(template, ty, false);
+        for (targets[0..count.*]) |existing| if (existing == target) return;
+        targets[count.*] = target;
+        count.* += 1;
+    }
+    fn selectedNumericCall(self: *Emitter, id: core.Id, arrow: resolved_call.Arrow, depth: usize) Error!bool {
+        const g = self.generator;
+        if (!g.inline_named or self.static_values.count() != 0 or g.layoutRole(arrow.result) != .scalar) return false;
+        const node = g.unit(self.unit_id).node(id);
+        const view = self.borrowedRowArgument(node.b) orelse return false;
+        if (view.row != arrow.parameter) return false;
+        var targets: [4]u32 = undefined;
+        var count: usize = 0;
+        var budget: usize = 32;
+        try self.numericCallTargets(node.a, &targets, &count, &budget);
+        if (count == 0) return false;
+        const signature = try g.closureSignature(arrow.parameter, arrow.result);
+        for (targets[0..count]) |target| if (g.module.functions.items[target].signature != signature) return false;
+        const callee = try self.capture(node.a, depth);
+        const selector = try self.temporary(.i32);
+        try self.emit(.local_get, callee);
+        try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
+        try self.emit(.local_set, selector);
+        for (targets[0..count]) |target| {
+            try self.emit(.local_get, selector);
+            try self.referenceConstant(target, .callable_function);
+            try self.emit(.i32_eq, 0);
+            try self.emit(.if_, @backingInt(g.representations.store.machine(arrow.result)));
+            self.labels += 1;
+            // Only a borrowed row read is delayed into this arm. Its scalar
+            // fields are immutable and the enclosing collection stays live.
+            // Each arm owns its materialization; SROA can erase an admitted
+            // reader's boxes without changing the unknown target fallback.
+            const argument = try self.capture(node.b, depth);
+            try self.emit(.local_get, callee);
+            try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
+            try self.emit(.local_get, argument);
+            try self.providerHead();
+            try self.emit(.call, target);
+            try self.emit(.else_, 0);
+        }
+        const argument = try self.capture(node.b, depth);
+        try self.emit(.local_get, callee);
+        try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
+        try self.emit(.local_get, argument);
+        try self.providerHead();
+        try self.emit(.local_get, selector);
+        try g.module.emit(self.function_id, ir.callResult(g.layoutRole(arrow.result)));
+        try self.emit(.call_indirect, signature);
+        for (0..count) |_| {
+            self.labels -= 1;
+            try self.emit(.end, 0);
+        }
+        return true;
     }
     fn prepareResourceScope(self: *Emitter, id: core.Id) Error!@FieldType(Plan, "resource_scope") {
         const g = self.generator;
@@ -9510,6 +9598,10 @@ pub const Owner = struct {
         if (depth >= 1024) return g.fail(self.unit_id, id, .complexity);
         const n = unit_.node(id);
         if (n.tag == .reference and unit_.types.node(n.ty).tag == .erased_proof) return;
+        if (g.inline_named) if (@import("identity_array.zig").analyze(g.units, self.unit_id, id)) |plan| {
+            if (g.artifacts) |artifacts| for (plan.dependencies[0..plan.dependency_count]) |target| try artifacts.readInlineBody(target);
+            return self.expression(plan.source, depth + 1);
+        };
         switch (n.tag) {
             .resource_acquire => try self.resourceAcquire(id, depth),
             .resource_release => try self.resourceRelease(id, depth),

@@ -195,11 +195,12 @@ entry const match_read = fn (n: U32) -> F32 => do:
       // Retains stay constant with size: no copy publishes a new version.
       const retains = new Map<string, number>();
       for (const n of [8, 64, 512]) {
-        // Two arrays and the generator's environment; a copy adds one per i.
+        // Two arrays; scalar-reader inlining also removes the direct
+        // generator environment. A copied update adds one per iteration.
         const cases: [string, number, number][] = [
           ["inlined", (n - 1) * 0.5 + 0.25, 1],
           ["called", called(n), 1],
-          ["generated", 3 * (n - 1), 3],
+          ["generated", 3 * (n - 1), 2],
           ["mapped", 3 * (n - 1), 3],
           ["local", 2, 1],
           ["match_read", 2, 1],
@@ -207,7 +208,7 @@ entry const match_read = fn (n: U32) -> F32 => do:
         for (const [name, expected, allocations] of cases) {
           const observed = run(name, n);
           equal(observed.result, expected);
-          equal(observed.destroyed, allocations);
+          if (observed.destroyed !== allocations) throw new Error(`${name}(${n}): expected ${allocations} retirements, observed ${observed.destroyed}`);
           retains.set(name, retains.get(name) ?? observed.retains);
           equal(observed.retains, retains.get(name));
         }
@@ -317,4 +318,46 @@ entry const indexed = fn (n: U32) => do:
       }
     },
   );
+});
+
+Deno.test("fresh copies and disjoint writes preserve sources and retained branch snapshots", async () => {
+  await compileAndRun(`
+entry const sliced = fn (count: U32) => do:
+  let source = @array.generate count (fn i => i)
+  let values = @array.slice source 0 count
+  for i in 0 .. count:
+    values[i] := self + 1
+  break #[source[0], source[count - 1], values[0], values[count - 1]]
+entry const branched = fn (count: U32) => do:
+  let values = @array.fill count 0
+  for i in 0 .. count:
+    if i % 2 == 0:
+      values[i] := i + 1
+    else:
+      values[i] := i + 3
+  break values
+entry const retained = fn (flag: Bool) => do:
+  let values = #[10, 20]
+  let previous = values
+  if flag:
+    values[0] := 1
+  else:
+    values[0] := 3
+  break #[previous[0], previous[1], values[0], values[1]]
+entry const nested_slice = fn (value: U32) => do:
+  let inner = #[value]
+  let source = #[inner, inner]
+  let values = @array.slice source 0 2
+  values[0][0] := value + 1
+  break #[inner[0], source[0][0], source[1][0], values[0][0], values[1][0]]
+`, (guest) => {
+    for (const count of [1, 32, 4096, 20020]) {
+      equal([...guest.call("sliced", count) as Uint32Array].join(","), `0,${count - 1},1,${count}`);
+      const values = guest.call("branched", count) as Uint32Array;
+      for (let i = 0; i < count; i++) equal(values[i], i + (i % 2 === 0 ? 1 : 3));
+    }
+    equal([...guest.call("retained", true) as Uint32Array].join(","), "10,20,1,20");
+    equal([...guest.call("retained", false) as Uint32Array].join(","), "10,20,3,20");
+    equal([...guest.call("nested_slice", 9) as Uint32Array].join(","), "9,9,9,10,9");
+  });
 });

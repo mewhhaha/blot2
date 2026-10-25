@@ -1,14 +1,27 @@
 # Open issue triage
 
-## Current assessment, 25 October 2026
+## Repair status
 
-Eleven issues are open: existing #25 and #27, plus nine runtime performance,
-measurement and memory-contract reports (#28–#36). Keep all eleven open. The new
-reports describe distinct boundaries; none of this investigation establishes a
-correctness failure or requires a language syntax change. The first repair
-should be **#31**, followed by the construction and call boundaries in **#30 and
-#29**. A small first slice of **#36** should support the ownership and cycle
-investigations without blocking those concrete fixes.
+The first repair batch fixes #29, #30, #31 and #34, with permanent native/Wasm
+regression laws and a public alternating benchmark. The complete release gate,
+zero-finding Zig lint and application compile-cost screen pass; these four
+issues are ready for closure after the fixes reach main. See
+[qualification and measurements](zig-native/RUNTIME_BOUNDARIES_QUALIFICATION.md).
+
+#28, #32, #33, #35 and #36 remain separate open design, representation and
+measurement work. The existing #25/#27 programs also remain open. The original
+triage below records the baseline before these repairs.
+
+## Initial assessment, 25 October 2026
+
+At initial triage, eleven issues were open: existing #25 and #27, plus nine
+runtime performance, measurement and memory-contract reports (#28–#36). The
+initial recommendation was to keep all eleven open pending implemented fixes.
+The new reports describe distinct boundaries; none of this investigation
+establishes a correctness failure or requires a language syntax change. The
+first repair should be **#31**, followed by the construction and call boundaries
+in **#30 and #29**. A small first slice of **#36** should support the ownership
+and cycle investigations without blocking those concrete fixes.
 
 This assessment includes source review and 28 executed cases on the qualified
 [CT116 release compiler](zig-native/CT116_QUALIFICATION.md), SHA-256

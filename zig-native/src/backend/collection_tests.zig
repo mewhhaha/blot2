@@ -1098,3 +1098,34 @@ test "linear cursor directory reference exits preserve owners through every allo
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, collectionIterationEmission, .{ &units, null, result.bytes });
     try std.testing.expectEqual(before, @import("../check/core_snapshot_tests.zig").stamp(module));
 }
+
+fn identityArrayFailures(a: std.mem.Allocator, module: *const core.Module) !void {
+    var proof = try ownership.Proof.init(a, &.{module.*}, 1);
+    defer proof.deinit(a);
+    for (proof.updates) |admitted| try std.testing.expect(!admitted);
+    var result = try @import("core_backend.zig").compile(a, &.{module.*}, 1);
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic == null);
+}
+test "identity generation shares immutable storage without granting either alias exclusive ownership" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\const generate = fn count => fn callback => @array.generate count callback
+        \\entry const run = fn (count: U32) => do:
+        \\  let saved = generate count (fn index => index)
+        \\  let copied = generate (@array.length saved) (fn index => @array.get saved index)
+        \\  saved[0] := 9
+        \\  copied[1] := 8
+        \\  break @u32.add saved[1] copied[0]
+    );
+    defer module.deinit(a);
+    const stamp = @import("../check/core_snapshot_tests.zig").stamp(module);
+    var admitted: usize = 0;
+    for (0..module.nodes.len) |id| if (@import("identity_array.zig").analyze(&.{module}, 1, @intCast(id)) != null) {
+        admitted += 1;
+    };
+    try std.testing.expectEqual(@as(usize, 1), admitted);
+    try identityArrayFailures(a, &module);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, identityArrayFailures, .{&module});
+    try std.testing.expectEqual(stamp, @import("../check/core_snapshot_tests.zig").stamp(module));
+}

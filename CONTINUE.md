@@ -1,5 +1,25 @@
 # Continue here
 
+The runtime repair batch fixes #29/#30/#31/#34 and is correctness-qualified. See
+[the repair report](zig-native/RUNTIME_BOUNDARIES_QUALIFICATION.md) and
+[issue status](ISSUE_TRIAGE.md). All 2,601 native laws, 1,668 release guests, 48
+smoke tests and 57 tooling tests pass, with exhaustive allocation failures and
+zero Zig lint findings. The prior frontend/benchmark work is committed as
+`9ff812b`; the runtime commit includes the previously pending owned-array
+branch/slice/concat changes. No source work remains excluded from this batch.
+
+Release kernel measurements remove per-row boxes, unused indexed loads and
+identity-copy reference traffic. The gdev three-pair screen is 6.852 s fresh,
+3.142 s literal edit and 5.491 s body edit; ordinary edits remain well above one
+second. #28/#32/#33/#35/#36 and the broader #25/#27 programs remain open. CT110
+remains installed locally. Preserve unrelated untracked build directories.
+
+## Historical checkpoints
+
+The entries below record their original qualification and publication state. The
+former exclusions and no-commit/no-push notes are superseded by the current
+runtime batch above.
+
 CT116 is correctness-qualified. Requirement dependencies, immutable imported
 sharing metadata, indexed membership and four-worker fresh module checking are
 implemented. Fresh profiled frontend time falls from 1.600 to 1.036 s; checking

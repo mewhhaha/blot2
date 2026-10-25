@@ -239,3 +239,41 @@ test "a borrowed element read keeps nested containers shared" {
         \\
     ));
 }
+
+test "exclusive owned arrays keep fresh slice and concat buffers while preserving source aliases" {
+    const a = std.testing.allocator;
+    for ([_][]const u8{ "@array.slice source 0 count", "@array.concat source source" }) |allocation| {
+        const source = try a.print(
+            \\entry const run = fn (count: U32) => do:
+            \\  let source = @array.fill count 7
+            \\  let values = {s}
+            \\  for i in 0 .. count:
+            \\    values[i] := i
+            \\  break (source, values)
+            \\
+        , .{allocation});
+        defer a.free(source);
+        try std.testing.expectEqual(@as(usize, 1), try admittedUpdates(a, source));
+    }
+}
+
+test "exclusive owned arrays admit disjoint writes but reject retained predecessors" {
+    const a = std.testing.allocator;
+    for ([_]bool{ false, true }) |retained| {
+        const source = try a.print(
+            \\entry const run = fn (count: U32) => do:
+            \\  let values = @array.fill count 0
+            \\  for i in 0 .. count:
+            \\    {s}
+            \\    if @u32.eq (@u32.rem i 2) 0:
+            \\      values[i] := @u32.add i 1
+            \\    else:
+            \\      values[i] := @u32.add i 3
+            \\    {s}
+            \\  break values
+            \\
+        , .{ if (retained) "let previous = values" else "", if (retained) "use @array.length previous" else "" });
+        defer a.free(source);
+        try std.testing.expectEqual(@as(usize, if (retained) 0 else 2), try admittedUpdates(a, source));
+    }
+}

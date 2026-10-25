@@ -228,8 +228,12 @@ leaf caches. Direct loops walk pending subtrees with a bounded private stack
 that roots the original collection. Scalar-only row uses and flat tuple bindings
 can read private leaf views; crossing rows use a scoped scalar buffer. Escaping
 rows keep owned extraction. A bounded direct-call expansion pass exposes
-ordinary allocation producers to scalar replacement. Generic iterator
-step/cursor allocation remains a separate limit.
+ordinary allocation producers and their forwarding wrappers to scalar
+replacement. Bounded selected readers use guarded direct calls and retain the
+owned indirect fallback. Exact identity-generated arrays share immutable
+storage; emission and uniqueness analysis consume the same structural proof. See
+[the runtime boundary report](RUNTIME_BOUNDARIES_QUALIFICATION.md). Generic
+iterator step/cursor allocation remains a separate limit.
 
 ## Limits and measurement
 

@@ -36,12 +36,13 @@ parents and preserving constructor tags and reference roles. No borrowed
 interior address becomes a source value. F32 words move as raw bits.
 
 A loop may read scalar fields directly from packed storage when checked use
-analysis admits the complete projection path. This follows nominal and
-structural nesting and forwards the view to a known immediate reader only when
-its body passes the same check. Unknown calls materialize an owned value. Values
-saved after a loop, deferred captures, non-scalar subobjects and unproved uses
-keep normal ownership. The original collection remains the owner of every
-borrowed physical read.
+analysis admits the complete projection path. Indexed scalar reads use the same
+physical-path proof, preserving bounds and evaluation order without loading the
+other fields. This follows nominal and structural nesting and forwards the view
+to a known immediate reader only when its body passes the same check. Unknown
+calls materialize an owned value. Values saved after a loop, deferred captures,
+non-scalar subobjects and unproved uses keep normal ownership. The original
+collection remains the owner of every borrowed physical read.
 
 Generated rows use ordinary cleanup scopes in batches of at most 32. After a
 batch has copied its scalar words, its temporary object graphs can be retired.
@@ -55,6 +56,15 @@ scalar leaf, capped at 128 nodes, with a separate 128-visit layout proof.
 Ordinary inline limits remain unchanged. In particular, a one-word nominal
 wrapper does not force unrelated helpers to inline. The optimizer still decides
 whether exposed allocations disappear.
+
+The runtime IR also admits one forwarding producer wrapper under its existing
+96-instruction/64-byte-allocation bounds. A runtime-selected reader with up to
+four recoverable targets can use guarded direct paths, with its original
+function selector, captured environment and an owned indirect fallback. Bounded
+scalar readers may contain internal branches; inlining initializes any local
+that could otherwise retain a previous activation's value. The public boxed ABI
+and unknown-target behavior remain unchanged. See the
+[runtime boundary qualification](RUNTIME_BOUNDARIES_QUALIFICATION.md).
 
 ## Host boundaries and guarantees
 

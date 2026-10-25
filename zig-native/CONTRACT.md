@@ -614,12 +614,14 @@ edits use the same checked stride. Constant serialization matches physical
 record field names and nominal payloads. Observable extraction reconstructs an
 owned object tree, with children initialized before parents; no interior pointer
 escapes. A complete checked scalar projection path may borrow a packed row,
-including through a known immediate reader. Unknown calls and escaping values
-materialize ordinary owned values. Scalar replacement keeps its own proof.
-Generated temporary rows retire in normal root scopes of at most 32 rows, after
-scalar words have been copied; older captures and destination storage remain
-owned outside that scope. Full and partial batches preserve callback order and
-failure cleanup.
+including through checked indexing and a known immediate reader. Up to four
+recoverable selected-reader targets may receive guarded direct calls with the
+original selector/environment and an owned indirect fallback. Unknown calls and
+escaping values materialize ordinary owned values. Scalar replacement keeps its
+own proof. Generated temporary rows retire in normal root scopes of at most 32
+rows, after scalar words have been copied; older captures and destination
+storage remain owned outside that scope. Full and partial batches preserve
+callback order and failure cleanup.
 
 Raw word copies preserve floating-point bits. List descriptors and tree ranges
 count storage words; typed emission converts logical counts and positions and
@@ -1578,3 +1580,14 @@ whole frame length and encoded metadata are validated before either candidate
 commits. Both commits retain segment owners through the final flush; post-commit
 IO failure remains terminal. The wire format and binary offsets are unchanged;
 no combined payload-sized allocation is required on the asset path.
+
+## Identity-generated arrays
+
+`identity_array.zig` recognizes exact length/index generation over one immutable
+local or parameter, including bounded, saturated forwarding wrappers. Emission
+may share the source array, while recording every wrapper body as a retained
+code dependency. The same proof prevents treating the result as fresh storage
+and prevents exclusive mutation of the source. Escaping aliases, captured
+callbacks, suspension and nested edits retain ordinary counted ownership and
+snapshot semantics. Different counts, indices, effectful bodies and exhausted
+proof bounds retain ordinary generation. No global region reset participates.

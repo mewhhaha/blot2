@@ -145,3 +145,12 @@ both compilers; `--candidate-frontend-workers N` changes only the candidate.
 Leave the baseline option omitted when comparing against an older compiler that
 does not recognize the new flag. These options are separate from evaluator
 semantic workers and optimizer workers.
+
+## Runtime representation boundaries
+
+`deno run -A scripts/bench/runtime_boundaries.ts --baseline OLD/blotc
+--candidate NEW/blotc`
+compares the 28 public numeric-row and reference-scratch cases. It checks
+runtime ownership budgets and records alternating samples, fresh compilation
+costs, output sizes and input hashes. See
+[the methodology](../../benchmarks/runtime-boundaries/README.md).

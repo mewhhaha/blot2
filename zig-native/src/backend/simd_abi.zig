@@ -593,6 +593,10 @@ fn workerScenario(a: A, scenario: usize) !void {
     try module.setParameterRoles(sum, ir.packParameterRoles(&.{ if (scenario == 2) .value else .reference, .reference }));
     try module.setProviderParameter(sum, 1);
     try module.emitSlice(sum, &.{ .{ .op = .local_get }, .{ .op = .f32_load }, .{ .op = .local_get }, .{ .op = .f32_load, .operand = 12 }, .{ .op = .f32_add } });
+    // A runtime bias keeps this reader outside pure-reader inlining, so this
+    // law continues exercising vector workers, spills and boxed table calls.
+    const bias = try module.addGlobal(.f32, 0, true);
+    try module.emitSlice(sum, &.{ .{ .op = .global_get, .operand = bias }, .{ .op = .f32_add } });
     if (scenario == 6) try module.emitSlice(sum, &.{ .{ .op = .local_get }, .{ .op = .local_get, .operand = 1 }, .{ .op = .call, .operand = sum }, .{ .op = .f32_add } });
     if (scenario == 7) try module.emitSlice(sum, &.{ .{ .op = .local_get }, .{ .op = .f32_load, .operand = 16 }, .{ .op = .f32_add } });
     if (scenario == 4) try module.table_functions.append(a, sum);

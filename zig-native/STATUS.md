@@ -1,5 +1,15 @@
 # Zig compiler status
 
+The [qualified runtime repairs](RUNTIME_BOUNDARIES_QUALIFICATION.md) fix
+#29/#30/#31/#34: bounded selected-reader paths and forwarded producers remove
+numeric row boxes, indexed projections load only the requested field, and
+identity-generated arrays share immutable storage with preserved ownership. The
+complete gate passes 2,601 native laws and 1,668 release guests, including the
+previously pending owned-array work. The
+[root README](../README.md#runtime-boundary-benchmarks) records runtime results
+and code-size/compile-cost tradeoffs. Broader variants, fusion, cycle
+attribution and collector-free contracts remain open.
+
 The [CT116 frontend update](CT116_QUALIFICATION.md) adds requirement dependency
 reuse, immutable imported sharing metadata, indexed inference membership and
 four-worker checking of independent fresh modules. `frontendWorkers` /
@@ -7,8 +17,8 @@ four-worker checking of independent fresh modules. `frontendWorkers` /
 cutoff path. Canonical imported graphs are still copied. The
 [root README](../README.md#idiomatic-blot-and-rust-benchmarks) includes eighteen
 idiomatic Blot/Rust compile-time and same-engine Wasm runtime benchmarks. CT110
-remains installed; preserved concurrent array work is outside the frozen CT116
-qualification.
+remains installed. The former concurrent array work is included in the later
+runtime repair qualification linked above.
 
 The [CT114 frontend changes](CT114_QUALIFICATION.md) reduce checking allocation
 requests by 27.0% and requested bytes by 17.6%. The instrumented frontend median

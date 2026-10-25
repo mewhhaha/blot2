@@ -26,15 +26,17 @@ fn childAt(plan: *const numeric_rows.Plan, owner: u8, offset: u32) ?Position {
     return null;
 }
 
-fn numericPosition(source: *const core.Module, id: core.Id, binding: core.BindingId, layouts: *const layout.Store, plan: *const numeric_rows.Plan, depth: usize) ?Position {
+const Origin = union(enum) { binding: core.BindingId, expression: core.Id };
+fn numericPosition(source: *const core.Module, id: core.Id, origin: Origin, layouts: *const layout.Store, plan: *const numeric_rows.Plan, depth: usize) ?Position {
     if (id == 0 or depth >= 16) return null;
+    if (origin == .expression and id == origin.expression) return .{ .storage = 0 };
     const node = source.node(id);
     if (node.tag == .reference) {
         const ref = source.reference(id);
-        return if ((ref.unit == 0 or ref.unit == source.unit) and ref.binding == binding) .{ .storage = 0 } else null;
+        return if (origin == .binding and (ref.unit == 0 or ref.unit == source.unit) and ref.binding == origin.binding) .{ .storage = 0 } else null;
     }
     if (node.tag != .project) return null;
-    const parent = numericPosition(source, node.a, binding, layouts, plan, depth + 1) orelse return null;
+    const parent = numericPosition(source, node.a, origin, layouts, plan, depth + 1) orelse return null;
     if (parent != .storage) return null;
     var owner = parent.storage;
     var shape = layouts.node(plan.storage[owner].layout);
@@ -63,7 +65,14 @@ fn numericPosition(source: *const core.Module, id: core.Id, binding: core.Bindin
 /// Only a complete scalar projection chain may borrow packed storage. A
 /// projected subobject or a bare value still needs its owned representation.
 pub fn numericOffset(source: *const core.Module, id: core.Id, binding: core.BindingId, layouts: *const layout.Store, plan: *const numeric_rows.Plan) ?u32 {
-    const position = numericPosition(source, id, binding, layouts, plan, 0) orelse return null;
+    const position = numericPosition(source, id, .{ .binding = binding }, layouts, plan, 0) orelse return null;
+    return if (position == .leaf) @as(u32, position.leaf) * 4 else null;
+}
+
+/// An indexed row uses the same checked projection path as a borrowed loop
+/// row. The caller retains evaluation and bounds checks at the exact origin.
+pub fn numericExpressionOffset(source: *const core.Module, id: core.Id, origin: core.Id, layouts: *const layout.Store, plan: *const numeric_rows.Plan) ?u32 {
+    const position = numericPosition(source, id, .{ .expression = origin }, layouts, plan, 0) orelse return null;
     return if (position == .leaf) @as(u32, position.leaf) * 4 else null;
 }
 
@@ -144,7 +153,15 @@ const Proof = struct {
             .bind => return node.a != self.binding and self.visit(node.b, depth + 1),
             .construct => return self.visit(node.b, depth + 1),
             .return_, .force, .result_associated => return self.visit(node.a, depth + 1),
-            .scalar, .associated, .logical, .apply, .record_merge => return self.visit(node.a, depth + 1) and self.visit(node.b, depth + 1),
+            .scalar, .associated, .logical, .record_merge => return self.visit(node.a, depth + 1) and self.visit(node.b, depth + 1),
+            .apply => {
+                if (self.isRow(node.b)) {
+                    const arrow = self.source.types.node(self.source.typeOf(node.a));
+                    if (arrow.tag != .function or self.source.types.node(arrow.a).tag == .demand) return false;
+                    return self.visit(node.a, depth + 1);
+                }
+                return self.visit(node.a, depth + 1) and self.visit(node.b, depth + 1);
+            },
             .if_value, .if_stmt => {
                 for (self.source.branchMerges(id)) |merge| {
                     if (merge.then_binding == self.binding or merge.else_binding == self.binding) return false;

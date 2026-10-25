@@ -4,12 +4,13 @@ Prepared 23 October 2026 from current main `93bc8d4`, the preserved candidate in
 `/workspace/blot2`, the task index, and GitHub issues #25–#27. This is an
 execution plan; no implementation or qualification is claimed by its creation.
 
-[The current issue triage](ISSUE_TRIAGE.md) covers all eleven open issues,
-including the 25 October runtime reports #28–#36. It recommends the indexed-read
-repair first, followed by numeric construction/call boundaries and executed cost
-attribution. The original 23 October triage is retained there as history;
-cold-start phase attribution and allocation-free contract research remain
-separate tracks.
+[The current issue triage](ISSUE_TRIAGE.md) covers the original eleven issues,
+including the 25 October runtime reports #28–#36. The
+[qualified runtime batch](zig-native/RUNTIME_BOUNDARIES_QUALIFICATION.md) fixes
+#29/#30/#31/#34 with complete native/release-guest qualification and measured
+kernel improvements. #28/#32/#33/#35/#36 and the broader #25/#27 programs remain
+open. Cold-start attribution, tagged numeric storage, record-pipeline fusion,
+cycle-scan reductions and collector-free contracts are separate remaining work.
 
 ## Execution checkpoint, 24 October 2026
 

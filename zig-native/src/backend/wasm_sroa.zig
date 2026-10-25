@@ -780,34 +780,6 @@ fn publishField(out: *Output, analysis: *Analysis, id: u32, field: u32) !void {
     const scope: ir.Ownership = .{ .kind = .scope, .chunk = 4, .roles = @intCast(slot | (value << 13)) };
     try emit(out, analysis.a, .ownership, @bitCast(scope));
 }
-// A checked private callback can expose bounded scalar field consumption.
-// Internal blocks keep their labels; every local is freshly initialized for
-// each activation. Memory writes, allocation, other calls and loops decline.
-fn scalarConsumer(body: *const w.Function) bool {
-    if (body.result_role != .scalar or body.codeLength() == 0 or body.codeLength() > 96 or body.parameters.len > 4 or body.locals.items.len > 64 - body.parameters.len) return false;
-    const count = body.parameters.len + body.locals.items.len;
-    for (0..body.parameters.len) |parameter| if (body.parameterRole(parameter) == .unknown) return false;
-    for (body.locals.items) |ty| if (ty != .i32 and ty != .f32) return false;
-    var depth: usize = 0;
-    for (body.instructions.items) |inst| switch (inst.op) {
-        .block, .if_ => depth += 1,
-        .end => {
-            if (depth == 0) return false;
-            depth -= 1;
-        },
-        .else_ => if (depth == 0) return false,
-        .br, .br_if => if (inst.operand >= depth) return false,
-        .unreachable_ => {},
-        .local_get, .local_set, .local_tee => if (inst.operand >= count) return false,
-        .ownership => {
-            const fact: ir.Ownership = @bitCast(inst.operand);
-            if (fact.kind == .scope) return false;
-        },
-        .i32_load, .f32_load => {},
-        else => if (ir.fixed(inst.op).effect != .pure) return false,
-    };
-    return depth == 0;
-}
 // A private closure's explicit table reference can expose its tiny projection
 // wrapper. The existing initialization/copy proof supplies dominance; numeric
 // scalar constants and mutable/imported table values cannot enter this path.
@@ -842,7 +814,7 @@ fn projectedCall(analysis: *Analysis, module: *const w.Module, instructions: []c
     if (body.parameters.len == 0 or body.parameters.len > 4 or body.parameters[0] != .i32) return null;
     const environment_role = body.parameterRole(0);
     if (environment_role != .reference and environment_role != .scalar) return null;
-    if (scalarConsumer(body)) return id;
+    if (@import("scalar_consumer.zig").check(body)) return id;
     if (environment_role != .reference) return null;
     if (body.locals.items.len != 0 or body.instructions.items.len != body.parameters.len + 2) return null;
     const code = body.instructions.items;

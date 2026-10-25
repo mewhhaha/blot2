@@ -685,6 +685,12 @@ primitives. Lists have `@list.length`, but no `@list.get` or `@list.set`.
 index order. Lists also have `@list.fill` and `@list.generate`. Empty
 collections can need a `List T` or `Array T` annotation.
 
+An optimized exact identity copy, such as
+`array.generate values.length (fn index => values[index])`, may share the
+existing immutable array. Both versions remain valid snapshots; later edits to
+either preserve the other's values. This avoids repeated per-element ownership
+work when the elements contain references.
+
 Wasm reuses locally allocated storage when its last reference is consumed,
 including a single array carried through a loop. It copies when uniqueness
 cannot be established: for example, live aliases, captured arrays, function
