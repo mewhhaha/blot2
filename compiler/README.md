@@ -2,8 +2,15 @@
 
 The compiler is implemented in [zig-native](../zig-native/README.md). This
 directory contains its Deno project client, CLI, WebAssembly guest host,
-formatter and language documentation. No second compiler backend is selected at
-runtime.
+formatter and language documentation. Zig is the only compiler; there is no
+TypeScript compiler or fallback backend to deprecate. `createCompiler` starts
+the native project server, and CLI checking/builds invoke `blotc` directly.
+
+The Baba parser in `syntax.ts` serves the formatter and derive source generator.
+Those tools read and rewrite Blot source; they do not perform type/effect
+inference, compile-time evaluation or Wasm emission. The native compiler parses
+source independently and checks generated source through the same language
+pipeline. Editor completion also delegates semantic queries to Zig.
 
 The package root exports `createCompiler({ entry, executable? })`.
 `createZigProjectCompiler` exposes the explicit native transport. Both support
@@ -48,3 +55,12 @@ the release compiler with this CLI, formatter, guide and standard library.
 Run `deno task test:compiler` from the repository root. Tests cover compiler
 ownership, language behavior, generated Wasm, host lifetimes, retained builds,
 failed-edit recovery, packaging, and command-line compilation.
+
+The native project client accepts `frontendWorkers: 1..16` (default four) for
+independent fresh module checks. Retained edit checking retains its existing
+cutoff behavior. This option is separate from evaluator `semanticWorkers` and
+optimizer `codegenWorkers`; see
+[the project API](../zig-native/PROJECT_CLIENT.md). Public idiomatic Blot/Rust
+sources and compile/runtime methodology are in
+[benchmarks/idiomatic](../benchmarks/idiomatic/README.md), with measured tables
+in the [root README](../README.md#idiomatic-blot-and-rust-benchmarks).

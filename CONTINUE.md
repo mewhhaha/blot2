@@ -1,7 +1,140 @@
 # Continue here
 
-CT110 is qualified and installed. See [qualification](zig-native/CT110_QUALIFICATION.md)
-and [the work record](COMPILER_CT110_WORK.md). Seven unprofiled release pairs
+CT116 is correctness-qualified. Requirement dependencies, immutable imported
+sharing metadata, indexed membership and four-worker fresh module checking are
+implemented. Fresh profiled frontend time falls from 1.600 to 1.036 s; checking
+from 1.214 to 0.649 s. See [the final report](zig-native/CT116_QUALIFICATION.md)
+and [work record](COMPILER_CT116_WORK.md). Eighteen public idiomatic Blot/Rust
+pairs have measured compile-time and same-engine Wasm runtime results in README.
+Canonical imported type graphs are still copied; full direct instantiation and
+sub-second ordinary edit builds remain open. Preserve the three concurrent
+owned-array files excluded from the frozen candidate. CT110 remains installed;
+no commit or push is included.
+
+CT115 investigates SIMD and parallelism without changing the production
+compiler. See [the big-lever review](COMPILER_BIG_LEVERS.md). Three release
+traces and a separate stable-topology probe cover 189 modules and 1,604 edges;
+all eight outputs match strict Wasm pins. `game.blot` consumes 447 ms of checker
+CPU and 91.5% of selected generic-requirement candidates. Its 78-step builder
+composition is the next target for per-declaration/rebinding measurements and
+dependency-indexed generalization. The attribution is module-wide; a quadratic
+builder scaling curve is not yet established.
+
+Four modeled module workers leave the whole frontend near 1.24 s; eight barely
+improve it. Combine less inference work on the critical chain with immutable
+module jobs. SIMD lexing alone has a 26 ms ceiling. Ordinary literal/body edit
+frontends already take 133/139 ms and check one module. These are diagnostic
+observations and scheduling models, not new optimized-compiler qualification.
+CT110 remains installed. No syntax change, commit or push is included.
+
+CT114 is correctness-qualified: compact generic-requirement storage, omission of
+unused sharing analysis for predicate-free schemes, and whole-project checking
+counters. The profiled fresh frontend median is 1.872 → 1.784 s; checking is
+1.421 → 1.344 s. Checker allocation requests fall 27.0% and requested bytes
+17.6%. Unprofiled whole-build measurements do not establish a latency
+improvement. These instrumented clocks are separate from unprofiled end-to-end
+timings. The whole fresh frontend remains above one second. See
+[the final report](zig-native/CT114_QUALIFICATION.md) and
+[work record](COMPILER_CT114_WORK.md).
+
+The frozen candidate passes 2,589 exhaustive native laws, 1,660 release guests,
+48 smoke tests, 57 tooling checks and final zero-finding Zig lint. Exact Wasm,
+input pins and fresh controls pass. Preserve concurrent array work, which is
+excluded from this qualification. CT110 remains installed; no commit or push is
+included.
+
+Zig is already the only compiler. TypeScript provides host/formatter tools; the
+READMEs now state that boundary. Baba's parser lessons are useful for shared
+analysis, but lex/parse already takes tens of milliseconds. The rejected query
+cache saved only twelve graph visits and is removed; do not widen it.
+
+Follow [the frontend architecture review](COMPILER_FRONTEND_REVIEW.md), now
+prioritized by CT115: track requirement dependencies, instantiate directly from
+immutable producer interfaces, and reduce repeated checked/Core/frozen
+construction. Those root changes remain unimplemented. Keep backend
+dependency-proof work below separate.
+
+CT113 is correctness-qualified: a bounded refinement census, private proof-work
+counters and an 8,192-record refinement cache. Three release pairs improve fresh
+gdev compilation from 7.546 to 7.078 s (paired CPU -5.21%). Literal/body edits
+remain about 3.0/5.2 s; no edit latency gain is established. The frozen
+candidate passes 2,587 exhaustive native laws, 1,660 release guests, 48 smoke
+tests and 57 tooling checks; selected Zig lint has zero findings. A guest
+cleanup race is fixed by disabling its unused disk cache; native evidence
+resumes with hashes verified. See
+[the CT113 report](zig-native/CT113_QUALIFICATION.md) and
+[work record](COMPILER_CT113_WORK.md).
+
+The next target is the producing call proof's complete dependency record: 813
+baseline body requests / 1,345,784 nodes encounter call-presence mismatches.
+Isolated proof rechecks add work and have been removed. Three principal misses
+still visit 3,388,263 nodes. Preserve the exact source/input guards; do not
+claim all five architecture steps or sub-second edits are complete. CT110
+remains installed. No commit or push is included in this turn. Preserve
+concurrent array changes, which are excluded from the frozen qualification, and
+the unrelated untracked build directories. CT112 below is the preceding
+checkpoint.
+
+CT112 is correctness-qualified after the user's request to continue. Preserve
+the CT111 record below as the preceding checkpoint. The current work restores
+completed selected closure results and their solved capture graphs across
+revision replay, including exact remapping through session-local canonical
+reuse. See [the CT112 work record](COMPILER_CT112_WORK.md). No syntax changes
+are involved; CT110 remains installed. The three-pair screen is complete:
+literal/body wall 2.863/4.754 s, paired CPU -2.4%/-9.5%, fresh CPU +4.4%. Work
+falls by only nine/five regions; do not claim a repeatable speedup. The frozen
+full gate passes 2,586 exhaustive native laws, 1,660 release guests, 48 smoke
+and 57 tooling checks in 723.99 s. Selected Zig lint has zero findings. Evidence
+is under `build/bench/ct112/full-gate`. See
+[the CT112 report](zig-native/CT112_QUALIFICATION.md). No commit, push or
+installation has occurred. Further widening this cache is not supported by the
+small work reduction. Refinement reuse already serves 10,495/11,782 body-edit
+requests. Next classify the 1,287 remaining solves before extending the owned
+projection/capture and completed-body boundary. Do not add a duplicate cache or
+waive borrowed-projection dependencies.
+
+Previous CT111 decision: stop extending inferred-interface shortcuts. The final
+CT111 candidate passes correctness qualification but shows no performance
+improvement. Three release pairs measure literal/body medians of 3.151/5.294 s
+versus paired CT110 3.122/5.229 s; paired CPU rises 0.6%/1.5%. Strict outputs,
+fresh controls and fresh CPU guards pass. CT110 remains installed. No CT111
+commit, push or installation has occurred.
+
+The frozen CT111-only snapshot passes 2,584 exhaustive native laws, 1,659
+release guests, 48 smoke and 57 tooling checks, with zero selected Zig lint
+findings. See [qualification and evidence](zig-native/CT111_QUALIFICATION.md)
+and [the work record](COMPILER_CT111_WORK.md). Preserve concurrent changes in
+`backend/owned_arrays.zig`, `backend/owned_arrays_tests.zig` and
+`tests/owned_array_execution.test.ts`; they are excluded from CT111 evidence.
+
+Recommendations 1, 2 and 5 have bounded foundations; 3 (completed elaborated
+bodies) and 4 (expanded development generic ABI) remain unimplemented. None of
+the five is complete. The user approved optional written `result` requirements;
+other syntax changes still require consultation. The final body profile still
+misses three of 20 principals, constructs 3.39 million nodes for those misses,
+and starts 534 inference regions during lowering. Preserve the work and review;
+the next architectural step is a completed semantic artifact for one measured
+function family, rather than another expansion of shortcut eligibility.
+
+The [25 October architecture review](COMPILER_ARCHITECTURE_REVIEW.md) is the
+next direction: measure distinct semantic queries and invalidation, establish
+complete interfaces for the three principal misses, then retain elaborated
+function results that lower without new inference. The user is open to language
+changes, including explicit public contracts/staging and cheaper development
+generics. This review does not implement those proposals or change the installed
+compiler. Preserve separate fresh-build and ordinary-edit targets.
+
+The review's 115-build policy screen passes strict optimized output pins and
+same-tier fresh controls. With the default semantic policy, development-tier
+literal/body medians are 2.504/4.365 s versus optimized 2.637/4.407 s in three
+alternating rounds. Inference-region counts and principal misses are unchanged.
+Explicit one-worker mode enables a different component policy; do not conflate
+it with omission. Four-worker timings are noisy and do not justify a policy
+change. Raw evidence is preserved in the review's measurement archive.
+
+CT110 is qualified and installed. See
+[qualification](zig-native/CT110_QUALIFICATION.md) and
+[the work record](COMPILER_CT110_WORK.md). Seven unprofiled release pairs
 against CT109 reduce paired CPU 2.9% fresh, 4.4% literal and 3.0% body; wall
 medians are 7.335 / 3.034 / 5.035 s. Literal/body reverts improve 4.6% / 3.8%.
 Strict outputs, independent fresh controls and both fresh CPU guards pass.
@@ -12,26 +145,27 @@ memoizes successful structural job imports. Operation visits fall 86% for
 literal edits, but most removed visits were cheap certificate hits. Region
 counts remain 2,934 / 7,216 for literal/body edits; body principal hits remain
 17/20. The three remaining misses depend on inferred requirements. Fragment
-matching still visits about four million positions. Allocation traffic and
-peak RSS are essentially unchanged. Two-second/sub-second goals remain open.
+matching still visits about four million positions. Allocation traffic and peak
+RSS are essentially unchanged. Two-second/sub-second goals remain open.
 
-The full gate passes 2,576 exhaustive native laws, 1,656 guests, 48 smoke and
-57 tooling tests, with zero Zig lint findings. The selected 99-law / 56-guest
+The full gate passes 2,576 exhaustive native laws, 1,656 guests, 48 smoke and 57
+tooling tests, with zero Zig lint findings. The selected 99-law / 56-guest
 development cycle takes 25.54 s. First full qualification finds a resource-test
 cache-directory cleanup race after native execution passes. The fixture now
 joins detached writer locks; the resumed gate verifies the exact native evidence
 and completes in 51.06 s. That excludes the 1,228.48 s exhaustive native run
 (two shards). Preserve the failed run and resume journal as evidence.
 
-Three held-out pairs and all 44 independent Wasm executions pass. Native SHA-256:
-`b0ebc5ecf07f962665fcc3cf879f5e955eb07f1341a0f2b5b8d783b963228dd2`.
+Three held-out pairs and all 44 independent Wasm executions pass. Native
+SHA-256: `b0ebc5ecf07f962665fcc3cf879f5e955eb07f1341a0f2b5b8d783b963228dd2`.
 Both local tools pass external format/check/build, exact output, runtime answer
 29 and bundled-guide checks. Installation/rollback records are in
 `build/install/ct110/installed.json`. The 1,003 qualified inputs are pinned in
 `build/bench/ct110/final-pins.json`. Preserve the frozen 554-file workload,
 workspace-backed TMPDIR and unrelated untracked `zig-native/build/` and
 `zig-out-modern/`. Do not rerun the previous 86-item program; use the updated
-[performance queue](COMPILE_HILLS.md) and keep conditional architectures explicit.
+[performance queue](COMPILE_HILLS.md) and keep conditional architectures
+explicit.
 
 Historical CT109 checkpoint, 24 October 2026:
 
@@ -47,15 +181,15 @@ Seven alternating release pairs against CT106 pass all exact output and fresh
 CPU guards. Literal/body revert CPU improves 11.5%/7.5%; first-literal CPU is
 effectively unchanged and body CPU improves only 2.5%. First-literal/body wall
 medians are 3.261/5.377 s. All 44 held-out Wasm executions and the 232-request /
-200-distinct-edit memory series pass. Final idle RSS is 521 MiB, with no swap
-or major faults. Mapping growth at edit 159 remains unattributed; this run does
-not prove indefinite memory bounds.
+200-distinct-edit memory series pass. Final idle RSS is 521 MiB, with no swap or
+major faults. Mapping growth at edit 159 remains unattributed; this run does not
+prove indefinite memory bounds.
 
 Candidate 10 passes the full gate (`run-d644cc958a2cea54`) in 711.82 s: 2,573
 exhaustive native laws, 1,656 guests, 48 smoke tests and 57 tooling tests. Lint
 has zero findings. The native compiler SHA-256 is
-`6b9ed919a48f4d98b7faaedee3ac25cd87e931601189eb1d1d4239fbd3842b1c`.
-Both `~/.local/bin/blot` and `blotc` pass external format/check/build, exact Wasm,
+`6b9ed919a48f4d98b7faaedee3ac25cd87e931601189eb1d1d4239fbd3842b1c`. Both
+`~/.local/bin/blot` and `blotc` pass external format/check/build, exact Wasm,
 answer 29 and bundled-guide checks. Installation and rollback records are in
 `build/install/ct109/installed.json`; 1,003 source/test/client/tool inputs are
 pinned. Failed gates and rejected caches are preserved in the evidence archive.
@@ -70,19 +204,18 @@ workspace-backed TMPDIR. Preserve unrelated untracked `zig-native/build/` and
 
 Historical CT106 qualified and installed, 24 October 2026:
 [qualification and measurements](zig-native/CT106_QUALIFICATION.md),
-[all 86 dispositions](COMPILER_CT106_WORK.md).
-Seven alternating pairs against CT105 reduce first-literal CPU 19.1% (3.62 →
-2.91 s wall median). Fresh CPU improves 2.4%, body CPU is effectively unchanged,
-and literal-revert CPU rises 3.5%. Both fresh guards pass; ordinary body,
-two-second and sub-second targets remain open. Keep the frozen 554-file workload
-and strict Wasm pins when comparing another candidate.
+[all 86 dispositions](COMPILER_CT106_WORK.md). Seven alternating pairs against
+CT105 reduce first-literal CPU 19.1% (3.62 → 2.91 s wall median). Fresh CPU
+improves 2.4%, body CPU is effectively unchanged, and literal-revert CPU rises
+3.5%. Both fresh guards pass; ordinary body, two-second and sub-second targets
+remain open. Keep the frozen 554-file workload and strict Wasm pins when
+comparing another candidate.
 
 Final native SHA-256:
 `7d7ea08313e865a633ec9be2acc0347bc1560490ce8caca82e96df1c5b2dba69`.
 Identity-file SHA-256:
-`c6f01a199871b66d90fb24354c1d165bfff7bdc10323ea83c7c92cc8964a004f`.
-Installed CLI SHA-256:
-`0fc44a8d4be387868f9cf95df10300039b8e9bb8a472567e73909d2cd3ce6410`.
+`c6f01a199871b66d90fb24354c1d165bfff7bdc10323ea83c7c92cc8964a004f`. Installed
+CLI SHA-256: `0fc44a8d4be387868f9cf95df10300039b8e9bb8a472567e73909d2cd3ce6410`.
 Installation and rollback records: `build/install/ct106/installed.json`.
 
 Full qualification passes 2,564 exhaustive native laws, 1,655 guests, 48 smoke
@@ -95,18 +228,18 @@ attempt remain preserved and are not passes. The isolated qualified checkout
 uses frozen sibling fixtures and workspace-backed temporary storage.
 
 The first frontend edit checks one module instead of 22. Operation interner
-candidates fall from 90.45M to 0.74M; actual argument-height checks fall to 1.79M.
-Four body principals still fail their own source-position check after two
+candidates fall from 90.45M to 0.74M; actual argument-height checks fall to
+1.79M. Four body principals still fail their own source-position check after two
 narrowing attempts. Preserve exact provenance. Query-key changes did not reduce
 candidate counts. Finer arena bins, notification coalescing, semantic-worker
 default changes and host-native CPU targeting did not earn adoption.
 
 A 200-distinct-edit sequence passes 232 requests with 12 sampled fresh controls.
 Follow-up profiled windows show fixed small-heap/virtual capacity while RSS
-rises, supporting residency changes during that window, not an indefinite
-memory bound. All-thread PMU and CPU-set screens, nine held-out structural
-programs, 36 runtime executions and the actual Zig timing trace are archived.
-LLVM emission is about 97% of the measured release build.
+rises, supporting residency changes during that window, not an indefinite memory
+bound. All-thread PMU and CPU-set screens, nine held-out structural programs, 36
+runtime executions and the actual Zig timing trace are archived. LLVM emission
+is about 97% of the measured release build.
 
 Remaining work is explicit in the ledger: stable declaration origins, residual
 query validation/import, cache/membership ablations, backend planning/encoding
@@ -115,22 +248,22 @@ Preserve unrelated `zig-native/build/` and `zig-out-modern/`. Do not rerun the
 historical program or report failed acceptance targets as completed hills.
 
 Historical post-CT105 review, 24 October 2026:
-[86 compiler performance suggestions](COMPILER_REVIEW_CT105.md), with six
-ranked experiments and archived evidence. Implementation `a0645de` is pushed;
-the installed compiler and all compiler source bytes are unchanged. The new
+[86 compiler performance suggestions](COMPILER_REVIEW_CT105.md), with six ranked
+experiments and archived evidence. Implementation `a0645de` is pushed; the
+installed compiler and all compiler source bytes are unchanged. The new
 three-pair diagnostic medians are 6.878 s fresh, 3.786 s first literal, 2.580 s
-literal revert and 4.816 s body edit. These are not new speedup claims.
-Five cycles over seven source texts settle around 419–482 MiB post-build RSS;
-this does not bound a session of distinct edits. Literal non-inference work
-still takes 1.326 s in the same-profile subtraction.
+literal revert and 4.816 s body edit. These are not new speedup claims. Five
+cycles over seven source texts settle around 419–482 MiB post-build RSS; this
+does not bound a session of distinct edits. Literal non-inference work still
+takes 1.326 s in the same-profile subtraction.
 
 Start by recording the exact frontend graph-decline reason and query-chain
 costs, then trial operation-interner discrimination and narrower body-region
 dependencies. The graph-size probe sees 20,178 versus 20,179 type nodes, below
-the 65,536 cap; the exact declining branch remains unknown. Earlier wording
-that inferred a semantic mismatch was too strong. Preserve the qualified
-compiler, full verification rules and unrelated untracked directories. This
-review introduces no compiler implementation changes.
+the 65,536 cap; the exact declining branch remains unknown. Earlier wording that
+inferred a semantic mismatch was too strong. Preserve the qualified compiler,
+full verification rules and unrelated untracked directories. This review
+introduces no compiler implementation changes.
 
 CT105 checkpoint, 24 October 2026:
 [solver scans, row certificates and exact catalog indexes are qualified](zig-native/CT105_QUALIFICATION.md).
@@ -227,46 +360,49 @@ blocker. The separate text-capability changes remain preserved outside this
 candidate.
 
 Post-CT96 review, 23 October 2026: `c5b9ad1` commits the measurement tools and
-qualified spawn optimization. The [new performance review](PERFORMANCE_REVIEW.md)
-selects CT97's row traversal first: the 27.4% hotspot is already inlined and
-almost all node self CPU follows replacement rows. Count chain hops and
-cache misses/bypasses before choosing an index or memo. For CT98, zero backend
-candidates is a late counter: literal edits already reuse 17 principals and
-145 specialization queries, so trace the earlier executable-admission filters.
-BT4's three slowest laws passed a new 33-sweep diagnostic run with 44,074
-scenario executions. Profile backend allocations in the two deep-path fixtures;
-their frontend setup is already outside the fault sweeps. No further compiler
-optimization or installation is claimed by this review. The separate dirty
-text-capability repair remains preserved and outside CT96's qualification.
+qualified spawn optimization. The
+[new performance review](PERFORMANCE_REVIEW.md) selects CT97's row traversal
+first: the 27.4% hotspot is already inlined and almost all node self CPU follows
+replacement rows. Count chain hops and cache misses/bypasses before choosing an
+index or memo. For CT98, zero backend candidates is a late counter: literal
+edits already reuse 17 principals and 145 specialization queries, so trace the
+earlier executable-admission filters. BT4's three slowest laws passed a new
+33-sweep diagnostic run with 44,074 scenario executions. Profile backend
+allocations in the two deep-path fixtures; their frontend setup is already
+outside the fault sweeps. No further compiler optimization or installation is
+claimed by this review. The separate dirty text-capability repair remains
+preserved and outside CT96's qualification.
 
 CT96 checkpoint, 23 October 2026: the generator now prepares spawn-contract
 presence and its immutable module-pointer view once per compilation. Seven
 alternating release pairs show **28.6% less game CPU** and **29.0% less devtools
-CPU**, with identical Wasm; game median build wall changes from 17.24 to 12.16 s.
-The [qualification record](zig-native/CT96_QUALIFICATION.md) covers 2,539 exhaustive
-native laws, 1,648 guest checks, 48 smoke checks, 57 tooling checks and zero lint.
-It also preserves the first gate's timeout and the complete rerun with a longer
-allowance. The edited task development cycle passes in 14.54 s. The qualified
-release is `build/bench/ct96-20261023/candidate/blotc`; it is isolated from the
-concurrent text-capability repair and does not replace the installed tools.
-The new profile has no scan self-CPU samples; effect-row lookup/version traversal
-now owns 27.4% of sampled CPU. Continue with **CT97** in the updated
-[compile-time hills](COMPILE_HILLS.md). CT99 stays deferred: constant preparation
-is about 0.33 s. Retained backend reuse and the broader completion plan remain open.
+CPU**, with identical Wasm; game median build wall changes from 17.24 to 12.16
+s. The [qualification record](zig-native/CT96_QUALIFICATION.md) covers 2,539
+exhaustive native laws, 1,648 guest checks, 48 smoke checks, 57 tooling checks
+and zero lint. It also preserves the first gate's timeout and the complete rerun
+with a longer allowance. The edited task development cycle passes in 14.54 s.
+The qualified release is `build/bench/ct96-20261023/candidate/blotc`; it is
+isolated from the concurrent text-capability repair and does not replace the
+installed tools. The new profile has no scan self-CPU samples; effect-row
+lookup/version traversal now owns 27.4% of sampled CPU. Continue with **CT97**
+in the updated [compile-time hills](COMPILE_HILLS.md). CT99 stays deferred:
+constant preparation is about 0.33 s. Retained backend reuse and the broader
+completion plan remain open.
 
-Baseline measurement checkpoint, 23 October 2026: compiler `63c931f` was unchanged.
-The [measurement report](COMPILE_MEASUREMENTS.md) pins the current 554-file gdev
-snapshot, fresh/profiled pairs, retained edits, CPU stacks and compiler-build
-experiments. That checkpoint selected **CT96** in the [compile-time queue](COMPILE_HILLS.md):
-`prepareSpawnApplication` repeatedly scans all bindings and owns 27.6% of sampled
-CPU. Reprofile after that before choosing effect-row work or backend reuse;
-ordinary code edits currently offer zero backend candidates. Do not rerun the
-historical CT1–CT94 program. [Build hills](BUILD_HILLS.md) keep ordinary caching
-as the default (3.4 s real compiler edits; 15 ms unchanged builds), preserve the
-4.64 s warm development cycle, and target the slow exhaustive allocation tests.
-Measurement tooling and documentation were implemented at that checkpoint; CT96
-is qualified above, and the later hills and broader completion plan remain open.
-Raw baseline evidence is linked from the report.
+Baseline measurement checkpoint, 23 October 2026: compiler `63c931f` was
+unchanged. The [measurement report](COMPILE_MEASUREMENTS.md) pins the current
+554-file gdev snapshot, fresh/profiled pairs, retained edits, CPU stacks and
+compiler-build experiments. That checkpoint selected **CT96** in the
+[compile-time queue](COMPILE_HILLS.md): `prepareSpawnApplication` repeatedly
+scans all bindings and owns 27.6% of sampled CPU. Reprofile after that before
+choosing effect-row work or backend reuse; ordinary code edits currently offer
+zero backend candidates. Do not rerun the historical CT1–CT94 program.
+[Build hills](BUILD_HILLS.md) keep ordinary caching as the default (3.4 s real
+compiler edits; 15 ms unchanged builds), preserve the 4.64 s warm development
+cycle, and target the slow exhaustive allocation tests. Measurement tooling and
+documentation were implemented at that checkpoint; CT96 is qualified above, and
+the later hills and broader completion plan remain open. Raw baseline evidence
+is linked from the report.
 
 Latest checkpoint, 23 October 2026: the derive and budget propagation work is
 committed in `58e00c3`, followed by the frontend associated-work repair. The

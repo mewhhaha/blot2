@@ -2,6 +2,37 @@
 //! increments on existing evaluator and solver structs: no clocks, allocation,
 //! identity or semantic decision reads them, so a budget can assert on them
 //! without wall-time noise. A retained revision counts only the work it ran.
+pub const InferenceStage = enum { general, specialization, preparation, lowering };
+
+/// Completed checker invocations in the project-check phase, aggregated across
+/// modules. Backend inference uses its own counters even when it calls check.
+pub const Frontend = struct {
+    parallel_batches: u64 = 0,
+    parallel_jobs: u64 = 0,
+    parallel_retries: u64 = 0,
+    modules: u64 = 0,
+    scheme_calls: u64 = 0,
+    candidate_scans: u64 = 0,
+    candidates: u64 = 0,
+    candidate_parts: u64 = 0,
+    candidate_variables: u64 = 0,
+    candidate_rows: u64 = 0,
+    dependency_hits: u64 = 0,
+    dependency_recomputations: u64 = 0,
+    import_requests: u64 = 0,
+    imported_schemes: u64 = 0,
+    imported_summary_reuses: u64 = 0,
+    imported_read: u64 = 0,
+    type_nodes: u64 = 0,
+    normalization: Normalization = .{},
+
+    pub fn merge(self: *Frontend, other: Frontend) void {
+        inline for (@typeInfo(Frontend).@"struct".field_names) |field| {
+            if (comptime @import("std").mem.eql(u8, field, "normalization")) self.normalization.merge(other.normalization) else @field(self, field) +|= @field(other, field);
+        }
+    }
+};
+
 pub const Normalization = struct {
     row_requests: u64 = 0,
     closed_row_hits: u64 = 0,
@@ -89,6 +120,16 @@ pub const Counters = struct {
     max_semantic_component_workers: u64 = 0,
     /// Inference regions opened (ClosureRegion lifetimes, including split children).
     inference_regions: u64 = 0,
+    /// Each region belongs to its innermost architectural stage at creation.
+    /// Region/node counts are disjoint; they are not CPU time or retained bytes.
+    inference_general_regions: u64 = 0,
+    inference_general_nodes: u64 = 0,
+    inference_specialization_regions: u64 = 0,
+    inference_specialization_nodes: u64 = 0,
+    inference_preparation_regions: u64 = 0,
+    inference_preparation_nodes: u64 = 0,
+    inference_lowering_regions: u64 = 0,
+    inference_lowering_nodes: u64 = 0,
     /// Session-local canonical requests and complete proofs reconstructed around
     /// the current captures without opening a new inference region.
     canonical_specialization_queries: u64 = 0,
@@ -150,6 +191,17 @@ pub const Counters = struct {
     principal_graph_builds: u64 = 0,
     principal_graph_imports: u64 = 0,
     principal_graph_deferred: u64 = 0,
+    principal_graph_retained_requests: u64 = 0,
+    principal_graph_retained_hits: u64 = 0,
+    principal_graph_retained: u64 = 0,
+    principal_graph_retained_bytes: u64 = 0,
+    completed_interface_requests: u64 = 0,
+    completed_interface_hits: u64 = 0,
+    completed_interface_proofs: u64 = 0,
+    completed_interface_declines: u64 = 0,
+    completed_interface_imports: u64 = 0,
+    completed_interface_body_proofs: u64 = 0,
+    completed_interface_proof_work: u64 = 0,
     principal_containing_sources: u64 = 0,
     principal_module_sources: u64 = 0,
     /// Capture scopes projected while selecting interfaces for lexical keys.

@@ -56,7 +56,7 @@ async function project(directory: string, bumps: number[]) {
   return sources;
 }
 
-Deno.test("lowering and codegen workers emit identical Wasm and diagnostics for every worker count", async () => {
+Deno.test("frontend lowering and codegen workers emit identical Wasm and diagnostics for every worker count", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-workers-" });
   const base = {
     executable,
@@ -76,18 +76,31 @@ Deno.test("lowering and codegen workers emit identical Wasm and diagnostics for 
     broken[`${directory}/m5.blot`] += "const other: U32 = fn value => value\n";
     const results: Uint8Array[][] = [];
     const rejections: unknown[] = [];
-    const counts = [[1, 1], [2, 1], [4, 1], [1, 4], [4, 4]];
-    for (const [semanticWorkers, codegenWorkers] of counts) {
+    const counts = [[1, 1, 1], [2, 1, 1], [4, 1, 1], [1, 4, 1], [4, 4, 1], [
+      1,
+      1,
+      4,
+    ], [4, 4, 4]];
+    for (const [semanticWorkers, codegenWorkers, frontendWorkers] of counts) {
       const compiler = await createZigProjectCompiler({
         ...base,
         semanticWorkers,
         codegenWorkers,
+        frontendWorkers,
+        profileBackend: true,
       });
       try {
         const bytes = [];
         for (const sources of [original, edited, original]) {
           const result = await compiler.build({ sources });
           assert(result.success, JSON.stringify(result));
+          if (bytes.length === 0 && frontendWorkers > 1) {
+            const profile = result.stats.phaseProfile as {
+              checking: Record<string, number>;
+            };
+            assert(profile.checking.parallel_jobs >= modules);
+            assert.equal(profile.checking.parallel_retries, 0);
+          }
           bytes.push(result.bytes);
         }
         const rejected = await compiler.build({ sources: broken });

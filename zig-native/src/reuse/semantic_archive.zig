@@ -107,6 +107,8 @@ pub fn encodeWithDigests(a: A, compiler: format.Digest, source: *const capture.C
     for (source.metadata.specialization_queries.records.items) |query| {
         const proof = query.dependencies;
         // The portable closure schema cannot own Array-member authority.
+        // Native completed-capture proofs are omitted too: decoded queries
+        // retain their outer result and recheck nested closures when consumed.
         if (proof.member != null or !selected.Adapter.complete(query)) continue;
         try records.append(a, .{
             .key = .{ .input = proof.input, .expected = proof.expected, .options = proof.options, .depth = proof.depth },

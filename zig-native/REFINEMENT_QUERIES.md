@@ -83,11 +83,14 @@ The task-013 immutable compiler remains the differential comparison oracle.
 
 ## Bounds and measurements
 
-Defaults admit at most **4,096 complete records**, **16 MiB of owned payload
-slices**, **2 MiB of retained record/index capacity**, and **4,096 inspected
-bucket positions per lookup**. Existing semantic Options and graph-comparison
-depth/work limits remain separate authoritative bounds. Saturation declines
-optional reuse and continues ordinary checking.
+The refinement Context admits at most **8,192 complete records**, **16 MiB of
+owned payload slices**, **8 MiB of retained record/index capacity**, and **4,096
+inspected bucket positions per lookup**. CT113 raises only this family's record
+and buffer limits after observing saturation in the gdev fresh build. The common
+table defaults remain 4,096 records and 2 MiB of record/index capacity. Existing
+semantic Options and graph-comparison depth/work limits remain separate
+authoritative bounds. Saturation declines optional reuse and continues ordinary
+checking.
 
 Payload bytes count exact key/dependency/result slices. `capacity_bytes`
 measures actual raw record-vector, link-vector and hash-map allocations,
@@ -103,6 +106,39 @@ Refinement statistics expose inspected index positions/local candidates, current
 record count, retained payload/capacity bytes and saturation. These counters
 report work and ownership; they grant no validity. Complete compiler backing
 traffic and retained old/new revision overlap are measured separately.
+
+## Request census (CT113)
+
+Backend profiling adds `work.refinements`: up to 32 groups of whole fresh
+requests, an explicit overflow total, and the eight largest individual requests
+by specialization solver nodes. Requests and nodes are conserved when the group
+limit is reached. This adds no per-request allocation. Ordinary unprofiled
+responses still omit the `work` object. Flags diagnose work; they never grant
+semantic reuse.
+
+Groups carry exact flag combinations. Admission bits 0–4 mean no cache, instance
+mappings, explicit captures, code projection, and an outer receipt. Publication
+bits 0–11 mean physical holes, unknown observations, nesting, incomplete
+observations, multiple regions, selected results, value growth, child growth,
+execution steps, typed views, declined publication, and successful publication.
+Candidate-rejection bits follow `refinement_receipt.Reason`:
+mode/root/source/shape/seed/scalar/call/plain/import. A request can inspect
+several candidates; these bits describe reasons encountered, not a unique causal
+reason for the request. `record_rejections` bits follow `RecordDecline`:
+owner/source/generative/incomplete/capacity.
+
+The ordinary refinement counters also separate a required call proof missing
+from the new session (`call_missing`) from a previously absent proof becoming
+present (`call_became_present`). They count candidate rejections, not distinct
+requests. Both conditions still decline retained refinement reuse.
+
+Independent executable-query proof attempts expose private inference regions,
+nodes, and rejection counts in `selectedQueries`. Those regions and nodes are
+separate from the coordinating evaluator's counters and must be included when
+comparing total work. Workers accumulate locally; the coordinator joins their
+counts. Rejection order is inputs/imports/query/proof/diagnostic/unknown/nested/
+views/regions/incomplete/steps/values/calls/scalar/source. These counters do not
+enable proof recovery for refinement queries.
 
 ## Qualification
 

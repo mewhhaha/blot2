@@ -43,15 +43,15 @@ fingerprint.
 `inferenceBudget` sets the inference work allowance (default 1,000,000 steps).
 The native CLI accepts the same setting as `--inference-budget`. Each module's
 ordinary inference has that allowance; associated-type checking shares an
-allowance across the project, and evaluator sessions start their associated
-work allowance from the same setting. Larger configured values apply throughout
-these stages, without an additional one-million-step cap. Budget changes alter
-the compiler identity, so retained and persistent candidates cannot cross them.
-An `associated_limit` diagnostic from module checking reports the actual
-associated work allowance available to that module, which can be smaller after
-checking its dependencies. Ordinary effect rows in a solver with no associated
-projections do not consume associated normalization work merely because an
-implementation is in scope.
+allowance across the project, and evaluator sessions start their associated work
+allowance from the same setting. Larger configured values apply throughout these
+stages, without an additional one-million-step cap. Budget changes alter the
+compiler identity, so retained and persistent candidates cannot cross them. An
+`associated_limit` diagnostic from module checking reports the actual associated
+work allowance available to that module, which can be smaller after checking its
+dependencies. Ordinary effect rows in a solver with no associated projections do
+not consume associated normalization work merely because an implementation is in
+scope.
 
 `codegenTier: "development"` skips optional scalar replacement and automatic
 vectorization. Type/effect checking, constant evaluation, explicit cleanup and
@@ -72,26 +72,26 @@ Game, 5 pairs: population 2,367 → 2,268 ms, a literal edit 1,087 → 996 ms, a
 body change 1,621 → 1,565 ms, an `ink/math` body edit 2,333 → 2,229 ms.
 
 A test runner keeps one session per worker on one fixture entry and overlays
-each test module at it. A session keeps a library of the dependency modules
-its revisions froze. When a build's entry reaches other modules than the last
-seed holds, the library supplies every module whose source and imports are
-unchanged, renumbered as a fresh load numbers it; only modules no earlier
-build froze, changed ones and the entry are checked
+each test module at it. A session keeps a library of the dependency modules its
+revisions froze. When a build's entry reaches other modules than the last seed
+holds, the library supplies every module whose source and imports are unchanged,
+renumbered as a fresh load numbers it; only modules no earlier build froze,
+changed ones and the entry are checked
 (`attemptStats.fallback.relocated_modules` counts the reused modules). Each
 build's Wasm and diagnostics equal a fresh session's, and a rejected build
-leaves the library as it was. Generated code is not shared between entries:
-each test still pays its own backend.
+leaves the library as it was. Generated code is not shared between entries: each
+test still pays its own backend.
 
-`pen test-blot` adopts this without a protocol change. Its workers already
-keep one session for the fixture entry (`run_module` in
+`pen test-blot` adopts this without a protocol change. Its workers already keep
+one session for the fixture entry (`run_module` in
 `crates/pen/src/blot_test.rs`) and overlay each module at
 `src/test_fixture.blot`. pen must keep doing exactly that: open each worker's
-session on the fixture entry once, overlay only that path for every test
-module, and keep the session after rejected builds rather than reopening it per
-module. Each worker's first build pays for every module it reaches; later
-builds pay for the test module and any module no earlier build of that worker
-reached. On the gdev snapshot one session over pen's 68 test modules takes
-72.9 s of CPU instead of 96.1 s (91.0 → 67.5 s wall, peak RSS 717 → 742 MiB);
+session on the fixture entry once, overlay only that path for every test module,
+and keep the session after rejected builds rather than reopening it per module.
+Each worker's first build pays for every module it reaches; later builds pay for
+the test module and any module no earlier build of that worker reached. On the
+gdev snapshot one session over pen's 68 test modules takes 72.9 s of CPU instead
+of 96.1 s (91.0 → 67.5 s wall, peak RSS 717 → 742 MiB);
 `deno task bench:compile --workload tests --shared-session` measures it.
 
 `shareMachineCode: true` enables the internal body-sharing prototype. Identical
@@ -103,15 +103,27 @@ improvement has been established. The `runtimeOptimization.shared` counter
 counts removed duplicate bodies. Artifact statistics describe the logical
 functions retained for replay.
 
+`frontendWorkers` requests 1–16 module checker workers (default 4). The native
+CLI accepts `--frontend-workers` on `build`, `build-project` and
+`serve-project`. Fresh projects with at least two eligible modules and 4,096
+syntax nodes check independent modules in dependency-ready batches. Each worker
+owns its solver; producer interfaces and the shared symbol pool remain immutable
+until join. Diagnostics, an unprepared generated name or combined project-budget
+exhaustion replay the original serial order. Retained edit checking, source
+validation, editor queries and small projects retain their existing paths.
+Optional phase profiling reports `checking.parallel_batches`, `parallel_jobs`
+and `parallel_retries`. This setting is independent of evaluator
+`semanticWorkers` and optimizer `codegenWorkers`; it grants no reuse authority.
+
 `codegenWorkers` requests 1–16 concurrent optimizer workers (default 4). Jobs
 read immutable function bodies and completed lifetime summaries, optimize them
 and plan their reference counts; each worker owns its scratch arena. Small
-builds and edits with fewer than four uncached bodies or 4,096 instructions
-stay serial. `runtimeOptimization.workers` and `parallel_jobs` report the actual
-work scheduled. Output and rejections are byte-identical to serial assembly.
-This parallelizes runtime optimization, not semantic checking or evaluation. On
-the gdev game, four workers cut assembly from 201 to 91 ms and build wall time
-by 3.9% (a literal edit by 9.2%) with CPU within 1.3% (CT89).
+builds and edits with fewer than four uncached bodies or 4,096 instructions stay
+serial. `runtimeOptimization.workers` and `parallel_jobs` report the actual work
+scheduled. Output and rejections are byte-identical to serial assembly. This
+parallelizes runtime optimization, not semantic checking or evaluation. On the
+gdev game, four workers cut assembly from 201 to 91 ms and build wall time by
+3.9% (a literal edit by 9.2%) with CPU within 1.3% (CT89).
 
 The direct native client accepts `semanticWorkers: 1..16` to opt into private
 semantic component jobs. Explicit `1` runs the same component path with one
@@ -145,23 +157,35 @@ global validated-call proofs. The legacy `projected_empty_declines` name remains
 the total for all projected-query declines, including nonempty results.
 
 `stats.principals.source_declines` reports up to eight first failed source
-observations, with target/source unit and binding IDs and an exact decline reason.
-Unused slots have reason `none`; module-image observations use source binding
-zero. These diagnostics do not decide admission. Frontend cutoff statistics also
-report the first mismatching unit, changed interface-field bit mask, binding
-counts, remaining correspondence budget and comparison progress.
+observations, with target/source unit and binding IDs and an exact decline
+reason. Unused slots have reason `none`; module-image observations use source
+binding zero. These diagnostics do not decide admission. Frontend cutoff
+statistics also report the first mismatching unit, changed interface-field bit
+mask, binding counts, remaining correspondence budget and comparison progress.
 Graph declines additionally identify the reason, first type/row pair, tags,
-depth and remaining work. Equal immutable nodes may have different sharing;
-type and row variables still require injective correspondence.
+depth and remaining work. Equal immutable nodes may have different sharing; type
+and row variables still require injective correspondence.
+
+With `profileBackend`, `stats.phaseProfile` reports exclusive frontend/backend
+phase clocks, allocation requests and requested bytes. Its `checking` object
+aggregates completed project-check invocations across modules: generic-scheme
+construction, pending positions scanned, selected requirements and type/row
+components, scheme imports, directly read imported bindings and normalization
+work. Backend invocations of the checker are excluded. A failed invocation that
+does not return its checked result contributes no completed-check counters.
+Unread imports may still serve shared callees, coherence or publication; their
+count is not removable work. Requested bytes are allocation traffic, not live
+memory. Compare unprofiled build costs separately because profiling adds work.
 
 `stats.workCounters.normalization` counts region-solver row requests, closed and
-epoch cache hits, argument rows/labels/arguments inspected, changed rows, fallback
-certificate evictions and operation-interner requests/candidates/argument tests.
-These are work counts, not elapsed time or cache hardware events; frontend type
-stores are excluded. `lexical_region_candidates` records the candidate volume of
-the former whole-region variable scan, while `lexical_scope_candidates` counts
-visits through the source-scope index. Their difference is avoided scan work,
-not a measured speedup percentage.
+epoch cache hits, argument rows/labels/arguments inspected, changed rows,
+fallback certificate evictions and operation-interner
+requests/candidates/argument tests. These are work counts, not elapsed time or
+cache hardware events; frontend type stores are excluded.
+`lexical_region_candidates` records the candidate volume of the former
+whole-region variable scan, while `lexical_scope_candidates` counts visits
+through the source-scope index. Their difference is avoided scan work, not a
+measured speedup percentage.
 
 Normalization also separates reused operation certificates from actual argument
 height checks. Worklist counters record retained/refreshed frontiers, subscriber
@@ -169,8 +193,8 @@ visits and empty ready-word scans; lexical counters distinguish type and row
 variables. Query counters expose bucket lengths, candidates and canonical hits.
 The optional query prepare/scan/source/import/match/validate/publish clocks are
 exclusive work categories. Entering one pauses the previous category;
-`lookup_us` therefore excludes these stages. All work categories sit inside
-the enclosing backend clock and must not be added to that clock again.
+`lookup_us` therefore excludes these stages. All work categories sit inside the
+enclosing backend clock and must not be added to that clock again.
 
 With `profileBackend`, `backendTiming.work.region_callers` attributes inclusive
 region wall time, scope/node counts and solver/scratch requested allocations to
@@ -204,7 +228,8 @@ is `null`. The snapshot precedes revision publication and can include both old
 and pending owners. It excludes directly mapped large blocks and is neither
 process RSS nor post-build live memory. Arena request, backing-capacity and
 reuse/remap counters describe different layers and must not be summed as
-independent physical allocations. See [experiment tools](../scripts/bench/README.md).
+independent physical allocations. See
+[experiment tools](../scripts/bench/README.md).
 
 The CLI and native project server automatically persist restart candidates under
 `$XDG_CACHE_HOME/blot` or `$HOME/.cache/blot` on Linux,
@@ -223,16 +248,17 @@ the cache is written, but on Linux a detached writer process already holds the
 key's lock, so an immediate `dispose()` still leaves restart candidates: the
 next compiler's open waits (at most 10 s) for that write and then loads it. A
 killed writer leaves the previous file, if any. Other platforms write before
-replying. Later edits avoid cache writes; `close()` publishes the latest committed
-revision before acknowledging when it has changed. `dispose()` does not join
-detached writers. A caller that owns a temporary cache directory must wait for
-its cache-key locks before deleting it. Failed edits never replace the last successful
-checkpoint. The cache also holds the saved revision's Wasm and every input it
-read: a restarted compiler whose first build has exactly those inputs and the
-same settings returns that Wasm without compiling (`attemptStats.restored_output`).
-A restarted compiler whose sources changed starts from the saved dependency
-frontend instead, so unchanged dependencies are not checked again. Keep the compiler alive for
-editing; restart caching and retained edits are measured separately by
+replying. Later edits avoid cache writes; `close()` publishes the latest
+committed revision before acknowledging when it has changed. `dispose()` does
+not join detached writers. A caller that owns a temporary cache directory must
+wait for its cache-key locks before deleting it. Failed edits never replace the
+last successful checkpoint. The cache also holds the saved revision's Wasm and
+every input it read: a restarted compiler whose first build has exactly those
+inputs and the same settings returns that Wasm without compiling
+(`attemptStats.restored_output`). A restarted compiler whose sources changed
+starts from the saved dependency frontend instead, so unchanged dependencies are
+not checked again. Keep the compiler alive for editing; restart caching and
+retained edits are measured separately by
 `deno task bench:compile --restart-cache`.
 
 `exportCheckpoint()` also returns portable backend cache bytes from the last

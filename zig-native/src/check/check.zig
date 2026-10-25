@@ -96,6 +96,11 @@ pub const GlobalTrace = struct {
     computation_annotations: usize,
 };
 pub const PrivateExecution = struct {
+    parallel_min_nodes: usize = 4096,
+    scheme_dependency_reuse: bool = true,
+    indexed_scheme_membership: bool = true,
+    eager_scheme_summaries: bool = false,
+    imported_summary_reuse: bool = true,
     alias_globals: bool = false,
     schedule_globals: bool = true,
     stats: ?*AliasGlobalStats = null,
@@ -103,6 +108,34 @@ pub const PrivateExecution = struct {
     observe: ?*const fn (?*anyopaque, GlobalTrace) void = null,
 };
 pub const Identity = T.NominalIdentity;
+/// Discover synthesized names before borrowing a frozen pool. A missed name
+/// causes a serial retry, never growth while another worker borrows storage.
+pub fn prepareGeneratedNames(a: Allocator, pool: *symbols.Pool, tree: *const ast.Tree, catalogs: []const ImportedCatalog) !void {
+    _ = try pool.intern(a, "result");
+    _ = try pool.intern(a, "effects");
+    for (tree.roots.items) |root| {
+        const node = tree.node(root);
+        if (node.tag == .implementation_decl) {
+            const declaration = tree.implementation(root);
+            for (tree.list(declaration.members)) |member| try prepareQualifiedName(a, pool, 0, declaration.name, tree.node(member).a);
+        } else if (node.tag == .contract_decl) {
+            for (tree.children(node.b)) |member| try prepareQualifiedName(a, pool, 0, node.a, tree.node(member).a);
+        }
+    }
+    for (catalogs) |imported| if (imported.kind == .contract) {
+        const producer = imported.catalog();
+        const contract = producer.contracts[imported.index];
+        for (producer.contract_members[contract.members.start..][0..contract.members.len]) |member| {
+            if (member.kind == .value) try prepareQualifiedName(a, pool, imported.namespace, imported.name, member.name);
+        }
+    };
+}
+fn prepareQualifiedName(a: Allocator, pool: *symbols.Pool, namespace: symbols.Symbol, owner: symbols.Symbol, member: symbols.Symbol) !void {
+    if (owner == 0 or member == 0) return;
+    const text = if (namespace == 0) try a.print("{s}.{s}", .{ pool.get(owner), pool.get(member) }) else try a.print("{s}.{s}.{s}", .{ pool.get(namespace), pool.get(owner), pool.get(member) });
+    defer a.free(text);
+    _ = try pool.intern(a, text);
+}
 pub const Nominal = PI.Nominal;
 pub const Contract = PI.Contract;
 pub const ContractMember = PI.ContractMember;
@@ -151,7 +184,7 @@ pub const ImportedCatalog = struct {
         }
         const owner = self.producer.?;
         const value = owner.bindings[id];
-        return .{ .producer_binding = id, .proof_contract = checkedProofContract(owner, id), .types = .{ .store = &owner.types }, .scheme = value.scheme, .capability_flow = value.capability_flow, .capability_parameters = value.capability_parameters, .named_function = value.named_function, .obligations = owner.obligations, .callees = .{ .live = owner } };
+        return .{ .producer_binding = id, .proof_contract = checkedProofContract(owner, id), .types = .{ .store = &owner.types }, .scheme = value.scheme, .summary = if (value.summary.shareable) value.summary else null, .capability_flow = value.capability_flow, .capability_parameters = value.capability_parameters, .named_function = value.named_function, .obligations = owner.obligations, .callees = .{ .live = owner } };
     }
 };
 /// Static imports cannot carry principal source-body interfaces.
@@ -184,6 +217,9 @@ pub const CapabilityFlow = @import("capability_flow.zig").Contract;
 pub const Binding = struct { read: bool = false, capability_flow: CapabilityFlow = .unknown, capability_parameters: @import("capability_flow.zig").Parameters = .{}, operation_ref: u32 = 0, private: bool = false, name: symbols.Symbol, declaration: ast.Id, owner: ast.Id, kind: Kind, named_function: bool = false, ty: T.Id, scheme: T.Scheme = .{}, external: ?ExternalTarget = null, predecessor: BindingId = 0, summary: SchemeSummary = .{} };
 /// An immutable interface borrows only semantic tables, never a source body.
 pub const SchemeInterface = struct {
+    /// Completed immutable sharing metadata, in the producer type/row domain.
+    /// Absent for frozen interfaces and bindings without a published summary.
+    summary: ?SchemeSummary = null,
     /// Binding ordinal in the owner of `callees`, before external relocation.
     producer_binding: BindingId = 0,
     proof_contract: ?*const proof_headers.Owned = null,
@@ -217,7 +253,7 @@ pub const Callees = union(enum) {
             .live => |owner| {
                 if (binding == 0 or binding >= owner.bindings.len) return null;
                 const value = owner.bindings[binding];
-                return .{ .producer_binding = binding, .proof_contract = checkedProofContract(owner, binding), .types = .{ .store = &owner.types }, .scheme = value.scheme, .capability_flow = value.capability_flow, .capability_parameters = value.capability_parameters, .named_function = value.named_function, .obligations = owner.obligations, .callees = self };
+                return .{ .producer_binding = binding, .proof_contract = checkedProofContract(owner, binding), .types = .{ .store = &owner.types }, .scheme = value.scheme, .summary = if (value.summary.shareable) value.summary else null, .capability_flow = value.capability_flow, .capability_parameters = value.capability_parameters, .named_function = value.named_function, .obligations = owner.obligations, .callees = self };
             },
             .frozen => |owner| {
                 if (binding == 0 or binding >= owner.bindings.len) return null;
@@ -792,6 +828,7 @@ const CatalogIndex = struct {
 const ArmCapture = struct { block: ast.Id, versions: []BindingId, carrying: bool = false };
 
 const Engine = struct {
+    frontend_work: @import("../work_counters.zig").Frontend = .{},
     catalogs: CatalogIndex = .{},
     associated_usage_work: @import("usage_check.zig").Work = .{},
     usage_loans: std.ArrayList(UsageLoan) = .empty,
@@ -887,6 +924,7 @@ const Engine = struct {
     pending: std.ArrayList(PendingObligation) = .empty,
     /// Ready bits and type watches for `pending`, by the same index.
     pending_queue: @import("solver_worklist.zig").Queue = .{},
+    scheme_dependencies: @import("scheme_dependencies.zig").Cache = .{},
     counters: Counters = .{},
     /// Closed outcomes of shared scheme uses, keyed by callee and the closed
     /// projection of the use's instantiation. Values are owned slices.
@@ -1567,7 +1605,9 @@ const Engine = struct {
     /// Copies one producer scheme. Schemes it shares are imported first, as
     /// bindings of their own, so shared uses keep pointing at shared schemes.
     fn importScheme(self: *Engine, interface: SchemeInterface, target: ExternalTarget, name: symbols.Symbol, origin: ast.Id, depth: usize) T.Error!?BindingId {
+        self.frontend_work.import_requests += 1;
         if (self.catalogs.external_targets.get(target)) |existing| return existing;
+        self.frontend_work.imported_schemes += 1;
         const range = interface.scheme.obligations;
         const constraints = interface.obligations[range.start..][0..range.len];
         var callees: std.ArrayList(BindingId) = .empty;
@@ -1638,9 +1678,28 @@ const Engine = struct {
             try self.capability_roots.append(self.allocator, .{ .binding = binding, .root = capability_root });
             committed = true;
         }
-        self.bindings.items[binding].summary = try self.summarize(principal);
+        self.bindings.items[binding].summary = if (self.execution.imported_summary_reuse and interface.summary != null) blk: {
+            const summary = try self.relocateSummary(&copier, interface.summary.?);
+            self.frontend_work.imported_summary_reuses += 1;
+            break :blk summary;
+        } else try self.summarize(principal);
         try self.catalogs.external_targets.put(self.allocator, target, binding);
         return binding;
+    }
+
+    /// Preserve the producer's immutable analysis while allocating every
+    /// consumer quantifier in its own solver. Flags are values, not type IDs.
+    fn relocateSummary(self: *Engine, copier: *SchemeCopier, source: SchemeSummary) T.Error!SchemeSummary {
+        var result = source;
+        var variables: std.ArrayList(T.Id) = .empty;
+        defer variables.deinit(self.allocator);
+        for (copier.source.list(source.public_variables)) |variable| try variables.append(self.allocator, try copier.copy(variable, 0));
+        result.public_variables = try self.types.saveList(variables.items);
+        result.public_rows = try copier.relocatedRows(copier.source.list(source.public_rows));
+        inline for (.{ "public_inputs", "public_outputs", "requirement_variables", "requirement_rows" }) |field| {
+            @field(result, field) = try self.types.saveList(copier.source.list(@field(source, field)));
+        }
+        return result;
     }
 
     fn pendingAllocator(self: *Engine) Allocator.Error!Allocator {
@@ -1648,6 +1707,7 @@ const Engine = struct {
         return self.pending_arena.?.allocator();
     }
     fn appendPending(self: *Engine, item: PendingObligation) Allocator.Error!void {
+        self.scheme_dependencies.truncate(self.allocator, self.pending.items.len);
         var value = item;
         value.scope = self.qualification_scope;
         value.method_member = value.method_member or (value.value.kind == .receiver and !value.value.explicit);
@@ -1953,8 +2013,7 @@ const Engine = struct {
         return null;
     }
     fn inList(values: []const T.Id, wanted: T.Id) bool {
-        for (values) |value| if (value == wanted) return true;
-        return false;
+        return std.mem.findScalar(T.Id, values, wanted) != null;
     }
     fn catalogKey(self: *const Engine, name: symbols.Symbol) Qualified {
         return self.qualifiedKey(name) orelse .{ .namespace = 0, .member = name };
@@ -9413,21 +9472,21 @@ const Engine = struct {
         const details = self.tree.extra.items[node.c..][0..3];
         const syntax = self.tree.list(.{ .start = details[0], .len = details[1] });
         const name = self.pool.get(node.a);
-        const kind: T.ObligationKind = if (std.mem.eql(u8, name, "type_eq")) .type_eq else if (std.mem.eql(u8, name, "associated")) .dispatch else if (std.mem.eql(u8, name, "receiver")) .receiver else if (std.mem.eql(u8, name, "merge")) .record_merge else if (std.mem.eql(u8, name, "field")) .field else if (std.mem.eql(u8, name, "update")) .update else if (std.mem.eql(u8, name, "operation")) .effect_operation else if (std.mem.eql(u8, name, "type_rep")) .type_rep else if (std.mem.eql(u8, name, "effect_rep")) .effect_rep else {
+        const kind: T.ObligationKind = if (std.mem.eql(u8, name, "type_eq")) .type_eq else if (std.mem.eql(u8, name, "associated")) .dispatch else if (std.mem.eql(u8, name, "result")) .result_dispatch else if (std.mem.eql(u8, name, "receiver")) .receiver else if (std.mem.eql(u8, name, "merge")) .record_merge else if (std.mem.eql(u8, name, "field")) .field else if (std.mem.eql(u8, name, "update")) .update else if (std.mem.eql(u8, name, "operation")) .effect_operation else if (std.mem.eql(u8, name, "type_rep")) .type_rep else if (std.mem.eql(u8, name, "effect_rep")) .effect_rep else {
             try self.diagnostic(.invalid_constraint, id);
             return null;
         };
         self.has_associated_types = self.has_associated_types or kind == .type_eq;
         self.types.has_projections = self.types.has_projections or kind == .type_eq;
-        const named = kind == .dispatch or kind == .receiver or kind == .field or kind == .update;
+        const named = kind == .dispatch or kind == .result_dispatch or kind == .receiver or kind == .field or kind == .update;
         const expected: usize = switch (kind) {
             .dispatch, .receiver, .update, .record_merge => 3,
-            .field, .type_eq => 2,
+            .field, .result_dispatch, .type_eq => 2,
             .type_rep => 1,
             .effect_rep => 0,
             else => syntax.len,
         };
-        const has_invocation = kind == .dispatch or kind == .receiver or kind == .update;
+        const has_invocation = kind == .dispatch or kind == .result_dispatch or kind == .receiver or kind == .update;
         if ((named and node.b == 0) or (!named and node.b != 0) or syntax.len != expected or
             (kind == .effect_rep and details[2] == 0) or (!has_invocation and kind != .effect_rep and details[2] != 0) or
             (kind == .effect_operation and syntax.len == 0))
@@ -9489,7 +9548,7 @@ const Engine = struct {
             result.identity = template.identity;
         } else if (kind != .effect_rep) {
             result.ty = arguments.items[0];
-            if (kind == .field or kind == .type_eq) result.result = arguments.items[1] else {
+            if (kind == .field or kind == .result_dispatch or kind == .type_eq) result.result = arguments.items[1] else {
                 result.other = arguments.items[1];
                 result.result = arguments.items[2];
                 if (kind == .dispatch) result.operator = memberOperator(self.pool.get(node.b));
@@ -9524,7 +9583,7 @@ const Engine = struct {
         try self.qualifications.append(self.allocator, .{ .scope = scope, .owner = self.current, .clauses = .{ .start = start, .len = @intCast(self.declared_obligations.items.len - start) }, .value = value });
     }
     fn requirementOpen(self: *Engine, constraint: T.Obligation) T.Error!bool {
-        const include_signature = constraint.kind != .dispatch and constraint.kind != .receiver and constraint.kind != .update;
+        const include_signature = constraint.kind != .dispatch and constraint.kind != .result_dispatch and constraint.kind != .receiver and constraint.kind != .update;
         for ([_]T.Id{ constraint.ty, constraint.other, constraint.result, if (include_signature) constraint.signature else 0 }) |part| {
             if (part == 0) continue;
             if (try self.types.containsProjection(part)) return true;
@@ -9538,7 +9597,7 @@ const Engine = struct {
         return false;
     }
     fn sourceRequirement(kind: T.ObligationKind) bool {
-        return kind == .type_eq or kind == .contract or kind == .record_merge or kind == .dispatch or kind == .field or kind == .writable_field or kind == .receiver or kind == .update or kind == .effect_operation or kind == .type_rep or kind == .effect_rep;
+        return kind == .type_eq or kind == .contract or kind == .record_merge or kind == .dispatch or kind == .result_dispatch or kind == .field or kind == .writable_field or kind == .receiver or kind == .update or kind == .effect_operation or kind == .type_rep or kind == .effect_rep;
     }
     fn requirementHead(self: *const Engine, wanted: T.Obligation, declared: T.Obligation) bool {
         if (wanted.kind == .dispatch and declared.kind == .dispatch) return if (wanted.name != 0) wanted.name == declared.name else wanted.operator != .none and wanted.operator == declared.operator;
@@ -9597,7 +9656,7 @@ const Engine = struct {
                     if (a_.tag != .function or b_.tag != .function) break :blk false;
                     // An empty ambient determines the selected method's row.
                     // Nonempty ambients may contain unrelated body effects.
-                    const ambient_signature = wanted.kind == .dispatch;
+                    const ambient_signature = wanted.kind == .dispatch or wanted.kind == .result_dispatch;
                     const ambient = self.types.row(try self.types.resolveEffects(a_.c, 0));
                     const pure_ambient = ambient.tail == .closed and ambient.labels.len == 0;
                     if (!ambient_signature or pure_ambient) self.types.unifyEffects(a_.c, b_.c) catch |err| switch (err) {
@@ -9660,6 +9719,14 @@ const Engine = struct {
             while (clause < boundary.clauses.len) : (clause += 1) {
                 const declared = self.declared_obligations.items[boundary.clauses.start + clause];
                 if (try self.unifyRequirement(coverage, declared)) {
+                    if (coverage.kind == .result_dispatch) {
+                        // Coverage removes the inferred goal from the public
+                        // scheme, but emission still needs this invocation's
+                        // complete signature. Its row is the selected method's
+                        // row, not the body's possibly larger ambient row.
+                        const carrier = self.types.node(try self.types.resolve(declared.signature, 0));
+                        self.dispatch_signatures[coverage.source] = try self.types.functionWithEffects(coverage.ty, coverage.result, carrier.c);
+                    }
                     matched_requirement = true;
                     break;
                 }
@@ -9756,9 +9823,32 @@ const Engine = struct {
     fn scheme(self: *Engine, root: T.Id, excluded: []const T.Id, group: []const BindingId, capture_concrete: bool, certificate_owner: BindingId, qualification_scope: ast.Id) T.Error!T.Scheme {
         return self.schemeInto(root, excluded, group, capture_concrete, certificate_owner, qualification_scope, &self.obligations, null);
     }
-    const SchemeCandidate = struct { index: usize, variables: []T.Id, rows: []u32, retained: bool = false };
-    fn schemeCandidates(self: *Engine, group: []const BindingId, capture_concrete: bool, qualification_scope: ast.Id, candidates: *std.ArrayList(SchemeCandidate)) T.Error!void {
+    const SchemeCandidate = struct { index: usize, variables: T.List, rows: T.List, retained: bool = false };
+    /// One generalization owns the candidate table and its variable spans.
+    /// No candidate holds an allocation or a pointer invalidated by growth.
+    const SchemeCandidates = struct {
+        entries: std.ArrayList(SchemeCandidate) = .empty,
+        variables: std.ArrayList(T.Id) = .empty,
+        rows: std.ArrayList(u32) = .empty,
+
+        fn deinit(self: *SchemeCandidates, allocator: Allocator) void {
+            self.entries.deinit(allocator);
+            self.variables.deinit(allocator);
+            self.rows.deinit(allocator);
+        }
+        fn types(self: *const SchemeCandidates, candidate: SchemeCandidate) []const T.Id {
+            return self.variables.items[candidate.variables.start..][0..candidate.variables.len];
+        }
+        fn effects(self: *const SchemeCandidates, candidate: SchemeCandidate) []const u32 {
+            return self.rows.items[candidate.rows.start..][0..candidate.rows.len];
+        }
+    };
+    fn schemeCandidates(self: *Engine, group: []const BindingId, capture_concrete: bool, qualification_scope: ast.Id, candidates: *SchemeCandidates) T.Error!void {
+        self.frontend_work.scheme_calls += 1;
         const pending_end = self.pending.items.len;
+        self.frontend_work.candidate_scans += pending_end;
+        var parts: std.ArrayList(T.Id) = .empty;
+        defer parts.deinit(self.allocator);
         var index: usize = 0;
         while (index < pending_end) : (index += 1) {
             // Evidence selection may append obligations and move this table.
@@ -9794,34 +9884,39 @@ const Engine = struct {
                 break;
             };
             if (qualified and !pending.declared and pending.scope == qualification_scope and sourceRequirement(pending.value.kind)) continue;
-            var predicate_free: std.ArrayList(T.Id) = .empty;
-            defer predicate_free.deinit(self.allocator);
-            var parts: std.ArrayList(T.Id) = .empty;
-            defer parts.deinit(self.allocator);
+            self.frontend_work.candidates += 1;
+            const variables_start = std.math.cast(u32, candidates.variables.items.len) orelse return error.TypeLimit;
+            const rows_start = std.math.cast(u32, candidates.rows.items.len) orelse return error.TypeLimit;
+            parts.clearRetainingCapacity();
             if (!capture_concrete and pending.value.kind == .callee_use and self.bindings.items[pending.value.identity.decl].summary.has_explicit) {
                 try self.requirementParts(pending.value, &parts);
             } else {
                 for ([_]T.Id{ pending.value.ty, pending.value.other, pending.value.result, pending.value.signature }) |part| if (part != 0) try parts.append(self.allocator, part);
             }
-            for (parts.items) |part| {
-                if (part == 0) continue;
-                const vars = try self.types.freeVariables(part);
-                defer self.allocator.free(vars);
-                for (vars) |variable| if (!inList(predicate_free.items, variable)) try predicate_free.append(self.allocator, variable);
+            self.frontend_work.candidate_parts += parts.items.len;
+            if (self.execution.scheme_dependency_reuse) {
+                const dependencies = try self.scheme_dependencies.query(self.allocator, &self.types, index, parts.items);
+                try candidates.variables.appendSlice(self.allocator, dependencies.variables);
+                try candidates.rows.appendSlice(self.allocator, dependencies.rows);
+            } else {
+                for (parts.items) |part| {
+                    if (part == 0) continue;
+                    const vars = try self.types.freeVariables(part);
+                    defer self.allocator.free(vars);
+                    for (vars) |variable| if (!inList(candidates.variables.items[variables_start..], variable)) try candidates.variables.append(self.allocator, variable);
+                }
+                for (parts.items) |part| {
+                    if (part == 0) continue;
+                    const rows = try self.types.freeRowVariables(part);
+                    defer self.allocator.free(rows);
+                    for (rows) |row| if (!inList(candidates.rows.items[rows_start..], row)) try candidates.rows.append(self.allocator, row);
+                }
             }
-            var predicate_rows: std.ArrayList(u32) = .empty;
-            defer predicate_rows.deinit(self.allocator);
-            for (parts.items) |part| {
-                if (part == 0) continue;
-                const rows = try self.types.freeRowVariables(part);
-                defer self.allocator.free(rows);
-                for (rows) |row| if (!inList(predicate_rows.items, row)) try predicate_rows.append(self.allocator, row);
-            }
-            const owned = try predicate_free.toOwnedSlice(self.allocator);
-            errdefer self.allocator.free(owned);
-            const owned_rows = try predicate_rows.toOwnedSlice(self.allocator);
-            errdefer self.allocator.free(owned_rows);
-            try candidates.append(self.allocator, .{ .index = index, .variables = owned, .rows = owned_rows });
+            const variables: T.List = .{ .start = variables_start, .len = std.math.cast(u32, candidates.variables.items.len - variables_start) orelse return error.TypeLimit };
+            const rows: T.List = .{ .start = rows_start, .len = std.math.cast(u32, candidates.rows.items.len - rows_start) orelse return error.TypeLimit };
+            self.frontend_work.candidate_variables += variables.len;
+            self.frontend_work.candidate_rows += rows.len;
+            try candidates.entries.append(self.allocator, .{ .index = index, .variables = variables, .rows = rows });
         }
     }
     fn schemeRequirements(self: *Engine, candidates: []const SchemeCandidate, capture_concrete: bool, output: *std.ArrayList(T.Obligation), suspensions: ?*std.ArrayList(usize)) T.Error!T.List {
@@ -9846,22 +9941,20 @@ const Engine = struct {
         const resolved = try self.types.resolve(root, 0);
         const free = try self.types.freeVariables(resolved);
         defer self.allocator.free(free);
-        var candidates: std.ArrayList(SchemeCandidate) = .empty;
-        defer {
-            for (candidates.items) |candidate| {
-                self.allocator.free(candidate.variables);
-                self.allocator.free(candidate.rows);
-            }
-            candidates.deinit(self.allocator);
-        }
+        var candidates: SchemeCandidates = .{};
+        defer candidates.deinit(self.allocator);
         try self.schemeCandidates(group, capture_concrete, qualification_scope, &candidates);
         // A latent result depending on an outer variable is itself monomorphic.
         // This closure prevents a local binding from generalizing p.x while p
         // still belongs to an enclosing function's inference region.
         var outer: std.ArrayList(T.Id) = .empty;
+        var outer_index: @import("ordered_membership.zig").Index = .{ .enabled = self.execution.indexed_scheme_membership };
+        defer outer_index.deinit(self.allocator);
         defer outer.deinit(self.allocator);
         try outer.appendSlice(self.allocator, excluded);
         var outer_rows: std.ArrayList(u32) = .empty;
+        var outer_rows_index: @import("ordered_membership.zig").Index = .{ .enabled = self.execution.indexed_scheme_membership };
+        defer outer_rows_index.deinit(self.allocator);
         defer outer_rows.deinit(self.allocator);
         const ambient_free = self.types.effects.freeVariables(self.ambient) catch |err| return T.effectError(err);
         defer self.allocator.free(ambient_free);
@@ -9884,49 +9977,53 @@ const Engine = struct {
         var progress = true;
         while (progress) {
             progress = false;
-            for (candidates.items) |candidate| {
+            for (candidates.entries.items) |candidate| {
                 var connected = false;
-                for (candidate.variables) |variable| if (inList(outer.items, variable)) {
+                for (candidates.types(candidate)) |variable| if (try outer_index.contains(self.allocator, outer.items, variable)) {
                     connected = true;
                     break;
                 };
-                for (candidate.rows) |row| if (inList(outer_rows.items, row)) {
+                for (candidates.effects(candidate)) |row| if (try outer_rows_index.contains(self.allocator, outer_rows.items, row)) {
                     connected = true;
                     break;
                 };
                 if (!connected) continue;
-                for (candidate.rows) |row| if (!inList(outer_rows.items, row)) {
+                for (candidates.effects(candidate)) |row| if (!try outer_rows_index.contains(self.allocator, outer_rows.items, row)) {
                     try outer_rows.append(self.allocator, row);
                     progress = true;
                 };
-                for (candidate.variables) |variable| if (!inList(outer.items, variable)) {
+                for (candidates.types(candidate)) |variable| if (!try outer_index.contains(self.allocator, outer.items, variable)) {
                     try outer.append(self.allocator, variable);
                     progress = true;
                 };
             }
         }
         var variables: std.ArrayList(T.Id) = .empty;
+        var variables_index: @import("ordered_membership.zig").Index = .{ .enabled = self.execution.indexed_scheme_membership };
+        defer variables_index.deinit(self.allocator);
         defer variables.deinit(self.allocator);
-        for (free) |id| if (!inList(outer.items, id)) try variables.append(self.allocator, id);
+        for (free) |id| if (!try outer_index.contains(self.allocator, outer.items, id)) try variables.append(self.allocator, id);
         var row_variables: std.ArrayList(u32) = .empty;
+        var row_variables_index: @import("ordered_membership.zig").Index = .{ .enabled = self.execution.indexed_scheme_membership };
+        defer row_variables_index.deinit(self.allocator);
         defer row_variables.deinit(self.allocator);
         const free_rows = try self.types.freeRowVariables(resolved);
         defer self.allocator.free(free_rows);
-        for (free_rows) |row| if (!inList(outer_rows.items, row)) try row_variables.append(self.allocator, row);
+        for (free_rows) |row| if (!try outer_rows_index.contains(self.allocator, outer_rows.items, row)) try row_variables.append(self.allocator, row);
         // Quantifiers cover the entire retained predicate graph, including
         // intermediate dispatch results absent from the visible signature.
         // Each use freshens these private variables with the public ones.
         progress = true;
         while (progress) {
             progress = false;
-            for (candidates.items) |*candidate| {
+            for (candidates.entries.items) |*candidate| {
                 const pending = self.pending.items[candidate.index];
                 var retained = candidate.retained or pending.method_member or self.explicitRequirement(pending.value) or (capture_concrete and (pending.value.kind == .dispatch or pending.value.kind == .result_dispatch or pending.value.kind == .monad_factory or pending.value.kind == .resolver_dispatch or pending.value.kind == .resolver_shape or pending.value.kind == .effect_operation or pending.value.kind == .effect_handler or pending.value.kind == .type_head or pending.value.kind == .callee_use) and !pending.suspended);
-                if (!retained) for (candidate.variables) |variable| if (inList(variables.items, variable)) {
+                if (!retained) for (candidates.types(candidate.*)) |variable| if (try variables_index.contains(self.allocator, variables.items, variable)) {
                     retained = true;
                     break;
                 };
-                if (!retained) for (candidate.rows) |row| if (inList(row_variables.items, row)) {
+                if (!retained) for (candidates.effects(candidate.*)) |row| if (try row_variables_index.contains(self.allocator, row_variables.items, row)) {
                     retained = true;
                     break;
                 };
@@ -9935,20 +10032,22 @@ const Engine = struct {
                     candidate.retained = true;
                     progress = true;
                 }
-                for (candidate.rows) |row| if (!inList(outer_rows.items, row) and !inList(row_variables.items, row)) {
+                for (candidates.effects(candidate.*)) |row| if (!try outer_rows_index.contains(self.allocator, outer_rows.items, row) and !try row_variables_index.contains(self.allocator, row_variables.items, row)) {
                     try row_variables.append(self.allocator, row);
                     progress = true;
                 };
-                for (candidate.variables) |variable| if (!inList(outer.items, variable) and !inList(variables.items, variable)) {
+                for (candidates.types(candidate.*)) |variable| if (!try outer_index.contains(self.allocator, outer.items, variable) and !try variables_index.contains(self.allocator, variables.items, variable)) {
                     try variables.append(self.allocator, variable);
                     progress = true;
                 };
             }
         }
         var protected_rows: std.ArrayList(u32) = .empty;
+        var protected_rows_index: @import("ordered_membership.zig").Index = .{ .enabled = self.execution.indexed_scheme_membership };
+        defer protected_rows_index.deinit(self.allocator);
         defer protected_rows.deinit(self.allocator);
-        for (candidates.items) |candidate| if (candidate.retained) {
-            for (candidate.rows) |row| if (!inList(protected_rows.items, row)) try protected_rows.append(self.allocator, row);
+        for (candidates.entries.items) |candidate| if (candidate.retained) {
+            for (candidates.effects(candidate)) |row| if (!try protected_rows_index.contains(self.allocator, protected_rows.items, row)) try protected_rows.append(self.allocator, row);
         };
         const closed = try self.types.closeCovariantCertified(resolved, row_variables.items, protected_rows.items);
         for (self.generative_bindings.items) |*binder| if (binder.arrow != 0) {
@@ -9960,13 +10059,13 @@ const Engine = struct {
         const remaining_rows = try self.types.freeRowVariables(closed.root);
         defer self.allocator.free(remaining_rows);
         var kept: usize = 0;
-        for (row_variables.items) |variable| if (inList(remaining_rows, variable) or inList(protected_rows.items, variable)) {
+        for (row_variables.items) |variable| if (inList(remaining_rows, variable) or try protected_rows_index.contains(self.allocator, protected_rows.items, variable)) {
             row_variables.items[kept] = variable;
             kept += 1;
         };
         row_variables.shrinkRetainingCapacity(kept);
         const span = try self.types.saveList(variables.items);
-        const requirements = try self.schemeRequirements(candidates.items, capture_concrete, output, suspensions);
+        const requirements = try self.schemeRequirements(candidates.entries.items, capture_concrete, output, suspensions);
         return .{ .root = closed.root, .variables = span, .row_variables = try self.types.saveList(row_variables.items), .closed_rows = closed.closed_rows, .generative = try @import("generative_schemes.zig").collect(&self.types, self.allocator, closed.root, self.generative_bindings.items), .obligations = requirements };
     }
     fn sharedKind(kind: T.ObligationKind) bool {
@@ -9999,7 +10098,10 @@ const Engine = struct {
             }
         }
         summary.flat_size = @intCast(@min(flat, 1 << 30));
-        if (principal.root == 0) return summary;
+        // With no predicates there is no shared use to instantiate. Its type
+        // scheme still owns every quantifier; public-slot sharing metadata is
+        // unnecessary, including for imported ordinary polymorphic functions.
+        if (principal.root == 0 or (!self.execution.eager_scheme_summaries and principal.obligations.len == 0)) return summary;
         const free = try self.types.freeVariables(try self.types.resolve(principal.root, 0));
         defer self.allocator.free(free);
         const free_rows = try self.types.freeRowVariables(try self.types.resolve(principal.root, 0));
@@ -10034,17 +10136,22 @@ const Engine = struct {
         var requirements: std.ArrayList(T.Id) = .empty;
         defer requirements.deinit(self.allocator);
         for (obligations[principal.obligations.start..][0..principal.obligations.len]) |constraint| try self.requirementParts(constraint, &requirements);
+        // These membership lists are temporary; only the flags saved below
+        // cross the summary boundary. Small requirements need no heap buffers.
+        var requirement_buffer: [512]u8 align(@alignOf(usize)) = undefined;
+        var requirement_scratch: std.heap.BufferFirstAllocator = .init(&requirement_buffer, self.allocator);
+        const requirement_allocator = requirement_scratch.allocator();
         var requirement_variables: std.ArrayList(T.Id) = .empty;
-        defer requirement_variables.deinit(self.allocator);
+        defer requirement_variables.deinit(requirement_allocator);
         var requirement_rows: std.ArrayList(u32) = .empty;
-        defer requirement_rows.deinit(self.allocator);
+        defer requirement_rows.deinit(requirement_allocator);
         for (requirements.items) |part| {
             const variables = try self.types.freeVariables(part);
             defer self.allocator.free(variables);
-            try requirement_variables.appendSlice(self.allocator, variables);
+            try requirement_variables.appendSlice(requirement_allocator, variables);
             const rows = try self.types.freeRowVariables(part);
             defer self.allocator.free(rows);
-            try requirement_rows.appendSlice(self.allocator, rows);
+            try requirement_rows.appendSlice(requirement_allocator, rows);
         }
         for (public.items, flags) |variable, *flag| flag.* = @intFromBool(inList(requirement_variables.items, variable));
         summary.requirement_variables = try self.types.saveList(flags);
@@ -12907,7 +13014,10 @@ const Engine = struct {
             for (instance[0..summary.public_variables.len], self.types.list(summary.requirement_variables)) |part, flag| if (flag != 0) try output.append(self.allocator, part);
             for (instance[summary.public_variables.len..], self.types.list(summary.requirement_rows)) |part, flag| if (flag != 0) try output.append(self.allocator, part);
         } else if (sourceRequirement(requirement.kind)) {
-            for ([_]T.Id{ requirement.ty, requirement.other, requirement.result, requirement.signature }) |part| if (part != 0) try output.append(self.allocator, part);
+            // Consumers collect a union of free variables. Repeated operands
+            // within one requirement need only one traversal of that type.
+            const parts = [_]T.Id{ requirement.ty, requirement.other, requirement.result, requirement.signature };
+            for (parts, 0..) |part, index| if (part != 0 and !inList(parts[0..index], part)) try output.append(self.allocator, part);
         }
     }
     fn addResolverOp(self: *Engine, value: ResolverOp, explicit: bool) T.Error!u32 {
@@ -15552,6 +15662,7 @@ noinline fn deinitEngine(engine: *Engine, published: bool) void {
         engine.types.deinit();
     }
     engine.pending_queue.deinit(allocator);
+    engine.scheme_dependencies.deinit(allocator);
     engine.usage_loans.deinit(allocator);
     engine.staging_bindings.deinit(allocator);
     engine.catalogs.deinit(allocator);
@@ -15823,6 +15934,15 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
             if (err == error.OutOfMemory) return error.OutOfMemory;
         };
     };
+    engine.frontend_work.modules = 1;
+    engine.frontend_work.type_nodes = checked.types.nodes.items.len;
+    engine.frontend_work.dependency_hits = engine.scheme_dependencies.hits;
+    engine.frontend_work.dependency_recomputations = engine.scheme_dependencies.recomputations;
+    engine.frontend_work.normalization = checked.types.normalization;
+    for (checked.bindings) |binding| if (binding.kind == .external and binding.read) {
+        engine.frontend_work.imported_read += 1;
+    };
+    @import("../phase_profile.zig").recordChecking(engine.frontend_work);
     return checked;
 }
 

@@ -43,6 +43,9 @@ pub const Provider = struct {
 };
 pub const Record = struct {
     member: ?*Member = null,
+    /// Closure results frozen by this complete query, proved at their own
+    /// semantic evidence. Native-only; a typed view is not such a result.
+    completed_closures: []u32 = &.{},
     input: u32,
     expected: u32,
     selected: u32,
@@ -64,6 +67,7 @@ pub const Record = struct {
     views: []ViewEffect,
     plain_facts: []PlainFact,
     pub fn deinit(self: *Record, a: Allocator) void {
+        a.free(self.completed_closures);
         if (self.member) |member| {
             a.free(member.principals);
             a.free(member.ready);
@@ -107,13 +111,15 @@ pub const Record = struct {
         result.views = try a.dupe(ViewEffect, self.views);
         errdefer a.free(result.views);
         result.plain_facts = try a.dupe(PlainFact, self.plain_facts);
+        errdefer a.free(result.plain_facts);
+        result.completed_closures = try a.dupe(u32, self.completed_closures);
         return result;
     }
 };
 pub fn ownedBytes(record: Record) usize {
     var total: usize = 0;
     if (record.member) |member| total += @sizeOf(Member) + member.principals.len * @sizeOf(PrincipalRead) + member.ready.len * @sizeOf(ReadyRead);
-    inline for (.{ "sources", "scalar_reads", "call_reads", "call_publications", "views", "plain_facts" }) |field| {
+    inline for (.{ "sources", "scalar_reads", "call_reads", "call_publications", "views", "plain_facts", "completed_closures" }) |field| {
         const entries = @field(record, field);
         total +|= entries.len *| @sizeOf(@TypeOf(entries[0]));
     }

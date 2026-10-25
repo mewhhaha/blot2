@@ -319,6 +319,9 @@ pub const Gate = struct {
     /// executable fragment is admitted by this proof. Requirement producers
     /// have separate observations; their exact public headers must also pass.
     pub fn admitsCheckedInterface(self: *const Gate, target: core.BindingRef) bool {
+        return self.checkedInterfaceEqual(target, true);
+    }
+    fn checkedInterfaceEqual(self: *const Gate, target: core.BindingRef, functions_only: bool) bool {
         if (self.constant_types or !self.admitsCallIdentity(target)) return false;
         const old = self.source_pools.?.modules[target.unit - 1].module;
         const current = &self.units[target.unit - 1];
@@ -329,14 +332,36 @@ pub const Gate = struct {
         // The gate already proves the whole type/catalog graph. Compare the
         // fields used to instantiate headers, including the explicit-leaf bit
         // consulted before descending into a producer's requirements.
-        if (!before.is_function or !after.is_function or !equal(left.scheme, right.scheme) or
+        if ((functions_only and (!before.is_function or !after.is_function)) or !equal(left.scheme, right.scheme) or
             left.has_explicit != right.has_explicit or before.parameters.len != after.parameters.len or
             !equal(old.types.list(left.public_variables), current.types.list(right.public_variables)) or
             !equal(old.types.list(left.public_rows), current.types.list(right.public_rows)) or
             !equal(old.types.list(before.closed_rows), current.types.list(after.closed_rows))) return false;
+        if (!projection.parameterHeadersEqual(old, before.*, current, after.*)) return false;
         // Retained residual constraints may carry requirement diagnostics.
         // Unlike catalog equality, this proof keeps their locations exact.
         return equal(old.obligations[left.scheme.obligations.start..][0..left.scheme.obligations.len], current.obligations[right.scheme.obligations.start..][0..right.scheme.obligations.len]);
+    }
+
+    /// Inferred requirements additionally consume a lexical completeness proof.
+    /// Equal headers alone cannot certify a different implementation. Rebuild
+    /// that proof from current Core before accepting the old query's result.
+    pub fn admitsCompletedInterface(self: *const Gate, target: core.BindingRef) Allocator.Error!bool {
+        if (!self.checkedInterfaceEqual(target, false)) return false;
+        const current = &self.units[target.unit - 1];
+        const scheme = current.binding(target.binding).scheme;
+        var needs_proof = !current.body(target.binding).?.is_function;
+        for (current.obligations[scheme.obligations.start..][0..scheme.obligations.len]) |requirement| {
+            needs_proof = needs_proof or !requirement.explicit;
+        }
+        if (needs_proof) {
+            const owners = try self.allocator.alloc(*const core.Module, self.units.len);
+            defer self.allocator.free(owners);
+            for (owners, self.units) |*owner, *module| owner.* = module;
+            var remaining: usize = 65_536;
+            @import("../check/package_core.zig").checkedInterfaceBody(current, target.binding, .{ .units = owners }, &remaining, self.allocator) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+        }
+        return true;
     }
 
     /// A closure root of a structural unit, or one reached by the exact

@@ -1,5 +1,6 @@
 //! Independently compiled checker laws.
 comptime {
+    _ = @import("reuse/parallel_check_tests.zig");
     _ = @import("check/task_check_tests.zig");
     _ = @import("check/numeric_proof_terms.zig");
     _ = @import("check/numeric_proof_contracts.zig");

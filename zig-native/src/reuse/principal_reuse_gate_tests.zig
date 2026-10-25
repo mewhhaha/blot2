@@ -59,6 +59,38 @@ test "call identity follows unique owned declaration names across source movemen
     try std.testing.expect(!ambiguous.admitsCheckedInterface(later));
 }
 
+fn referencedBodyExtentFailure(allocator: std.mem.Allocator, before: *const Pinned, after: *const Fixture, producer: core.BindingRef, consumer: core.BindingRef) !void {
+    var gate = try Gate.init(allocator, &before.pools, after.units, after.names.view());
+    defer gate.deinit();
+    try std.testing.expect(gate.enabled);
+    try std.testing.expect(!gate.admitsLocalSource(producer));
+    try std.testing.expect(gate.admitsCheckedInterface(producer));
+    try std.testing.expect(gate.admitsLocalSource(consumer));
+    // The consumer body is unchanged, but executable/transitive authority
+    // still observes the changed producer implementation.
+    try std.testing.expect(!gate.admitsPrincipal(consumer));
+    try std.testing.expect(!gate.admits(consumer));
+}
+
+test "named header references ignore producer body extent while preserving transitive invalidation through OOM" {
+    const prefix = "entry const producer = fn (x: U32) -> U32 => @u32.add x ";
+    const suffix = "\nentry const consumer = fn (x: U32) -> U32 => producer x\n";
+    var before = try Fixture.init(a, &.{prefix ++ "1" ++ suffix});
+    defer before.deinit(a);
+    var pinned = try Pinned.init(a, &before);
+    defer pinned.deinit(a);
+    var after = try Fixture.init(a, &.{prefix ++ "20" ++ suffix});
+    defer after.deinit(a);
+    const producer = target(&after.units[0], "producer");
+    const consumer = target(&after.units[0], "consumer");
+    try referencedBodyExtentFailure(a, &pinned, &after, producer, consumer);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, referencedBodyExtentFailure, .{ &pinned, &after, producer, consumer });
+    after.units[0].bindings[producer.binding].has_explicit = !after.units[0].bindings[producer.binding].has_explicit;
+    var changed_header = try Gate.init(a, &pinned.pools, after.units, after.names.view());
+    defer changed_header.deinit();
+    try std.testing.expect(!changed_header.admitsLocalSource(consumer));
+}
+
 test "checked requirement interfaces reject changed producer flags requirement kinds and diagnostic positions" {
     const source = "entry const local: U32 -> U32 where { type_rep U32 } = fn x => @u32.add x 1\n";
     var before = try Fixture.init(a, &.{source});

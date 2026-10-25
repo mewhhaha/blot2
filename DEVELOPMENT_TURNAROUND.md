@@ -1,23 +1,56 @@
 # Five-minute development feedback
 
+CT116's selected Safe/noLLVM development cycle passes in 29.80 s, including the
+new dependency, membership, imported-summary and parallel-checker laws. This is
+one observed cycle, not a paired compiler-build speedup. The frozen full gate
+uses four native shards and completes in 687.33 s with exhaustive allocation
+faults. A missing local analyzer was rebuilt with its compatible Zig 0.17
+backend under `build/tooling`; `ZIG_ANALYZER` selects that workspace-owned
+executable. See [CT116 qualification](zig-native/CT116_QUALIFICATION.md).
+
+The [CT113 cycle](zig-native/CT113_QUALIFICATION.md) compiles all 2,587 native
+laws and passes 130 selected sampled laws, 68 executed guests, formatting/types
+and zero Zig lint findings in 28.16 s. Native compilation takes 7.21 s. This
+cycle overlaps diagnostic work and is not a compiler-build speed comparison. The
+final LLVM release builds in about three minutes. Full native execution passes
+2,587 laws and 1,687 exhaustive allocation sweeps in 632.80 s. After a guest
+temporary-directory race is fixed, the successful resumed gate takes 78.23 s,
+including 30.56 s for all 1,660 release guests. The cached native phase is
+verified and resumed; these are not fresh full-gate build timings. Default
+development and all native-test compilation remain noLLVM.
+
+Historical CT112 observations follow.
+
+The [CT112 follow-up](zig-native/CT112_QUALIFICATION.md) expands static-sharing
+to 120 sampled native laws and 68 guests. Its final isolated cycle compiles the
+complete 2,586-law native inventory and passes formatting/types and zero Zig
+lint findings in 29.09 s. The cycle overlaps LLVM release construction; it is
+not a quiet or paired compiler-build timing. A separate four-shard sampled run
+passes all 2,586 laws in 30.82 s. The separate full gate passes in 723.99 s,
+including 635.97 s exhaustive native execution on four shards and 39.74 s
+release guests. Its native compilation and already built release are cached;
+these are not fresh compiler-construction timings.
+
+Historical CT110 iteration measurements:
+
 [CT110](zig-native/CT110_QUALIFICATION.md) passes the expanded 99-law / 56-guest
-selected development cycle in 25.54 s, including complete Safe/noLLVM compilation
-of 2,576 native laws. Full native compilation takes 9.70 s and exhaustive
-execution 1,228.48 s across two shards. The LLVM release builds in 318.80 s while
-native execution overlaps. These are observations, not paired build gains; the
-previous CT109 run below used four shards.
+selected development cycle in 25.54 s, including complete Safe/noLLVM
+compilation of 2,576 native laws. Full native compilation takes 9.70 s and
+exhaustive execution 1,228.48 s across two shards. The LLVM release builds in
+318.80 s while native execution overlaps. These are observations, not paired
+build gains; the previous CT109 run below used four shards.
 
 The first full gate passes native execution but finds a guest cache-directory
-cleanup race. The fixture now waits for detached writer locks. A verified
-native resume completes guests/local checks in 51.06 s; that excludes the
-already completed exhaustive execution and is not a 51-second full gate.
-Final qualification passes all 1,656 guests and zero Zig lint findings.
+cleanup race. The fixture now waits for detached writer locks. A verified native
+resume completes guests/local checks in 51.06 s; that excludes the already
+completed exhaustive execution and is not a 51-second full gate. Final
+qualification passes all 1,656 guests and zero Zig lint findings.
 
 Historical CT109 iteration measurements:
 
-[CT109](zig-native/CT109_QUALIFICATION.md) expands the static-sharing family
-to 95 native laws. Its last complete selected cycle passes in 25.73 s; this is
-one shared-host observation, not a paired construction speedup. Final exhaustive
+[CT109](zig-native/CT109_QUALIFICATION.md) expands the static-sharing family to
+95 native laws. Its last complete selected cycle passes in 25.73 s; this is one
+shared-host observation, not a paired construction speedup. Final exhaustive
 qualification compiles all 2,573 native laws with Safe/noLLVM in 8.63 s and
 executes them in 651.07 s (four shards, 630–651 s). The full gate takes 711.82 s
 and includes 1,656 guests; its already built LLVM release is reused. Development
@@ -27,16 +60,16 @@ The CT106 distribution below retains its original 78-law selection and source
 pins; it is historical evidence, not the current selection count.
 
 [CT106](zig-native/CT106_QUALIFICATION.md) measures 20 complete Safe/noLLVM
-static-sharing edit/check cycles: **25.35 s median**,
-**27.64 s observed p95**, **27.78 s maximum**.
-Leaf/checker compiler construction medians are 4.29/4.88 s; the test-only cached
-compiler build is 0.36 s. Complete native compilation takes 7.20–8.03 s by edit
-class, and guest smoke about 9.7–9.9 s. Every cycle compiles all 2,564 native
-laws, runs the same 78-law sampled family and 55 guests, and passes local checks.
-The first failed teardown sequence is excluded and preserved; the completed
-sequence verifies every source restoration, compiler identity and inventory.
-These are observed distributions on a shared host, not paired build speedups or
-universal latency bounds. Full release qualification remains separate.
+static-sharing edit/check cycles: **25.35 s median**, **27.64 s observed p95**,
+**27.78 s maximum**. Leaf/checker compiler construction medians are 4.29/4.88 s;
+the test-only cached compiler build is 0.36 s. Complete native compilation takes
+7.20–8.03 s by edit class, and guest smoke about 9.7–9.9 s. Every cycle compiles
+all 2,564 native laws, runs the same 78-law sampled family and 55 guests, and
+passes local checks. The first failed teardown sequence is excluded and
+preserved; the completed sequence verifies every source restoration, compiler
+identity and inventory. These are observed distributions on a shared host, not
+paired build speedups or universal latency bounds. Full release qualification
+remains separate.
 
 The historical LLVM release trace spends 220.88 of 227.76 s in emission. Keep
 Safe/noLLVM for development and the complete native inventory; focus next on
@@ -81,11 +114,11 @@ artifacts.
 
 - Compile the complete native inventory with Zig's backend, then select existing
   laws at runtime. LLVM is reserved for the actual release compiler.
-- The current static-sharing family selects 95 native laws, covering aggregate
+- The current static-sharing family selects 99 native laws, covering aggregate
   parity and rejection, persistent roots, principal observations, portable
-  archives, closure replay, checked interfaces, bounded backend reuse, effect-row
-  normalization and fault-policy behavior.
-  `--list-areas` and the run's exact selection are authoritative.
+  archives, closure replay, checked interfaces, bounded backend reuse,
+  effect-row normalization and fault-policy behavior. `--list-areas` and the
+  run's exact selection are authoritative.
 - Run the selected protocol, budget-recovery and client edit/error/recovery
   guest tests. JUnit validation requires every selected file/name to actually
   execute and pass.
@@ -167,6 +200,14 @@ budget. Shrinking them would stop testing their intended limits.
 A quick pass never replaces the full native exhaustive-OOM gate, full guests/CI,
 or release exact-output, CPU, runtime and allocation qualification. Frozen
 evidence remains tied to its original inputs.
+
+The automatic recent-failure preflight currently runs guests with Safe/noLLVM.
+Release-calibrated allocator budgets can therefore fail there even when the
+release compiler passes. CT111 encountered this mismatch. Recheck the complete
+budget file through `test:compiler --guest` using the same `--timings-dir`; a
+successful release run clears the recent-failure entry normally before retrying
+the full gate. Preserve the failed log and do not relax budgets or inject native
+resume evidence. This limitation is separate from compiler correctness.
 
 Validation before publication: all 44 tooling tests pass. The final full-gate
 smoke-lease correction passes all 19 affected launcher/journal tests, including

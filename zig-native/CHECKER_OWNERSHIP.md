@@ -19,6 +19,15 @@ intrinsic permission active while its ordinary invocation rule runs. Scheme
 generalization separates candidate selection, connected variable/row closure,
 and residual requirement publication without changing query order.
 
+Each generalization owns one candidate table and two flat variable buffers.
+Candidate spans remain valid when those buffers grow; no candidate owns a
+separate allocation or borrows a pointer into a growing array. One temporary
+type-component list is reused during discovery. Failure releases the complete
+unpublished workspace. A predicate-free scheme retains its full type/effect
+quantifiers but needs no public-slot sharing summary: ordinary instantiation
+freshens it directly. A private differential control retains eager summaries for
+regression checks. No new free-variable cache is retained between queries.
+
 The lifecycle coordinator still owns allocation guards and final `Checked`
 publication. Its current 417 lines are visible; no completion claim hides that
 remaining size. Source/header validation stays separate from retained body

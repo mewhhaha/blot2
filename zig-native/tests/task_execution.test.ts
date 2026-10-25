@@ -643,7 +643,9 @@ Deno.test("wide Source task scope and thunk execute with more than 64 direct chi
     executable,
     entry,
     prelude: null,
-    cacheDirectory: `${directory}/cache`,
+    // This fixture checks task width; a detached restart writer can outlive
+    // the server and race temporary-directory removal.
+    cacheDirectory: false,
   });
   const outer = Array.from(
     { length: 96 },

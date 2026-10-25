@@ -279,12 +279,16 @@ const IndexedRegion = struct {
 
 /// An immutable source-owned interface with residual body actions and shared
 /// callee edges. Each import freshens its binders in the receiving solver.
-const PrincipalGraph = struct {
-    const Key = struct { target: Target, source_interface: bool, deferred_member: bool, options: Options };
+pub const PrincipalGraph = struct {
+    pub const Key = struct { target: Target, source_interface: bool, deferred_member: bool, options: Options };
     const TypeImport = struct { source: types.Id, graph: types.Id };
     const RowImport = struct { source: u32, graph: types.Effects.Id };
     const Action = union(enum) { constraint: u32, alias: u32, function: u32, reference: u32 };
     key: Key,
+    leases: usize = 1,
+    /// Only source descriptions with no session observations or publications
+    /// may cross revisions. A residual theorem is a separate, stronger claim.
+    retention_eligible: bool = false,
     allocations: @import("../runtime/memory.zig").TrackedAllocator,
     types: types.Store,
     root: types.Id = 0,
@@ -321,7 +325,16 @@ const PrincipalGraph = struct {
         return count;
     }
 
-    fn deinit(self: *PrincipalGraph, backing: Allocator) void {
+    fn retain(self: *PrincipalGraph) void {
+        std.debug.assert(self.leases != std.math.maxInt(usize));
+        self.leases += 1;
+    }
+
+    fn deinit(self: *PrincipalGraph, _: Allocator) void {
+        std.debug.assert(self.leases != 0);
+        self.leases -= 1;
+        if (self.leases != 0) return;
+        const backing = self.allocations.backing;
         const allocator = self.allocations.allocator();
         for (self.constraints) |constraint| allocator.free(constraint.diagnostic_name);
         for (self.requirements) |constraint| allocator.free(constraint.diagnostic_name);
@@ -339,6 +352,66 @@ const PrincipalGraph = struct {
         self.types.deinit();
         std.debug.assert(self.allocations.counts.live_bytes == 0);
         backing.destroy(self);
+    }
+};
+
+/// Borrowed, source-owned graph. The receiving session must acquire its own
+/// lease only after its private query table has reserved publication storage.
+pub const PrincipalGraphProvider = struct {
+    context: *anyopaque,
+    lookup: *const fn (*anyopaque, PrincipalGraph.Key) ?*PrincipalGraph,
+};
+
+/// A bounded set of immutable source descriptions used by the last successful
+/// revision. No solver history, values, mutable memo facts or negative answers
+/// are retained here. Unused descriptions disappear at the next publication.
+pub const RetainedPrincipalGraphs = struct {
+    queries: PrincipalQueries(.source_description) = .{},
+
+    pub fn deinit(self: *RetainedPrincipalGraphs, a: Allocator) void {
+        self.queries.deinit(a);
+    }
+
+    pub fn capture(self: *RetainedPrincipalGraphs, session: *Session) Allocator.Error!void {
+        std.debug.assert(self.queries.count() == 0);
+        for (session.specializations.call_summaries.principals.table.records.items) |record| {
+            const graph = record.value.graph orelse continue;
+            if (!graph.retention_eligible) continue;
+            if (!try self.queries.put(session.allocator, graph.key, graph, session)) continue;
+            graph.retain();
+            session.counters.principal_graph_retained += 1;
+            session.counters.principal_graph_retained_bytes += @sizeOf(PrincipalGraph) + graph.allocations.counts.live_bytes;
+        }
+    }
+
+    /// The supplied gate pairs these exact source pins with current immutable
+    /// Core. Body IDs and diagnostic spans require structural correspondence;
+    /// interface-only equality is deliberately insufficient for this artifact.
+    pub fn lookup(self: *const RetainedPrincipalGraphs, key: PrincipalGraph.Key, gate: anytype) ?*PrincipalGraph {
+        if (!gate.admits(.{ .unit = @intCast(key.target.unit + 1), .binding = key.target.binding })) return null;
+        const Queries = PrincipalQueries(.source_description);
+        var cursor = self.queries.table.candidates(Queries.Adapter.fingerprint(.{ .source = key }), .oldest_first);
+        var remaining = self.queries.lookup_budget;
+        candidate: while (cursor.next()) |position| {
+            if (remaining == 0) return null;
+            remaining -= 1;
+            const record = self.queries.table.records.items[position];
+            if (!std.meta.eql(record.key.source, key)) continue;
+            const graph = record.value.graph orelse continue;
+            if (!graph.retention_eligible) continue;
+            for (graph.dependencies) |source| {
+                if (remaining == 0) return null;
+                remaining -= 1;
+                if (!gate.admits(source)) continue :candidate;
+            }
+            for (graph.references) |source| {
+                if (remaining == 0) return null;
+                remaining -= 1;
+                if (!gate.admits(.{ .unit = @intCast(source.unit + 1), .binding = source.binding })) continue :candidate;
+            }
+            return graph;
+        }
+        return null;
     }
 };
 
@@ -683,6 +756,186 @@ test "principal query templates distinguish owners claims flags plain observatio
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, principalQueryCollisionScenario, .{});
 }
 
+const RetainedGraphTestProvider = struct {
+    old: *const RetainedPrincipalGraphs,
+    denied: core.BindingId = 0,
+    pub fn admits(self: *const RetainedGraphTestProvider, source: core.BindingRef) bool {
+        return source.unit == 1 and source.binding != 0 and source.binding != self.denied;
+    }
+    fn lookup(context: *anyopaque, key: PrincipalGraph.Key) ?*PrincipalGraph {
+        const self: *RetainedGraphTestProvider = @ptrCast(@alignCast(context));
+        return self.old.lookup(key, self);
+    }
+};
+fn retainedGraphScenario(a: Allocator, module: *const core.Module) !void {
+    const root = for (module.bodies) |body| {
+        if (body.exported) break body.binding;
+    } else return error.TestExpectedRoot;
+    const dependency = for (module.bodies) |body| {
+        if (body.binding != 0 and body.binding != root) break body.binding;
+    } else return error.TestExpectedDependency;
+    const key: PrincipalGraph.Key = .{ .target = .{ .unit = 0, .binding = root }, .source_interface = true, .deferred_member = false, .options = .{} };
+    var retained: RetainedPrincipalGraphs = .{};
+    defer retained.deinit(a);
+    {
+        var original = try Session.init(a, &.{module.*});
+        defer original.deinit();
+        var region = try ClosureRegion.init(&original);
+        defer region.deinit();
+        const graph = (try region.principalGraphForKey(key)).?;
+        try std.testing.expect(graph.retention_eligible);
+        // Exercise dependency rejection separately from rejection of the root.
+        const owner = graph.allocations.allocator();
+        owner.free(graph.dependencies);
+        graph.dependencies = &.{};
+        graph.dependencies = try owner.dupe(core.BindingRef, &.{.{ .unit = 1, .binding = dependency }});
+        try retained.capture(&original);
+        try std.testing.expectEqual(@as(usize, 2), graph.leases);
+    }
+    var provider: RetainedGraphTestProvider = .{ .old = &retained };
+    const graph = retained.lookup(key, &provider).?;
+    try std.testing.expectEqual(@as(usize, 1), graph.leases);
+    var different = key;
+    different.options.max_type_depth -= 1;
+    try std.testing.expect(retained.lookup(different, &provider) == null);
+    different = key;
+    different.deferred_member = true;
+    try std.testing.expect(retained.lookup(different, &provider) == null);
+    different = key;
+    different.source_interface = false;
+    try std.testing.expect(retained.lookup(different, &provider) == null);
+    provider.denied = dependency;
+    try std.testing.expect(retained.lookup(key, &provider) == null);
+    provider.denied = key.target.binding;
+    try std.testing.expect(retained.lookup(key, &provider) == null);
+    provider.denied = 0;
+    var current = try Session.init(a, &.{module.*});
+    defer current.deinit();
+    current.principal_graph_provider = .{ .context = &provider, .lookup = RetainedGraphTestProvider.lookup };
+    var region = try ClosureRegion.init(&current);
+    defer region.deinit();
+    const before = current.counters.inference_regions;
+    try std.testing.expect((try region.principalGraphForKey(key)).? == graph);
+    try std.testing.expectEqual(before, current.counters.inference_regions);
+    try std.testing.expectEqual(@as(u64, 1), current.counters.principal_graph_retained_hits);
+    var next: RetainedPrincipalGraphs = .{};
+    defer next.deinit(a);
+    try next.capture(&current);
+    retained.deinit(a);
+    retained = .{};
+    try std.testing.expectEqual(@as(usize, 2), graph.leases);
+    try std.testing.expect(current.specializations.call_summaries.principals.get(key, &current).?.? == graph);
+    var limited: RetainedPrincipalGraphs = .{};
+    defer limited.deinit(a);
+    limited.queries.table.limits.owned_bytes = 0;
+    try limited.capture(&current);
+    try std.testing.expectEqual(@as(usize, 0), limited.queries.count());
+    try std.testing.expectEqual(@as(usize, 2), graph.leases);
+    // A later capture carries only the graphs that revision actually used.
+    var unused = try Session.init(a, &.{module.*});
+    defer unused.deinit();
+    var pruned: RetainedPrincipalGraphs = .{};
+    defer pruned.deinit(a);
+    try pruned.capture(&unused);
+    try std.testing.expectEqual(@as(usize, 0), pruned.queries.count());
+}
+test "retained immutable principal graphs outlive sessions validate dependencies and release leases through OOM" {
+    var module = try bodyRecipeLower("entry const identity = fn value => value\nconst dependency = fn value => value\n");
+    defer module.deinit(std.testing.allocator);
+    try retainedGraphScenario(std.testing.allocator, &module);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, retainedGraphScenario, .{&module});
+}
+
+fn largeInterfaceScenario(a: Allocator, module: *const core.Module, binding: core.BindingId) !void {
+    const equations = @import("../check/scheme_equations.zig");
+    const contracts = @import("../check/package_contracts.zig");
+    var remaining: usize = 65_536;
+    try @import("../check/package_core.zig").checkedInterfaceBody(module, binding, .{ .units = &[_]*const core.Module{module} }, &remaining, a);
+    // A large ordinary type graph does not enlarge the package reader's ABI.
+    var small: contracts.Context = .{ .types = &module.types, .remaining = &remaining };
+    try std.testing.expectError(error.InvalidArtifact, small.initialize());
+    var views: contracts.Context = .{ .types = &module.types, .remaining = &remaining, .large_plain_graph = true };
+    try views.initialize();
+    var scheme = module.binding(binding).scheme;
+    scheme.variables = .{ .start = @intCast(module.types.extra.len - 1), .len = 1 };
+    try views.generic(scheme);
+    try views.closed_rows.set(5000);
+    var solver = try equations.Solver.init(a, module, &views, &remaining);
+    defer solver.deinit();
+    try std.testing.expect(solver.ownsRigid(solver.store.nodes.items[4100]));
+    try std.testing.expect(!solver.ownsRigid(solver.store.nodes.items[4101]));
+    var other_scope = solver.store.nodes.items[4100];
+    other_scope.a += 1;
+    try std.testing.expect(!solver.ownsRigid(other_scope));
+    try std.testing.expect(solver.store.effects.rows.items[5000].tail == .closed);
+    try std.testing.expect(solver.store.effects.rows.items[5001].tail == .formal);
+}
+test "completed body interfaces admit large ordinary type graphs with exact rigid owners through OOM" {
+    const a = std.testing.allocator;
+    var module = try bodyRecipeLower("entry const identity = fn value => value\n");
+    defer module.deinit(a);
+    const binding = for (module.bodies) |body| {
+        if (body.exported) break body.binding;
+    } else return error.TestExpectedRoot;
+    const nodes = try a.alloc(types.Node, 4200);
+    @memcpy(nodes[0..module.types.nodes.len], module.types.nodes);
+    @memset(nodes[module.types.nodes.len..], .{ .tag = .u32 });
+    nodes[4100] = .{ .tag = .variable };
+    nodes[4101] = .{ .tag = .variable };
+    a.free(module.types.nodes);
+    module.types.nodes = nodes;
+    const extra = try a.alloc(u32, module.types.extra.len + 1);
+    @memcpy(extra[0..module.types.extra.len], module.types.extra);
+    extra[extra.len - 1] = 4100;
+    a.free(module.types.extra);
+    module.types.extra = extra;
+    const rows = try a.alloc(types.Effects.Row, 6000);
+    @memcpy(rows[0..module.types.effects.rows.len], module.types.effects.rows);
+    @memset(rows[module.types.effects.rows.len..], .{ .labels = .{}, .tail = .closed });
+    rows[5000].tail = .{ .variable = module.types.effects.variable_count };
+    rows[5001].tail = rows[5000].tail;
+    module.types.effects.variable_count += 1;
+    a.free(module.types.effects.rows);
+    module.types.effects.rows = rows;
+    try largeInterfaceScenario(a, &module, binding);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, largeInterfaceScenario, .{ &module, binding });
+}
+
+fn sourceBodyDependencyScenario(a: Allocator, module: *core.Module, root: core.BindingId, producer: core.BindingId, bad: core.Id) !void {
+    const proof = @import("../check/package_core.zig");
+    var remaining: usize = 65_536;
+    try proof.checkedInterfaceBody(module, root, .{ .units = &[_]*const core.Module{module} }, &remaining, a);
+    for (module.bodies) |*body| if (body.binding == producer) {
+        const original = body.root;
+        defer body.root = original;
+        body.root = bad;
+        remaining = 65_536;
+        proof.checkedInterfaceBody(module, root, .{ .units = &[_]*const core.Module{module} }, &remaining, a) catch |err| {
+            if (err == error.OutOfMemory) return err;
+            try std.testing.expectEqual(error.InvalidArtifact, err);
+            return;
+        };
+        return error.TestExpectedInvalidProducer;
+    };
+    return error.TestExpectedProducer;
+}
+test "source interface authority checks every reached declaration body through allocation failures" {
+    const a = std.testing.allocator;
+    var module = try bodyRecipeLower("const producer: U32 -> U32 = fn value => @u32.add value 1\nentry const relay: U32 -> U32 = fn value => producer value\nconst unrelated = #True\n");
+    defer module.deinit(a);
+    var producer: core.BindingId = 0;
+    var root: core.BindingId = 0;
+    var bad: core.Id = 0;
+    for (module.bodies) |body| {
+        if (body.exported) root = body.binding;
+        if (std.mem.eql(u8, module.name(body.declaration_name), "producer")) producer = body.binding;
+        if (std.mem.eql(u8, module.name(body.declaration_name), "unrelated")) bad = body.root;
+    }
+    try std.testing.expect(root != 0 and producer != 0 and bad != 0);
+    try sourceBodyDependencyScenario(a, &module, root, producer, bad);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, sourceBodyDependencyScenario, .{ &module, root, producer, bad });
+}
+
 const CallSummaries = struct {
     const Key = struct { target: Target, inputs: type_evidence.Id, source_interface: bool, lexical: u32 = 0, expected_result: type_evidence.Id = 0, expected_signature: type_evidence.Id = 0, deferred_member: bool = false, options: Options = .{} };
     const JobState = enum { queued, running, waiting, complete, declined };
@@ -704,6 +957,8 @@ const CallSummaries = struct {
     restart: ?usize = null,
     eligibility: std.AutoHashMapUnmanaged(Target, bool) = .empty,
     checked_requirements: std.AutoHashMapUnmanaged(Target, bool) = .empty,
+    completed_interfaces: std.AutoHashMapUnmanaged(Target, ?[]Target) = .empty,
+    completed_interface_targets: usize = 0,
     // Exact source slots consumed by the mandatory header graph. These are
     // immutable source facts, not a live instantiation or a completed proof.
     public_requirements: std.AutoHashMapUnmanaged(Target, HeaderParts) = .empty,
@@ -1096,6 +1351,9 @@ const CallSummaries = struct {
         self.components.deinit(session.allocator);
         self.eligibility.deinit(session.allocator);
         self.checked_requirements.deinit(session.allocator);
+        var interfaces = self.completed_interfaces.valueIterator();
+        while (interfaces.next()) |targets| if (targets.*) |owned| session.allocator.free(owned);
+        self.completed_interfaces.deinit(session.allocator);
         var public_requirements = self.public_requirements.valueIterator();
         while (public_requirements.next()) |parts| session.allocator.free(parts.mask);
         self.public_requirements.deinit(session.allocator);
@@ -1373,6 +1631,20 @@ const RetainedRecords = struct {
 };
 
 pub const Session = struct {
+    pub const InferenceStage = @import("../work_counters.zig").InferenceStage;
+    pub const StageScope = struct {
+        session: *Session,
+        previous: InferenceStage,
+        pub fn deinit(self: StageScope) void {
+            self.session.inference_stage = self.previous;
+        }
+    };
+    pub fn enterInferenceStage(self: *Session, stage: InferenceStage) StageScope {
+        const result: StageScope = .{ .session = self, .previous = self.inference_stage };
+        self.inference_stage = stage;
+        return result;
+    }
+    inference_stage: InferenceStage = .general,
     dense_unit_ids: bool = false,
     retained: RetainedRecords = .{},
     specializations: SpecializationCaches = .{},
@@ -1418,6 +1690,7 @@ pub const Session = struct {
     member_trace: ?*receipt.MemberTrace = null,
     refinement_observation: ?*@import("../reuse/refinement_receipt.zig").Observation = null,
     principal_provider: ?PrincipalProvider = null,
+    principal_graph_provider: ?PrincipalGraphProvider = null,
     principal_regions: usize = 0,
     principal_recordings: u64 = 0,
     principal_reads: ?*principal_inputs.Recorder = null,
@@ -1587,7 +1860,7 @@ pub const Session = struct {
         @memset(slots, .{});
         var storage = try value_storage.Store.init(allocator);
         errdefer storage.deinit(allocator);
-        return .{ .associated_remaining = @import("../inference_limits.zig").configured(), .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = parent.units, .dense_unit_ids = parent.dense_unit_ids, .providers = provider_chain.Store.init(allocator), .binding_offsets = parent.binding_offsets, .node_offsets = parent.node_offsets, .slots = slots, .node_count = parent.node_count, .borrowed_tables = true, .field_locations = parent.field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = parent.has_implementations, .has_generative_sources = parent.has_generative_sources };
+        return .{ .associated_remaining = @import("../inference_limits.zig").configured(), .storage = storage, .regions = .init(allocator), .allocator = allocator, .units = parent.units, .dense_unit_ids = parent.dense_unit_ids, .providers = provider_chain.Store.init(allocator), .binding_offsets = parent.binding_offsets, .node_offsets = parent.node_offsets, .slots = slots, .node_count = parent.node_count, .borrowed_tables = true, .inference_stage = parent.inference_stage, .field_locations = parent.field_locations, .implementation_proofs = .{ .allocator = allocator }, .has_implementations = parent.has_implementations, .has_generative_sources = parent.has_generative_sources };
     }
     pub fn deinit(self: *Session) void {
         self.retained.deinit(self.allocator);
@@ -1912,6 +2185,28 @@ pub const Session = struct {
             .plain_facts = &.{},
         });
         try self.cacheCompletedSpecialization(key, specialized, &region);
+        if (record) |*owned| if (owned.complete) {
+            // The same solved region proves the frozen capture closures, not
+            // merely the outer interface. Carry those exact completed results
+            // with this query's dependencies so replay need not infer them again.
+            var completed: std.ArrayList(u32) = .empty;
+            defer completed.deinit(self.allocator);
+            var frozen = region.scratch.frozen.valueIterator();
+            while (frozen.next()) |frozen_value| {
+                if (self.valueInfo(frozen_value.*).kind != .closure or self.valueEvidence(frozen_value.*) == 0) continue;
+                if (frozen_value.* == specialized and self.valueEvidence(frozen_value.*) == expected) continue;
+                try completed.append(self.allocator, frozen_value.*);
+            }
+            std.mem.sort(u32, completed.items, {}, std.sort.asc(u32));
+            var count: usize = 0;
+            for (completed.items) |frozen_value| {
+                if (count != 0 and completed.items[count - 1] == frozen_value) continue;
+                completed.items[count] = frozen_value;
+                count += 1;
+            }
+            completed.items.len = count;
+            owned.completed_closures = try completed.toOwnedSlice(self.allocator);
+        };
         if (record) |owned| {
             if (canonical) |input| {
                 canonical = null;
@@ -6635,6 +6930,7 @@ const ClosureRegion = struct {
             self.* = undefined;
         }
     };
+    inference_stage: Session.InferenceStage = .general,
     reference_scan: bool = false,
     work_revision: u64 = 0,
     component_work: usize = 0,
@@ -6702,6 +6998,7 @@ const ClosureRegion = struct {
         const allocator = arena.scratchAllocator();
         var region: ClosureRegion = .{ .session = session, .current_origin = session.specialization_origin, .timing = timing, .solver = try types.Store.initWithOptions(solver_allocator orelse arena.solverAllocator(), .{ .closed_graphs = true }), .scratch_allocator = allocator, .arena = arena };
         region.scratch.projection_cache.allocator = allocator;
+        region.inference_stage = session.inference_stage;
         region.profile_caller = comptime &.{ .function = caller.fn_name, .line = caller.line };
         if (session.inquiry_regions == 0 and session.semantic_job_budget == null) {
             session.summary_transitions = 0;
@@ -6721,6 +7018,12 @@ const ClosureRegion = struct {
         defer if (self.timing) |scope| scope.deinit();
         const counters = &self.session.counters;
         counters.inference_regions += 1;
+        switch (self.inference_stage) {
+            inline else => |stage| {
+                @field(counters, "inference_" ++ @tagName(stage) ++ "_regions") += 1;
+                @field(counters, "inference_" ++ @tagName(stage) ++ "_nodes") += nodes;
+            },
+        }
         counters.region_scopes += self.scratch.sources.items.len;
         counters.max_region_scopes = @max(counters.max_region_scopes, self.scratch.sources.items.len);
         // Arena pooling retains backing memory, never the solver. This region
@@ -6754,6 +7057,7 @@ const ClosureRegion = struct {
         counters.max_scratch_live_bytes = @max(counters.max_scratch_live_bytes, self.arena.scratch_meter.counts.peak_bytes);
         if (self.timing) |scope| scope.owner.region_callers.add(.{
             .caller = self.profile_caller,
+            .stage = self.inference_stage,
             .regions = 1,
             .inclusive_us = scope.elapsedUs(),
             .scopes = scopes,
@@ -6856,6 +7160,7 @@ const ClosureRegion = struct {
             if (!obligation.explicit) continue;
             const kind: ConstraintKind = switch (obligation.kind) {
                 .dispatch => .binary,
+                .result_dispatch => .result_dispatch,
                 .field => .physical_field,
                 .receiver => .receiver,
                 .update => .update,
@@ -6883,7 +7188,7 @@ const ClosureRegion = struct {
                 .member = obligation.name,
                 .op = obligation.operator,
                 .identity = .{ .unit = if (obligation.identity.unit == 0) self.session.unitId(self.scratch.sources.items[scope].owner) else obligation.identity.unit, .decl = obligation.identity.decl },
-                .row_carrier = obligation.kind == .dispatch or obligation.kind == .receiver or obligation.kind == .update,
+                .row_carrier = obligation.kind == .dispatch or obligation.kind == .result_dispatch or obligation.kind == .receiver or obligation.kind == .update,
             });
         }
     }
@@ -8586,15 +8891,23 @@ const ClosureRegion = struct {
                 return;
             }
         }
+        // Input-keyed jobs already bound repeated concrete calls. An eager
+        // interface import must not expand their shared callee graph again.
+        const completed_interface = self.session.reuse_principal_graphs and self.partial_principal and !self.retain_selected and !self.complete_demand_bodies and
+            definition != null and definition.?.is_function and binding.kind == .global and
+            binding.scheme.obligations.len != 0 and !try self.summaryEligible(target_) and try self.completedInterface(target_);
         // Source checking proves a declared body under its written requirements.
         // Import those requirements with fresh variables; do not recollect the
         // body or publish a closed call proof before its predicates are solved.
-        if ((!self.source_interface or binding.scheme.obligations.len != 0) and !self.retain_selected and !self.complete_demand_bodies and definition != null and definition.?.is_function and binding.kind == .global and try self.checkedSchemeReusable(target_)) {
+        if ((!self.source_interface or binding.scheme.obligations.len != 0) and !self.retain_selected and !self.complete_demand_bodies and definition != null and definition.?.is_function and binding.kind == .global and (completed_interface or try self.checkedSchemeReusable(target_))) {
             // This branch consumes the freshly checked scheme, not its body.
             // Requirement producers are checked headers too. Record the entire
             // reachable header graph, even when checkedRequirements hit its
             // session cache or a producer currently has no explicit leaves.
             try self.observeCheckedScheme(target_);
+            // Keep shared residual edges before importing an interface tree.
+            // Repeated callee requirements may form a diamond; expanding every
+            // path loses the bounded principal-graph algorithm.
             if (binding.scheme.obligations.len != 0 and self.partial_principal and try self.retainOpenPrincipal(.{ .target = target_, .scope = caller, .node = body_root, .left = instantiated, .result = instantiated, .deferred_member = self.defer_members })) {
                 const start = self.scratch.summary_arguments.items.len;
                 if (arguments.len > std.math.maxInt(u32) - start) return error.TypeLimit;
@@ -8609,7 +8922,10 @@ const ClosureRegion = struct {
             self.scratch.sources.items[scope].closed_rows = definition.?.closed_rows;
             self.setSourceRoot(scope, try self.importType(scope, source_type, 0));
             _ = try self.admitSignature(instantiated, self.scratch.sources.items[scope].root);
-            try self.importScheme(scope, binding.scheme, body_root);
+            if (completed_interface) {
+                self.principal_only_used = true;
+                try self.importCompletedInterface(scope, target_);
+            } else try self.importScheme(scope, binding.scheme, body_root);
             if (self.source_interface) {
                 var formal = self.scratch.sources.items[scope].root;
                 const caller_module = &self.session.units[self.scratch.sources.items[caller].owner];
@@ -8646,6 +8962,173 @@ const ClosureRegion = struct {
             return;
         }
         try self.collectInlineCall(caller, target_, callee_type, arguments);
+    }
+    /// A complete first-order interface includes inferred leaves. It is
+    /// admitted only after independent lexical body validation; unsupported
+    /// requirements and cycles continue through ordinary body collection.
+    fn completedInterface(self: *ClosureRegion, root: Target) RegionError!bool {
+        self.session.counters.completed_interface_requests += 1;
+        const cache = &self.session.specializations.call_summaries.completed_interfaces;
+        const targets = (if (cache.getPtr(root)) |known| known: {
+            self.session.counters.completed_interface_hits += 1;
+            break :known known.*;
+        } else fresh: {
+            if (cache.count() >= self.session.options.max_values) return false;
+            const complete = try self.checkCompletedInterface(root);
+            errdefer if (complete) |owned| self.session.allocator.free(owned);
+            if (complete) |owned| if (owned.len > self.session.options.max_children -| self.session.specializations.call_summaries.completed_interface_targets) {
+                self.session.allocator.free(owned);
+                return false;
+            };
+            try cache.put(self.session.allocator, root, complete);
+            if (complete) |owned| self.session.specializations.call_summaries.completed_interface_targets += owned.len;
+            if (complete != null) self.session.counters.completed_interface_proofs += 1 else self.session.counters.completed_interface_declines += 1;
+            break :fresh complete;
+        }) orelse return false;
+        // Only the immutable lexical proof is cached. These shape inquiries
+        // consume mutable plain-data memo facts, including negative reads, and
+        // must be observed again by each principal or refinement recorder.
+        for (targets) |target_| {
+            const module = &self.session.units[target_.unit];
+            const body = module.body(target_.binding).?;
+            var ty = body.scheme.root;
+            // A source alias has no parameter binders of its own. Its checked
+            // arrow still exposes the same complete first-order interface.
+            var arrows: usize = 0;
+            while (module.types.node(ty).tag == .function) : (arrows += 1) {
+                if (arrows >= self.session.options.max_type_depth) return false;
+                const arrow = module.types.node(ty);
+                if (!try self.potentialData(target_.unit, arrow.a, 0)) return false;
+                ty = arrow.b;
+            }
+            if (!try self.potentialData(target_.unit, ty, 0)) return false;
+        }
+        return true;
+    }
+    fn checkCompletedInterface(self: *ClosureRegion, root: Target) RegionError!?[]Target {
+        const Visit = struct { target: Target, next: usize = 0 };
+        var pending: std.ArrayList(Visit) = .empty;
+        defer pending.deinit(self.scratch_allocator);
+        var seen: std.AutoHashMapUnmanaged(Target, bool) = .empty;
+        defer seen.deinit(self.scratch_allocator);
+        try pending.append(self.scratch_allocator, .{ .target = root });
+        try seen.put(self.scratch_allocator, root, false);
+        var inferred = false;
+        var edges: usize = 0;
+        while (pending.items.len != 0) {
+            const at = pending.items.len - 1;
+            const frame = pending.items[at];
+            const module = &self.session.units[frame.target.unit];
+            const binding = module.binding(frame.target.binding);
+            _ = module.body(frame.target.binding) orelse return null;
+            if (frame.next == 0 and binding.kind != .global) return null;
+            if (frame.next == binding.scheme.obligations.len) {
+                seen.getPtr(frame.target).?.* = true;
+                _ = pending.pop();
+                continue;
+            }
+            pending.items[at].next += 1;
+            edges += 1;
+            if (edges > self.session.options.max_children) return null;
+            const requirement = module.obligations[binding.scheme.obligations.start + frame.next];
+            if (requirement.kind == .callee_use) {
+                const child = try self.schemeTarget(frame.target.unit, requirement.identity);
+                if (seen.get(child)) |complete| {
+                    if (!complete) return null;
+                    continue;
+                }
+                if (seen.count() >= self.session.options.max_values) return null;
+                try seen.put(self.scratch_allocator, child, false);
+                try pending.append(self.scratch_allocator, .{ .target = child });
+            } else {
+                if (completedRequirementKind(requirement.kind) == null) return null;
+                // An inferred selection may choose an associated accessor;
+                // the physical-field predicate alone does not encode that
+                // decision. Keep its original body until the plan owns it.
+                if (requirement.kind == .field and !requirement.explicit) return null;
+                inferred = inferred or !requirement.explicit;
+                if (requirement.kind == .dispatch or requirement.kind == .result_dispatch) {
+                    if (requirement.signature == 0 or module.types.node(requirement.signature).tag != .function) return null;
+                }
+            }
+        }
+        // Keep existing written-header behavior and its exact diagnostic order.
+        if (!inferred) return null;
+        var buffer: [1024]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&buffer, self.scratch_allocator);
+        const owners = try scratch.allocator().alloc(*const core.Module, self.session.units.len);
+        defer scratch.allocator().free(owners);
+        for (owners, self.session.units) |*owner, *module| owner.* = module;
+        var remaining: usize = @min(self.session.options.max_children, 65_536);
+        const proof_budget = remaining;
+        defer self.session.counters.completed_interface_proof_work += proof_budget - remaining;
+        var targets = seen.keyIterator();
+        while (targets.next()) |target_| {
+            self.session.counters.completed_interface_body_proofs += 1;
+            @import("../check/package_core.zig").checkedInterfaceBody(&self.session.units[target_.unit], target_.binding, .{ .units = owners }, &remaining, self.scratch_allocator) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else null;
+        }
+        const result = try self.session.allocator.alloc(Target, seen.count());
+        targets = seen.keyIterator();
+        for (result) |*target_| target_.* = targets.next().?.*;
+        return result;
+    }
+    fn completedRequirementKind(kind: types.ObligationKind) ?ConstraintKind {
+        return switch (kind) {
+            .dispatch => .binary,
+            .result_dispatch => .result_dispatch,
+            .field => .physical_field,
+            .type_rep => .type_rep,
+            .effect_rep => .effect_rep,
+            else => null,
+        };
+    }
+    fn importCompletedInterface(self: *ClosureRegion, scope: u32, root: Target) RegionError!void {
+        const InterfaceFrame = struct { target: Target, scope: u32, next: usize = 0 };
+        const a = self.scratch_allocator;
+        var pending: std.ArrayList(InterfaceFrame) = .empty;
+        defer pending.deinit(a);
+        try pending.append(a, .{ .target = root, .scope = scope });
+        var edges: usize = 0;
+        while (pending.items.len != 0) {
+            const at = pending.items.len - 1;
+            const target_ = pending.items[at].target;
+            const frame_scope = pending.items[at].scope;
+            const module = &self.session.units[target_.unit];
+            const scheme = module.binding(target_.binding).scheme;
+            if (pending.items[at].next == scheme.obligations.len) {
+                _ = pending.pop();
+                continue;
+            }
+            edges += 1;
+            if (edges > self.session.options.max_children) return error.TypeLimit;
+            const requirement = module.obligations[scheme.obligations.start + pending.items[at].next];
+            pending.items[at].next += 1;
+            if (requirement.kind == .callee_use) {
+                const target = try self.schemeTarget(target_.unit, requirement.identity);
+                const producer = &self.session.units[target.unit];
+                const principal = producer.binding(target.binding);
+                const body = producer.body(target.binding).?;
+                const actual = try self.importType(frame_scope, requirement.ty, 0);
+                const product = self.solver.node(actual);
+                if (product.tag != .product or product.b != principal.public_variables.len + principal.public_rows.len) return error.UnresolvedType;
+                const arguments = try a.dupe(types.Id, self.solver.list(.{ .start = product.a, .len = product.b }));
+                defer a.free(arguments);
+                const child_scope = try self.typeScope(target.unit);
+                self.scratch.sources.items[child_scope].body = body.root;
+                self.scratch.sources.items[child_scope].binding = target.binding;
+                self.scratch.sources.items[child_scope].closed_rows = body.closed_rows;
+                self.setSourceRoot(child_scope, try self.importType(child_scope, body.scheme.root, 0));
+                for (producer.types.list(principal.public_variables), arguments[0..principal.public_variables.len]) |variable, value|
+                    try self.unify(try self.importType(child_scope, variable, 0), value);
+                for (producer.types.list(principal.public_rows), arguments[principal.public_variables.len..]) |variable, value|
+                    try self.solver.unifyEffects(try self.importRowVariable(child_scope, variable), self.solver.node(value).c);
+                try pending.append(a, .{ .target = target, .scope = child_scope });
+                continue;
+            }
+            const kind = completedRequirementKind(requirement.kind) orelse return error.UnresolvedType;
+            try self.appendConstraint(.{ .scope = frame_scope, .node = module.body(target_.binding).?.root, .span = requirement.span, .explicit = requirement.explicit, .qualification_span = requirement.qualification_span, .qualification_unit = requirement.qualification_unit, .diagnostic_name = module.name(requirement.diagnostic_name), .kind = kind, .left = try self.importType(frame_scope, requirement.ty, 0), .right = if (requirement.other == 0) 0 else try self.importType(frame_scope, requirement.other, 0), .result = if (requirement.result == 0) 0 else try self.importType(frame_scope, requirement.result, 0), .signature = if (requirement.signature == 0) 0 else try self.importType(frame_scope, requirement.signature, 0), .member = requirement.name, .op = requirement.operator, .identity = .{ .unit = if (requirement.identity.unit == 0) self.session.unitId(target_.unit) else requirement.identity.unit, .decl = requirement.identity.decl }, .row_carrier = requirement.explicit and (requirement.kind == .dispatch or requirement.kind == .result_dispatch), .deferred_member = self.defer_members });
+            self.session.counters.completed_interface_imports += 1;
+        }
     }
     fn observeCheckedScheme(self: *ClosureRegion, target_: Target) RegionError!void {
         const reads = self.session.principal_reads orelse return;
@@ -8725,7 +9208,7 @@ const ClosureRegion = struct {
             } else {
                 if (!requirement.explicit) return false;
                 switch (requirement.kind) {
-                    .dispatch, .field, .receiver, .update, .record_merge, .effect_operation, .type_eq, .contract, .type_rep, .effect_rep => {},
+                    .dispatch, .result_dispatch, .field, .receiver, .update, .record_merge, .effect_operation, .type_eq, .contract, .type_rep, .effect_rep => {},
                     else => return false,
                 }
             }
@@ -8743,7 +9226,7 @@ const ClosureRegion = struct {
     };
     const SchemeImport = union(enum) { solved, open, frame: SchemeFrame };
     fn autonomousRowCarrier(self: *ClosureRegion, target_: Target, requirement: core.Obligation) bool {
-        if (requirement.kind != .dispatch and requirement.kind != .receiver and requirement.kind != .update) return false;
+        if (requirement.kind != .dispatch and requirement.kind != .result_dispatch and requirement.kind != .receiver and requirement.kind != .update) return false;
         if (requirement.signature == 0) return false;
         const module = &self.session.units[target_.unit];
         const carrier = module.types.node(requirement.signature);
@@ -9111,6 +9594,7 @@ const ClosureRegion = struct {
                 if (!requirement.explicit) continue;
                 const kind: ConstraintKind = switch (requirement.kind) {
                     .dispatch => .binary,
+                    .result_dispatch => .result_dispatch,
                     .field => .physical_field,
                     .receiver => .receiver,
                     .update => .update,
@@ -9122,7 +9606,7 @@ const ClosureRegion = struct {
                     .effect_rep => .effect_rep,
                     else => return error.UnresolvedType,
                 };
-                try self.appendConstraint(.{ .scope = use.scope, .node = use.node, .span = use.span, .kind = kind, .explicit = true, .qualification_span = requirement.qualification_span, .qualification_unit = requirement.qualification_unit, .diagnostic_name = module.name(requirement.diagnostic_name), .left = try pending.items[last].copy.ty(requirement.ty, 0), .right = try pending.items[last].copy.ty(requirement.other, 0), .result = try pending.items[last].copy.ty(requirement.result, 0), .signature = try pending.items[last].copy.ty(requirement.signature, 0), .member = requirement.name, .op = requirement.operator, .identity = .{ .unit = if (requirement.identity.unit == 0) self.session.unitId(use.target.unit) else requirement.identity.unit, .decl = requirement.identity.decl }, .row_carrier = requirement.kind == .dispatch or requirement.kind == .receiver or requirement.kind == .update });
+                try self.appendConstraint(.{ .scope = use.scope, .node = use.node, .span = use.span, .kind = kind, .explicit = true, .qualification_span = requirement.qualification_span, .qualification_unit = requirement.qualification_unit, .diagnostic_name = module.name(requirement.diagnostic_name), .left = try pending.items[last].copy.ty(requirement.ty, 0), .right = try pending.items[last].copy.ty(requirement.other, 0), .result = try pending.items[last].copy.ty(requirement.result, 0), .signature = try pending.items[last].copy.ty(requirement.signature, 0), .member = requirement.name, .op = requirement.operator, .identity = .{ .unit = if (requirement.identity.unit == 0) self.session.unitId(use.target.unit) else requirement.identity.unit, .decl = requirement.identity.decl }, .row_carrier = requirement.kind == .dispatch or requirement.kind == .result_dispatch or requirement.kind == .receiver or requirement.kind == .update });
             }
         }
         self.scratch.constraints.items[index].solved = true;
@@ -9893,6 +10377,9 @@ const ClosureRegion = struct {
     }
     fn describePrincipal(self: *ClosureRegion, key: PrincipalGraph.Key) RegionError!?*PrincipalGraph {
         const a = self.session.allocator;
+        const initial_steps = self.session.steps;
+        const initial_values = self.session.storage.values.items.len;
+        const initial_children = self.session.storage.children.items.len;
         const tape = self.session.receipt_tape;
         const reads = self.session.principal_reads;
         const plain_reads = self.session.principal_plain_reads;
@@ -10009,6 +10496,10 @@ const ClosureRegion = struct {
         graph.foreign_types_only = true;
         graph.dependencies = try buffers.dupe(core.BindingRef, dependencies.sources.items);
         graph.plain_reads = try buffers.dupe(receipt.PlainFact, dependencies.plain_facts.items);
+        graph.retention_eligible = !graph.untracked_reads and dependencies.scalar_reads.items.len == 0 and
+            dependencies.call_publications.items.len == 0 and graph.plain_reads.len == 0 and imported_children.count() == 0 and
+            self.session.steps == initial_steps and self.session.storage.values.items.len == initial_values and
+            self.session.storage.children.items.len == initial_children;
         var copy: principal_type_graph.NormalizedCopy = .{ .allocator = buffers, .source = &region.solver, .destination = &graph.types, .max_depth = self.session.options.max_type_depth, .max_nodes = self.session.options.max_values };
         defer copy.deinit();
         graph.root = try copy.ty(try region.solver.resolve(region.scratch.sources.items[scope].root, 0), 0);
@@ -10109,6 +10600,22 @@ const ClosureRegion = struct {
         if (self.session.specializations.call_summaries.principals.get(key, self.session)) |graph| return graph;
         if (!self.session.summaryCharge(1)) return null;
         if (self.session.specializations.call_summaries.principals.count() >= self.session.options.max_values) return null;
+        if (self.session.principal_graph_provider) |provider| {
+            self.session.counters.principal_graph_retained_requests += 1;
+            if (provider.lookup(provider.context, key)) |retained| {
+                const nodes = retained.nodeCount();
+                const edges = retained.edgeCount();
+                if (nodes <= self.session.options.max_values -| self.session.principal_graph_nodes and edges <= self.session.options.max_children -| self.session.principal_graph_edges and
+                    try self.session.specializations.call_summaries.principals.put(self.session.allocator, key, retained, self.session))
+                {
+                    retained.retain();
+                    self.session.principal_graph_nodes += nodes;
+                    self.session.principal_graph_edges += edges;
+                    self.session.counters.principal_graph_retained_hits += 1;
+                    return retained;
+                }
+            }
+        }
         const graph = self.describePrincipal(key) catch |err| switch (err) {
             error.OutOfMemory => return err,
             else => null,
@@ -11849,7 +12356,7 @@ const ClosureRegion = struct {
         if (arrow.tag != .function) return error.TypeMismatch;
         try self.unify(constraint.left, arrow.a);
         try self.unify(constraint.result, arrow.b);
-        _ = try self.admitSignature(constraint.signature, signature);
+        if (constraint.row_carrier) try self.addInvocation(constraint, signature, false) else _ = try self.admitSignature(constraint.signature, signature);
         try self.collectSelected(constraint.scope, scope, target_);
         return true;
     }

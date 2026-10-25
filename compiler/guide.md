@@ -1213,6 +1213,7 @@ constraints explicitly after a complete binding annotation:
 ```blot
 const twice: a -> a where { associated "add" a a a } = fn value => value + value
 const first: a -> b where { field "first" a b } = fn value => value.first
+const convert: a -> b where { result "from" a b } = fn value => @type.result "from" value
 entry const answer = fn () => twice 21
 ```
 
@@ -1220,14 +1221,31 @@ The `where` clause is available on top-level `const`/`let` and local `let`;
 `where` remains an ordinary identifier elsewhere. Predicates are separated by
 commas, and a final comma is allowed. The forms are `associated "member" T T
 T`,
-`receiver "member" T T T`, `field "member" T T`, `update "member" T T
-T`,
-`operation Operation.name T...`, `type_rep T`, and `effect_rep !{...}`.
-Parenthesize a non-atomic type argument. `associated`, `receiver`, and `update`
-may end in an effect row such as `! {| e}`; without one, their invocation
-effects are inferred. The clause constrains the binding's callers and must cover
-the requirements of its body. Extra predicates deliberately narrow the public
-type. Parameter annotations cannot contain `where` clauses.
+`result "member" Input Output`, `receiver "member" T T T`, `field "member" T T`,
+`update "member" T T
+T`, `operation Operation.name T...`, `type_rep T`, and
+`effect_rep !{...}`. Parenthesize a non-atomic type argument. `associated`,
+`result`, `receiver`, and `update` may end in an effect row such as `! {| e}`;
+without one, their invocation effects are inferred. The clause constrains the
+binding's callers and must cover the requirements of its body. Extra predicates
+deliberately narrow the public type. Parameter annotations cannot contain
+`where` clauses.
+
+`result "member" Input Output` requires the member selected by the **output**
+type, matching `@type.result "member" input`. The input type does not supply a
+fallback implementation. The selected member must accept `Input`, return
+`Output`, and satisfy the optional invocation effect row. For an effectful
+conversion, share that row with the function annotation:
+
+```blot
+const convert: a -> b ! {| e} where { result "from" a b ! {| e} } =
+  fn value => @type.result "from" value
+```
+
+This requirement can also appear in a named contract or a local binding's
+`where` clause. Inferred conversions continue to work without a written clause.
+A written clause must cover an open result-selection requirement just as it
+covers an associated operation or field requirement.
 
 Use `type Name parameters is contract = { ... }` to name a reusable bundle of
 predicates. Contracts can include other contracts, refer forward, take shaped or

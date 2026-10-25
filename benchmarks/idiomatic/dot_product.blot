@@ -1,0 +1,8 @@
+import * as array from "std/array"
+entry const run = fn (seed: U32) -> U32 => do:
+  let left = array.generate 8192 (fn index => (seed + index * 17) % 1024)
+  let right = array.generate 8192 (fn index => (seed + index * 31) % 1024)
+  let total = 0
+  for index in 0..left.length:
+    total := self + left[index] * right[index]
+  break total

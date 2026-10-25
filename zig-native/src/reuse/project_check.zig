@@ -124,7 +124,7 @@ pub const CheckedProject = struct {
     }
     pub fn interface(self: *const CheckedProject, target: check.ExternalTarget) check.SchemeInterface {
         const producer = &self.module(target.unit).checked;
-        return .{ .producer_binding = target.binding, .proof_contract = check.checkedProofContract(producer, target.binding), .types = .{ .store = &producer.types }, .scheme = producer.bindings[target.binding].scheme, .capability_flow = producer.bindings[target.binding].capability_flow, .capability_parameters = producer.bindings[target.binding].capability_parameters, .named_function = producer.bindings[target.binding].named_function, .obligations = producer.obligations, .callees = .{ .live = producer } };
+        return .{ .producer_binding = target.binding, .proof_contract = check.checkedProofContract(producer, target.binding), .types = .{ .store = &producer.types }, .scheme = producer.bindings[target.binding].scheme, .summary = if (producer.bindings[target.binding].summary.shareable) producer.bindings[target.binding].summary else null, .capability_flow = producer.bindings[target.binding].capability_flow, .capability_parameters = producer.bindings[target.binding].capability_parameters, .named_function = producer.bindings[target.binding].named_function, .obligations = producer.obligations, .callees = .{ .live = producer } };
     }
 };
 
@@ -153,6 +153,7 @@ const Engine = struct {
     result: CheckedProject,
     diagnostics: std.ArrayList(Diagnostic) = .empty,
     source_validation: bool = false,
+    prepare_names: bool = false,
     execution: check.PrivateExecution = .{},
     resolution_remaining: usize = 1_000_000,
     associated_remaining: usize = 1_000_000,
@@ -303,6 +304,182 @@ const Engine = struct {
 
     fn diagnostic(self: *Engine, unit: project.UnitId, span: ast.Span, code: Code) Allocator.Error!void {
         try self.diagnostics.append(self.allocator, .{ .unit = unit, .span = span, .code = code });
+    }
+
+    const ParallelJob = struct {
+        work: @import("../work_counters.zig").Frontend = .{},
+        diagnostics: std.ArrayList(Diagnostic) = .empty,
+        failure: ?anyerror = null,
+        missing_name: bool = false,
+        resolution_used: usize = 0,
+        associated_used: usize = 0,
+    };
+    const ParallelWork = struct {
+        parent: *Engine,
+        allocator: Allocator,
+        units: []const u32,
+        jobs: []ParallelJob,
+        next: std.atomic.Value(usize) = .init(0),
+
+        fn execute(self: *ParallelWork) void {
+            while (true) {
+                const at = self.next.fetchAdd(1, .monotonic);
+                if (at >= self.units.len) return;
+                const unit = self.units[at];
+                const job = &self.jobs[unit - 1];
+                var source = self.parent.source.*;
+                source.symbols.read_only = true;
+                source.symbols.missing_name = false;
+                var worker = self.parent.*;
+                worker.source = &source;
+                worker.allocator = self.allocator;
+                worker.diagnostics = .empty;
+                worker.result.body_elaborations = 0;
+                worker.result.imported_schemes = 0;
+                worker.result.normalization = .{};
+                const capture = @import("../phase_profile.zig").captureChecking(&job.work);
+                defer capture.restore();
+                worker.checkModule(unit) catch |err| {
+                    job.failure = err;
+                };
+                job.diagnostics = worker.diagnostics;
+                job.missing_name = source.symbols.missing_name;
+                job.resolution_used = self.parent.resolution_remaining - worker.resolution_remaining;
+                job.associated_used = self.parent.associated_remaining - worker.associated_remaining;
+                job.work.parallel_jobs += 1;
+            }
+        }
+    };
+
+    fn parallelReady(self: *const Engine, unit: u32, done: []const bool) bool {
+        for (self.source.unitImports(unit)) |imported| {
+            if (!done[imported.target - 1] and self.source.compiledModule(imported.target) == null) return false;
+        }
+        if (self.source.unit(unit).implicit_prelude and self.source.prelude_unit != 0 and self.source.prelude_unit != unit) {
+            const prelude = self.source.prelude_unit;
+            if (!done[prelude - 1] and self.source.compiledModule(prelude) == null) return false;
+        }
+        return true;
+    }
+    fn discardParallel(self: *Engine, resolution: usize, associated: usize) void {
+        for (self.result.modules) |*slot| if (slot.*) |*module_| {
+            module_.deinit(self.allocator);
+            slot.* = null;
+        };
+        for (self.result.body_caches) |*cache| {
+            cache.deinit(self.allocator);
+            cache.* = .{};
+        }
+        self.result.body_elaborations = 0;
+        self.result.imported_schemes = 0;
+        self.result.normalization = .{};
+        self.resolution_remaining = resolution;
+        self.associated_remaining = associated;
+        @import("../phase_profile.zig").recordChecking(.{ .parallel_retries = 1 });
+    }
+    /// Ready modules run against immutable producer slots and a frozen symbol
+    /// pool. Every batch joins before symbol growth or ordered budget charging.
+    /// Diagnostics, unknown synthesized names and aggregate budget exhaustion
+    /// discard speculation and replay the original serial diagnostic order.
+    fn checkParallel(self: *Engine, deferrable: bool) !bool {
+        const requested = self.source.checking.workers;
+        if (requested <= 1 or self.source_validation or self.editor != null or self.execution.observe != null or self.execution.stats != null or self.source.input_mode != .project) return false;
+        const io = self.source.checking.io orelse return false;
+        var nodes: usize = 0;
+        var remaining: usize = 0;
+        for (self.source.order.items) |unit| {
+            if (deferrable and unit == self.source.entry) continue;
+            nodes +|= self.source.unit(unit).tree.nodes.items.len;
+            remaining += 1;
+        }
+        if (remaining < 2 or nodes < self.execution.parallel_min_nodes) return false;
+        const initial_resolution = self.resolution_remaining;
+        const initial_associated = self.associated_remaining;
+        const done = try self.allocator.alloc(bool, self.source.units.items.len);
+        defer self.allocator.free(done);
+        @memset(done, false);
+        const jobs = try self.allocator.alloc(ParallelJob, done.len);
+        defer self.allocator.free(jobs);
+        @memset(jobs, .{});
+        defer for (jobs) |*job| {
+            var cleanup = self.*;
+            cleanup.diagnostics = job.diagnostics;
+            cleanup.deinitDiagnostics();
+        };
+        var ready: std.ArrayList(u32) = .empty;
+        defer ready.deinit(self.allocator);
+        var locked: @import("../eval/parallel_allocator.zig").LockedAllocator = .{ .backing = self.allocator, .io = io };
+        while (remaining != 0) {
+            ready.clearRetainingCapacity();
+            for (self.source.order.items) |unit| {
+                if (done[unit - 1] or (deferrable and unit == self.source.entry)) continue;
+                if (self.parallelReady(unit, done)) try ready.append(self.allocator, unit);
+            }
+            if (ready.items.len == 0) {
+                self.discardParallel(initial_resolution, initial_associated);
+                return false;
+            }
+            for (ready.items) |unit| {
+                var preparation = self.*;
+                preparation.prepare_names = true;
+                preparation.diagnostics = .empty;
+                defer preparation.deinitDiagnostics();
+                try preparation.checkModule(unit);
+                if (preparation.diagnostics.items.len != 0) {
+                    self.discardParallel(initial_resolution, initial_associated);
+                    return false;
+                }
+            }
+            var work: ParallelWork = .{ .parent = self, .allocator = locked.allocator(), .units = ready.items, .jobs = jobs };
+            {
+                var group: std.Io.Group = .init;
+                const protection = io.swapCancelProtection(.blocked);
+                defer _ = io.swapCancelProtection(protection);
+                defer group.cancel(io);
+                const count = @min(@as(usize, requested), @min(ready.items.len, 16));
+                for (1..count) |_| group.concurrent(io, ParallelWork.execute, .{&work}) catch break;
+                work.execute();
+                group.await(io) catch unreachable;
+            }
+            // Store allocators must not retain the temporary lock adapter.
+            for (ready.items) |unit| if (self.result.modules[unit - 1]) |*module_| {
+                module_.checked.types.allocator = self.allocator;
+                module_.checked.types.effects.allocator = self.allocator;
+            };
+            @import("../phase_profile.zig").recordChecking(.{ .parallel_batches = 1 });
+            var retry = false;
+            var out_of_memory = false;
+            for (ready.items) |unit| {
+                const job = &jobs[unit - 1];
+                @import("../phase_profile.zig").recordChecking(job.work);
+                if (job.failure) |failure| {
+                    out_of_memory = out_of_memory or failure == error.OutOfMemory;
+                    retry = true;
+                }
+                retry = retry or job.missing_name or job.diagnostics.items.len != 0 or self.result.modules[unit - 1] == null;
+                if (job.resolution_used > self.resolution_remaining or job.associated_used > self.associated_remaining) {
+                    retry = true;
+                } else {
+                    self.resolution_remaining -= job.resolution_used;
+                    self.associated_remaining -= job.associated_used;
+                }
+            }
+            if (retry) {
+                self.discardParallel(initial_resolution, initial_associated);
+                if (out_of_memory) return error.OutOfMemory;
+                return false;
+            }
+            for (ready.items) |unit| {
+                const checked = &self.result.modules[unit - 1].?.checked;
+                self.result.body_elaborations += checked.body_elaborations;
+                self.result.imported_schemes += checked.imported_schemes;
+                self.result.normalization.merge(checked.types.normalization);
+                done[unit - 1] = true;
+                remaining -= 1;
+            }
+        }
+        if (deferrable) self.result.deferred_entry = .{ .resolution_remaining = self.resolution_remaining, .associated_remaining = self.associated_remaining };
+        return true;
     }
     fn appendCatalog(self: *Engine, catalogs: *std.ArrayList(check.ImportedCatalog), source_catalogs: *std.ArrayList(check.SourceCatalog), producer: CatalogModule, name: symbols.Symbol, namespace: symbols.Symbol, kind: @FieldType(check.ImportedCatalog, "kind"), index: u32, origin: ast.Id) Allocator.Error!void {
         switch (producer.owner) {
@@ -638,6 +815,10 @@ const Engine = struct {
                 }
             }
         }
+        if (self.prepare_names) {
+            try check.prepareGeneratedNames(self.allocator, &self.source.symbols, tree, catalogs.items);
+            return;
+        }
         var options: check.ModuleOptions = .{ .associated_remaining = &self.associated_remaining, .purity_origins = .{ .context = self.source, .lookup = moduleOrigin, .source_available = moduleSourceAvailable }, .builtin_catalog = unit == self.source.prelude_unit, .prelude_unit = self.source.prelude_unit, .inherited_fixities = inherited_fixities.items };
         if (self.retain_bodies and self.editor == null) options.retained_bodies = &self.result.body_caches[unit - 1];
         options.body_source = self.source.unit(unit).source;
@@ -864,7 +1045,8 @@ fn checkProjectModeDeferring(allocator: Allocator, source: *project.Project, exe
         }
         try engine.initCompiledCatalogs();
         const deferrable = defer_entry and source.input_mode == .project and !engine.source_validation and source.order.items.len != 0 and source.order.items[source.order.items.len - 1] == source.entry;
-        for (source.order.items) |unit| {
+        const parallel = previous == null and try engine.checkParallel(deferrable);
+        if (!parallel) for (source.order.items) |unit| {
             if (deferrable and unit == source.entry) {
                 engine.result.deferred_entry = .{ .resolution_remaining = engine.resolution_remaining, .associated_remaining = engine.associated_remaining };
                 break;
@@ -874,7 +1056,7 @@ fn checkProjectModeDeferring(allocator: Allocator, source: *project.Project, exe
             // reordered, so the first is final once it exists. Source
             // validation still collects every module's numeric diagnostics.
             if (first_diagnostic and !engine.source_validation and engine.diagnostics.items.len != 0) break;
-        }
+        };
     }
     engine.result.diagnostics = try engine.diagnostics.toOwnedSlice(allocator);
     return engine.result;
@@ -911,4 +1093,50 @@ test "project exports preserve positioned inference budget rejection with empty 
     try std.testing.expectEqual(checked.diagnostics[0].span, diagnostic.span);
     try std.testing.expect(diagnostic.span.end > diagnostic.span.start);
     try std.testing.expectEqualStrings(checked.diagnostics[0].detail.?, diagnostic.detail.?);
+}
+
+fn forwardingBudgetCheck(allocator: Allocator, source: *project.Project, parallel: bool) !CheckedProject {
+    var engine: Engine = .{ .allocator = allocator, .source = source, .result = .{}, .resolution_remaining = 1, .execution = .{ .parallel_min_nodes = 0 } };
+    errdefer engine.result.deinit(allocator);
+    defer engine.deinitDiagnostics();
+    defer engine.deinitSourceModules();
+    engine.result.modules = try allocator.alloc(?Module, source.units.items.len);
+    @memset(engine.result.modules, null);
+    try engine.initCompiledCatalogs();
+    const completed = parallel and try engine.checkParallel(false);
+    if (!completed) for (source.order.items) |unit| {
+        if (!try engine.checkOrdered(unit, null)) break;
+    };
+    engine.result.diagnostics = try engine.diagnostics.toOwnedSlice(allocator);
+    return engine.result;
+}
+
+test "parallel module forwarding charges the combined project budget in serial order" {
+    const allocator = std.testing.allocator;
+    var directory = std.testing.tmpDir(.{});
+    defer directory.cleanup();
+    const filenames = [_][]const u8{ "shared.blot", "left.blot", "right.blot", "main.blot" };
+    const sources = [_][]const u8{
+        "const value = 42\n",
+        "export {value as first} from \"./shared\"\n",
+        "export {value as second} from \"./shared\"\n",
+        "import {first} from \"./left\"\nimport {second} from \"./right\"\nentry const answer = first\n",
+    };
+    for (filenames, sources) |filename, text| try directory.dir.writeFile(std.testing.io, .{ .sub_path = filename, .data = text });
+    const path = try directory.dir.realPathFileAlloc(std.testing.io, "main.blot", allocator);
+    defer allocator.free(path);
+    var source = try project.load(allocator, std.testing.io, path, .{});
+    defer source.deinit(allocator);
+    source.checking = .{ .io = std.testing.io, .workers = 4 };
+    var serial = try forwardingBudgetCheck(allocator, &source, false);
+    defer serial.deinit(allocator);
+    var counts: @import("../work_counters.zig").Frontend = .{};
+    const capture = @import("../phase_profile.zig").captureChecking(&counts);
+    defer capture.restore();
+    var parallel = try forwardingBudgetCheck(allocator, &source, true);
+    defer parallel.deinit(allocator);
+    try std.testing.expectEqual(@as(u64, 1), counts.parallel_retries);
+    try std.testing.expect(serial.diagnostics.len != 0);
+    try std.testing.expectEqualDeep(serial.diagnostics, parallel.diagnostics);
+    try std.testing.expectEqual(Code.resolution_budget, parallel.diagnostics[0].code);
 }

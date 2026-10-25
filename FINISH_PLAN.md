@@ -4,9 +4,12 @@ Prepared 23 October 2026 from current main `93bc8d4`, the preserved candidate in
 `/workspace/blot2`, the task index, and GitHub issues #25–#27. This is an
 execution plan; no implementation or qualification is claimed by its creation.
 
-[Triage of issues 26 and 27](ISSUE_TRIAGE.md) prioritizes cold-start phase
-attribution before choosing an implementation and keeps the nested-layout
-comparison separate from allocation-free contract research.
+[The current issue triage](ISSUE_TRIAGE.md) covers all eleven open issues,
+including the 25 October runtime reports #28–#36. It recommends the indexed-read
+repair first, followed by numeric construction/call boundaries and executed cost
+attribution. The original 23 October triage is retained there as history;
+cold-start phase attribution and allocation-free contract research remain
+separate tracks.
 
 ## Execution checkpoint, 24 October 2026
 
@@ -19,10 +22,10 @@ ordinary-edit, two-second and sub-second targets remain open.
 
 The candidate passes 2,573 exhaustive native laws, 1,656 guests, 44 independent
 held-out Wasm executions and 232 requests over 200 distinct edits. Post-session
-RSS is 521 MiB. The [86-item ledger](COMPILER_CT109_LEDGER.md) records implemented
-work, rejected experiments and still-open architectural designs. The qualified
-CLI and native compiler are installed locally; raw evidence and limits are
-linked from the qualification record.
+RSS is 521 MiB. The [86-item ledger](COMPILER_CT109_LEDGER.md) records
+implemented work, rejected experiments and still-open architectural designs. The
+qualified CLI and native compiler are installed locally; raw evidence and limits
+are linked from the qualification record.
 
 The broader language and upstream-issue requirements below remain open; this
 performance follow-up does not close unrelated completion work.
@@ -40,8 +43,8 @@ Exact frontend correspondence now checks one module on the first edit instead
 of 22. Bounded operation indexes/certificates, lexical links and import scratch
 remove repeated work. The report includes 200 distinct edits, allocator/CPU
 attribution, exhaustive qualification and rejected experiments. All 86 review
-suggestions have a [disposition](COMPILER_CT106_WORK.md); conditional alternatives
-and unfinished architectural work are explicit.
+suggestions have a [disposition](COMPILER_CT106_WORK.md); conditional
+alternatives and unfinished architectural work are explicit.
 
 Full qualification passes 2,564 exhaustive native laws and 1,655 guest checks.
 The broader completion requirements below remain open; this performance pass
@@ -86,13 +89,14 @@ and rollback backups are recorded in `build/install/ct103/installed.json`.
 Preserve unrelated untracked `zig-native/build/` and `zig-out-modern/`. The
 dated checkpoints below are historical; do not rerun completed hills.
 
-The preceding CT97 batch: seven alternating release pairs reduce fresh game CPU by **32.5%** against CT96;
-median build wall falls from **13.60 to 8.68 s**, with identical Wasm.
-Literal/body edits use 40.7% / 43.1% less CPU and take 7.63 / 6.56 s median
-wall. The 50% edit-CPU and four-second wall targets remain open. The
-[new qualification](zig-native/CT97_QUALIFICATION.md) closes CT97 and records
-restored executable reuse and fewer real backend allocations. CT98, BT4 and the
-broader completion plan remain open; follow the updated hill tables below.
+The preceding CT97 batch: seven alternating release pairs reduce fresh game CPU
+by **32.5%** against CT96; median build wall falls from **13.60 to 8.68 s**,
+with identical Wasm. Literal/body edits use 40.7% / 43.1% less CPU and take 7.63
+/ 6.56 s median wall. The 50% edit-CPU and four-second wall targets remain open.
+The [new qualification](zig-native/CT97_QUALIFICATION.md) closes CT97 and
+records restored executable reuse and fewer real backend allocations. CT98, BT4
+and the broader completion plan remain open; follow the updated hill tables
+below.
 
 The [CT96 optimization](zig-native/CT96_QUALIFICATION.md) removes repeated
 whole-program spawn-contract scans during emission. Seven alternating release

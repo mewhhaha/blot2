@@ -406,7 +406,7 @@ const Scan = struct {
         while (self.work.pop()) |work| switch (work) {
             .node => |id| try self.scanNode(id),
             .binding => |id| {
-                const value = try self.projectedItem(core.Binding, self.old.bindings, self.current.bindings, id);
+                const value = try self.referencedBinding(id);
                 const shift = if (self.origins.len != 0) self.bindingShift(id) else 0;
                 if (!shiftedPoint(self.old.sourceNamePoint(id), self.current.sourceNamePoint(id), shift)) return error.Changed;
                 if (!shiftedPoint(self.old.runtimeNamePoint(id), self.current.runtimeNamePoint(id), shift)) return error.Changed;
@@ -431,7 +431,43 @@ const Scan = struct {
             },
         };
     }
+    /// A named reference consumes the producer's identity and checked header,
+    /// not the extent of its implementation. The root declaration still goes
+    /// through run's exact body comparison; producer bodies and observations
+    /// retain their own dependency gates. Unique origins authorize positions
+    /// only, and every non-position binding field remains exact.
+    fn referencedBinding(self: *const Scan, id: u32) Error!core.Binding {
+        if (id >= self.old.bindings.len or id >= self.current.bindings.len) return error.Changed;
+        const before = self.old.bindings[id];
+        const after = self.current.bindings[id];
+        if (!self.constant_types and before.kind == .global and after.kind == .global and
+            id < self.origins.len and self.origins[id])
+        {
+            var header = before;
+            header.span = after.span;
+            if (!std.meta.eql(header, after)) return error.Changed;
+            const old_body = self.old.body(id) orelse return error.Changed;
+            const new_body = self.current.body(id) orelse return error.Changed;
+            if (!parameterHeadersEqual(self.old, old_body.*, self.current, new_body.*)) return error.Changed;
+            return before;
+        }
+        return self.projectedItem(core.Binding, self.old.bindings, self.current.bindings, id);
+    }
 };
+
+/// Parameter annotation provenance is part of the public call boundary even
+/// when both checked arrows happen to have identical concrete types. Producer
+/// body extents and absolute parameter locations do not define that boundary.
+pub fn parameterHeadersEqual(old: *const core.Module, before: core.Body, current: *const core.Module, after: core.Body) bool {
+    if (before.is_function != after.is_function or before.parameters.len != after.parameters.len) return false;
+    const left = before.parameters;
+    const right = after.parameters;
+    if (left.start > old.parameters.len or left.len > old.parameters.len - left.start or right.start > current.parameters.len or right.len > current.parameters.len - right.start) return false;
+    for (old.parameters[left.start..][0..left.len], current.parameters[right.start..][0..right.len]) |a, b| {
+        if (a.binding != b.binding or a.ty != b.ty or a.inferred != b.inferred) return false;
+    }
+    return true;
+}
 
 /// Does not by itself certify the transitive producers or a callable use.
 pub fn definitionEqual(a: Allocator, old: *const core.Module, current: *const core.Module, binding: u32) Allocator.Error!bool {

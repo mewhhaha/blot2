@@ -17,7 +17,7 @@ const absent = std.math.maxInt(u32);
 const value_template = @import("source_value_template.zig");
 const Error = Allocator.Error || error{ InvalidFunctionReference, InvalidGlobalReference, ModuleTooLarge, Declined };
 const Address = struct { original: u32, actual: u32, len: u32, owner: u32 };
-pub const Stats = struct { graph_imports: importer.OwnerCensus = .{}, static_graph_scratch: @import("source_value_template.zig").ScratchStats = .{}, static_graph_scratch_bytes: usize = 0, request_checks: usize = 0, request_hits: usize = 0, candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0, reused_scalar_constants: usize = 0, reused_aggregate_constants: usize = 0 };
+pub const Stats = struct { graph_imports: importer.OwnerCensus = .{}, static_graph_scratch: @import("source_value_template.zig").ScratchStats = .{}, static_graph_scratch_bytes: usize = 0, lookup_positions: usize = 0, request_checks: usize = 0, request_hits: usize = 0, candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0, reused_scalar_constants: usize = 0, reused_aggregate_constants: usize = 0 };
 /// An admitted aggregate constant child: the current request and the old
 /// serialized root address that the retained caller's operands name.
 const AggregateConstant = struct { request: artifacts.Request, root: u32 };
@@ -350,8 +350,15 @@ pub const State = struct {
     }
     pub fn find(self: *State, g: anytype, request: artifacts.Request) Allocator.Error!?u32 {
         if (!self.enabled or !self.old.executable_queries_complete) return null;
-        var candidates = self.old.executable_queries.candidates(@import("executable_query.zig").fragmentFingerprint(request), .oldest_first);
+        var indexed = request;
+        switch (indexed) {
+            .named => |*key| key.target.unit = self.priorUnit(key.target.unit) orelse return null,
+            .closure => |*key| key.unit = self.priorUnit(key.unit) orelse return null,
+            else => return null,
+        }
+        var candidates = self.old.executable_queries.candidates(@import("executable_query.zig").fragmentFingerprint(indexed), .oldest_first);
         while (candidates.next()) |position| {
+            self.stats.lookup_positions += 1;
             const record = self.old.executable_queries.records.items[position];
             const same_origin = switch (request) {
                 .named => |key| switch (record.key.request) {
@@ -389,6 +396,14 @@ pub const State = struct {
     /// Matching owners still require complete shape/evidence/capture import.
     fn sameUnit(self: *const State, old: u32, current: u32) bool {
         return old != 0 and old <= self.importer.unit_map.len and current != 0 and self.importer.unit_map[old - 1] == current;
+    }
+    fn priorUnit(self: *const State, current: u32) ?u32 {
+        if (current == 0) return null;
+        // Ordinary retained edits preserve dense owners. Reordered namespaces
+        // use the already validated path correspondence, never numeric equality.
+        if (current <= self.importer.unit_map.len and self.importer.unit_map[current - 1] == current) return current;
+        for (self.importer.unit_map, 1..) |mapped, old| if (mapped == current) return @intCast(old);
+        return null;
     }
     fn localAddress(self: *const State, address: u32, owner: u32) bool {
         if (address < @import("../runtime/arena_runtime.zig").metadata_bytes) return self.arena != null;

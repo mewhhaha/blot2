@@ -1,0 +1,5 @@
+import * as array from "std/array"
+entry const run = fn (seed: U32) -> U32 => do:
+  let values = array.generate 8192 (fn index => (seed + index * 7919) % 65536)
+  let mapped = array.map (fn value => value * value + 3) values
+  break array.fold_left (fn total value => total + value) 0 mapped

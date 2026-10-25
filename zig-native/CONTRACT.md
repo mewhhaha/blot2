@@ -17,6 +17,31 @@ dispatch. Symbolic principal projections and complete selected witnesses remain
 distinct claims; neither mutable solver IDs nor private catalogs cross the
 public or portable evidence boundary.
 
+A written `result "member" Input Output` clause owns the same destination-only
+selection obligation as `@type.result`. Its signature is an invocation-row
+carrier; the covered body operation retains an actual input/output signature for
+Core and emission. A caller's additional ambient effects do not widen that
+selected method's exact requirement. No input-owner fallback is authorized.
+
+A completed selected-query receipt may own the closure results frozen by that
+query's solved region. Replay imports their graphs and exact semantic evidence,
+validates every source and observed input, and reserves all publication capacity
+before restoring completion for the outer result and those captures. A bare
+typed view or imported closure grants no completion. Canonical session replay
+must remap these receipt values alongside the returned graph. Native capture
+completion lists are omitted from portable archives; restart keeps the outer
+query result and rechecks nested closures when needed. This authority proves
+selection at an exact interface, not a reusable backend body or arbitrary effect
+widening.
+
+Checked source-interface proofs may inspect one reached declaration at a time
+only after the complete immutable source context's bounds have been validated.
+Active recursive headers are hypotheses, and success requires all reached bodies
+to pass; failure revokes nested claims. This mode never establishes serialized
+package authority. Lexical row facts are bounded sparse pages copied by value
+for rollback; saturation declines the optional proof. Open substitutions remain
+private, and ordinary package admission retains its existing size limits.
+
 ## Storage and ownership
 
 Source bytes are immutable UTF-8. Tokens refer to byte ranges. Identifiers use
@@ -24,17 +49,17 @@ Source bytes are immutable UTF-8. Tokens refer to byte ranges. Identifiers use
 offset/length entries and stable numeric IDs. Hashes locate candidates; exact
 bytes decide identity. Array growth must never invalidate hash keys or handles.
 Immutable Core keeps one owned spelling for each record field symbol it uses.
-Backend spawn preparation computes contract presence once per generator and
-owns a pointer view of that run's immutable modules only when a spawn contract
+Backend spawn preparation computes contract presence once per generator and owns
+a pointer view of that run's immutable modules only when a spawn contract
 exists. The view borrows Core, is freed with the generator, and never crosses a
 retained revision or retry. Every positive application still validates its
-actual spawn wrapper and arguments; cached presence grants no authority.
-Runtime structural record slots follow UTF-8 spelling order, independent of
-source evaluation order and symbol relocation. Constructor tuple views keep
-declaration order and convert explicitly at the representation boundary.
-Evaluator records retain slot names beside their values; every projection
-matches names rather than assuming an annotation's field order. Merge results
-intern their ordered name spans, so repeated updates do not grow shape metadata.
+actual spawn wrapper and arguments; cached presence grants no authority. Runtime
+structural record slots follow UTF-8 spelling order, independent of source
+evaluation order and symbol relocation. Constructor tuple views keep declaration
+order and convert explicitly at the representation boundary. Evaluator records
+retain slot names beside their values; every projection matches names rather
+than assuming an annotation's field order. Merge results intern their ordered
+name spans, so repeated updates do not grow shape metadata.
 
 Specialization diagnostic provenance consists of owned unit IDs and byte spans,
 scoped to the current requesting use. It never participates in semantic or
@@ -46,6 +71,30 @@ stamps include this bit.
 AST IDs, type IDs and instruction IDs are 32-bit indexes into contiguous owned
 tables. Lists are spans in side arrays. There are no per-character nodes,
 semantic linked lists or persistent tree maps in hot mutable state.
+
+Generic-requirement candidates likewise use owned flat variable buffers and
+index spans scoped to one generalization. Buffer growth cannot invalidate a
+candidate, and publication retains no temporary span. Schemes without residual
+predicates keep their ordinary quantified types and rows; they omit only
+metadata for shared-predicate instantiation, which they cannot request.
+
+Requirement dependency caches are local to one checker and pending ordinal. They
+preserve ordered variable discovery and invalidate on type/effect writes,
+rollback, reused slots and future IDs. Projection queries keep their original
+charged path. A cache hit grants no semantic completion or cross-revision reuse.
+Completed live sharing summaries borrow immutable producer tables only for the
+import transaction; every retained type/row ID is relocated into the consumer.
+Frozen interfaces and bindings without a published sharing summary recompute it.
+
+Parallel fresh-module checking admits only dependency-ready modules. Workers
+borrow immutable syntax, symbols and completed producer interfaces, own separate
+solvers/diagnostics/budgets, and publish into distinct module slots. Joins
+precede symbol growth, allocator-adapter release and ordered budget accounting.
+All retained stores restore their owning allocator before the temporary adapter
+is released. Any diagnostic, missing synthesized name or aggregate budget
+failure releases speculative modules and replays the serial check. Allocation
+failure joins all workers before returning. No worker owns the borrowed symbol
+pool.
 
 A staged callable may accept data containing unobserved open callback rows.
 Selected source emission retains that callable and its exact Session-owned
@@ -215,6 +264,18 @@ generic variables are never used as a principal cache key. The receipt owner
 also exists in fresh CLI builds, independently of artifact recording. Keeping a
 local query answer does not enable the emission journal or retain a complete
 backend snapshot.
+
+A retained principal source graph owns normalized immutable types, source IDs
+and copied diagnostic names. It may be leased across revisions only with the
+same durable allocator, exact source-owner correspondence and unchanged body and
+source dependencies. The first retained family excludes plain-memo facts, value
+observations/publications, untracked reads, evaluated allocations and normalized
+child imports. Each receiving Session charges its own graph budgets and acquires
+a lease only after query-table publication storage is reserved. The next
+successful artifact retains only eligible graphs used in that Session; failed
+attempts release their leases and leave the previous artifact intact. These
+source descriptions are not closed selected-call proofs or executable artifacts.
+They never retain mutable solver substitutions.
 
 Across revisions, a refinement receipt distinguishes collected source bodies
 from positive closed-call proof reads. An unchanged local body may survive a
@@ -474,11 +535,11 @@ index still falls back to ordinary preparation. A retained final-body RC verdict
 also requires exact arena, cohort and fixture-helper roles in addition to the
 complete optimizer correspondence; module-level ownership admission still runs.
 Encoded function bodies occupy one owned buffer whose payload and allocated
-capacity are capped at 8 MiB. Reuse requires
-an unchanged physical body and ordinal, exact function-index mapping, globals,
-section counts, root/RC/wide lowering modes and resource-retirement import.
-Every other body encodes normally and complete section publication remains
-unchanged. These RC/encoding caches are absent from restart archives.
+capacity are capped at 8 MiB. Reuse requires an unchanged physical body and
+ordinal, exact function-index mapping, globals, section counts, root/RC/wide
+lowering modes and resource-retirement import. Every other body encodes normally
+and complete section publication remains unchanged. These RC/encoding caches are
+absent from restart archives.
 
 Compilation tiers belong to the session and to optimized captures. Development
 mode may omit scalar replacement and automatic vectorization, but never
@@ -883,40 +944,40 @@ An initially empty validated-call table compactly proves all external negatives;
 otherwise each consumed lookup is recorded. Nominal memo inputs retain absence,
 true and false separately; internal writes preserve the final value. No value
 evaluation, nested specialization or unrecorded runtime read may enter the key.
-Reserve all memo capacity before publication. Ordinary evaluation still runs
-and reports errors; executable admission has its own source/value checks.
+Reserve all memo capacity before publication. Ordinary evaluation still runs and
+reports errors; executable admission has its own source/value checks.
 
-Closed call publications are optional memo outputs of that completed query.
-An individual proof that cannot be translated under the existing type/depth
-checks is omitted; its next use performs ordinary checking. This does not
-decline the independently admitted result or publish the old evidence ID.
-The next capture owns only successfully translated publications. Scalar and
-nominal inputs, source admission, result admission and atomic memo
-publication retain their checks. Principal statistics distinguish projected
-owner, result, missing-recording, dynamic-input, image and importer declines;
+Closed call publications are optional memo outputs of that completed query. An
+individual proof that cannot be translated under the existing type/depth checks
+is omitted; its next use performs ordinary checking. This does not decline the
+independently admitted result or publish the old evidence ID. The next capture
+owns only successfully translated publications. Scalar and nominal inputs,
+source admission, result admission and atomic memo publication retain their
+checks. Principal statistics distinguish projected owner, result,
+missing-recording, dynamic-input, image and importer declines;
 `call_publications_declined` counts omitted memo outputs separately from query
 declines.
 
 The recorded region includes the independent summary jobs it drains: their
 reads, publications and consumed jobs pass through the same recorder, so their
 results are recorded work even when they publish no validated call. A job
-finished outside that recording must match a recorded ordinary call proof or
-an exact completed-summary key and result. Supported summary keys contain the
+finished outside that recording must match a recorded ordinary call proof or an
+exact completed-summary key and result. Supported summary keys contain the
 source target, closed argument product, deferred-member mode and query options;
 lexical, result-directed and source-interface jobs decline this import. Joint
 recursive summaries remain completed memo judgments, never global validated-call
 certificates. Optional summary outputs are translated and may be omitted under
-the same ownership rule as call outputs. Portable principal archive version eight
-owns these inputs and outputs and still requires the complete source image.
-Portable summary inputs must translate and match exactly. An unsupported
+the same ownership rule as call outputs. Portable principal archive version
+eight owns these inputs and outputs and still requires the complete source
+image. Portable summary inputs must translate and match exactly. An unsupported
 optional summary output is omitted without discarding the admitted principal
 result; its next use performs ordinary checking. All allocation and required
-input failures retain their existing behavior.
-A principal-graph description detaches the recorder but reports nominal memo
-observations in order. Owned module observations are unique, bounded and validated
-before archive exposure. Exact named-source results may remain valid independently
-of these broader observations; unverified memo outputs are neither replayed nor
-carried into the next capture.
+input failures retain their existing behavior. A principal-graph description
+detaches the recorder but reports nominal memo observations in order. Owned
+module observations are unique, bounded and validated before archive exposure.
+Exact named-source results may remain valid independently of these broader
+observations; unverified memo outputs are neither replayed nor carried into the
+next capture.
 
 Operation-row normalization caches at most 64 answers per solver. Every lookup
 matches the resolved row, historical cursor, depth, depth limit, and both type
@@ -927,23 +988,24 @@ runs first. Only a closed tail can certify an entire closed type. Positive row
 certificates use a solver-owned dense index grown at the fallible resolution
 boundary. Infallible construction uses a four-entry fallback. Generation and
 physical-epoch checks invalidate both stores on rollback or mutation; recycled
-row IDs cannot restore discarded proofs. The sidecar is released with the solver.
+row IDs cannot restore discarded proofs. The sidecar is released with the
+solver.
 
 Positive operation-argument certificates share the same generation and physical
 epoch guards. They record maximum closed argument height and whether arguments
 exist; no-argument operations retain their distinct depth behavior. Operations
-with symbolic instances or unresolved arguments cannot acquire these proofs.
-The sidecar grows only at a fallible resolver boundary and does not escape its
+with symbolic instances or unresolved arguments cannot acquire these proofs. The
+sidecar grows only at a fallible resolver boundary and does not escape its
 solver. Historical type/effect lookup still selects the first successor at or
 after a cursor; checking the last write may prove there is no successor.
 
 Operation interning uses bounded structural argument fingerprints only to select
 candidate chains. Exact equality and oldest-match priority remain authoritative.
 Physical mutation and rollback revoke the index generation; projections and
-saturated generations keep the ordinary comparison path. Closed DAG equality
-may deduplicate visited pairs only after positive closure certificates exclude
-open and cyclic graphs. Wide record lookup retains first matching field names,
-and effect equality preserves operation multiplicities and argument checks.
+saturated generations keep the ordinary comparison path. Closed DAG equality may
+deduplicate visited pairs only after positive closure certificates exclude open
+and cyclic graphs. Wide record lookup retains first matching field names, and
+effect equality preserves operation multiplicities and argument checks.
 
 Frontend graph correspondence distinguishes constructor storage sharing from
 binder identity. Equal immutable constructors and rows may have different
@@ -986,10 +1048,10 @@ private frontend markers; source accepts contextual `from`/`where` without
 reserving them everywhere.
 
 The default `$` parses to ordinary application at precedence zero, right
-associative. It does not route through a generic helper: primitive arity,
-scoped callbacks, demands and ownership therefore use the parenthesized call
-path. An explicit local or inherited `$` fixity still selects ordinary binary
-operator dispatch. The prelude does not override this default.
+associative. It does not route through a generic helper: primitive arity, scoped
+callbacks, demands and ownership therefore use the parenthesized call path. An
+explicit local or inherited `$` fixity still selects ordinary binary operator
+dispatch. The prelude does not override this default.
 
 Spark expansion retains an unbound `task_region` leaf until checking. It has no
 source spelling and resolves to the exact active task-scope parameter, including
@@ -1134,8 +1196,8 @@ Row/layout conversion, mapping export and certificate maps may use 512-byte
 stack scratch; scalar replacement uses 2 KiB for temporary analysis. Overflow
 uses the original allocator and remains subject to allocation-failure checks.
 Interned evidence copies its inputs; exported mappings and scalar-replacement
-output always belong to the destination allocator. No returned slice or
-retained allocator points into local scratch.
+output always belong to the destination allocator. No returned slice or retained
+allocator points into local scratch.
 
 The shared query tables retain distinct selected, principal, source-description
 and open-residual claims. A completed selected receipt pins its evaluator owner;
@@ -1167,9 +1229,11 @@ including the same-position optimizer path. Semantic interface stability never
 certifies executable consumers. See [the qualification](EXECUTABLE_QUERIES.md).
 
 Executable capture indexes have a separate 16,384-record / 8 MiB retained
-capacity budget so moderately sized complete captures can be sealed. The
-generic semantic query default remains 4,096 records / 2 MiB. Owned payload and
-lookup-work limits are unchanged; exceeding any bound still declines reuse.
+capacity budget so moderately sized complete captures can be sealed. The generic
+semantic query default remains 4,096 records / 2 MiB. Refinement Contexts use a
+separate 8,192-record / 8 MiB buffer bound (CT113); their 16 MiB payload and
+4,096-position per-lookup bounds remain unchanged. Exceeding any bound still
+declines reuse.
 
 Same-position optimizer invalidation scans local observations once, then walks
 callee-to-caller edges until every changed dependency has invalidated its

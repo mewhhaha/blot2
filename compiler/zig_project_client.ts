@@ -120,6 +120,8 @@ export interface ZigProjectCompilerOptions {
   codegenWorkers?: number;
   /** Opt-in private semantic components with 1..16 workers; default stays serial. */
   semanticWorkers?: number;
+  /** Independent frontend module workers (1..16; default 4). */
+  frontendWorkers?: number;
   /** Process-local inference limit, included in compiler identity. */
   inferenceBudget?: number;
   /** Optional backend checkpoint from exportCheckpoint; copied at startup. */
@@ -414,8 +416,12 @@ class ProjectProcess implements ZigProjectCompiler {
     cacheEnvironment: Record<string, string>,
     semanticWorkers?: number,
     inferenceBudget?: number,
+    frontendWorkers?: number,
   ) {
     const args = ["serve-project"];
+    if (frontendWorkers !== undefined) {
+      args.push("--frontend-workers", String(frontendWorkers));
+    }
     if (semanticWorkers !== undefined) {
       args.push("--semantic-workers", String(semanticWorkers));
     }
@@ -1134,6 +1140,7 @@ export async function createZigProjectCompiler(
     "shareMachineCode",
     "codegenWorkers",
     "semanticWorkers",
+    "frontendWorkers",
     "inferenceBudget",
     "checkpoint",
     "cacheDirectory",
@@ -1206,6 +1213,13 @@ export async function createZigProjectCompiler(
       options.semanticWorkers < 1 || options.semanticWorkers > 16)
   ) {
     throw new RangeError("semanticWorkers must be an integer in 1..16");
+  }
+  if (
+    options.frontendWorkers !== undefined &&
+    (!Number.isInteger(options.frontendWorkers) ||
+      options.frontendWorkers < 1 || options.frontendWorkers > 16)
+  ) {
+    throw new RangeError("frontendWorkers must be an integer in 1..16");
   }
   const nullablePath = (value: unknown, name: string) =>
     value == null ? null : path(value, name);
@@ -1292,6 +1306,7 @@ export async function createZigProjectCompiler(
     cacheEnvironment,
     options.semanticWorkers,
     options.inferenceBudget,
+    options.frontendWorkers,
   );
   await process.initialize(open, timeout, identity, checkpoint);
   if (assets !== undefined) {

@@ -7,10 +7,14 @@ const F = @import("frozen_types.zig");
 const Import = @import("check_scheme_import.zig").Copier;
 pub const Error = error{ InvalidArtifact, OutOfMemory };
 pub const Admission = struct {
+    const Body = struct { module: *const core.Module, binding: core.BindingId };
     workspace: ?*Workspace = null,
     remaining: *usize,
     units: [128]*const core.Module = undefined,
     count: usize = 0,
+    source_bodies: bool = false,
+    bodies: [128]Body = undefined,
+    body_count: usize = 0,
 };
 pub const Workspace = struct {
     allocator: std.mem.Allocator,
@@ -43,6 +47,7 @@ pub const Solver = struct {
     scope: u32,
     oom: bool = false,
     rigid_types: std.bit_set.Static(4096) = .empty,
+    rigid_type_overflow: std.AutoHashMapUnmanaged(T.Id, void) = .empty,
     rigid_rows: std.AutoHashMapUnmanaged(u32, void) = .empty,
     remaining: *usize,
     pub fn init(allocator: std.mem.Allocator, module: *const core.Module, views: anytype, remaining: *usize) Error!Solver {
@@ -61,14 +66,16 @@ pub const Solver = struct {
         store.effects.labels.clearRetainingCapacity();
         try store.effects.labels.appendSlice(allocator, module.types.effects.labels);
         var rigid_types: std.bit_set.Static(4096) = .empty;
+        var rigid_type_overflow: std.AutoHashMapUnmanaged(T.Id, void) = .empty;
+        errdefer rigid_type_overflow.deinit(allocator);
         var rigid_rows: std.AutoHashMapUnmanaged(u32, void) = .empty;
         errdefer rigid_rows.deinit(allocator);
         const scope = store.rigidScope() catch |err| return convert(err);
         for (views.schemes[0..views.scheme_count]) |scheme| {
             if (module.types.node(scheme.root).tag != .forall) for (module.types.list(scheme.variables)) |formal| {
-                if (remaining.* == 0 or formal >= rigid_types.capacity()) return error.InvalidArtifact;
+                if (remaining.* == 0 or formal >= module.types.nodes.len) return error.InvalidArtifact;
                 remaining.* -= 1;
-                rigid_types.set(formal);
+                if (formal < rigid_types.capacity()) rigid_types.set(formal) else try rigid_type_overflow.put(allocator, formal, {});
             };
             for (module.types.list(scheme.row_variables)) |formal| {
                 if (remaining.* == 0) return error.InvalidArtifact;
@@ -80,7 +87,6 @@ pub const Solver = struct {
             node.closed_height = 0;
             node.closed_generation = 0;
             if (node.tag == .variable) {
-                if (id >= rigid_types.capacity()) return error.InvalidArtifact;
                 node.* = .{ .tag = .rigid, .a = scope, .b = @intCast(id) };
             }
         }
@@ -89,7 +95,7 @@ pub const Solver = struct {
         for (0..module.types.effects.rows.len) |index| {
             const row = store.effects.rows.items[index];
             if (row.tail != .variable) continue;
-            if (index < views.closed_rows.len and views.closed_rows[index]) {
+            if (views.closed_rows.contains(index)) {
                 store.effects.rows.items[index].tail = .closed;
             } else {
                 const rigid = store.rigid(scope, row.tail.variable, 1) catch |err| return convert(err);
@@ -99,7 +105,7 @@ pub const Solver = struct {
         store.has_projections = true;
         store.has_rank_types = true;
         store.has_usage_types = true;
-        var result: Solver = .{ .store = store, .scope = scope, .remaining = remaining, .rigid_types = rigid_types, .rigid_rows = rigid_rows };
+        var result: Solver = .{ .store = store, .scope = scope, .remaining = remaining, .rigid_types = rigid_types, .rigid_type_overflow = rigid_type_overflow, .rigid_rows = rigid_rows };
         result.refresh();
         return result;
     }
@@ -109,10 +115,11 @@ pub const Solver = struct {
     }
     pub fn ownsRigid(self: *const Solver, node: T.Node) bool {
         if (node.tag != .rigid or node.a != self.scope) return false;
-        if (node.c == 0) return node.b < self.rigid_types.capacity() and self.rigid_types.isSet(node.b);
+        if (node.c == 0) return if (node.b < self.rigid_types.capacity()) self.rigid_types.isSet(node.b) else self.rigid_type_overflow.contains(node.b);
         return node.c == 1 and self.rigid_rows.contains(node.b);
     }
     pub fn deinit(self: *Solver) void {
+        self.rigid_type_overflow.deinit(self.store.allocator);
         self.rigid_rows.deinit(self.store.allocator);
         self.store.deinit();
     }

@@ -7,6 +7,11 @@ const receipt = @import("specialization_receipt.zig");
 const importer = @import("artifact_import.zig");
 const layout = @import("../backend/layout.zig");
 const Allocator = std.mem.Allocator;
+pub const DeclineReason = enum { inputs, imports, query, proof, diagnostic, unknown, nested, views, regions, incomplete, steps, values, calls, scalar, source };
+fn reject(state: anytype, reason: DeclineReason) ?Record {
+    state.stats.independent_rejections[@backingInt(reason)] += 1;
+    return null;
+}
 pub const ScalarInput = struct { target: core.BindingRef, evidence: u32, value: ?eval.Value };
 pub const Record = struct {
     target: core.BindingRef,
@@ -89,17 +94,23 @@ fn recheck(state: anytype, g: anytype, read: receipt.CallRead, actual: u32) Allo
     const Probe = struct { evaluator: eval.Session, representations: struct { store: layout.Store } };
     var probe: Probe = .{ .evaluator = try eval.Session.initShared(a, &g.evaluator), .representations = .{ .store = undefined } };
     defer probe.evaluator.deinit();
+    // Workers share the read-only generator. Charge private work to the local
+    // result, then join its counts; never write the parent's clocks or counters.
+    defer {
+        state.stats.independent_regions += probe.evaluator.counters.inference_regions;
+        state.stats.independent_nodes += probe.evaluator.counters.inference_general_nodes + probe.evaluator.counters.inference_specialization_nodes + probe.evaluator.counters.inference_preparation_nodes + probe.evaluator.counters.inference_lowering_nodes;
+    }
     probe.representations.store = layout.Store.init(a) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else null;
     defer probe.representations.store.deinit();
     probe.evaluator.options = g.evaluator.options;
     probe.evaluator.depth = g.evaluator.depth;
     probe.evaluator.seedScalarInputs(&g.evaluator) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
-        error.Declined, error.RequestUnwind => return null,
+        error.Declined, error.RequestUnwind => return reject(state, .inputs),
     };
-    var maps = (try importer.Importer.initIndependentQuery(a, &state.old.metadata.pools.?, g.evaluator.units, &state.gate)) orelse return null;
+    var maps = (try importer.Importer.initIndependentQuery(a, &state.old.metadata.pools.?, g.evaluator.units, &state.gate)) orelse return reject(state, .imports);
     defer maps.deinit();
-    const expected = (try maps.importEvidence(&probe, read.evidence)) orelse return null;
+    const expected = (try maps.importEvidence(&probe, read.evidence)) orelse return reject(state, .imports);
     var tape: receipt.Tape = .{};
     defer tape.deinit(a);
     var observation: @import("refinement_receipt.zig").Observation = .{};
@@ -109,24 +120,32 @@ fn recheck(state: anytype, g: anytype, read: receipt.CallRead, actual: u32) Allo
     const before_children = probe.evaluator.storage.children.items.len;
     const proved = probe.evaluator.recheckCallProof(target, expected) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
-        error.Declined, error.RequestUnwind => return null,
+        error.Declined, error.RequestUnwind => return reject(state, .query),
     };
-    if (!proved or probe.evaluator.diagnostic != null or tape.unknown or tape.nested or tape.views.items.len != 0 or observation.regions != 1 or !observation.complete or probe.evaluator.steps != 0 or probe.evaluator.storage.values.items.len != before_values or probe.evaluator.storage.children.items.len != before_children) return null;
+    if (!proved) return reject(state, .proof);
+    if (probe.evaluator.diagnostic != null) return reject(state, .diagnostic);
+    if (tape.unknown) return reject(state, .unknown);
+    if (tape.nested) return reject(state, .nested);
+    if (tape.views.items.len != 0) return reject(state, .views);
+    if (observation.regions != 1) return reject(state, .regions);
+    if (!observation.complete) return reject(state, .incomplete);
+    if (probe.evaluator.steps != 0) return reject(state, .steps);
+    if (probe.evaluator.storage.values.items.len != before_values or probe.evaluator.storage.children.items.len != before_children) return reject(state, .values);
     // Recheck has no incoming call certificates or plain-data facts.
     // Its primitive values are independent copies of checked current inputs.
     // Negative call reads trigger ordinary source inference. A successful
     // judgment therefore has no external call-presence premise to replay.
-    for (tape.call_reads.items) |input| if (input.present) return null;
+    for (tape.call_reads.items) |input| if (input.present) return reject(state, .calls);
     var scalar_reads: std.ArrayList(ScalarInput) = .empty;
     defer scalar_reads.deinit(a);
     for (tape.scalar_reads.items) |input| {
-        if (!state.gate.admits(input.target)) return null;
-        const actual_read = scalarInput(g, input.target) orelse return null;
-        if (actual_read.evidence != input.evidence) return null;
+        if (!state.gate.admits(input.target)) return reject(state, .scalar);
+        const actual_read = scalarInput(g, input.target) orelse return reject(state, .scalar);
+        if (actual_read.evidence != input.evidence) return reject(state, .scalar);
         try scalar_reads.append(a, actual_read);
     }
     try tape.sources.append(a, target);
-    for (tape.sources.items) |source| if (!state.gate.admits(source)) return null;
+    for (tape.sources.items) |source| if (!state.gate.admits(source)) return reject(state, .source);
     const sources = try tape.sources.toOwnedSlice(a);
     errdefer a.free(sources);
     return .{ .target = target, .evidence = actual, .options = g.evaluator.options, .depth = g.evaluator.depth, .sources = sources, .scalar_reads = try scalar_reads.toOwnedSlice(a) };

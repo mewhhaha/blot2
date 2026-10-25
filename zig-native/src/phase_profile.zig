@@ -37,6 +37,7 @@ pub const Profile = struct {
     previous: std.Io.Timestamp,
     /// Written by the installing thread; CountingAllocator reads it anywhere.
     active: Phase = .other,
+    checking: @import("work_counters.zig").Frontend = .{},
     nanos: [phase_count]u64 = @splat(0),
     /// Updated atomically by CountingAllocator from any thread.
     requested_bytes: [phase_count]u64 = @splat(0),
@@ -75,6 +76,7 @@ pub const Profile = struct {
         self.account();
         self.sampleRss(@backingInt(self.active));
         var result: Record = .{ .profiled = true, .total_us = @intCast(@max(0, self.started.durationTo(self.previous).toMicroseconds())), .peak_rss_kib = self.peak_rss_kib };
+        result.checking = self.checking;
         for (&result.phases, 0..) |*phase, index| phase.* = .{
             .us = self.nanos[index] / std.time.ns_per_us,
             .requested_bytes = @atomicLoad(u64, &self.requested_bytes[index], .monotonic),
@@ -108,6 +110,7 @@ pub const Record = struct {
     total_us: u64 = 0,
     peak_rss_kib: u64 = 0,
     phases: [phase_count]PhaseRecord = @splat(.{}),
+    checking: @import("work_counters.zig").Frontend = .{},
     pub fn jsonStringify(self: *const Record, stream: *std.json.Stringify) std.Io.Writer.Error!void {
         try stream.beginObject();
         if (self.profiled) {
@@ -122,12 +125,36 @@ pub const Record = struct {
                 try stream.write(self.phases[index]);
             }
             try stream.endObject();
+            try stream.objectField("checking");
+            try stream.write(self.checking);
         }
         try stream.endObject();
     }
 };
 
 threadlocal var installed: ?*Profile = null;
+threadlocal var checking_capture: ?*@import("work_counters.zig").Frontend = null;
+
+pub const CheckingCapture = struct {
+    previous: ?*@import("work_counters.zig").Frontend,
+    pub fn restore(self: CheckingCapture) void {
+        checking_capture = self.previous;
+    }
+};
+pub fn captureChecking(output: *@import("work_counters.zig").Frontend) CheckingCapture {
+    const previous = checking_capture;
+    checking_capture = output;
+    return .{ .previous = previous };
+}
+
+pub fn recordChecking(work: @import("work_counters.zig").Frontend) void {
+    if (checking_capture) |output| {
+        output.merge(work);
+        return;
+    }
+    const profile = installed orelse return;
+    if (profile.active == .check) profile.checking.merge(work);
+}
 
 /// Restores the profile that was installed before `install`.
 pub const Installation = struct {
@@ -256,6 +283,23 @@ test "nested phases are exclusive and partition the profiled interval" {
     try std.testing.expect(std.mem.find(u8, detail, "\"total_us\":") != null);
     try std.testing.expect(std.mem.find(u8, detail, "\"validation\":{\"us\":") != null);
     try std.testing.expect(std.mem.find(u8, detail, "\"requested_bytes\":") != null);
+}
+
+test "project checking counters merge modules and exclude backend checker invocations" {
+    var profile: Profile = .init(std.testing.io);
+    const installation = install(&profile);
+    defer installation.restore();
+    const checking = enter(.check);
+    recordChecking(.{ .modules = 1, .imported_schemes = 3, .normalization = .{ .free_type_visits = 7 } });
+    recordChecking(.{ .modules = 1, .imported_schemes = 5, .normalization = .{ .free_type_visits = 11 } });
+    const backend = enter(.backend);
+    recordChecking(.{ .modules = 99, .imported_schemes = 99 });
+    backend.exit();
+    checking.exit();
+    const record = profile.record();
+    try std.testing.expectEqual(@as(u64, 2), record.checking.modules);
+    try std.testing.expectEqual(@as(u64, 8), record.checking.imported_schemes);
+    try std.testing.expectEqual(@as(u64, 18), record.checking.normalization.free_type_visits);
 }
 
 test "counting allocator charges requests to the active phase and only while attached" {

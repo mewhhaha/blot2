@@ -71,8 +71,8 @@ pub const Context = struct {
     types: *const core.Types,
     remaining: *usize,
     owners: [limit]T.Id = @splat(0),
-    pure_rows: [limit]bool = @splat(false),
-    closed_rows: [limit]bool = @splat(false),
+    pure_rows: @import("package_row_facts.zig").Facts = .{},
+    closed_rows: @import("package_row_facts.zig").Facts = .{},
     formal: ?T.Id = null,
     generic_variables: T.List = .{},
     generic_rows: T.List = .{},
@@ -86,24 +86,31 @@ pub const Context = struct {
     witness: bool = false,
     representation_floor: ?usize = null,
     executable: bool = false,
+    /// A checked source-body inquiry may contain unrelated ordinary types
+    /// above the package reader's small tables. Lexical binders and row views
+    /// still require their explicit bounds; this grants no package authority.
+    large_plain_graph: bool = false,
     openings: [128]struct { binding: core.BindingId, binders: T.List, quantifier: T.Id } = undefined,
     projection_resolver: ?ProjectionResolver = null,
     opening_count: usize = 0,
     pub fn initialize(self: *Context) Error!void {
-        try require(self.types.nodes.len <= limit and self.types.effects.rows.len <= limit);
+        try require(self.large_plain_graph or (self.types.nodes.len <= limit and self.types.effects.rows.len <= limit));
         try @import("quantifier_goals.zig").validateWithBudget(self.types.nodes, self.types.quantifier_goals, self.types.quantifier_obligations, self.remaining);
         for (self.types.nodes, 0..) |node, id| {
             if (node.tag != .forall and node.tag != .existential) continue;
             try require(id != 0 and node.c != 0 and node.c <= 128);
             for (try span(self.types, .{ .start = node.b, .len = node.c }), 0..) |binder, ordinal| {
-                try require(binder < self.types.nodes.len);
+                try require(binder < self.types.nodes.len and binder < self.owners.len);
                 const leaf = self.types.node(binder);
                 try require(leaf.tag == .bound and leaf.a == ordinal and leaf.b <= 2 and (node.tag == .forall or leaf.b == 0) and leaf.c == 0 and self.owners[binder] == 0);
                 self.owners[binder] = @intCast(id);
             }
         }
         for (self.types.nodes, 0..) |node, id| {
-            if (node.tag == .bound and node.c == 0) try require(self.owners[id] != 0);
+            if (node.tag == .bound) {
+                try require(id < self.owners.len);
+                if (node.c == 0) try require(self.owners[id] != 0);
+            }
         }
     }
     pub fn generic(self: *Context, scheme: T.Scheme) Error!void {
@@ -212,20 +219,20 @@ pub const Context = struct {
     fn representationBinder(self: *const Context, root: T.Id) Error!void {
         const floor = self.representation_floor orelse return;
         const node = self.types.node(root);
-        try require(node.tag == .bound and node.c == 0);
+        try require(node.tag == .bound and node.c == 0 and root < self.owners.len);
         for (self.formals[floor..self.formal_count]) |owner| if (self.owners[root] == owner) return;
         return error.InvalidArtifact;
     }
     pub fn isForeign(self: *const Context, id: T.Effects.Id) bool {
         if (foreign(self.types, id)) return true;
-        if (id >= self.types.effects.rows.len or id >= self.closed_rows.len or !self.closed_rows[id]) return false;
+        if (id >= self.types.effects.rows.len or !self.closed_rows.contains(id)) return false;
         const row = self.types.row(id);
         if (row.labels.len == 0 or row.tail != .variable) return false;
         for (self.types.rowLabels(id)) |label| if (label != T.foreign_operation) return false;
         return true;
     }
     pub fn isPure(self: *const Context, row: T.Effects.Id) bool {
-        return pure(self.types, row) or (row < self.pure_rows.len and self.pure_rows[row]);
+        return pure(self.types, row) or (self.pure_rows.contains(row));
     }
     fn genericRow(self: *Context, id: T.Effects.Id, depth: usize) Error!bool {
         if (id >= self.types.effects.rows.len) return false;
@@ -252,7 +259,7 @@ pub const Context = struct {
         } else {
             var generic_row = false;
             if (value.tail == .variable) generic_row = try self.ownsRow(value.tail.variable);
-            try require(value.tail == .closed or generic_row or self.isPure(id) or self.isForeign(id) or (id < self.closed_rows.len and self.closed_rows[id]));
+            try require(value.tail == .closed or generic_row or self.isPure(id) or self.isForeign(id) or (self.closed_rows.contains(id)));
         }
         for (self.types.rowLabels(id)) |label| {
             try self.step(depth);
@@ -836,8 +843,8 @@ pub const Principal = struct {
         self.pending_count = 0;
         try self.match(left, right, 0);
         if (self.views) |views| for (self.pending[0..self.pending_count]) |row| {
-            views.closed_rows[row] = true;
-            if (views.types.row(row).labels.len == 0) views.pure_rows[row] = true;
+            try views.closed_rows.set(row);
+            if (views.types.row(row).labels.len == 0) try views.pure_rows.set(row);
         };
     }
     fn rowPure(self: *const Principal, types: *const core.Types, row: T.Effects.Id) bool {
@@ -871,7 +878,7 @@ pub const Principal = struct {
         if (id >= types.effects.rows.len) return false;
         const row = types.row(id);
         if (row.tail == .closed) return true;
-        if (self.views) |views| if (views.types == types and id < views.closed_rows.len and views.closed_rows[id]) return true;
+        if (self.views) |views| if (views.types == types and views.closed_rows.contains(id)) return true;
         if (types == self.left and row.tail == .variable) return std.mem.findScalar(u32, types.list(self.left_rows), row.tail.variable) != null;
         return false;
     }
@@ -964,7 +971,7 @@ pub const Principal = struct {
         } else if (!subset or a.tail != .closed) {
             if (!(self.closedRow(self.left, left) and self.closedRow(self.right, right)) and !std.meta.eql(a.tail, b.tail)) {
                 const views = self.views orelse return error.InvalidArtifact;
-                try require(!subset and self.closedRow(self.left, left) and views.types == self.right and b.tail == .variable and right < views.closed_rows.len);
+                try require(!subset and self.closedRow(self.left, left) and views.types == self.right and b.tail == .variable);
                 try require(self.pending_count < self.pending.len);
                 self.pending[self.pending_count] = right;
                 self.pending_count += 1;
@@ -1047,7 +1054,7 @@ pub const Principal = struct {
             return;
         }
         const views = self.views orelse return error.InvalidArtifact;
-        try require(views.types == self.right and right < self.right.effects.rows.len and right < views.pure_rows.len);
+        try require(views.types == self.right and right < self.right.effects.rows.len);
         const actual = self.right.row(right);
         // Covariant source reads may add an empty inference tail. Only an
         // independently matched pure owner recipe discharges that view.

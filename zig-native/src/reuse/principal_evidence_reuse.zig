@@ -212,7 +212,7 @@ pub const State = struct {
         }
         return false;
     }
-    fn sourcesEqual(self: *State, target: core.BindingRef, inputs: *const @import("principal_inputs.zig").Key) bool {
+    fn sourcesEqual(self: *State, target: core.BindingRef, inputs: *const @import("principal_inputs.zig").Key) Allocator.Error!bool {
         if (!self.gate.enabled) return self.sourceDeclined(.{ .target = target, .reason = .disabled });
         if (self.gate.constant_types) return self.sourceDeclined(.{ .target = target, .reason = .constant_types });
         if (!inputs.source_complete) return self.sourceDeclined(.{ .target = target, .reason = .incomplete });
@@ -220,7 +220,7 @@ pub const State = struct {
             if (unit == 0 or unit > self.gate.units.len or !@import("principal_input_image.zig").moduleEqual(self.old.metadata.pools.?.modules[unit - 1].module, &self.gate.units[unit - 1])) return self.sourceDeclined(.{ .target = target, .source = .{ .unit = unit, .binding = 0 }, .reason = .module_image });
         }
         for (inputs.interfaces) |source| {
-            if (!self.gate.admitsCheckedInterface(source)) return self.sourceDeclined(.{ .target = target, .source = source, .interface_observation = true, .reason = if (self.gate.admitsCallIdentity(source)) .changed_source else .identity });
+            if (!try self.gate.admitsCompletedInterface(source)) return self.sourceDeclined(.{ .target = target, .source = source, .interface_observation = true, .reason = if (self.gate.admitsCallIdentity(source)) .changed_source else .identity });
         }
         var root = false;
         for (inputs.sources) |source| {
@@ -233,7 +233,7 @@ pub const State = struct {
     /// publication before publishing any of them or retaining the new key.
     fn currentInputs(self: *State, generator: anytype, target: core.BindingRef, inputs: *const @import("principal_inputs.zig").Key) Allocator.Error!?*const @import("principal_inputs.zig").Key {
         if (inputs.call_publications.len == 0 and inputs.call_reads.len == 0 and inputs.summary_reads.len == 0 and inputs.summary_publications.len == 0) return inputs;
-        if ((!self.inputImageEqual() and !self.sourcesEqual(target, inputs)) or !try self.ensureGraphs()) return null;
+        if ((!self.inputImageEqual() and !try self.sourcesEqual(target, inputs)) or !try self.ensureGraphs()) return null;
         // This importer is private to principal type/row translation. The
         // gate proved every source type, nominal and effect ID equal. The
         // source observations separately prove the consumed bodies. It grants no
@@ -325,7 +325,7 @@ pub const State = struct {
                     return null;
                 }
                 const complete_image = self.inputImageEqual();
-                if (!complete_image and !self.sourcesEqual(target, inputs)) {
+                if (!complete_image and !try self.sourcesEqual(target, inputs)) {
                     self.stats.projected_image_declines += 1;
                     self.stats.projected_empty_declines += 1;
                     return null;

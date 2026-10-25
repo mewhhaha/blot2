@@ -5429,6 +5429,53 @@ test "canonical selected proofs use current captures and exact equality under fo
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, canonicalScalarScenario, .{ &module, true });
 }
 
+fn canonicalCompletedCaptures(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    session.retain_specialization_receipts = true;
+    session.specializations.canonical_specializations.force_collision = true;
+    const expected = try session.storage.evidence.intern(.function, types.u32_type, types.u32_type, &.{});
+    // Canonical capture keys require known semantic interfaces. Independent
+    // inference supplies that interface without selecting this invocation.
+    const add = target(module, "add");
+    const inferred = try session.inferClosure(try session.richValue(add));
+    session.slots[session.binding_offsets[0] + add.binding].value = inferred;
+    // Stabilize the observed call-proof state. A first inquiry may record an
+    // absent call memo and publish it; that absence must not replay as present.
+    const warm = try session.richValue(target(module, "warm"));
+    _ = try session.specializeClosure(warm, expected);
+    const first_record = session.retained.specialization_receipts.items.len;
+    const first = try session.richValue(target(module, "first"));
+    const again = try session.richValue(target(module, "again"));
+    _ = try session.specializeClosure(first, expected);
+    try std.testing.expect(session.retained.specialization_receipts.items[first_record].completed_closures.len > 0);
+    const regions = session.counters.inference_regions;
+    const reused = session.specializations.canonical_specializations.reused;
+    const selected = try session.specializeClosure(again, expected);
+    try std.testing.expectEqual(reused + 1, session.specializations.canonical_specializations.reused);
+    try std.testing.expectEqual(regions, session.counters.inference_regions);
+    const previous = session.retained.specialization_receipts.items[first_record].completed_closures;
+    const current = session.retained.specialization_receipts.items[first_record + 1].completed_closures;
+    try std.testing.expectEqual(previous.len, current.len);
+    try std.testing.expectEqual(@as(usize, 1), current.len);
+    try std.testing.expect(previous[0] != current[0]);
+    try std.testing.expectEqual(session.valueChildren(selected)[0], current[0]);
+    for (current) |child| try std.testing.expectEqual(child, try session.specializeClosure(child, session.valueEvidence(child)));
+    try std.testing.expectEqual(regions, session.counters.inference_regions);
+}
+
+test "canonical completed capture results remap publication receipts and remain solved through allocation failures" {
+    var module = try lower(
+        \\entry const add = fn extra => @u32.add extra 42
+        \\const make = fn invoke => fn extra => invoke extra
+        \\entry const warm = make add
+        \\entry const first = make add
+        \\entry const again = make add
+    );
+    defer module.deinit(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, canonicalCompletedCaptures, .{&module});
+}
+
 test "canonical inference proofs distinguish selected and entry modes with current capture graphs" {
     var module = try lower(
         \\const make: U32 -> (U32 -> U32 ! {}) = fn captured => fn value => @u32.add captured value

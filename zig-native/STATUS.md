@@ -1,20 +1,70 @@
 # Zig compiler status
 
+The [CT116 frontend update](CT116_QUALIFICATION.md) adds requirement dependency
+reuse, immutable imported sharing metadata, indexed inference membership and
+four-worker checking of independent fresh modules. `frontendWorkers` /
+`--frontend-workers` selects 1–16 workers; retained edits keep their existing
+cutoff path. Canonical imported graphs are still copied. The
+[root README](../README.md#idiomatic-blot-and-rust-benchmarks) includes eighteen
+idiomatic Blot/Rust compile-time and same-engine Wasm runtime benchmarks. CT110
+remains installed; preserved concurrent array work is outside the frozen CT116
+qualification.
+
+The [CT114 frontend changes](CT114_QUALIFICATION.md) reduce checking allocation
+requests by 27.0% and requested bytes by 17.6%. The instrumented frontend median
+is 1.872 → 1.784 s in three alternating pairs; this does not establish an
+unprofiled latency improvement. The frozen candidate passes 2,589 exhaustive
+native laws, 1,660 release guests, 48 smoke tests, 57 tooling checks and zero
+Zig lint findings. The fresh sub-second target remains open. See
+[the architecture review](../COMPILER_FRONTEND_REVIEW.md) for the larger
+changes. CT110 remains installed.
+
+The preceding CT113 checkpoint follows.
+
+The [CT113 follow-up](CT113_QUALIFICATION.md) adds a bounded request census and
+raises the refinement cache to 8,192 records. It saves 4,513 fresh inference
+regions and measures 7.546 → 7.078 s fresh gdev compilation in three release
+pairs. Ordinary edit latency remains essentially unchanged. The frozen full gate
+passes 2,587 exhaustive native laws, 1,660 release guests, 48 smoke tests and 57
+tooling checks; the selected development check has zero Zig lint findings.
+Unsuccessful proof-recovery trials are removed. CT110 remains installed; the
+five-part architecture program remains open.
+
+The preceding CT112 checkpoint follows.
+
+CT112 preserves completed selected closures and solved capture results across
+validated replay. Its frozen candidate passes 2,586 exhaustive native laws,
+1,660 release guests, 48 smoke tests, 57 tooling checks and the selected
+zero-lint development check. The [current report](CT112_QUALIFICATION.md)
+separates the three-pair timing screen from the small deterministic work
+reduction. CT110 remains installed. General elaborated bodies and the
+development generic ABI remain unfinished; none of the five architecture
+recommendations is complete.
+
+The preceding CT111 checkpoint follows.
+
+The bounded CT111 snapshot passes correctness qualification; see the
+[current work record](../COMPILER_CT111_WORK.md) for implemented boundaries,
+approved optional result requirements, remaining elaboration/generic work and
+performance screens. It passes 2,584 exhaustive native laws and 1,659 release
+guests. None of the five architecture recommendations is complete. CT110 remains
+installed. Do not treat reduced inference-region counts as a measured speedup.
+
 ## Exact frontend reuse and bounded inference work, 24 October 2026
 
-The [CT106 qualification](CT106_QUALIFICATION.md) records **19.1%
-less first-literal-edit CPU** against CT105 in seven alternating release pairs,
-with identical Wasm. First-literal wall median falls from 3.62 to **2.91 s**;
-fresh CPU improves 2.4%, body CPU is effectively unchanged and literal-revert
-CPU rises 3.5%. These are shared-host observations. Body-edit, two-second and
+The [CT106 qualification](CT106_QUALIFICATION.md) records **19.1% less
+first-literal-edit CPU** against CT105 in seven alternating release pairs, with
+identical Wasm. First-literal wall median falls from 3.62 to **2.91 s**; fresh
+CPU improves 2.4%, body CPU is effectively unchanged and literal-revert CPU
+rises 3.5%. These are shared-host observations. Body-edit, two-second and
 sub-second targets remain open.
 
 Exact frontend correspondence now checks one module on the first edit instead
 of 22. Bounded operation indexes/certificates, lexical links and import scratch
 remove repeated work. The report includes 200 distinct edits, allocator/CPU
 attribution, exhaustive qualification and rejected experiments. All 86 review
-suggestions have a [disposition](../COMPILER_CT106_WORK.md); conditional alternatives
-and unfinished architectural work are explicit.
+suggestions have a [disposition](../COMPILER_CT106_WORK.md); conditional
+alternatives and unfinished architectural work are explicit.
 
 Full qualification passes 2,564 exhaustive native laws and 1,655 guest checks.
 The broader completion requirements below remain open; this performance pass
@@ -64,33 +114,32 @@ literal CPU against CT97, is superseded by the combined install above.
 
 ## Row traversal, retained reuse and scratch, 24 October 2026
 
-Seven alternating release pairs reduce fresh game CPU by **32.5%** against
-CT96; median build wall falls from **13.60 to 8.68 s**, with identical Wasm.
-Matching phase measurements reduce inference 9.93 → 6.23 s. Literal/body edits
-use 40.7% / 43.1% less CPU and take 7.63 / 6.56 s median wall. The 50%
-edit-CPU and four-second wall targets remain open. Backend temporary scratch
-cuts 33 exhaustive sweeps from 44,074 to 37,930 runs. The isolated full gate
-passes 2,540 exhaustive native laws, 1,648 guest checks, 48 smoke checks and
-57 tooling checks, with zero Zig lint findings. See
-[qualification](CT97_QUALIFICATION.md). CT97 is complete; CT98 and BT4 retain
-their remaining timing targets. The separate text repair remains outside this
-candidate. The qualified release was installed locally on 24 October 2026; see
-the installation checkpoint in
+Seven alternating release pairs reduce fresh game CPU by **32.5%** against CT96;
+median build wall falls from **13.60 to 8.68 s**, with identical Wasm. Matching
+phase measurements reduce inference 9.93 → 6.23 s. Literal/body edits use 40.7%
+/ 43.1% less CPU and take 7.63 / 6.56 s median wall. The 50% edit-CPU and
+four-second wall targets remain open. Backend temporary scratch cuts 33
+exhaustive sweeps from 44,074 to 37,930 runs. The isolated full gate passes
+2,540 exhaustive native laws, 1,648 guest checks, 48 smoke checks and 57 tooling
+checks, with zero Zig lint findings. See [qualification](CT97_QUALIFICATION.md).
+CT97 is complete; CT98 and BT4 retain their remaining timing targets. The
+separate text repair remains outside this candidate. The qualified release was
+installed locally on 24 October 2026; see the installation checkpoint in
 [the handoff](../CONTINUE.md).
 
 ## CT96 spawn preparation, 23 October 2026
 
-The [qualified optimization](CT96_QUALIFICATION.md) scans for spawn contracts once
-per generator and reuses one immutable module-pointer view. Every positive call
-keeps its existing authority checks. Seven alternating release pairs reduce game
-CPU by 28.6% and devtools CPU by 29.0%; game median build wall falls from 17.24 to
-12.16 s, with byte-identical Wasm. The isolated gate passes 2,539 exhaustive native
-laws, 1,648 guest checks, 48 smoke checks and 57 tooling checks, with zero lint.
-The separate text-capability repair is outside this candidate's qualification.
-The [post-CT96 review](../PERFORMANCE_REVIEW.md) selects row traversal next and
-explains why zero executable candidates does not imply zero semantic reuse.
-Its three-law diagnostic run passes 33 exhaustive sweeps and 44,074 scenario
-runs; it implements no further compiler optimization.
+The [qualified optimization](CT96_QUALIFICATION.md) scans for spawn contracts
+once per generator and reuses one immutable module-pointer view. Every positive
+call keeps its existing authority checks. Seven alternating release pairs reduce
+game CPU by 28.6% and devtools CPU by 29.0%; game median build wall falls from
+17.24 to 12.16 s, with byte-identical Wasm. The isolated gate passes 2,539
+exhaustive native laws, 1,648 guest checks, 48 smoke checks and 57 tooling
+checks, with zero lint. The separate text-capability repair is outside this
+candidate's qualification. The [post-CT96 review](../PERFORMANCE_REVIEW.md)
+selects row traversal next and explains why zero executable candidates does not
+imply zero semantic reuse. Its three-law diagnostic run passes 33 exhaustive
+sweeps and 44,074 scenario runs; it implements no further compiler optimization.
 
 ## Compile and build costs, 23 October 2026
 
@@ -103,22 +152,22 @@ profile. The older scan cost is historical; CT97 is the next experiment.
 
 Compiler development edits take about 3.4 s with ordinary Safe/noLLVM caching;
 the warm affected check takes 4.64 s. [Build hills](../BUILD_HILLS.md) retain
-ordinary caching and target exhaustive test cost separately. The benchmark
-tools preserve configured budgets/assets/std, pin inputs and outputs, distinguish
-wall and CPU clocks, and measure isolated build/edit/revert cycles.
+ordinary caching and target exhaustive test cost separately. The benchmark tools
+preserve configured budgets/assets/std, pin inputs and outputs, distinguish wall
+and CPU clocks, and measure isolated build/edit/revert cycles.
 
 ## Associated work budgets, 23 October 2026
 
 The associated-work repair compiles the unchanged frozen gdev game without a
-source migration. Five fresh release builds have a median of 16.192 seconds
-for the game and 0.918 seconds for devtools. It honors configured budgets
-through checking and evaluation, skips unnecessary normalization for ordinary
-effect rows, and reports the allowance actually exhausted. The combined gate
-passes 2,539 exhaustive native tests and 1,647 guest/client checks, with
-zero analyzer findings. The release CLI and compiler are installed locally.
-See [qualification and measurements](ASSOCIATED_WORK_QUALIFICATION.md).
-The preceding derive/budget changes are in `58e00c3`; the broader completion
-plan remains open.
+source migration. Five fresh release builds have a median of 16.192 seconds for
+the game and 0.918 seconds for devtools. It honors configured budgets through
+checking and evaluation, skips unnecessary normalization for ordinary effect
+rows, and reports the allowance actually exhausted. The combined gate passes
+2,539 exhaustive native tests and 1,647 guest/client checks, with zero analyzer
+findings. The release CLI and compiler are installed locally. See
+[qualification and measurements](ASSOCIATED_WORK_QUALIFICATION.md). The
+preceding derive/budget changes are in `58e00c3`; the broader completion plan
+remains open.
 
 ## Qualified task-surface continuation, 23 October 2026
 

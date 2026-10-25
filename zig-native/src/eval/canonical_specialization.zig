@@ -129,7 +129,7 @@ pub const Cache = struct {
         if (!proof.complete or proof.steps != 0 or session.valueEvidence(proof.selected) == 0) return;
         const size = input.words.len +| input.values.len +| input.mappings.len *| 2 +| input.rows.len *| 2 +| input.slots.len *| 3 +|
             proof.values_added *| 4 +| proof.children_added +| proof.sources.len *| 2 +| proof.scalar_reads.len *| 3 +|
-            proof.call_reads.len *| 4 +| proof.call_publications.len *| 4 +| proof.views.len *| 4 +| proof.plain_facts.len *| 3;
+            proof.call_reads.len *| 4 +| proof.call_publications.len *| 4 +| proof.views.len *| 4 +| proof.plain_facts.len *| 3 +| proof.completed_closures.len;
         if (size > session.options.max_children -| self.retained_words) return;
         var minimum_bytes = receipt.ownedBytes(proof);
         inline for (.{ "words", "values", "mappings", "rows", "slots" }) |field| {
@@ -290,6 +290,7 @@ fn replay(session: anytype, entry: *const Entry, input: *const inputs.Inputs) Al
         next.?.selected = mapped(anchors, proof, before, proof.selected);
         next.?.values_before = before;
         next.?.children_before = child_before;
+        for (next.?.completed_closures) |*value| value.* = mapped(anchors, proof, before, value.*);
         for (next.?.views) |*view| {
             view.value = mapped(anchors, proof, before, view.value);
             view.selected = mapped(anchors, proof, before, view.selected);

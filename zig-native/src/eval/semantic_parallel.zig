@@ -6,7 +6,7 @@ const independent = @import("../reuse/independent_call_proof.zig");
 const receipt = @import("../reuse/specialization_receipt.zig");
 const A = std.mem.Allocator;
 pub const Request = struct { index: usize, read: receipt.CallRead, actual: u32 };
-const Counts = struct { independent_rechecked: usize = 0, independent_reused: usize = 0, independent_declined: usize = 0 };
+const Counts = struct { independent_regions: u64 = 0, independent_nodes: u64 = 0, independent_rejections: [@typeInfo(independent.DeclineReason).@"enum".field_names.len]usize = @splat(0), independent_rechecked: usize = 0, independent_reused: usize = 0, independent_declined: usize = 0 };
 const Slot = struct { record: ?independent.Record = null, cached: ?usize = null, failed: bool = false, counts: Counts = .{} };
 pub const Batch = struct {
     allocator: A,
@@ -42,6 +42,9 @@ pub const Batch = struct {
             stats.independent_rechecked += slot.counts.independent_rechecked;
             stats.independent_reused += slot.counts.independent_reused;
             stats.independent_declined += slot.counts.independent_declined;
+            stats.independent_regions += slot.counts.independent_regions;
+            stats.independent_nodes += slot.counts.independent_nodes;
+            for (&stats.independent_rejections, slot.counts.independent_rejections) |*total, count| total.* += count;
             slot.counts = .{};
             if (slot.failed) return error.OutOfMemory;
             if (slot.cached) |cached| return try self.retained.?.items[cached].clone(self.allocator);

@@ -1,0 +1,13 @@
+import * as array from "std/array"
+entry const run = fn (seed: U32) -> U32 => do:
+  let size = 24
+  let left = array.generate (size * size) (fn index => (seed + index * 17) % 256)
+  let right = array.generate (size * size) (fn index => (seed + index * 31) % 256)
+  let output = array.fill (size * size) 0
+  for row in 0..size:
+    for column in 0..size:
+      let total = 0
+      for inner in 0..size:
+        total := self + left[row * size + inner] * right[inner * size + column]
+      output[row * size + column] := total
+  break array.fold_left (fn total value => total + value) 0 output

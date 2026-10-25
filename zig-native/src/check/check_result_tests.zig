@@ -138,3 +138,82 @@ fn failures(allocator: std.mem.Allocator) !void {
 test "result scheme selection and principal publication release every failed allocation" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, failures, .{});
 }
+
+fn writtenResults(allocator: std.mem.Allocator) !void {
+    const text =
+        \\type Box a is data = #Box a
+        \\const Box.from = fn value => #Box value
+        \\type Convert (a, b) is contract = { result "from" a b }
+        \\const from: a -> b where { result "from" a b } = fn value => @type.result "from" value
+        \\const alias: a -> b where { Convert (a, b) } = from
+        \\entry const answer = fn () => do:
+        \\  let local: a -> b where { result "from" a b ! {} } = alias
+        \\  let #Box first: Box U32 = local 42
+        \\  let #Box second: Box F32 = local 1.25
+        \\  break (first, second)
+    ;
+    var f = try Fixture.init(allocator, text);
+    defer f.deinit(allocator);
+    try f.valid();
+    var interfaces: usize = 0;
+    for (f.checked.bindings[1..]) |binding| {
+        const name = f.pool.get(binding.name);
+        if (!std.mem.eql(u8, name, "from") and !std.mem.eql(u8, name, "alias") and !std.mem.eql(u8, name, "local")) continue;
+        interfaces += 1;
+        try std.testing.expectEqual(@as(u32, 2), binding.scheme.variables.len);
+        try std.testing.expectEqual(@as(u32, 1), binding.scheme.obligations.len);
+        const goal = f.checked.obligations[binding.scheme.obligations.start];
+        try std.testing.expectEqual(T.ObligationKind.result_dispatch, goal.kind);
+        try std.testing.expect(goal.explicit);
+        const arrow = f.checked.types.node(binding.scheme.root);
+        try std.testing.expectEqual(arrow.a, goal.ty);
+        try std.testing.expectEqual(arrow.b, goal.result);
+        const row = f.checked.types.row(f.checked.types.node(goal.signature).c);
+        try std.testing.expect(row.tail == .closed and row.labels.len == 0);
+    }
+    try std.testing.expectEqual(@as(usize, 3), interfaces);
+    // A covered goal is absent from the exported inferred requirements, but
+    // its concrete invocation signature must still reach immutable Core.
+    for (f.tree.nodes.items, 0..) |node, index| {
+        if (node.tag != .apply) continue;
+        const inner = f.tree.node(node.a);
+        if (inner.tag != .apply) continue;
+        const head = f.tree.node(inner.a);
+        if (head.tag != .intrinsic or !std.mem.eql(u8, f.pool.get(head.a), "@type.result")) continue;
+        const signature = f.checked.dispatch_signatures[index];
+        try std.testing.expect(signature != 0);
+        const arrow = f.checked.types.node(signature);
+        try std.testing.expectEqual(T.Tag.function, arrow.tag);
+        try std.testing.expectEqual(f.checked.expr_types[node.b], arrow.a);
+        try std.testing.expectEqual(f.checked.expr_types[index], arrow.b);
+    }
+}
+
+test "written result requirements preserve destination input aliases contracts and local polymorphism through OOM" {
+    try writtenResults(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, writtenResults, .{});
+}
+
+fn invalidWrittenResults(allocator: std.mem.Allocator) !void {
+    const cases = [_]struct { clause: []const u8, code: check.Code }{
+        .{ .clause = "", .code = .missing_predicate },
+        .{ .clause = "result \"other\" a b", .code = .missing_predicate },
+        .{ .clause = "result a b", .code = .invalid_constraint },
+        .{ .clause = "result \"from\" a", .code = .invalid_constraint },
+        .{ .clause = "result \"from\" a b a", .code = .invalid_constraint },
+        .{ .clause = "result \"from\" a b ! {Foreign}", .code = .missing_predicate },
+    };
+    for (cases) |item| {
+        const text = try allocator.print("const from: a -> b where {{ {s} }} = fn value => @type.result \"from\" value\n", .{item.clause});
+        defer allocator.free(text);
+        var f = try Fixture.init(allocator, text);
+        defer f.deinit(allocator);
+        try std.testing.expect(f.checked.diagnostics.len != 0);
+        try std.testing.expectEqual(item.code, f.checked.diagnostics[0].code);
+    }
+}
+
+test "written result requirements reject missing coverage wrong members malformed arity and incompatible rows through OOM" {
+    try invalidWrittenResults(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, invalidWrittenResults, .{});
+}

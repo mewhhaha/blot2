@@ -1,6 +1,70 @@
 import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 
+Deno.test("completed captured callbacks preserve edits rejection recovery and both codegen tiers", async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-completed-capture-",
+  });
+  const entry = `${directory}/main.blot`;
+  const source = (seed: number | null, schema: number) =>
+    `const add = fn extra => ${
+      seed === null ? "@f32.add extra 1.0" : `@u32.add extra ${seed}`
+    }
+const factory = fn invoke => fn extra => invoke extra
+const callback = factory add
+entry const schema: U32 = ${schema}
+entry const answer = fn (extra: U32) -> U32 => callback extra
+`;
+  try {
+    await Deno.writeTextFile(entry, source(42, 7));
+    for (const codegenTier of ["optimized", "development"] as const) {
+      const options = {
+        executable: Deno.args[0] ??
+          new URL("../zig-out/bin/blotc", import.meta.url).pathname,
+        entry,
+        prelude: null,
+        codegenTier,
+        codegenWorkers: 1,
+        cacheDirectory: false as const,
+      };
+      const retained = await createZigProjectCompiler(options);
+      try {
+        for (
+          const [seed, schema] of [[42, 7], [42, 9], [43, 9], [null, 9], [
+            42,
+            7,
+          ]] as const
+        ) {
+          const sources = { [entry]: source(seed, schema) };
+          const actual = await retained.build({ sources });
+          const fresh = await createZigProjectCompiler(options);
+          try {
+            const expected = await fresh.build({ sources });
+            assert.equal(actual.success, expected.success);
+            if (seed === null) {
+              assert(!actual.success && !expected.success);
+              assert.deepEqual(actual.diagnostics, expected.diagnostics);
+              continue;
+            }
+            assert(actual.success && expected.success, JSON.stringify(actual));
+            assert.deepEqual(actual.bytes, expected.bytes);
+            const { instance } = await WebAssembly.instantiate(actual.bytes);
+            const answer = instance.exports.answer;
+            assert.equal(typeof answer, "function");
+            assert.equal((answer as CallableFunction)(5), seed + 5);
+          } finally {
+            await fresh.dispose();
+          }
+        }
+      } finally {
+        await retained.dispose();
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 Deno.test("retained nested source owners preserve unrelated edits consumed closures suspensions and error recovery", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-source-owner-" });
   const entry = `${directory}/main.blot`;
@@ -291,15 +355,21 @@ Deno.test("checked interface principal reuse executes changed bodies and preserv
     `const add = fn (x: U32) -> U32 => @u32.add x 1
 const sub = fn (x: U32) -> U32 => @u32.sub x 1
 const div = fn (x: U32) -> U32 => @u32.div x 1
-const local${required ? ": U32 -> U32 where { type_rep U32 }" : ""} = fn (x: U32) -> U32 => @u32.${operation} x ${operand}
+const local${
+      required ? ": U32 -> U32 where { type_rep U32 }" : ""
+    } = fn (x: U32) -> U32 => @u32.${operation} x ${operand}
 entry const answer: U32 where { type_rep U32 } = local 41
 `;
   try {
     await Deno.writeTextFile(entry, source("add", 1));
-    for (const [codegenTier, required] of [
-      ["optimized", false], ["development", false],
-      ["optimized", true], ["development", true],
-    ] as const) {
+    for (
+      const [codegenTier, required] of [
+        ["optimized", false],
+        ["development", false],
+        ["optimized", true],
+        ["development", true],
+      ] as const
+    ) {
       const options = {
         executable: Deno.args[0] ??
           new URL("../zig-out/bin/blotc", import.meta.url).pathname,
@@ -346,6 +416,105 @@ entry const answer: U32 where { type_rep U32 } = local 41
               answer,
             );
             if (revision === 1) {
+              const principals = result.stats.principals as Record<
+                string,
+                number
+              >;
+              assert(
+                principals.projected_empty_hits +
+                    principals.projected_nonempty_hits > 0,
+              );
+              assert.equal(principals.fresh_regions, 0);
+            }
+          } finally {
+            await fresh.dispose();
+          }
+        }
+      } finally {
+        await retained.dispose();
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
+Deno.test("completed inferred interfaces preserve current conversions body edits errors and recovery", async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-completed-interface-",
+  });
+  const entry = `${directory}/main.blot`;
+  const source = (rounding: string, member = "from", written = false) =>
+    `type Token is data = #Token U32
+const Token.from = fn value => #Token (@f32.to_u32 value)
+const Token.fail = fn value => #Token (@u32.div (@f32.to_u32 value) 0)
+const from${
+      written ? `: a -> b where { result "${member}" a b }` : ""
+    } = fn value => @type.result "${member}" value
+const floor_impl = fn value => @f32.floor value
+const ceil_impl = fn value => @f32.ceil value
+const floor = floor_impl
+const ceil = ceil_impl
+const local = fn value => from (${rounding} value)
+entry const answer: U32 where { type_rep U32 } = case local 41.25 of
+  #Token value => value
+`;
+  try {
+    await Deno.writeTextFile(entry, source("floor"));
+    for (
+      const [codegenTier, written] of [
+        ["optimized", false],
+        ["development", false],
+        ["optimized", true],
+        ["development", true],
+      ] as const
+    ) {
+      const options = {
+        executable: Deno.args[0] ??
+          new URL("../zig-out/bin/blotc", import.meta.url).pathname,
+        entry,
+        prelude: null,
+        codegenTier,
+        codegenWorkers: 1,
+        cacheDirectory: false as const,
+      };
+      const retained = await createZigProjectCompiler(options);
+      try {
+        for (
+          const [revision, [rounding, member, answer]] of ([
+            ["floor", "from", 41],
+            ["ceil", "from", 42],
+            ["ceil", "fail", null],
+            ["ceil", "from", 42],
+            ["floor", "from", 41],
+          ] as const).entries()
+        ) {
+          const sources = { [entry]: source(rounding, member, written) };
+          const result = await retained.build({ sources });
+          const fresh = await createZigProjectCompiler(options);
+          try {
+            const expected = await fresh.build({ sources });
+            assert.equal(result.success, expected.success);
+            if (answer === null) {
+              assert(!result.success && !expected.success);
+              assert.deepEqual(result.diagnostics, expected.diagnostics);
+              assert.equal(
+                result.diagnostics[0].code,
+                "integer_divide_by_zero",
+              );
+              continue;
+            }
+            assert(result.success && expected.success, JSON.stringify(result));
+            assert.deepEqual(result.bytes, expected.bytes);
+            const { instance } = await WebAssembly.instantiate(result.bytes);
+            const actual = instance.exports.answer;
+            assert.equal(
+              typeof actual === "function"
+                ? actual()
+                : (actual as WebAssembly.Global).value,
+              answer,
+            );
+            if (revision === 1 || revision === 4) {
               const principals = result.stats.principals as Record<
                 string,
                 number

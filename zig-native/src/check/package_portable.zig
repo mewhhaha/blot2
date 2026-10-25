@@ -23,8 +23,8 @@ fn scheme(types: *const core.Types, value: T.Scheme) Error!void {
     if (comptime @hasField(T.Scheme, "generative")) try require(value.generative.len == 0);
 }
 fn closedViews(context: *C.Context, certificates: T.List) Error!void {
-    context.pure_rows = @splat(false);
-    context.closed_rows = @splat(false);
+    context.pure_rows = .{};
+    context.closed_rows = .{};
     for (context.types.effects.rows, 0..) |row, id| {
         try require(context.remaining.* != 0);
         context.remaining.* -= 1;
@@ -33,8 +33,8 @@ fn closedViews(context: *C.Context, certificates: T.List) Error!void {
             try require(context.remaining.* != 0);
             context.remaining.* -= 1;
             if (row.tail.variable != variable) continue;
-            context.closed_rows[id] = true;
-            if (row.labels.len == 0) context.pure_rows[id] = true;
+            try context.closed_rows.set(id);
+            if (row.labels.len == 0) try context.pure_rows.set(id);
         }
     }
 }

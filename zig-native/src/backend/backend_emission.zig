@@ -790,6 +790,8 @@ pub const Owner = struct {
     /// labels, environments and the original lazy function-index order.
     fn prepareBody(self: *Emitter, root: core.Id, depth: usize, template: bool) Error!Body {
         const g = self.generator;
+        const inference_stage = g.evaluator.enterInferenceStage(.preparation);
+        defer inference_stage.deinit();
         if (self.preparation_depth >= 256) return g.fail(self.unit_id, root, .complexity);
         var storage: std.ArrayList(Mapping) = .empty;
         defer storage.deinit(g.allocator);
@@ -811,6 +813,8 @@ pub const Owner = struct {
     /// enter here directly with their facts and no storage decisions.
     fn prepareMapped(self: *Emitter, root: core.Id, depth: usize, template: bool, mappings: []const Mapping, rows: []const RowMapping, instances: ?*const InstanceDecisions) Error!Body {
         const g = self.generator;
+        const inference_stage = g.evaluator.enterInferenceStage(.preparation);
+        defer inference_stage.deinit();
         if (self.preparation_depth >= 256) return g.fail(self.unit_id, root, .complexity);
         var body = try Body.init(g.allocator, self.unit_id, root, mappings, rows);
         errdefer body.deinit(g.allocator);
@@ -982,6 +986,8 @@ pub const Owner = struct {
     /// Encodes `root` under a body prepared for it, with that body's exact
     /// substitutions in force until it returns.
     fn preparedExpression(self: *Emitter, body: *const Body, root: core.Id, depth: usize, template: bool) Error!void {
+        const inference_stage = self.generator.evaluator.enterInferenceStage(.lowering);
+        defer inference_stage.deinit();
         const previous_context = self.semantic_context;
         self.semantic_context = null;
         defer self.semantic_context = previous_context;

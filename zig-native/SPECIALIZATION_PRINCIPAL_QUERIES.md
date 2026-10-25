@@ -1,5 +1,15 @@
 # Specialization and principal query migration
 
+The [CT112 work](../COMPILER_CT112_WORK.md) preserves the completion of selected
+closure results across replay. A validated query restores both its input-to-result
+answer and its result's completion at the exact expected interface. Native
+receipts also own the closure captures frozen by that same solved region; their
+value IDs are remapped through revision and canonical session replay. Publication
+remains atomic. Ordinary imported values and typed views supply no such proof.
+Portable queries retain their existing schema and recheck nested captures after
+restart. This is a selected semantic result, not a retained resolved backend
+body. Qualification and performance status are recorded in the work record.
+
 Task 016 implements and qualifies the common tables described below at local
 revision `913a59f308fc58b6b3aad0197903149f16c780c4`. The common ownership/index
 primitives were qualified for refinement in

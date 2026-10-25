@@ -4,6 +4,11 @@ The compiler uses one native project pipeline for full builds and retained
 revisions. Deno supplies the optional client, formatter and guest host; it does
 not parse, infer or stage source for compilation.
 
+The [25 October architecture review](../COMPILER_ARCHITECTURE_REVIEW.md)
+separates this implemented design from proposed changes to semantic completion,
+incremental queries and development specialization. Current measurements and
+qualification are in [CT110](CT110_QUALIFICATION.md).
+
 1. Immutable UTF-8 source buffers feed flat token and syntax arrays. Symbols are
    interned once into an owned byte buffer and referenced by numeric IDs.
 2. The checker owns dense type, row, binding and chronological substitution
@@ -34,8 +39,9 @@ publication have separate owners:
 The owned body auxiliary schema covers every checked metadata table and nested
 catalog edge. Relocation follows actual declaration syntax and parser ordinals;
 borrowed AST pointers and old proof receipts do not supply current authority.
-These refactors have focused parity evidence; the final combined gate remains
-required.
+The ownership reports retain their original focused parity evidence. The
+installed compiler passes the CT110 full gate; later compiler changes still
+require qualification of their exact final source.
 
 Specialization lives in `src/eval/specialization.zig`: it binds layout
 expectations, solves type/effect obligations and returns owned mappings for a
@@ -123,8 +129,8 @@ substitutions. Closed results remain stable; open aliases watch the remaining
 chronological variable. Physical type/effect edits and rollback invalidate the
 certificate generation, and historical cursor queries retain their original
 traversal. Published source variables carry no solver certificate. Composite
-resolution and constraint scheduling still use their existing epoch-based cache
-and solver passes.
+resolution and constraint scheduling retain separate bounded dependency and
+epoch validity rules.
 
 Representation conversions distinguish layout, evidence, their respective effect
 rows and code-expectation handles. Runtime cleanup distinguishes function/local
@@ -151,8 +157,10 @@ function bodies. Exact source instructions, signatures, direct callee bodies and
 completed ownership summaries authorize reuse. A transitive change to a callee's
 escape behavior invalidates callers even when their instructions are unchanged.
 Summary preparation uses deterministic function order before either fresh
-optimization or reuse. Numeric function IDs currently remain part of the key;
-index movement conservatively loses reuse. Final Wasm assembly still runs.
+optimization or reuse. Structural candidates and exact graph correspondence
+allow optimized IR to survive moved function IDs; references are relocated into
+the current graph. Encoded body bytes additionally require unchanged physical
+indices. Final Wasm assembly still runs.
 
 Principal query receipts also preserve compiler memo effects. An admitted
 literal-only edit can reuse an empty inference result while replaying exact
@@ -170,12 +178,16 @@ complete source image (including literal bits) and observed semantic inputs gate
 principal-proof import. Optimized bodies use the ordinary exact
 input/callee/lifetime matcher. `restart_cache.zig` persists these candidates by
 compiler identity and entry under the platform cache directory, using atomic
-replacement. The CLI writes only successful builds. The server writes its first
-committed revision before replying and its latest committed revision on graceful
-close; editing does not add a checkpoint write per build. Missing, corrupt and
-unavailable caches fall back to ordinary compilation. Explicit checkpoint
-import/export remains available. This is separate from `.blotdep` frontend
-bundles and from the more permissive in-memory literal projection.
+replacement. The CLI writes only successful builds. On Linux the server's first
+committed revision is written by a detached process that holds the cache-key
+lock before the reply; other platforms write before replying. Graceful close
+writes the latest committed revision if it changed; editing does not add a
+checkpoint write per build. Immediate disposal does not join detached writers.
+See the [project client](PROJECT_CLIENT.md) for cache waiting and directory
+ownership. Missing, corrupt and unavailable caches fall back to ordinary
+compilation. Explicit checkpoint import/export remains available. This is
+separate from `.blotdep` frontend bundles and from the more permissive in-memory
+literal projection.
 
 ## Ownership and memory
 
@@ -250,3 +262,110 @@ Deterministic work counters (`work_counters` in CLI stats, `workCounters` in the
 project API) are always on: inference regions, region scopes, callee body
 collections split into closed (memoized) and unresolved (re-collected), solver
 passes and constraint visits, and occurs steps. Budget on these, not wall time.
+
+### CT111 bounded implementation
+
+The correctness-qualified CT111 snapshot extends checked interfaces to supported
+inferred requirements with independent current-body proof, including checked
+source aliases. Ordinary type nodes can exceed the proof reader's small lexical
+table size; actual binders and storage definitions retain their bounds. Sparse
+copyable row facts admit high row IDs. The source-only proof follows reached
+declarations; package readers retain whole-module authority. An unsupported
+proof returns to ordinary inference. Selected bodies, higher-order interfaces
+and inferred member projections still need the existing body path.
+
+A bounded retained family now shares immutable source principal graphs between
+Sessions. It excludes mutable memo facts and evaluated inputs, checks exact
+source/body correspondence, and releases unused graph leases at the next
+successful publication. This does not retain the complete Generator-local
+resolved body. Fragment lookup translates the current module owner into the old
+capture before choosing a declaration bucket; full request, value, body and
+capture comparisons still authorize every reuse.
+
+Inference counters now attribute each region and its solver-node count to its
+innermost stage at creation: general semantic work, specialization, body
+preparation or prepared-body lowering. Those categories are disjoint counts, not
+CPU time. Profiled region clocks also group caller sites by stage. They make the
+remaining elaboration boundary observable. Written `result` requirements retain
+the selected invocation row through checking and lowering; inferred conversions
+keep their existing syntax. See
+[the current work record](../COMPILER_CT111_WORK.md) for coverage, measurements
+and qualification status.
+
+### CT112 completed selected results
+
+A completed selected query now carries its outer closure's completion and the
+closure results frozen by the same solved region. After exact dependency and
+resource checks, replay imports their semantic evidence and reserves all
+publication storage before publishing the graph and completed keys together.
+Canonical session replay remaps those IDs with the selected graph. Consuming a
+restored result at its proved interface therefore needs no new inference region.
+
+This is a bounded completed-result family. It does not grant completion from
+typed views, does not drop observed negative memo facts, and does not retain
+every elaborated body. Native receipts own the additional claims; the existing
+portable schema omits nested claims and rechecks those closures after restart.
+See the [CT112 work record](../COMPILER_CT112_WORK.md) for verification and
+measurements. The generic development ABI remains a separate unfinished step.
+
+### CT114 frontend ownership and work accounting
+
+Each generalization now owns a flat candidate table, a type-variable buffer and
+an effect-row buffer. Candidates hold checked numeric spans into those buffers;
+growth cannot invalidate a stored pointer. Type-component scratch is reused
+between candidates, and cleanup releases the whole unpublished workspace.
+Discovery order and requirement closure are unchanged. Predicate-free schemes
+retain their complete quantifiers but omit public-slot sharing analysis, since
+they cannot produce a shared callee requirement.
+
+`phaseProfile.checking` merges work from completed project-check invocations,
+including candidate scans, imported schemes and normalization visits. Checker
+calls during backend inference are excluded by phase. These measurements do not
+participate in identities, admission checks or semantic decisions.
+
+The [frontend review](../COMPILER_FRONTEND_REVIEW.md) proposes direct
+instantiation from immutable producer interfaces, requirement dependency
+tracking, and fewer copies across checked/Core/frozen boundaries. Those larger
+representation changes remain unimplemented. The current changes preserve the
+language and do not establish a sub-second fresh frontend.
+
+### CT113 refinement work and cache limits
+
+The refinement profile now counts whole fresh requests with exact admission,
+publication and candidate-rejection flags, plus solver-node cost. It keeps 32
+groups, an explicit overflow total, and eight heavy individual requests without
+allocating per request. Private independent-call checks report their own work;
+workers return counts for the coordinator to join.
+
+The refinement Context has its own 8,192-record / 8 MiB buffer budget. This
+removes measured fresh-build saturation without changing evidence admission.
+Payload and lookup-work bounds remain fixed. The failed proof-recheck trials are
+not included: missing proof provenance still prevents replay of many otherwise
+matching body queries. See [the CT113 record](../COMPILER_CT113_WORK.md) for the
+trial boundaries, memory tradeoff, measurements and qualification status.
+
+### CT116 dependency reuse and fresh module workers
+
+`check/scheme_dependencies.zig` caches the ordered free-type and free-row sets
+of pending requirements. It reuses the solver's reverse frontier watches and
+invalidates on relevant writes, physical edits, rollback, future IDs and ordinal
+reuse. Projection queries retain their original work charging. Membership
+indexes complement ordered buffers; they do not determine iteration order.
+
+Live producer interfaces may supply completed immutable sharing summaries.
+Imports relocate their public type/row positions and copy flags into the
+consumer's owned store. Frozen interfaces and unpublished summaries fall back to
+recomputation. This removes repeated analysis, while canonical graph copies and
+checked/Core/frozen representation boundaries remain.
+
+`reuse/project_check.zig` checks dependency-ready fresh modules in joined
+batches. Workers own separate engines and stores, borrow immutable producer
+interfaces and symbol storage, and publish into distinct slots. Generated names
+are prepared before dispatch. A name miss, diagnostic or aggregate budget
+failure discards speculation and replays serially. Allocation failures join
+before returning; retained store allocators cannot refer to a temporary lock
+adapter. Module checking defaults to four workers, independently of semantic
+evaluation and codegen policy. Retained edits use their existing cutoff checks.
+
+See [CT116 qualification](CT116_QUALIFICATION.md) for measured effects and the
+remaining canonical interface-copy boundary.

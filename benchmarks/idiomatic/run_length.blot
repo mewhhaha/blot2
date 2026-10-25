@@ -1,0 +1,19 @@
+import * as array from "std/array"
+entry const run = fn (seed: U32) -> U32 => do:
+  let values = array.generate 8192 (fn index => (seed + index / 7) % 16)
+  let output: List (U32, U32) = []
+  let current = values[0]
+  let length = 0
+  for value in values:
+    if value == current:
+      length := self + 1
+    else:
+      output := [...self, (current, length)]
+      current := value
+      length := 1
+  output := [...self, (current, length)]
+  let total = 0
+  for pair in output:
+    let (value, count) = pair
+    total := self * 31 + value * count
+  break total

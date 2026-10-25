@@ -54,13 +54,17 @@ const FragmentAdapter = struct {
 };
 pub const FragmentTable = queries.Table(FragmentAdapter);
 /// Owner translation and complete imported request equality happen after this
-/// coarse bucket selection. A source ordinal alone never certifies a hit.
+/// coarse bucket selection. Callers translate the current owner to this
+/// capture's namespace before lookup. An ordinal never certifies a hit.
 pub fn fragmentFingerprint(request: artifacts.Request) u64 {
     var hash = std.hash.Wyhash.init(0);
     std.hash.autoHash(&hash, std.meta.activeTag(request));
     switch (request) {
-        .named => |key| std.hash.autoHash(&hash, key.target.binding),
-        .closure => |key| std.hash.autoHash(&hash, key.catalog),
+        .named => |key| std.hash.autoHash(&hash, key.target),
+        .closure => |key| {
+            std.hash.autoHash(&hash, key.unit);
+            std.hash.autoHash(&hash, key.catalog);
+        },
         else => {},
     }
     return hash.final();

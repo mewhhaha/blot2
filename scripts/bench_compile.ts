@@ -65,6 +65,7 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   [--shared-session] [--guard-cpu] [--codegen-workers 4]
   [--candidate-profile] [--manifest FILE] [--hashes FILE] [--scenarios NAMES]
   [--semantic-workers N] [--candidate-semantic-workers N]
+  [--frontend-workers N] [--candidate-frontend-workers N]
 
   --baseline/--candidate  blotc executables. Pass one binary twice to measure noise.
   --workload              comma-separated: gdev entries (game, devtools), every
@@ -97,6 +98,8 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   --codegen-workers       pin both compilers to 1..16 codegen workers (default 4).
   --semantic-workers      opt both variants into 1..16 semantic workers.
   --candidate-semantic-workers  override the candidate for a worker-policy comparison.
+  --frontend-workers      pin both compilers to 1..16 module checker workers.
+  --candidate-frontend-workers  override only candidate module checking.
 Results: build/tmp/bench/<timestamp>/{results.json,samples.jsonl}.`;
 
 const { values: args } = parseArgs({
@@ -123,6 +126,8 @@ const { values: args } = parseArgs({
     "codegen-workers": { type: "string", default: "4" },
     "semantic-workers": { type: "string" },
     "candidate-semantic-workers": { type: "string" },
+    "frontend-workers": { type: "string" },
+    "candidate-frontend-workers": { type: "string" },
     help: { type: "boolean", default: false },
   },
 });
@@ -145,6 +150,14 @@ const candidateSemanticWorkers =
   args["candidate-semantic-workers"] === undefined
     ? semanticWorkers
     : Number(args["candidate-semantic-workers"]);
+
+const frontendWorkers = args["frontend-workers"] === undefined
+  ? undefined
+  : Number(args["frontend-workers"]);
+const candidateFrontendWorkers =
+  args["candidate-frontend-workers"] === undefined
+    ? frontendWorkers
+    : Number(args["candidate-frontend-workers"]);
 
 type Hash = string;
 async function sha256(bytes: Uint8Array<ArrayBuffer>): Promise<Hash> {
@@ -324,6 +337,9 @@ async function openSession(
   const compiler = await createZigProjectCompiler({
     ...sessionOptions(variant.executable, workload),
     codegenWorkers,
+    frontendWorkers: variant.name === "candidate"
+      ? candidateFrontendWorkers
+      : frontendWorkers,
     semanticWorkers: variant.name === "candidate"
       ? candidateSemanticWorkers
       : semanticWorkers,
@@ -523,6 +539,8 @@ async function main(): Promise<number> {
   await Deno.mkdir(out, { recursive: true });
   for (
     const [name, count] of [
+      ["frontend-workers", frontendWorkers],
+      ["candidate-frontend-workers", candidateFrontendWorkers],
       ["semantic-workers", semanticWorkers],
       ["candidate-semantic-workers", candidateSemanticWorkers],
     ] as const
@@ -1055,6 +1073,8 @@ async function main(): Promise<number> {
           os: Deno.build.os,
           cpus,
           codegen_workers: codegenWorkers,
+          frontend_workers: frontendWorkers ?? null,
+          candidate_frontend_workers: candidateFrontendWorkers ?? null,
           semantic_workers: semanticWorkers ?? null,
           candidate_semantic_workers: candidateSemanticWorkers ?? null,
           load_start: loadStart,

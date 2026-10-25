@@ -269,8 +269,8 @@ const Named = struct {
                 if (std.mem.findScalar(u32, self.m.types.list(current.closed), row.tail.variable) != null) closed = true;
             }
             if (!closed) continue;
-            context.closed_rows[index] = true;
-            if (row.labels.len == 0) context.pure_rows[index] = true;
+            try context.closed_rows.set(index);
+            if (row.labels.len == 0) try context.pure_rows.set(index);
         }
     }
     fn step(self: *Named, depth: usize) Error!void {

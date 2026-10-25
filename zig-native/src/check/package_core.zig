@@ -44,6 +44,37 @@ pub fn parametricBody(module: *const core.Module, binding: core.BindingId, conte
     var walker: Walker = .{ .module = module, .context = contextView(context), .scopes = &scopes, .admission = &admission };
     try walker.proveBody(body.*);
 }
+/// The caller has already validated immutable Core and its dependency bounds.
+/// Reconstruct one body's interface, allowing ordinary scheme equations for
+/// inferred callee requirements. This does not certify the enclosing module.
+pub fn checkedInterfaceBody(module: *const core.Module, binding: core.BindingId, context: anytype, remaining: *usize, allocator: std.mem.Allocator) Equations.Error!void {
+    var workspace: Equations.Workspace = .{ .allocator = allocator };
+    var admission: Admission = .{ .remaining = remaining, .workspace = &workspace, .source_bodies = true };
+    workspace.admission = &admission;
+    sourceBody(module, binding, contextView(context), &admission) catch return if (workspace.oom) error.OutOfMemory else error.InvalidArtifact;
+    if (workspace.oom) return error.OutOfMemory;
+}
+/// Declaration-sized source authority. Active recursive declarations use their
+/// own headers as hypotheses, just as module admission does; all reached bodies
+/// must finish successfully. A failed branch rolls back every nested claim.
+/// This private mode assumes the caller already validated immutable Core bounds
+/// for the complete source context. It never certifies a serialized package.
+fn sourceBody(module: *const core.Module, binding: core.BindingId, context: Context, admission: *Admission) Error!void {
+    std.debug.assert(admission.source_bodies);
+    try require(binding != 0 and binding < module.bindings.len and module.bindings.len <= 4096);
+    try require(module.binding(binding).kind == .global);
+    const body = module.body(binding) orelse return error.InvalidArtifact;
+    for (admission.bodies[0..admission.body_count]) |prior| if (prior.module == module and prior.binding == binding) return;
+    try require(admission.body_count < admission.bodies.len);
+    const before = admission.body_count;
+    errdefer admission.body_count = before;
+    admission.bodies[admission.body_count] = .{ .module = module, .binding = binding };
+    admission.body_count += 1;
+    var scopes: contracts.Context = .{ .types = &module.types, .remaining = admission.remaining, .executable = true, .obligations = module.obligations, .large_plain_graph = true };
+    try scopes.initialize();
+    var walker: Walker = .{ .module = module, .context = context, .scopes = &scopes, .admission = admission };
+    try walker.proveBody(body.*);
+}
 pub fn parametricBodyWorkspace(module: *const core.Module, binding: core.BindingId, context: anytype, remaining: *usize, workspace: *Equations.Workspace) Error!void {
     try require(binding != 0 and binding < module.bindings.len);
     const body = module.body(binding) orelse return error.InvalidArtifact;
@@ -112,8 +143,8 @@ fn owned(module: *const core.Module, context: Context, admission: *Admission) Er
                 try require(admission.remaining.* != 0);
                 admission.remaining.* -= 1;
                 if (row.tail.variable != variable) continue;
-                views.closed_rows[id] = true;
-                if (row.labels.len == 0) views.pure_rows[id] = true;
+                try views.closed_rows.set(id);
+                if (row.labels.len == 0) try views.pure_rows.set(id);
             }
         }
         var proof: contracts.Principal = .{ .left = &owner.types, .right = &module.types, .remaining = admission.remaining, .views = &views, .left_rows = original.scheme.closed_rows };
@@ -224,8 +255,8 @@ const Walker = struct {
             try require(std.meta.eql(body.scheme, self.module.binding(body.binding).scheme));
             return;
         }
-        self.scopes.pure_rows = @splat(false);
-        self.scopes.closed_rows = @splat(false);
+        self.scopes.pure_rows = .{};
+        self.scopes.closed_rows = .{};
         self.closed_rows = body.closed_rows;
         try self.closeRows(body.closed_rows);
         try self.providerRows(body.root, 0);
@@ -314,10 +345,10 @@ const Walker = struct {
     }
     fn rowsForVariable(self: *Self, variable: u32) Error![]const T.Effects.Id {
         if (!self.rows_indexed) {
-            try require(self.module.types.effects.rows.len <= self.row_index.len);
             for (self.module.types.effects.rows, 0..) |row, id| {
                 try self.step(0);
                 if (row.tail != .variable) continue;
+                try require(self.row_index_len < self.row_index.len);
                 self.row_index[self.row_index_len] = @intCast(id);
                 self.row_index_len += 1;
             }
@@ -350,14 +381,14 @@ const Walker = struct {
     fn closeRows(self: *Self, owned_rows: T.List) Error!void {
         for (self.module.types.list(owned_rows)) |variable| {
             for (try self.rowsForVariable(variable)) |id| {
-                self.scopes.closed_rows[id] = true;
-                if (self.module.types.row(id).labels.len == 0) self.scopes.pure_rows[id] = true;
+                try self.scopes.closed_rows.set(id);
+                if (self.module.types.row(id).labels.len == 0) try self.scopes.pure_rows.set(id);
             }
         }
     }
     fn closedRowOwned(self: *Self, variable: u32) Error!bool {
         if (std.mem.findScalar(u32, self.module.types.list(self.closed_rows), variable) != null) return true;
-        for (try self.rowsForVariable(variable)) |id| if (self.scopes.closed_rows[id]) return true;
+        for (try self.rowsForVariable(variable)) |id| if (self.scopes.closed_rows.contains(id)) return true;
         return false;
     }
     fn providerRows(self: *Self, source: core.Id, depth: usize) Error!void {
@@ -373,9 +404,9 @@ const Walker = struct {
             // An operation intrinsically performs only its exact owned
             // selector. Its contextual empty tail is a declaration view,
             // independently checked against the actual label below.
-            if (row.tail == .variable and !try self.scopes.ownsRow(row.tail.variable)) self.scopes.closed_rows[signature.c] = true;
+            if (row.tail == .variable and !try self.scopes.ownsRow(row.tail.variable)) try self.scopes.closed_rows.set(signature.c);
             const selected = self.module.types.row(view.c);
-            if (selected.tail == .variable and !try self.scopes.ownsRow(selected.tail.variable)) self.scopes.closed_rows[view.c] = true;
+            if (selected.tail == .variable and !try self.scopes.ownsRow(selected.tail.variable)) try self.scopes.closed_rows.set(view.c);
             return;
         }
         if (node.tag != .effect_provider) return;
@@ -389,8 +420,8 @@ const Walker = struct {
         if (row.tail != .variable or std.mem.findScalar(u32, self.module.types.list(closure.closed_rows), row.tail.variable) == null) return;
         // This exact callback is checked independently below. The provider
         // retains its latent row; construction does not execute the callback.
-        self.scopes.closed_rows[provider.c] = true;
-        if (row.labels.len == 0) self.scopes.pure_rows[provider.c] = true;
+        try self.scopes.closed_rows.set(provider.c);
+        if (row.labels.len == 0) try self.scopes.pure_rows.set(provider.c);
     }
     fn target(self: *Self, reference: core.BindingRef) Error!*const core.Module {
         if (reference.unit == 0 or reference.unit == self.module.unit) return self.origin orelse self.module;
@@ -411,7 +442,9 @@ const Walker = struct {
             try require(!try contracts.quantified(&owner.types, declaration.ty, self.scopes.remaining));
             try require(declaration.scheme.variables.len == 0 and declaration.scheme.row_variables.len == 0 and declaration.scheme.obligations.len == 0);
         }
-        if (owner != self.module) {
+        if (self.admission.source_bodies) {
+            if (declaration.kind == .global) try sourceBody(owner, reference.binding, self.context, self.admission);
+        } else if (owner != self.module) {
             // The sibling may not yet have reached its enclosing reader's
             // bounds pass. Check before following any claimed body edge.
             var checked = false;
@@ -482,7 +515,9 @@ const Walker = struct {
     fn solverInstance(self: *Self, solver: *Equations.Solver, owner: *const core.Module, binding: core.BindingId, expected: T.Id, version_pairs: []const contracts.Principal.VersionPair) Error!contracts.Principal {
         // The selected endpoint cannot substitute for the real declaration
         // and its ordinary body proof, including foreign module ownership.
-        if (owner != self.origin) try owned(owner, self.context, self.admission);
+        if (self.admission.source_bodies) {
+            if (owner.binding(binding).kind == .global) try sourceBody(owner, binding, self.context, self.admission);
+        } else if (owner != self.origin) try owned(owner, self.context, self.admission);
         const source_scheme = owner.binding(binding).scheme;
         var frozen: @import("frozen_types.zig").Graph = undefined;
         var copy = solver.importer(owner, &frozen, source_scheme) catch |err| return solver.readerError(err);

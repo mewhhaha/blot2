@@ -204,6 +204,37 @@ test "checked requirement observations retain transitive headers through body ed
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, checkedInterfaceReplay, .{ &after, &initial.capture.?, expected.bytes });
 }
 
+test "completed inferred result interfaces preserve body edits and reverts without recollecting principals through OOM" {
+    const prefix =
+        "type Token is data = #Token U32\n" ++
+        "const Token.from = fn value => #Token (@f32.to_u32 value)\n" ++
+        "const from = fn value => @type.result \"from\" value\n" ++
+        "const floor_impl = fn value => @f32.floor value\n" ++
+        "const ceil_impl = fn value => @f32.ceil value\n" ++
+        "const floor = floor_impl\n" ++
+        "const ceil = ceil_impl\n" ++
+        "const local = fn value => from (";
+    const suffix = " value)\nentry const answer: U32 where { type_rep U32 } = case local 41.25 of\n  #Token value => value\n";
+    var before = try Fixture.init(prefix ++ "floor" ++ suffix);
+    defer before.deinit();
+    var after = try Fixture.init(prefix ++ "ceil" ++ suffix);
+    defer after.deinit();
+    var initial = try before.emit(.{ .retain_artifacts = true });
+    defer initial.deinit(a);
+    try std.testing.expect(initial.diagnostic == null);
+    try std.testing.expect(initial.counters.completed_interface_proofs > 0);
+    try std.testing.expect(initial.counters.completed_interface_imports > 0);
+    var expected = try after.emit(.{});
+    defer expected.deinit(a);
+    try std.testing.expect(expected.diagnostic == null);
+    try std.testing.expect(!std.mem.eql(u8, initial.bytes, expected.bytes));
+    try checkedInterfaceReplay(a, &after, &initial.capture.?, expected.bytes);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, checkedInterfaceReplay, .{ &after, &initial.capture.?, expected.bytes });
+    var edited = try after.emit(.{ .retain_artifacts = true, .principal_previous = &initial.capture.? });
+    defer edited.deinit(a);
+    try checkedInterfaceReplay(a, &before, &edited.capture.?, initial.bytes);
+}
+
 test "principal input image does not hide staged errors or change the last good capture" {
     var before = try Fixture.init("entry const answer: U32 where { type_rep U32 } = @u32.div 8 2\n");
     defer before.deinit();

@@ -1,6 +1,103 @@
 # Compile-time hills
 
+CT116 is correctness-qualified on its frozen candidate. Whole profiled frontend
+falls from 1.600 to 1.036 s, checking from 1.214 to 0.649 s; fresh unprofiled
+game wall time falls from 7.594 to 7.050 s in three alternating pairs. Ordinary
+edit latency is not meaningfully improved. See
+[the report](zig-native/CT116_QUALIFICATION.md). Independent module checking
+defaults to four workers; retained edits keep their existing path. Canonical
+imported graphs and repeated import preparation remain architectural targets.
+The backend still dominates full builds. Eighteen public Blot/Rust
+compile/runtime workloads and measured README tables expose substantial runtime
+gaps in text and list pipelines; those need their own runtime profiles.
+
+The [CT115 big-lever investigation](COMPILER_BIG_LEVERS.md) identifies the next
+fresh-frontend targets. `game.blot` takes 447 ms of checker CPU and accounts for
+91.5% of selected generic-requirement candidates. Measure its builder chain by
+declaration/rebinding, then remove repeated dependency discovery. Prepare
+immutable module jobs for roughly four workers: the optimistic model reaches 798
+ms checking and 1.238 s whole frontend; eight workers barely improve it. SIMD
+lexing has only a 26 ms ceiling. No parallel implementation or new speedup is
+claimed. Ordinary edits check one module and already have 133/139 ms frontends,
+so their larger latency still needs backend work.
+
+The [CT114 implementation](COMPILER_CT114_WORK.md) reduces temporary checker
+allocations by 27% and adds project-wide work counters. The
+[final paired screen](zig-native/CT114_QUALIFICATION.md) measures the profiled
+frontend at 1.872 → 1.784 s, but establishes no unprofiled latency improvement.
+The remaining frontend queue is in
+[the architecture review](COMPILER_FRONTEND_REVIEW.md):
+
+1. Maintain requirement dependencies and lexical ownership instead of scanning
+   millions of pending positions during generalization.
+2. Instantiate from immutable producer interfaces without first copying their
+   schemes into each consumer's solver.
+3. Reduce repeated construction and validation across checked, Core and frozen
+   representations while preserving external admission checks.
+
+The rejected small variable-query cache saved only twelve graph visits despite
+161,744 hits. Keep the compact storage changes; do not widen that cache. The
+fresh sub-second frontend target remains open, separate from backend edit-time
+work below.
+
+The initial
+[frontend investigation](COMPILE_MEASUREMENTS.md#fresh-frontend-and-baba-review-25-october-2026)
+adds a separate fresh-build target: reduce checking from the profiled 1.277 s
+toward 0.599 s to bring the whole 1.678 s frontend below one second. Lex/parse
+already takes 36 ms. CPU samples point to generic requirement construction and
+imported interfaces; measure repeated graph walks and eager imports before
+changing their ownership. Baba's shared analysis and deferred materialization
+are relevant designs, but its parser benchmark results are not Blot speedups.
+That initial investigation changed no compiler behavior or release
+qualification; the implementation above follows it.
+
+The [CT113 refinement census](zig-native/CT113_QUALIFICATION.md) finds a bounded
+cache problem and a larger missing-proof problem. Raising the refinement table
+from 4,096 to 8,192 records removes saturation, saves 4,513 fresh inference
+regions and 477 first-edit regions, and retains about 4.82 MiB more cache
+storage. Three release pairs measure fresh gdev compilation at 7.546 → 7.078 s
+(paired CPU -5.21%). Literal/body edits remain about 3.0/5.2 s; no edit-time
+gain is established. The frozen full gate and selected zero-lint development
+check pass.
+
+The next architectural target is the producing call proof's dependency record.
+The baseline body census finds 813 fresh requests / 1,345,784 nodes encountering
+missing or changed call presence after matching inputs. Most required proofs are
+missing. Isolated rechecks add work and recover few hits, so both recovery
+trials were removed. Keep exact source, scalar, call and plain-fact premises;
+retain and validate the completed producing judgment instead of inventing a
+missing premise. Three principal misses still visit 3,388,263 nodes. See
+[the CT113 work record](COMPILER_CT113_WORK.md). The five-part program remains
+open and CT110 remains installed.
+
+The preceding [CT112 experiment](zig-native/CT112_QUALIFICATION.md) restores
+exact closure completion across retained and canonical replay. Its tiny work
+reduction and three-pair timing screen did not establish a repeatable speedup.
+
+The following CT111 figures describe the preceding experiment.
+
+The [final CT111 screen](zig-native/CT111_QUALIFICATION.md) passes correctness
+qualification but establishes **no performance improvement**. Three release
+pairs measure literal/body medians of 3.151/5.294 s versus CT110 3.122/5.229 s;
+paired CPU rises 0.6%/1.5%. Exact outputs, fresh controls and CPU guards pass.
+The optional `result` requirement, bounded inferred-interface proofs, shared
+source graphs and stage measurements are implemented. All five architectural
+recommendations remain incomplete; CT110 remains installed.
+
+Stop widening those shortcuts. The final body profile still misses three
+principals, constructs 3.39 million nodes for them and starts 534 inference
+regions during lowering. Inference remains the largest measured CPU cost. The
+next substantial implementation is a retained completed semantic body and the
+development generic ABI; see the [work record](COMPILER_CT111_WORK.md).
+
 ## Current queue: ordinary edits toward one second (25 October 2026)
+
+The [architecture review](COMPILER_ARCHITECTURE_REVIEW.md) recommends moving the
+next work above individual solver operations: complete semantic interfaces,
+stable dependency queries and retained elaborated bodies. Start with the three
+principal misses and one reusable function family. Measure distinct semantic
+keys and invalidation before expanding another cache; language and development
+ABI changes remain explicit experiments.
 
 [CT110](zig-native/CT110_QUALIFICATION.md) passes seven release pairs against
 CT109: paired CPU improves 2.9% fresh, 4.4% literal and 3.0% body. Wall medians
@@ -35,9 +132,9 @@ conditional architecture work from implemented optimizations.
 The [CT109 qualification](zig-native/CT109_QUALIFICATION.md) passes seven
 alternating release pairs against CT106 with exact outputs. Paired CPU changes
 are fresh +0.1%, first literal -0.6%, literal revert -11.5%, body -2.5%, body
-revert -7.5% and devtools -1.2%. First-literal/body wall medians are 3.261/5.377 s
-on the shared host. Reverts improve; the first-literal/body acceptance targets,
-two-second goal and sub-second goal remain open.
+revert -7.5% and devtools -1.2%. First-literal/body wall medians are 3.261/5.377
+s on the shared host. Reverts improve; the first-literal/body acceptance
+targets, two-second goal and sub-second goal remain open.
 
 CT109 adds bounded optimizer/RC/encoded-body reuse, unique declaration origins
 with exact relative-position proof, checked-interface observations, scratch
@@ -53,15 +150,17 @@ establish an ordinary-edit benefit and is removed. Free-variable summaries and
 row/composite policy trials also fail to earn adoption. Cross-owner sharing,
 resumable inference and a unified dependency query service remain conditional.
 All 86 proposals have a [current disposition](COMPILER_CT109_LEDGER.md); the
-[work record](COMPILER_CT109_WORK.md) preserves failed gates and negative trials.
+[work record](COMPILER_CT109_WORK.md) preserves failed gates and negative
+trials.
 
 The complete gate passes 2,573 exhaustive native laws and 1,656 guests. The
-200-distinct-edit memory series and local installation checks also pass. The native
-allocation-budget regression was repaired by smaller per-region storage, not a
-larger budget. Keep frozen workloads and unprofiled paired guards. Inclusive
-region clocks and exclusive phase CPU explain work; they are not throughput
-results. The earlier [CT106 report](zig-native/CT106_QUALIFICATION.md) retains its
-separate first-edit gain and compiler-iteration measurements.
+200-distinct-edit memory series and local installation checks also pass. The
+native allocation-budget regression was repaired by smaller per-region storage,
+not a larger budget. Keep frozen workloads and unprofiled paired guards.
+Inclusive region clocks and exclusive phase CPU explain work; they are not
+throughput results. The earlier
+[CT106 report](zig-native/CT106_QUALIFICATION.md) retains its separate
+first-edit gain and compiler-iteration measurements.
 
 The comparison and diagnostic sequence below are historical CT103/CT104
 evidence.
@@ -87,18 +186,18 @@ fresh controls. Literal inference is still about 1.5 s; body inference is
 | CT95–CT97: measurement, spawn preparation and effect rows | Complete; retain dated evidence and frozen workload/settings.                                                                                                                                                                      | Do not rerun the historical program or weaken output/fault checks.                                                                                                                |
 | CT98: ordinary edit reuse                                 | Capture capacity and literal principal reuse are fixed. Body edits still rebuild four regions.                                                                                                                                     | Combined literal/body targets remain open: at least 50% cheaper than CT96, then under 4 s wall. Do not multiply separate historical ratios.                                       |
 | CT99: constants                                           | Previously measured at 0.217 s in the CT102 literal profile. Reattribute if the residual profile changes.                                                                                                                          | Defer until eligible cost exceeds 10% of whole-build CPU.                                                                                                                         |
-| CT100: first-edit and fresh frontend allocation           | CT106 checks one module on the first edit after fixing immutable-constructor sharing; see the current qualification for paired CPU and profiling results.                                                                                               | At least 25% fewer check allocations and 20% less check time, with no whole-build CPU regression.                                                                                 |
+| CT100: first-edit and fresh frontend allocation           | CT106 checks one module on the first edit after fixing immutable-constructor sharing; see the current qualification for paired CPU and profiling results.                                                                          | At least 25% fewer check allocations and 20% less check time, with no whole-build CPU regression.                                                                                 |
 | CT101: combined qualification                             | CT103 fresh game CPU falls 6.1%; devtools unchanged. Combined main passes its own full gate and strict output screen.                                                                                                              | Seven paired comparisons, <=5% unaffected CPU regression, exact outputs, full exhaustive gate and zero lint. Keep the 8 s fresh milestone open.                                   |
 | CT102: optional memo output declines                      | Complete: keep admitted results while omitted outputs receive ordinary checking.                                                                                                                                                   | Qualified >=10% literal CPU improvement against CT97; retain ownership and rejection laws.                                                                                        |
 | CT103: remaining principal regions                        | Nonempty import, exact call/summary observations and consumed-source admission implemented. Literal 18→20 hits; body 15→16. Trace the exact consumed declarations blocking the four remaining body regions before extending reuse. | Literal >=20% CPU target met (24.8%); body target missed (4.2%) and remains open. Require exact source/type/effect/catalog rejection, fresh parity, errors/recovery and full OOM. |
 | CT104: residual inference and iteration budget            | Bounded 64-slot exact-epoch operation-row cache implemented; simulation covers 12.55% of label visits. No isolated cache speedup claim. Attribute repeated summary/body work outside principal replay next.                        | Both ordinary edit classes below 2 s, then below 1 s on a documented quiet host. Both targets remain open. Report CPU and wall distributions.                                     |
 
-| New hill                                              | Evidence and next action                                                                                                                                                         | Acceptance target                                                                                                          |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| CT105: repeated solver scans and normalization        | Qualified fresh/body CPU reductions; dense certificates lower argument work with about 9.88 MB additional peak region storage. Literal gain is 3.3%.                             | Fresh/body benefit retained; combined >=10% literal/body target remains open.                                              |
-| CT106: residual queries and exact source observations | CT106 narrows containing-declaration reads, but all four body regions still fail their own source-position check. Body CPU is unchanged and later-literal CPU rises 3.5%. | >=20% body CPU and >=10% later-literal CPU reduction, exact fresh/error/restart parity, bounded retention, full OOM.       |
-| CT107: frontend graph correspondence                  | Fixed in CT106: equal immutable constructors may differ in sharing; variables remain injective. First-edit checking drops from 22 modules to one.                              | First-edit check allocations -25% and checking time -20%; no weakening of graph/contract admission.                        |
-| CT108: remaining non-inference floor                  | CT106 profiles about 406 ms remaining lookup and 1.55 s outside inference; query stages are separate exclusive work categories. Attribute validation/import, optimized-body clones and encoding.                      | Both ordinary edit classes below 2 s, then 1 s, in seven quiet-host pairs with instructions/CPU/wall/current RSS controls. |
+| New hill                                              | Evidence and next action                                                                                                                                                                         | Acceptance target                                                                                                          |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| CT105: repeated solver scans and normalization        | Qualified fresh/body CPU reductions; dense certificates lower argument work with about 9.88 MB additional peak region storage. Literal gain is 3.3%.                                             | Fresh/body benefit retained; combined >=10% literal/body target remains open.                                              |
+| CT106: residual queries and exact source observations | CT106 narrows containing-declaration reads, but all four body regions still fail their own source-position check. Body CPU is unchanged and later-literal CPU rises 3.5%.                        | >=20% body CPU and >=10% later-literal CPU reduction, exact fresh/error/restart parity, bounded retention, full OOM.       |
+| CT107: frontend graph correspondence                  | Fixed in CT106: equal immutable constructors may differ in sharing; variables remain injective. First-edit checking drops from 22 modules to one.                                                | First-edit check allocations -25% and checking time -20%; no weakening of graph/contract admission.                        |
+| CT108: remaining non-inference floor                  | CT106 profiles about 406 ms remaining lookup and 1.55 s outside inference; query stages are separate exclusive work categories. Attribute validation/import, optimized-body clones and encoding. | Both ordinary edit classes below 2 s, then 1 s, in seven quiet-host pairs with instructions/CPU/wall/current RSS controls. |
 
 Record each experiment's hypothesis and threshold first. After two bounded
 misses, stop that approach and preserve negative evidence. Measure before
@@ -478,22 +577,21 @@ A body or literal edit in `ink/math` (71 importers) reuses nothing.
   `Quat.conjugate` carry recipes only at population. That difference in
   `check.zig` also makes retained interfaces differ from cold ones; it belongs
   to the checker hills.
-- **Result, capability facts (18 October 2026):** CT11, "Take a catalog
-  member's capability facts from its producer". The recipes did not come from
-  scoped types: `ink/math` imports the prelude's F32 members through
-  `std/vector`'s catalog, as aliases. A live alias carries its producer's flow
-  and recipe, but a frozen interface strips both from aliases, so a check
-  against frozen dependencies could not derive recipes for `Color.lerp` and
-  `Quat.conjugate`, and retained and cold builds published different
-  interfaces. A catalog member now takes its capability facts from its
-  producer, live or frozen; a law checks that the re-exporting consumer
-  publishes identical flows and recipes at population, after an edit and in a
-  cold build. The first `ink/math` edit still re-checks the 76 importers
-  (2,459 → 2,470 ms): its interface also differs in type-graph sharing, since
-  replayed body facts give `Mat4.view`'s inferred result its own `Mat4` node
-  where fresh elaboration shares the constructor's. Hash-consing projected
-  interface graphs, or comparing them modulo sharing, would remove that.
-  Wasm identical.
+- **Result, capability facts (18 October 2026):** CT11, "Take a catalog member's
+  capability facts from its producer". The recipes did not come from scoped
+  types: `ink/math` imports the prelude's F32 members through `std/vector`'s
+  catalog, as aliases. A live alias carries its producer's flow and recipe, but
+  a frozen interface strips both from aliases, so a check against frozen
+  dependencies could not derive recipes for `Color.lerp` and `Quat.conjugate`,
+  and retained and cold builds published different interfaces. A catalog member
+  now takes its capability facts from its producer, live or frozen; a law checks
+  that the re-exporting consumer publishes identical flows and recipes at
+  population, after an edit and in a cold build. The first `ink/math` edit still
+  re-checks the 76 importers (2,459 → 2,470 ms): its interface also differs in
+  type-graph sharing, since replayed body facts give `Mat4.view`'s inferred
+  result its own `Mat4` node where fresh elaboration shares the constructor's.
+  Hash-consing projected interface graphs, or comparing them modulo sharing,
+  would remove that. Wasm identical.
 - **Follow-up, interface sharing (19 October 2026):** not landed. Projecting
   structurally equal types, rows and operations to one interface node (only
   identity-free nodes; variables, binders, quantifiers, rigid and scoped types
@@ -538,10 +636,10 @@ Constant serialization is 31% of a literal edit.
   Sampled over 16 literal edits after CT9–CT12, `Generator.constant` is 34.7%
   inclusive but 0.43% outside the closures and callables it reaches: closure
   specialization 12.6%, fresh callable generation 16.8% and closure functions
-  4.9%. Retained aggregates are already replayed by value graph (684 per
-  edit); their cost is admission, the old graph inspection and value match in
-  `aggregateConstantRequest` (8.5%), whose correspondence the caller's
-  relocated operands need.
+  4.9%. Retained aggregates are already replayed by value graph (684 per edit);
+  their cost is admission, the old graph inspection and value match in
+  `aggregateConstantRequest` (8.5%), whose correspondence the caller's relocated
+  operands need.
 
 ### CT14: cheaper `prepareReuse`
 
@@ -550,48 +648,46 @@ Constant serialization is 31% of a literal edit.
 - **Fix:** index the previous revision's instances by key instead of scanning
   them, and skip modules whose stamps match.
 - **Result (18 October 2026):** CT14, "Certify retained pins by an identical
-  certificate context". Sampled after CT15, `prepareReuse` is 11.3% of a
-  literal edit: 6.6% frozen-Core validation of every module twice (the old
-  pins and the current modules), 3.7% module stamps (CT18), no instance scan
-  and 0.1% `dirtySelections` even on a body edit. gdev's capability recipes,
-  scoped types and staging make the validation context non-reusable, so the
-  previous edit's certificate never matched. A certificate whose every module
-  image equals its retained pin, under the same namespace and bounds, was
-  captured for exactly this context and now certifies the pins; current
-  modules are still validated. Game, 5 pairs at load 1.1–2.2: revert of
-  literal_constant 1,161 → 1,098 ms (10.86 → 10.40 G instructions),
-  literal_in_body edit 1,155 → 1,089 ms, body_change 1,782 → 1,713 ms; the
-  first edit after population has no certificate yet. Wasm identical.
+  certificate context". Sampled after CT15, `prepareReuse` is 11.3% of a literal
+  edit: 6.6% frozen-Core validation of every module twice (the old pins and the
+  current modules), 3.7% module stamps (CT18), no instance scan and 0.1%
+  `dirtySelections` even on a body edit. gdev's capability recipes, scoped types
+  and staging make the validation context non-reusable, so the previous edit's
+  certificate never matched. A certificate whose every module image equals its
+  retained pin, under the same namespace and bounds, was captured for exactly
+  this context and now certifies the pins; current modules are still validated.
+  Game, 5 pairs at load 1.1–2.2: revert of literal_constant 1,161 → 1,098 ms
+  (10.86 → 10.40 G instructions), literal_in_body edit 1,155 → 1,089 ms,
+  body_change 1,782 → 1,713 ms; the first edit after population has no
+  certificate yet. Wasm identical.
 
 ### CT15: cache `source_value_template.moduleGenerative`
 
 It is 2.7% self in a literal edit and recomputed per revision.
 
 - **Fix:** cache it per module stamp.
-- **Result (18 October 2026):** CT15, "Share unit facts with private
-  evaluator sessions". The scans came from `Session.init` in the 64
-  independent call-proof rechecks of each edit, each rescanning every module
-  (3.5% of a literal edit, plus offsets and field-location hashing). Private
-  sessions (`initShared`: those rechecks and semantic component jobs) now copy
-  the parent session's unit facts over the same units. Game, 5 pairs at load
-  1.7: literal_constant edit 1,389 → 1,316 ms (12.83 → 12.49 G instructions),
-  literal_in_body 1,319 → 1,253 ms, body_change 1,947 → 1,899 ms; population
-  unchanged. Wasm identical.
+- **Result (18 October 2026):** CT15, "Share unit facts with private evaluator
+  sessions". The scans came from `Session.init` in the 64 independent call-proof
+  rechecks of each edit, each rescanning every module (3.5% of a literal edit,
+  plus offsets and field-location hashing). Private sessions (`initShared`:
+  those rechecks and semantic component jobs) now copy the parent session's unit
+  facts over the same units. Game, 5 pairs at load 1.7: literal_constant edit
+  1,389 → 1,316 ms (12.83 → 12.49 G instructions), literal_in_body 1,319 → 1,253
+  ms, body_change 1,947 → 1,899 ms; population unchanged. Wasm identical.
 
 ### CT16: index `artifact_import` lookups
 
 `knownRow` and `knownLayout` are 1.7% and 1.3% self in a literal edit.
 
 - **Fix:** replace their scans with hash indexes built once per artifact.
-- **Result (18 October 2026):** CT16, "Memoize known layout ceilings per
-  layout store". The two were an unmemoized recursive walk over shared layout
-  DAGs (7.5% of a literal edit with callers). `artifact_import.Knowledge` keeps
-  each node's and row's ceiling, the deepest level at which it is still known,
+- **Result (18 October 2026):** CT16, "Memoize known layout ceilings per layout
+  store". The two were an unmemoized recursive walk over shared layout DAGs
+  (7.5% of a literal edit with callers). `artifact_import.Knowledge` keeps each
+  node's and row's ceiling, the deepest level at which it is still known,
   computed once per append-only store without recursion; known(id, 0) is then a
-  lookup. Game, 5 pairs at load 1.1–2.2: literal_constant edit 1,306 → 1,218
-  ms (12.49 → 11.26 G instructions), literal_in_body 1,247 → 1,159 ms,
-  body_change 1,871 → 1,790 ms (17.62 → 16.40 G); population unchanged. Wasm
-  identical.
+  lookup. Game, 5 pairs at load 1.1–2.2: literal_constant edit 1,306 → 1,218 ms
+  (12.49 → 11.26 G instructions), literal_in_body 1,247 → 1,159 ms, body_change
+  1,871 → 1,790 ms (17.62 → 16.40 G); population unchanged. Wasm identical.
 
 ### CT17: interval index for fragment admission
 
@@ -599,14 +695,13 @@ It is 2.7% self in a literal edit and recomputed per revision.
 (`reuse/artifact_fragment.zig:288-300`).
 
 - **Fix:** use an interval index.
-- **Result (18 October 2026):** CT17, "Follow skipped aggregate ranges with
-  one cursor during admission". The per-address scan (`localAddress`) is
-  negligible now; the self time was `admit` testing every emission record
-  against every skipped aggregate child. Those ranges are disjoint and
-  ascending, so one cursor follows them and a binary search passes over each
-  child's records. Game, 5 pairs: literal_constant edit 11.26 → 11.18 G
-  instructions (1,218 → 1,214 ms, within CPU noise), body_change 16.40 →
-  16.33 G. Wasm identical.
+- **Result (18 October 2026):** CT17, "Follow skipped aggregate ranges with one
+  cursor during admission". The per-address scan (`localAddress`) is negligible
+  now; the self time was `admit` testing every emission record against every
+  skipped aggregate child. Those ranges are disjoint and ascending, so one
+  cursor follows them and a binary search passes over each child's records.
+  Game, 5 pairs: literal_constant edit 11.26 → 11.18 G instructions (1,218 →
+  1,214 ms, within CPU noise), body_change 16.40 → 16.33 G. Wasm identical.
 
 ### CT18: generation tokens instead of module stamps
 
@@ -619,25 +714,25 @@ are linear (`reuse/code_artifacts.zig:665-730`).
   owner.
 - **Overlaps:** tasks 093 and 101.
 - **Result (18 October 2026):** CT18, "Pin retained Core by generation token".
-  Approved by the owner. Sampled before, stamps were 5.3% of a literal edit
-  (the importer re-hashed every retained module). A pin now carries a token,
-  issued once when its Core image is first pinned, and a 64-bit print of the
-  header it pinned; it holds while its module names those buffers. A view
-  inherits a token only from the same buffers or from complete content equality
-  (the existing `proveSame` comparison), so a changed module never keeps one.
-  Certificates compare tokens. One law edited pinned Core in place; it now
-  edits a copy, as revisions do.
-  `validate_pins` keeps the digest check opt-in; checkpoints store digests,
-  never tokens, and restored pins validate them once. `owns()` is a range check.
-  Laws: token memo (copies, every change kind, storage, unowned views, threads,
-  allocation failure), admission (in-place change caught only by validation,
-  header change and forged token always), identical decisions with and without
-  validation over an edit series, checkpoint restore, and a retained revision
-  under allocation failure. Game, 5 pairs at load 1.1–2.0: −0.70 G instructions
-  per build; literal_constant revert 1,027 → 969 ms (9.90 → 9.21 G),
-  literal_in_body revert 1,043 → 983 ms, body_change revert 1,647 → 1,584 ms,
-  population 2,491 → 2,425 ms. Every deterministic stat equal to the previous
-  build, and to a validating build over a 42-build mixed series. Wasm identical.
+  Approved by the owner. Sampled before, stamps were 5.3% of a literal edit (the
+  importer re-hashed every retained module). A pin now carries a token, issued
+  once when its Core image is first pinned, and a 64-bit print of the header it
+  pinned; it holds while its module names those buffers. A view inherits a token
+  only from the same buffers or from complete content equality (the existing
+  `proveSame` comparison), so a changed module never keeps one. Certificates
+  compare tokens. One law edited pinned Core in place; it now edits a copy, as
+  revisions do. `validate_pins` keeps the digest check opt-in; checkpoints store
+  digests, never tokens, and restored pins validate them once. `owns()` is a
+  range check. Laws: token memo (copies, every change kind, storage, unowned
+  views, threads, allocation failure), admission (in-place change caught only by
+  validation, header change and forged token always), identical decisions with
+  and without validation over an edit series, checkpoint restore, and a retained
+  revision under allocation failure. Game, 5 pairs at load 1.1–2.0: −0.70 G
+  instructions per build; literal_constant revert 1,027 → 969 ms (9.90 → 9.21
+  G), literal_in_body revert 1,043 → 983 ms, body_change revert 1,647 → 1,584
+  ms, population 2,491 → 2,425 ms. Every deterministic stat equal to the
+  previous build, and to a validating build over a 42-build mixed series. Wasm
+  identical.
 
 ### CT19: cheaper revision input snapshots
 
@@ -688,8 +783,8 @@ Pool leases memcmp every pool and recopy grown ones
   A literal edit copies 1.4 MB of evaluator snapshot in 14 fields
   (`snapshot_copy_bytes`); a body-edit revert copies none. The rest of pool
   capture was module stamps (CT18) and sorting field locations from their hash
-  map (0.28%). Chunked pools would change every consumer's contiguous slices
-  for under a millisecond. Retained memory does not grow either (CT25).
+  map (0.28%). Chunked pools would change every consumer's contiguous slices for
+  under a millisecond. Retained memory does not grow either (CT25).
 
 ### CT22: reuse encoded functions
 
@@ -699,20 +794,19 @@ even reused ones (`backend/optimized_bodies.zig:99-117`, `wasm.zig:1067`).
 
 - **Fix:** keep encoded bytes and refcounted captures for matcher-reused
   functions.
-- **Result (18 October 2026):** CT22, "Count positional optimizer matching
-  apart from the relocation budget". Encoding is about 1% of a literal edit
-  and capture cloning 0.07%; the cost was functions the optimizer redid. The
+- **Result (18 October 2026):** CT22, "Count positional optimizer matching apart
+  from the relocation budget". Encoding is about 1% of a literal edit and
+  capture cloning 0.07%; the cost was functions the optimizer redid. The
   matcher's 1 M walk budget was spent by the positional checks alone (622 k to
   prepare positions on gdev's 3,541 functions), so even an unchanged position
-  stopped matching part way. Positional checks are linear and now keep their
-  own count. Game, 5 pairs at load 1.2–1.7: positional reuse on a
-  literal_constant revert 2,602 → 3,538 of 3,541; revert 1,097 → 1,037 ms
-  (10.43 → 9.93 G instructions), literal_in_body revert 1,102 → 1,047 ms,
-  body_change revert 1,717 → 1,663 ms. Edits that move positions are
-  unchanged: relocation walks fail on genuinely different bodies (9,164 of
-  9,168 on the first edit, where population's bodies differ from retained
-  ones), so a memo of proved callee pairs was tried and dropped. Wasm
-  identical.
+  stopped matching part way. Positional checks are linear and now keep their own
+  count. Game, 5 pairs at load 1.2–1.7: positional reuse on a literal_constant
+  revert 2,602 → 3,538 of 3,541; revert 1,097 → 1,037 ms (10.43 → 9.93 G
+  instructions), literal_in_body revert 1,102 → 1,047 ms, body_change revert
+  1,717 → 1,663 ms. Edits that move positions are unchanged: relocation walks
+  fail on genuinely different bodies (9,164 of 9,168 on the first edit, where
+  population's bodies differ from retained ones), so a memo of proved callee
+  pairs was tried and dropped. Wasm identical.
 - **Follow-up (19 October 2026):** not attempted. On the game (one
   serial-codegen pair) the first edit after population still optimizes 2,737 of
   3,541 functions again (804 reused, matcher budget exhausted), and its assembly
@@ -728,11 +822,10 @@ even reused ones (`backend/optimized_bodies.zig:99-117`, `wasm.zig:1067`).
 
 - **Fix:** carry summaries across revisions in a deterministic order.
 - **Result (18 October 2026):** dropped. `Summaries.prepare` is 0.74% of a
-  literal edit and 0.54% of a body edit (about 10 ms), under what one build
-  can attribute. Summaries are inputs to the optimizer matcher, so reusing
-  them would need a proof of their own, and a recursive or depth-limited
-  summary depends on the order functions are visited, which an insertion
-  changes.
+  literal edit and 0.54% of a body edit (about 10 ms), under what one build can
+  attribute. Summaries are inputs to the optimizer matcher, so reusing them
+  would need a proof of their own, and a recursive or depth-limited summary
+  depends on the order functions are visited, which an insertion changes.
 
 ### CT24: reply before persisting
 
@@ -740,36 +833,36 @@ The project server persists its checkpoint before replying on revision 1
 (`reuse/zig_project_server.zig:367`).
 
 - **Fix:** reply first, then persist.
-- **Result (18 October 2026):** deferred; it needs an owner decision. Saving
-  the 54.6 MB restart cache adds 175 ms CPU and 205 ms wall to the first game
-  build (2,445 → 2,650 ms wall, 4 runs after CT19). But the reply currently
-  implies the cache is on disk: the protocol tells hosts to kill a busy server
-  and restart warm from it, and `restart_cache.test.ts` disposes (SIGKILL)
-  right after the first reply and expects the next process to load it.
-  Replying first would lose the cache to a kill in that window. The options are
-  to weaken the promise (saved after the first reply; `close` still saves) or
-  to persist from a detached process that later opens wait for.
+- **Result (18 October 2026):** deferred; it needs an owner decision. Saving the
+  54.6 MB restart cache adds 175 ms CPU and 205 ms wall to the first game build
+  (2,445 → 2,650 ms wall, 4 runs after CT19). But the reply currently implies
+  the cache is on disk: the protocol tells hosts to kill a busy server and
+  restart warm from it, and `restart_cache.test.ts` disposes (SIGKILL) right
+  after the first reply and expects the next process to load it. Replying first
+  would lose the cache to a kill in that window. The options are to weaken the
+  promise (saved after the first reply; `close` still saves) or to persist from
+  a detached process that later opens wait for.
 - **Decision (18 October 2026):** the owner chose the detached process. The
   reply comes first, a detached writer persists the cache, and a later open
   waits for that write to finish, so the warm-restart promise still holds.
   Scheduled with CT82–CT85.
 - **Result (19 October 2026):** CT24, "Persist the restart cache from a detached
   writer after the reply". The server takes an exclusive lock on the key's
-  `.lock` file, forks a writer (new session, private heap, stdio on
-  `/dev/null`) that inherits it, and only then replies; the writer encodes its
-  copy-on-write image, writes `.partial` and renames it. Opens wait at most
-  10 s for a shared lock, so a SIGKILL right after the reply still leaves the
-  cache; a killed writer publishes nothing, the kernel frees its lock, and the
-  previous file stays whole. Other platforms write before replying. Game, 6
-  pairs at load 0.3–0.8, 4 codegen workers: first-reply wall 2,351 → 2,167 ms,
-  server CPU 2,407 → 2,255 ms; the file is on disk 31 ms later than before
-  (2,364 → 2,395 ms from the request). A restart's own first-build save leaves
-  the critical path too (restart wall 2,553 → 2,362 ms). Laws: detached
-  publication with waiting loaders, a killed writer (lock freed, last whole file
-  kept, partial file never read and replaced), failed encoding, a writer that
-  waits for a held lock, concurrent loaders, two parts from one writer;
-  restart-after-SIGKILL, killed writer then cold open, and concurrent opens
-  waiting for a write in executed tests. Wasm identical.
+  `.lock` file, forks a writer (new session, private heap, stdio on `/dev/null`)
+  that inherits it, and only then replies; the writer encodes its copy-on-write
+  image, writes `.partial` and renames it. Opens wait at most 10 s for a shared
+  lock, so a SIGKILL right after the reply still leaves the cache; a killed
+  writer publishes nothing, the kernel frees its lock, and the previous file
+  stays whole. Other platforms write before replying. Game, 6 pairs at load
+  0.3–0.8, 4 codegen workers: first-reply wall 2,351 → 2,167 ms, server CPU
+  2,407 → 2,255 ms; the file is on disk 31 ms later than before (2,364 → 2,395
+  ms from the request). A restart's own first-build save leaves the critical
+  path too (restart wall 2,553 → 2,362 ms). Laws: detached publication with
+  waiting loaders, a killed writer (lock freed, last whole file kept, partial
+  file never read and replaced), failed encoding, a writer that waits for a held
+  lock, concurrent loaders, two parts from one writer; restart-after-SIGKILL,
+  killed writer then cold open, and concurrent opens waiting for a write in
+  executed tests. Wasm identical.
 
 ### CT25: bound retained memory
 
@@ -1055,10 +1148,10 @@ inputs.
   diagnostics, errors and ownership do not change. Wasm identical on the game,
   devtools and the 10 slowest tests. Game with 4 workers (5 pairs, load 1.3):
   the `lower` phase 84.7 → 44.5 ms, wall 2,486 → 2,444 ms (-1.7%) and an
-  `imported_body` edit 2,347 → 2,308 ms; CPU +1.9% with identical
-  instructions, peak RSS 300 → 298 MiB. Devtools wall 905 → 896 ms; the 10
-  slowest tests 44.5 → 44.1 s. The largest unit bounds the speedup. Serial
-  builds take the old path.
+  `imported_body` edit 2,347 → 2,308 ms; CPU +1.9% with identical instructions,
+  peak RSS 300 → 298 MiB. Devtools wall 905 → 896 ms; the 10 slowest tests 44.5
+  → 44.1 s. The largest unit bounds the speedup. Serial builds take the old
+  path.
 
 ### CT43: prefetch loading
 
@@ -1067,30 +1160,30 @@ The loader reads, lexes and parses one file at a time (`reuse/project.zig`).
 - **Fix:** read and lex discovered imports on workers.
 - **Result (18 October 2026):** dropped. On a 2.5 s game build the phase clocks
   give lexing 19 ms, parsing 12 ms and loading 6 ms (1.5% of cold samples in
-  all). Parsing interns into the shared symbol pool under inherited fixities,
-  so only reads and lexing could move: at most about 15 ms of wall time with
-  four workers. `serve-project` reads through the revision snapshot, which
-  records every read and is not thread-safe, so prefetching would also need a
-  concurrent snapshot and speculative import resolution.
+  all). Parsing interns into the shared symbol pool under inherited fixities, so
+  only reads and lexing could move: at most about 15 ms of wall time with four
+  workers. `serve-project` reads through the revision snapshot, which records
+  every read and is not thread-safe, so prefetching would also need a concurrent
+  snapshot and speculative import resolution.
 
 ### CT44: level-wise parallel checking
 
 - **Fix:** check independent modules of one dependency level in parallel. It
   needs a symbol-pool overlay. Large and high risk; do it after CT30–CT41.
 - **Result (18 October 2026):** deferred with measurements. Clocked per module
-  on the game, checking takes 856 ms over 129 modules. The critical path is
-  393 ms: `game.blot` (157 ms) ← `title` ← `scenes` ← `hover` ← `station` ←
-  `robots` (44 ms) ← … ← `ink/math` ← `std/vector` ← prelude. Checking level by
-  level with 4 workers would take 453 ms, about 400 ms of wall time saved.
-  It is blocked by shared state. Checking interns qualified names into the
-  shared symbol pool (`check.zig`, the `self.pool.intern` calls for dotted
-  names), so IDs would follow thread timing. The `associated_remaining` and
+  on the game, checking takes 856 ms over 129 modules. The critical path is 393
+  ms: `game.blot` (157 ms) ← `title` ← `scenes` ← `hover` ← `station` ← `robots`
+  (44 ms) ← … ← `ink/math` ← `std/vector` ← prelude. Checking level by level
+  with 4 workers would take 453 ms, about 400 ms of wall time saved. It is
+  blocked by shared state. Checking interns qualified names into the shared
+  symbol pool (`check.zig`, the `self.pool.intern` calls for dotted names), so
+  IDs would follow thread timing. The `associated_remaining` and
   `resolution_remaining` budgets are spent across modules in order, and
-  diagnostics append in unit order. Design: per-module overlay pools whose
-  new symbols are renumbered in unit order after each level, which means
-  remapping every symbol in a checked module or proving checking interns none
-  that escape; per-module budget charges verified in unit order, with a serial
-  recheck on exhaustion; and diagnostics merged in unit order.
+  diagnostics append in unit order. Design: per-module overlay pools whose new
+  symbols are renumbered in unit order after each level, which means remapping
+  every symbol in a checked module or proving checking interns none that escape;
+  per-module budget charges verified in unit order, with a serial recheck on
+  exhaustion; and diagnostics merged in unit order.
 
 ## Phase 3: frontend validation
 
@@ -1120,18 +1213,18 @@ whole program on every build.
   dependencies (every cold build) validated each module's Core in source
   numbering, to guard an unchecked relink, and again in the closure pass. The
   relink now rejects units naming the excluded entry or no module, and only the
-  dense pass runs: game instructions -1.51% (23,423 → 23,068 M), devtools -1.62%,
-  measured on `fa4d4d5`. "CT46: reuse shared Core validation by owner inputs,
-  not global facts": validation reads foreign modules only through unit
+  dense pass runs: game instructions -1.51% (23,423 → 23,068 M), devtools
+  -1.62%, measured on `fa4d4d5`. "CT46: reuse shared Core validation by owner
+  inputs, not global facts": validation reads foreign modules only through unit
   references, so a shared module whose transitive owners are all shared keeps
   its receipt when the module count is unchanged and the dictionary only grew,
   instead of requiring every module's bounds and the symbol count to match.
   Game, 3 runs at load 1.1: a type-change revert revalidates 13 instead of 129
   modules' Core (validation 61.9 → 24.6 ms, edit 1,937 → 1,896 ms), an
-  unused-export revert 75 instead of 129 (81.8 → 53.7 ms); the miniature
-  suite's type change revalidates 1 instead of 4 (budgeted). Building the edges
-  once was not needed: each pass visits an edge once. A linear acyclicity proof
-  for lowered type graphs saved 0.17% of instructions and was dropped. Wasm
+  unused-export revert 75 instead of 129 (81.8 → 53.7 ms); the miniature suite's
+  type change revalidates 1 instead of 4 (budgeted). Building the edges once was
+  not needed: each pass visits an edge once. A linear acyclicity proof for
+  lowered type graphs saved 0.17% of instructions and was dropped. Wasm
   identical.
 
 ### CT47: copy-free capability views
@@ -1157,14 +1250,13 @@ whole program on every build.
   game instructions -0.67% (23,068 → 22,913 M), devtools -0.67%. "CT48: keep
   shared interface receipts when only the dictionary grows": shared interfaces
   were already reused (no hash needed: a shared owner is immutable), but any new
-  symbol revalidated all of them. Interface validation reads only its own
-  module and bounds symbol IDs from above, so a grown dictionary keeps the
-  receipts: a game type-change edit checks 13 instead of 129 interfaces, an
-  unused export 75 instead of 129 (miniature suite 1 and 3 instead of 4,
-  budgeted). With CT46, versus main `67f1068` (5 pairs, load 0.8): cold game
-  validation clock 128 → 58 ms, instructions -2.2% (23,185 → 22,675 M),
-  devtools -2.4%; type-change edit validation 72.7 → 24.8 ms (CPU 1,987 →
-  1,941 ms). Wasm identical.
+  symbol revalidated all of them. Interface validation reads only its own module
+  and bounds symbol IDs from above, so a grown dictionary keeps the receipts: a
+  game type-change edit checks 13 instead of 129 interfaces, an unused export 75
+  instead of 129 (miniature suite 1 and 3 instead of 4, budgeted). With CT46,
+  versus main `67f1068` (5 pairs, load 0.8): cold game validation clock 128 → 58
+  ms, instructions -2.2% (23,185 → 22,675 M), devtools -2.4%; type-change edit
+  validation 72.7 → 24.8 ms (CPU 1,987 → 1,941 ms). Wasm identical.
 
 ### CT49: attribute `validateModuleBodies`
 
@@ -1174,12 +1266,12 @@ It is 13.1% inclusive cold.
   it into checking.
 - **Result (18 October 2026):** dropped after attribution. It is the checker's
   body inference, inside the `check` clock, not a separate validation: 14.6% of
-  cold game samples, of which `inferGlobal` is 81% (`inferDeclarationBody`
-  9.2%, `finishGlobal` 2.4% of the build), `finish` resolving final types 16%
-  (2.2%) and source-operator validation 0.4%. Each module is checked once cold;
-  retained edits already skip unchanged modules (module cutoff and body
-  caches), and a cross-process cache per stamp is the restart cache (CT82).
-  Its cost belongs to the checker and inference hills.
+  cold game samples, of which `inferGlobal` is 81% (`inferDeclarationBody` 9.2%,
+  `finishGlobal` 2.4% of the build), `finish` resolving final types 16% (2.2%)
+  and source-operator validation 0.4%. Each module is checked once cold;
+  retained edits already skip unchanged modules (module cutoff and body caches),
+  and a cross-process cache per stamp is the restart cache (CT82). Its cost
+  belongs to the checker and inference hills.
 
 ## Phase 4: inference
 
@@ -1190,27 +1282,27 @@ It is 13.1% inclusive cold.
 
 - **Fix:** memoize refinements per canonical (callee, mapping) key.
 - **Overlaps:** Hill 4.
-- **Result (18 October 2026):** dropped. Refinement receipts already memoize
-  per (root, expected, seeds, rows): on a cold game build 16,254 of 19,248
-  requests hit the local memo, leaving 2,994 fresh regions, of which only 63
-  repeat an earlier key (physical-shape queries that cannot publish). A
-  canonical memo could save at most 2% of refinement regions; the 28%
-  inclusive is those regions' own inference, which CT60 and CT61 cut.
+- **Result (18 October 2026):** dropped. Refinement receipts already memoize per
+  (root, expected, seeds, rows): on a cold game build 16,254 of 19,248 requests
+  hit the local memo, leaving 2,994 fresh regions, of which only 63 repeat an
+  earlier key (physical-shape queries that cannot publish). A canonical memo
+  could save at most 2% of refinement regions; the 28% inclusive is those
+  regions' own inference, which CT60 and CT61 cut.
 
 ### CT51: split the largest region
 
 Region `game.blot:9829` has 5,137 scopes and takes 262 ms.
 
 - **Fix:** extend Hill 2's general split to it.
-- **Result (18 October 2026):** deferred; far larger than a hill. The region
-  is the principal evidence of the `played` composition constant (253 ms
-  profiled at main, 260 ms after CT60/CT61). Its 5,137 scopes are 2,944
-  named-body instances of only 255 bindings, 2,192 constructor instantiations
-  from field accesses and updates, and one closure; 922 roots stay open. The
-  calls stay inline because summaries key only first-order parameters
+- **Result (18 October 2026):** deferred; far larger than a hill. The region is
+  the principal evidence of the `played` composition constant (253 ms profiled
+  at main, 260 ms after CT60/CT61). Its 5,137 scopes are 2,944 named-body
+  instances of only 255 bindings, 2,192 constructor instantiations from field
+  accesses and updates, and one closure; 922 roots stay open. The calls stay
+  inline because summaries key only first-order parameters
   (`summaryShapeEligible`), and plugins and systems arrive as functions.
-  Splitting it needs Hill 2's summaries parametric in their argument
-  functions' obligations, a semantic design change.
+  Splitting it needs Hill 2's summaries parametric in their argument functions'
+  obligations, a semantic design change.
 
 ### CT52: certify incrementally
 
@@ -1220,12 +1312,12 @@ Region `game.blot:9829` has 5,137 scopes and takes 262 ms.
 - **Fix:** record certified pairs as scopes are added, and return early when
   nothing changed.
 - **Result (18 October 2026):** dropped after measurement. After CT60
-  `closeCertificates` is 2.6% of cold game samples, but it runs about once
-  per region, at solve end: 6,495 calls over 5,886 regions, 3,549 of which
-  close rows; 1,154 find no certificate and only 363 see an unchanged solver.
-  A settled-row set with lazy protection (rollback-safe, reference path under
-  projections) passed a parity law but measured 20.633 → 20.611 G
-  instructions (-0.1%) and 2,340 → 2,330 ms over 5 pairs.
+  `closeCertificates` is 2.6% of cold game samples, but it runs about once per
+  region, at solve end: 6,495 calls over 5,886 regions, 3,549 of which close
+  rows; 1,154 find no certificate and only 363 see an unchanged solver. A
+  settled-row set with lazy protection (rollback-safe, reference path under
+  projections) passed a parity law but measured 20.633 → 20.611 G instructions
+  (-0.1%) and 2,340 → 2,330 ms over 5 pairs.
 
 ### CT53: per-scope edge lists
 
@@ -1234,10 +1326,9 @@ scan every variable per scope (`eval/core_eval.zig:6572-6640, 11743-11750`).
 That is quadratic in region scopes.
 
 - **Fix:** use compressed sparse rows and per-scope variable lists.
-- **Result (18 October 2026):** dropped. On 2,475 cold game samples
-  `freeze` is 0.2–0.3% inclusive and `exportSolved` 1.4%, almost all of it
-  projection and row resolution rather than scanning; per-scope lists would
-  save under 0.3%.
+- **Result (18 October 2026):** dropped. On 2,475 cold game samples `freeze` is
+  0.2–0.3% inclusive and `exportSolved` 1.4%, almost all of it projection and
+  row resolution rather than scanning; per-scope lists would save under 0.3%.
 
 ### CT54: memoize `lexicalScope` and index instance selection
 
@@ -1255,10 +1346,10 @@ for a mean of 17 constraint visits.
 
 - **Fix:** initialize them lazily and pool the region shell.
 - **Result (18 October 2026):** dropped after measurement. Region setup and
-  teardown are 0.5% of cold samples (arena reset 0.4% self), and 4,233 of
-  5,886 regions request under 16 KB of solver memory. Resetting only the bump
-  blocks in use and keeping already-binned large blocks measured 20.451 →
-  20.442 G instructions (-0.04%), 2,345 → 2,339 ms over 5 pairs.
+  teardown are 0.5% of cold samples (arena reset 0.4% self), and 4,233 of 5,886
+  regions request under 16 KB of solver memory. Resetting only the bump blocks
+  in use and keeping already-binned large blocks measured 20.451 → 20.442 G
+  instructions (-0.04%), 2,345 → 2,339 ms over 5 pairs.
 
 ### CT56: solver allocation under 100 MB
 
@@ -1267,15 +1358,15 @@ The solver requests 262 MB in 477k allocations, and scratch requests 122 MB in
 
 - **Fix:** reset region arenas instead of freeing, and size pools from counters.
 - **Overlaps:** Hill 7.
-- **Result (18 October 2026):** deferred. The solver's final capacities sum
-  to 109 MB over a cold game build (effect rows 37 MB, type nodes 26 MB,
-  effect versions 14 MB, labels 11 MB, extra 7 MB, operations 6 MB); the
-  rest of its 262 MB is ArrayList regrowth inside pooled arenas, under 1% of
-  cold CPU. Rows dominate because chronological resolution publishes a fresh
-  row header per resolved fragment. Under 100 MB needs solver stores pooled
-  beyond one region's arena, or fewer row headers in `effects.zig`, a memory
-  model change. CT60's label memo and CT61's chains raise the requests to 266
-  MB solver and 132 MB scratch.
+- **Result (18 October 2026):** deferred. The solver's final capacities sum to
+  109 MB over a cold game build (effect rows 37 MB, type nodes 26 MB, effect
+  versions 14 MB, labels 11 MB, extra 7 MB, operations 6 MB); the rest of its
+  262 MB is ArrayList regrowth inside pooled arenas, under 1% of cold CPU. Rows
+  dominate because chronological resolution publishes a fresh row header per
+  resolved fragment. Under 100 MB needs solver stores pooled beyond one region's
+  arena, or fewer row headers in `effects.zig`, a memory model change. CT60's
+  label memo and CT61's chains raise the requests to 266 MB solver and 132 MB
+  scratch.
 
 ### CT57: share program tables between sessions
 
@@ -1284,9 +1375,8 @@ sessions repeat it (`reuse/independent_call_proof.zig:90`).
 
 - **Fix:** share immutable tables between sessions.
 - **Result (18 October 2026):** covered by CT15, whose `Session.initShared`
-  gives private sessions (independent call proofs and semantic component
-  jobs) the parent's unit facts. A cold build's one `Session.init` is 0.1% of
-  samples.
+  gives private sessions (independent call proofs and semantic component jobs)
+  the parent's unit facts. A cold build's one `Session.init` is 0.1% of samples.
 
 ### CT58: stop copying wide values
 
@@ -1295,20 +1385,20 @@ sessions repeat it (`reuse/independent_call_proof.zig:90`).
 
 - **Fix:** pass pointers.
 - **Overlaps:** Hill 14.
-- **Result (18 October 2026):** dropped. `attemptConstraint` copies a
-  Constraint of about 160 bytes per visit (52,075 visits, about 8 MB on a
-  cold game build). `Body.get` is 0.3% of cold samples, nearly all from
-  `Body.deinit` copying each plan out, and plan put, deinit and init 1%
-  together; pointer access would save under 0.5%.
+- **Result (18 October 2026):** dropped. `attemptConstraint` copies a Constraint
+  of about 160 bytes per visit (52,075 visits, about 8 MB on a cold game build).
+  `Body.get` is 0.3% of cold samples, nearly all from `Body.deinit` copying each
+  plan out, and plan put, deinit and init 1% together; pointer access would save
+  under 0.5%.
 
 ### CT59: a solver worklist
 
 - **Fix:** finish Hill 5's open worklist so solver passes revisit only the
   constraints that changed.
 - **Result (18 October 2026):** dropped. Regions with more than eight
-  constraints already use the watched worklist. Of 52,075 constraint visits
-  on a cold game build, 42,500 solve, 8,542 wait on summaries and 830 stay
-  open, so there is no rescanning left to remove.
+  constraints already use the watched worklist. Of 52,075 constraint visits on a
+  cold game build, 42,500 solve, 8,542 wait on summaries and 830 stay open, so
+  there is no rescanning left to remove.
 
 ### CT60: memoize type-evidence projection
 
@@ -1320,8 +1410,8 @@ sessions repeat it (`reuse/independent_call_proof.zig:90`).
   labels". Owned (mapping-free) projection memoized type nodes but re-projected
   every effect row label: per call-site `project` in `collectCallAt` and
   `collectSelected` was 12% of cold game samples, half of it interning the same
-  operations. The region's projection cache now also memoizes each solver
-  label, charging its arguments' exact visits and failing at the depth where
+  operations. The region's projection cache now also memoizes each solver label,
+  charging its arguments' exact visits and failing at the depth where
   re-projection would; it shares the type memo's clocks. Laws compare with
   unmemoized projection, invalidate on rollback and argument writes, sweep
   allocation failures, and pin hit budgets and depths. 5 pairs at load 1.2–1.8:
@@ -1337,17 +1427,17 @@ It is 0.7% self.
 - **Fix:** cache imports per region by source type id.
 - **Result (18 October 2026):** CT61, "Chain solver operations by identity,
   instance and arity". `importType` already memoizes per (scope, type) and
-  shares closed source types per region (0.4% self after CT60). The import
-  cost left was interning imported evidence labels: `internResolvedOperation`
-  scanned every solver operation per new label (2.6% of cold game samples,
-  all from `importEvidenceLabel`, quadratic in a seed row's labels). The
-  solver now chains operations by identity, instance and arity in index order,
-  linked lazily and unlinked by rollback, so interning compares only same-key
+  shares closed source types per region (0.4% self after CT60). The import cost
+  left was interning imported evidence labels: `internResolvedOperation` scanned
+  every solver operation per new label (2.6% of cold game samples, all from
+  `importEvidenceLabel`, quadratic in a seed row's labels). The solver now
+  chains operations by identity, instance and arity in index order, linked
+  lazily and unlinked by rollback, so interning compares only same-key
   candidates and still returns the oldest equal one. A law checks every intern
   against the old scan through rollback, argument writes, seeded tables and
-  allocation failures. 5 pairs at load 1.4: game 2,340 → 2,321 ms, 20.63 →
-  20.45 G instructions (-0.9%); devtools -0.4%; `robot_pickup` 5,311 → 5,257
-  ms (-1.6% instructions). Wasm identical.
+  allocation failures. 5 pairs at load 1.4: game 2,340 → 2,321 ms, 20.63 → 20.45
+  G instructions (-0.9%); devtools -0.4%; `robot_pickup` 5,311 → 5,257 ms (-1.6%
+  instructions). Wasm identical.
 
 ### Issue #15: reference overlap validation
 
@@ -1357,17 +1447,17 @@ marks the parent escaped.
 
 - **Result (18 October 2026):** measured; neither CPU nor rejections are
   material, so no implementation. The pass has no samples in 2,475 cold game
-  samples (the whole lifetime pass is 1.7–2.1%). Counted with a temporary
-  probe that also ran the uncapped scan: cold game 7,111 calls (2,070 with
-  references; 5,602 references, 37,401 accesses, at most 271 and 2,981 in one
-  function) make 8,516 comparisons; devtools 5,183; `robot_pickup` 8,972; a
-  retained session with five edit/revert pairs 60,309 over 65,052 calls. No
-  call exhausts the budget, so no proof is rejected by it. Stress shapes on
-  one self-referencing record: W disjoint fields cost W² comparisons (the cap
-  first binds at W = 513), K reads per field multiply that by K + 1 (W = 256,
-  K = 4 exhausts it), and an overlapping write ends the scan early (W = 256:
-  32,897) but still exhausts it at W = 1,024. Only budget exhaustion on such
-  records rejects a proof the uncapped scan would accept.
+  samples (the whole lifetime pass is 1.7–2.1%). Counted with a temporary probe
+  that also ran the uncapped scan: cold game 7,111 calls (2,070 with references;
+  5,602 references, 37,401 accesses, at most 271 and 2,981 in one function) make
+  8,516 comparisons; devtools 5,183; `robot_pickup` 8,972; a retained session
+  with five edit/revert pairs 60,309 over 65,052 calls. No call exhausts the
+  budget, so no proof is rejected by it. Stress shapes on one self-referencing
+  record: W disjoint fields cost W² comparisons (the cap first binds at W =
+  513), K reads per field multiply that by K + 1 (W = 256, K = 4 exhausts it),
+  and an overlapping write ends the scan early (W = 256: 32,897) but still
+  exhausts it at W = 1,024. Only budget exhaustion on such records rejects a
+  proof the uncapped scan would accept.
 
 ## Phase 5: backend
 
@@ -1458,11 +1548,11 @@ in big modules.
 
 - **Fix:** extend reach incrementally.
 - **Result (18 October 2026):** dropped. The loop runs only for runtime cells
-  (top-level `let`), and none of gdev's sources, its tests or `std` declare
-  one, so `planRuntime` returns after its body scan on every gdev entry: 0 of
-  959 cold game samples and 2 of 7,689 on a literal edit. Incremental reach
-  would also have to reproduce the first `const_only` origin and follow
-  suspensions cached between iterations, for nothing gdev can measure.
+  (top-level `let`), and none of gdev's sources, its tests or `std` declare one,
+  so `planRuntime` returns after its body scan on every gdev entry: 0 of 959
+  cold game samples and 2 of 7,689 on a literal edit. Incremental reach would
+  also have to reproduce the first `const_only` origin and follow suspensions
+  cached between iterations, for nothing gdev can measure.
 
 ### CT67: an arena per emitter
 
@@ -1549,8 +1639,8 @@ path (`main.zig:438-475`).
   and about 1% of an edit. Per-worker buffers joined in index order kept the
   Wasm identical for every worker count, but with `codegenWorkers` 4 (5 pairs,
   load 1.6) `assemble_us` fell only from 89.6 to 89.1 ms on the game, 95.1 to
-  92.3 ms on a literal edit and 64.2 to 60.0 ms on its revert. Wall time did
-  not move (2,256 → 2,258, 1,038 → 1,036 and 936 → 931 ms), and CPU rose 2%.
+  92.3 ms on a literal edit and 64.2 to 60.0 ms on its revert. Wall time did not
+  move (2,256 → 2,258, 1,038 → 1,036 and 936 → 931 ms), and CPU rose 2%.
 
 ## Phase 6: hashing, copying, memory
 
@@ -1668,31 +1758,30 @@ against 3.0 s).
   of 14), and fix the key or the seed.
 - **Target:** restart under 25% of cold.
 - **Result (19 October 2026):** CT82, "Restore an unchanged restart's output
-  from the cache". Neither the key nor the seed was wrong. `rebuilt_seed` is
-  set by every first build of a process, and the checkpoint holds no executable
+  from the cache". Neither the key nor the seed was wrong. `rebuilt_seed` is set
+  by every first build of a process, and the checkpoint holds no executable
   fragments (`semantic_archive.zig` says so), so no named instance can be
   reused. Its principal archive keeps 1 portable record of the 14 principal
   queries: the first lookup (`game.blot:9829`, 272 ms) declines on evidence
   import, and the other 13 run with 4,753 or more validated calls, which
-  `principal_inputs.Key.matches` declines by design. Loading the checkpoint
-  cost about 440 ms (decode at open 200, the semantic gate 166, evaluation and
-  constants 100) for 84 selected replays that saved nothing. The writer now
-  also persists the revision's Wasm with every input it read, and a first build
-  whose inputs, settings, entry and output policy equal them exactly publishes
-  it under the unchanged-input contract of a retained session; the checkpoint
-  is read only when that build compiles. Game, 6 pairs at load 0.8–1.5:
-  unchanged restart wall 2,361 → 20 ms, CPU 2,334 → 16 ms (0.9% of the 2,160 ms
-  cold build), open 5 ms once the writer is done; first reply unchanged; the
-  writer takes 36 ms more for the 3.1 MB output part. A restart with changed
-  sources still compiles cold; that needs CT83 and persisted fragments. Laws:
+  `principal_inputs.Key.matches` declines by design. Loading the checkpoint cost
+  about 440 ms (decode at open 200, the semantic gate 166, evaluation and
+  constants 100) for 84 selected replays that saved nothing. The writer now also
+  persists the revision's Wasm with every input it read, and a first build whose
+  inputs, settings, entry and output policy equal them exactly publishes it
+  under the unchanged-input contract of a retained session; the checkpoint is
+  read only when that build compiles. Game, 6 pairs at load 0.8–1.5: unchanged
+  restart wall 2,361 → 20 ms, CPU 2,334 → 16 ms (0.9% of the 2,160 ms cold
+  build), open 5 ms once the writer is done; first reply unchanged; the writer
+  takes 36 ms more for the 3.1 MB output part. A restart with changed sources
+  still compiles cold; that needs CT83 and persisted fragments. Laws:
   publication only on equal inputs (changed source, prelude, output identity,
   tier and explained demands decline), byte identity with fresh builds, foreign
   and damaged bytes, allocation failure through encode, decode and publication,
   and in executed tests unchanged, changed, foreign, truncated and corrupt
   restarts plus export after a restored build. Wasm identical. CT84's write
   report later showed 9 test entries (3 MB of Wasm each) over the default
-  element limit, which counts bytes; the output part now uses the
-  checkpoint's.
+  element limit, which counts bytes; the output part now uses the checkpoint's.
 
 ### CT83: cache the frontend
 
@@ -1703,23 +1792,23 @@ The cache holds only the backend checkpoint.
 - **Overlaps:** Hill 8 and task 020.
 - **Result (19 October 2026):** CT83, "Start a restarted build from the cached
   dependency seed". The writer also persists the session's frozen dependency
-  seed (22.8 MB for the game, keyed by compiler and project settings). The
-  first build of a process that compiles, without explicit `dependencies`,
-  validates and adopts it in place of the empty seed, so unchanged
-  dependencies are admitted as with a `dependencies` bundle and changed ones
-  and their importers are rebuilt through the ordinary fallback; an unchanged
-  restart still restores the output without reading it. Game, 4 runs each at
-  load 1.2–1.3, restart after an edit, CPU against CT84: `literal_constant`
-  2,462 → 2,064 ms, `body_change` 2,469 → 2,064 ms, `type_change` 2,322 →
-  1,919 ms (8–14% under a cold build of the edited tree, 2,230–2,238 ms), but
-  `imported_body` (in `ink/math`, which most modules import) 2,458 → 2,539
-  ms: decoding and validating the seed costs more than the few modules it
-  keeps. First reply and the unchanged restart are unchanged; the writer takes
-  136 ms more. Laws: entry and dependency edits after adoption, a stale seed at
-  the first build, refusal of other compilers, settings and damaged bytes, a
-  second adoption refused, allocation failure through decode and adoption, and
-  in executed tests entry, dependency and damaged-seed restarts. Wasm identical
-  to cold on every scenario.
+  seed (22.8 MB for the game, keyed by compiler and project settings). The first
+  build of a process that compiles, without explicit `dependencies`, validates
+  and adopts it in place of the empty seed, so unchanged dependencies are
+  admitted as with a `dependencies` bundle and changed ones and their importers
+  are rebuilt through the ordinary fallback; an unchanged restart still restores
+  the output without reading it. Game, 4 runs each at load 1.2–1.3, restart
+  after an edit, CPU against CT84: `literal_constant` 2,462 → 2,064 ms,
+  `body_change` 2,469 → 2,064 ms, `type_change` 2,322 → 1,919 ms (8–14% under a
+  cold build of the edited tree, 2,230–2,238 ms), but `imported_body` (in
+  `ink/math`, which most modules import) 2,458 → 2,539 ms: decoding and
+  validating the seed costs more than the few modules it keeps. First reply and
+  the unchanged restart are unchanged; the writer takes 136 ms more. Laws: entry
+  and dependency edits after adoption, a stale seed at the first build, refusal
+  of other compilers, settings and damaged bytes, a second adoption refused,
+  allocation failure through decode and adoption, and in executed tests entry,
+  dependency and damaged-seed restarts. Wasm identical to cold on every
+  scenario.
 
 ### CT84: a compact cache
 
@@ -1731,18 +1820,18 @@ The game's cache file is 57 MB against a 64 MiB limit.
   report cache writes past a limit". The checkpoint was 78% zero bytes:
   `dependency_format` wrote every `usize` as 8 bytes and every enum and slice
   length as 4. Version 5 writes integers wider than a byte, enum values and
-  lengths as LEB128 (signed ones zigzagged; only the shortest encoding
-  decodes), so dependency bundles and checkpoints shrink too. The game's
-  checkpoint is 57.4 → 20.1 MB (the principal, optimizer and semantic archives
-  were 0.3, 18.4 and 38.6 MB), with 3.2 times headroom under the 64 MiB limit,
-  so it is not split per module. Nothing over a limit is silent now: the writer
-  leaves a JSON report in the key's `.lock` file (part sizes, `over_limit`,
+  lengths as LEB128 (signed ones zigzagged; only the shortest encoding decodes),
+  so dependency bundles and checkpoints shrink too. The game's checkpoint is
+  57.4 → 20.1 MB (the principal, optimizer and semantic archives were 0.3, 18.4
+  and 38.6 MB), with 3.2 times headroom under the 64 MiB limit, so it is not
+  split per module. Nothing over a limit is silent now: the writer leaves a JSON
+  report in the key's `.lock` file (part sizes, `over_limit`,
   `semantic_over_limit`), the next open reports it as `restartCacheWrite`, and
-  the CLI reports the same fields. Game, 6 pairs at load 0.8–0.9: the file is
-  on disk 54 ms sooner (2,431 → 2,377 ms from the request); first reply and
-  unchanged restart unchanged; a restart after the `literal_constant` edit,
-  6 runs each, CPU 2,485 → 2,457 ms (within noise), still about 220 ms over a
-  cold build of the edited tree (2,240 ms): the checkpoint's semantic gate and
+  the CLI reports the same fields. Game, 6 pairs at load 0.8–0.9: the file is on
+  disk 54 ms sooner (2,431 → 2,377 ms from the request); first reply and
+  unchanged restart unchanged; a restart after the `literal_constant` edit, 6
+  runs each, CPU 2,485 → 2,457 ms (within noise), still about 220 ms over a cold
+  build of the edited tree (2,240 ms): the checkpoint's semantic gate and
   replays cost more than they save on gdev. Laws: integer round trips at every
   width and sign, overlong and oversized lengths rejected, over-limit parts
   reported with the old file kept (detached and synchronous), and in executed
@@ -1752,13 +1841,13 @@ The game's cache file is 57 MB against a 64 MiB limit.
 
 - **Fix:** write the cache after the reply, or on a worker.
 - **Overlaps:** CT24 and CT72.
-- **Result (19 October 2026):** no separate change. CT24's detached writer
-  takes every server save (first build and close) off the critical path, and
-  CT72 found capture is read by the next build. What remains is the CLI's
-  synchronous save after it writes the Wasm: 6–7 ms on the CLI-buildable
-  corpus programs (`chain_generic` 1500, `fanout` 400, caches of 267 and 289
-  KB). gdev needs native assets, which only the server supports, so a detached
-  CLI writer would save nothing measurable and is not added.
+- **Result (19 October 2026):** no separate change. CT24's detached writer takes
+  every server save (first build and close) off the critical path, and CT72
+  found capture is read by the next build. What remains is the CLI's synchronous
+  save after it writes the Wasm: 6–7 ms on the CLI-buildable corpus programs
+  (`chain_generic` 1500, `fanout` 400, caches of 267 and 289 KB). gdev needs
+  native assets, which only the server supports, so a detached CLI writer would
+  save nothing measurable and is not added.
 
 ## Phase 8: parallelism and test runs
 
@@ -1772,40 +1861,40 @@ One worker adds 27% CPU, and no worker count beats serial wall time.
 - **Result (18 October 2026):** "CT86: Offer each private component once and
   borrow parent tables". With 4 workers the game dispatched 465 component jobs
   in 62 batches and ran 11,772 regions for the serial 5,886. 247 jobs declined
-  (all on a receipt read the package cannot carry), and 21 targets came back
-  up to 41 times each while they stayed ready. Setup was 85% of a job: copying
+  (all on a receipt read the package cannot carry), and 21 targets came back up
+  to 41 times each while they stayed ready. Setup was 85% of a job: copying
   offsets and field locations, a fresh 580 KB slot table past the 512 KiB
   scratch the worker kept, and a seed scan of all 72k bindings. Now a declined
-  component stays serial, private Sessions borrow the parent's immutable
-  tables and allocate trace marks lazily, the seed visits only completed
-  slots, and workers keep 4 MiB of scratch. Dispatch 147 → 19 ms, job time 420
-  → 55 ms, 240 jobs in 15 batches, 6,579 regions. Game, 10 pairs at load 1.6:
-  4 workers 2,499 → 2,368 ms wall and 2,840 → 2,470 ms CPU (20.97 → 19.94 G
-  instructions), against serial 2,403 ms wall and 2,370 ms CPU: −1.5% wall,
-  +4.2% CPU, peak RSS 278 against 274 MiB. Serial builds are
-  instruction-identical. Lowering alone (components off) gives −1.6% wall at
-  +2.3% CPU: the adopted jobs are leaves the parent would have finished
-  cheaply. The default stays serial: over all 56 test entries (one run each)
-  4 workers cost 6% more CPU for no wall gain. Wasm identical on every entry.
+  component stays serial, private Sessions borrow the parent's immutable tables
+  and allocate trace marks lazily, the seed visits only completed slots, and
+  workers keep 4 MiB of scratch. Dispatch 147 → 19 ms, job time 420 → 55 ms, 240
+  jobs in 15 batches, 6,579 regions. Game, 10 pairs at load 1.6: 4 workers 2,499
+  → 2,368 ms wall and 2,840 → 2,470 ms CPU (20.97 → 19.94 G instructions),
+  against serial 2,403 ms wall and 2,370 ms CPU: −1.5% wall, +4.2% CPU, peak RSS
+  278 against 274 MiB. Serial builds are instruction-identical. Lowering alone
+  (components off) gives −1.6% wall at +2.3% CPU: the adopted jobs are leaves
+  the parent would have finished cheaply. The default stays serial: over all 56
+  test entries (one run each) 4 workers cost 6% more CPU for no wall gain. Wasm
+  identical on every entry.
 
 ### CT87: parallel region inference
 
 Hill 9. It needs CT57, CT74 and CT88.
 
-- **Result (18 October 2026):** deferred; larger than one hill. Inference is
-  861 ms of a cold game build over 5,886 regions. The slowest region, the
-  principal region at `game.blot:9829` (5,137 scopes), takes 249 ms and the
-  next 31 ms, so four workers could save at most about 600 ms. Regions run
-  depth-first inside `Generator.function` and write session-wide state: the
-  evidence store, call-summary jobs and constant slots. The only private path
-  today, CT86's component jobs, shows the costs: a private Session starts
-  without the parent's completed summaries and re-infers every callee (before
-  CT86, 4 workers ran 11,772 regions for 5,886), and its adopted jobs are
-  leaves that save no measurable parent time. Design: (1) CT88 to know a
-  wavefront of instance keys before inferring them; (2) private Sessions that
-  look up completed summaries in the parent, which is immutable during a batch,
-  by structural lookup of private evidence in the parent store; (3) import of
-  results in key order before emission.
+- **Result (18 October 2026):** deferred; larger than one hill. Inference is 861
+  ms of a cold game build over 5,886 regions. The slowest region, the principal
+  region at `game.blot:9829` (5,137 scopes), takes 249 ms and the next 31 ms, so
+  four workers could save at most about 600 ms. Regions run depth-first inside
+  `Generator.function` and write session-wide state: the evidence store,
+  call-summary jobs and constant slots. The only private path today, CT86's
+  component jobs, shows the costs: a private Session starts without the parent's
+  completed summaries and re-infers every callee (before CT86, 4 workers ran
+  11,772 regions for 5,886), and its adopted jobs are leaves that save no
+  measurable parent time. Design: (1) CT88 to know a wavefront of instance keys
+  before inferring them; (2) private Sessions that look up completed summaries
+  in the parent, which is immutable during a batch, by structural lookup of
+  private evidence in the parent store; (3) import of results in key order
+  before emission.
 
 ### CT88: split resolution from emission
 
@@ -1817,13 +1906,13 @@ Hill 9. It needs CT57, CT74 and CT88.
 - **Result (18 October 2026):** deferred. Of 1,064 ms of profiled game
   generation, inference is 861 ms, constants 125 ms, layouts 17 ms, evaluation
   20 ms and specialization 14 ms; emission and the rest are about 25 ms. The
-  split alone would parallelize only those 25 ms; its value is enabling CT87.
-  A callee's key exists only once its caller's region is solved, so
-  resolution is a top-down wavefront, and each resolution writes the evidence
-  store, the summary jobs and constant slots. Function IDs follow depth-first
-  order, so byte identity needs emission to keep that order. Design: resolve
-  each wavefront's keys (on CT87's private Sessions), publish in key order,
-  then emit depth-first exactly as today.
+  split alone would parallelize only those 25 ms; its value is enabling CT87. A
+  callee's key exists only once its caller's region is solved, so resolution is
+  a top-down wavefront, and each resolution writes the evidence store, the
+  summary jobs and constant slots. Function IDs follow depth-first order, so
+  byte identity needs emission to keep that order. Design: resolve each
+  wavefront's keys (on CT87's private Sessions), publish in key order, then emit
+  depth-first exactly as today.
 
 ### CT89: parallel lifetime planning and codegen
 
@@ -1834,19 +1923,19 @@ The `rcPlan` loop is serial (`backend/wasm.zig:1063-1083`), and
 - **Result (18 October 2026):** "CT89: Plan reference counts in the codegen
   worker jobs" and "CT89: Default serve-project codegen workers to four". A
   serial game assembly is 201 ms: 13 ms of lifetime summaries, 142 ms of
-  optimization, 12 ms of `rcPlan` and 25 ms of sharing and encoding. Each
-  worker job now also plans reference counts over its final body, optimized or
-  reused, and assembly reads the verdicts in function order, so rejections name
-  the serial first unproven function (a law compares 1, 2 and 4 workers).
-  Serve-project sessions now default to 4 codegen workers; the CLI and
-  `Policy` stay serial, which keeps compile budgets and the unshared CLI meter.
-  Against 1 worker (5 pairs, load 1.7): game wall 2,424 → 2,330 ms (−3.9%),
-  CPU 2,390 → 2,420 ms, assembly 201 → 91 ms; literal edit 1,111 → 1,009 ms
-  (−9.2%); body edit 1,641 → 1,568 ms; imported-body edit 2,354 → 2,262 ms
-  and its revert 1,350 → 1,248 ms; CPU at most +1.3%, peak RSS unchanged
-  (274 MiB). The rc part alone takes 7–9 ms off every assembly at 4 workers.
-  All 56 test entries (one run each): wall 101.1 → 96.8 s, CPU 99.7 → 100.5
-  s. Wasm identical on the game, devtools and every test entry.
+  optimization, 12 ms of `rcPlan` and 25 ms of sharing and encoding. Each worker
+  job now also plans reference counts over its final body, optimized or reused,
+  and assembly reads the verdicts in function order, so rejections name the
+  serial first unproven function (a law compares 1, 2 and 4 workers).
+  Serve-project sessions now default to 4 codegen workers; the CLI and `Policy`
+  stay serial, which keeps compile budgets and the unshared CLI meter. Against 1
+  worker (5 pairs, load 1.7): game wall 2,424 → 2,330 ms (−3.9%), CPU 2,390 →
+  2,420 ms, assembly 201 → 91 ms; literal edit 1,111 → 1,009 ms (−9.2%); body
+  edit 1,641 → 1,568 ms; imported-body edit 2,354 → 2,262 ms and its revert
+  1,350 → 1,248 ms; CPU at most +1.3%, peak RSS unchanged (274 MiB). The rc part
+  alone takes 7–9 ms off every assembly at 4 workers. All 56 test entries (one
+  run each): wall 101.1 → 96.8 s, CPU 99.7 → 100.5 s. Wasm identical on the
+  game, devtools and every test entry.
 
 ### CT90: share the checked game across test entries
 
@@ -1873,12 +1962,12 @@ overlaid.
   the test modules' own checks (robot_pickup's alone is 2.1 s).
   `bench:compile --shared-session` (56 entries, one run): 86.5 → 65.0 s, fresh
   builds unchanged. Wasm and diagnostics identical to fresh builds on every
-  entry. The target needs the 45 s of backend shared too, and every backend
-  gate declines across entries: the principal gate wants byte-equal
-  dictionaries (each test adds spellings) and index-aligned modules, and
-  `selectionStable` wants equal module lists and entry catalogs, so no test
-  reuses an instance (`reused_named` 0). Sharing it needs CT10's relocation of
-  retained artifacts through unit and symbol maps; deferred.
+  entry. The target needs the 45 s of backend shared too, and every backend gate
+  declines across entries: the principal gate wants byte-equal dictionaries
+  (each test adds spellings) and index-aligned modules, and `selectionStable`
+  wants equal module lists and entry catalogs, so no test reuses an instance
+  (`reused_named` 0). Sharing it needs CT10's relocation of retained artifacts
+  through unit and symbol maps; deferred.
 
 ### CT91: parallel test entries
 
@@ -1887,16 +1976,16 @@ overlaid.
 - **Result (19 October 2026):** dropped. pen already runs test modules on
   `--jobs` workers (cores/2, at most 8), each with its own session, and CT90
   applies to each. pen's 68 modules after CT90, one run each at load 0.8–3.7
-  (before CT90 in brackets): 1 worker 72.9 s CPU, 67.5 s wall, 0.74 GB [96.1
-  s, 91.0 s]; 2 workers 76.0 s, 35.3 s, 1.3 GB [102.3 s, 49.2 s]; 4 workers
-  79.8 s, 20.5 s, 2.3 GB [107.6 s, 26.6 s]; 8 workers 94.0 s, 13.6 s, 4.3 GB
-  summed peak RSS [120.0 s, 17.1 s]. At 8 workers the sessions check 1,149
-  modules where one checks 211, but most of the 21 s of extra CPU is
-  contention (it is 24 s without CT90): sharing one library would save about
-  3–6 s of CPU and under 1 s of wall time. That needs concurrent sessions in one
-  process over refcounted module payloads, which are not thread-safe, and a
-  batch request in pen's protocol; memory would barely change, since each
-  test's backend peak dominates.
+  (before CT90 in brackets): 1 worker 72.9 s CPU, 67.5 s wall, 0.74 GB [96.1 s,
+  91.0 s]; 2 workers 76.0 s, 35.3 s, 1.3 GB [102.3 s, 49.2 s]; 4 workers 79.8 s,
+  20.5 s, 2.3 GB [107.6 s, 26.6 s]; 8 workers 94.0 s, 13.6 s, 4.3 GB summed peak
+  RSS [120.0 s, 17.1 s]. At 8 workers the sessions check 1,149 modules where one
+  checks 211, but most of the 21 s of extra CPU is contention (it is 24 s
+  without CT90): sharing one library would save about 3–6 s of CPU and under 1 s
+  of wall time. That needs concurrent sessions in one process over refcounted
+  module payloads, which are not thread-safe, and a batch request in pen's
+  protocol; memory would barely change, since each test's backend peak
+  dominates.
 
 ## Phase 9: guards and docs
 
@@ -1907,7 +1996,8 @@ overlaid.
 - **Result (19 October 2026):** direct lower bounds on named reuse and upper
   bounds on body elaboration/lowering cover every edit/revert, alongside the
   existing revalidation and entry-switch budgets. Missing or invalid counters
-  fail. All 11 budget cases pass; see [compile guards](zig-native/COMPILE_GUARDS.md).
+  fail. All 11 budget cases pass; see
+  [compile guards](zig-native/COMPILE_GUARDS.md).
 
 ### CT93: a timing guard
 

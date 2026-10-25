@@ -628,6 +628,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
                 opened = try OpenProject.init(session_allocator, io, request, compiler, frame.payload(), cache_root);
                 opened.?.allocation_counter = allocation_counter;
                 opened.?.session.policy.semantic_workers = policy.semantic_workers;
+                opened.?.session.policy.frontend_workers = policy.frontend_workers;
                 opened.?.session.policy.semantic_components = policy.semantic_components;
                 try reply(a, writer, .{ .kind = "open", .id = request.id, .epoch = epoch, .revision = 0 }, &.{});
             },

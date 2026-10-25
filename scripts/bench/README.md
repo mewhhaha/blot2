@@ -121,3 +121,27 @@ times. `costSummary` keeps `backend_work_thread_cpu_ms` separate from wall
 clocks. Nested region times overlap; do not sum them. Profiling may add
 significant clock overhead, so throughput decisions require unprofiled
 alternating pairs.
+
+For frontend investigations, use `stats.phaseProfile.phases` for exclusive
+clocks and `stats.phaseProfile.checking` for work aggregated across completed
+module checks. The latter includes candidate scans, scheme imports and frontend
+normalization; `stats.frontend` alone describes the entry module. Sum every
+phase except `backend` for the whole frontend. Keep this instrumented total
+separate from unprofiled process CPU and end-to-end latency. See the
+[frontend architecture review](../../COMPILER_FRONTEND_REVIEW.md) for the CT114
+findings and remaining representation changes.
+
+## Idiomatic Blot/Rust programs
+
+`deno task bench:idiomatic` measures eighteen public source pairs with fresh
+optimized compiler processes and same-engine Wasm execution. Every output is
+checked against independent witnesses. Commands, compiler/source hashes,
+wall/CPU/RSS, runtime distributions and Wasm sizes remain in the report. See
+[workloads and methodology](../../benchmarks/idiomatic/README.md); this is a
+small-program comparison, not a whole-application build-system comparison.
+
+For module-check policy measurements, `bench:compile --frontend-workers N` pins
+both compilers; `--candidate-frontend-workers N` changes only the candidate.
+Leave the baseline option omitted when comparing against an older compiler that
+does not recognize the new flag. These options are separate from evaluator
+semantic workers and optimizer workers.

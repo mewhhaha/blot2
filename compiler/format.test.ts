@@ -227,12 +227,14 @@ type Add a is contract = {
 }
 const contract=fn contract=>contract
 const twice:a->a where {Add a}=fn value=>value+value
+const convert:a->b ! {|e} where {result "from" a b ! {|e}}=fn value=>@type.result "from" value
 const unfinished=fn (action:Action U32)=>@hole
 `;
   const formatted = await formatSource(source);
   equal(await formatSource(formatted), formatted);
   equal(formatted.includes("type Add a is contract"), true);
   equal(formatted.includes("contracts.Read a"), true);
+  equal(formatted.includes('result "from" a b'), true);
   equal(formatted.includes("@hole"), true);
 });
 

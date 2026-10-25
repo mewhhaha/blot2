@@ -113,7 +113,11 @@ fn rootFingerprint(root: Root) u64 {
     return state.final();
 }
 pub const Reason = enum { mode, root, source, shape, seed, scalar, call, plain, import };
+pub const RecordDecline = enum { owner, source, generative, incomplete, capacity };
 pub const Stats = struct {
+    record_declines: [@typeInfo(RecordDecline).@"enum".field_names.len]usize = @splat(0),
+    call_became_present: usize = 0,
+    call_missing: usize = 0,
     requests: usize = 0,
     recorded: usize = 0,
     complete: usize = 0,
@@ -274,10 +278,19 @@ test "local refinement memo preserves dynamic facts identity ownership and faile
 }
 pub fn record(g: anytype, root: Root, expected: u32, seeds: []const evidence.Mapping, rows: []const evidence.RowMapping, result: eval.SolvedEvidence, tape: *receipt.Tape, observed: Observation, before_values: usize, before_children: usize, before_steps: usize) Allocator.Error!void {
     const a = g.allocator;
-    const owner = g.refinement_owner orelse return;
+    const owner = g.refinement_owner orelse {
+        g.refinement_stats.record_declines[@backingInt(RecordDecline.owner)] += 1;
+        return;
+    };
     defer storageStats(g, &owner.refinement_queries);
-    if (!queryOwners(g.evaluator.units, root, tape.sources.items)) return;
-    if (g.evaluator.has_generative_sources and try generativeQuery(a, g.evaluator.units, root, tape.sources.items)) return;
+    if (!queryOwners(g.evaluator.units, root, tape.sources.items)) {
+        g.refinement_stats.record_declines[@backingInt(RecordDecline.source)] += 1;
+        return;
+    }
+    if (g.evaluator.has_generative_sources and try generativeQuery(a, g.evaluator.units, root, tape.sources.items)) {
+        g.refinement_stats.record_declines[@backingInt(RecordDecline.generative)] += 1;
+        return;
+    }
     if (root == .body) try tape.sources.append(a, root.body);
     var facts = try tape.finish(a, .{
         .input = 0,
@@ -313,9 +326,15 @@ pub fn record(g: anytype, root: Root, expected: u32, seeds: []const evidence.Map
     builder.read(facts);
     owns_facts = false;
     builder.stage(try copyResult(a, result));
-    var candidate = builder.complete() orelse return;
+    var candidate = builder.complete() orelse {
+        g.refinement_stats.record_declines[@backingInt(RecordDecline.incomplete)] += 1;
+        return;
+    };
     defer candidate.abort();
-    const prepared = try owner.refinement_queries.prepare(a, &candidate) orelse return;
+    const prepared = try owner.refinement_queries.prepare(a, &candidate) orelse {
+        g.refinement_stats.record_declines[@backingInt(RecordDecline.capacity)] += 1;
+        return;
+    };
     _ = owner.refinement_queries.publish(prepared, &candidate);
     g.refinement_stats.recorded += 1;
     g.refinement_stats.complete += 1;
@@ -513,7 +532,9 @@ pub fn lookup(g: anytype, root: Root, shape: expectation.View, expected: u32, se
                 valid = false;
                 break;
             };
-            if (g.evaluator.specializations.validated_calls.contains(.{ .target = .{ .unit = read.unit - 1, .binding = read.binding }, .evidence = actual }) != read.present) {
+            const present = g.evaluator.specializations.validated_calls.contains(.{ .target = .{ .unit = read.unit - 1, .binding = read.binding }, .evidence = actual });
+            if (present != read.present) {
+                if (present) g.refinement_stats.call_became_present += 1 else g.refinement_stats.call_missing += 1;
                 valid = false;
                 break;
             }

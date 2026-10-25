@@ -115,6 +115,8 @@ pub const Project = struct {
     /// How this project's fresh units are lowered. An execution choice only:
     /// Core, diagnostics and every cache key are the same for any value.
     lowering: Lowering = .{},
+    /// Independent frontend module jobs; retained edits keep serial cutoffs.
+    checking: Lowering = .{},
 
     pub const Lowering = struct { io: ?Io = null, workers: u8 = 1 };
 
@@ -276,8 +278,7 @@ const Loader = struct {
             const timing = phase_profile.enter(.parse);
             defer timing.exit();
             break :parsed try parser.parseWithFixities(self.allocator, source, tokens.tokens.items, &self.project.symbols, self.inherited_fixities.items);
-        } else
-            try ast.Tree.init(self.allocator);
+        } else try ast.Tree.init(self.allocator);
         defer if (!transferred) tree.deinit(self.allocator);
         const id: UnitId = reserved orelse @intCast(self.project.units.items.len + 1);
         const unit_: Unit = .{ .filename = filename_, .source = source, .tree = tree, .implicit_prelude = self.prelude_ready };

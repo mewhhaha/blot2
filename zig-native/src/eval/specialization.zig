@@ -200,6 +200,8 @@ pub const Service = struct {
         return self.refineMappingsCaptures(unit_id, root, expected, mappings, rows, span, &.{});
     }
     pub fn refineMappingsCaptures(self: *Service, unit_id: u32, root: EvidenceRoot, expected: layout.Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), span: core.Span, captures: []const core_eval.RetainedCapture) Error!void {
+        const inference_stage = self.evaluator.enterInferenceStage(.specialization);
+        defer inference_stage.deinit();
         var shapes: std.ArrayList(Mapping) = .empty;
         defer shapes.deinit(self.allocator);
         var partial: PhysicalProjection = .{ .allocator = self.allocator, .layouts = self.layouts, .mappings = &shapes };
@@ -236,8 +238,17 @@ pub const Service = struct {
         var has_instances = false;
         for (mappings.items) |entry| has_instances = has_instances or entry.instance.decl != 0;
         const enabled = !has_instances and self.cache != null and captures.len == 0 and self.code_projection == null and self.evaluator.receipt_tape == null;
+        const profiling = if (self.timing) |work| work.clock.io != null else false;
+        const before_reasons = if (profiling) self.refinement_stats.reasons else @as(@TypeOf(self.refinement_stats.reasons), @splat(0));
         const cached = if (enabled) try self.cache.?.lookup(self.cache.?.context, root, bridge.partialView(), result, seeds.items, row_seeds.items) else null;
+        var rejected_candidates: u16 = 0;
+        if (profiling) for (before_reasons, self.refinement_stats.reasons, 0..) |before, after, index| if (after != before) {
+            rejected_candidates |= @as(u16, 1) << @intCast(index);
+        };
         var solved = cached orelse fresh: {
+            const before_nodes = self.evaluator.counters.inference_specialization_nodes;
+            const before_recorded = self.refinement_stats.recorded;
+            const before_record_declines = self.refinement_stats.record_declines;
             self.refinement_regions.* += 1;
             var tape: @import("../reuse/specialization_receipt.zig").Tape = .{};
             defer tape.deinit(self.allocator);
@@ -266,7 +277,40 @@ pub const Service = struct {
             errdefer output.deinit(self.allocator);
             // Physical holes carry no semantic proof. Queries needing their
             // projected shapes rebuild instead of publishing an incomplete receipt.
+            const publication: u16 = if (!enabled or !profiling) 0 else @as(u16, @intFromBool(shapes.items.len != 0)) |
+                (@as(u16, @intFromBool(tape.unknown)) << 1) |
+                (@as(u16, @intFromBool(tape.nested)) << 2) |
+                (@as(u16, @intFromBool(!observation.complete)) << 3) |
+                (@as(u16, @intFromBool(observation.regions != 1)) << 4) |
+                (@as(u16, @intFromBool(output.selected.len != 0)) << 5) |
+                (@as(u16, @intFromBool(self.evaluator.storage.values.items.len != before_values)) << 6) |
+                (@as(u16, @intFromBool(self.evaluator.storage.children.items.len != before_children)) << 7) |
+                (@as(u16, @intFromBool(self.evaluator.steps != before_steps)) << 8) |
+                (@as(u16, @intFromBool(tape.views.items.len != 0)) << 9);
             if (enabled and shapes.items.len == 0) try self.cache.?.record(self.cache.?.context, .{ .root = root, .expected = result, .seeds = seeds.items, .rows = row_seeds.items, .result = output, .tape = &tape, .observed = observation, .before_values = before_values, .before_children = before_children, .before_steps = before_steps });
+            if (self.timing) |work| if (work.clock.io != null) {
+                var record_rejections: u8 = 0;
+                for (before_record_declines, self.refinement_stats.record_declines, 0..) |before, after, index| if (after != before) {
+                    record_rejections |= @as(u8, 1) << @intCast(index);
+                };
+                const admission: u8 = @as(u8, @intFromBool(self.cache == null)) |
+                    (@as(u8, @intFromBool(has_instances)) << 1) |
+                    (@as(u8, @intFromBool(captures.len != 0)) << 2) |
+                    (@as(u8, @intFromBool(self.code_projection != null)) << 3) |
+                    (@as(u8, @intFromBool(old_tape != null)) << 4);
+                work.refinements.add(.{
+                    .cost = .{ .admission = admission, .publication = publication | (if (!enabled) @as(u16, 0) else if (self.refinement_stats.recorded != before_recorded) @as(u16, 2048) else @as(u16, 1024)), .rejected_candidates = rejected_candidates, .record_rejections = record_rejections, .requests = 1, .nodes = self.evaluator.counters.inference_specialization_nodes - before_nodes },
+                    .unit = unit_id,
+                    .source = switch (root) {
+                        .body => |body| body.binding,
+                        .closure => |closure_| closure_.catalog,
+                    },
+                    .closure = root == .closure,
+                    .expected = result,
+                    .seeds = seeds.items.len,
+                    .rows = row_seeds.items.len,
+                });
+            };
             break :fresh output;
         };
         defer solved.deinit(self.allocator);

@@ -1,10 +1,32 @@
 # Semantic worker policy
 
+`frontendWorkers` is a separate module-check policy introduced in CT116. It
+defaults to four workers for eligible fresh dependency batches; retained checks
+keep their existing cutoff path. It does not enable private evaluator semantic
+components or change the serial semantic default described below. See
+[the project API](PROJECT_CLIENT.md) and
+[CT116 work record](../COMPILER_CT116_WORK.md).
+
 Task 013 is qualified at source milestone `4c61f25`. The default continues to
 use serial inference; explicit `semanticWorkers` or `--semantic-workers` selects
 the private path, including explicit one-worker mode. This record keeps
 performance policy separate from the
 [semantic ownership rules](SEMANTIC_JOBS.md).
+
+CT113 also reports `selectedQueries.independent_regions`, `independent_nodes`
+and `independent_rejections` for private call-proof checks. These are separate
+from the coordinating evaluator's inference counters. Slots own the counts;
+`Batch.take` merges and clears them after join. Workers never mutate the shared
+evaluator's counters or clocks. See
+[the census contract](REFINEMENT_QUERIES.md#request-census-ct113).
+
+The
+[25 October architecture review](../COMPILER_ARCHITECTURE_REVIEW.md#development-tier-and-semantic-worker-screen)
+adds a CT110 screen with separate omitted-default and explicit-component
+controls. Four-worker body profiles retain the three principal misses; 9,718
+scheduling attempts are recording-gated and 4,405 have no worker IO context. The
+timing screen has substantial host noise and does not qualify a policy change.
+Reusable semantic boundaries remain the next architectural target.
 
 ## CT106 policy screen, 24 October 2026
 
@@ -14,9 +36,9 @@ and independent fresh-control outputs match the strict Wasm pins. These are
 shared-host screening runs, not seven-pair optimization qualifications.
 
 | Candidate policy | Fresh game CPU | First literal CPU | Literal revert CPU | Body edit CPU | Fresh devtools CPU |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| 2 workers | -0.5% | +1.4% | +2.9% | +2.4% | +3.7% |
-| 4 workers | +2.6% | +2.0% | +2.7% | +0.7% | +5.4% |
+| ---------------- | -------------: | ----------------: | -----------------: | ------------: | -----------------: |
+| 2 workers        |          -0.5% |             +1.4% |              +2.9% |         +2.4% |              +3.7% |
+| 4 workers        |          +2.6% |             +2.0% |              +2.7% |         +0.7% |              +5.4% |
 
 Percentages are medians of within-pair process-CPU ratios. Neither policy
 establishes an ordinary-edit improvement. Four workers also exceed the 5%

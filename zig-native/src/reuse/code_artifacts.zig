@@ -345,15 +345,17 @@ pub const Context = struct {
     pools: ?Pools = null,
     demand_summaries: @import("../backend/demand_summary.zig").Table = .{},
     principal_queries: @import("principal_query.zig").Table = .{},
+    principal_graphs: core_eval.RetainedPrincipalGraphs = .{},
     specialization_queries: @import("../eval/selected_query.zig").Table = .{},
     independent_calls: std.ArrayList(@import("independent_call_proof.zig").Record) = .empty,
-    refinement_queries: @import("refinement_receipt.zig").Table = .{},
+    refinement_queries: @import("refinement_receipt.zig").Table = .{ .limits = .{ .records = 8192, .retained_capacity = 8 * 1024 * 1024 } },
     pub fn init(allocator: Allocator) Context {
         return .{ .allocator = allocator };
     }
     pub fn deinit(self: *Context) void {
         self.demand_summaries.deinit(self.allocator);
         self.principal_queries.deinit(self.allocator);
+        self.principal_graphs.deinit(self.allocator);
         self.specialization_queries.deinit(self.allocator);
         self.refinement_queries.deinit(self.allocator);
         for (self.independent_calls.items) |*record| record.deinit(self.allocator);

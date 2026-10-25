@@ -13,6 +13,9 @@ const Allocator = std.mem.Allocator;
 pub const Reason = enum { mode, source, domain, expected, input, scalar, call, view, plain, resource, imported };
 pub const Stats = struct {
     independent_rechecked: usize = 0,
+    independent_rejections: [@typeInfo(independent.DeclineReason).@"enum".field_names.len]usize = @splat(0),
+    independent_regions: u64 = 0,
+    independent_nodes: u64 = 0,
     independent_reused: usize = 0,
     independent_declined: usize = 0,
     parallel_batches: usize = 0,
@@ -24,6 +27,7 @@ pub const Stats = struct {
     member_payload_bytes: usize = 0,
     member_reused: usize = 0,
     complete_records: usize = 0,
+    completed_closures: usize = 0,
     lookups: usize = 0,
     candidates: usize = 0,
     reused: usize = 0,
@@ -123,6 +127,14 @@ pub const State = struct {
             for (member.ready) |read| try roots.append(self.allocator, read.value);
         }
         for (record.views) |view| try roots.appendSlice(self.allocator, &.{ view.value, view.selected });
+        for (record.completed_closures) |value| {
+            const snapshot = &self.old.metadata.pools.?.evaluator;
+            if (value == 0 or value >= snapshot.values.len or snapshot.values[value].kind != .closure or snapshot.value_evidence[value] == 0) {
+                cached.checked = true;
+                return null;
+            }
+            try roots.append(self.allocator, value);
+        }
         const inspection = try graph.Plan.inspectRootsWithRows(self.allocator, &self.old.metadata.pools.?, &self.gate, roots.items, .source_declared);
         self.stats.plan_inspections += 1;
         cached.plan = inspection.plan;
@@ -447,6 +459,12 @@ pub const State = struct {
             }
             if (timing) |scope| scope.change(.query_publish);
             // Prepare all semantic keys and map capacity before graph publication.
+            const completed_evidence = try self.allocator.alloc(u32, record.completed_closures.len);
+            defer self.allocator.free(completed_evidence);
+            for (record.completed_closures, completed_evidence) |value, *actual| actual.* = (try evidence(g, maps, pools.evaluator.value_evidence[value])) orelse {
+                valid = false;
+                break;
+            };
             const view_evidence = try self.allocator.alloc(u32, record.views.len);
             defer self.allocator.free(view_evidence);
             for (record.views, view_evidence) |view, *actual| actual.* = (try evidence(g, maps, view.evidence)) orelse {
@@ -468,7 +486,7 @@ pub const State = struct {
             const collect_proofs = self.semantic_workers > 1;
             if (collect_proofs) try self.independent_calls.ensureUnusedCapacity(self.allocator, proofs.items.len);
             try g.evaluator.specializations.plain_nominals.ensureUnusedCapacity(self.allocator, @intCast(plain.count()));
-            try g.evaluator.storage.specialized_closures.ensureUnusedCapacity(self.allocator, 1);
+            try g.evaluator.storage.specialized_closures.ensureUnusedCapacity(self.allocator, @intCast(record.completed_closures.len + @as(usize, if (record.member == null) 2 else 0)));
             var next = try record.clone(self.allocator);
             var next_owned = true;
             defer if (next_owned) next.deinit(self.allocator);
@@ -521,11 +539,25 @@ pub const State = struct {
                     current_member.function = mapped[member.function];
                     for (current_member.ready) |*read| read.value = mapped[read.value];
                 }
-            } else g.evaluator.storage.specialized_closures.putAssumeCapacity(.{ .value = input, .evidence = expected }, mapped[record.selected]);
+            } else {
+                const selected = mapped[record.selected];
+                g.evaluator.storage.specialized_closures.putAssumeCapacity(.{ .value = input, .evidence = expected }, selected);
+                // A fully validated completed query proves its returned closure
+                // at this exact expected interface too. Preserve that result's
+                // completion across owners, as fresh specialization does. A
+                // typed view or imported value alone never grants this proof.
+                g.evaluator.storage.specialized_closures.putAssumeCapacity(.{ .value = selected, .evidence = expected }, selected);
+                self.stats.completed_closures += 1;
+            }
+            for (record.completed_closures, completed_evidence) |value, actual| {
+                g.evaluator.storage.specialized_closures.putAssumeCapacity(.{ .value = mapped[value], .evidence = actual }, mapped[value]);
+                self.stats.completed_closures += 1;
+            }
             if (g.evaluator.retain_specialization_receipts) {
                 next.input = input;
                 next.expected = expected;
                 next.selected = mapped[record.selected];
+                for (next.completed_closures) |*value| value.* = mapped[value.*];
                 next.values_before = before;
                 next.children_before = before_children;
                 for (next.views, view_evidence) |*view, actual| {

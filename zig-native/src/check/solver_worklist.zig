@@ -58,6 +58,14 @@ pub const Queue = struct {
     pub fn requeue(self: *Queue, index: usize) void {
         self.enqueue(index);
     }
+    /// Inspect one owner's dirty bit without consuming a different item.
+    pub fn takeIndex(self: *Queue, index: usize) bool {
+        const mask = @as(u64, 1) << @intCast(index % 64);
+        const word = &self.ready.items[index / 64];
+        const dirty = word.* & mask != 0;
+        word.* &= ~mask;
+        return dirty;
+    }
     /// Drops entries at and after `len`, with their watches, when the owner's
     /// list shrinks. Later additions start fresh and ready.
     pub fn truncate(self: *Queue, len: usize) void {
@@ -301,6 +309,29 @@ const Frontier = struct {
                     local = .{ node.a, node.c, 0 };
                     if (node.b == 0) break :blk local[0..2];
                     break :blk local[0..1];
+                },
+                .forall, .existential => blk: {
+                    if (len == stack.len) {
+                        self.overflow = true;
+                        return;
+                    }
+                    stack[len] = node.a;
+                    len += 1;
+                    const resolved = try store.resolve(root, 0);
+                    for (store.quantifierGoals(resolved)) |goal| {
+                        inline for (.{ "ty", "other", "result", "signature" }) |field| {
+                            const child = @field(goal, field);
+                            if (child != 0) {
+                                if (len == stack.len) {
+                                    self.overflow = true;
+                                    return;
+                                }
+                                stack[len] = child;
+                                len += 1;
+                            }
+                        }
+                    }
+                    break :blk &.{};
                 },
                 .array, .list, .cursor, .resolver, .demand, .provider => blk: {
                     local[0] = node.a;

@@ -705,7 +705,7 @@ test "package Foreign row closure belongs to exact body certificates" {
     try proof.validate(6, 7);
     proof.left_rows = .{};
     try std.testing.expectError(error.InvalidArtifact, proof.validate(6, 7));
-    context.closed_rows[1] = true;
+    try context.closed_rows.set(1);
     try context.visit(6);
     try proof.validate(6, 7);
     labels[0] = 0;
@@ -1448,6 +1448,9 @@ fn ordinaryPredicateSchemeScenario(allocator: std.mem.Allocator) !void {
         \\const identity: Identity = fn value => value
         \\type Point is data = #Point { x: U32 }
         \\const Point.add = fn (left: Point) => fn (right: U32) => @u32.add left.x right
+        \\const Point.from = fn (value: U32) => #Point {x: value}
+        \\const convert: a -> b where { result "from" a b } = fn value => @type.result "from" value
+        \\const converted: Point = convert 20
         \\const combine = fn left => fn right => @type.call "add" left right
         \\const represented: a -> a where { type_rep a } = fn value => value
         \\const field = fn value => value.x
@@ -2151,26 +2154,26 @@ test "exact Foreign inference views publish only complete endpoints and preserve
     var proof: contracts.Principal = .{ .left = &graph, .right = &graph, .remaining = &remaining, .views = &scopes, .foreign_views = true };
     try std.testing.expectError(error.InvalidArtifact, scopes.visit(7));
     try std.testing.expectError(error.InvalidArtifact, proof.validate(9, 11));
-    try std.testing.expect(!scopes.closed_rows[2]);
+    try std.testing.expect(!scopes.closed_rows.contains(2));
     try std.testing.expectError(error.InvalidArtifact, scopes.visit(7));
     try proof.validate(9, 10);
-    try std.testing.expect(scopes.closed_rows[2]);
+    try std.testing.expect(scopes.closed_rows.contains(2));
     try scopes.visit(10);
 
     // Covariant supersets remain legal only under their existing lexical owner.
     try proof.validate(6, 12);
-    try std.testing.expect(!scopes.closed_rows[3]);
+    try std.testing.expect(!scopes.closed_rows.contains(3));
     try std.testing.expectError(error.InvalidArtifact, scopes.visit(12));
     try scopes.pushGeneric(.{ .root = 12, .row_variables = .{ .start = 8, .len = 1 } });
     try proof.validate(6, 12);
     try scopes.visit(12);
-    try std.testing.expect(!scopes.closed_rows[3]);
+    try std.testing.expect(!scopes.closed_rows.contains(3));
     scopes.popGeneric();
     try proof.validate(6, 13);
-    try std.testing.expect(!scopes.closed_rows[4]);
+    try std.testing.expect(!scopes.closed_rows.contains(4));
     try std.testing.expectError(error.InvalidArtifact, scopes.visit(13));
     try std.testing.expectError(error.InvalidArtifact, proof.validate(6, 14));
-    try std.testing.expect(!scopes.closed_rows[5]);
+    try std.testing.expect(!scopes.closed_rows.contains(5));
     try std.testing.expectError(error.InvalidArtifact, proof.validate(15, 7));
     try std.testing.expectError(error.InvalidArtifact, proof.validate(6, 16));
 
@@ -2178,29 +2181,29 @@ test "exact Foreign inference views publish only complete endpoints and preserve
     try scopes.enter(18);
     try proof.validate(6, 19);
     try scopes.visit(19);
-    try std.testing.expect(!scopes.closed_rows[7]);
+    try std.testing.expect(!scopes.closed_rows.contains(7));
     scopes.leave();
     try scopes.enter(21);
     try std.testing.expectError(error.InvalidArtifact, scopes.visit(19));
     try std.testing.expectError(error.InvalidArtifact, proof.validate(19, 22));
     scopes.leave();
-    try std.testing.expect(!scopes.closed_rows[7] and !scopes.closed_rows[8]);
+    try std.testing.expect(!scopes.closed_rows.contains(7) and !scopes.closed_rows.contains(8));
 
-    scopes.closed_rows[2] = false;
+    scopes.closed_rows.unset(2);
     try scopes.pushGeneric(.{ .root = 7, .row_variables = .{ .start = 9, .len = 1 } });
     try proof.validate(6, 7);
     try scopes.visit(7);
-    try std.testing.expect(!scopes.closed_rows[2]);
+    try std.testing.expect(!scopes.closed_rows.contains(2));
     scopes.popGeneric();
     try std.testing.expectError(error.InvalidArtifact, scopes.visit(7));
     rows[2].tail = .{ .variable = 5 };
     try std.testing.expectError(error.InvalidArtifact, proof.validate(6, 7));
-    try std.testing.expect(!scopes.closed_rows[2]);
+    try std.testing.expect(!scopes.closed_rows.contains(2));
     rows[2].tail = .{ .variable = 0 };
     remaining = 1;
     try std.testing.expectError(error.InvalidArtifact, proof.validate(6, 7));
     try std.testing.expectEqual(0, remaining);
-    try std.testing.expect(!scopes.closed_rows[2]);
+    try std.testing.expect(!scopes.closed_rows.contains(2));
 }
 
 const named_ordinary_owner_source =

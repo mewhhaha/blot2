@@ -59,9 +59,63 @@ pub const ThreadCpu = struct {
         try stream.endObject();
     }
 };
+/// Whole fresh refinement requests, grouped by exact diagnostic flag sets.
+/// Flags are observational only; they never admit a semantic query.
+pub const RefinementCost = struct {
+    admission: u8 = 0,
+    publication: u16 = 0,
+    rejected_candidates: u16 = 0,
+    record_rejections: u8 = 0,
+    requests: u64 = 0,
+    nodes: u64 = 0,
+};
+pub const RefinementRequest = struct {
+    cost: RefinementCost = .{},
+    unit: u32 = 0,
+    source: u32 = 0,
+    closure: bool = false,
+    expected: u32 = 0,
+    seeds: usize = 0,
+    rows: usize = 0,
+};
+pub const RefinementCensus = struct {
+    groups: [32]RefinementCost = @splat(.{}),
+    overflow: RefinementCost = .{},
+    heaviest: [8]RefinementRequest = @splat(.{}),
+    pub fn add(self: *RefinementCensus, request: RefinementRequest) void {
+        const cost = request.cost;
+        const slot = for (&self.groups) |*group| {
+            if (group.requests == 0 or (group.admission == cost.admission and group.publication == cost.publication and group.rejected_candidates == cost.rejected_candidates and group.record_rejections == cost.record_rejections)) break group;
+        } else &self.overflow;
+        if (slot.requests == 0 and slot != &self.overflow) slot.* = cost else {
+            slot.requests +|= cost.requests;
+            slot.nodes +|= cost.nodes;
+        }
+        var smallest: usize = 0;
+        for (self.heaviest, 0..) |prior, index| if (prior.cost.nodes < self.heaviest[smallest].cost.nodes) {
+            smallest = index;
+        };
+        if (cost.nodes > self.heaviest[smallest].cost.nodes) self.heaviest[smallest] = request;
+    }
+    pub fn jsonStringify(self: *const RefinementCensus, stream: *std.json.Stringify) std.Io.Writer.Error!void {
+        try stream.beginObject();
+        try stream.objectField("groups");
+        try stream.beginArray();
+        for (self.groups) |group| if (group.requests != 0) try stream.write(group);
+        try stream.endArray();
+        try stream.objectField("overflow");
+        try stream.write(self.overflow);
+        try stream.objectField("heaviest");
+        try stream.beginArray();
+        for (self.heaviest) |request| if (request.cost.requests != 0) try stream.write(request);
+        try stream.endArray();
+        try stream.endObject();
+    }
+};
 pub const WorkStats = struct {
     regions: [8]Region = @splat(.{}),
     region_callers: RegionCensus = .{},
+    refinements: RefinementCensus = .{},
     thread_cpu_us: ?ThreadCpu = null,
     lookup_us: u64 = 0,
     query_prepare_us: u64 = 0,
@@ -106,6 +160,7 @@ pub const RegionCost = struct {
     /// Descriptors are comptime constants with compiler-process lifetime,
     /// including when this census is copied into a result snapshot.
     caller: *const RegionCaller = &.{},
+    stage: ?@import("../work_counters.zig").InferenceStage = .general,
     regions: u64 = 0,
     /// Inclusive region wall time: nested regions overlap and cannot be added
     /// to the exclusive inference clock. Allocation totals have distinct owners.
@@ -119,14 +174,17 @@ pub const RegionCost = struct {
 };
 pub const RegionCensus = struct {
     entries: [32]RegionCost = @splat(.{}),
-    overflow: RegionCost = .{ .caller = &.{ .function = "overflow" } },
+    overflow: RegionCost = .{ .caller = &.{ .function = "overflow" }, .stage = null },
     pub fn add(self: *RegionCensus, cost: RegionCost) void {
         const slot = for (&self.entries) |*entry| {
-            if (entry.regions == 0 or (entry.caller.line == cost.caller.line and std.mem.eql(u8, entry.caller.function, cost.caller.function))) break entry;
+            if (entry.regions == 0 or (entry.stage == cost.stage and entry.caller.line == cost.caller.line and std.mem.eql(u8, entry.caller.function, cost.caller.function))) break entry;
         } else &self.overflow;
-        if (slot.regions == 0 and slot != &self.overflow) slot.caller = cost.caller;
+        if (slot.regions == 0 and slot != &self.overflow) {
+            slot.caller = cost.caller;
+            slot.stage = cost.stage;
+        }
         inline for (@typeInfo(RegionCost).@"struct".field_names) |field| {
-            if (comptime !std.mem.eql(u8, field, "caller")) @field(slot, field) +|= @field(cost, field);
+            if (comptime !std.mem.eql(u8, field, "caller") and !std.mem.eql(u8, field, "stage")) @field(slot, field) +|= @field(cost, field);
         }
     }
     pub fn jsonStringify(self: *const RegionCensus, stream: *std.json.Stringify) std.Io.Writer.Error!void {
@@ -144,6 +202,7 @@ pub const Work = struct {
     active: Phase = .other,
     regions: [8]Region = @splat(.{}),
     region_callers: RegionCensus = .{},
+    refinements: RefinementCensus = .{},
     nanos: [@typeInfo(Phase).@"enum".field_names.len]u64 = @splat(0),
     semantic_job_nanos: u64 = 0,
     pub const Scope = struct {
@@ -171,7 +230,7 @@ pub const Work = struct {
         self.cpu_nanos[@backingInt(self.active)] += self.cpu_clock.lapNanos();
     }
     pub fn snapshot(self: *const Work) WorkStats {
-        var result: WorkStats = .{ .regions = self.regions, .region_callers = self.region_callers, .semantic_job_sum_us = self.semantic_job_nanos / std.time.ns_per_us };
+        var result: WorkStats = .{ .regions = self.regions, .region_callers = self.region_callers, .refinements = self.refinements, .semantic_job_sum_us = self.semantic_job_nanos / std.time.ns_per_us };
         if (self.cpu_clock.io != null) {
             result.thread_cpu_us = .{};
             for (self.cpu_nanos, &result.thread_cpu_us.?.values) |nanos, *us| us.* = nanos / std.time.ns_per_us;
@@ -246,4 +305,30 @@ test "unprofiled timing publishes no work object or placeholder regions" {
     try std.testing.expect(std.mem.find(u8, detail, "\"inference_us\":7") != null);
     // Seven empty slots are not published; only the recorded region is.
     try std.testing.expectEqual(@as(usize, 1), std.mem.count(u8, detail, "\"scopes\""));
+    var census: RegionCensus = .{};
+    const caller: *const RegionCaller = &.{ .function = "same", .line = 1 };
+    census.add(.{ .caller = caller, .stage = .general, .regions = 1 });
+    census.add(.{ .caller = caller, .stage = .lowering, .regions = 2 });
+    census.add(.{ .caller = caller, .stage = .general, .regions = 3 });
+    try std.testing.expectEqual(@as(u64, 4), census.entries[0].regions);
+    try std.testing.expectEqual(@as(u64, 2), census.entries[1].regions);
+    const stages = try std.json.Stringify.valueAlloc(allocator, census, .{});
+    defer allocator.free(stages);
+    try std.testing.expectEqual(@as(usize, 2), std.mem.count(u8, stages, "\"stage\""));
+    try std.testing.expect(std.mem.find(u8, stages, "\"stage\":\"general\"") != null);
+    try std.testing.expect(std.mem.find(u8, stages, "\"stage\":\"lowering\"") != null);
+}
+
+test "refinement census preserves all request work through bounded overflow" {
+    var census: RefinementCensus = .{};
+    for (0..40) |index| census.add(.{ .cost = .{ .admission = @intCast(index), .requests = 1, .nodes = index + 1 } });
+    var requests = census.overflow.requests;
+    var nodes = census.overflow.nodes;
+    for (census.groups) |group| {
+        requests += group.requests;
+        nodes += group.nodes;
+    }
+    try std.testing.expectEqual(@as(u64, 40), requests);
+    try std.testing.expectEqual(@as(u64, 820), nodes);
+    for (census.heaviest) |request| try std.testing.expect(request.cost.nodes >= 33);
 }

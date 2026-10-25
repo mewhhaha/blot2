@@ -212,6 +212,15 @@ pub const Generator = struct {
         if (self.persisted_principals) |reader| return reader.lookup(&self.evaluator, target, options);
         return null;
     }
+    fn principalGraphLookup(context: *anyopaque, key: core_eval.PrincipalGraph.Key) ?*core_eval.PrincipalGraph {
+        const self: *Generator = @ptrCast(@alignCast(context));
+        const state = self.principal_state orelse return null;
+        if (state.gate.source_pools != &state.old.metadata.pools.?) return null;
+        // A lease may outlive the previous capture. Retain only under the
+        // same durable allocator owner as the current capture.
+        if (!std.meta.eql(state.old.metadata.allocator, self.allocator)) return null;
+        return state.old.metadata.principal_graphs.lookup(key, &state.gate);
+    }
     fn principalRecord(context: *anyopaque, target: core.BindingRef, options: core_eval.Options, solved: core_eval.SolvedEvidence, inputs: ?*const @import("../reuse/principal_inputs.zig").Key) Allocator.Error!void {
         const self: *Generator = @ptrCast(@alignCast(context));
         const retained_inputs = if (self.principal_state) |state| state.last_inputs else null;
@@ -986,6 +995,8 @@ pub const Generator = struct {
         return retained.reconstruct(self, id, request, scope);
     }
     pub fn function(self: *Generator, key: Key) Error!u32 {
+        const inference_stage = self.evaluator.enterInferenceStage(.specialization);
+        defer inference_stage.deinit();
         var scope: ?code_artifacts.Scope = if (self.artifacts) |context| try context.enter(.{ .named = key }) else null;
         defer if (scope) |*actor| actor.deinit();
         if (self.planning.instances.get(key)) |existing| {
@@ -1259,6 +1270,8 @@ pub const Generator = struct {
         try self.refineMappingsCaptures(key.unit, .{ .closure = .{ .unit = key.unit, .catalog = key.catalog } }, key.ty, mappings, rows, source.span(metadata.body), hints.items);
     }
     pub fn closureFunction(self: *Generator, key: ClosureKey) Error!u32 {
+        const inference_stage = self.evaluator.enterInferenceStage(.specialization);
+        defer inference_stage.deinit();
         var scope: ?code_artifacts.Scope = if (self.artifacts) |context| try context.enter(.{ .closure = key }) else null;
         defer if (scope) |*actor| actor.deinit();
         if (self.planning.closures.get(key)) |existing| {
@@ -2498,6 +2511,7 @@ const CompileRun = struct {
             };
             // Bind callbacks only after the Generator reaches its stable stack address.
             self.generator.evaluator.principal_provider = .{ .context = &self.generator, .lookup = Generator.principalLookup, .record = Generator.principalRecord };
+            self.generator.evaluator.principal_graph_provider = .{ .context = &self.generator, .lookup = Generator.principalGraphLookup };
         }
         self.generator.evaluator.retain_specialization_receipts = self.recording;
         self.generator.evaluator.retain_constant_receipts = self.recording and self.options.constant_receipts;
@@ -2704,6 +2718,7 @@ const CompileRun = struct {
             result.reuse.reused_named = state.stats.reused_named;
             result.reuse.reused_closures = state.stats.reused_closures;
             result.reuse.candidates = state.stats.candidates;
+            result.reuse.lookup_positions = state.stats.lookup_positions;
             result.reuse.request_checks = state.stats.request_checks;
             result.reuse.request_hits = state.stats.request_hits;
             result.reuse.declined = state.stats.declined;
@@ -2713,6 +2728,7 @@ const CompileRun = struct {
     }
     fn recordArtifact(self: *CompileRun, result: *Result) Error!void {
         if (self.recording) {
+            try self.metadata.principal_graphs.capture(&self.generator.evaluator);
             for (self.generator.evaluator.retained.specialization_receipts.items) |record| {
                 var input = record.input;
                 if (record.member) |member| input = member.function;

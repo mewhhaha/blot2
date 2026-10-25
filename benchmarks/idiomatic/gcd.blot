@@ -1,0 +1,15 @@
+const gcd = fn (a: U32) (b: U32) -> U32 => do:
+  let left = a
+  let right = b
+  for ever:
+    if Bool.not (right != 0):
+      break
+    let remainder = left % right
+    left := right
+    right := remainder
+  break left
+entry const run = fn (seed: U32) -> U32 => do:
+  let total = 0
+  for index in 0..4096:
+    total := self + gcd (seed + index * 7919) (index * 104729 + 1)
+  break total

@@ -1,8 +1,20 @@
 # Zig compiler
 
+The [CT116 frontend update](CT116_QUALIFICATION.md) adds requirement dependency
+reuse, immutable imported sharing metadata, indexed inference membership and
+four-worker checking of independent fresh modules. `frontendWorkers` /
+`--frontend-workers` selects 1–16 workers; retained edits keep their existing
+cutoff path. Canonical imported graphs are still copied. The
+[root README](../README.md#idiomatic-blot-and-rust-benchmarks) includes eighteen
+idiomatic Blot/Rust compile-time and same-engine Wasm runtime benchmarks. CT110
+remains installed; preserved concurrent array work is outside the frozen CT116
+qualification.
+
 This is Blot's production compiler, written directly in Zig 0.17.0. It owns
 lexing, parsing, type/effect inference, staging, incremental revisions and Wasm
-emission. There is no Bend runtime or compiler dependency.
+emission. It is the only Blot compiler; there is no TypeScript fallback or Bend
+runtime dependency. The TypeScript host tools and their Baba formatter parser
+are described in [compiler/README.md](../compiler/README.md).
 
 From the repository root:
 
@@ -49,48 +61,84 @@ check. Reserve LLVM for the actual final release compiler and release
 performance measurements.
 
 Use `deno task bench:compiler-build --out build/bench/build-next` from the
-repository root to measure isolated cache initialization, compiler/native builds,
-source edits and reverts. The [initial build measurements](../COMPILE_MEASUREMENTS.md)
-record roughly 3.4 s real compiler edits and a 4.64 s warm development cycle;
-the expanded development family below is measured separately.
-Keep ordinary writable Zig caches; explicit incremental mode did not improve
-the measured edit cycle. [Build hills](../BUILD_HILLS.md) track the remaining
-iteration and qualification costs separately from
-[application compile hills](../COMPILE_HILLS.md).
+repository root to measure isolated cache initialization, compiler/native
+builds, source edits and reverts. The
+[initial build measurements](../COMPILE_MEASUREMENTS.md) record roughly 3.4 s
+real compiler edits and a 4.64 s warm development cycle; the expanded
+development family below is measured separately. Keep ordinary writable Zig
+caches; explicit incremental mode did not improve the measured edit cycle.
+[Build hills](../BUILD_HILLS.md) track the remaining iteration and qualification
+costs separately from [application compile hills](../COMPILE_HILLS.md).
 
-The [CT106 qualification](CT106_QUALIFICATION.md) records **19.1%
-less first-literal-edit CPU** against CT105 in seven alternating release pairs,
-with identical Wasm. First-literal wall median falls from 3.62 to **2.91 s**;
-fresh CPU improves 2.4%, body CPU is effectively unchanged and literal-revert
-CPU rises 3.5%. These are shared-host observations. Body-edit, two-second and
-sub-second targets remain open.
+The [CT110 qualification](CT110_QUALIFICATION.md) records seven alternating
+release pairs against CT109 with identical Wasm. Paired CPU improves 2.9% fresh,
+4.4% for literal edits and 3.0% for body edits. Shared-host wall medians are
+**7.335 / 3.034 / 5.035 s** respectively. Two-second and sub-second ordinary
+edits remain open.
 
-Exact frontend correspondence now checks one module on the first edit instead
-of 22. Bounded operation indexes/certificates, lexical links and import scratch
-remove repeated work. The report includes 200 distinct edits, allocator/CPU
-attribution, exhaustive qualification and rejected experiments. All 86 review
-suggestions have a [disposition](../COMPILER_CT106_WORK.md); conditional alternatives
-and unfinished architectural work are explicit.
+Frontend reuse checks one module on the first edit. Shared effect-label proofs,
+temporary graph buffers and structural import memoization remove repeated work,
+but literal/body inference still opens 2,934 / 7,216 regions. Three expensive
+body principals retain dependencies on inferred requirements. Peak RSS is
+essentially unchanged. The
+[architecture review](../COMPILER_ARCHITECTURE_REVIEW.md) recommends stable
+semantic interfaces, reusable elaborated bodies and a cheaper development
+specialization policy. These remain proposals. The
+[86-item ledger](../COMPILER_CT109_LEDGER.md) keeps partial and conditional work
+explicit.
 
-The matching CLI and native compiler are installed locally. The final gate
-passes 2,564 exhaustive native laws, 1,655 guest checks,
-48 smoke checks and 57 tooling checks. Four body principals still require
-stronger source-origin correspondence. See the
+The [CT111 work record](../COMPILER_CT111_WORK.md) records the bounded
+follow-up: optional written result requirements, inferred-interface proofs,
+retained source graphs, fragment indexing and inference-stage measurements. Its
+frozen snapshot passes 2,584 exhaustive native laws, 1,659 release guests, 48
+smoke tests and 57 tooling checks. Completed elaborated bodies and the
+development generic ABI are still unimplemented; all five architectural
+recommendations remain incomplete. The [final screen](CT111_QUALIFICATION.md)
+shows no performance improvement; CT110 remains installed.
+
+The [CT112 follow-up](CT112_QUALIFICATION.md) restores completed closure and
+capture proofs across exact query replay. Its frozen candidate passes 2,586
+exhaustive native laws, 1,660 release guests, 48 smoke tests, 57 tooling checks
+and the selected zero-lint development check. Three release pairs report lower
+edit times and higher fresh CPU, while deterministic work falls only slightly.
+This screen does not establish a repeatable speedup. The installed compiler is
+unchanged; the general elaborated-body boundary remains unfinished.
+
+The [qualified CT113 follow-up](CT113_QUALIFICATION.md) adds a bounded request
+census and raises the refinement cache to 8,192 records. Three release pairs
+measure fresh gdev compilation at 7.55 → 7.08 s (paired CPU -5.2%); literal/body
+edits remain about 3.0/5.2 s. It retains about 4.82 MiB more cache storage and
+passes 2,587 exhaustive native laws, 1,660 release guests, 48 smoke and 57
+tooling checks, plus the selected zero-lint development check. Missing
+call-proof provenance remains an architectural bottleneck; unsuccessful recheck
+trials were removed. CT110 remains installed.
+
+The [CT114 frontend changes](CT114_QUALIFICATION.md) reduce checking allocation
+requests by 27.0% and requested bytes by 17.6%. The instrumented frontend median
+is 1.872 → 1.784 s in three alternating pairs; this does not establish an
+unprofiled latency improvement. The frozen candidate passes 2,589 exhaustive
+native laws, 1,660 release guests, 48 smoke tests, 57 tooling checks and zero
+Zig lint findings. The fresh sub-second target remains open. See
+[the architecture review](../COMPILER_FRONTEND_REVIEW.md) for the larger
+changes. CT110 remains installed.
+
+The matching CT110 CLI and native compiler are installed locally. Its gate
+passes 2,576 exhaustive native laws, 1,656 guest checks, 48 smoke checks and 57
+tooling checks, with zero Zig lint findings. See the
 [development-cycle measurements](../DEVELOPMENT_TURNAROUND.md) and
 [measurement tools](../scripts/bench/README.md).
 
 `blotc build ENTRY OUTPUT.wasm --prelude std/prelude.blot --std-root std`
 compiles a project. `dependencies ENTRY OUTPUT.blotdep` produces reusable typed
 dependencies. `serve-project` serves the framed retained-project protocol used
-by [the client](PROJECT_CLIENT.md).
-The client `inferenceBudget` setting and native `--inference-budget` option
-control ordinary inference and associated work through checking and evaluation.
-See [budget accounting](PROJECT_CLIENT.md) and the
-[associated-work qualification](ASSOCIATED_WORK_QUALIFICATION.md).
+by [the client](PROJECT_CLIENT.md). The client `inferenceBudget` setting and
+native `--inference-budget` option control ordinary inference and associated
+work through checking and evaluation. See [budget accounting](PROJECT_CLIENT.md)
+and the [associated-work qualification](ASSOCIATED_WORK_QUALIFICATION.md).
 
 The language distinguishes chunked `List a` from contiguous `Array a`. Indexing
-and indexed rebinding are array-only. Shared list edits copy the chain; proven
-exclusive end edits reuse storage. See the
+and indexed rebinding are array-only. Shared list edits copy the affected tree
+path and leaf; proven exclusive end edits reuse storage. See the
 [collection guide](../compiler/guide.md#lists-arrays-and-libraries).
 
 Structured tasks support checked ordinary scope wrappers, exact explicit spawn
@@ -105,3 +153,8 @@ compiler and a CLI containing its matching release binary.
 
 [Architecture](ARCHITECTURE.md), [ownership contract](CONTRACT.md),
 [validation and performance](STATUS.md).
+
+The approved `result "member" Input Output` predicate expresses destination
+selection in a complete written interface; see the
+[qualified bindings guide](../compiler/guide.md#qualified-bindings). Existing
+inferred conversions remain valid.

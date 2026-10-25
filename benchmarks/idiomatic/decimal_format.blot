@@ -1,0 +1,11 @@
+import * as text from "std/text"
+entry const run = fn (seed: U32) -> U32 => do:
+  let output = text.builder ()
+  for index in 0..512:
+    output := text.append_u32 (seed + index * 7919) self
+    output := text.push 44 self
+  let result = text.finish output
+  let total = 0
+  for scalar in result:
+    total := self * 31 + scalar
+  break total

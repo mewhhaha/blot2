@@ -35,6 +35,7 @@ const usage =
     \\       --explain-demands reports bounded source-site demand lowering decisions.
     \\       --explain-allocations reports bounded emitted allocation sites and array-edit ownership decisions.
     \\       --inference-budget STEPS sets a process-local inference limit (default: 1000000).
+    \\       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.
     \\       --semantic-workers 1..16 (build, build-project, serve-project) opts into private semantic jobs.
     \\
     \\Handwritten Zig source compiler. JSON-lines diagnostics and stage metrics
@@ -323,7 +324,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
     if (profile) |*owner| counting.attach(owner);
     // Worker jobs allocate through this meter directly when it is shared; a
     // profiled build counts below it, so its workers keep their lock.
-    var tracked: memory.TrackedAllocator = .{ .backing = if (profile != null) counting.allocator() else backing, .sharing = if (policy.semantic_workers > 1 or policy.codegen_workers > 1) .shared else .single };
+    var tracked: memory.TrackedAllocator = .{ .backing = if (profile != null) counting.allocator() else backing, .sharing = if (policy.semantic_workers > 1 or policy.codegen_workers > 1 or policy.frontend_workers > 1) .shared else .single };
     const allocator = tracked.allocator();
     const start = now(io);
     const installation: ?phase_profile.Installation = if (profile) |*owner| phase_profile.install(owner) else null;
@@ -362,6 +363,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
     var teardown_us: i64 = 0;
     const ok = compilation: {
         var loaded = try project.load(allocator, io, filename, options);
+        loaded.checking = .{ .io = io, .workers = policy.frontend_workers };
         defer {
             const release_start = now(io);
             loaded.deinit(allocator);
@@ -611,7 +613,11 @@ fn run(init: std.process.Init) !bool {
         while (at < args.len) : (at += 2) {
             if (at + 1 >= args.len) return error.InvalidServeArguments;
             if (std.mem.eql(u8, args[at], "--semantic-workers")) {
-                policy = semanticPolicy(args[at + 1]) orelse return error.InvalidServeArguments;
+                const selected = semanticPolicy(args[at + 1]) orelse return error.InvalidServeArguments;
+                policy.semantic_workers = selected.semantic_workers;
+                policy.semantic_components = true;
+            } else if (std.mem.eql(u8, args[at], "--frontend-workers")) {
+                policy.frontend_workers = (semanticPolicy(args[at + 1]) orelse return error.InvalidServeArguments).semantic_workers;
             } else if (std.mem.eql(u8, args[at], "--inference-budget")) {
                 try configureInferenceBudget(args[at + 1]);
             } else return error.InvalidServeArguments;
@@ -682,7 +688,12 @@ fn run(init: std.process.Init) !bool {
             defer at += 2;
             if (std.mem.eql(u8, args[at], "--semantic-workers")) {
                 if (command != .build and command != .build_project) return false;
-                policy = semanticPolicy(args[at + 1]) orelse return false;
+                const selected = semanticPolicy(args[at + 1]) orelse return false;
+                policy.semantic_workers = selected.semantic_workers;
+                policy.semantic_components = true;
+            } else if (std.mem.eql(u8, args[at], "--frontend-workers")) {
+                if (command != .build and command != .build_project) return false;
+                policy.frontend_workers = (semanticPolicy(args[at + 1]) orelse return false).semantic_workers;
             } else if (std.mem.eql(u8, args[at], "--inference-budget")) {
                 try configureInferenceBudget(args[at + 1]);
             } else if (std.mem.eql(u8, args[at], "--std-root")) {

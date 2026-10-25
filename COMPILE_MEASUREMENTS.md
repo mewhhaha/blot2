@@ -1,14 +1,193 @@
 # Compile and compiler-build measurements
 
+CT116 is correctness-qualified on its frozen candidate. Whole profiled frontend
+falls from 1.600 to 1.036 s, checking from 1.214 to 0.649 s; fresh unprofiled
+game wall time falls from 7.594 to 7.050 s in three alternating pairs. Ordinary
+edit latency is not meaningfully improved. See
+[the report](zig-native/CT116_QUALIFICATION.md). Independent module checking
+defaults to four workers; retained edits keep their existing path. Canonical
+imported graphs and repeated import preparation remain architectural targets.
+The backend still dominates full builds. Eighteen public Blot/Rust
+compile/runtime workloads and measured README tables expose substantial runtime
+gaps in text and list pipelines; those need their own runtime profiles.
+
+## CT115 module costs and parallelism model (25 October 2026)
+
+Three instrumented release traces measure 1,296 ms of module-check CPU across
+189 modules: 325 ms headers, 818 ms bodies and 153 ms other module work. These
+are sums of per-module medians. `game.blot` takes 447 ms and selects 587,596 of
+641,867 generic-requirement candidates (91.5%). Its builder composition is the
+strongest lead for repeated generalization, pending finer attribution.
+
+A separately verified topology probe records 1,604 edges. The critical chain
+costs 797 ms; a ready-task model estimates checking at 896/798/797 ms for 2/4/8
+workers. With other frontend costs, four workers estimate 1.238 s total. These
+are optimistic models, not actual parallel compiler measurements. The
+literal/body edits check one module and spend 133/139 ms in the frontend.
+
+All seven release outputs and the topology output match strict Wasm pins.
+Production source and installation are unchanged. See
+[the detailed review and evidence](COMPILER_BIG_LEVERS.md) for source pins, CPU
+attribution, counterfactual targets, SIMD limits and model assumptions.
+
+## CT114 frontend implementation (25 October 2026)
+
+The profiled fresh frontend median is 1.872 → 1.784 s; checking is 1.421 → 1.344
+s. Checker allocation requests fall 27.0% and requested bytes 17.6%. Unprofiled
+whole-build measurements do not establish a latency improvement. The final
+candidate passes the frozen full compiler gate and strict fresh/edit/revert
+output controls. These profiled clocks are separate from unprofiled whole-build
+performance; allocation accounting itself has overhead. The frontend remains
+above one second. See
+[the exact-candidate report](zig-native/CT114_QUALIFICATION.md) for all paired
+clocks, allocation counters, qualification scope and limitations, and
+[the architecture review](COMPILER_FRONTEND_REVIEW.md) for the remaining work.
+CT110 remains installed.
+
+## Fresh frontend and Baba review (25 October 2026)
+
+The initial CT114 investigation measured the unchanged CT113 release; the later
+implementation is recorded in [the work log](COMPILER_CT114_WORK.md). The
+existing CT113 phase profile separates these fresh gdev costs across 189 modules
+and 239,697 syntax nodes:
+
+| Phase                               | Profiled wall time |
+| ----------------------------------- | -----------------: |
+| Load source                         |               6 ms |
+| Lex                                 |              23 ms |
+| Parse                               |              13 ms |
+| Check                               |           1,277 ms |
+| Lower                               |             138 ms |
+| Freeze                              |              82 ms |
+| Validate                            |             112 ms |
+| Assets, input bookkeeping and other |              26 ms |
+| Total before backend                |           1,678 ms |
+
+These are one instrumented build's exclusive phase times, not unprofiled
+medians. Literal/body edit frontend totals are already 124/118 ms. Parsing and
+lexing together account for 36 ms, about 2.2% of the fresh frontend. With the
+other phases fixed, checking must fall to about 599 ms (53% less) for the whole
+fresh frontend to fall below one second. This does not make the complete build
+or ordinary edits sub-second; backend inference remains the larger cost.
+
+Two new GDB runs sample the frozen CT113 binary against the same manifest.
+Per-thread CPU deltas weight complete intervals inside each build, excluding
+idle threads and four boundary intervals. Coverage is 16,046.5/16,100 CPU ms
+(99.67%), with no missing or truncated stacks. Both Wasm outputs match the
+existing strict fresh-game pin. The debugger changes timing: use these samples
+for attribution, not latency comparisons. Restricting stacks to
+`reuse.project_check` prevents backend uses of the same checker from entering
+the frontend attribution.
+
+| Operation                                               | Inclusive share of project-check CPU |
+| ------------------------------------------------------- | -----------------------------------: |
+| Check module bodies                                     |                                60.1% |
+| Collect headers, including imports                      |                                28.1% |
+| Construct generic schemes (`schemeInto`)                |                                27.1% |
+| Gather pending scheme requirements (`schemeCandidates`) |                                23.9% |
+| Import schemes (`importScheme`)                         |                                23.2% |
+| Resolve type graphs                                     |                                29.8% |
+| Find free type variables                                |                                16.3% |
+| Find free effect-row variables                          |                                12.7% |
+| Capture retained checked bodies                         |                                 8.0% |
+| Allocation/free paths, including profiling accounting   |                                11.7% |
+
+Rows overlap; do not add them. The phase counter records 7,636,643 allocation
+requests and 1,078,511,978 requested bytes during checking. Requested bytes are
+allocation traffic, not live memory. Neither allocation count nor sampled
+allocator cost proves a memory-bandwidth bottleneck. No hardware-counter
+measurement was made. Profile accounting also adds overhead.
+
+The sibling Baba work uses cached immutable lexer tables, compact token records,
+shared parser analysis, lazy token/cursor materialization and direct incremental
+record transfers. Blot's TypeScript syntax tooling already uses Baba
+(`compiler/syntax.ts`); the native compiler uses its own Zig lexer/parser.
+Baba's `validate()` is syntax validation, not Blot's semantic/Core validation
+phase. Its workload-specific speedups do not transfer directly to gdev.
+
+The useful architectural transfer is sharing analysis and delaying copies.
+Prioritize measuring scheme-candidate rescans and graph visits per owner, then
+avoid recomputing unchanged free-variable sets under exact solver history.
+Measure imported versus actually used interfaces before introducing lazy scheme
+materialization or shared immutable interface graphs. Fresh quantified variables
+must remain private to each importing solver; preserve diagnostics, coherence
+checks, chronological cursors, rollback and allocation-failure laws.
+Whole-project counters are needed: `stats.frontend` alone describes the entry,
+whereas `attemptStats.fallback` exposes aggregate module/body counts. No parser
+replacement or checker optimization is implemented by this investigation.
+
+Raw evidence and reproduction scripts are in
+`zig-native/measurements/ct114-frontend-review-2026-10-25.tar.gz`; the local run
+directory is `build/bench/ct114/frontend-sampling`. It includes the phase
+inputs, strict output pins, CPU summaries and sampled stacks. Run
+`python3 summarize_frontend.py .` inside its `sampling` directory to regenerate
+the scoped report. CT110 remains installed; existing CT113 qualification and the
+concurrent array-work exclusions are unchanged.
+
+Archive SHA-256:
+`acb75abf7d20fce388954334d41352eb40fd4f57bebf16b156a360a3e7149d38`. All 16
+archived member hashes and 559 sampling input pins were verified.
+
+## CT113 release screen
+
+The [CT113 release screen](zig-native/CT113_QUALIFICATION.md) measures a modest
+fresh-build improvement: 7.546 → 7.078 s, median paired CPU -5.21%, with all
+three fresh pairs improving. Literal edits are 3.008 → 2.991 s and body edits
+5.172 → 5.217 s; their CPU differences are small and no edit-time improvement is
+established. All 60 samples, strict Wasm pins, fresh controls and CPU guards
+pass. The larger bounded cache saves 4,513 fresh regions and retains 4.82 MiB
+more cache storage. First-edit peak RSS rises about 4.4 MiB. The frozen full
+gate passes 2,587 exhaustive native laws, 1,660 release guests, 48 smoke tests
+and 57 tooling checks; selected Zig lint has zero findings. CT110 remains
+installed. The request census and failed proof-recovery trials are recorded with
+the measurements.
+
+The following CT112 figures describe the preceding experiment.
+
+The [CT112 screen](zig-native/CT112_QUALIFICATION.md) preserves completed
+selected-closure proofs across revision replay. Three pairs against CT111
+measure literal/body wall medians of 2.863/4.754 s (paired CPU -2.4%/-9.5%), but
+fresh CPU rises 4.4% and the deterministic reduction is only nine/five regions.
+These screening timings do not establish a repeatable speedup. Peak RSS is
+essentially unchanged. The frozen full gate passes 2,586 exhaustive native laws,
+1,660 release guests, 48 smoke tests and 57 tooling checks in 723.99 s; selected
+Zig lint has zero findings. CT110 remains installed.
+
+The following CT111 figures describe the preceding experiment.
+
+The [final CT111 screen](zig-native/CT111_QUALIFICATION.md) passes correctness
+qualification but establishes **no performance improvement**. Three alternating
+release pairs measure fresh/literal/body medians of 7.900/3.151/5.294 s versus
+CT110 7.779/3.122/5.229 s. Paired CPU rises 1.5%/0.6%/1.5%; peak RSS is
+essentially flat to slightly higher. Exact outputs, independent fresh controls,
+input pins and fresh CPU guards pass. These are shared-host screening results.
+
+The final gate passes 2,584 exhaustive native laws, 1,659 release guests, 48
+smoke and 57 tooling checks. Selected Zig lint has zero findings. The profiled
+body edit still misses three principals and starts 534 lowering inference
+regions. Stop extending inferred-interface shortcuts. Completed elaborated
+bodies and the expanded development generic ABI remain unimplemented; none of
+the five architectural recommendations is complete. CT110 remains installed.
+
+The
+[25 October architecture review](COMPILER_ARCHITECTURE_REVIEW.md#development-tier-and-semantic-worker-screen)
+adds a 115-build screen of the unchanged CT110 release. Three alternating
+default-policy rounds measure optimized/development literal medians of
+2.637/2.504 s and body medians of 4.407/4.365 s. Both tiers retain the same
+inference-region counts and principal misses. Separate explicit-component runs
+do not establish a four-worker improvement. This screening evidence is distinct
+from the seven-pair qualification below; input/output controls, clock scopes,
+host-noise limitations and raw archive are linked from the review.
+
 The [CT110 qualification](zig-native/CT110_QUALIFICATION.md) passes seven
-alternating release pairs against CT109, exact outputs, fresh CPU guards and
-the complete compiler gate. Paired CPU falls 2.9% fresh, 4.4% on literal edits
-and 3.0% on body edits. Wall medians are 7.335 / 3.034 / 5.035 s respectively.
+alternating release pairs against CT109, exact outputs, fresh CPU guards and the
+complete compiler gate. Paired CPU falls 2.9% fresh, 4.4% on literal edits and
+3.0% on body edits. Wall medians are 7.335 / 3.034 / 5.035 s respectively.
 Literal/body reverts improve 4.6% / 3.8%; devtools remains within its guard.
 
 Sharing immutable effect lists and their proofs removes 86% of literal-edit
-operation visits. Inference still opens 2,934 literal / 7,216 body regions,
-and body principal hits stay 17/20. Peak RSS is effectively flat. The report
+operation visits. Inference still opens 2,934 literal / 7,216 body regions, and
+body principal hits stay 17/20. Peak RSS is effectively flat. The report
 separates these work counts from latency, allocation requests and retained
 memory. Two-second and sub-second ordinary edits remain open.
 
@@ -30,10 +209,10 @@ ordinary-edit, two-second and sub-second targets remain open.
 
 The candidate passes 2,573 exhaustive native laws, 1,656 guests, 44 independent
 held-out Wasm executions and 232 requests over 200 distinct edits. Post-session
-RSS is 521 MiB. The [86-item ledger](COMPILER_CT109_LEDGER.md) records implemented
-work, rejected experiments and still-open architectural designs. The qualified
-CLI and native compiler are installed locally; raw evidence and limits are
-linked from the qualification record.
+RSS is 521 MiB. The [86-item ledger](COMPILER_CT109_LEDGER.md) records
+implemented work, rejected experiments and still-open architectural designs. The
+qualified CLI and native compiler are installed locally; raw evidence and limits
+are linked from the qualification record.
 
 Historical CT106 qualification, 24 October 2026:
 
@@ -48,8 +227,8 @@ Exact frontend correspondence now checks one module on the first edit instead
 of 22. Bounded operation indexes/certificates, lexical links and import scratch
 remove repeated work. The report includes 200 distinct edits, allocator/CPU
 attribution, exhaustive qualification and rejected experiments. All 86 review
-suggestions have a [disposition](COMPILER_CT106_WORK.md); conditional alternatives
-and unfinished architectural work are explicit.
+suggestions have a [disposition](COMPILER_CT106_WORK.md); conditional
+alternatives and unfinished architectural work are explicit.
 
 Historical CT105 diagnostic review, 24 October 2026:
 [post-CT105 CPU, memory, algorithm and architecture review](COMPILER_REVIEW_CT105.md).
@@ -57,8 +236,8 @@ Three profiling-off/on pairs of the same installed release measure unprofiled
 wall medians of 6.878 s fresh, 3.786 s first literal, 2.580 s literal revert and
 4.816 s body edit. CPU-weighted stacks, five eight-state memory cycles and a
 targeted graph-size probe are archived with source/binary pins. All outputs
-match strict existing hashes. This is a review of unchanged `a0645de`, not a
-new optimization comparison, compiler build measurement or qualification.
+match strict existing hashes. This is a review of unchanged `a0645de`, not a new
+optimization comparison, compiler build measurement or qualification.
 
 Historical CT105 qualification, 24 October 2026:
 [CT105 solver scans, normalization and catalog costs](zig-native/CT105_QUALIFICATION.md).

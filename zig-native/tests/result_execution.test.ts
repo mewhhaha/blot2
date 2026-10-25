@@ -6,6 +6,75 @@ import {
 import { resultCases } from "./result_cases.ts";
 import { decodeText } from "../../compiler/text.ts";
 
+Deno.test("written result interfaces select the destination through aliases contracts and local templates", async () => {
+  await compileAndRun(`
+type Box a is data = #Box a
+const Box.from = fn value => #Box value
+type Convert (a, b) is contract = { result "from" a b }
+const convert: a -> b where { result "from" a b } = fn value => @type.result "from" value
+const alias: a -> b where { Convert (a, b) } = convert
+entry const answer = fn () => do:
+  let local: a -> b where { result "from" a b ! {} } = alias
+  let #Box first: Box U32 = local 40
+  let #Box second: Box F32 = local 2.5
+  break @u32.add first (@f32.to_u32 second)
+`, (guest) => equal(guest.call("answer", null), 42), { prelude: "none" });
+  await compileAndRun(`
+const convert: a -> b where { result "from" a b } = fn value => @type.result "from" value
+entry const answer = fn () => @u32.add (convert (floor 40.5)) (convert (ceil 1.5))
+`, (guest) => equal(guest.call("answer", null), 42));
+});
+
+Deno.test("written result interfaces propagate selected effects and reject missing or incompatible evidence", async () => {
+  const header = `
+type Read is effect = Unit -> U32
+type Box is data = #Box U32
+const Box.from: Unit -> Box ! {Read} = fn () => do:
+  use value <- Read ()
+  break #Box value
+const convert: a -> b ! {|e} where { result "from" a b ! {|e} } = fn value => @type.result "from" value
+`;
+  await compileAndRun(header + `
+entry const answer = fn () => do (@effect.provider Read (fn () => 42)):
+  use box: Box <- convert ()
+  let #Box value = box
+  break value
+`, (guest) => equal(guest.call("answer", null), 42), { prelude: "none" });
+  await compileAndRun(`
+type Tick is effect = Unit -> Unit
+type Box is data = #Box U32
+const Box.from = fn (value: U32) => #Box value
+const convert: a -> b ! {Tick} where { result "from" a b ! {} } = fn value => do:
+  use Tick ()
+  break @type.result "from" value
+entry const answer = fn () => do (@effect.provider Tick (fn () => ())):
+  use box: Box <- convert 42
+  let #Box value = box
+  break value
+`, (guest) => equal(guest.call("answer", null), 42), { prelude: "none" });
+  await compileExpectedFailure(`
+type Source is data = #Source U32
+type Target is data = #Target U32
+const Source.from = fn value => #Target 42
+const convert: a -> b where { result "from" a b } = fn value => @type.result "from" value
+entry const answer: Target = convert (#Source 1)
+`, "missing_associated", undefined, { prelude: "none" });
+  await compileExpectedFailure(`
+type Target is data = #Target U32
+const Target.from = fn (value: F32) => #Target 42
+const convert: a -> b where { result "from" a b } = fn value => @type.result "from" value
+entry const answer: Target = convert 1
+`, "type_mismatch", undefined, { prelude: "none" });
+  await compileExpectedFailure(header.replace(
+    'result "from" a b ! {|e}', 'result "from" a b ! {}',
+  ) + `
+entry const answer = fn () => do (@effect.provider Read (fn () => 42)):
+  use box: Box <- convert ()
+  let #Box value = box
+  break value
+`, "effect_mismatch", undefined, { prelude: "none" });
+});
+
 Deno.test("staged nested conversions infer their destination from the surrounding operator", async () => {
   await compileAndRun(
     `

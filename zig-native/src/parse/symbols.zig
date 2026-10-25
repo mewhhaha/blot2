@@ -8,11 +8,15 @@ pub const Error = std.mem.Allocator.Error || error{SymbolLimit};
 /// Numeric handles survive all growth. Hash buckets contain IDs, never slices
 /// into the growable byte buffer; collisions always compare exact UTF-8 bytes.
 pub const Pool = struct {
+    /// A worker view borrows immutable storage until every worker joins.
+    read_only: bool = false,
+    missing_name: bool = false,
     bytes: std.ArrayList(u8) = .empty,
     entries: std.ArrayList(Entry) = .empty,
     buckets: []Symbol = &.{},
 
     pub fn deinit(self: *Pool, allocator: std.mem.Allocator) void {
+        std.debug.assert(!self.read_only);
         self.bytes.deinit(allocator);
         self.entries.deinit(allocator);
         if (self.buckets.len != 0) allocator.free(self.buckets);
@@ -62,6 +66,10 @@ pub const Pool = struct {
 
     pub fn internHashed(self: *Pool, allocator: std.mem.Allocator, text: []const u8, hash: u64) Error!Symbol {
         if (self.find(text, hash)) |existing| return existing;
+        if (self.read_only) {
+            self.missing_name = true;
+            return error.SymbolLimit;
+        }
         if (self.entries.items.len >= std.math.maxInt(Symbol) or
             text.len > std.math.maxInt(u32) or
             self.bytes.items.len > std.math.maxInt(u32) - text.len) return error.SymbolLimit;

@@ -62,6 +62,8 @@ contract_member = (contract_type_member | contract_value_member | constraint_pre
 contract_type_member = ("type" name:TYPE_IDENT value:("=" type_expression)?) ;
 contract_value_member = ("const" name:(source_identifier | TYPE_IDENT) ":" signature:type_expression) ;
 constraint_body = ("{" LAYOUT_NEWLINE? (predicates:constraint_predicate ("," LAYOUT_NEWLINE? predicates:constraint_predicate)* ","?)? LAYOUT_NEWLINE? "}") ;
+// Predicate names are contextual. `result "member" Input Output ! {row}` uses
+// this common form; checking validates its two arguments and optional row.
 constraint_predicate = (kind:qualified_name member:STRING? arguments:type_atom* effects:effect_row?) ;
 type_application = (head:type_atom arguments:type_atom*) ;
 demand_type = ("~" value:type_atom) ;

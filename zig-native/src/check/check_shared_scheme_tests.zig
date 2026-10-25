@@ -8,6 +8,53 @@ const ast = @import("../parse/ast.zig");
 const check = @import("check.zig");
 const a = std.testing.allocator;
 
+fn predicateFreeSummaryScenario(allocator: std.mem.Allocator) !void {
+    const prefix =
+        \\const identity = fn value => value
+        \\const apply = fn transform => fn value => transform value
+        \\const nested = fn value => do:
+        \\  let local = fn item => identity item
+        \\  let first = local 1
+        \\  let second = local 1.5
+        \\  break local value
+        \\
+    ;
+    for ([_][]const u8{
+        "entry const answer: U32 = apply identity 42\nentry const other: F32 = nested 1.5\n",
+        "entry const wrong: U32 = apply identity 1.5\n",
+        "entry const wrong: U32 = nested 1.5\n",
+    }, 0..) |suffix, index| {
+        const source = try std.mem.concat(allocator, u8, &.{ prefix, suffix });
+        defer allocator.free(source);
+        var tokens = try lexer.lex(allocator, source);
+        defer tokens.deinit(allocator);
+        var pool: symbols.Pool = .{};
+        defer pool.deinit(allocator);
+        var tree = try parser.parse(allocator, source, tokens.tokens.items, &pool);
+        defer tree.deinit(allocator);
+        var eager = try check.checkPrivateExecution(allocator, &tree, &pool, .{ .eager_scheme_summaries = true });
+        defer eager.deinit(allocator);
+        var lazy = try check.check(allocator, &tree, &pool);
+        defer lazy.deinit(allocator);
+        try std.testing.expectEqual(eager.diagnostics.len, lazy.diagnostics.len);
+        try std.testing.expectEqual(index == 0, lazy.diagnostics.len == 0);
+        for (eager.diagnostics, lazy.diagnostics) |expected, actual| {
+            try std.testing.expectEqual(expected.code, actual.code);
+            try std.testing.expectEqualDeep(expected.span, actual.span);
+        }
+        try std.testing.expectEqual(eager.bindings.len, lazy.bindings.len);
+        for (eager.bindings, lazy.bindings) |expected, actual| {
+            try std.testing.expectEqual(expected.scheme.variables.len, actual.scheme.variables.len);
+            try std.testing.expectEqual(expected.scheme.row_variables.len, actual.scheme.row_variables.len);
+            try std.testing.expectEqual(expected.scheme.obligations.len, actual.scheme.obligations.len);
+        }
+    }
+}
+
+test "predicate-free schemes preserve independent types and callback rows without sharing summaries through OOM" {
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, predicateFreeSummaryScenario, .{});
+}
+
 test "recursive frontend scheduling keeps forward chains independent of native and syntax depth" {
     for ([_]usize{ 300, 1000 }) |depth| {
         for ([_]bool{ false, true }) |annotated| {

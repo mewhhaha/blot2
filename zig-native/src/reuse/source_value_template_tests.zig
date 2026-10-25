@@ -1147,6 +1147,58 @@ const query_source =
     \\const run_value: U32 = callback 0
 ;
 
+const completed_capture_source =
+    \\const add = fn extra => @u32.add extra 42
+    \\const factory = fn invoke => fn extra => invoke extra
+    \\const callback = factory add
+    \\entry const schema: U32 = 7
+    \\entry const answer = fn (extra: U32) -> U32 => callback extra
+    \\const run_value: U32 = callback 0
+;
+
+fn completedCaptureFailure(allocator: Allocator, fixture: *const Fixture, old: *const capture.Capture, position: usize) !void {
+    var g = try Generator.initAt(allocator, fixture);
+    defer g.deinit();
+    g.evaluator.options.trace_runtime_dependencies = true;
+    g.evaluator.retain_specialization_receipts = true;
+    const input = try g.evaluator.richValue(fixture.target("callback"));
+    const expected = try queryExpected(&g, old, old.metadata.specialization_queries.records.items[position].dependencies.expected);
+    var state = try @import("../eval/completed_specialization_query.zig").State.init(allocator, old, fixture.units, fixture.names.view());
+    defer state.deinit();
+    const sizes = sourceRowPublicationSizes(&g);
+    const selected = state.lookup(&g, input, expected) catch |err| {
+        try std.testing.expectEqual(sizes, sourceRowPublicationSizes(&g));
+        return err;
+    };
+    try std.testing.expect(selected != null);
+    try std.testing.expect(state.stats.completed_closures > 1);
+    const completed = g.evaluator.retained.specialization_receipts.items[0].completed_closures;
+    try std.testing.expect(completed.len > 0);
+    const regions = g.evaluator.counters.inference_regions;
+    try std.testing.expectEqual(selected.?, try g.evaluator.specializeClosure(selected.?, expected));
+    for (completed) |value| {
+        try std.testing.expectEqual(value, try g.evaluator.specializeClosure(value, g.evaluator.valueEvidence(value)));
+    }
+    try std.testing.expectEqual(regions, g.evaluator.counters.inference_regions);
+    g.evaluator.slots[g.evaluator.binding_offsets[0] + fixture.target("callback").binding].value = selected.?;
+    try std.testing.expectEqual(@as(u32, 42), (try g.evaluator.value(fixture.target("run_value"))).bits);
+}
+
+test "completed selected capture graphs replay without inference and publish atomically through allocation failures" {
+    var before = try Fixture.init(completed_capture_source);
+    defer before.deinit();
+    var initial = try before.emitQuery(a, .{ .retain_artifacts = true });
+    defer initial.deinit(a);
+    try successful(&initial);
+    const position = for (initial.capture.?.metadata.specialization_queries.records.items, 0..) |record, index| {
+        if (record.dependencies.completed_closures.len != 0) break index;
+    } else return error.MissingCompletedCaptures;
+    var after = try Fixture.init(completed_capture_source);
+    defer after.deinit();
+    editSchema(&after);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, completedCaptureFailure, .{ &after, &initial.capture.?, position });
+}
+
 const independent_query_source = query_source ++
     \\
     \\const factor: U32 = 5
@@ -1635,6 +1687,9 @@ fn queryAllocationFailure(allocator: Allocator, fixture: *const Fixture, old: *c
     const ordinary = old.metadata.specialization_queries.records.items[0].dependencies;
     try std.testing.expectEqual(ordinary.values_added, g.evaluator.storage.values.items.len - sizes[0]);
     try std.testing.expectEqual(ordinary.children_added, g.evaluator.storage.children.items.len - sizes[1]);
+    const regions = g.evaluator.counters.inference_regions;
+    try std.testing.expectEqual(selected.?, try g.evaluator.specializeClosure(selected.?, expected));
+    try std.testing.expectEqual(regions, g.evaluator.counters.inference_regions);
     g.evaluator.slots[g.evaluator.binding_offsets[0] + fixture.target("callback").binding].value = selected.?;
     try std.testing.expectEqual(@as(u32, 42), (try g.evaluator.value(fixture.target("run_value"))).bits);
 }
@@ -1737,7 +1792,13 @@ test "completed specialization query exact current expected type and cache-state
     changed.complete = false;
     try std.testing.expect((try state.lookup(&g, input, expected)) == null);
     changed.complete = saved_complete;
-    try std.testing.expect((try state.lookup(&g, input, expected)) != null);
+    const selected = (try state.lookup(&g, input, expected)).?;
+    const regions = g.evaluator.counters.inference_regions;
+    try std.testing.expectEqual(selected, try g.evaluator.specializeClosure(selected, expected));
+    try std.testing.expectEqual(regions, g.evaluator.counters.inference_regions);
+    try std.testing.expectError(error.Declined, g.evaluator.specializeClosure(selected, wrong));
+    try std.testing.expectEqual(eval.Code.type_mismatch, g.evaluator.diagnostic.?.code);
+    try std.testing.expect(g.evaluator.counters.inference_regions > regions);
 }
 
 test "completed specialization query declines foreign allocator and same-pointer shorter owner before access" {
@@ -1803,6 +1864,9 @@ test "completed specialization query selected values and remapped receipt surviv
     old_live = false;
     before.deinit();
     before_live = false;
+    const regions = g.evaluator.counters.inference_regions;
+    try std.testing.expectEqual(selected, try g.evaluator.specializeClosure(selected, expected));
+    try std.testing.expectEqual(regions, g.evaluator.counters.inference_regions);
     g.evaluator.slots[g.evaluator.binding_offsets[0] + after.target("callback").binding].value = selected;
     try std.testing.expectEqual(@as(u32, 42), (try g.evaluator.value(after.target("run_value"))).bits);
     try std.testing.expectEqual(selected, g.evaluator.retained.specialization_receipts.items[0].selected);
