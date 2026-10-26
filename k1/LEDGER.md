@@ -105,6 +105,14 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) after connecting the I08
+source/type/bounds representation to its independently checked operation
+trace and Wasm target, adding canonical builder-use checks, and evaluating
+restricted pure calls inside static products. The `-O0`/`-O2` run includes
+forgery controls and an independent F32 execution oracle. These remain private
+subsets: source association and structural builder use do not establish live
+runtime loans, dynamic versions, complete C09 accounting, or the host ABI.
+
 A combined Goose fixture run passed (exit 0) after adding the I08 source
 syntax, type-shape and formal-bound checks and bounded static products and
 pure calls. It runs these checks at `-O0` and `-O2` alongside the prior

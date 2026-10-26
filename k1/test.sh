@@ -142,6 +142,9 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/i08_resume_boundary.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/i08_bound_adversarial_audit.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/i08_bound_nested_audit.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_affine_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_affine_adversarial_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_affine_generated_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/format_k1_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/format_k1_independent_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/effect_test.goose"
@@ -151,6 +154,8 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/static_product_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/static_call_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/static_audit_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_compound_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_compound_bridge_audit.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/mixed_depth_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/mixed_compat_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/mixed_adapter_independent_test.goose"
@@ -166,6 +171,10 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/particle_lower_test.goose" && node "$script_dir/particle_lower_test.mjs")
     (cd "$test_dir" && node "$script_dir/particle_order_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_job_test.goose" && node "$script_dir/particle_lower_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_cap_test.goose" && node "$script_dir/particle_lower_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_link_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_link_forgery_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_link_numeric_test.goose" && node "$script_dir/i08_link_numeric_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_same_emit.goose" && "$GOOSE" --debug "-O$level" "$script_dir/i08_same_source_test.goose" && node "$script_dir/i08_same_test.mjs" && node "$script_dir/i08_same_bridge_test.mjs" && node "$script_dir/i08_same_bridge_oracle_test.mjs" && node "$script_dir/i08_same_bridge_adversarial_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/particle_expr_test.goose" && node "$script_dir/particle_expr_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/graph_test.goose" && node "$script_dir/graph_test.mjs")
