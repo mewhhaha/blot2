@@ -1,0 +1,9 @@
+import i08_header_parse; import i08_typed_shape; import i08_bound_shape; fn replace(s:u8[:],a:u8[:],b:u8[:])->u8[] {var out:u8[>..]=[];var i=0;var found=false;while i<s.len {if !found && a.len<=s.len-i && s[i..i+a.len]==a {out.append(b);i+=a.len;found=true;}else {out.push(s[i]);i+=1;}}assert(found);return out;} fn main(){
+ let s="pub let project: forall [r: Region, s: Region, n: Nat, c: Nat, d: Domain] => Fn[static, Many, (View[r,{x:F32,y:F32,vx:F32,vy:F32},n,d], F32, Builder[s,{x:F32,y:F32},0,c,Append]), exists [e: Domain] => View[s,{x:F32,y:F32},n,e]] ! {read r, write s} requires [Le(n,c)] resources {depth: 2, frame: 256} = fn (source,dt,initial) => do:\n  let built = for i in 0..n carry (b = initial)\n    invariant [Eq(Init(b),i)] do:\n      next (builder.append(b, {x: source[i].x + source[i].vx * dt, y: source[i].y + source[i].vy * dt}))\n  return builder.freeze(built)\n";
+ var tree,status=i08_header_parse::parse(s);assert(status==0 && i08_typed_shape::verify(tree,s) && i08_bound_shape::verify(tree,s));
+ for pair in [
+ ["0..n","0..c"], ["0..n","1..n"], ["0..n","0..source.length"], ["source[i].x","source[0].x"], ["source[i].x","source[c].x"], ["source[i].x","source[i + 0].x"]
+ ] {let text=replace(s,pair[0],pair[1]);var p,st=i08_header_parse::parse(text);assert(st==0 && i08_typed_shape::verify(p,text) && !i08_bound_shape::verify(p,text));}
+ for pair in [["source[i].x","source.length"], ["source[i].vx * dt","source[i].vx * initial"], ["builder.append(b,","builder.append(dt,"], ["builder.freeze(built)","builder.freeze(dt)"]] {let text=replace(s,pair[0],pair[1]);var p,st=i08_header_parse::parse(text);assert(st==0 && !i08_typed_shape::verify(p,text) && !i08_bound_shape::verify(p,text));}
+ let save=tree.nodes[0];tree.nodes[0].a=999999;assert(!i08_bound_shape::verify(tree,s));tree.nodes[0]=save;assert(!i08_bound_shape::verify(tree,"wrong"));
+ print("independent I08 formal bounds/typing controls passed");}

@@ -1,0 +1,10 @@
+import lexer; import i08_header_parse; import i08_header_verify; import i08_verify; import i08_parse; fn main(){
+ let s="pub let project: forall [r: Region, s: Region, n: Nat, c: Nat, d: Domain] => Fn[static, Many, (View[r,{x:F32,y:F32,vx:F32,vy:F32},n,d], F32, Builder[s,{x:F32,y:F32},0,c,Append]), exists [e: Domain] => View[s,{x:F32,y:F32},n,e]] ! {read r, write s} requires [Le(n,c)] resources {depth: 2, frame: 256} = fn (source,dt,initial) => do:\n  let built = for i in 0..n carry (b = initial)\n    invariant [Eq(Init(b),i)] do:\n      next (builder.append(b, {x: source[i].x + source[i].vx * dt, y: source[i].y + source[i].vy * dt}))\n  return builder.freeze(built)\n";
+ var tree,st=i08_header_parse::parse(s);assert(st==0);var altered:u8[>..]=[];altered.append(s);altered[8]='P';tree.source[8]='P';assert(!i08_header_verify::verify(tree,altered));
+ var state=lexer::init(altered);var tok=lexer::next(altered,state);var seeds:lexer::Token[5]=[lexer::Token {};5];var scope:i64=0;
+ while tok.kind!=0 && !(tok.kind==1 && altered[tok.start..tok.end]=="fn") {if tok.kind==1 {let w=altered[tok.start..tok.end];if w=="forall" {scope=tok.start+1;} else if w=="r" && seeds[0].end==0 {seeds[0]=tok;}else if w=="s" && seeds[1].end==0 {seeds[1]=tok;}else if w=="n" && seeds[2].end==0 {seeds[2]=tok;}else if w=="c" && seeds[3].end==0 {seeds[3]=tok;}else if w=="d" && seeds[4].end==0 {seeds[4]=tok;}}tok=lexer::next(altered,state);}
+ assert(i08_verify::verify_from(tree,altered,state,tok,seeds,scope));
+ for f in 9 {var wrong=state;if f==0 {wrong.position=-1;}else if f==1 {wrong.position=999999;}else if f==2 {wrong.source_len+=1;}else if f==3 {wrong.at_line_start=true;}else if f==4 {wrong.finished=true;}else if f==5 {wrong.error_status=1;}else if f==6 {wrong.indent_depth=999;}else if f==7 {wrong.delimiter_depth=-1;}else {wrong.pending_dedents=1;}
+  assert(!i08_verify::verify_from(tree,altered,wrong,tok,seeds,scope));let _,status=i08_parse::parse_from(altered,wrong,tok,seeds,scope);assert(status!=0);
+ }
+ print("malformed resume states rejected; altered header rejects at public entry");}

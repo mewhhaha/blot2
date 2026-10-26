@@ -59,6 +59,9 @@ index, length, version and true edge; those identities remain trusted fixture
 inputs rather than K1 binding or loan authority. A separate private guarded
 increment path checks source and successor evidence before emitting Wasm.
 These paths do not implement general bounds reasoning or the particle loop.
+The formal View/read and loan-forwarding experiments derive exact parameter
+identities from source and recheck the declared obligations; they do not
+establish a live external capability or enable an executable View ABI.
 
 The unified scalar source path now supports one source-backed successor proof
 on the true edge of `x < U32.MAX`. Separate private iteration, generalized
@@ -101,6 +104,21 @@ interface-envelope candidate test also passed at O0/O2. This is focused test
 evidence, not full K1 qualification.
 
 ## Validation evidence
+
+A combined Goose fixture run passed (exit 0) after adding the I08 source
+syntax, type-shape and formal-bound checks and bounded static products and
+pure calls. It runs these checks at `-O0` and `-O2` alongside the prior
+fixtures, adversarial tests and Wasm execution. The new I08 checks do not
+admit executable code or establish live loans; static Domain/global publication
+and full semantic-work accounting remain unimplemented.
+
+A further combined Goose fixture run passed (exit 0) with source-bound formal
+View proofs and forwarding, a locally allocated singleton View, scalar call
+chains, and a same-owner range model and one-region host bridge. The run covers
+`-O0` and `-O2`, independent adversarial checks, and execution of the private
+Wasm worker. These cases use bounded, trusted models and do not establish
+general loan provenance, frame preflight, the full M12 ABI, or public K1
+admission.
 
 A further combined Goose fixture run passed (exit 0) with mixed-loop fact
 checks, multi-entry linking, the private host-copy witness and the corrected

@@ -34,6 +34,7 @@ python3 "$script_dir/mixed_generated_oracle.py"
 python3 "$script_dir/mixed_fact_generated_oracle.py"
 python3 "$script_dir/linked_test.py"
 python3 "$script_dir/multilink_test.py"
+python3 "$script_dir/chain_test.py"
 for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/abi_fixed_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/blake3_test.goose"
@@ -131,12 +132,25 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/particle_lower_verify_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/particle_lower_verify_mutation_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/i08_job_adversarial_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_verify_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_header_smoke.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_typed_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_expression_audit.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_mutation_audit.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_precedence_audit.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_header_mutation_audit.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_resume_boundary.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_bound_adversarial_audit.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_bound_nested_audit.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/format_k1_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/format_k1_independent_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/effect_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/effect_oracle_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/static_forgery_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/static_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_product_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_call_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_audit_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/mixed_depth_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/mixed_compat_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/mixed_adapter_independent_test.goose"
@@ -152,6 +166,7 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/particle_lower_test.goose" && node "$script_dir/particle_lower_test.mjs")
     (cd "$test_dir" && node "$script_dir/particle_order_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_job_test.goose" && node "$script_dir/particle_lower_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_same_emit.goose" && "$GOOSE" --debug "-O$level" "$script_dir/i08_same_source_test.goose" && node "$script_dir/i08_same_test.mjs" && node "$script_dir/i08_same_bridge_test.mjs" && node "$script_dir/i08_same_bridge_oracle_test.mjs" && node "$script_dir/i08_same_bridge_adversarial_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/particle_expr_test.goose" && node "$script_dir/particle_expr_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/graph_test.goose" && node "$script_dir/graph_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/bounds_test.goose" && node "$script_dir/bounds_test.mjs")
@@ -173,6 +188,14 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/relation_direct_test.goose" && node "$script_dir/relation_direct_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/relation_path_test.goose" && node "$script_dir/relation_path_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/relation_forgery_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/viewproof_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/viewproof_adversarial_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/viewproof_source_mutation_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/viewcall_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/viewcall_adversarial_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/viewcall_shadow_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/viewalloc_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/viewalloc_adversarial_test.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/session_retained_test.goose" && node "$script_dir/session_retained_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/loop_test.goose" && node "$script_dir/loop_test.mjs" && node "$script_dir/loop_exhaustive_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/closure_test.goose" && node "$script_dir/closure_test.mjs" && node "$script_dir/closure_audit_test.mjs")
