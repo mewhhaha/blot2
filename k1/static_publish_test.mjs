@@ -1,0 +1,21 @@
+import {strict as assert} from 'node:assert';
+import {readFileSync} from 'node:fs';
+import {openVerifiedFixture} from './static_publish_host.mjs';
+const bytes=readFileSync('static-publish.wasm');assert(WebAssembly.validate(bytes));
+const mod=new WebAssembly.Module(bytes);assert.deepEqual(WebAssembly.Module.imports(mod),[]);
+assert.deepEqual(WebAssembly.Module.exports(mod).map(e=>[e.name,e.kind]),[['read','function'],['length','function'],['width','function']]);
+// Test-only raw exports demonstrate guest-side bounds; memory stays private.
+const raw=new WebAssembly.Instance(mod).exports;assert.equal(raw.length(),2);assert.equal(raw.width(),2);
+for(const [i,f] of [[2,0],[-1,0],[0,2],[0,-1]])assert.throws(()=>raw.read(i,f),WebAssembly.RuntimeError);
+const twin=readFileSync('static-publish-twin.wasm');assert.deepEqual(twin,bytes);
+const a=openVerifiedFixture(bytes),b=openVerifiedFixture(twin),a0=a.index(0),a1=a.index(1),b0=b.index(0);
+assert.deepEqual([a.read(a0,0),a.read(a0,1),a.read(a1,0),a.read(a1,1)],[1,0x80000000,3,0x7fc00000]);
+assert.equal(b.read(b0,0),1);assert.throws(()=>a.read(b0,0),TypeError);assert.throws(()=>b.read(a0,0),TypeError);
+assert.throws(()=>a.read({},0),TypeError);assert.throws(()=>a.read(0,0),TypeError);
+for(const x of [-1,2,2**32,NaN,1.1])assert.throws(()=>a.index(x),RangeError);
+for(const x of [-1,2,NaN,1.1])assert.throws(()=>a.read(a0,x),RangeError);
+const wideBytes=readFileSync('static-publish-wide.wasm');assert(WebAssembly.validate(wideBytes));
+const wide=openVerifiedFixture(wideBytes);assert.equal(wide.length,8193);assert.equal(wide.width,2);
+assert.equal(wide.read(wide.index(8192),0),1);assert.equal(wide.read(wide.index(8192),1),2);
+assert.throws(()=>wide.index(8193),RangeError);assert.throws(()=>wide.read(a0,0),TypeError);
+console.log('private static array instance isolation and index controls passed');

@@ -30,6 +30,8 @@ python3 "$script_dir/ownership_oracle_test.py"
 python3 "$script_dir/project_graph_test.py"
 python3 "$script_dir/link_check_test.py"
 python3 "$script_dir/particle_lower_generated_oracle.py"
+python3 "$script_dir/static_publish_generated_oracle.py"
+python3 "$script_dir/i08_transition_generated_oracle.py"
 python3 "$script_dir/mixed_generated_oracle.py"
 python3 "$script_dir/mixed_fact_generated_oracle.py"
 python3 "$script_dir/linked_test.py"
@@ -145,6 +147,7 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/i08_affine_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/i08_affine_adversarial_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/i08_affine_generated_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_live_affine_adversarial_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/format_k1_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/format_k1_independent_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/effect_test.goose"
@@ -175,6 +178,11 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_link_test.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_link_forgery_test.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_link_numeric_test.goose" && node "$script_dir/i08_link_numeric_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_live_source_test.goose" && node "$script_dir/i08_live_authority_test.mjs" && node "$script_dir/i08_live_adversarial_test.mjs" && node "$script_dir/i08_window_fixture_test.mjs" && node "$script_dir/i08_window_oracle_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_transition_test.goose" && node "$script_dir/i08_transition_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_transition_association_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_live_transition_test.goose" && node "$script_dir/i08_live_authority_test.mjs" && node "$script_dir/i08_live_adversarial_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_live_transition_adversarial_test.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_same_emit.goose" && "$GOOSE" --debug "-O$level" "$script_dir/i08_same_source_test.goose" && node "$script_dir/i08_same_test.mjs" && node "$script_dir/i08_same_bridge_test.mjs" && node "$script_dir/i08_same_bridge_oracle_test.mjs" && node "$script_dir/i08_same_bridge_adversarial_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/particle_expr_test.goose" && node "$script_dir/particle_expr_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/graph_test.goose" && node "$script_dir/graph_test.mjs")
@@ -193,6 +201,7 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/mixed_fact_integration_test.goose" && node "$script_dir/mixed_fact_integration_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/refinement_unified_test.goose" && node "$script_dir/refinement_unified_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/static_float_oracle.goose" && node "$script_dir/static_float_oracle.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/static_publish_test.goose" && node "$script_dir/static_publish_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/ule_refinement_test.goose" && node "$script_dir/ule_refinement_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/relation_direct_test.goose" && node "$script_dir/relation_direct_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/relation_path_test.goose" && node "$script_dir/relation_path_test.mjs")

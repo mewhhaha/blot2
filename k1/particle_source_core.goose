@@ -2,7 +2,10 @@
 // portable artifact. The supplied Context identifies compiler-owned symbolic
 // values in one trusted job; integers do not grant region/loan/domain authority.
 // This subset assumes independently established immutable input, exclusive
-// builder, distinct input/output backing regions, and a preflighted host.
+// builder, independently established disjoint input/output storage ranges,
+// and a preflighted host. The formal Region binder IDs must be distinct as
+// syntax symbols, but their actual backing owner may be the same only when
+// checked range and loan evidence establishes this premise.
 namespace particle_source_core;
 struct Context {
     owner:u32=0, input:u32=0, input_version:u32=0, input_region:u32=0, input_domain:u32=0, length:u32=0,

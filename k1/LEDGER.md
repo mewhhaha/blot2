@@ -105,6 +105,14 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) with the checked source and
+conditional transition gate, a private live-Wasm instance and fixed-window
+fixture, and immutable static-array publication. It covers `-O0`/`-O2`,
+independent generated oracles, source/target forgery, hostile input and
+failure paths. The window's frame preflight is modeled, the live adapter
+trusts its host and runtime, and the static index identity is a host model.
+These checks do not qualify general K1 loans, M12, C09 or public admission.
+
 A combined Goose fixture run passed (exit 0) after connecting the I08
 source/type/bounds representation to its independently checked operation
 trace and Wasm target, adding canonical builder-use checks, and evaluating

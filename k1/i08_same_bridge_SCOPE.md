@@ -11,8 +11,8 @@ independently checked against the restricted particle source.
 This does not implement the M12 host ABI or validate a general manifest. Its
 numeric descriptors and source region symbols do not establish authentic source
 capabilities or immutable loans. The restricted particle source checker
-assumes distinct input and output backing regions; the disjoint ranges in this
-one-owner witness have not been justified as a valid substitution for those
+requires independently established disjoint input and output ranges and loans;
+this witness does not establish general source-level loan authority for the
 formal regions. This bridge therefore cannot admit that source-level call.
 Host frame preflight, source-level error
 recovery, shared-memory concurrency, complete arithmetic-NaN qualification and
