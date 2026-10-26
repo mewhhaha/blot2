@@ -1,4 +1,5 @@
-/** Paired K1 kernel workloads; phase attribution is separate from timing. */
+/** Paired K1 kernels; runtime samples each use a fresh engine process. */
+import { seeds, workloads } from "./runtime_workloads.ts";
 const root = new URL("../", import.meta.url).pathname;
 const options = new Map(Deno.args.map((arg) => {
   const split = arg.indexOf("=");
@@ -9,9 +10,20 @@ const baseline = options.get("--baseline") ?? candidate;
 const opt = options.get("--opt") ?? "release";
 const baselineOpt = options.get("--baseline-opt") ?? "off";
 const rounds = Number(options.get("--rounds") ?? 5);
-const warmup = Number(options.get("--runtime-warmup") ?? 2000);
+const warmup = Number(options.get("--runtime-warmup") ?? 20000);
+const engine = options.get("--engine") ?? "default";
+const selectedNames =
+  (options.get("--workloads") ?? workloads.map((w) => w.name).join(",")).split(
+    ",",
+  );
+const selectedWorkloads = selectedNames.map((name) => {
+  const item = workloads.find((w) => w.name === name);
+  if (!item) throw new Error(`unknown workload ${name}`);
+  return item;
+});
 const calls = Number(options.get("--runtime-calls") ?? 20000);
 if (
+  !["default", "optimizing"].includes(engine) ||
   ![opt, baselineOpt].every((s) => ["off", "fast", "release"].includes(s)) ||
   !Number.isInteger(rounds) || rounds < 1 || rounds > 100 ||
   !Number.isInteger(warmup) || warmup < 0 || warmup > 1000000 ||
@@ -29,46 +41,13 @@ const digest = async (bytes: Uint8Array) =>
   )
     .map((b) => b.toString(16).padStart(2, "0")).join("");
 const sha = async (path: string) => digest(await Deno.readFile(path));
-const bits = new DataView(new ArrayBuffer(4));
-function f32bits(value: number) {
-  bits.setFloat32(0, value, true);
-  return bits.getUint32(0, true);
-}
-const seeds = [0, 1, 7, 40, 255, 65535, 0xffffffff];
-const workloads = [
-  {
-    name: "recurrence",
-    iterations: 1024,
-    encode: (value: number) => value >>> 0,
-    reference(seed: number) {
-      let state = seed >>> 0, total = 0;
-      for (let i = 0; i < 1024; i++) {
-        state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-        total = (total + state) >>> 0;
-      }
-      return total;
-    },
-  },
-  {
-    name: "affine_loop",
-    iterations: 128,
-    encode: f32bits,
-    reference(seed: number) {
-      let state = Math.fround(seed);
-      for (let i = 0; i < 128; i++) {
-        state = Math.fround(Math.fround(state * Math.fround(1.0001)) + 0.5);
-      }
-      return state;
-    },
-  },
-];
 const candidateHash = await sha(candidate);
 const qualification = await Deno.readTextFile(
   root + "test-results/qualification.json",
 )
   .then(JSON.parse).catch(() => null);
 const metadata = {
-  format: "K1-KERNEL-WORKLOADS-1",
+  format: "K1-KERNEL-WORKLOADS-2",
   timestamp: new Date().toISOString(),
   os: Deno.build,
   deno: Deno.version,
@@ -85,10 +64,16 @@ const metadata = {
   harness_sha256: await sha(new URL(import.meta.url).pathname),
   rounds,
   seeds,
+  engine,
+  workloads: selectedNames,
+  runtime_worker_sha256: await sha(
+    root + "scripts/benchmark_runtime_worker.ts",
+  ),
+  reference_models_sha256: await sha(root + "scripts/runtime_workloads.ts"),
   warmup_calls: warmup,
   timed_calls: calls,
   method:
-    "Sequential counterbalanced pairs, fresh process compilation, same default Deno/V8 engine. Warmed kernels use varying deterministic seeds, exact integer/F32 references and timed checksums. Includes JS/Wasm boundary; no host array bridge. CPU placement/frequency/cache uncontrolled.",
+    "Sequential counterbalanced pairs and fresh compiler processes. Each artifact runs in a fresh Deno/V8 process; startup/instantiation/warmup/reference checks are outside runtime timing. Default and optimizing-only engine results stay separate. Kernels use varying deterministic seeds, exact integer/F32 references and timed checksums. Includes JS/Wasm boundary; no host array bridge. CPU placement/frequency/cache uncontrolled.",
 };
 type Sample = {
   workload: string;
@@ -104,6 +89,9 @@ type Sample = {
   expected?: number[];
   runtime_checksum?: number;
   runtime_ns_per_call?: number;
+  runtime_command?: string[];
+  runtime_calls?: number;
+  runtime_warmup_calls?: number;
   kernel_iterations_per_call: number;
   phase?: unknown;
 };
@@ -160,44 +148,36 @@ async function measure(
   if (sample.exit_code === 0) {
     const bytes = await Deno.readFile(prefix + ".wasm");
     sample.wasm_sha256 = await digest(bytes);
-    const { instance } = await WebAssembly.instantiate(bytes);
-    const run = instance.exports.run as (seed: number) => number;
-    const expected = seeds.map((seed) =>
-      workload.encode(workload.reference(seed))
-    );
-    sample.expected = expected;
-    seeds.forEach((seed, index) => {
-      const actual = workload.encode(run(seed));
-      if (actual !== expected[index]) {
-        throw new Error(
-          `${workload.name}/${who}/${seed}: ${actual} != ${expected[index]}`,
-        );
-      }
-    });
-    if (round >= 0) {
-      const sweep = (count: number) => {
-        let checksum = 0;
-        for (let i = 0; i < count; i++) {
-          checksum =
-            (checksum + workload.encode(run(seeds[i % seeds.length]))) >>> 0;
-        }
-        const cycle = expected.reduce((sum, n) => (sum + n) >>> 0, 0);
-        let wanted = Math.imul(cycle, Math.floor(count / seeds.length)) >>> 0;
-        for (let i = 0; i < count % seeds.length; i++) {
-          wanted = (wanted + expected[i]) >>> 0;
-        }
-        if (checksum !== wanted) throw new Error("kernel checksum changed");
-        return checksum;
-      };
-      sweep(warmup);
-      const start = performance.now();
-      sample.runtime_checksum = sweep(calls);
-      sample.runtime_ns_per_call = (performance.now() - start) * 1e6 / calls;
-    } else {
+    const runtimeArgs = [
+      "run",
+      ...(engine === "optimizing" ? ["--v8-flags=--no-liftoff"] : []),
+      "--allow-read",
+      root + "scripts/benchmark_runtime_worker.ts",
+      prefix + ".wasm",
+      workload.name,
+      String(round < 0 ? 0 : warmup),
+      String(round < 0 ? 0 : calls),
+    ];
+    sample.runtime_command = [Deno.execPath(), ...runtimeArgs];
+    const runtime = await new Deno.Command(Deno.execPath(), {
+      args: runtimeArgs,
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    await Deno.writeFile(prefix + ".runtime.stdout", runtime.stdout);
+    await Deno.writeFile(prefix + ".runtime.stderr", runtime.stderr);
+    if (!runtime.success) {
+      throw new Error(
+        `runtime worker failed: ${decoder.decode(runtime.stderr)}`,
+      );
+    }
+    Object.assign(sample, JSON.parse(decoder.decode(runtime.stdout)));
+    if (round < 0) {
       sample.phase = (await Deno.readTextFile(prefix + ".stderr")).split("\n")
         .filter((line) => line.startsWith("{")).map((line) => JSON.parse(line));
     }
   }
+
   await Deno.writeTextFile(
     out + "/results.json",
     JSON.stringify({ metadata, samples }, null, 2) + "\n",
@@ -206,7 +186,7 @@ async function measure(
     throw new Error(`failed workload retained in ${prefix}.stderr`);
   }
 }
-for (const workload of workloads) {
+for (const workload of selectedWorkloads) {
   for (let round = 0; round < rounds; round++) {
     for (
       const who of round % 2

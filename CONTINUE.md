@@ -1,97 +1,94 @@
 # Continue the Goose K1 rewrite
 
 Worktree: `/home/mewhhaha/.codex/worktrees/0409/blot2`, branch `rewrite/goose-k1`.
-Main and the installed legacy compiler remain separate. The latest task was to
-implement the next predictable performance steps: structural validator/proof
-work, then bounded release inlining. Three Sol agents implemented and reviewed
-the changes; root integrated counters, session invalidation, workloads and evidence.
-The qualified implementation is frozen and is being published as a draft PR.
-The user next requested a bounded runtime performance pass with Sol review;
-stop if measurements do not justify further changes.
+Draft PR: https://github.com/mewhhaha/blot2/pull/43, targeting `main`.
+The user requested the draft PR, then a bounded runtime performance pass with Sol
+review. The PR was opened after pushing `900ede2`; the bounded runtime follow-up is
+complete and recorded below. All agent lanes are frozen,
+all required checks and measurements are complete, and no jobs remain running.
+Do not continue an open-ended optimization search without a new user request.
 
-Read [current results](benchmarks/STRUCTURAL.md), [ledger](IMPLEMENTATION.md),
-[contracts](docs/CONTRACT.md) and [normative snapshots](docs/spec/INDEX.md).
-The earlier [parity report](benchmarks/PARITY.md) remains historical evidence.
+Read [current runtime results](benchmarks/RUNTIME.md),
+[implementation ledger](IMPLEMENTATION.md), [contracts](docs/CONTRACT.md) and
+[normative snapshots](docs/spec/INDEX.md). The earlier
+[structural](benchmarks/STRUCTURAL.md) and [parity](benchmarks/PARITY.md) reports
+remain immutable historical evidence.
 
-The current release gate passed **115 native entries, 88 Deno tests, editor
-scopes and 29 formatter round trips**. Input manifest:
-`32c050991a86eec699074c07a52add676ebef9f795685c3f6490743ab054b928`.
-Executable SHA-256:
-`ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527`.
-[Current evidence](benchmarks/results/structural/manifest.json) pins all 191
-qualified inputs and 1,177 records, including isolated release ablations,
-previous/new K1, legacy, retained edits, fast/release and engine controls.
-All samples, hashes, raw logs, source overlays and profiling reports are archived.
-Historical evidence packages are immutable. Do not rerun snapshot-specific
-packagers against a different candidate.
+## Current qualification
 
-## Completed mechanisms
+The release gate passed **116 native entries, 92 Deno tests, editor scopes and
+29 formatter round trips**. Input manifest:
+`27e9627f595ffe94ff0a2955c600ef977cd1262638152326700716c8fb85d67e`.
+Compiler SHA-256:
+`94b3d24012f8868a8eb7e8e6351edcfea9529c3d7de36845d10b0b2e47f032bd`.
+[Current evidence](benchmarks/results/runtime/manifest.json) pins all 197
+qualified inputs, full gate logs, baseline inputs and 228 measurement records.
+Source and binary hashes remain identical to the passed gate. Historical
+packages and snapshot-specific packagers must not be overwritten or rerun
+against a different candidate.
 
-Validator Context borrows its immutable Core view, avoiding repeated copies of
-the table inventory. Attempt budgets/scratch remain private. Fifty-four frozen
-before/after admissions preserve exact outcomes, diagnostics, work counts and
-canonical digests. Iterative Tarjan proof SCCs remove reverse adjacency and a
-second graph traversal, while keeping the first strict edge, certificate BFS,
-evidence order and direct contradiction shortcut. Guard-heavy proof visits fall
-about 15%; the isolated Tarjan wall-time ratio is 0.999, so no separate timing win
-is established. The Core-borrow ablation helps several larger workloads.
+## Completed runtime pass
 
-The release tier adds direct monomorphic single-block U32/Bool/F32 inlining.
-It excludes captures, generic substitutions, effects and proof-bearing interfaces
-or pinned producers. Templates are immutable; arguments evaluate once; SSA,
-source order and separate F32 rounding are preserved. Policy limits are unchanged:
-32 callee nodes, depth 2, 16 sites/caller, floor(caller nodes/4) growth capped at 256,
-global output N+64, visits 8N+1024 and rewrites N+256. Preflight and reserved cleanup
-visits retain a valid prefix on optional refusal. Internal mapping failures still
-fail; every candidate is independently validated. Nine native laws and two guest
-laws cover boundaries, a 256-limit multi-block sweep, F32 and effectful arguments.
-A retained release test checks callee edits while reusing caller judgments.
+Exactly two mechanisms were selected after Sol review:
 
-The CLI exposes inline_sites/growth/declines/max_callee/max_depth separately.
-These count attempted work; whole-candidate rewrite_declines can still cause
-baseline emission. Semantic receipts contain preoptimization bodies, so each
-revision redoes optional transport from current completed callees.
+- Frame planning shares the register-edge predicate with emission and omits
+  physical phi scratch for those edges. Nonflat parallel-copy fallback and
+  independent Owned-seal scratch remain. The plain F32 loop body drops from
+  138 to 93 Wasm bytes and from eight frame bytes to zero. Conservative certified
+  body bounds, source admission and public contract preflight remain unchanged.
+- Four-byte copies use integer load-before-store. Dynamic sizes select that
+  path for four bytes and otherwise keep bulk copy, including zero; known other
+  fixed sizes remain unchanged. Size calculation precedes scratch spills,
+  F32 bits and overlap behavior are exact, telemetry counts once, and argument/
+  result slots remain distinct. Shared generic bodies and the ABI are unchanged.
 
-## Results and limits
+One native fixture, three copy execution laws and one phi execution law cover
+0–256-byte copies, unaligned overlaps, signed-zero/NaN words, bounds failure
+without partial writes, typed generic/fixed paths, exact counters, simultaneous
+mixed/F32 swaps, nonflat edges and conservative envelope rejection. The full
+existing ownership, generic, adapter, artifact, cancellation and OOM corpus passed.
 
-At scale 128 (chains 127), paired whole-compile ratios against previous K1 are
-0.851–0.932, roughly 7–15% less time. Off-tier Wasm is byte-identical throughout.
-Body edits: 6.96 → 6.29 ms; unchanged: 7.31 → 6.34 ms. These are synthetic inputs, not gdev.
-Against legacy, modules are near parity (10.71 vs 10.61 ms); proofs (22.56 vs 25.40 ms) and
-domains (7.35 vs 13.23 ms) remain slower. Old/new absolute times across separate batches
-are not comparable; host load/frequency/cache are uncontrolled.
+## Results and stopping point
 
-Inlining has no established general runtime win. The 128-diamond corpus retains
-25 sites/+8 operations within 12,288 visits, no whole-candidate decline. Only 9 of 128
-export call graphs change; 119 are byte-identical. Original mixed-family runtime
-ratio 1.228 regressed, fresh-engine control 0.796 reversed direction, and optimizing
-engine control 0.989 was near parity. All are retained. Integer/F32 loop kernel
-ratios 1.010/0.980 also do not resolve a win. Do not tune source or policy to these
-fixtures or claim that more inlining alone closes the runtime gap.
+Five counterbalanced pairs of five loop kernels run each Wasm artifact in a
+fresh Deno process. Both compiler versions use `--opt=off`; this is independent
+of the earlier inlining work. Default V8 and optimizing-only controls stay separate.
+Each call executes 1,024 integer or 128 F32 iterations, with varying seeds, exact
+reference results, 20,000 warmup and 20,000 timed calls.
 
-Next useful compiler work is completion/evidence traversal, remaining validator
-/type traversal and static-domain planning. For runtime, examine shared generic
-slot/adapter overhead with engine-stable whole kernels before more rewrite rules.
-Retained transport and Goose/C build iteration remain separate targets. Compiler
-rebuild-time was not remeasured. No syntax or ABI change was made.
+Generic integer recurrence improves from 5.795 to 1.267 microseconds per kernel
+call in default V8: paired ratio 0.220, about 4.5× faster. Optimizing-only ratio is
+0.206, about 4.9× faster. Generic F32 paired ratios are 0.813/0.847, about 15–19%
+less time. Ordinary kernels and the eight-byte aggregate fallback remain roughly
+unchanged. Nine compile controls give paired ratios 0.959–1.023, with no established
+compile-time change. All samples/ranges are retained; CPU placement/load/frequency
+and cache remain uncontrolled. No new gdev or legacy comparison was made.
 
-## Reproduction
+The selected changes passed and have useful measured results. Stop here rather
+than tuning these kernels further. The initial release inliner remains qualified
+but its earlier general runtime benefit is unresolved; no inlining limits changed.
+
+## Earlier work and reproduction
+
+The prior structural pass borrowed validator Core views, replaced proof SCC
+search with iterative Tarjan, and added bounded release inlining. It reduced
+fresh compile time roughly 7–15% against the preceding K1 and retained body edits
+from 6.96 to 6.29 ms. Its off-tier Wasm was byte-identical before/after. Previous
+legacy numbers belong to that snapshot, not the new runtime candidate.
 
 Pinned Goose: `/tmp/blot-k1-goose/build/goose`, commit
 `a108677d300cb0e8bbb842c35a353abe67a20c6c`,
-`GOOSE_HOME=/tmp/blot-k1-goose-home`. The same pinned toolchain was rebuilt this
-turn after its temporary executable disappeared. Bootstrap can recreate it.
+`GOOSE_HOME=/tmp/blot-k1-goose-home`. Bootstrap can recreate it.
 Compiler changes require the complete `scripts/check.sh --release` gate.
+Current compiler is `build/blot`; the preserved runtime baseline is
+`build/runtime-pass-baseline/blot` (`ca49141e…`) with complete input/gate snapshots.
+Earlier preserved binaries and hashes are documented in historical reports.
 
-Previous qualified compiler: `build/structural-baseline/blot` (`f84aa746…`), with
-its input snapshot. Earlier preserved executables: `build/review-baseline/blot`,
-`build/parity-baseline/blot`, `build/parity-first-candidate/blot`,
-`build/parity-before-publication/blot`. Full hashes are in their evidence packages.
-Final orchestration and control scripts are archived from `build/run_structural.py`
-and `build/run_inline_control.py`; public workload harness is
-`scripts/benchmark_workloads.ts`. No required checks remain pending.
+The runtime orchestration and structural inspection are archived from
+`build/run_runtime_pass.py` and `build/runtime-pass-attribution/inspect.py`.
+Public harness/model/worker files live in `scripts/`. Compiler rebuild-time and
+retained-edit timings were not rerun for this runtime pass.
 
-The user authorized committing and pushing this branch for a draft PR.
-The next runtime pass should preserve the qualified baseline and report measured
-results, including unsuccessful experiments. Do not replace the installed
-compiler, merge the draft or close #37 without the user's instruction.
+The user authorized committing/pushing for the draft PR. No installation, merge
+or issue closure is part of this task; do not replace the installed compiler,
+merge the draft or close #37 without a new instruction.

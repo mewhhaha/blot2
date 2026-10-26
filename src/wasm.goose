@@ -540,10 +540,27 @@ recursive fn emit_size(s: Lowering, b: u8[>..]&, type_id: u32, depth: u32) {
   }
   constant(b, layout(s.core, s.layouts, id).size);
 }
+// Destination, source and byte count are already on the operand stack. Save
+// addresses only after size evaluation: nested generic sums use tmp0 too.
+fn copy_dynamic_word(b: u8[>..]&, size: u32, source: u32, destination: u32) {
+  set(b, size); set(b, source); set(b, destination);
+  get(b, size); constant(b, 4); op(b, 0x46); when(b);
+  get(b, destination); get(b, source); load(b, 0); store(b, 0);
+  otherwise(b); get(b, destination); get(b, source); get(b, size);
+  op(b, 0xfc); uleb(b, 10); uleb(b, 0); uleb(b, 0); end(b);
+}
 fn copy_type(s: Lowering, b: u8[>..]&, type_id: u32) {
+  let fixed = fixed_layout(s.core, type_id, 0);
+  if fixed && layout(s.core, s.layouts, type_id).size == 4 {
+    telemetry_add_const(s.module,b,runtime::T_INITIALIZED,4); telemetry_add_const(s.module,b,runtime::T_COPIED,4);
+    // Integer words preserve every F32 bit; load completes before store even
+    // when trusted internal source/destination ranges overlap.
+    load(b, 0); store(b, 0); return;
+  }
   emit_size(s, b, type_id, 0);
   if s.module.telemetry { tee(b,s.base+69); telemetry_add_local(s.module,b,runtime::T_INITIALIZED,s.base+69,1); telemetry_add_local(s.module,b,runtime::T_COPIED,s.base+69,1); }
-  op(b, 0xfc); uleb(b, 10); uleb(b, 0); uleb(b, 0);
+  if !fixed { copy_dynamic_word(b, s.base+69, s.tmp0, s.tmp1); }
+  else { op(b, 0xfc); uleb(b, 10); uleb(b, 0); uleb(b, 0); }
 }
 fn zero_type(s: Lowering, b: u8[>..]&, type_id: u32) {
   constant(b, 0); emit_size(s, b, type_id, 0);
@@ -1082,13 +1099,17 @@ fn emit_operation(s: Lowering, b: u8[>..]&, operation_id: u32, operation: Operat
   return opcode_diagnostic(diags, 3009, operation);
 }
 
+// Allocation and emission share this exact predicate: a register-only edge
+// never reads or writes phi scratch, including zero-word fixed aggregates.
+fn edge_in_registers(c: const Core&, layouts: const u32[:], flat_locals: const u32[:], edge: Edge) -> bool {
+  for arg in refs(c, edge.args) { if aggregate(layout(c, layouts, c.values[arg].type_id)) && flat_locals[arg] == 0 { return false; } }
+  for param in refs(c, c.blocks[edge.to].params) { if aggregate(layout(c, layouts, c.values[param].type_id)) && flat_locals[param] == 0 { return false; } }
+  return true;
+}
 fn emit_edge_values(s: Lowering, b: u8[>..]&, edge: Edge) {
   if s.module.telemetry { for loop_row,i in s.core.loops { if i!=0 && loop_row.header==edge.from && loop_row.body==edge.to { telemetry_add_const(s.module,b,runtime::T_LOOPS,1); } } }
   let args = refs(s.core, edge.args); let params = refs(s.core, s.core.blocks[edge.to].params);
-  var registers = true;
-  for arg in args { if aggregate(value_layout(s, arg)) && !flat(s, arg) { registers = false; } }
-  for param in params { if aggregate(value_layout(s, param)) && !flat(s, param) { registers = false; } }
-  if registers {
+  if edge_in_registers(s.core, s.layouts, s.flat_locals, edge) {
     for arg in args {
       if flat(s, arg) { for word in value_layout(s, arg).size / 4 { get(b, s.flat_locals[arg] + word); } }
       else { value(s, b, arg); }
@@ -1287,14 +1308,18 @@ fn lower_function(c: Core, m: ModuleBuilder&, h: Helpers, layouts: const u32[:],
     }
   }
   let base = params.len as u32 + i32_count;
-  var f32_local = base + 69 + (if m.telemetry {1 as u32} else {0});
+  // Dynamic copy size shares the telemetry size slot. Compaction removes it
+  // whenever neither path uses it; F32 locals must follow the integer group.
+  var f32_local = base + 70;
   for v, i in c.values { if included[i] && layout(c, layouts, v.type_id).abi == ABI_F32 { local_ids[i] = f32_local; f32_local++; } }
   var phi_bytes: u32 = 0;
   for block_id in refs(c, f.blocks) {
     let row = c.blocks[block_id];
     for edge_id in refs(c, c.terminators[row.term].edges) {
+      let edge = c.edges[edge_id];
+      if edge_in_registers(c, layouts, flat_ids, edge) { continue; }
       var bytes: u32 = 0;
-      for value_id in refs(c, c.edges[edge_id].args) { bytes += layout(c, layouts, c.values[value_id].type_id).size; }
+      for value_id in refs(c, edge.args) { bytes += layout(c, layouts, c.values[value_id].type_id).size; }
       phi_bytes = max(phi_bytes, bytes);
     }
     for op_id in refs(c, row.ops) {
@@ -1330,7 +1355,7 @@ fn lower_function(c: Core, m: ModuleBuilder&, h: Helpers, layouts: const u32[:],
   let s = Lowering {c, m, h, layouts, functions, signatures, plans, local_ids[..], offsets[..],
     flat_ids[..], adapter_entries, static_addresses, adapter_codes, environments[..], call_arguments[..], call_results[..], fid, base, base + 1, base + 2, base + 3, base + 4, phi, frame, params.len as u32};
   var b: u8[>..] = [];
-  uleb(b, if f32_count == 0 { 1 } else { 2 }); uleb(b, i32_count + 69 + (if m.telemetry {1 as u32} else {0})); op(b, I32);
+  uleb(b, if f32_count == 0 { 1 } else { 2 }); uleb(b, i32_count + 70); op(b, I32);
   if f32_count != 0 { uleb(b, f32_count); op(b, F32); }
   // A zero-byte activation has no local frame addresses or frontier mutation.
   // Public wrappers still preflight the complete allowance before effects.

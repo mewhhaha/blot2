@@ -1,0 +1,17 @@
+let identity: forall [T:Type] => T -> T ! {} resources {depth:1,frame:1024} = fn value => return value
+let four: (U32,Unit) -> (U32,Unit) ! {} resources {depth:1,frame:256} = fn value => return value
+let eight: (U32,U32) -> (U32,U32) ! {} resources {depth:1,frame:256} = fn value => return value
+pub let run: U32 -> U32 ! {} resources {depth:2,frame:2048} = fn value => return identity@[U32](value)
+pub let run_float: F32 -> F32 ! {} resources {depth:2,frame:2048} = fn value => return identity@[F32](value)
+pub let unit: Unit -> U32 ! {} resources {depth:2,frame:2048} = fn () => do:
+  let _ = identity@[Unit](())
+  return 7
+pub let pair: U32 -> U32 ! {} resources {depth:2,frame:2048} = fn value => do:
+  let (answer,_) = identity@[(U32,U32)]((value,13))
+  return answer
+pub let fixed: U32 -> U32 ! {} resources {depth:2,frame:2048} = fn value => do:
+  let (answer,_) = four((value,()))
+  return answer
+pub let fixed_eight: U32 -> U32 ! {} resources {depth:2,frame:2048} = fn value => do:
+  let (answer,_) = eight((value,13))
+  return answer

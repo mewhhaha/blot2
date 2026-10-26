@@ -189,6 +189,21 @@ Retained `total_ns` measures the candidate pipeline. Separate `cache_admit_ns`
 buffer copy) and `publication_ns` expose the surrounding work. Measured request
 wall time also includes protocol, scratch destruction and scheduling overhead.
 
+## Physical scratch and word copies
+
+The frame planner and edge emitter share one predicate for parallel transfers
+performed entirely through scalar/flat Wasm registers. Those edges need no
+physical phi scratch; nonflat edges retain the complete parallel-copy fallback.
+Owned sealing retains its independent scratch, and source admission, public
+preflight and declared resource envelopes remain conservative.
+
+A known four-byte payload copy uses an integer load followed by an integer store.
+Dictionary-sized copies evaluate their size once, use the same word transfer for
+four bytes, and retain bulk copy for every other size, including zero. Load-before-
+store preserves overlapping-copy behavior and exact F32 bits. Size evaluation
+finishes before addresses enter scratch locals; telemetry counts each logical
+copy once. Argument and writable result slots remain distinct under the ABI.
+
 ## Bounded release inlining
 
 The release tier may transport an admitted direct, monomorphic, single-block

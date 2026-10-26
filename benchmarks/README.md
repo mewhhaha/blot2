@@ -1,6 +1,9 @@
 # K1 measurement corpus
 
-[Current structural measurements](STRUCTURAL.md) isolate borrowed validator views,
+[Current runtime measurements](RUNTIME.md) cover two bounded lowering changes
+with fresh engine processes, exact kernel references and compile controls.
+
+[Earlier structural measurements](STRUCTURAL.md) isolate borrowed validator views,
 forward-only proof SCCs and bounded release inlining.
 
 [Earlier parity investigation](PARITY.md) compares the improved rewrite with the
@@ -142,3 +145,27 @@ its isolated ablation overlays, previous/final qualified inputs, sampling report
 raw pairs, full gate and new workload sources. Its manifest refuses changed
 inputs or overwritten evidence. Historical packagers remain tied to their own
 candidates; they are not general commands for packaging an arbitrary new build.
+
+## Isolated runtime kernel comparisons
+
+The workload harness now starts a fresh Deno process for every artifact. Default
+and optimizing-only engine results are separate. Five kernels cover ordinary
+integer/F32 loops, scalar generic transfers and an eight-byte generic fallback.
+Reference checks and warmup are outside runtime timing; complete checksums guard
+the measured loop. The default is 20,000 warmup and 20,000 timed kernel calls.
+
+```sh
+deno run -A scripts/benchmark_workloads.ts \
+  --baseline=build/runtime-pass-baseline/blot --opt=off --baseline-opt=off \
+  --engine=default --rounds=5 --out=build/bench-runtime-default
+deno run -A scripts/benchmark_workloads.ts \
+  --baseline=build/runtime-pass-baseline/blot --opt=off --baseline-opt=off \
+  --engine=optimizing --rounds=5 --out=build/bench-runtime-optimizing
+```
+
+`--workloads=recurrence,affine_loop` selects a subset. The worker and independent
+models are `scripts/benchmark_runtime_worker.ts` and `scripts/runtime_workloads.ts`.
+The public harness accepts other compiler paths; the baseline above is the saved
+local candidate for this investigation. `benchmarks/package_runtime.py` freezes
+this specific qualified pass and verifies its baseline, source hashes and exact
+paired outputs. Historical packages retain their original harness versions.

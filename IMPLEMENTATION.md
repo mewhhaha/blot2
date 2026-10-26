@@ -1,16 +1,16 @@
 # K1 implementation and qualification ledger
 
 The K1 source, runtime, artifact, reuse and optimizer implementations pass the
-frozen release gate: **115 native entries, 88 Deno integration tests and the editor
+frozen release gate: **116 native entries, 92 Deno integration tests and the editor
 gate**. The candidate is identified by input manifest
-`32c050991a86eec699074c07a52add676ebef9f795685c3f6490743ab054b928`
+`27e9627f595ffe94ff0a2955c600ef977cd1262638152326700716c8fb85d67e`
 and executable SHA-256
-`ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527`.
+`94b3d24012f8868a8eb7e8e6351edcfea9529c3d7de36845d10b0b2e47f032bd`.
 **I09 measurements and the initial K1-10 handoff are complete.** The
-[structural follow-up](benchmarks/STRUCTURAL.md) records validator/proof work
-reductions and bounded release inlining after the earlier
-[parity investigation](benchmarks/PARITY.md). Its
-[latest evidence](benchmarks/results/structural/manifest.json) binds all 191
+[runtime follow-up](benchmarks/RUNTIME.md) records register-only phi scratch
+omission and four-byte payload copy lowering, after the earlier
+[structural](benchmarks/STRUCTURAL.md) and [parity](benchmarks/PARITY.md) work.
+Its [latest evidence](benchmarks/results/runtime/manifest.json) binds all 197
 qualified inputs, raw records and the gate to this candidate.
 The [preceding parity package](benchmarks/results/parity/manifest.json),
 [Sol review](benchmarks/SOL_REVIEW.md) and [initial report](benchmarks/RESULTS.md)
@@ -240,3 +240,23 @@ that rejected revisions retain the prior output.
 [Structural measurements](benchmarks/STRUCTURAL.md) separate isolated changes,
 combined compiler results and release/fast runtime behavior. The two new loop
 workloads have independent integer/F32 reference models and varying inputs.
+
+## Bounded runtime follow-up coverage
+
+Frame allocation and emission share `edge_in_registers`; scalar/flat edges no
+longer reserve unused physical phi scratch. The new executed law in
+[wasm_runtime_test.ts](tests/wasm_runtime_test.ts) checks joins, loops, mixed/F32
+parallel swaps, nonflat fallback, telemetry, frontier restoration and unchanged
+public/source envelope rejection. Owned sealing retains separate scratch.
+
+Four-byte copies use integer load-before-store, with a guarded path for dynamic
+sizes and bulk fallback for all other sizes including zero. The native fixture
+in [wasm_copy_test.goose](tests/wasm_copy_test.goose) and three executed laws in
+[wasm_copy_test.ts](tests/wasm_copy_test.ts) compare memmove behavior over 0–256
+bytes, unaligned overlaps, signed-zero/NaN word bits, bounds failures without
+partial writes, typed generic/fixed paths and exact byte/call counters.
+
+[Runtime measurements](benchmarks/RUNTIME.md) contain one fixed before/after
+pass with fresh engine processes: generic integer/F32 kernels improve, aggregate
+and ordinary controls remain roughly unchanged. The pass is complete; there is
+no ongoing optimization search or pending required check.

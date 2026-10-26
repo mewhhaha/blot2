@@ -270,7 +270,7 @@ Deno.test("C07/M10 generic arguments borrow immutable slots and return trees avo
         generic++;
         check(own === 0 && frame >= 256, "generic input slot is borrowed while baseline frame certificate stays conservative");
         check(ops.filter(op => op === 252).length === 1, "generic identity performs only its required result copy");
-        check(!ops.includes(54) && !ops.includes(56), "generic identity has no entry or exit frontier stores");
+        check(ops.filter(op => op === 54).length === 1 && !ops.includes(56), "generic identity has only the guarded four-byte payload store, with no frontier stores");
       }
     }
     check(sources === 3 && (telemetry || generic === 1), "fixture retains exactly one generic body and two entrypoints");
@@ -354,4 +354,74 @@ Deno.test("C07 compacted machine locals retain implicit I32 and F32 zero initial
   for (const n of [0, -0, 1.25, -1.25, Infinity, -Infinity, NaN]) {
     if (!Object.is(zero(0xffffffff, n), 0)) throw new Error("unassigned compacted I32/F32 locals must start at positive zero");
   }
+});
+
+Deno.test("C07/M10 register-only edges omit phi scratch while nonflat edges retain parallel copies", async () => {
+  function check(ok: unknown, message: string): asserts ok { if (!ok) throw new Error(message); }
+  const root = new URL("../", import.meta.url).pathname;
+  for (const telemetry of [false, true]) {
+    const output = root + `build/runtime-phi-scratch-${telemetry}.wasm`;
+    const built = await new Deno.Command(root + "build/blot", {
+      cwd: root, args: ["build", "tests/runtime_phi_scratch.blot", "--opt=off", "-o", output, ...(telemetry ? ["--telemetry"] : [])], stdout: "piped", stderr: "piped",
+    }).output();
+    check(built.success, new TextDecoder().decode(built.stderr));
+    const bytes = await Deno.readFile(output), module = await WebAssembly.compile(bytes);
+    const certificate = new FrameReader(new Uint8Array(WebAssembly.Module.customSections(module, "blot.k1.certificate")[0]));
+    certificate.take(8 + 96);
+    const geometry = Array.from({ length: 18 }, () => certificate.word()); certificate.take(8);
+    const code = new FrameReader(frameSections(bytes).find(s => s.id === 10)!.bytes);
+    const bodies = Array.from({ length: code.leb() }, () => code.take(code.leb()));
+    let sources = 0, zeroFrames = 0, nonflat = 0;
+    for (let i = 0, count = certificate.word(); i < count; i++) {
+      const index = certificate.word(); certificate.word(); const role = certificate.word(); certificate.word();
+      const own = certificate.word(), frame = certificate.word(); certificate.take(4 + 32);
+      certificate.take(certificate.word() * 4); certificate.take(certificate.word() * 8);
+      if (role !== 2) continue;
+      sources++;
+      const ops = frameInstructions(bodies[index]);
+      if (own === 0) {
+        zeroFrames++;
+        check(frame > 0, "loop/join admission certificate keeps its conservative phi allowance");
+        if (!telemetry) check(!ops.some(op => [40, 42, 45, 54, 56, 252].includes(op)), "register-only scalar loop/join has no memory or frontier traffic");
+      }
+      if (ops.filter(op => op === 252).length > 1) {
+        nonflat++;
+        check(own > 0 && frame - own === 256, "nonflat generic phi scratch remains; only the existing borrowed input slot is omitted");
+      }
+    }
+    check(sources === 6 && zeroFrames === 2 && nonflat === 1, "fixture covers scalar loops/joins, mixed parallel swaps and one nonflat fallback body");
+    const instance = await WebAssembly.instantiate(await WebAssembly.compile(frameObserved(bytes)));
+    const ex = instance.exports, data = new DataView((ex["test.memory"] as WebAssembly.Memory).buffer);
+    const frontier = geometry[2] + 4, incoming = 28;
+    data.setUint32(frontier, incoming, true);
+    for (const n of [0, 1, 3, 10]) {
+      check((ex.sum as (n: number) => number)(n) === 17 + n * (n - 1) / 2, "scalar loop carry executes every back edge");
+    }
+    for (const n of [0, 1, 17, 0xffffffff]) {
+      check((ex.join as (n: number) => number)(n) >>> 0 === (n + (n < 10 ? 3 : 7)) >>> 0, "scalar join chooses and transports the correct value");
+      check((ex.swap as (n: number) => number)(n) >>> 0 === n, "U32/Bool/Unit back-edge swaps use simultaneous sources");
+      check((ex.fallback as (n: number) => number)(n) >>> 0 === n, "nonflat dictionary-backed carry retains the memory-copy fallback");
+    }
+    for (const n of [0, -0, 1.25, -1.25, Infinity, -Infinity, NaN]) {
+      check(Object.is((ex.swap_float as (n: number) => number)(n), n), "parallel F32 swaps preserve signed zero, infinities, NaN and finite values");
+    }
+    check(data.getUint32(frontier, true) === incoming, "register-only and memory-copy edges preserve the incoming frontier");
+    if (telemetry) {
+      const word = ex["blot.telemetry"] as (n: number) => number;
+      check(word(11 * 2) === 27 && word(12 * 2) === 59, "source call and loop counters remain exact on both edge paths");
+    }
+    // Public preflight still enforces the admitted 128-byte contract before
+    // executing this now physically zero-frame source body.
+    data.setUint32(frontier, geometry[8] - 128 + 4, true);
+    let trapped = false;
+    try { (ex.sum as (n: number) => number)(0); } catch (error) { trapped = error instanceof WebAssembly.RuntimeError; }
+    check(trapped && data.getUint32(frontier, true) === geometry[8] - 128 + 4, "physical scratch omission never widens public admission");
+  }
+  const input = "build/runtime-phi-too-small.blot";
+  const source = await Deno.readTextFile(root + "tests/runtime_phi_scratch.blot");
+  await Deno.writeTextFile(root + input, source.replace("resources {depth:1,frame:128}", "resources {depth:1,frame:0}"));
+  const rejected = await new Deno.Command(root + "build/blot", {
+    cwd: root, args: ["build", input, "--opt=off", "-o", "build/runtime-phi-too-small.wasm"], stdout: "piped", stderr: "piped",
+  }).output();
+  check(!rejected.success, "the source frame envelope must still cover baseline phi scratch");
 });

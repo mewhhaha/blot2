@@ -4,7 +4,7 @@ A clean implementation of [issue #37](https://github.com/mewhhaha/blot2/issues/3
 in [Goose](https://github.com/aardappel/goose), on `rewrite/goose-k1`.
 The previous Zig compiler is preserved on `main`.
 
-**Linux qualification is complete:** 115 native tests, 88 integration
+**Linux qualification is complete:** 116 native tests, 92 integration
 tests and the editor gate pass. The [implementation ledger](IMPLEMENTATION.md)
 maps the specification to executable evidence. The
 [versioned specification](docs/spec/INDEX.md) defines the language and ABI.
@@ -124,15 +124,25 @@ stores, two multiplies, two adds and no calls inside the loop.
 
 ## Performance
 
-The latest structural changes reduce **fresh compile time by roughly 7–15%**
+The latest runtime pass makes the measured **generic integer loop 4.5–4.9×
+faster** and reduces generic F32 loop time by **15–19%** across default and
+optimizing-only V8. It removes unused phi scratch and lowers four-byte payload
+copies to raw word loads/stores. Ordinary loops and the aggregate-copy fallback
+remain roughly unchanged. These are five reference-checked kernels, with a fresh
+engine process for every sample, rather than a whole-application speedup.
+[Runtime results and limitations](benchmarks/RUNTIME.md) preserve all 228 records.
+
+The preceding structural changes reduced **fresh compile time by roughly 7–15%**
 against the previous qualified K1 at the largest measured scales. They borrow
 validator table views and use a forward-only proof-graph traversal. The
 [structural report](benchmarks/STRUCTURAL.md) separates isolated changes, combined
 results and remaining limits.
 
 Five counterbalanced pairs on a Ryzen 7 7800X3D, 128 functions/callers except the
-127-depth chain. Both are native release compilers; K1 uses `--opt=off` and legacy
-uses its default pipeline. Fresh process compilation medians:
+127-depth chain. This legacy table belongs to the preceding structural snapshot;
+the runtime pass did not rerun the legacy comparison. Both are native release
+compilers; K1 uses `--opt=off` and legacy uses its default pipeline. Fresh process
+compilation medians:
 
 | Workload | Legacy ms | K1 ms |
 | --- | ---: | ---: |
@@ -156,15 +166,15 @@ show no resolved runtime gain. Diamond timings change direction across engine
 controls, so no general inlining speedup is claimed. The report retains the
 original regression and all controls.
 
-Default-engine runtime still has gaps: diamonds measured 23.02 → 56.25 ns/call and
+The preceding snapshot also recorded default-engine runtime gaps: diamonds measured 23.02 → 56.25 ns/call and
 generic calls 15.80 → 30.63 ns (legacy → K1). Captured closures measured
 37.43 → 33.96 ns and static domains 40.64 → 28.74 ns. Both use the same Deno/V8
 engine, one million warmup calls and checksum-checked export sweeps. Runtime
 includes the JS/Wasm boundary; engine state and host load affect the results.
 
-[Qualification and raw evidence](benchmarks/results/structural/manifest.json) pin
-115 native tests, 88 integration tests, the editor gate and 1,177 measurement
-records. These are synthetic workloads and two loop kernels, not migrated `gdev`.
+[Current qualification and raw evidence](benchmarks/results/runtime/manifest.json)
+pin 116 native tests, 92 integration tests, the editor gate and 228 measurement
+records; the earlier structural package preserves its 1,177 records. These are synthetic workloads and two loop kernels, not migrated `gdev`.
 Modules are near compile-time parity; proof-heavy and static-domain compilation
 still trail legacy. Required validation, syntax, ABI and shared generic bodies
 remain intact. Ordinary Wasm publication guarantees atomic visibility rather

@@ -29,6 +29,7 @@ import tests.runtime_test;
 import tests.tooling_test;
 import tests.validator_source_test;
 import tests.validator_test;
+import tests.wasm_copy_test;
 import tests.wasm_test;
 import tests.wasm_validation_test;
 fn main() {
@@ -472,6 +473,10 @@ fn main() {
     let start_test_validator_unrelated_value_work = clock_ns();
     test_validator_unrelated_value_work();
     print("BLOT_TEST_END test_validator_unrelated_value_work ", clock_ns() - start_test_validator_unrelated_value_work);
+    print("BLOT_TEST_BEGIN test_wasm_word_copy_fixture");
+    let start_test_wasm_word_copy_fixture = clock_ns();
+    test_wasm_word_copy_fixture();
+    print("BLOT_TEST_END test_wasm_word_copy_fixture ", clock_ns() - start_test_wasm_word_copy_fixture);
     print("BLOT_TEST_BEGIN test_dictionary_coverage");
     let start_test_dictionary_coverage = clock_ns();
     test_dictionary_coverage();
@@ -492,5 +497,5 @@ fn main() {
     let start_test_wasm_validation = clock_ns();
     test_wasm_validation();
     print("BLOT_TEST_END test_wasm_validation ", clock_ns() - start_test_wasm_validation);
-    print("BLOT_TEST_COMPLETE 115");
+    print("BLOT_TEST_COMPLETE 116");
 }
