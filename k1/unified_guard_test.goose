@@ -23,7 +23,7 @@ fn main() {
     rejected("let f: U32 -> U32 = fn x => do:\n  if x < 4294967295:\n    return x\n  else:\n    return x + 1\n");
     rejected("let f: U32 -> U32 = fn x => do:\n  if x < 4294967295:\n    return x\n  return x + 1\n");
     rejected("let f: U32 -> U32 = fn x => do:\n  if x < 4294967295:\n    let y = U32.wrapping_add(x,1)\n    return y + 1\n  else:\n    return x\n");
-    rejected("let f: U32 -> U32 = fn x => do:\n  if x < 4294967295 && #True:\n    return x + 1\n  return x\n");
+    accepted("let f: U32 -> U32 = fn x => do:\n  if x < 4294967295 && #True:\n    return x + 1\n  return x\n",5);
     let a="let f: U32 -> U32 = fn x => do:\n  if x < 4294967295:\n    return x + 1\n  return x\n";
     let b="let f: U32 -> U32 = fn x => do:\n  if x < 4294967294:\n    return x + 1\n  return x\n";
     var r=unified_frontend::parse(a);assert(r.status==0 && a.len==b.len && unified_guard::check(b,r.program).status!=0 && unified_wasm::emit(b,r.program).len==0);

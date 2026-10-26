@@ -37,7 +37,7 @@ fn main() {
     rejected("let f: U32 -> U32 = fn x => do:\n  if x < 4294967295:\n    let y = x\n    return y + 1\n  else:\n    let y = U32.wrapping_add(x,1)\n    return y + 1\n");
     rejected("let f: U32 -> U32 = fn x => do:\n  if x < 4294967295:\n    let y = U32.wrapping_add(x,1)\n    return y + 1\n  return x\n");
     rejected("let f: U32 -> U32 = fn x => do:\n  if x < 4294967295 || #True:\n    return x + 1\n  return x\n");
-    rejected("let f: U32 -> U32 = fn x => do:\n  if #False && x < 4294967295:\n    return x + 1\n  return x\n");
+    accepted("let f: U32 -> U32 = fn x => do:\n  if #False && x < 4294967295:\n    return x + 1\n  return x\n",4);
     rejected("let f: U32 -> U32 = fn x => do:\n  if x < 4294967295:\n    let y = x\n    return y\n  return y + 1\n");
     rejected("let f: U32 -> U32 = fn x => do:\n  return 4294967295 + 1\n");
     rejected("let f: U32 -> U32 = fn x => do:\n  return 4294967296\n");

@@ -225,16 +225,22 @@ fn verify(tree: iteration_core::Tree&, expected_source: u8[:]) -> bool {
     if expected_source.len>65536 || tree.source[..]!=expected_source || tree.nodes.len<1 || tree.nodes.len>2048 || tree.bindings.len>256 {return false;}
     let s=expected_source; var r=Reader {lex:lexer::init(s)}; bump(s,r);
     while !r.bad && r.t.kind==6 {bump(s,r);}
-    let function=take(s,r,1,"fn"); r.function_target=function.start+1; take(s,r,5,"("); var count:i64=0;
-    if !text(s,r.t,5,")") {
-        loop {
-            if r.bad || count>=16 {r.bad=true;break;}
-            let name=r.t; if !ident(s,name) {r.bad=true;break;} bump(s,r);
-            let empty:i64[0]=[]; let id=binding(s,r,tree,name,1,r.function_target,empty); activate(r,id); count+=1;
-            if !text(s,r.t,5,",") {break;} bump(s,r);
+    let function=take(s,r,1,"fn"); r.function_target=function.start+1; var count:i64=0;
+    if text(s,r.t,5,"(") {
+        bump(s,r);
+        if !text(s,r.t,5,")") {
+            loop {
+                if r.bad || count>=16 {r.bad=true;break;}
+                let name=r.t; if !ident(s,name) {r.bad=true;break;} bump(s,r);
+                let empty:i64[0]=[]; let id=binding(s,r,tree,name,1,r.function_target,empty); activate(r,id); count+=1;
+                if !text(s,r.t,5,",") {break;} bump(s,r);
+            }
         }
+        take(s,r,5,")");
+    } else {
+        let name=r.t;if !ident(s,name) {r.bad=true;}else {bump(s,r);let empty:i64[0]=[];let id=binding(s,r,tree,name,1,r.function_target,empty);activate(r,id);count=1;}
     }
-    take(s,r,5,")"); take(s,r,5,"=>"); take(s,r,1,"do"); take(s,r,5,":"); kind(s,r,6); kind(s,r,7);
+    take(s,r,5,"=>"); take(s,r,1,"do"); take(s,r,5,":"); kind(s,r,6); kind(s,r,7);
     let body=suite(s,r,tree,r.function_target); kind(s,r,8);
     while !r.bad && r.t.kind==6 {bump(s,r);}
     if r.bad || r.t.kind!=0 || body.id==0 {return false;}

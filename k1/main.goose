@@ -10,9 +10,9 @@ import public_snapshot;
 import flow_decl;
 import flow_decl_check;
 import flow_decl_wasm;
-import unified_frontend;
-import unified_check;
-import unified_wasm;
+import compiler_frontend;
+import compiler_validate;
+import compiler_wasm;
 import module_frontend;
 import module_wasm;
 import add_frontend;
@@ -162,10 +162,10 @@ fn flow_fixture(source: u8[:], trace: bool) {
     encoded.push('\n'); write_stdout(encoded);
 }
 
-// Private whole-source U32 locals/flow fixture. The subset and proof
-// restrictions are documented in unified_schema.md; no public admission.
+// Private whole-source U32 scalar/loop fixture. The subset and proof
+// restrictions are documented in compiler_schema.md; no public admission.
 fn locals_fixture(source: u8[:], trace: bool) {
-    var result = unified_frontend::parse(source);
+    var result = compiler_frontend::parse(source);
     if result.status != 0 {
         var detail: u8[>..] = [];
         format(detail, "source error ", result.status);
@@ -176,8 +176,8 @@ fn locals_fixture(source: u8[:], trace: bool) {
         format(detail, "\n");
         write_stderr(detail); exit(1);
     }
-    if !unified_check::verify(source, result.program) { fail("internal locals fixture source mismatch"); }
-    let bytes = unified_wasm::emit(source, result.program);
+    if !compiler_validate::verify(source, result.program) { fail("internal locals fixture source mismatch"); }
+    let bytes = compiler_wasm::emit(source, result.program);
     if bytes.len == 0 { fail("internal locals fixture emission failure"); }
     if trace { write_stderr("locals fixture: source, bindings and checked arithmetic validated; Wasm emitted\n"); }
     let hex = "0123456789abcdef";

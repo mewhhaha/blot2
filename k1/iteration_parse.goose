@@ -230,15 +230,23 @@ fn statement(s: u8[:], p: Parser&) -> i64 {
 fn parse(s: u8[:]) -> iteration_core::Tree, i64 {
     if s.len>65536 { return iteration_core::Tree {},2; }
     var p=Parser { lex:lexer::init(s) }; advance(s,p); while p.status==0 && p.t.kind==6 { advance(s,p); }
-    let f=p.t; if !take(s,p,1,"fn") || !take(s,p,5,"(") { return iteration_core::Tree {},p.status; }
+    let f=p.t; if !take(s,p,1,"fn") { return iteration_core::Tree {},p.status; }
     p.function_target=f.start+1; p.scope=p.function_target; var count: i64=0;
-    while p.status==0 && !is(s,p.t,5,")") {
-        if count>=16 { p.status=2; break; }
-        let name=p.t; let id=reserve(s,p,name,1,p.scope,-1); if id==0 { break; }
-        activate(p,id); advance(s,p); count+=1;
-        if is(s,p.t,5,",") { advance(s,p); if is(s,p.t,5,")") { p.status=1; } } else { break; }
+    if is(s,p.t,5,"(") {
+        advance(s,p);
+        while p.status==0 && !is(s,p.t,5,")") {
+            if count>=16 { p.status=2; break; }
+            let name=p.t; let id=reserve(s,p,name,1,p.scope,-1); if id==0 { break; }
+            activate(p,id); advance(s,p); count+=1;
+            if is(s,p.t,5,",") { advance(s,p); if is(s,p.t,5,")") { p.status=1; } } else { break; }
+        }
+        if !take(s,p,5,")") { return iteration_core::Tree {},if p.status==0 {1} else {p.status}; }
+    } else {
+        let name=p.t; let id=reserve(s,p,name,1,p.scope,-1);
+        if id==0 {return iteration_core::Tree {},if p.status==0 {1} else {p.status};}
+        activate(p,id); advance(s,p); count=1;
     }
-    if !take(s,p,5,")") || !take(s,p,5,"=>") || !take(s,p,1,"do") || !take(s,p,5,":") || !take_kind(s,p,6) || !take_kind(s,p,7) {
+    if !take(s,p,5,"=>") || !take(s,p,1,"do") || !take(s,p,5,":") || !take_kind(s,p,6) || !take_kind(s,p,7) {
         return iteration_core::Tree {},if p.status==0 { 1 } else { p.status };
     }
     let body=suite(s,p); if body==0 || !take_kind(s,p,8) { return iteration_core::Tree {},if p.status==0 { 1 } else { p.status }; }

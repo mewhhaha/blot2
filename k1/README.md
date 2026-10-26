@@ -76,8 +76,9 @@ explicit returns, nested branches and short-circuit Boolean expressions. Its
 test caller must supply canonical Bool values; it is not a host ABI.
 The locals fixture handles a narrow U32 declaration with scoped immutable
 bindings, nested branches, explicit returns and checked or explicitly wrapping
-arithmetic. Its accepted proofs and limitations are described in
-`unified_schema.md`.
+arithmetic. A separate tagged alternative handles a bounded finite-loop
+subset. Their accepted proofs and limitations are described in
+`unified_schema.md` and `compiler_schema.md`.
 A separate thin-entry fixture exercises a scalar worker and canonical adapter;
 it does not define the public host protocol. Complete lowering plans and portable
 checked artifacts remain absent. The builder, pool and ordering graph models are

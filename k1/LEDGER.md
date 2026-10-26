@@ -21,9 +21,11 @@ legacy remains default. This ledger records evidence, not completion claims.
 
 ## Additional experimental models
 
-An executed private Wasm pool/builder experiment and a hand-emitted particle
-projection exercise scoped storage and complete-row publication. They do not
-come from admitted K1 source or prove the I08 loop invariant. A private
+An executed private Wasm pool/builder experiment and a closed source-linked
+particle projection exercise scoped storage and complete-row publication. The
+particle target remains pinned to a fixed fixture and assumes trusted owner and
+loan context; it does not qualify source admission or prove the I08 invariant
+for general K1 programs. A private
 fixed-U32 copy bridge is exercised as both a native model and an emitted Wasm
 fixture; neither is the complete M12 bridge or qualified host API. A retained
 scalar snapshot experiment checks exact observations and simulated rollback
@@ -36,6 +38,12 @@ descriptor-relative source resolver can read below a trusted live package root;
 it is not yet integrated with project configuration or an import graph, and
 its platform, mutable-file and handle-lifetime limits are documented in
 `SOURCE_RESOLVER.md`.
+
+A private project-graph loader records exact import observations and stages
+source revisions. It is not a module compiler, a coherent filesystem snapshot,
+an authenticated dependency graph or an allocation-failure guarantee. The
+tagged source path delegates to independently checked scalar or restricted
+finite-loop representations; it is not a general shared expression/loop IR.
 
 Further private slices exercise checked stored graph endpoints, a source-bound
 U32-capture closure with indirect Wasm calls, a scalar Owned lifecycle model,
@@ -85,6 +93,13 @@ interface-envelope candidate test also passed at O0/O2. This is focused test
 evidence, not full K1 qualification.
 
 ## Validation evidence
+
+A combined Goose fixture run passed (exit 0) after adding the tagged
+scalar/loop path, source-linked particle worker, private project graph,
+multi-schema wire model and source-bound successor refinements. Tests include
+Goose `-O0`/`-O2`, independent oracles and Wasm execution. Trusted fixture
+contexts, incomplete work accounting and the other limitations above remain;
+this is not the full K1 qualification gate.
 
 A further combined Goose fixture run passed (exit 0) after integrating the
 unified guarded-increment path and adding source-bound proofgraph, iteration
