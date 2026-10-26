@@ -1,0 +1,6 @@
+let leaf: U32 -> U32 ! {} resources {depth:1,frame:0} = fn x => return U32.wrapping_add(x,1)
+let framed: U32 -> U32 ! {} resources {depth:3,frame:128} = fn bias => do:
+  let add = fn (x: U32) => return leaf(U32.wrapping_add(x,bias))
+  return add(3)
+pub let mixed: U32 -> U32 ! {} resources {depth:4,frame:128} = fn x => return framed(x)
+pub let zero: U32 -> U32 ! {} resources {depth:2,frame:0} = fn x => return leaf(x)

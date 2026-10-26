@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
 /* 0 = EOF, 1 = complete line, 2 = oversized line (drained, never allocated). */
 uint32_t blot_read_line_bounded(uint32_t limit, gs_rref out) {
     uint8_t buf[4096]; size_t used = 0; uint64_t total = 0;
@@ -49,6 +50,44 @@ uint8_t blot_read_bounded(sl_u8 path, uint32_t limit, gs_rref out) {
         gs_bld_append(out, buf, (int64_t)n);
     }
     int ok = !ferror(f); fclose(f); return ok;
+}
+/* Generated Wasm needs atomic replacement, not a power-loss durability
+ * acknowledgement. Finish every fallible write/permission/close operation
+ * before rename. Deferred media/writeback failures are outside this result. */
+uint8_t blot_write_generated_atomic(sl_u8 path, sl_u8 bytes) {
+    char raw[4096], directory[4096], output[4096], temporary[4096];
+    if (path.len <= 0 || (uint64_t)path.len >= sizeof(raw) || memchr(path.data, 0, path.len) || bytes.len < 0) return 0;
+    memcpy(raw, path.data, path.len); raw[path.len] = 0;
+    char *slash = strrchr(raw, '/'); const char *base = slash ? slash + 1 : raw;
+    if (!*base || !strcmp(base, ".") || !strcmp(base, "..")) return 0;
+    if (slash) { *slash = 0; if (!realpath(*raw ? raw : "/", directory)) return 0; }
+    else if (!realpath(".", directory)) return 0;
+    if (snprintf(output, sizeof(output), "%s/%s", directory, base) >= (int)sizeof(output)) return 0;
+    struct stat st; int had_original = 0;
+    if (!lstat(output, &st)) { if (!S_ISREG(st.st_mode)) return 0; had_original = 1; }
+    else if (errno != ENOENT) return 0;
+    int fd = -1;
+    for (int attempt = 0; attempt < 8; attempt++) {
+        if (snprintf(temporary, sizeof(temporary), "%s.blot-stage-%016llx", output,
+                (unsigned long long)gs_os_random_u64()) >= (int)sizeof(temporary)) return 0;
+        fd = open(temporary, O_WRONLY | O_CREAT | O_EXCL, 0666);
+        if (fd >= 0) break;
+        if (errno != EEXIST) return 0;
+    }
+    if (fd < 0) return 0;
+    int ok = !had_original || fchmod(fd, st.st_mode & 0777) == 0;
+    int64_t at = 0;
+    while (ok && at < bytes.len) {
+        size_t chunk = bytes.len - at > (1 << 30) ? (size_t)1 << 30 : (size_t)(bytes.len - at);
+        ssize_t n = write(fd, bytes.data + at, chunk);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) { ok = 0; break; }
+        at += n;
+    }
+    /* close may already have released fd on failure; never retry it. */
+    if (close(fd)) ok = 0;
+    if (ok && rename(temporary, output) == 0) return 1;
+    unlink(temporary); return 0;
 }
 /* Stage all data and rollback links before publishing either output. The
  * commit window performs no allocation and defers ordinary cancellation.

@@ -1,0 +1,11 @@
+type Payload[r:Region] = Unit
+let acquire: Unit -> U32 ! {reserve,release} resources {depth:3,frame:4096} = fn () => do:
+  let built = owned@[Payload[_],#Cancelled](0) as r free in do:
+    seal(free,())
+  case built:
+    #Err(_) => return 7
+    #Ok(handle) => do:
+      owned.close(handle)
+      return 21
+let twice: U32 -> U32 ! {} resources {depth:1,frame:0} = fn x => return U32.wrapping_add(x,x)
+pub let run: Unit -> U32 ! {reserve,release} resources {depth:4,frame:8192} = fn () => return twice(acquire(()))

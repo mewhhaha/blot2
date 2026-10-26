@@ -3,16 +3,37 @@
 import .model;
 import .hash;
 
-struct CanonRow { words: Span }
-struct CanonMemo { type_id: u32, context: Span, canonical: u32 }
+struct CanonRow { words: Span, hash: u32 }
+struct CanonMemo { type_id: u32, context: Span, canonical: u32, hash: u32 }
 fn canonical_interface(c: Core, type_id: u32, out: u8[>..]&) -> bool {
     var rows: CanonRow[>..] = [CanonRow { .. }]; var words: u32[>..] = [];
     var pending: u32[>..<] = []; var bound: u32[>..<] = []; var free: u32[>..] = [];
-    var slots: u32[131072] = [0; 131072];
-    var memo: CanonMemo[>..] = []; var contexts: u32[>..] = []; var memo_slots: u32[131072] = [0; 131072];
+    var slots: u32[>..] = [0; 32];
+    var memo: CanonMemo[>..] = []; var contexts: u32[>..] = []; var memo_slots: u32[>..] = [0; 32];
     var free_values: u32[>..] = [];
     var visits: u32 = 0;
     fn tick() { visits++; if visits > LIMIT_VISITS { return false from canonical_interface; } }
+    // Lookup storage follows the reached graph, with the same hard capacity.
+    // Rehashing preserves row IDs; neither hash nor slot position is identity.
+    fn grow_rows() {
+        if rows.len * 2 <= slots.len || slots.len == 131072 { return; }
+        let capacity = slots.len * 2; slots.resize(0); for i in capacity { slots.push(0); }
+        for row, id in rows {
+            if id == 0 { continue; }
+            var slot = row.hash & (slots.len as u32 - 1);
+            while slots[slot] != 0 { tick(); slot = (slot + 1) & (slots.len as u32 - 1); }
+            slots[slot] = id as u32;
+        }
+    }
+    fn grow_memo() {
+        if (memo.len + 1) * 2 <= memo_slots.len || memo_slots.len == 131072 { return; }
+        let capacity = memo_slots.len * 2; memo_slots.resize(0); for i in capacity { memo_slots.push(0); }
+        for row, id in memo {
+            var slot = row.hash & (memo_slots.len as u32 - 1);
+            while memo_slots[slot] != 0 { tick(); slot = (slot + 1) & (memo_slots.len as u32 - 1); }
+            memo_slots[slot] = id as u32 + 1;
+        }
+    }
     fn put(n: u32) { tick(); pending.push(n); }
     fn text(bytes: const u8[:]) {
         put(bytes.len as u32);
@@ -24,25 +45,25 @@ fn canonical_interface(c: Core, type_id: u32, out: u8[>..]&) -> bool {
         }
     }
     fn intern(mark: i64) -> u32 {
-        let candidate = pending[mark..];
+        grow_rows(); let candidate = pending[mark..];
         var hash: u32 = 2166136261;
         for word in candidate { tick(); hash = (hash ^ word) * 16777619; }
-        var slot = hash & 131071;
+        var slot = hash & (slots.len as u32 - 1);
         var probes: u32 = 0;
         while slots[slot] != 0 {
-            tick(); probes++; if probes == 131072 { return false from canonical_interface; }
+            tick(); probes++; if probes == slots.len { return false from canonical_interface; }
             let i = slots[slot]; let row = rows[i];
             if row.words.count == candidate.len {
                 var equal = true;
                 for word, j in candidate { tick(); if words[row.words.start + j] != word { equal = false; break; } }
                 if equal { pending.resize(mark); return i; }
             }
-            slot = (slot + 1) & 131071;
+            slot = (slot + 1) & (slots.len as u32 - 1);
         }
         if words.len + candidate.len > LIMIT_ARTIFACT / 4 { return false from canonical_interface; }
         let id = rows.len as u32;
         slots[slot] = id;
-        rows.push(CanonRow { words: Span { start: words.len as u32, count: candidate.len as u32 } });
+        rows.push(CanonRow { words: Span { start: words.len as u32, count: candidate.len as u32 }, hash: hash });
         words.append(candidate); pending.resize(mark); return id;
     }
     fn binder(id: u32) {
@@ -88,11 +109,11 @@ fn canonical_interface(c: Core, type_id: u32, out: u8[>..]&) -> bool {
         if !id_ok(id, c.types.len) || depth > 64 { return false from canonical_interface; }
         let key = id | 0x80000000; var hash = key * 16777619;
         for bid in bound { hash = (hash ^ bid) * 16777619; }
-        var slot = hash & 131071;
+        var slot = hash & (memo_slots.len as u32 - 1);
         while memo_slots[slot] != 0 {
             tick(); let old = memo[memo_slots[slot] - 1]; var same = old.type_id == key && old.context.count == bound.len;
             if same { for bid, i in bound { tick(); if contexts[old.context.start + i] != bid { same = false; break; } } }
-            if same { return old.canonical; } slot = (slot + 1) & 131071;
+            if same { return old.canonical; } slot = (slot + 1) & (memo_slots.len as u32 - 1);
         }
         let t = c.types[id];
         if t.tag == TY_ALIAS || t.tag == TY_FORALL { return layout_shape(c.refs[t.children.start], depth + 1); }
@@ -105,8 +126,8 @@ fn canonical_interface(c: Core, type_id: u32, out: u8[>..]&) -> bool {
             for i in count { let child = if t.fields.count != 0 { c.fields[c.refs[t.fields.start + i]].type_id } else { c.refs[t.children.start + i] }; put(layout_shape(child, depth + 1)); }
         }
         let result = intern(mark); let context = Span { start: contexts.len as u32, count: bound.len as u32 }; contexts.append(bound);
-        slot = hash & 131071; while memo_slots[slot] != 0 { tick(); slot = (slot + 1) & 131071; }
-        memo.push(CanonMemo { type_id: key, context: context, canonical: result }); memo_slots[slot] = memo.len as u32; return result;
+        grow_memo(); slot = hash & (memo_slots.len as u32 - 1); while memo_slots[slot] != 0 { tick(); slot = (slot + 1) & (memo_slots.len as u32 - 1); }
+        memo.push(CanonMemo { type_id: key, context: context, canonical: result, hash: hash }); memo_slots[slot] = memo.len as u32; return result;
     }
     recursive fn contract(id: u32, depth: u32) -> u32 {
         if !id_ok(id, c.contracts.len) || depth > 64 { return false from canonical_interface; }
@@ -127,16 +148,16 @@ fn canonical_interface(c: Core, type_id: u32, out: u8[>..]&) -> bool {
         if !id_ok(id, c.types.len) || depth > 64 { return false from canonical_interface; }
         var memo_hash = id * 16777619;
         for bid in bound { memo_hash = (memo_hash ^ bid) * 16777619; }
-        var memo_slot = memo_hash & 131071; var memo_probes: u32 = 0;
+        var memo_slot = memo_hash & (memo_slots.len as u32 - 1); var memo_probes: u32 = 0;
         while memo_slots[memo_slot] != 0 {
-            tick(); memo_probes++; if memo_probes == 131072 { return false from canonical_interface; }
+            tick(); memo_probes++; if memo_probes == memo_slots.len { return false from canonical_interface; }
             let previous = memo[memo_slots[memo_slot] - 1];
             if previous.type_id == id && previous.context.count == bound.len {
                 var equal = true;
                 for bid, i in bound { tick(); if contexts[previous.context.start + i] != bid { equal = false; break; } }
                 if equal { return previous.canonical; }
             }
-            memo_slot = (memo_slot + 1) & 131071;
+            memo_slot = (memo_slot + 1) & (memo_slots.len as u32 - 1);
         }
         let context = Span { start: contexts.len as u32, count: bound.len as u32 }; contexts.append(bound);
         let t = c.types[id];
@@ -161,9 +182,9 @@ fn canonical_interface(c: Core, type_id: u32, out: u8[>..]&) -> bool {
         }
         put(if t.contract != 0 { contract(t.contract, depth + 1) } else { 0 });
         let result = intern(mark); bound.resize(binder_mark);
-        memo_slot = memo_hash & 131071;
-        while memo_slots[memo_slot] != 0 { tick(); memo_slot = (memo_slot + 1) & 131071; }
-        memo.push(CanonMemo { type_id: id, context: context, canonical: result }); memo_slots[memo_slot] = memo.len as u32;
+        grow_memo(); memo_slot = memo_hash & (memo_slots.len as u32 - 1);
+        while memo_slots[memo_slot] != 0 { tick(); memo_slot = (memo_slot + 1) & (memo_slots.len as u32 - 1); }
+        memo.push(CanonMemo { type_id: id, context: context, canonical: result, hash: memo_hash }); memo_slots[memo_slot] = memo.len as u32;
         return result;
     }
     let root = shape(type_id, 0);

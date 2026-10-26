@@ -1,0 +1,31 @@
+let twice: U32 -> U32 ! {} resources {depth:1,frame:0} = fn x => return U32.wrapping_add(x,x)
+let affine: F32 -> F32 ! {} resources {depth:1,frame:0} = fn x => return x*1.0000001192092896+0.137
+let early: U32 -> U32 ! {} resources {depth:1,frame:0} = fn x => do:
+  let answer = U32.wrapping_add(x,x)
+  let _ = U32.wrapping_add(x,1)
+  return answer
+pub let run: U32 -> U32 ! {} resources {depth:2,frame:0} = fn x => do:
+  let first = twice(x)
+  return twice(first)
+pub let run_float: F32 -> F32 ! {} resources {depth:2,frame:0} = fn x => do:
+  let _ = 0
+  let _ = 1
+  let _ = 2
+  let _ = 3
+  let _ = 4
+  let _ = 5
+  let _ = 6
+  let _ = 7
+  let _ = 8
+  let _ = 9
+  return affine(x)
+pub let run_early: U32 -> U32 ! {} resources {depth:2,frame:0} = fn x => do:
+  let _ = 0
+  let _ = 1
+  let _ = 2
+  let _ = 3
+  let _ = 4
+  let _ = 5
+  return early(x)
+let negate: F32 -> F32 ! {} resources {depth:1,frame:0} = fn x => return -x
+pub let run_negate: F32 -> F32 ! {} resources {depth:2,frame:0} = fn x => return negate(x)

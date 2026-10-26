@@ -7,12 +7,25 @@ const args = new Map(Deno.args.map((x) => {
 const rounds = Number(args.get("--rounds") ?? 5);
 const scales = (args.get("--scales") ?? "8,32,128").split(",").map(Number);
 const baseline = args.get("--baseline");
+const candidate = args.get("--candidate") ?? root + "build/blot";
+const baselineKind = args.get("--baseline-kind") ?? "legacy";
+const opt = args.get("--opt") ?? "off";
+const baselineOpt = args.get("--baseline-opt") ?? opt;
+const runtimeCalls = Number(args.get("--runtime-calls") ?? 20000);
+const warmupCalls = Number(args.get("--runtime-warmup") ?? 0);
 const families = (args.get("--families") ??
   "independent,calls,chains,diamonds,generics,closures,modules,proofs,domains")
   .split(",");
 if (
   !Number.isInteger(rounds) || rounds < 1 || rounds > 100 ||
-  scales.some((x) => !Number.isInteger(x) || x < 1 || x > 2048)
+  scales.some((x) => !Number.isInteger(x) || x < 1 || x > 2048) ||
+  !["legacy", "k1"].includes(baselineKind) ||
+  !["off", "fast", "release"].includes(opt) ||
+  !["off", "fast", "release"].includes(baselineOpt) ||
+  !Number.isSafeInteger(runtimeCalls) || runtimeCalls < 1 ||
+  runtimeCalls > 10000000 ||
+  !Number.isSafeInteger(warmupCalls) || warmupCalls < 0 ||
+  warmupCalls > 10000000
 ) throw new Error("invalid benchmark limits");
 const out = root + (args.get("--out") ?? "build/bench-k1");
 await Deno.mkdir(out, { recursive: true });
@@ -39,7 +52,7 @@ async function command(exe: string, argv: string[]) {
   };
 }
 const cpu = await Deno.readTextFile("/proc/cpuinfo").catch(() => "unavailable");
-const candidateHash = await hash(await Deno.readFile(root + "build/blot"));
+const candidateHash = await hash(await Deno.readFile(candidate));
 const baselineHash = baseline
   ? await hash(await Deno.readFile(baseline))
   : null;
@@ -50,9 +63,10 @@ const metadata = {
   timestamp: new Date().toISOString(),
   os: Deno.build,
   deno: Deno.version,
-  cpu: cpu.split("\n").find((x) => x.startsWith("model name")),
+  cpu: cpu.split("\n").find((x) => x.startsWith("model name")) ?? "unavailable",
   commit: (await command("git", ["rev-parse", "HEAD"])).text.trim(),
   candidate_sha256: candidateHash,
+  candidate_path: candidate,
   qualification: qualification?.status === "passed" &&
       qualification.compiler_sha256 === candidateHash
     ? {
@@ -62,10 +76,17 @@ const metadata = {
     }
     : null,
   baseline_sha256: baselineHash,
+  baseline_kind: baselineKind,
+  candidate_opt: opt,
+  baseline_opt: baselineKind === "k1" ? baselineOpt : "legacy-default",
   baseline_revision: baselineHash ===
       "fd2119f5528cb164131e1156d35ba97c434393647f1b326ae5aa154db137d923"
     ? "1e39b5d8a4268b9edf769c2813d5231abe1c963b"
+    : baselineHash ===
+        "7b61cff1941de683e99269dc2a3c30cc137201d9bca8f98e90a8d0bbc02366b2"
+    ? "102963640f603cdcaf197c977357860b57f03c57"
     : null,
+  harness_sha256: await hash(await Deno.readFile(new URL(import.meta.url))),
   goose_revision: "a108677d300cb0e8bbb842c35a353abe67a20c6c",
   policy: "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
   candidate_build: args.get("--build-label") ??
@@ -76,6 +97,10 @@ const metadata = {
     "separate phase-attribution build; timing samples omit --timings",
   rounds,
   scales,
+  runtime_calls_requested: runtimeCalls,
+  runtime_warmup_requested: warmupCalls,
+  runtime_method:
+    "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary",
 };
 type Sample = {
   family: string;
@@ -94,6 +119,7 @@ type Sample = {
   runtime_ns_per_call?: number;
   runtime_calls?: number;
   runtime_checksum?: number;
+  runtime_warmup_calls?: number;
 };
 const samples: Sample[] = [];
 function sources(family: string, n: number) {
@@ -184,7 +210,12 @@ function sources(family: string, n: number) {
       legacy += `entry const run_${i} = fn (x: U32) -> U32 => ${old}\n`;
     }
   }
-  return { candidate: k1, baseline: legacy };
+  return {
+    candidate: k1,
+    baseline: baselineKind === "k1"
+      ? k1.replaceAll("-candidate-", "-baseline-")
+      : legacy,
+  };
 }
 async function measure(
   family: string,
@@ -195,6 +226,7 @@ async function measure(
   exe: string,
   phase = false,
 ) {
+  const isK1 = compiler === "candidate" || baselineKind === "k1";
   const prefix = `${out}/${family}-${scale}-${compiler}-${
     phase ? "phase" : round
   }`;
@@ -204,20 +236,20 @@ async function measure(
     for (let i = 0; i < scale; i++) {
       await Deno.writeTextFile(
         `${out}/module-${scale}-${compiler}-${i}.blot`,
-        compiler === "candidate"
+        isK1
           ? `pub let leaf: U32 -> U32 ! {} resources {depth:1,frame:0} = fn x => return U32.wrapping_add(x,${i})\n`
           : `const leaf = fn (x: U32) -> U32 => @u32.add x ${i}\n`,
       );
     }
   }
-  const argv = compiler === "candidate"
+  const argv = isK1
     ? [
       "build",
       input,
       "-o",
       output,
       `--package-root=${out}`,
-      "--opt=off",
+      `--opt=${compiler === "candidate" ? opt : baselineOpt}`,
       ...(phase ? ["--timings"] : []),
     ]
     : [
@@ -297,18 +329,30 @@ async function measure(
     }
     sample.checksum = checksum;
     if (!phase) {
-      const iterations = Math.max(1, Math.floor(20000 / scale));
-      let runtimeChecksum = 0;
-      const begin = performance.now();
-      for (let j = 0; j < iterations; j++) {
-        for (let i = 0; i < scale; i++) {
-          enter?.();
-          runtimeChecksum = (runtimeChecksum +
-            (instance.exports[`run_${i}`] as (x: number) => number)(40)) >>>
-            0;
-          leave?.(0);
+      const entries = Array.from(
+        { length: scale },
+        (_, i) => instance.exports[`run_${i}`] as (x: number) => number,
+      );
+      function run(iterations: number) {
+        let sum = 0;
+        for (let j = 0; j < iterations; j++) {
+          for (const entry of entries) {
+            enter?.();
+            sum = (sum + entry(40)) >>> 0;
+            leave?.(0);
+          }
         }
+        if (sum !== Math.imul(checksum, iterations) >>> 0) {
+          throw new Error("runtime checksum changed");
+        }
+        return sum;
       }
+      const warmupIterations = Math.floor(warmupCalls / scale);
+      run(warmupIterations);
+      sample.runtime_warmup_calls = warmupIterations * scale;
+      const iterations = Math.max(1, Math.floor(runtimeCalls / scale));
+      const begin = performance.now();
+      const runtimeChecksum = run(iterations);
       sample.runtime_calls = iterations * scale;
       sample.runtime_ns_per_call = (performance.now() - begin) * 1e6 /
         sample.runtime_calls;
@@ -347,7 +391,7 @@ for (const family of families) {
           compiler,
           round,
           source[compiler as keyof typeof source],
-          compiler === "candidate" ? root + "build/blot" : baseline!,
+          compiler === "candidate" ? candidate : baseline!,
         );
       }
     }
@@ -357,9 +401,20 @@ for (const family of families) {
       "candidate",
       -1,
       source.candidate,
-      root + "build/blot",
+      candidate,
       true,
     );
+    if (baseline && baselineKind === "k1") {
+      await measure(
+        family,
+        scale,
+        "baseline",
+        -1,
+        source.baseline,
+        baseline,
+        true,
+      );
+    }
     console.log("measured", family, scale);
   }
 }

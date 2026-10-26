@@ -1,0 +1,187 @@
+{
+  "metadata": {
+    "format": "K1-KERNEL-WORKLOADS-1",
+    "timestamp": "2026-10-26T22:32:19.863Z",
+    "os": {
+      "target": "x86_64-unknown-linux-gnu",
+      "arch": "x86_64",
+      "os": "linux",
+      "vendor": "unknown",
+      "env": "gnu",
+      "standalone": false
+    },
+    "deno": {
+      "deno": "2.9.7",
+      "v8": "15.0.245.2-rusty",
+      "typescript": "6.0.3"
+    },
+    "candidate": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+    "baseline": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+    "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+    "baseline_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+    "candidate_opt": "release",
+    "baseline_opt": "fast",
+    "qualification": "32c050991a86eec699074c07a52add676ebef9f795685c3f6490743ab054b928",
+    "harness_sha256": "65e8860a161e10abd349f6d6766318d12a04d6b61c5e6737df4ce1bec851d1ee",
+    "rounds": 5,
+    "seeds": [
+      0,
+      1,
+      7,
+      40,
+      255,
+      65535,
+      4294967295
+    ],
+    "warmup_calls": 2000,
+    "timed_calls": 20000,
+    "method": "Sequential counterbalanced pairs, fresh process compilation, same default Deno/V8 engine. Warmed kernels use varying deterministic seeds, exact integer/F32 references and timed checksums. Includes JS/Wasm boundary; no host array bridge. CPU placement/frequency/cache uncontrolled."
+  },
+  "samples": 24,
+  "comparisons": [
+    {
+      "family": "affine_loop",
+      "scale": 128,
+      "wall_ms": {
+        "baseline": {
+          "median": 2.858886,
+          "min": 2.507147,
+          "max": 3.321022
+        },
+        "candidate": {
+          "median": 2.875245,
+          "min": 2.465007,
+          "max": 3.009444
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.919366608896174,
+          "min": 0.8622264056699007,
+          "max": 1.1707067834474805
+        }
+      },
+      "cpu_ms": {
+        "baseline": {
+          "median": 2.618,
+          "min": 2.335,
+          "max": 2.8739999999999997
+        },
+        "candidate": {
+          "median": 2.675,
+          "min": 2.259,
+          "max": 2.796
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.930758524704245,
+          "min": 0.8638623326959848,
+          "max": 1.1974304068522483
+        }
+      },
+      "peak_rss_kib": {
+        "baseline": {
+          "median": 13088,
+          "min": 12608,
+          "max": 13164
+        },
+        "candidate": {
+          "median": 12940,
+          "min": 12852,
+          "max": 13172
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9829838954725008,
+          "min": 0.9790209790209791,
+          "max": 1.0437817258883249
+        }
+      },
+      "runtime_ns_per_call": {
+        "baseline": {
+          "median": 185.75304999999958,
+          "min": 160.05415000000198,
+          "max": 194.40845000000309
+        },
+        "candidate": {
+          "median": 175.6710499999997,
+          "min": 156.77464999999984,
+          "max": 232.762299999996
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9795100595642031,
+          "min": 0.9050932511666128,
+          "max": 1.1972848916803376
+        }
+      }
+    },
+    {
+      "family": "recurrence",
+      "scale": 1024,
+      "wall_ms": {
+        "baseline": {
+          "median": 2.756185,
+          "min": 2.606657,
+          "max": 2.922995
+        },
+        "candidate": {
+          "median": 2.882795,
+          "min": 2.666967,
+          "max": 3.323913
+        },
+        "paired_candidate_over_baseline": {
+          "median": 1.0594368665383493,
+          "min": 0.9525851738480524,
+          "max": 1.220937869385614
+        }
+      },
+      "cpu_ms": {
+        "baseline": {
+          "median": 2.601,
+          "min": 2.467,
+          "max": 2.7729999999999997
+        },
+        "candidate": {
+          "median": 2.702,
+          "min": 2.499,
+          "max": 3.098
+        },
+        "paired_candidate_over_baseline": {
+          "median": 1.0356731875719218,
+          "min": 0.9607843137254902,
+          "max": 1.204978607545702
+        }
+      },
+      "peak_rss_kib": {
+        "baseline": {
+          "median": 13072,
+          "min": 12892,
+          "max": 13332
+        },
+        "candidate": {
+          "median": 13080,
+          "min": 13052,
+          "max": 13224
+        },
+        "paired_candidate_over_baseline": {
+          "median": 1.0061106018942867,
+          "min": 0.9795979597959796,
+          "max": 1.0124107973937326
+        }
+      },
+      "runtime_ns_per_call": {
+        "baseline": {
+          "median": 881.2114000000007,
+          "min": 863.2759499999993,
+          "max": 928.211650000003
+        },
+        "candidate": {
+          "median": 907.9597499999977,
+          "min": 856.1224999999979,
+          "max": 931.1881
+        },
+        "paired_candidate_over_baseline": {
+          "median": 1.0096487108206849,
+          "min": 0.9670024862865662,
+          "max": 1.0567136330737428
+        }
+      }
+    }
+  ]
+}

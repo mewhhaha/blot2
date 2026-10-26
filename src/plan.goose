@@ -225,14 +225,7 @@ fn build_plans(b: CoreBuilder, requested_export: const u8[:], diagnostics: Diagn
         else { let id = b.types.len as u32; b.types.push(TypeNode {tag:TY_TUPLE,children:ref_span(b,children),..}); adapter_env_types.push(id); }
     }
     if !build_layout_premises(b,env_types,adapter_env_types,diagnostics) { return false; }
-    let type_count = b.types.len;
-    for i in 1..type_count {
-        if validator::type_is_template(core_view(b),i as u32,0) { continue; }
-        var work = Work { .. };
-        let layout, ok = validator::derive_layout(core_view(b), i as u32, work, diagnostics);
-        if !ok { return false; }
-        b.layouts.push(layout);
-    }
+    if !validator::append_layouts(b, 1, true, diagnostics) { return false; }
     for ty, i in adapter_env_types { if i != 0 { b.callable_adapters[i].environment_layout = layout_id(core_view(b),ty); } }
     for f, index in b.functions {
         if index == 0 { continue; }

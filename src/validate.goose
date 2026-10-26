@@ -10,7 +10,17 @@ import std;
 let FRESH: u32 = 0;
 let OPTIONAL: u32 = 1;
 let REQUIRED: u32 = 2;
-struct Context { c: Core, mode: u32, work: Work&, diags: Diagnostic[>..]&, visit_limit:u64 = LIMIT_VISITS, proof_limit:u64 = LIMIT_PROOF_VISITS, origin:u32 = 0, proof_mode:bool = false }
+struct DominanceEntry { definition:u32, target:u32, epoch:u32, result:bool }
+// Rebuilt only from structurally checked Core. These are attempt-local lookup
+// tables, never transported authority or a substitute for ownership validation.
+struct ValidationIndex {
+    op_blocks:const u32[:], op_positions:const u32[:], incoming:const u32[:],
+    dominance:DominanceEntry[:], seen:u64[:], queue:u32[:], stamp:u64[:],
+    plan_heads:const u32[:], plan_next:const u32[:], adapter_heads:const u32[:], adapter_next:const u32[:]
+}
+// Contexts borrow the enclosing attempt's immutable Core view. Origin/proof
+// contexts copy account and index references, without copying every table span.
+struct Context { c: const Core&, mode: u32, work: Work&, diags: Diagnostic[>..]&, visit_limit:u64 = LIMIT_VISITS, proof_limit:u64 = LIMIT_PROOF_VISITS, origin:u32 = 0, proof_mode:bool = false, indexes:ValidationIndex&? = null, epoch:u32 = 0 }
 struct Geometry { dependent: bool, minimum: u32, min_nodes: u32, min_leaves: u32, min_guards: u32, size: u32, align: u32, plain: bool, share: bool, must_handle: bool, nodes: u32, leaves: u32, guards: u32, depth: u32 }
 fn reject(v: Context, cause: u32, subject: u32) -> bool {
     // A caller may observe a false helper result after its account exhausted.
@@ -458,11 +468,11 @@ fn type_child(c: Core, t: TypeNode, i: u32) -> u32 {
 fn type_count(t: TypeNode) -> u32 {
     if t.fields.count != 0 { return t.fields.count; } return t.children.count;
 }
-recursive fn type_node(v: Context, id: u32, colors: u32[>..]&, geometry: Geometry[>..]&, depth: u32) -> bool {
+recursive fn type_node(v: Context, id: u32, colors: u32[>..]&, geometry: Geometry[>..]&, depth: u32, stamp: u32 = 1) -> bool {
     if !visit(v, 1) { return false; }
-    if colors[id] == 2 { return true; }
-    if colors[id] == 1 || depth > LIMIT_NEST { return reject(v, 2024, id); }
-    colors[id] = 1;
+    if colors[id] == stamp + 1 { return true; }
+    if colors[id] == stamp || depth > LIMIT_NEST { return reject(v, 2024, id); }
+    colors[id] = stamp;
     let c = v.c;
     let t = c.types[id];
     if t.tag < TY_UNIT || t.tag > TY_OWNED_CONSTRUCTION { return reject(v, 2034, id); }
@@ -480,7 +490,7 @@ recursive fn type_node(v: Context, id: u32, colors: u32[>..]&, geometry: Geometr
     var g = Geometry { dependent: false, minimum: 0, min_nodes: 1, min_leaves: 0, min_guards: 0, size: 0, align: 1, plain: true, share: true, must_handle: false, nodes: 1, leaves: 0, guards: 0, depth: 1 };
     for i in n { if !visit(v,1) { return false from type_node; }
         let child = type_child(c, t, i);
-        if !type_node(v, child, colors, geometry, depth + 1) { return false; }
+        if !type_node(v, child, colors, geometry, depth + 1, stamp) { return false; }
         let cg = geometry[child];
         if t.tag==TY_TUPLE || t.tag==TY_RECORD || t.tag==TY_SUM || t.tag==TY_RESULT || t.tag==TY_EXISTS || t.tag==TY_ALIAS || t.tag==TY_FORALL { g.dependent=g.dependent || cg.dependent; }
         if !g.dependent && (g.nodes > 8192 - cg.nodes || g.leaves > 8192 - cg.leaves || g.guards > 8192 - cg.guards) { return reject(v, 2024, id); }
@@ -553,7 +563,7 @@ recursive fn type_node(v: Context, id: u32, colors: u32[>..]&, geometry: Geometr
     if g.plain && (g.minimum > 64 || g.min_nodes > 32 || g.min_leaves > 64 || g.min_guards > 32 || !g.dependent && (g.size > 64 || g.nodes > 32 || g.leaves > 64 || g.guards > 32)) { g.plain = false; }
     if g.dependent { g.nodes=min(g.nodes,8192); g.leaves=min(g.leaves,8192); g.guards=min(g.guards,8192); }
     if g.size != 0 { g.align = 4; }
-    geometry[id] = g; colors[id] = 2; return true;
+    geometry[id] = g; colors[id] = stamp + 1; return true;
 }
 fn equal_fact(a: Fact, b: Fact) -> bool {
     return a.tag == b.tag && a.left == b.left && a.right == b.right && a.third == b.third && a.domain == b.domain && a.version == b.version;
@@ -817,6 +827,49 @@ recursive fn evidence_node(parent:Context, id: u32, colors: u32[>..]&, depth: u3
     if !ok { return reject(v, 2034, id); }
     colors[id] = 2; return true;
 }
+// Each stored edge counts, including one not listed by its source terminator.
+// This preserves the conservative authority test for hostile unused edges.
+fn index_core(v:Context,op_blocks:u32[>..]&,op_positions:u32[>..]&,incoming:u32[>..]&) -> bool {
+    for op in v.c.ops { op_blocks.push(0); op_positions.push(0); }
+    for basic in v.c.blocks { incoming.push(0); }
+    for basic,id in v.c.blocks {
+        if !visit(v,1) { return false; } if id==0 { continue; }
+        for i in basic.ops.count {
+            if !visit(v,1) { return false; } let operation=at(v.c,basic.ops,i);
+            // The first occurrence matches operation_block's scan. Duplicate
+            // membership still rejects in independent function ownership checks.
+            if op_blocks[operation]==0 { op_blocks[operation]=id as u32; op_positions[operation]=i; }
+        }
+    }
+    for edge,id in v.c.edges { if !visit(v,1) { return false; } if id!=0 { incoming[edge.to]++; } }
+    return true;
+}
+// Keep every row, including repeated owners and contract-only ABI plans.
+// Reverse insertion preserves the original ascending table traversal order.
+fn index_layout_owners(v:Context,plan_heads:u32[>..]&,plan_next:u32[>..]&,adapter_heads:u32[>..]&,adapter_next:u32[>..]&) -> bool {
+    let c=v.c;
+    for function in c.functions { plan_heads.push(0); }
+    for plan in c.abi_plans { plan_next.push(0); }
+    for operation in c.ops { adapter_heads.push(0); }
+    for adapter in c.callable_adapters { adapter_next.push(0); }
+    var cursor=c.abi_plans.len;
+    while cursor>1 {
+        if !visit(v,1) { return false; } cursor--; let plan=c.abi_plans[cursor];
+        plan_next[cursor]=plan_heads[plan.function]; plan_heads[plan.function]=cursor as u32;
+    }
+    cursor=c.callable_adapters.len;
+    while cursor>1 {
+        if !visit(v,1) { return false; } cursor--; let adapter=c.callable_adapters[cursor];
+        adapter_next[cursor]=adapter_heads[adapter.op]; adapter_heads[adapter.op]=cursor as u32;
+    }
+    return true;
+}
+fn unique_incoming(parent:Context,edge_id:u32)->bool {
+    let v=proof_context(parent); let edge=v.c.edges[edge_id];
+    let index=v.indexes; if index { if !proof_visit(v,1) { return false; } return index.incoming[edge.to]==1; }
+    for other,id in v.c.edges { if !proof_visit(v,1) { return false; } if id!=0 && id!=edge_id && other.to==edge.to { return false; } }
+    return true;
+}
 // A block dominates target iff every entry path reaches it. Reachability is bounded
 // and uses explicit edges only. Structured loop identities are checked separately.
 fn dominates(v: Context, definition: u32, target: u32) -> bool {
@@ -825,6 +878,24 @@ fn dominates(v: Context, definition: u32, target: u32) -> bool {
     if c.blocks[definition].function != c.blocks[target].function { return false; }
     let entry = c.functions[c.blocks[target].function].entry;
     if definition == entry { return true; }
+    let index=v.indexes; if index {
+        if !visit(v,1) { return false; }
+        let slot=((definition as u64*131+target)%index.dominance.len as u64) as u32;
+        let cached=index.dominance[slot];
+        if cached.definition==definition && cached.target==target && cached.epoch==v.epoch { return cached.result; }
+        index.stamp[0]++; let stamp=index.stamp[0];
+        var cursor:u32=0; var end:u32=1; index.queue[0]=entry; index.seen[entry]=stamp; var result=true;
+        while cursor<end {
+            if !visit(v,1) { return false; } let current=index.queue[cursor]; cursor++;
+            if current==target { result=false; break; }
+            let term=c.terminators[c.blocks[current].term];
+            for i in term.edges.count {
+                if !visit(v,1) { return false; } let to=c.edges[at(c,term.edges,i)].to;
+                if to!=definition && index.seen[to]!=stamp { index.seen[to]=stamp; index.queue[end]=to; end++; }
+            }
+        }
+        index.dominance[slot]=DominanceEntry{definition,target,v.epoch,result}; return result;
+    }
     var seen: u32[>..] = []; for fill in c.blocks.len { seen.push(0); }
     var queue: u32[>..] = []; queue.push(entry); seen[entry] = 1;
     var cursor: i64 = 0;
@@ -847,10 +918,14 @@ fn use_value(v: Context, value: u32, block_id: u32, position: u32) -> bool {
     if val.block_id != block_id {
         if !dominates(v, val.block_id, block_id) { return reject(v, 2034, value); }
     } else if val.op != 0 {
-        let ops = c.blocks[block_id].ops;
-        var found = false;
-        for i in position { if !visit(v,1) { return false from use_value; } if at(c, ops, i) == val.op { found = true; } }
-        if !found { return reject(v, 2034, value); }
+        let index=v.indexes; if index {
+            if !visit(v,1) { return false; }
+            if index.op_blocks[val.op]!=block_id || index.op_positions[val.op]>=position { return reject(v,2034,value); }
+        } else {
+            let ops = c.blocks[block_id].ops; var found = false;
+            for i in position { if !visit(v,1) { return false from use_value; } if at(c, ops, i) == val.op { found = true; } }
+            if !found { return reject(v, 2034, value); }
+        }
     } else if !contains(v, c.blocks[block_id].params, value) { return reject(v, 2034, value); }
     return true;
 }
@@ -862,11 +937,7 @@ fn evidence_available(parent:Context, id: u32, block_id: u32) -> bool {
     let edge = v.c.edges[e.edge];
     // Edge evidence is valid only while its edge controls entry. A second incoming
     // edge to that target would require a checked intersection, not this shortcut.
-    for other, index in v.c.edges {
-        if !proof_visit(v, 1) { return false; }
-        if index == 0 { continue; }
-        if other.to == edge.to && index != e.edge { return false; }
-    }
+    if !unique_incoming(v,e.edge) { return false; }
     return dominates(v, edge.to, block_id);
 }
 fn obligation(parent:Context, op: Operation, block_id: u32, tag: u32, left: u32, right: u32) -> bool {
@@ -879,18 +950,16 @@ fn obligation(parent:Context, op: Operation, block_id: u32, tag: u32, left: u32,
     return false;
 }
 
-fn derive_layout(c: Core, type_id: u32, work: Work&, diags: Diagnostic[>..]&) -> Layout, bool {
+fn derive_layout_scratch(c: Core, type_id: u32, work: Work&, diags: Diagnostic[>..]&, colors: u32[>..]&, geometry: Geometry[>..]&, stamp: u32) -> Layout, bool {
     let v = Context { c, FRESH, work, diags, LIMIT_VISITS, LIMIT_PROOF_VISITS };
     if !id_ok(type_id, c.types.len) { reject(v, 2034, type_id); return Layout { .. }, false; }
-    var colors: u32[>..] = []; for fill in c.types.len { colors.push(0); }
-    var geometry: Geometry[>..] = []; for fill in c.types.len { geometry.push(Geometry { .. }); }
-    if !type_node(v, type_id, colors, geometry, 0) { return Layout { .. }, false; }
+    if !type_node(v, type_id, colors, geometry, 0, stamp) { return Layout { .. }, false; }
     let g = geometry[type_id];
     var flags: u32 = 0;
     if g.plain { flags |= 1; } if g.share { flags |= 2; } if g.size == 0 { flags |= 4; }
     var abi = ABI_INDIRECT;
     var representation = type_id;
-    for unwrap in 65 { if !visit(v,1) { return Layout{..},false from derive_layout; }
+    for unwrap in 65 { if !visit(v,1) { return Layout{..},false from derive_layout_scratch; }
         if c.types[representation].tag != TY_ALIAS && c.types[representation].tag != TY_FORALL { break; }
         representation = type_child(c, c.types[representation], 0);
     }
@@ -900,6 +969,29 @@ fn derive_layout(c: Core, type_id: u32, work: Work&, diags: Diagnostic[>..]&) ->
     if tag == TY_F32 { abi = ABI_F32; }
     return Layout { type_id: type_id, size: g.size, align: g.align, flags: flags, abi: abi, schema: type_id,
         fields: c.types[type_id].fields, depth: g.depth, leaves: g.leaves, guards: g.guards }, true;
+}
+
+fn derive_layout(c: Core, type_id: u32, work: Work&, diags: Diagnostic[>..]&) -> Layout, bool {
+    var colors: u32[>..] = []; var geometry: Geometry[>..] = [];
+    for fill in c.types.len { colors.push(0); geometry.push(Geometry { .. }); }
+    return derive_layout_scratch(c, type_id, work, diags, colors, geometry, 1);
+}
+fn append_layouts(b: CoreBuilder, first: u32, skip_templates: bool, diags: Diagnostic[>..]&) -> bool {
+    let c = core_view(b);
+    if first >= c.types.len { return true; }
+    if c.types.len > 0x7fffffff { diags.push(Diagnostic {2031,0,0,0}); return false; }
+    var colors: u32[>..] = []; var geometry: Geometry[>..] = [];
+    for fill in c.types.len { colors.push(0); geometry.push(Geometry { .. }); }
+    for i in first..c.types.len {
+        if skip_templates && type_is_template(c, i as u32, 0) { continue; }
+        // A new epoch for every root preserves the exact independent traversal
+        // and work budget. Only scratch allocation/zeroing is shared.
+        var work = Work { .. };
+        let row, ok = derive_layout_scratch(c, i as u32, work, diags, colors, geometry, i as u32 * 2 + 1);
+        if !ok { return false; }
+        b.layouts.push(row);
+    }
+    return true;
 }
 
 recursive fn same_type(v: Context, a: u32, b: u32, depth: u32) -> bool {
@@ -1100,16 +1192,16 @@ fn consume(v: Context, geometry: const Geometry[:], live: u32[>..]&, value: u32)
     if live[value] == 0 { return reject(v, 2013, value); }
     live[value] = 0; return true;
 }
-fn live_exit(v: Context, geometry: const Geometry[:], live: const u32[:]) -> bool {
-    for state, value in live { if !visit(v,1) { return false from live_exit; }
-        if state != 0 {
-            if geometry[v.c.values[value].type_id].must_handle { return reject(v, 2021, value as u32); }
-            return reject(v, 2015, value as u32);
+fn live_exit(v: Context, geometry: const Geometry[:], live: const u32[:], affine: const u32[:]) -> bool {
+    for value in affine { if !visit(v,1) { return false from live_exit; }
+        if live[value] != 0 {
+            if geometry[v.c.values[value].type_id].must_handle { return reject(v, 2021, value); }
+            return reject(v, 2015, value);
         }
     }
     return true;
 }
-fn validate_function(parent: Context, id: u32, geometry: const Geometry[:], definitions: u32[>..]&, operation_owners: u32[>..]&, block_owners: u32[>..]&) -> bool {
+fn validate_function(parent: Context, id: u32, geometry: const Geometry[:], definitions: u32[>..]&, operation_owners: u32[>..]&, block_owners: u32[>..]&, live: u32[>..]&, outgoing: u32[>..]&) -> bool {
     let c = parent.c; let f = c.functions[id]; let v=with_origin(parent,f.origin); let contract = c.contracts[f.contract];
     if !f.evaluator_only && (contract.depth == 0 || contract.depth > 128 || contract.frame > 16777216) { return reject(v, 2023, id); }
     if f.evaluator_only && (f.visibility != VIS_PRIVATE || f.export_id != 0 || f.captures.count != 0 || f.environment_bindings.count != 0 || c.types[terminal(v,contract.arg)].tag != TY_UNIT) { return reject(v,2034,id); }
@@ -1146,12 +1238,14 @@ fn validate_function(parent: Context, id: u32, geometry: const Geometry[:], defi
         if basic.function != id || block_owners[block_id] != 0 { return reject(v, 2034, block_id); }
         block_owners[block_id] = id; count += basic.ops.count;
         if count > LIMIT_OPS { return reject(v, 2031, id); }
-        var live: u32[>..] = []; for fill in c.values.len { live.push(0); }
+        // Only this block's affine definitions can become live. Indexed scratch
+        // is shared by the validation attempt and cleared at each completed block.
+        var affine: u32[>..] = [];
         for pi in basic.params.count { if !visit(v,1) { return false from validate_function; }
             let parameter = at(c, basic.params, pi); let val = c.values[parameter];
             if val.op != 0 || val.block_id != block_id || definitions[parameter] != 0 { return reject(v, 2034, parameter); }
             definitions[parameter] = 1;
-            if !geometry[val.type_id].share { live[parameter] = 1; }
+            if !geometry[val.type_id].share { live[parameter] = 1; affine.push(parameter); }
             let parameter_tag = c.types[terminal(v, val.type_id)].tag;
             if parameter_tag != TY_UNIT && parameter_tag != TY_U32 && parameter_tag != TY_F32 && parameter_tag != TY_BOOL && parameter_tag != TY_INDEX { own_frame += geometry[val.type_id].size; }
         }
@@ -1165,7 +1259,7 @@ fn validate_function(parent: Context, id: u32, geometry: const Geometry[:], defi
                 if scope_conflict(v, region, authority, block_id, oi, geometry, live) { return reject(v, 2017, op_id); }
             }
             if op.tag == OP_OWNED_SEAL || op.tag == OP_OWNED_ABORT {
-                if op.args.count == 0 || !construction_exit(v, op, block_id, oi, geometry, live) { return false; }
+                if op.args.count == 0 || !construction_exit(v, op, block_id, oi, geometry, live, affine) { return false; }
             }
             for ai in op.args.count { if !visit(v,1) { return false from validate_function; }
                 let value = at(c, op.args, ai);
@@ -1198,7 +1292,7 @@ fn validate_function(parent: Context, id: u32, geometry: const Geometry[:], defi
                 let value = at(c, op.results, ri); let val = c.values[value];
                 if val.op != op_id || val.block_id != block_id || definitions[value] != 0 || val.version == 0 { return reject(v, 2034, value); }
                 definitions[value] = 1;
-                if !geometry[val.type_id].share { live[value] = 1; }
+                if !geometry[val.type_id].share { live[value] = 1; affine.push(value); }
                 let tag = c.types[val.type_id].tag;
                 if tag != TY_UNIT && tag != TY_U32 && tag != TY_F32 && tag != TY_BOOL && tag != TY_INDEX { own_frame += geometry[val.type_id].size; }
             }
@@ -1220,7 +1314,7 @@ fn validate_function(parent: Context, id: u32, geometry: const Geometry[:], defi
         if term.subject != 0 && !use_value(v, term.subject, block_id, basic.ops.count) { return false; }
         if term.tag == TERM_RETURN {
             if term.subject == 0 || term.edges.count != 0 || !same_type(v, c.values[term.subject].type_id, contract.result, 0) { return reject(v, 2003, basic.term); }
-            if !consume(v, geometry, live, term.subject) || !live_exit(v, geometry, live) { return false; }
+            if !consume(v, geometry, live, term.subject) || !live_exit(v, geometry, live, affine) { return false; }
             for ei in contract.ensures.count { if !visit(v,1) { return false from validate_function; }
                 let formal = c.facts[at(c, contract.ensures, ei)]; var proved = false;
                 for evidence, ev in c.evidence {
@@ -1271,19 +1365,20 @@ fn validate_function(parent: Context, id: u32, geometry: const Geometry[:], defi
                     cases |= 1 << edge.case_tag;
                 } else if edge.kind != EDGE_NORMAL && edge.kind != EDGE_TRUE && edge.kind != EDGE_FALSE && edge.kind != EDGE_LOOP_ENTRY && edge.kind != EDGE_LOOP_NEXT && edge.kind != EDGE_LOOP_STOP { return reject(v, 2028, edge_id); }
                 if edge.kind >= EDGE_LOOP_ENTRY && !id_ok(edge.loop_id, c.loops.len) { return reject(v, 2034, edge_id); }
-                var outgoing: u32[>..] = []; outgoing.append(live);
+                for value in affine { if !visit(v,1) { return false from validate_function; } outgoing[value] = live[value]; }
                 for ai in edge.args.count { if !visit(v,1) { return false from validate_function; }
                     let arg = at(c, edge.args, ai); let parameter = at(c, target.params, ai);
                     if !use_value(v, arg, block_id, basic.ops.count) || !edge_type(v, c.values[parameter].type_id, c.values[arg].type_id, edge_id, 0) { return reject(v, 2003, edge_id); }
                     if !consume(v, geometry, outgoing, arg) { return false; }
                 }
-                if !live_exit(v, geometry, outgoing) { return false; }
+                if !live_exit(v, geometry, outgoing, affine) { return false; }
                 // Backedges require explicit finite-range loop records, checked below.
                 if dominates(v, edge.to, block_id) && edge.kind != EDGE_LOOP_NEXT { return reject(v, 2028, edge_id); }
             }
             if term.tag == TERM_BRANCH && kinds != 3 { return reject(v, 2034, basic.term); }
         }
         if term.discharge.count != 0 { return reject(v, 2034, basic.term); }
+        for value in affine { if !visit(v,1) { return false from validate_function; } live[value] = 0; outgoing[value] = 0; }
     }
     if !f.evaluator_only && own_frame + callee_frame > contract.frame { return reject(v, 2023, id); }
     return true;
@@ -1293,8 +1388,16 @@ fn validate_core(c: Core, mode: u32, work: Work&, diags: Diagnostic[>..]&) -> bo
     // Input integrity has a byte/table-derived bound. It is not one source
     // declaration's semantic budget shared by an entire project.
     let input_limit=validation_input_limit(c);
-    let v = Context { c, mode, work, diags, input_limit, input_limit };
+    var v = Context { c, mode, work, diags, input_limit, input_limit };
     if !structure(v) || !producer_identities(v) { return false; }
+    var op_blocks:u32[>..]=[]; var op_positions:u32[>..]=[]; var incoming:u32[>..]=[];
+    if !index_core(v,op_blocks,op_positions,incoming) { return false; }
+    var dominance:DominanceEntry[>..]=[]; for fill in 1024 { dominance.push(DominanceEntry{..}); }
+    var seen:u64[>..]=[]; var queue:u32[>..]=[]; for basic in c.blocks { seen.push(0); queue.push(0); }
+    var plan_heads:u32[>..]=[]; var plan_next:u32[>..]=[]; var adapter_heads:u32[>..]=[]; var adapter_next:u32[>..]=[];
+    if !index_layout_owners(v,plan_heads,plan_next,adapter_heads,adapter_next) { return false; }
+    var stamp:u64[>..]=[0]; var indexes=ValidationIndex{op_blocks,op_positions,incoming,dominance,seen,queue,stamp,plan_heads,plan_next,adapter_heads,adapter_next};
+    v.indexes .= indexes;
     var colors: u32[>..] = []; for fill in c.types.len { colors.push(0); }
     var geometry: Geometry[>..] = []; for fill in c.types.len { geometry.push(Geometry { .. }); }
     for t, id in c.types { if !visit(v,1) { return false from validate_core; } if id != 0 && !template_type(v,id as u32,0) && !type_node(v, id as u32, colors, geometry, 0) { return false; } }
@@ -1307,7 +1410,10 @@ fn validate_core(c: Core, mode: u32, work: Work&, diags: Diagnostic[>..]&) -> bo
     if !term_structure(v) { return false; }
     var evidence_colors: u32[>..] = []; for fill in c.evidence.len { evidence_colors.push(0); }
     for e, id in c.evidence { if !visit(v,1) { return false from validate_core; } if id != 0 && !evidence_node(v, id as u32, evidence_colors, 0) { return false; } }
-    var definitions: u32[>..] = []; for fill in c.values.len { definitions.push(0); }
+    // Failure destroys both scratch tables with this validation attempt; no
+    // partially checked block can leak ownership state into a later attempt.
+    var live: u32[>..] = []; var outgoing: u32[>..] = [];
+    var definitions: u32[>..] = []; for fill in c.values.len { definitions.push(0); live.push(0); outgoing.push(0); }
     var operation_owners: u32[>..] = []; for fill in c.ops.len { operation_owners.push(0); }
     var block_owners: u32[>..] = []; for fill in c.blocks.len { block_owners.push(0); }
     var scope_owner:u32[>..]=[]; for scope in c.scopes { scope_owner.push(0); }
@@ -1336,13 +1442,14 @@ fn validate_core(c: Core, mode: u32, work: Work&, diags: Diagnostic[>..]&) -> bo
             for i in c.contracts[f.contract].binders.count { if !visit(v,1) { return false from validate_core; } bound.push(at(c,c.contracts[f.contract].binders,i)); }
             if !closed_interface(v,f.type_id,bound,0) { return reject(v,2016,id as u32); }
         }
-        let owner=owners[id]; let local=Context {c,mode,accounts[owner],diags,LIMIT_VISITS,LIMIT_PROOF_VISITS,diagnostic_origin(c,f.origin)};
+        let owner=owners[id]; var local=Context {c,mode,accounts[owner],diags,LIMIT_VISITS,LIMIT_PROOF_VISITS,diagnostic_origin(c,f.origin)};
+        local.indexes .= indexes; local.epoch=id as u32;
         let marks=InventoryMarks{type_marks,term_marks,fact_marks,proof_marks,contract_marks};
         if !declaration_inventory(local,id as u32,owner,inventory[owner],marks,proof_heads[id],proof_next) { work.exhausted=accounts[owner].exhausted; return false; }
         var evidence=proof_heads[id];
         while evidence!=0 { if !visit(v,1) { return false from validate_core; } if !evidence_node(local,evidence,local_colors,0) { work.exhausted=accounts[owner].exhausted; return false; } evidence=proof_next[evidence]; }
         if c.abi_plans.len>1 && !validate_layout_premises(local,id as u32,geometry) { work.exhausted=accounts[owner].exhausted; return false; }
-        if !validate_function(local, id as u32, geometry, definitions, operation_owners, block_owners) || accounts[owner].exhausted { work.exhausted=accounts[owner].exhausted; return false; }
+        if !validate_function(local, id as u32, geometry, definitions, operation_owners, block_owners, live, outgoing) || accounts[owner].exhausted { work.exhausted=accounts[owner].exhausted; return false; }
         for row,li in c.loops { if !visit(v,1) { return false from validate_core; } if li!=0 && c.blocks[row.header].function==id && !validate_loop(local,li as u32) { work.exhausted=accounts[owner].exhausted; return false; } }
     }
     // A type-only declaration has no Function body but still owns a complete
@@ -2380,10 +2487,10 @@ fn owned_operation(v: Context, id: u32, block_id: u32, geometry: const Geometry[
     }
     return reject(v, 2028, id);
 }
-fn construction_exit(v: Context, op: Operation, block_id: u32, position: u32, geometry: const Geometry[:], live: const u32[:]) -> bool {
+fn construction_exit(v: Context, op: Operation, block_id: u32, position: u32, geometry: const Geometry[:], live: const u32[:], affine: const u32[:]) -> bool {
     let c = v.c; let owner = at(c, op.args, 0); let region = c.types[c.values[owner].type_id].region;
-    for state, value in live { if !visit(v,1) { return false from construction_exit; }
-        if state != 0 && value != owner && type_region(v, c.values[value].type_id, region, 0) { return reject(v, 2015, value as u32); }
+    for value in affine { if !visit(v,1) { return false from construction_exit; }
+        if live[value] != 0 && value != owner && type_region(v, c.values[value].type_id, region, 0) { return reject(v, 2015, value); }
     }
     let basic = c.blocks[block_id];
     for i in position + 1..basic.ops.count { if !visit(v,1) { return false from construction_exit; }
@@ -3027,12 +3134,31 @@ recursive fn instantiated_layout(v:Context,ty:u32,subs:Span,depth:u32)->BoundGeo
 fn validate_layout_premises(v:Context,function_id:u32,geometry:const Geometry[:])->bool {
     let c=v.c; let f=c.functions[function_id]; let ct=c.contracts[f.contract];
     if !layout_required_type(v,ct,ct.arg,geometry,0) || !layout_required_type(v,ct,ct.result,geometry,0) { return false; }
-    for plan,pi in c.abi_plans { if !visit(v,1) { return false from validate_layout_premises; } if pi!=0 && plan.function==function_id && plan.env_layout!=0 && !layout_required_type(v,ct,c.layouts[plan.env_layout].type_id,geometry,0) { return false; } }
+    let index=v.indexes;
+    if index {
+        var pi=index.plan_heads[function_id];
+        while pi!=0 {
+            if !visit(v,1) { return false; } let plan=c.abi_plans[pi];
+            if plan.env_layout!=0 && !layout_required_type(v,ct,c.layouts[plan.env_layout].type_id,geometry,0) { return false; }
+            pi=index.plan_next[pi];
+        }
+    } else {
+        for plan,pi in c.abi_plans { if !visit(v,1) { return false from validate_layout_premises; } if pi!=0 && plan.function==function_id && plan.env_layout!=0 && !layout_required_type(v,ct,c.layouts[plan.env_layout].type_id,geometry,0) { return false; } }
+    }
     for bi in f.blocks.count { if !visit(v,1) { return false from validate_layout_premises; } let basic=c.blocks[at(c,f.blocks,bi)];
         for pi in basic.params.count { if !visit(v,1) { return false from validate_layout_premises; } if !layout_required_type(v,ct,c.values[at(c,basic.params,pi)].type_id,geometry,0) { return false; } }
         for oi in basic.ops.count { if !visit(v,1) { return false from validate_layout_premises; } let op=c.ops[at(c,basic.ops,oi)];
             for ri in op.results.count { if !visit(v,1) { return false from validate_layout_premises; } if !layout_required_type(v,ct,c.values[at(c,op.results,ri)].type_id,geometry,0) { return false; } }
-            for adapter,ai in c.callable_adapters { if !visit(v,1) { return false from validate_layout_premises; } if ai!=0 && adapter.op==at(c,basic.ops,oi) && !layout_required_type(v,ct,c.layouts[adapter.environment_layout].type_id,geometry,0) { return false; } }
+            if index {
+                var ai=index.adapter_heads[at(c,basic.ops,oi)];
+                while ai!=0 {
+                    if !visit(v,1) { return false; } let adapter=c.callable_adapters[ai];
+                    if !layout_required_type(v,ct,c.layouts[adapter.environment_layout].type_id,geometry,0) { return false; }
+                    ai=index.adapter_next[ai];
+                }
+            } else {
+                for adapter,ai in c.callable_adapters { if !visit(v,1) { return false from validate_layout_premises; } if ai!=0 && adapter.op==at(c,basic.ops,oi) && !layout_required_type(v,ct,c.layouts[adapter.environment_layout].type_id,geometry,0) { return false; } }
+            }
             if op.tag==OP_TRY_ALLOC && !layout_required(v,ct,op.imm0,LAYOUT_PLAIN,geometry) { return false; }
             for si in op.substitutions.count { if !visit(v,1) { return false from validate_layout_premises; } let sub=c.substitutions[at(c,op.substitutions,si)]; if sub.kind==KIND_TYPE && c.binders[sub.binder].constraints & CONSTRAINT_PLAIN!=0 && !layout_required(v,ct,sub.value,LAYOUT_PLAIN,geometry) { return false; } }
             if op.tag!=OP_CALL && op.tag!=OP_CLOSURE && op.tag!=OP_FN_PLACE { continue; }
@@ -3290,6 +3416,7 @@ fn closure_environment_bound(v:Context,function_id:u32,geometry:const Geometry[:
 }
 
 fn operation_block(v:Context,operation:u32)->u32 {
+    let index=v.indexes; if index { if !visit(v,1) { return 0; } return index.op_blocks[operation]; }
     for basic,id in v.c.blocks { if !visit(v,1) { return 0 from operation_block; } if id==0 {continue;} for i in basic.ops.count { if !visit(v,1) {return 0;} if at(v.c,basic.ops,i)==operation {return id as u32;} } } return 0;
 }
 recursive fn capture_alias(v:Context,value:u32,original:u32,depth:u32)->bool {

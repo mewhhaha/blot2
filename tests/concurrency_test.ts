@@ -124,6 +124,22 @@ pub let run: U32 -> U32 ! {} requires [AddFits(arg,1)] resources {depth:3,frame:
       "attribution changed emitted program",
     );
     const s = measured.stats;
+    const attributed = [
+      "setup_ns",
+      "pipeline_ns",
+      "artifact_encode_ns",
+      "publication_ns",
+    ];
+    assert(
+      attributed.every((field) =>
+        Number.isSafeInteger(s[field]) && s[field] >= 0
+      ),
+    );
+    assert(s.artifact_encode_ns === 0, "unrequested Core encoding was charged");
+    assert(
+      attributed.reduce((sum, field) => sum + s[field], 0) <= s.total_ns,
+      "CLI clocks overlap or exceed total time",
+    );
     assert(s.generated_bytes === measured.bytes.length);
     assert(s.static_steps === 2 && s.static_bytes === 4);
     assert(s.interface_instantiations === 1);
@@ -140,6 +156,10 @@ pub let run: U32 -> U32 ! {} requires [AddFits(arg,1)] resources {depth:3,frame:
         s.general_inference_nodes === 0 && s.downstream_regions === 0,
     );
     assert(s.rewrite_visits === 0 && s.rewrite_applications === 0);
+    assert(
+      s.inline_sites === 0 && s.inline_growth === 0 && s.inline_declines === 0,
+    );
+    assert(s.inline_max_depth === 0 && s.inline_max_callee === 0);
     const optimized = await build("optimized", "fast", true);
     assert(
       optimized.stats.rewrite_visits > 0 &&

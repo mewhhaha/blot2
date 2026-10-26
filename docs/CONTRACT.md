@@ -12,7 +12,10 @@ avoid arithmetic overflow. All variable-length ID lists use `refs`.
 A `CoreBuilder` borrows growable tables owned by one nonrecursive driver;
 `with_core` creates those tables. `core_view` lends immutable slices for one
 phase. Durable publication serializes/copies into separately owned storage; no
-parser, proof scratch or borrowed source pointers escape. Source paths/names
+parser, proof scratch or borrowed source pointers escape. Validator contexts borrow
+the immutable Core view for one attempt; copying a context must not copy its
+entire table inventory. Each attempt retains its own work accounts and scratch.
+Source paths/names
 are interned in the owned byte arena. Region/Domain IDs refer to binder scopes
 and generative introduction sites, never physical addresses or runtime nonces.
 
@@ -134,7 +137,18 @@ ordinary termination signals during the nonallocating rename window. Reported
 I/O failure restores prior outputs. This is not a power-loss transaction or a
 simultaneous two-path snapshot for unrelated readers. The retained session has
 one authoritative Wasm output and commits its private revision index only after
-that publication succeeds.
+that publication succeeds. Ordinary generated Wasm (`build`, `rebuild` and
+`serve`) uses checked writes and close followed by sibling-file atomic rename,
+without file or directory synchronization. Success means complete bytes visible
+to readers, not durable media acknowledgement; deferred writeback errors may
+occur later. Explicit Core serialization and paired Core/Wasm output retain their
+existing synchronization paths. Source-formatting output also retains its
+existing writer.
+
+CLI timing separates `setup_ns`, the required `pipeline_ns`, optional
+`artifact_encode_ns` and `publication_ns` inside `total_ns`. These clocks exclude
+process startup before CLI dispatch and teardown after reporting. Pipeline phase
+clocks still split loading, completion, planning, validation and lowering.
 
 Phase timing includes fresh semantic and independent validation work counts,
 retained bytes and balanced completion counters. `--trace` emits phase/module
@@ -174,3 +188,34 @@ Retained `total_ns` measures the candidate pipeline. Separate `cache_admit_ns`
 (decode and independent validation), `cache_encode_ns` (canonical encoding and
 buffer copy) and `publication_ns` expose the surrounding work. Measured request
 wall time also includes protocol, scratch destruction and scheduling overhead.
+
+## Bounded release inlining
+
+The release tier may transport an admitted direct, monomorphic, single-block
+scalar callee into its caller. Initial eligibility is U32/Bool/F32 arguments and
+results, exact total scalar operations and direct calls with matching complete
+interfaces. Captures, generic substitutions, effects, contracts requiring proof,
+and pinned evidence producers remain outside this rule. No syntax or ABI changes
+are implied by optional eligibility.
+
+Callee templates come from the immutable pre-expansion Core. A pending operation
+records its expansion depth, so rewriting a callee earlier cannot bypass the
+maximum depth. Arguments are evaluated once; cloned operations retain source
+order, including evaluated operations after the returned producer. The call's
+result identity is preserved and intermediate values receive fresh owner-local
+IDs. F32 operations remain separately rounded and are never reassociated.
+
+The optimizer preflights the existing policy limits: at most 32 admitted
+operation/terminator nodes in a callee, depth 2, 16 sites per caller, and growth
+at most floor(caller nodes / 4), capped at 256. Whole-candidate normalized growth
+also stays within N+64, and visits/rewrites retain 8*N+1024/N+256 bounds. Expanded
+rows and reference spans are checked against the artifact byte bound before
+mutation. Every published candidate is independently revalidated. Optional work
+cannot change source admission; budget refusal retains an admitted baseline or
+a validated bounded prefix.
+
+`inline_sites`, `inline_growth`, `inline_declines`, `inline_max_callee` and
+`inline_max_depth` report this work separately from the R01–R12 catalogue.
+They are zero in the off/fast tiers. Inlining never updates retained semantic
+receipts: a new revision redoes optional transport from its current completed
+callee bodies after semantic reuse.

@@ -19,6 +19,7 @@ struct BuildStats {
     static_steps: u64, static_bytes: u64, interface_instantiations: u64,
     semantic_instances: u64, executable_instances: u64, adapter_count: u64,
     rewrite_visits: u64, rewrite_applications: u64, rewrite_declines: u64, generated_bytes: u64,
+    inline_sites: u64, inline_growth: u64, inline_declines: u64, inline_max_callee: u64, inline_max_depth: u64,
     completed_modules: u64, created_regions: u64, active_regions: u32, downstream_regions: u64, reuse: ReuseStats
 }
 // Append fields to an already open JSON object. Inventory counts describe the
@@ -33,6 +34,8 @@ fn append_build_work(out: u8[>..]&, s: BuildStats) {
         ",\"semantic_instances\":", s.semantic_instances, ",\"executable_instances\":", s.executable_instances,
         ",\"adapter_count\":", s.adapter_count, ",\"rewrite_visits\":", s.rewrite_visits,
         ",\"rewrite_applications\":", s.rewrite_applications, ",\"rewrite_declines\":", s.rewrite_declines,
+        ",\"inline_sites\":", s.inline_sites, ",\"inline_growth\":", s.inline_growth, ",\"inline_declines\":", s.inline_declines,
+        ",\"inline_max_callee\":", s.inline_max_callee, ",\"inline_max_depth\":", s.inline_max_depth,
         ",\"generated_bytes\":", s.generated_bytes, ",\"cache_admission_visits\":", s.reuse.admission_visits,
         ",\"dependency_visits\":", s.reuse.dependency_visits,
         ",\"dependency_invalidations\":", s.reuse.dependency_invalidations,
@@ -57,7 +60,7 @@ fn optimized_wasm(c: Core, mode: const u8[:], out: u8[>..]&, diagnostics: Diagno
     var success = false;
     with_core() { candidate =>
         let start = clock_ns();
-        let admitted = optimize::optimize(c, optimize::Limits {}, candidate, stats, diagnostics);
+        let admitted = optimize::optimize(c, optimize::Limits {release: mode == "release", ..}, candidate, stats, diagnostics);
         optimize_ns = clock_ns() - start;
         if admitted { success = emit_wasm_candidate(core_view(candidate), out, diagnostics, telemetry); }
         else if stats.declines > 0 && diagnostics.len == 0 { success = emit_wasm_candidate(c, out, diagnostics, telemetry); }
@@ -73,18 +76,20 @@ fn compile_candidate(prior: Core, config: BuildConfig, b: CoreBuilder, wasm_byte
     if !load_package(config.input, config.root, b, order, diagnostics) { return false; }
     let loaded = clock_ns(); stats.load_ns = loaded - start;
     trace_phase(config, "completion", "");
-    for module_id in order {
-        if cancelled() { return loader_error(diagnostics, 4009, 0); }
-        let m = b.modules[module_id]; var work = Work { .. }; let source = b.bytes[m.source.start..m.source.start + m.source.count];
-        let accepted = if prior.receipts.len > 1 {
-            complete_retained_module(prior, source, name_bytes(core_view(b), m.path), b, work, stats.reuse, diagnostics)
-        } else { frontend_complete(source, name_bytes(core_view(b), m.path), b, work, diagnostics) };
-        stats.semantic_visits += work.visits;
-        stats.proof_visits += work.proof_visits; stats.static_steps += work.static_steps;
-        stats.static_bytes += work.static_bytes; stats.interface_instantiations += work.interface_instantiations;
-        if !accepted { return false; }
-        stats.completed_modules++; trace_phase(config, "module-complete", name_bytes(core_view(b), m.path));
-    }
+    with_frontend_scratch() { frontend_scratch =>
+        for module_id in order {
+            if cancelled() { loader_error(diagnostics, 4009, 0); return false from compile_candidate; }
+            let m = b.modules[module_id]; var work = Work { .. }; let source = b.bytes[m.source.start..m.source.start + m.source.count];
+            let accepted = if prior.receipts.len > 1 {
+                complete_retained_module_in(prior, source, name_bytes(core_view(b), m.path), b, work, stats.reuse, diagnostics, frontend_scratch)
+            } else { frontend_complete_in(source, name_bytes(core_view(b), m.path), b, work, diagnostics, frontend_scratch) };
+            stats.semantic_visits += work.visits;
+            stats.proof_visits += work.proof_visits; stats.static_steps += work.static_steps;
+            stats.static_bytes += work.static_bytes; stats.interface_instantiations += work.interface_instantiations;
+            if !accepted { return false from compile_candidate; }
+            stats.completed_modules++; trace_phase(config, "module-complete", name_bytes(core_view(b), m.path));
+        }
+    };
     if cancelled() { return loader_error(diagnostics, 4009, 0); }
     let completed = clock_ns(); stats.complete_ns = completed - loaded; stats.declarations = b.phase.completed; stats.bodies = (b.functions.len - 1) as u64 - stats.reuse.bodies; for f in b.functions { if f.evaluator_only { stats.static_bodies++; } }
     trace_phase(config, "planning", "");
@@ -107,6 +112,8 @@ fn compile_candidate(prior: Core, config: BuildConfig, b: CoreBuilder, wasm_byte
     stats.executable_instances = if config.emit { stats.semantic_instances - stats.static_bodies } else { 0 as u64 };
     stats.adapter_count = (b.callable_adapters.len - 1) as u64;
     stats.rewrite_visits = opt_stats.visits; stats.rewrite_applications = opt_stats.applications; stats.rewrite_declines = opt_stats.declines;
+    stats.inline_sites = opt_stats.inline_sites; stats.inline_growth = opt_stats.inline_growth; stats.inline_declines = opt_stats.inline_declines;
+    stats.inline_max_callee = opt_stats.inline_max_callee; stats.inline_max_depth = opt_stats.inline_max_depth;
     stats.generated_bytes = wasm_bytes.len as u64;
     stats.lower_ns = clock_ns() - validated - stats.optimize_ns; stats.total_ns = clock_ns() - start; return true;
 }

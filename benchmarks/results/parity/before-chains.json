@@ -1,0 +1,118 @@
+{
+  "metadata": {
+    "timestamp": "2026-10-26T19:47:28.273Z",
+    "os": {
+      "target": "x86_64-unknown-linux-gnu",
+      "arch": "x86_64",
+      "os": "linux",
+      "vendor": "unknown",
+      "env": "gnu",
+      "standalone": false
+    },
+    "deno": {
+      "deno": "2.9.7",
+      "v8": "15.0.245.2-rusty",
+      "typescript": "6.0.3"
+    },
+    "cpu": "unavailable",
+    "commit": "102963640f603cdcaf197c977357860b57f03c57",
+    "candidate_sha256": "b54c172a659c9346604fb7dae5b8b76eb9852a96e9f962ce4ab858e5ab013292",
+    "qualification": {
+      "input_manifest_sha256": "91d402345ffe5509f93f61642889c8422a3cfe65baac8f18836849250919b25f",
+      "finished": "2026-10-26T19:15:32.302910+00:00",
+      "mode": "--release"
+    },
+    "baseline_sha256": "fd2119f5528cb164131e1156d35ba97c434393647f1b326ae5aa154db137d923",
+    "baseline_kind": "legacy",
+    "baseline_revision": "1e39b5d8a4268b9edf769c2813d5231abe1c963b",
+    "harness_sha256": "5ee30465cc5d1a3156291bca6dd46640af190fc5e1beafc96fb4ea50fb04c2ff",
+    "goose_revision": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+    "policy": "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
+    "candidate_build": "sol-review-before-parity",
+    "threads": 1,
+    "cache": "fresh process; filesystem cache uncontrolled",
+    "instrumentation": "separate phase-attribution build; timing samples omit --timings",
+    "rounds": 5,
+    "scales": [
+      127
+    ],
+    "runtime_calls_requested": 500000,
+    "runtime_warmup_requested": 1000000,
+    "runtime_method": "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary"
+  },
+  "samples": 11,
+  "comparisons": [
+    {
+      "family": "chains",
+      "scale": 127,
+      "wall_ms": {
+        "baseline": {
+          "median": 8.509332,
+          "min": 8.074662,
+          "max": 9.557701
+        },
+        "candidate": {
+          "median": 10.67977,
+          "min": 10.4011,
+          "max": 11.529059
+        },
+        "paired_candidate_over_baseline": {
+          "median": 1.2396942556713029,
+          "min": 1.1738241254849409,
+          "max": 1.346889814087574
+        }
+      },
+      "cpu_ms": {
+        "baseline": {
+          "median": 8.036999999999999,
+          "min": 7.810999999999999,
+          "max": 8.839
+        },
+        "candidate": {
+          "median": 6.3660000000000005,
+          "min": 6.218,
+          "max": 7.016
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.7920865994774171,
+          "min": 0.7435630989493129,
+          "max": 0.7960568429138396
+        }
+      },
+      "peak_rss_kib": {
+        "baseline": {
+          "median": 13096,
+          "min": 13008,
+          "max": 15164
+        },
+        "candidate": {
+          "median": 12996,
+          "min": 12612,
+          "max": 13112
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9683660933660934,
+          "min": 0.8646795040886309,
+          "max": 0.9990774907749077
+        }
+      },
+      "runtime_ns_per_call": {
+        "baseline": {
+          "median": 29.20323240646503,
+          "min": 25.466966933933723,
+          "max": 33.77675355350726
+        },
+        "candidate": {
+          "median": 42.53574507149015,
+          "min": 40.29734259468523,
+          "max": 49.02603205206411
+        },
+        "paired_candidate_over_baseline": {
+          "median": 1.503821309110541,
+          "min": 1.2593201121033546,
+          "max": 1.718012499039936
+        }
+      }
+    }
+  ]
+}

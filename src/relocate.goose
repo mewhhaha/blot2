@@ -3,6 +3,7 @@
 namespace relocation;
 import src.model;
 import src.canonical;
+import std;
 struct Projection { source_definition:u32, target_definition:u32 }
 struct Ref { table:u32, id:u32 }
 struct Pair { table:u32, source:u32, target:u32 }
@@ -19,133 +20,39 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
     if !id_ok(source_definition,source.definitions.len) || !id_ok(target_definition,target.definitions.len) { return false; }
     let original=source.definitions[source_definition]; let replacement=target.definitions[target_definition];
     if original.kind != DEF_FUNCTION || replacement.kind != DEF_FUNCTION || original.function == 0 || replacement.function != 0 || replacement.type_id == 0 { return false; }
-    var map_layout_premises:u32[>..]=[]; for row in source.layout_premises { map_layout_premises.push(0); }
-    var map_dictionary_realizations:u32[>..]=[]; for row in source.dictionary_realizations { map_dictionary_realizations.push(0); }
-    var map_static_relocations:u32[>..]=[]; for row in source.static_relocations { map_static_relocations.push(0); }
-    var map_static_objects:u32[>..]=[]; for row in source.static_objects { map_static_objects.push(0); }
-    var map_adapter_captures:u32[>..]=[]; for row in source.adapter_captures { map_adapter_captures.push(0); }
-    var map_callable_adapters:u32[>..]=[]; for row in source.callable_adapters { map_callable_adapters.push(0); }
-    var map_schemas:u32[>..]=[]; for row in source.schemas { map_schemas.push(0); }
-    var map_environment_bindings:u32[>..]=[]; for row in source.environment_bindings { map_environment_bindings.push(0); }
-    var map_nat_witnesses:u32[>..]=[]; for row in source.nat_witnesses { map_nat_witnesses.push(0); }
-    var map_abi_plans:u32[>..]=[]; for row in source.abi_plans { map_abi_plans.push(0); }
-    var map_definitions:u32[>..]=[]; for row in source.definitions { map_definitions.push(0); }
-    var map_names:u32[>..]=[]; for row in source.names { map_names.push(0); }
-    var map_origins:u32[>..]=[]; for row in source.origins { map_origins.push(0); }
-    var map_modules:u32[>..]=[]; for row in source.modules { map_modules.push(0); }
-    var map_binders:u32[>..]=[]; for row in source.binders { map_binders.push(0); }
-    var map_scopes:u32[>..]=[]; for row in source.scopes { map_scopes.push(0); }
-    var map_types:u32[>..]=[]; for row in source.types { map_types.push(0); }
-    var map_fields:u32[>..]=[]; for row in source.fields { map_fields.push(0); }
-    var map_contracts:u32[>..]=[]; for row in source.contracts { map_contracts.push(0); }
-    var map_effects:u32[>..]=[]; for row in source.effects { map_effects.push(0); }
-    var map_values:u32[>..]=[]; for row in source.values { map_values.push(0); }
-    var map_ops:u32[>..]=[]; for row in source.ops { map_ops.push(0); }
-    var map_blocks:u32[>..]=[]; for row in source.blocks { map_blocks.push(0); }
-    var map_terminators:u32[>..]=[]; for row in source.terminators { map_terminators.push(0); }
-    var map_edges:u32[>..]=[]; for row in source.edges { map_edges.push(0); }
-    var map_terms:u32[>..]=[]; for row in source.terms { map_terms.push(0); }
-    var map_facts:u32[>..]=[]; for row in source.facts { map_facts.push(0); }
-    var map_evidence:u32[>..]=[]; for row in source.evidence { map_evidence.push(0); }
-    var map_loops:u32[>..]=[]; for row in source.loops { map_loops.push(0); }
-    var map_functions:u32[>..]=[]; for row in source.functions { map_functions.push(0); }
-    var map_calls:u32[>..]=[]; for row in source.calls { map_calls.push(0); }
-    var map_substitutions:u32[>..]=[]; for row in source.substitutions { map_substitutions.push(0); }
-    var map_captures:u32[>..]=[]; for row in source.captures { map_captures.push(0); }
-    var map_loans:u32[>..]=[]; for row in source.loans { map_loans.push(0); }
-    var map_transitions:u32[>..]=[]; for row in source.transitions { map_transitions.push(0); }
-    var map_layouts:u32[>..]=[]; for row in source.layouts { map_layouts.push(0); }
-    var map_interfaces:u32[>..]=[]; for row in source.interfaces { map_interfaces.push(0); }
-    var map_dependencies:u32[>..]=[]; for row in source.dependencies { map_dependencies.push(0); }
-    var map_receipts:u32[>..]=[]; for row in source.receipts { map_receipts.push(0); }
-    var map_exports:u32[>..]=[]; for row in source.exports { map_exports.push(0); }
-    var queue:Ref[>..]=[]; var paired:Pair[>..]=[];
+    // Sparse keys include their table: equal numeric IDs in different arenas
+    // are distinct. Only the reached graph occupies workspace.
+    var mappings:Pair[>..]=[]; var slots:u32[>..]=[0;64];
+    var queue:Ref[>..]=[]; var paired:Pair[>..]=[]; var prepared=false;
     fn tick() { if !charge(work,1,LIMIT_VISITS) { return false from relocate_function; } }
+    fn hash_key(table:u32,id:u32) -> u32 { return (id * 16777619) ^ (table * 2654435761); }
+    fn locate(table:u32,id:u32) -> u32 {
+        var slot=hash_key(table,id) & (slots.len as u32-1);
+        // Insertion bounds each successful key's displacement. Lookups after
+        // preparation cannot exhaust optional work after target mutation.
+        for probe in 128 {
+            if !prepared { tick(); }
+            if slots[slot]==0 { return slot; }
+            let row=mappings[slots[slot]-1];
+            if row.table==table && row.source==id { return slot; }
+            slot=(slot+1)&(slots.len as u32-1);
+        }
+        if prepared { assert(false); } return false from relocate_function;
+    }
     fn mapped(table:u32,id:u32) -> u32 {
-        if id == 0 || table == 0 { return id; }
-        if table == 1 { return map_layout_premises[id]; }
-        if table == 2 { return map_dictionary_realizations[id]; }
-        if table == 3 { return map_static_relocations[id]; }
-        if table == 4 { return map_static_objects[id]; }
-        if table == 5 { return map_adapter_captures[id]; }
-        if table == 6 { return map_callable_adapters[id]; }
-        if table == 7 { return map_schemas[id]; }
-        if table == 8 { return map_environment_bindings[id]; }
-        if table == 9 { return map_nat_witnesses[id]; }
-        if table == 10 { return map_abi_plans[id]; }
-        if table == 11 { return map_definitions[id]; }
-        if table == 12 { return map_names[id]; }
-        if table == 13 { return map_origins[id]; }
-        if table == 14 { return map_modules[id]; }
-        if table == 15 { return map_binders[id]; }
-        if table == 16 { return map_scopes[id]; }
-        if table == 17 { return map_types[id]; }
-        if table == 18 { return map_fields[id]; }
-        if table == 19 { return map_contracts[id]; }
-        if table == 20 { return map_effects[id]; }
-        if table == 21 { return map_values[id]; }
-        if table == 22 { return map_ops[id]; }
-        if table == 23 { return map_blocks[id]; }
-        if table == 24 { return map_terminators[id]; }
-        if table == 25 { return map_edges[id]; }
-        if table == 26 { return map_terms[id]; }
-        if table == 27 { return map_facts[id]; }
-        if table == 28 { return map_evidence[id]; }
-        if table == 29 { return map_loops[id]; }
-        if table == 30 { return map_functions[id]; }
-        if table == 31 { return map_calls[id]; }
-        if table == 32 { return map_substitutions[id]; }
-        if table == 33 { return map_captures[id]; }
-        if table == 34 { return map_loans[id]; }
-        if table == 35 { return map_transitions[id]; }
-        if table == 36 { return map_layouts[id]; }
-        if table == 37 { return map_interfaces[id]; }
-        if table == 38 { return map_dependencies[id]; }
-        if table == 39 { return map_receipts[id]; }
-        if table == 40 { return map_exports[id]; }
-        return 0;
+        if id==0 || table==0 { return id; }
+        let slot=locate(table,id); return if slots[slot]==0 { 0 } else { mappings[slots[slot]-1].target };
     }
     fn assign(table:u32,id:u32,value:u32) {
-        if table == 1 { map_layout_premises[id]=value; return; }
-        if table == 2 { map_dictionary_realizations[id]=value; return; }
-        if table == 3 { map_static_relocations[id]=value; return; }
-        if table == 4 { map_static_objects[id]=value; return; }
-        if table == 5 { map_adapter_captures[id]=value; return; }
-        if table == 6 { map_callable_adapters[id]=value; return; }
-        if table == 7 { map_schemas[id]=value; return; }
-        if table == 8 { map_environment_bindings[id]=value; return; }
-        if table == 9 { map_nat_witnesses[id]=value; return; }
-        if table == 10 { map_abi_plans[id]=value; return; }
-        if table == 11 { map_definitions[id]=value; return; }
-        if table == 12 { map_names[id]=value; return; }
-        if table == 13 { map_origins[id]=value; return; }
-        if table == 14 { map_modules[id]=value; return; }
-        if table == 15 { map_binders[id]=value; return; }
-        if table == 16 { map_scopes[id]=value; return; }
-        if table == 17 { map_types[id]=value; return; }
-        if table == 18 { map_fields[id]=value; return; }
-        if table == 19 { map_contracts[id]=value; return; }
-        if table == 20 { map_effects[id]=value; return; }
-        if table == 21 { map_values[id]=value; return; }
-        if table == 22 { map_ops[id]=value; return; }
-        if table == 23 { map_blocks[id]=value; return; }
-        if table == 24 { map_terminators[id]=value; return; }
-        if table == 25 { map_edges[id]=value; return; }
-        if table == 26 { map_terms[id]=value; return; }
-        if table == 27 { map_facts[id]=value; return; }
-        if table == 28 { map_evidence[id]=value; return; }
-        if table == 29 { map_loops[id]=value; return; }
-        if table == 30 { map_functions[id]=value; return; }
-        if table == 31 { map_calls[id]=value; return; }
-        if table == 32 { map_substitutions[id]=value; return; }
-        if table == 33 { map_captures[id]=value; return; }
-        if table == 34 { map_loans[id]=value; return; }
-        if table == 35 { map_transitions[id]=value; return; }
-        if table == 36 { map_layouts[id]=value; return; }
-        if table == 37 { map_interfaces[id]=value; return; }
-        if table == 38 { map_dependencies[id]=value; return; }
-        if table == 39 { map_receipts[id]=value; return; }
-        if table == 40 { map_exports[id]=value; return; }
+        let slot=locate(table,id);
+        if slots[slot]!=0 { mappings[slots[slot]-1].target=value; return; }
+        assert(!prepared);
+        if (mappings.len+1)*2>slots.len {
+            if slots.len==1048576 { return false from relocate_function; }
+            let capacity=slots.len*2; slots.resize(0); for i in capacity { slots.push(0); }
+            for row,index in mappings { let next=locate(row.table,row.source); slots[next]=index as u32+1; }
+        }
+        let next=locate(table,id); mappings.push(Pair {table,id,value}); slots[next]=mappings.len as u32;
     }
     fn pair(table:u32,a:u32,b:u32) {
         tick(); if a == 0 || b == 0 { if a != b { return false from relocate_function; } return; }
@@ -163,8 +70,8 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
             name_bytes(source,source.modules[x.module].path) != name_bytes(core_view(target),target.modules[y.module].path) { return false from relocate_function; }
         var left:u8[>..]=[]; var right:u8[>..]=[];
         if !canonical_interface(source,x.type_id,left) || !canonical_interface(core_view(target),y.type_id,right) || left != right { return false from relocate_function; }
-        map_definitions[a]=b; map_modules[x.module]=y.module;
-        if a != source_definition { if x.function != 0 { if y.function == 0 { return false from relocate_function; } map_functions[x.function]=y.function; } }
+        assign(11,a,b); assign(14,x.module,y.module);
+        if a != source_definition { if x.function != 0 { if y.function == 0 { return false from relocate_function; } assign(30,x.function,y.function); } }
         if x.kind == DEF_STATIC {
             if !id_ok(x.value,source.values.len) || !id_ok(y.value,target.values.len) { return false from relocate_function; }
             let old_op=source.values[x.value].op; let new_op=target.values[y.value].op;
@@ -172,7 +79,7 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
             let a=source.ops[old_op].imm0; let b=target.ops[new_op].imm0; let old_static=source.static_objects[a]; let new_static=target.static_objects[b];
             if old_static.kind != new_static.kind || old_static.count != new_static.count || old_static.relocations.count != 0 || new_static.relocations.count != 0 ||
                 source.bytes[old_static.bytes.start..old_static.bytes.start+old_static.bytes.count] != target.bytes[new_static.bytes.start..new_static.bytes.start+new_static.bytes.count] { return false from relocate_function; }
-            map_values[x.value]=y.value; map_ops[old_op]=new_op; map_static_objects[a]=b;
+            assign(21,x.value,y.value); assign(22,old_op,new_op); assign(4,a,b);
         }
         pair(17,x.type_id,y.type_id); pair_span(15,x.binders,y.binders);
     }
@@ -230,7 +137,7 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         if table == 30 && source.functions[id].producer != 0 && source.functions[id].producer != source_definition { return false from relocate_function; }
         if table == 14 {
             let path=name_bytes(source,source.modules[id].path);
-            for row,index in target.modules { tick(); if index != 0 && path == name_bytes(core_view(target),row.path) { map_modules[id]=index as u32; return; } }
+            for row,index in target.modules { tick(); if index != 0 && path == name_bytes(core_view(target),row.path) { assign(14,id,index as u32); return; } }
             return false from relocate_function;
         }
         assign(table,id,PENDING); queue.push(Ref {table,id});
@@ -246,14 +153,14 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
                 if id == 0 { continue; } var scope=row.scope;
                 for depth in 65 {
                     if scope == 0 { break; }
-                    if map_scopes[scope] == PENDING { mark(28,id as u32); break; }
+                    if mapped(16,scope) == PENDING { mark(28,id as u32); break; }
                     scope=source.scopes[scope].parent;
                 }
             }
-            for row,id in source.loops { if id != 0 && map_functions[source.blocks[row.header].function] == PENDING { mark(29,id as u32); } }
-            for row,id in source.interfaces { if id != 0 && map_functions[row.function] == PENDING { mark(37,id as u32); } }
+            for row,id in source.loops { if id != 0 && mapped(30,source.blocks[row.header].function) == PENDING { mark(29,id as u32); } }
+            for row,id in source.interfaces { if id != 0 && mapped(30,row.function) == PENDING { mark(37,id as u32); } }
             for row,id in source.receipts { if id != 0 && row.producer == source_definition { mark(39,id as u32); } }
-            for row,id in source.callable_adapters { if id != 0 && map_ops[row.op] == PENDING { mark(6,id as u32); } }
+            for row,id in source.callable_adapters { if id != 0 && mapped(22,row.op) == PENDING { mark(6,id as u32); } }
             if cursor == queue.len { break; }
         }
         tick(); let item=queue[cursor]; cursor++;
@@ -524,43 +431,45 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
     }
     // No optional decline occurs after this point. The owning build transaction
     // handles process allocation failure and atomically publishes only validation.
-    for value,id in map_layout_premises { if value == PENDING { map_layout_premises[id]=target.layout_premises.len as u32; target.layout_premises.push(LayoutPremise {..}); } }
-    for value,id in map_dictionary_realizations { if value == PENDING { map_dictionary_realizations[id]=target.dictionary_realizations.len as u32; target.dictionary_realizations.push(DictionaryRealization {..}); } }
-    for value,id in map_static_relocations { if value == PENDING { map_static_relocations[id]=target.static_relocations.len as u32; target.static_relocations.push(StaticRelocation {..}); } }
-    for value,id in map_static_objects { if value == PENDING { map_static_objects[id]=target.static_objects.len as u32; target.static_objects.push(StaticObject {..}); } }
-    for value,id in map_adapter_captures { if value == PENDING { map_adapter_captures[id]=target.adapter_captures.len as u32; target.adapter_captures.push(AdapterCapture {..}); } }
-    for value,id in map_callable_adapters { if value == PENDING { map_callable_adapters[id]=target.callable_adapters.len as u32; target.callable_adapters.push(CallableAdapter {..}); } }
-    for value,id in map_schemas { if value == PENDING { map_schemas[id]=target.schemas.len as u32; target.schemas.push(Schema {..}); } }
-    for value,id in map_environment_bindings { if value == PENDING { map_environment_bindings[id]=target.environment_bindings.len as u32; target.environment_bindings.push(EnvironmentBinding {..}); } }
-    for value,id in map_nat_witnesses { if value == PENDING { map_nat_witnesses[id]=target.nat_witnesses.len as u32; target.nat_witnesses.push(NatWitness {..}); } }
-    for value,id in map_abi_plans { if value == PENDING { map_abi_plans[id]=target.abi_plans.len as u32; target.abi_plans.push(AbiPlan {..}); } }
-    for value,id in map_names { if value == PENDING { map_names[id]=target.names.len as u32; target.names.push(Name {..}); } }
-    for value,id in map_origins { if value == PENDING { map_origins[id]=target.origins.len as u32; target.origins.push(Origin {..}); } }
-    for value,id in map_binders { if value == PENDING { map_binders[id]=target.binders.len as u32; target.binders.push(Binder {..}); } }
-    for value,id in map_scopes { if value == PENDING { map_scopes[id]=target.scopes.len as u32; target.scopes.push(Scope {..}); } }
-    for value,id in map_types { if value == PENDING { map_types[id]=target.types.len as u32; target.types.push(TypeNode {..}); } }
-    for value,id in map_fields { if value == PENDING { map_fields[id]=target.fields.len as u32; target.fields.push(Field {..}); } }
-    for value,id in map_contracts { if value == PENDING { map_contracts[id]=target.contracts.len as u32; target.contracts.push(Contract {..}); } }
-    for value,id in map_effects { if value == PENDING { map_effects[id]=target.effects.len as u32; target.effects.push(Effect {..}); } }
-    for value,id in map_values { if value == PENDING { map_values[id]=target.values.len as u32; target.values.push(Value {..}); } }
-    for value,id in map_ops { if value == PENDING { map_ops[id]=target.ops.len as u32; target.ops.push(Operation {..}); } }
-    for value,id in map_blocks { if value == PENDING { map_blocks[id]=target.blocks.len as u32; target.blocks.push(Block {..}); } }
-    for value,id in map_terminators { if value == PENDING { map_terminators[id]=target.terminators.len as u32; target.terminators.push(Terminator {..}); } }
-    for value,id in map_edges { if value == PENDING { map_edges[id]=target.edges.len as u32; target.edges.push(Edge {..}); } }
-    for value,id in map_facts { if value == PENDING { map_facts[id]=target.facts.len as u32; target.facts.push(Fact {..}); } }
-    for value,id in map_evidence { if value == PENDING { map_evidence[id]=target.evidence.len as u32; target.evidence.push(Evidence {..}); } }
-    for value,id in map_loops { if value == PENDING { map_loops[id]=target.loops.len as u32; target.loops.push(Loop {..}); } }
-    for value,id in map_functions { if value == PENDING { map_functions[id]=target.functions.len as u32; target.functions.push(Function {..}); } }
-    for value,id in map_calls { if value == PENDING { map_calls[id]=target.calls.len as u32; target.calls.push(Call {..}); } }
-    for value,id in map_substitutions { if value == PENDING { map_substitutions[id]=target.substitutions.len as u32; target.substitutions.push(Substitution {..}); } }
-    for value,id in map_captures { if value == PENDING { map_captures[id]=target.captures.len as u32; target.captures.push(Capture {..}); } }
-    for value,id in map_loans { if value == PENDING { map_loans[id]=target.loans.len as u32; target.loans.push(Loan {..}); } }
-    for value,id in map_transitions { if value == PENDING { map_transitions[id]=target.transitions.len as u32; target.transitions.push(Transition {..}); } }
-    for value,id in map_layouts { if value == PENDING { map_layouts[id]=target.layouts.len as u32; target.layouts.push(Layout {..}); } }
-    for value,id in map_interfaces { if value == PENDING { map_interfaces[id]=target.interfaces.len as u32; target.interfaces.push(Interface {..}); } }
-    for value,id in map_dependencies { if value == PENDING { map_dependencies[id]=target.dependencies.len as u32; target.dependencies.push(Dependency {..}); } }
-    for value,id in map_receipts { if value == PENDING { map_receipts[id]=target.receipts.len as u32; target.receipts.push(Receipt {..}); } }
-    for value,id in map_exports { if value == PENDING { map_exports[id]=target.exports.len as u32; target.exports.push(Export {..}); } }
+    sort(queue[..]) {a,z=>a.table<z.table || (a.table==z.table && a.id<z.id)};
+    prepared=true;
+    for item in queue { if item.table == 1 { assign(1,item.id,target.layout_premises.len as u32); target.layout_premises.push(LayoutPremise {..}); } }
+    for item in queue { if item.table == 2 { assign(2,item.id,target.dictionary_realizations.len as u32); target.dictionary_realizations.push(DictionaryRealization {..}); } }
+    for item in queue { if item.table == 3 { assign(3,item.id,target.static_relocations.len as u32); target.static_relocations.push(StaticRelocation {..}); } }
+    for item in queue { if item.table == 4 { assign(4,item.id,target.static_objects.len as u32); target.static_objects.push(StaticObject {..}); } }
+    for item in queue { if item.table == 5 { assign(5,item.id,target.adapter_captures.len as u32); target.adapter_captures.push(AdapterCapture {..}); } }
+    for item in queue { if item.table == 6 { assign(6,item.id,target.callable_adapters.len as u32); target.callable_adapters.push(CallableAdapter {..}); } }
+    for item in queue { if item.table == 7 { assign(7,item.id,target.schemas.len as u32); target.schemas.push(Schema {..}); } }
+    for item in queue { if item.table == 8 { assign(8,item.id,target.environment_bindings.len as u32); target.environment_bindings.push(EnvironmentBinding {..}); } }
+    for item in queue { if item.table == 9 { assign(9,item.id,target.nat_witnesses.len as u32); target.nat_witnesses.push(NatWitness {..}); } }
+    for item in queue { if item.table == 10 { assign(10,item.id,target.abi_plans.len as u32); target.abi_plans.push(AbiPlan {..}); } }
+    for item in queue { if item.table == 12 { assign(12,item.id,target.names.len as u32); target.names.push(Name {..}); } }
+    for item in queue { if item.table == 13 { assign(13,item.id,target.origins.len as u32); target.origins.push(Origin {..}); } }
+    for item in queue { if item.table == 15 { assign(15,item.id,target.binders.len as u32); target.binders.push(Binder {..}); } }
+    for item in queue { if item.table == 16 { assign(16,item.id,target.scopes.len as u32); target.scopes.push(Scope {..}); } }
+    for item in queue { if item.table == 17 { assign(17,item.id,target.types.len as u32); target.types.push(TypeNode {..}); } }
+    for item in queue { if item.table == 18 { assign(18,item.id,target.fields.len as u32); target.fields.push(Field {..}); } }
+    for item in queue { if item.table == 19 { assign(19,item.id,target.contracts.len as u32); target.contracts.push(Contract {..}); } }
+    for item in queue { if item.table == 20 { assign(20,item.id,target.effects.len as u32); target.effects.push(Effect {..}); } }
+    for item in queue { if item.table == 21 { assign(21,item.id,target.values.len as u32); target.values.push(Value {..}); } }
+    for item in queue { if item.table == 22 { assign(22,item.id,target.ops.len as u32); target.ops.push(Operation {..}); } }
+    for item in queue { if item.table == 23 { assign(23,item.id,target.blocks.len as u32); target.blocks.push(Block {..}); } }
+    for item in queue { if item.table == 24 { assign(24,item.id,target.terminators.len as u32); target.terminators.push(Terminator {..}); } }
+    for item in queue { if item.table == 25 { assign(25,item.id,target.edges.len as u32); target.edges.push(Edge {..}); } }
+    for item in queue { if item.table == 27 { assign(27,item.id,target.facts.len as u32); target.facts.push(Fact {..}); } }
+    for item in queue { if item.table == 28 { assign(28,item.id,target.evidence.len as u32); target.evidence.push(Evidence {..}); } }
+    for item in queue { if item.table == 29 { assign(29,item.id,target.loops.len as u32); target.loops.push(Loop {..}); } }
+    for item in queue { if item.table == 30 { assign(30,item.id,target.functions.len as u32); target.functions.push(Function {..}); } }
+    for item in queue { if item.table == 31 { assign(31,item.id,target.calls.len as u32); target.calls.push(Call {..}); } }
+    for item in queue { if item.table == 32 { assign(32,item.id,target.substitutions.len as u32); target.substitutions.push(Substitution {..}); } }
+    for item in queue { if item.table == 33 { assign(33,item.id,target.captures.len as u32); target.captures.push(Capture {..}); } }
+    for item in queue { if item.table == 34 { assign(34,item.id,target.loans.len as u32); target.loans.push(Loan {..}); } }
+    for item in queue { if item.table == 35 { assign(35,item.id,target.transitions.len as u32); target.transitions.push(Transition {..}); } }
+    for item in queue { if item.table == 36 { assign(36,item.id,target.layouts.len as u32); target.layouts.push(Layout {..}); } }
+    for item in queue { if item.table == 37 { assign(37,item.id,target.interfaces.len as u32); target.interfaces.push(Interface {..}); } }
+    for item in queue { if item.table == 38 { assign(38,item.id,target.dependencies.len as u32); target.dependencies.push(Dependency {..}); } }
+    for item in queue { if item.table == 39 { assign(39,item.id,target.receipts.len as u32); target.receipts.push(Receipt {..}); } }
+    for item in queue { if item.table == 40 { assign(40,item.id,target.exports.len as u32); target.exports.push(Export {..}); } }
     fn span(table:u32,old:Span) -> Span {
         let result=Span {start:target.refs.len as u32,count:old.count};
         for i in old.count { target.refs.push(mapped(table,source.refs[old.start+i])); } return result;
@@ -568,8 +477,8 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
     fn bytes(old:Span) -> Span {
         let result=Span {start:target.bytes.len as u32,count:old.count}; target.bytes.append(source.bytes[old.start..old.start+old.count]); return result;
     }
-    for old,id in source.terms {
-        if id == 0 || map_terms[id] != PENDING { continue; }
+    for item in queue {
+        if item.table != 26 { continue; } let id=item.id; let old=source.terms[id];
         var row=old;
         row.type_id=mapped(17,old.type_id);
         row.value=mapped(21,old.value);
@@ -583,11 +492,11 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
             if row.tag == EXPR_BINDER && candidate.tag == EXPR_BINDER && row.binder == candidate.binder { existing=index as u32; break; }
         }
         if existing == 0 { existing=target.terms.len as u32; target.terms.push(row); }
-        map_terms[id]=existing;
+        assign(26,id,existing);
     }
     for item in queue { if item.table != 1 { continue; } let old=source.layout_premises[item.id]; var row=old;
         row.type_id=mapped(17,old.type_id);
-        target.layout_premises[map_layout_premises[item.id]]=row;
+        target.layout_premises[mapped(1,item.id)]=row;
     }
     for item in queue { if item.table != 2 { continue; } let old=source.dictionary_realizations[item.id]; var row=old;
         row.type_id=mapped(17,old.type_id);
@@ -595,12 +504,12 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.arguments=span(17,old.arguments);
         row.concrete_type=mapped(17,old.concrete_type);
         row.layout=mapped(36,old.layout);
-        target.dictionary_realizations[map_dictionary_realizations[item.id]]=row;
+        target.dictionary_realizations[mapped(2,item.id)]=row;
     }
     for item in queue { if item.table != 3 { continue; } let old=source.static_relocations[item.id]; var row=old;
         row.target=mapped((if row.kind == STATIC_ADDRESS { 4 } else if row.kind == STATIC_FUNCTION { 30 } else if row.kind == STATIC_DICTIONARY { 17 } else { 22 }),old.target);
         row.addend=mapped((if row.kind == STATIC_CLOSURE { 4 } else { 0 }),old.addend);
-        target.static_relocations[map_static_relocations[item.id]]=row;
+        target.static_relocations[mapped(3,item.id)]=row;
     }
     for item in queue { if item.table != 4 { continue; } let old=source.static_objects[item.id]; var row=old;
         row.function=mapped(30,old.function);
@@ -611,11 +520,11 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.bytes=bytes(old.bytes);
         row.relocations=span(3,old.relocations);
         row.producer=mapped(11,old.producer);
-        target.static_objects[map_static_objects[item.id]]=row;
+        target.static_objects[mapped(4,item.id)]=row;
     }
     for item in queue { if item.table != 5 { continue; } let old=source.adapter_captures[item.id]; var row=old;
         row.source=mapped((if row.kind == KIND_TYPE { 17 } else { 26 }),old.source);
-        target.adapter_captures[map_adapter_captures[item.id]]=row;
+        target.adapter_captures[mapped(5,item.id)]=row;
     }
     for item in queue { if item.table != 6 { continue; } let old=source.callable_adapters[item.id]; var row=old;
         row.op=mapped(22,old.op);
@@ -623,23 +532,23 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.callback_contract=mapped(19,old.callback_contract);
         row.captures=span(5,old.captures);
         row.environment_layout=mapped(36,old.environment_layout);
-        target.callable_adapters[map_callable_adapters[item.id]]=row;
+        target.callable_adapters[mapped(6,item.id)]=row;
     }
     for item in queue { if item.table != 7 { continue; } let old=source.schemas[item.id]; var row=old;
         row.bytes=bytes(old.bytes);
         row.digest=bytes(old.digest);
-        target.schemas[map_schemas[item.id]]=row;
+        target.schemas[mapped(7,item.id)]=row;
     }
     for item in queue { if item.table != 8 { continue; } let old=source.environment_bindings[item.id]; var row=old;
         row.function=mapped(30,old.function);
         row.binder=mapped(15,old.binder);
         row.source_value=mapped(21,old.source_value);
-        target.environment_bindings[map_environment_bindings[item.id]]=row;
+        target.environment_bindings[mapped(8,item.id)]=row;
     }
     for item in queue { if item.table != 9 { continue; } let old=source.nat_witnesses[item.id]; var row=old;
         row.binder=mapped(15,old.binder);
         row.argument_path=span(0,old.argument_path);
-        target.nat_witnesses[map_nat_witnesses[item.id]]=row;
+        target.nat_witnesses[mapped(9,item.id)]=row;
     }
     for item in queue { if item.table != 10 { continue; } let old=source.abi_plans[item.id]; var row=old;
         row.contract=mapped(19,old.contract);
@@ -649,30 +558,30 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.env_layout=mapped(36,old.env_layout);
         row.dictionaries=span(15,old.dictionaries);
         row.nat_witnesses=span(9,old.nat_witnesses);
-        target.abi_plans[map_abi_plans[item.id]]=row;
+        target.abi_plans[mapped(10,item.id)]=row;
     }
     for item in queue { if item.table != 12 { continue; } let old=source.names[item.id]; var row=old;
         row.bytes=bytes(old.bytes);
-        target.names[map_names[item.id]]=row;
+        target.names[mapped(12,item.id)]=row;
     }
     for item in queue { if item.table != 13 { continue; } let old=source.origins[item.id]; var row=old;
         row.module=mapped(14,old.module);
         row.start=old.start-source.origins[original.origin].start+target.origins[replacement.origin].start;
         row.end=old.end-source.origins[original.origin].start+target.origins[replacement.origin].start;
-        target.origins[map_origins[item.id]]=row;
+        target.origins[mapped(13,item.id)]=row;
     }
     for item in queue { if item.table != 15 { continue; } let old=source.binders[item.id]; var row=old;
         row.scope=mapped(16,old.scope);
         row.introduction=mapped((if row.introduction_kind == INTRO_FUNCTION { 30 } else if row.introduction_kind == INTRO_OPERATION { 22 } else { 0 }),old.introduction);
         row.name=mapped(12,old.name);
         row.origin=mapped(13,old.origin);
-        target.binders[map_binders[item.id]]=row;
+        target.binders[mapped(15,item.id)]=row;
     }
     for item in queue { if item.table != 16 { continue; } let old=source.scopes[item.id]; var row=old;
         row.parent=mapped(16,old.parent);
         row.binder=mapped(15,old.binder);
         row.origin=mapped(13,old.origin);
-        target.scopes[map_scopes[item.id]]=row;
+        target.scopes[mapped(16,item.id)]=row;
     }
     for item in queue { if item.table != 17 { continue; } let old=source.types[item.id]; var row=old;
         row.children=span(17,old.children);
@@ -685,12 +594,12 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.contract=mapped(19,old.contract);
         row.binder=mapped(15,old.binder);
         row.origin=mapped(13,old.origin);
-        target.types[map_types[item.id]]=row;
+        target.types[mapped(17,item.id)]=row;
     }
     for item in queue { if item.table != 18 { continue; } let old=source.fields[item.id]; var row=old;
         row.name=mapped(12,old.name);
         row.type_id=mapped(17,old.type_id);
-        target.fields[map_fields[item.id]]=row;
+        target.fields[mapped(18,item.id)]=row;
     }
     for item in queue { if item.table != 19 { continue; } let old=source.contracts[item.id]; var row=old;
         row.layout_premises=span(1,old.layout_premises);
@@ -703,11 +612,11 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.on_false=span(27,old.on_false);
         row.effects=span(20,old.effects);
         row.origin=mapped(13,old.origin);
-        target.contracts[map_contracts[item.id]]=row;
+        target.contracts[mapped(19,item.id)]=row;
     }
     for item in queue { if item.table != 20 { continue; } let old=source.effects[item.id]; var row=old;
         row.region=mapped(15,old.region);
-        target.effects[map_effects[item.id]]=row;
+        target.effects[mapped(20,item.id)]=row;
     }
     for item in queue { if item.table != 21 { continue; } let old=source.values[item.id]; var row=old;
         row.type_id=mapped(17,old.type_id);
@@ -715,7 +624,7 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.op=mapped(22,old.op);
         row.scope=mapped(16,old.scope);
         row.origin=mapped(13,old.origin);
-        target.values[map_values[item.id]]=row;
+        target.values[mapped(21,item.id)]=row;
     }
     for item in queue { if item.table != 22 { continue; } let old=source.ops[item.id]; var row=old;
         row.args=span(21,old.args);
@@ -725,7 +634,7 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.scope=mapped(16,old.scope);
         row.origin=mapped(13,old.origin);
         row.imm0=mapped(operation_reference(row.tag),old.imm0);
-        target.ops[map_ops[item.id]]=row;
+        target.ops[mapped(22,item.id)]=row;
     }
     for item in queue { if item.table != 23 { continue; } let old=source.blocks[item.id]; var row=old;
         row.merge=mapped(23,old.merge);
@@ -736,7 +645,7 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.scope=mapped(16,old.scope);
         row.function=mapped(30,old.function);
         row.origin=mapped(13,old.origin);
-        target.blocks[map_blocks[item.id]]=row;
+        target.blocks[mapped(23,item.id)]=row;
     }
     for item in queue { if item.table != 24 { continue; } let old=source.terminators[item.id]; var row=old;
         row.evidence=span(28,old.evidence);
@@ -744,7 +653,7 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.edges=span(25,old.edges);
         row.discharge=span(21,old.discharge);
         row.origin=mapped(13,old.origin);
-        target.terminators[map_terminators[item.id]]=row;
+        target.terminators[mapped(24,item.id)]=row;
     }
     for item in queue { if item.table != 25 { continue; } let old=source.edges[item.id]; var row=old;
         row.from=mapped(23,old.from);
@@ -752,14 +661,14 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.args=span(21,old.args);
         row.evidence=span(28,old.evidence);
         row.loop_id=mapped(29,old.loop_id);
-        target.edges[map_edges[item.id]]=row;
+        target.edges[mapped(25,item.id)]=row;
     }
     for item in queue { if item.table != 27 { continue; } let old=source.facts[item.id]; var row=old;
         row.left=mapped(26,old.left);
         row.right=mapped(26,old.right);
         row.third=mapped(26,old.third);
         row.domain=mapped(15,old.domain);
-        target.facts[map_facts[item.id]]=row;
+        target.facts[mapped(27,item.id)]=row;
     }
     for item in queue { if item.table != 28 { continue; } let old=source.evidence[item.id]; var row=old;
         row.fact=mapped(27,old.fact);
@@ -771,7 +680,7 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.operands=span(21,old.operands);
         row.premises=span(28,old.premises);
         row.origin=mapped(13,old.origin);
-        target.evidence[map_evidence[item.id]]=row;
+        target.evidence[mapped(28,item.id)]=row;
     }
     for item in queue { if item.table != 29 { continue; } let old=source.loops[item.id]; var row=old;
         row.header=mapped(23,old.header);
@@ -784,7 +693,7 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.invariant=span(28,old.invariant);
         row.backedges=span(25,old.backedges);
         row.exits=span(25,old.exits);
-        target.loops[map_loops[item.id]]=row;
+        target.loops[mapped(29,item.id)]=row;
     }
     for item in queue { if item.table != 30 { continue; } let old=source.functions[item.id]; var row=old;
         row.environment_bindings=span(8,old.environment_bindings);
@@ -801,7 +710,7 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.export_id=0;
         row.producer=mapped(11,old.producer);
         row.origin=mapped(13,old.origin);
-        target.functions[map_functions[item.id]]=row;
+        target.functions[mapped(30,item.id)]=row;
     }
     for item in queue { if item.table != 31 { continue; } let old=source.calls[item.id]; var row=old;
         row.op=mapped(22,old.op);
@@ -809,19 +718,19 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.callee=mapped(30,old.callee);
         row.contract=mapped(19,old.contract);
         row.substitutions=span(32,old.substitutions);
-        target.calls[map_calls[item.id]]=row;
+        target.calls[mapped(31,item.id)]=row;
     }
     for item in queue { if item.table != 32 { continue; } let old=source.substitutions[item.id]; var row=old;
         row.binder=mapped(15,old.binder);
         row.value=mapped((if row.kind == KIND_TYPE { 17 } else if row.kind == KIND_NAT { 26 } else { 15 }),old.value);
-        target.substitutions[map_substitutions[item.id]]=row;
+        target.substitutions[mapped(32,item.id)]=row;
     }
     for item in queue { if item.table != 33 { continue; } let old=source.captures[item.id]; var row=old;
         row.function=mapped(30,old.function);
         row.value=mapped(21,old.value);
         row.local_value=mapped(21,old.local_value);
         row.scope=mapped(16,old.scope);
-        target.captures[map_captures[item.id]]=row;
+        target.captures[mapped(33,item.id)]=row;
     }
     for item in queue { if item.table != 34 { continue; } let old=source.loans[item.id]; var row=old;
         row.value=mapped(21,old.value);
@@ -829,7 +738,7 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.scope=mapped(16,old.scope);
         row.begin_op=mapped(22,old.begin_op);
         row.end_op=mapped(22,old.end_op);
-        target.loans[map_loans[item.id]]=row;
+        target.loans[mapped(34,item.id)]=row;
     }
     for item in queue { if item.table != 35 { continue; } let old=source.transitions[item.id]; var row=old;
         row.op=mapped(22,old.op);
@@ -837,13 +746,13 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.before=mapped(21,old.before);
         row.after=mapped(21,old.after);
         row.scope=mapped(16,old.scope);
-        target.transitions[map_transitions[item.id]]=row;
+        target.transitions[mapped(35,item.id)]=row;
     }
     for item in queue { if item.table != 36 { continue; } let old=source.layouts[item.id]; var row=old;
         row.type_id=mapped(17,old.type_id);
         row.schema=mapped(7,old.schema);
         row.fields=span(18,old.fields);
-        target.layouts[map_layouts[item.id]]=row;
+        target.layouts[mapped(36,item.id)]=row;
     }
     for item in queue { if item.table != 37 { continue; } let old=source.interfaces[item.id]; var row=old;
         row.abi_digest=bytes(old.abi_digest);
@@ -853,20 +762,20 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.dependencies=span(38,old.dependencies);
         row.digest=bytes(old.digest);
         row.producer=mapped(11,old.producer);
-        target.interfaces[map_interfaces[item.id]]=row;
+        target.interfaces[mapped(37,item.id)]=row;
     }
     for item in queue { if item.table != 38 { continue; } let old=source.dependencies[item.id]; var row=old;
         row.producer=mapped(11,old.producer);
         row.identity=bytes(old.identity);
         row.digest=bytes(old.digest);
-        target.dependencies[map_dependencies[item.id]]=row;
+        target.dependencies[mapped(38,item.id)]=row;
     }
     for item in queue { if item.table != 39 { continue; } let old=source.receipts[item.id]; var row=old;
         row.producer=mapped(11,old.producer);
         row.source_digest=bytes(old.source_digest);
         row.semantic_digest=bytes(old.semantic_digest);
         row.dependencies=span(38,old.dependencies);
-        target.receipts[map_receipts[item.id]]=row;
+        target.receipts[mapped(39,item.id)]=row;
     }
     for item in queue { if item.table != 40 { continue; } let old=source.exports[item.id]; var row=old;
         row.function=mapped(30,old.function);
@@ -877,8 +786,8 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
         row.fields=span(18,old.fields);
         row.input_maxima=span(0,old.input_maxima);
         row.abi_digest=bytes(old.abi_digest);
-        target.exports[map_exports[item.id]]=row;
+        target.exports[mapped(40,item.id)]=row;
     }
-    target.definitions[target_definition].function=map_functions[original.function];
+    target.definitions[target_definition].function=mapped(30,original.function);
     return true;
 }

@@ -1,7 +1,13 @@
 # K1 measurement corpus
 
-[Initial results and qualification](RESULTS.md) include all samples, regressions
-and the separate 127-depth chain control.
+[Current structural measurements](STRUCTURAL.md) isolate borrowed validator views,
+forward-only proof SCCs and bounded release inlining.
+
+[Earlier parity investigation](PARITY.md) compares the improved rewrite with the
+legacy Zig compiler, including remaining regressions and publication costs.
+[The earlier Sol review](SOL_REVIEW.md) compares the original and improved K1 releases.
+[Initial results](RESULTS.md) retain the legacy comparison, regressions and the
+separate 127-depth chain control.
 
 Run after correctness qualification, with a known compiler build:
 
@@ -14,6 +20,13 @@ deno run --allow-read --allow-write --allow-run scripts/benchmark.ts \
 semantically equivalent old/new source programs. Legacy arithmetic wraps; K1
 uses explicit wrapping operations. Both programs export the same scalar entry
 functions, and every measured module is executed to check its outputs.
+
+Use `--candidate=PATH` to select a candidate executable (default `build/blot`).
+Use `--baseline-kind=k1` for a prior K1 executable: both sides then use the same
+K1 source and flags. `--runtime-warmup=N` and `--runtime-calls=N` control the
+checksum-checked warmup and timed export sweeps; exports are resolved before
+timing. Defaults remain zero warmup and 20,000 calls. Record the exact method
+and compare both binaries with it; warmup does not prove a fixed engine tier.
 
 The generated families scale independent declarations, shared-callee calls,
 chains, diamonds, imported modules, one generic body with many calls, captured
@@ -39,6 +52,10 @@ python3 scripts/benchmark_iteration.py --goose=/path/to/goose --cc=clang \
 deno run --allow-read --allow-write=build --allow-run=build/blot \
   scripts/runtime_telemetry.ts
 ```
+
+`benchmark_sessions.py --compiler=PATH` selects a prior compiler for paired
+retained measurements. Alternate executable order across outer rounds; keep
+processes sequential and use separate output directories.
 
 The retained matrix separates unchanged checks, body/interface/static/ABI
 changes, rejected edits, valid reverts and moved source origins. It records
@@ -79,3 +96,49 @@ compiler intermediates are excluded; their hashes remain in the records.
 When reproducing an already published run, choose an unused evidence directory
 with `scripts/package_evidence.py --out=benchmarks/results/NEW_NAME`. The packager
 refuses to overwrite published evidence.
+
+The Sol review has a separate `benchmarks/package_review.py` packager for its
+paired K1/runtime/session scope. It checks source and executable identities,
+expected sample counts, matching runtime checksums and guest storage counters,
+then archives qualified inputs and raw evidence. See [its report](SOL_REVIEW.md)
+for the exact commands; the initial packager remains specific to the initial
+full I09 matrix.
+
+The parity investigation uses `benchmarks/package_parity.py`; its publication
+follow-up uses `benchmarks/package_publication.py`. Each freezes its own
+qualification, raw samples and source hashes and refuses to overwrite an
+existing package. The latter also verifies byte-identical Wasm from the K1
+before/after publication pair. `PARITY.md` distinguishes default-engine timing,
+`--no-liftoff` diagnostics, the debug-only local-compaction probe and the retained
+comparison. The publication follow-up records CLI `setup_ns`, `pipeline_ns`,
+`artifact_encode_ns` and `publication_ns` so disk waits cannot be mistaken for
+frontend/validator time. Ordinary Wasm publication guarantees atomic visibility,
+not durable media acknowledgement; explicit Core and paired output retain their
+existing synchronization paths.
+
+## Structural and inlining comparisons
+
+The fresh-process harness accepts `--opt=off|fast|release` and
+`--baseline-opt=off|fast|release` for paired K1 compilers. Compare release against
+fast on the same qualified binary to isolate inlining:
+
+```sh
+deno run -A scripts/benchmark.ts --baseline=build/blot --baseline-kind=k1 \
+  --opt=release --baseline-opt=fast --families=calls,diamonds,generics,modules \
+  --scales=128 --rounds=5 --runtime-warmup=1000000 --runtime-calls=500000 \
+  --build-label=qualified-release --out=build/bench-inline
+deno run -A scripts/benchmark_workloads.ts --baseline-opt=fast \
+  --out=build/bench-workloads
+```
+
+The second harness runs wrapping-integer recurrence and F32 affine loops with
+varying seeds and exact reference models. It records paired compile wall/CPU/RSS,
+Wasm runtime, hashes, checksums and separate phase builds. Source fixtures are in
+`benchmarks/workloads/`. These kernels are complementary to the synthetic scaling
+corpus; they do not represent a migrated application.
+
+`benchmarks/package_structural.py` freezes the structural investigation, including
+its isolated ablation overlays, previous/final qualified inputs, sampling reports,
+raw pairs, full gate and new workload sources. Its manifest refuses changed
+inputs or overwritten evidence. Historical packagers remain tied to their own
+candidates; they are not general commands for packaging an arbitrary new build.

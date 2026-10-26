@@ -6,9 +6,10 @@ import src.validate;
 import src.artifact;
 import src.evaluate;
 import math;
+import src.inline;
 
-struct Limits { visits: u64 = 0, rewrites: u64 = 0, output: u64 = 0 }
-struct Stats { visits: u64 = 0, applications: u64 = 0, declines: u64 = 0, candidates: u64 = 0, r01: u64 = 0, r02: u64 = 0, r05: u64 = 0, r09: u64 = 0, r10: u64 = 0, r03: u64 = 0, r04: u64 = 0, r06: u64 = 0, r07: u64 = 0, r08: u64 = 0, r11: u64 = 0, r12: u64 = 0 }
+struct Limits { release: bool = false, visits: u64 = 0, rewrites: u64 = 0, output: u64 = 0 }
+struct Stats { inline_sites:u64=0, inline_growth:u64=0, inline_declines:u64=0, inline_max_callee:u64=0, inline_max_depth:u64=0, visits: u64 = 0, applications: u64 = 0, declines: u64 = 0, candidates: u64 = 0, r01: u64 = 0, r02: u64 = 0, r05: u64 = 0, r09: u64 = 0, r10: u64 = 0, r03: u64 = 0, r04: u64 = 0, r06: u64 = 0, r07: u64 = 0, r08: u64 = 0, r11: u64 = 0, r12: u64 = 0 }
 fn tick(stats: Stats&, limit: u64) -> bool {
     if stats.visits >= limit { return false; } stats.visits++; return true;
 }
@@ -145,6 +146,14 @@ fn optimize(c: Core, limits: Limits, output: CoreBuilder, stats: Stats&, diags: 
         if rule == 1 { stats.r01++; stats.applications++; }
         if rule == 2 { stats.r02++; stats.applications++; }
         if rule == 5 { stats.r05++; stats.applications++; }
+    }
+    if limits.release {
+        var expansion=inlining::Stats{};
+        let accepted=inlining::run(c,output,pinned,inlining::Limits{visit_limit-stats.visits,rewrite_limit-stats.applications,output_limit-n as u64,encoded.len as u64},expansion);
+        stats.visits+=expansion.visits;stats.applications+=expansion.sites;
+        stats.inline_sites=expansion.sites;stats.inline_growth=expansion.growth;stats.inline_declines=expansion.declines;
+        stats.inline_max_callee=expansion.max_callee;stats.inline_max_depth=expansion.max_depth;
+        if !accepted { if expansion.exhausted { stats.declines++; } return false; }
     }
     var work = Work {..}; var validation_diags: Diagnostic[>..] = [];
     if !validator::validate_core(core_view(output), validator::FRESH, work, validation_diags) {

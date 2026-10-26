@@ -18,7 +18,7 @@ Qualification status belongs to [the implementation ledger](../IMPLEMENTATION.md
 | Host | Scalar exports and validated copy-only Plain-array bridge; explicit failure statuses |
 | Artifacts | Bounded canonical Core, independent admission, local executable rebuilding |
 | Reuse | Current-process exact receipts; changed complete interfaces/static observations invalidate consumers |
-| Optimization | Bounded R01–R12 kernel with independent candidate validation and baseline fallback on optional limits |
+| Optimization | Bounded R01–R12 kernel and release-only scalar inlining; independent candidate validation and baseline fallback on optional limits |
 | Measurements | Phase/work counters, separate guest telemetry, fresh/retained/scaling and build-iteration harnesses |
 
 K1 deliberately excludes runtime strings, recursive data/calls, higher-rank
@@ -27,9 +27,10 @@ effect handlers, implicit managed storage, memory growth and zero-copy or
 asynchronous host access. These are language boundaries, not unfinished silent
 fallbacks. Unsupported source receives a diagnostic.
 
-Release-only inlining, scalar replacement, fusion and SIMD remain optional
-future work under C10/I03; `--opt=release` currently uses the bounded
-kernel. Compiler jobs are internally single-threaded; the gate also compares
+`--opt=release` adds bounded direct scalar inlining to the R01–R12 kernel.
+Its initial eligibility and fixed budgets are documented in
+[the shared contract](CONTRACT.md#bounded-release-inlining). Scalar replacement,
+fusion and SIMD remain optional future work under C10/I03. Compiler jobs are internally single-threaded; the gate also compares
 four independent concurrent jobs. There is no persistent source-admission
 cache: restarting checks source afresh, while explicit source-less Core inputs
 use independent artifact admission and locally generated Wasm.

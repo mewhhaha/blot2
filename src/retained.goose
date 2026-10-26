@@ -56,6 +56,11 @@ fn retained_module_namespace<Tick>(prior: Core, old_module: u32, current: Core, 
     return true;
 }
 fn complete_retained_module(prior: Core, source: const u8[:], module_name: const u8[:], b: CoreBuilder, work: Work&, stats: ReuseStats&, diags: Diagnostic[>..]&) -> bool {
+    var ok = false;
+    with_frontend_scratch() { scratch => ok = complete_retained_module_in(prior, source, module_name, b, work, stats, diags, scratch); };
+    return ok;
+}
+fn complete_retained_module_in(prior: Core, source: const u8[:], module_name: const u8[:], b: CoreBuilder, work: Work&, stats: ReuseStats&, diags: Diagnostic[>..]&, scratch: FrontendScratch) -> bool {
     var projections: relocation::Projection[>..<] = [];
     var namespace_state: u32 = 0;
     var imports_state: u32 = 0;
@@ -117,5 +122,5 @@ fn complete_retained_module(prior: Core, source: const u8[:], module_name: const
         if !ok { stats.misses++; if !relocation_work.exhausted { stats.dependency_invalidations++; } return 0; }
         stats.hits++; stats.bodies += (b.functions.len - previous_functions) as u32; return b.definitions[definition].function;
     }
-    return frontend_complete_with_reuse(source, module_name, b, work, diags, reuse);
+    return frontend_complete_with_reuse_in(source, module_name, b, work, diags, scratch, reuse);
 }

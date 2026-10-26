@@ -22,7 +22,7 @@ npm ci --prefix editor --ignore-scripts --no-audit --no-fund --cache .tools/npm-
 npm test --prefix editor | tee test-results/editor.log
 "${CC:-clang}" -shared -fPIC -O2 tests/arena_fault.c -ldl -o build/arena_fault.so
 "${CC:-clang}" -shared -fPIC -O2 tests/publication_fault.c -ldl -o build/publication_fault.so
-deno test --allow-read --allow-write --allow-run tests/host_test.ts tests/admission_test.ts tests/concurrency_test.ts tests/optimizer_differential_test.ts tests/wasm_runtime_test.ts tests/wasm_bridge_test.ts tests/host_bridge_test.ts tests/oom_test.ts tests/wasm_particle_test.ts tests/wasm_closure_test.ts tests/wasm_lifecycle_test.ts tests/wasm_static_test.ts tests/wasm_telemetry_test.ts tests/artifact_cli_test.ts tests/migration_test.ts tests/session_test.ts tests/cancellation_test.ts tests/session_edits_test.ts tests/session_oom_test.ts | tee test-results/deno.log
+deno test --allow-read --allow-write --allow-run tests/host_test.ts tests/admission_test.ts tests/concurrency_test.ts tests/optimizer_differential_test.ts tests/inline_test.ts tests/wasm_runtime_test.ts tests/wasm_bridge_test.ts tests/host_bridge_test.ts tests/oom_test.ts tests/wasm_particle_test.ts tests/wasm_closure_test.ts tests/wasm_lifecycle_test.ts tests/wasm_static_test.ts tests/wasm_telemetry_test.ts tests/artifact_cli_test.ts tests/migration_test.ts tests/session_test.ts tests/cancellation_test.ts tests/session_edits_test.ts tests/session_oom_test.ts | tee test-results/deno.log
 python3 scripts/gate_manifest.py --finish
 # This is the complete current inventory. The implementation ledger separately
 # records mandatory specification stages that have not yet been implemented.

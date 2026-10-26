@@ -103,7 +103,7 @@ fn serve_main() {
                 else { if cached { cache_a.append(encoded); } }
                 cache_encode_ns = clock_ns() - encode_start;
                 if cancel_ok && file_exists(cancel) { loader_error(diagnostics, 4009, 0); show_diagnostics(core_view(candidate), diagnostics); return from with_core; }
-                let publication_start = clock_ns(); let published = write_file_atomic(output, wasm_bytes); publication_ns = clock_ns() - publication_start;
+                let publication_start = clock_ns(); let published = write_generated_atomic(output, wasm_bytes); publication_ns = clock_ns() - publication_start;
                 if !published { loader_error(diagnostics, 4000, 0); show_diagnostics(core_view(candidate), diagnostics); return from with_core; }
                 active = 1 - active; revision++; success = true;
             };
@@ -190,7 +190,7 @@ fn cli_main() {
                         var wasm_bytes: u8[>..] = []; var opt_stats = optimize::Stats {}; var optimize_ns: i64 = 0;
                         if !optimized_wasm(core_view(b), opt_mode, wasm_bytes, diagnostics, opt_stats, optimize_ns, telemetry) { show_diagnostics(core_view(b), diagnostics); exit(1); }
                         if cancel_file.len != 0 && file_exists(cancel_file) { write_stderr("k1_cancelled\n"); exit(1); }
-                        if !write_file_atomic(output, wasm_bytes) { write_stderr("k1_io_error: Wasm output\n"); exit(1); }
+                        if !write_generated_atomic(output, wasm_bytes) { write_stderr("k1_io_error: Wasm output\n"); exit(1); }
                         return;
                     }
                     print("valid K1 Core: ", b.functions.len - 1, " functions, ", b.ops.len - 1, " operations"); return;
@@ -200,21 +200,31 @@ fn cli_main() {
         }
         var wasm_bytes: u8[>..] = []; var core_bytes: u8[>..] = []; var stats = BuildStats { .. };
         let config = BuildConfig { input: input, root: root, selected: selected, bridge_config: bridge_config, cancel_file: cancel_file, opt_mode: opt_mode, emit: command == "build", telemetry: telemetry, trace: trace };
+        let candidate_start = clock_ns();
         if !compile_candidate(Core { .. }, config, b, wasm_bytes, stats, diagnostics) { show_diagnostics(core_view(b), diagnostics); exit(1); }
-        if artifact_path.len != 0 && !artifact::artifact_encode(core_view(b), core_bytes) { write_stderr("k1_artifact_limit\n"); exit(1); }
+        var artifact_encode_ns: i64 = 0;
+        if artifact_path.len != 0 {
+            let encode_start = clock_ns();
+            if !artifact::artifact_encode(core_view(b), core_bytes) { write_stderr("k1_artifact_limit\n"); exit(1); }
+            artifact_encode_ns = clock_ns() - encode_start;
+        }
         if cancel_file.len != 0 && file_exists(cancel_file) { write_stderr("k1_cancelled\n"); exit(1); }
+        let publication_start = clock_ns();
         // Publication happens only after every required phase has succeeded.
         if artifact_path.len != 0 && command == "build" {
             if !write_output_pair(artifact_path, core_bytes, output, wasm_bytes) { write_stderr("k1_io_error: output transaction\n"); exit(1); }
         } else {
             if artifact_path.len != 0 && !write_file_atomic(artifact_path, core_bytes) { write_stderr("k1_io_error: artifact output\n"); exit(1); }
-            if command == "build" && !write_file_atomic(output, wasm_bytes) { write_stderr("k1_io_error: Wasm output\n"); exit(1); }
+            if command == "build" && !write_generated_atomic(output, wasm_bytes) { write_stderr("k1_io_error: Wasm output\n"); exit(1); }
         }
+        let publication_ns = clock_ns() - publication_start;
         if timings {
             var line: u8[>..] = [];
             format(line, "{\"edition\":\"k1\",\"load_ns\":", stats.load_ns,
                 ",\"complete_ns\":", stats.complete_ns, ",\"plan_ns\":", stats.plan_ns,
                 ",\"validate_ns\":", stats.validate_ns, ",\"lower_ns\":", stats.lower_ns, ",\"optimize_ns\":", stats.optimize_ns,
+                ",\"setup_ns\":", candidate_start - start, ",\"pipeline_ns\":", stats.total_ns,
+                ",\"artifact_encode_ns\":", artifact_encode_ns, ",\"publication_ns\":", publication_ns,
                 ",\"total_ns\":", clock_ns() - start, ",\"completed_bodies\":", stats.bodies, ",\"completed_declarations\":", stats.declarations, ",\"static_bodies\":", stats.static_bodies, ",\"semantic_visits\":", stats.semantic_visits, ",\"validation_visits\":", stats.validation_visits, ",\"completed_modules\":", stats.completed_modules, ",\"active_regions\":", stats.active_regions, ",\"downstream_regions\":", stats.downstream_regions);
             append_build_work(line, stats); line.append("}\n");
             write_stderr(line);

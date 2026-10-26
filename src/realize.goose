@@ -9,10 +9,25 @@ fn realize_dictionaries(b: CoreBuilder, diagnostics: Diagnostic[>..]&) -> bool {
     var active:u32=0; var charges:u64[>..]=[]; for f in b.functions { charges.push(0); }
     var generated_types:u32=0; var generated_terms:u32=0;
     var instances:RealizationInstance[>..] = [];
+    var instance_heads:u32[>..]=[]; for f in b.functions { instance_heads.push(0); }
+    var instance_next:u32[>..]=[];
     var memo:RealizationMemo[>..] = [];
     var pending:u32[>..<] = [];
     let first_type = b.types.len;
     fn tick() { charges[active]++; if charges[active] > LIMIT_VISITS { diagnostics.push(Diagnostic {4017,0,0,0}); return false from realize_dictionaries; } }
+    // Instances visit only their function's values. Preserve ascending Value ID
+    // order so representation discovery is independent of block traversal order.
+    var value_heads:u32[>..]=[]; for f in b.functions { value_heads.push(0); }
+    var value_next:u32[>..]=[]; for v in b.values { value_next.push(0); }
+    var value_cursor=b.values.len;
+    while value_cursor>1 {
+        value_cursor--; let value=b.values[value_cursor];
+        active=if value.block_id!=0 {b.blocks[value.block_id].function} else {0}; tick();
+        if value.block_id!=0 {
+            let owner=active;
+            value_next[value_cursor]=value_heads[owner]; value_heads[owner]=value_cursor as u32;
+        }
+    }
     fn rows(span:Span) -> const u32[:] { b.refs[span.start..span.start+span.count] }
     fn replacement(subs:Span, binder:u32) -> u32 {
         for id in rows(subs) { tick(); let sub=b.substitutions[id]; if sub.kind==KIND_TYPE && sub.binder==binder { return sub.value; } }
@@ -105,9 +120,10 @@ fn realize_dictionaries(b: CoreBuilder, diagnostics: Diagnostic[>..]&) -> bool {
             let id=b.substitutions.len as u32; b.substitutions.push(Substitution {bid,KIND_TYPE,selected}); subs.push(id);
         }
         let ids=ref_span(b,subs);
-        for previous in instances { tick(); if previous.function==fid && same_subs(previous.substitutions,ids) { return; } }
+        var previous_id=instance_heads[fid];
+        while previous_id!=0 { tick(); let previous=instances[previous_id-1]; previous_id=instance_next[previous_id-1]; if same_subs(previous.substitutions,ids) { return; } }
         if (instances.len as u64)*12>LIMIT_ARTIFACT { diagnostics.push(Diagnostic {4017,0,0,0}); return false from realize_dictionaries; }
-        instances.push(RealizationInstance {fid,ids});
+        instances.push(RealizationInstance {fid,ids}); instance_next.push(instance_heads[fid]); instance_heads[fid]=instances.len as u32;
     }
     for f,i in b.functions { if i!=0 { active=i as u32; add_instance(i as u32,Span {..}); } }
     for ex,i in b.exports { if i!=0 { active=ex.function; add_instance(ex.function,ex.substitutions); } }
@@ -117,7 +133,8 @@ fn realize_dictionaries(b: CoreBuilder, diagnostics: Diagnostic[>..]&) -> bool {
         let obligations=b.contracts[f.contract].layout_premises;
         for pi in obligations.count { let premise=b.layout_premises[b.refs[obligations.start+pi]]; shape(premise.type_id,instance.substitutions,0); }
         shape(b.contracts[f.contract].arg,instance.substitutions,0); shape(b.contracts[f.contract].result,instance.substitutions,0);
-        for vid in 1..b.values.len { tick(); let v=b.values[vid]; if v.block_id!=0 && b.blocks[v.block_id].function==instance.function { shape(v.type_id,instance.substitutions,0); } }
+        var vid=value_heads[instance.function];
+        while vid!=0 { tick(); shape(b.values[vid].type_id,instance.substitutions,0); vid=value_next[vid]; }
         for bi in f.blocks.count { let block_id=b.refs[f.blocks.start+bi]; let operations=b.blocks[block_id].ops; for oi in operations.count { let oid=b.refs[operations.start+oi]; tick();
             let op=b.ops[oid];
             if op.tag==OP_TRY_ALLOC { shape(op.imm0,instance.substitutions,0); }
@@ -130,7 +147,7 @@ fn realize_dictionaries(b: CoreBuilder, diagnostics: Diagnostic[>..]&) -> bool {
             add_instance(op.imm0,ref_span(b,incoming));
         } }
     }
-    for ty in first_type..b.types.len { var work=Work {..}; let row,ok=validator::derive_layout(core_view(b),ty as u32,work,diagnostics); if !ok { return false; } b.layouts.push(row); }
+    if !validator::append_layouts(b, first_type as u32, false, diagnostics) { return false; }
     for row,i in b.dictionary_realizations { if i==0 { continue; } for layout,j in b.layouts { if j!=0 && layout.type_id==row.concrete_type { b.dictionary_realizations[i].layout=j as u32; break; } } }
     return true;
 }

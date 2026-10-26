@@ -1,6 +1,35 @@
 import { assert, sessionCase } from "./session_harness.ts";
 import { Blot } from "../host/blot.ts";
 
+Deno.test("REV-02 release inlining uses edited callees while reusing caller judgments", () =>
+  sessionCase(async (s) => {
+    const source = (value: number) =>
+      `pub let leaf: U32 -> U32 ! {} resources {depth:1,frame:0} = fn x => return ${value}\npub let run: U32 -> U32 ! {} resources {depth:2,frame:0} = fn x => return leaf(x)\n`;
+    await Deno.writeTextFile(s.input, source(41));
+    const first = await s.request({ opt: "release" });
+    assert(first.ok && Number(first.inline_sites) > 0);
+    assert(first.inline_growth === 0 && first.inline_max_depth === 1);
+    assert(await s.execute() === 41);
+    const unchanged = await s.request({ opt: "release" });
+    assert(unchanged.ok && unchanged.reused_bodies === 2);
+    assert(Number(unchanged.inline_sites) > 0 && await s.execute() === 41);
+    await Deno.writeTextFile(s.input, source(42));
+    const edited = await s.request({ opt: "release" });
+    assert(
+      edited.ok && edited.reused_bodies === 1 && edited.completed_bodies === 1,
+    );
+    assert(Number(edited.inline_sites) > 0);
+    assert(await s.execute() === 42 && await s.cold() === 42);
+    await Deno.writeTextFile(s.input, source(42) + "not a declaration\n");
+    const failed = await s.request({ opt: "release" });
+    assert(!failed.ok && failed.revision === edited.revision);
+    assert(await s.execute() === 42);
+    await Deno.writeTextFile(s.input, source(42));
+    const recovered = await s.request({ opt: "release" });
+    assert(recovered.ok && recovered.reused_bodies === 2);
+    assert(Number(recovered.inline_sites) > 0 && await s.execute() === 42);
+  }));
+
 Deno.test("REV-02 interface, origins and namespace edits preserve justified cutoffs", () =>
   sessionCase(async (s) => {
     const source = (depth: number, extra = "") =>

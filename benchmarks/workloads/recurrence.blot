@@ -1,0 +1,9 @@
+let advance: U32 -> U32 ! {} resources {depth: 1, frame: 0} =
+  fn state => return U32.wrapping_add(U32.wrapping_mul(state,1664525),1013904223)
+
+pub let run: U32 -> U32 ! {} resources {depth: 2, frame: 512} = fn seed => do:
+  let answer = for i in 0..1024 carry (state = seed, total = 0) do:
+    let updated = advance(state)
+    next (updated,U32.wrapping_add(total,updated))
+  let (state,total) = answer
+  return total

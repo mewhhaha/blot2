@@ -1,0 +1,527 @@
+{
+  "metadata": {
+    "timestamp": "2026-10-26T19:21:06.882Z",
+    "os": {
+      "target": "x86_64-unknown-linux-gnu",
+      "arch": "x86_64",
+      "os": "linux",
+      "vendor": "unknown",
+      "env": "gnu",
+      "standalone": false
+    },
+    "deno": {
+      "deno": "2.9.7",
+      "v8": "15.0.245.2-rusty",
+      "typescript": "6.0.3"
+    },
+    "cpu": "unavailable",
+    "commit": "102963640f603cdcaf197c977357860b57f03c57",
+    "candidate_sha256": "b54c172a659c9346604fb7dae5b8b76eb9852a96e9f962ce4ab858e5ab013292",
+    "qualification": {
+      "input_manifest_sha256": "91d402345ffe5509f93f61642889c8422a3cfe65baac8f18836849250919b25f",
+      "finished": "2026-10-26T19:15:32.302910+00:00",
+      "mode": "--release"
+    },
+    "baseline_sha256": "7b61cff1941de683e99269dc2a3c30cc137201d9bca8f98e90a8d0bbc02366b2",
+    "baseline_kind": "k1",
+    "baseline_revision": "102963640f603cdcaf197c977357860b57f03c57",
+    "harness_sha256": "5ee30465cc5d1a3156291bca6dd46640af190fc5e1beafc96fb4ea50fb04c2ff",
+    "goose_revision": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+    "policy": "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
+    "candidate_build": "sol-review-release",
+    "threads": 1,
+    "cache": "fresh process; filesystem cache uncontrolled",
+    "instrumentation": "separate phase-attribution build; timing samples omit --timings",
+    "rounds": 5,
+    "scales": [
+      8,
+      32,
+      128
+    ],
+    "runtime_calls_requested": 500000,
+    "runtime_warmup_requested": 1000000,
+    "runtime_method": "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary"
+  },
+  "summary": [
+    {
+      "family": "independent",
+      "scale": 8,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 6.832708,
+      "min_ms": 6.180131,
+      "max_ms": 7.400045
+    },
+    {
+      "family": "independent",
+      "scale": 8,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 9.272776,
+      "min_ms": 8.315071,
+      "max_ms": 10.260172
+    },
+    {
+      "family": "independent",
+      "scale": 32,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 7.486975,
+      "min_ms": 7.207696,
+      "max_ms": 8.64136
+    },
+    {
+      "family": "independent",
+      "scale": 32,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 11.604406,
+      "min_ms": 11.288647,
+      "max_ms": 12.83236
+    },
+    {
+      "family": "independent",
+      "scale": 128,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 9.978593,
+      "min_ms": 9.786903,
+      "max_ms": 10.48911
+    },
+    {
+      "family": "independent",
+      "scale": 128,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 20.051196,
+      "min_ms": 19.431718,
+      "max_ms": 20.815192
+    },
+    {
+      "family": "calls",
+      "scale": 8,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 4.888027,
+      "min_ms": 4.616918,
+      "max_ms": 5.370015
+    },
+    {
+      "family": "calls",
+      "scale": 8,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 7.637293,
+      "min_ms": 6.805258,
+      "max_ms": 7.805514
+    },
+    {
+      "family": "calls",
+      "scale": 32,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 5.651674,
+      "min_ms": 4.955477,
+      "max_ms": 5.994791
+    },
+    {
+      "family": "calls",
+      "scale": 32,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 10.051983,
+      "min_ms": 9.625505,
+      "max_ms": 10.202812
+    },
+    {
+      "family": "calls",
+      "scale": 128,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 7.661014,
+      "min_ms": 7.468435,
+      "max_ms": 10.315901
+    },
+    {
+      "family": "calls",
+      "scale": 128,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 20.006686,
+      "min_ms": 19.759338,
+      "max_ms": 20.776722
+    },
+    {
+      "family": "diamonds",
+      "scale": 8,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 5.603774,
+      "min_ms": 5.373235,
+      "max_ms": 6.025951
+    },
+    {
+      "family": "diamonds",
+      "scale": 8,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 9.630765,
+      "min_ms": 9.379256,
+      "max_ms": 10.375801
+    },
+    {
+      "family": "diamonds",
+      "scale": 32,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 7.952822,
+      "min_ms": 7.571305,
+      "max_ms": 8.848808
+    },
+    {
+      "family": "diamonds",
+      "scale": 32,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 21.148281,
+      "min_ms": 20.546893,
+      "max_ms": 22.270215
+    },
+    {
+      "family": "diamonds",
+      "scale": 128,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 27.45028,
+      "min_ms": 27.402241,
+      "max_ms": 29.7259
+    },
+    {
+      "family": "diamonds",
+      "scale": 128,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 79.242826,
+      "min_ms": 78.4838,
+      "max_ms": 81.532495
+    },
+    {
+      "family": "generics",
+      "scale": 8,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 5.000116,
+      "min_ms": 4.798897,
+      "max_ms": 5.452745
+    },
+    {
+      "family": "generics",
+      "scale": 8,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 7.664804,
+      "min_ms": 7.212406,
+      "max_ms": 7.711074
+    },
+    {
+      "family": "generics",
+      "scale": 32,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 5.911292,
+      "min_ms": 4.850927,
+      "max_ms": 6.675439
+    },
+    {
+      "family": "generics",
+      "scale": 32,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 10.941768,
+      "min_ms": 9.881254,
+      "max_ms": 11.375606
+    },
+    {
+      "family": "generics",
+      "scale": 128,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 8.643599,
+      "min_ms": 8.028742,
+      "max_ms": 9.869693
+    },
+    {
+      "family": "generics",
+      "scale": 128,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 20.597133,
+      "min_ms": 20.104565,
+      "max_ms": 22.999381
+    },
+    {
+      "family": "closures",
+      "scale": 8,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 5.067666,
+      "min_ms": 4.819647,
+      "max_ms": 5.726133
+    },
+    {
+      "family": "closures",
+      "scale": 8,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 8.032971,
+      "min_ms": 8.023852,
+      "max_ms": 9.394305
+    },
+    {
+      "family": "closures",
+      "scale": 32,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 6.964127,
+      "min_ms": 6.491999,
+      "max_ms": 7.535555
+    },
+    {
+      "family": "closures",
+      "scale": 32,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 12.765179,
+      "min_ms": 12.68817,
+      "max_ms": 13.335787
+    },
+    {
+      "family": "closures",
+      "scale": 128,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 13.468756,
+      "min_ms": 12.80925,
+      "max_ms": 14.146013
+    },
+    {
+      "family": "closures",
+      "scale": 128,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 35.494392,
+      "min_ms": 34.621866,
+      "max_ms": 38.774047
+    },
+    {
+      "family": "modules",
+      "scale": 8,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 5.408994,
+      "min_ms": 4.801847,
+      "max_ms": 6.183741
+    },
+    {
+      "family": "modules",
+      "scale": 8,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 8.37628,
+      "min_ms": 7.670634,
+      "max_ms": 9.344736
+    },
+    {
+      "family": "modules",
+      "scale": 32,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 6.786198,
+      "min_ms": 6.598169,
+      "max_ms": 7.323595
+    },
+    {
+      "family": "modules",
+      "scale": 32,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 13.712265,
+      "min_ms": 12.76621,
+      "max_ms": 14.410212
+    },
+    {
+      "family": "modules",
+      "scale": 128,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 18.671002,
+      "min_ms": 17.455278,
+      "max_ms": 18.97287
+    },
+    {
+      "family": "modules",
+      "scale": 128,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 41.625543,
+      "min_ms": 39.199795,
+      "max_ms": 42.686718
+    },
+    {
+      "family": "proofs",
+      "scale": 8,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 7.990502,
+      "min_ms": 7.299946,
+      "max_ms": 9.614745
+    },
+    {
+      "family": "proofs",
+      "scale": 8,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 11.448966,
+      "min_ms": 10.099712,
+      "max_ms": 12.370071
+    },
+    {
+      "family": "proofs",
+      "scale": 32,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 18.86678,
+      "min_ms": 18.785611,
+      "max_ms": 19.318998
+    },
+    {
+      "family": "proofs",
+      "scale": 32,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 34.549596,
+      "min_ms": 33.260642,
+      "max_ms": 37.151044
+    },
+    {
+      "family": "proofs",
+      "scale": 128,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 109.893039,
+      "min_ms": 107.866369,
+      "max_ms": 123.500934
+    },
+    {
+      "family": "proofs",
+      "scale": 128,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 302.329314,
+      "min_ms": 294.879681,
+      "max_ms": 307.577522
+    },
+    {
+      "family": "domains",
+      "scale": 8,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 5.417235,
+      "min_ms": 5.141576,
+      "max_ms": 5.479794
+    },
+    {
+      "family": "domains",
+      "scale": 8,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 10.900548,
+      "min_ms": 10.027512,
+      "max_ms": 11.280197
+    },
+    {
+      "family": "domains",
+      "scale": 32,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 8.690539,
+      "min_ms": 8.071881,
+      "max_ms": 9.446875
+    },
+    {
+      "family": "domains",
+      "scale": 32,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 22.464954,
+      "min_ms": 21.419758,
+      "max_ms": 23.801207
+    },
+    {
+      "family": "domains",
+      "scale": 128,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 25.13669,
+      "min_ms": 24.453424,
+      "max_ms": 25.39498
+    },
+    {
+      "family": "domains",
+      "scale": 128,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 89.040327,
+      "min_ms": 87.279325,
+      "max_ms": 89.953572
+    }
+  ]
+}

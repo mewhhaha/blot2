@@ -18,16 +18,18 @@ parser.add_argument("--rounds", type=int, default=5)
 parser.add_argument("--scales", default="8,32,128")
 parser.add_argument("--out", default="build/bench-sessions")
 parser.add_argument("--build-label", required=True)
+parser.add_argument("--compiler", default="build/blot")
 args = parser.parse_args()
 root = Path(__file__).resolve().parent.parent
 out = (root / args.out).resolve()
 out.mkdir(parents=True, exist_ok=True)
 scales = [int(x) for x in args.scales.split(",")]
 assert 1 <= args.rounds <= 100 and all(1 <= n <= 2048 for n in scales)
-exe = root / "build/blot"
+exe = (root / args.compiler).resolve()
 metadata = {"timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "platform": platform.platform(), "cpu": next((line.split(":", 1)[1].strip() for line in Path("/proc/cpuinfo").read_text().splitlines() if line.startswith("model name")), "unknown"),
             "candidate_sha256": hashlib.sha256(exe.read_bytes()).hexdigest(),
+            "compiler": str(exe),
             "build_label": args.build_label, "threads": 1, "rounds": args.rounds,
             "scales": scales, "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
             "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"}

@@ -22,3 +22,26 @@ fn test_canonical_interface_identity() {
     };
     print("KEY canonical interfaces ignore allocation/origin/transparent aliases and preserve field order and binder equality");
 }
+
+fn test_canonical_growth() {
+    with_core() { b =>
+        b.types.push(TypeNode { tag: TY_U32, .. });
+        b.binders.push(Binder { kind: KIND_DOMAIN, .. }); b.binders.push(Binder { kind: KIND_DOMAIN, .. });
+        var children: u32[>..] = []; var copies: u32[>..] = [];
+        // Hundreds of distinct term/type rows cross several hash-table growth
+        // boundaries; strided literals collide in the low hash bits throughout
+        // growth. Duplicate type IDs still canonicalize to the same graph.
+        for i in 256 {
+            let term = b.terms.len as u32; b.terms.push(Term { tag: EXPR_LITERAL, type_id: 1, literal: (i * 2048) as u32, .. });
+            children.push(b.types.len as u32); b.types.push(TypeNode { tag: TY_VIEW, children: ref_span(b, [1 as u32]), nat: term, domain: 1, .. });
+        }
+        for child in children { copies.push(b.types.len as u32); b.types.push(b.types[child]); }
+        let first = b.types.len as u32; b.types.push(TypeNode { tag: TY_TUPLE, children: ref_span(b, children), .. });
+        let second = b.types.len as u32; b.types.push(TypeNode { tag: TY_TUPLE, children: ref_span(b, copies), .. });
+        var before: u8[>..] = []; var same: u8[>..] = []; var different: u8[>..] = [];
+        assert(canonical_interface(core_view(b), first, before)); assert(canonical_interface(core_view(b), second, same)); assert(before == same);
+        b.types[copies[255]].domain = 2;
+        assert(canonical_interface(core_view(b), second, different)); assert(before != different);
+    };
+    print("KEY growing canonical indexes preserve structural equality and shared domain identity");
+}

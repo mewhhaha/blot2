@@ -322,11 +322,45 @@ struct FrontCapturedName { function: u32, name: u32, value: u32 }
 struct FrontOwned { target: u32, construction: u32, owned_type: u32, error_type: u32, body_error: u32, substitutions: Span, scope: u32 }
 struct FrontLoop { id: u32, node: u32, index: u32, upper_value: u32, header_params: Span, exit_params: Span, carries: u32, hidden_indices: Span }
 struct FrontTarget { block_id: u32, value: u32, type_id: u32, incoming: u32, scope: u32, binding_limit: u32, carry_indices: Span, carry_values: Span }
+// Owned by one candidate build, never a retained revision or admission receipt.
+// Types/terms/facts are append-only during completion. Reload the finalized
+// suffix at each module boundary, including rows appended by retained replay.
+// Seen sets, ranks and declaration budgets remain module-local.
+struct FrontendLoaded { types: u32, terms: u32, facts: u32 }
+struct FrontendScratch { lists: KeyIndex<FrontListKey>&, types: KeyIndex<FrontTypeKey>&, terms: KeyIndex<ProofTermKey>&, facts: KeyIndex<Fact>&, loaded: FrontendLoaded& }
+fn with_frontend_scratch<F>() {
+    var lists = KeyIndex<FrontListKey> {}; var types = KeyIndex<FrontTypeKey> {}; var terms = KeyIndex<ProofTermKey> {}; var facts = KeyIndex<Fact> {}; var loaded = FrontendLoaded { .. };
+    F(FrontendScratch { lists: lists, types: types, terms: terms, facts: facts, loaded: loaded });
+}
+fn frontend_scratch_clear(scratch: FrontendScratch) {
+    scratch.lists.heads = [0; 1024]; scratch.lists.slots.resize(0); scratch.types.heads = [0; 1024]; scratch.types.slots.resize(0);
+    scratch.terms.heads = [0; 1024]; scratch.terms.slots.resize(0); scratch.facts.heads = [0; 1024]; scratch.facts.slots.resize(0); scratch.loaded = FrontendLoaded { .. };
+}
+fn frontend_seed(b: CoreBuilder, scratch: FrontendScratch) {
+    for id in scratch.loaded.types..b.types.len { if id != 0 { key_index_insert(scratch.types, front_type_key(core_view(b), b.types[id], scratch.lists), id as u32); } }
+    for id in scratch.loaded.terms..b.terms.len { if id != 0 { key_index_insert(scratch.terms, proof_key(b, b.terms[id]), id as u32); } }
+    for id in scratch.loaded.facts..b.facts.len { if id != 0 { key_index_insert(scratch.facts, b.facts[id], id as u32); } }
+    scratch.loaded.types = b.types.len as u32; scratch.loaded.terms = b.terms.len as u32; scratch.loaded.facts = b.facts.len as u32;
+}
 fn frontend_no_reuse<R>(definition: u32, span: Span, type_id: u32) -> u32 { 0 }
 fn frontend_complete(source: const u8[:], module_name: const u8[:], b: CoreBuilder, work: Work&, diagnostics: Diagnostic[>..]&) -> bool {
     return frontend_complete_with_reuse(source, module_name, b, work, diagnostics, frontend_no_reuse);
 }
 fn frontend_complete_with_reuse<F>(source: const u8[:], module_name: const u8[:], b: CoreBuilder, work: Work&, diagnostics: Diagnostic[>..]&) -> bool {
+    var ok = false;
+    with_frontend_scratch() { scratch => ok = frontend_complete_with_reuse_in(source, module_name, b, work, diagnostics, scratch, F); };
+    return ok;
+}
+fn frontend_complete_in(source: const u8[:], module_name: const u8[:], b: CoreBuilder, work: Work&, diagnostics: Diagnostic[>..]&, scratch: FrontendScratch) -> bool {
+    return frontend_complete_with_reuse_in(source, module_name, b, work, diagnostics, scratch, frontend_no_reuse);
+}
+fn frontend_complete_with_reuse_in<F>(source: const u8[:], module_name: const u8[:], b: CoreBuilder, work: Work&, diagnostics: Diagnostic[>..]&, scratch: FrontendScratch) -> bool {
+    let ok = frontend_complete_indexed(source, module_name, b, work, diagnostics, scratch, F);
+    // Failed attempts cannot lend indexes to another candidate or a retry.
+    if !ok { frontend_scratch_clear(scratch); }
+    return ok;
+}
+fn frontend_complete_indexed<F>(source: const u8[:], module_name: const u8[:], b: CoreBuilder, work: Work&, diagnostics: Diagnostic[>..]&, scratch: FrontendScratch) -> bool {
     var nodes: AstNode[>..] = []; var ast_refs: u32[>..] = [];
     let parsed = parse_source(source, nodes, ast_refs);
     var module_id: u32 = 0;
@@ -334,9 +368,9 @@ fn frontend_complete_with_reuse<F>(source: const u8[:], module_name: const u8[:]
     if module_id == 0 { module_id = b.modules.len as u32; let name = add_name(b, module_name); let bytes = Span { start: b.bytes.len as u32, count: source.len as u32 }; b.bytes.append(source); b.modules.push(Module { name: name, path: name, source: bytes, .. }); }
     if parsed.root == 0 { let origin = b.origins.len as u32; b.origins.push(Origin { module: module_id, start: parsed.start, end: parsed.end }); diagnostics.push(Diagnostic { code: frontend_parse_code(parsed.category), origin: origin, detail: add_name(b, parsed.message), .. }); return false; }
     var owned_schemas: FrontOwnedSchema[>..] = [FrontOwnedSchema { .. }]; var local_regions = KeyIndex<u32> {};
-    var list_index = KeyIndex<FrontListKey> {}; var type_index = KeyIndex<FrontTypeKey> {}; for t, id in b.types { if id != 0 { key_index_insert(type_index, front_type_key(core_view(b), t, list_index), id as u32); } }
-    var proof_terms = KeyIndex<ProofTermKey> {}; var proof_facts = KeyIndex<Fact> {}; var proof_seen = KeyIndex<ProofSeenKey> {}; var proof_counts: ProofCounts[>..] = [];
-    let proof_index = ProofIndex { terms: proof_terms, facts: proof_facts, seen: proof_seen, counts: proof_counts }; proof_index_load(b, proof_index);
+    frontend_seed(b, scratch);
+    var proof_seen = KeyIndex<ProofSeenKey> {}; var proof_counts: ProofCounts[>..] = [];
+    let proof_index = ProofIndex { terms: scratch.terms, facts: scratch.facts, seen: proof_seen, counts: proof_counts };
     var environment_bounds: u32[>..<] = []; var escape_bounds: u32[>..<] = []; var emit_arguments: u32[>..<] = []; var booleans: FrontBoolean[>..] = [];
     var alias_work: u64[>..] = []; var alias_heads: u32[>..] = []; var alias_remaining: u32[>..] = []; var alias_dependencies: FrontAliasDependency[>..] = [FrontAliasDependency { .. }]; var alias_names = KeyIndex<u32> {}; var alias_seen = KeyIndex<FrontListKey> {}; var alias_bounds: u32[>..<] = []; var alias_queue: u32[>..] = []; var value_names = KeyIndex<u32> {}; var value_queue: u32[>..] = [];
     var local_aliases: FrontAlias[>..<] = []; var alias_base: i64 = 0; var alias_lexical: i64 = 0;
@@ -354,15 +388,15 @@ fn frontend_complete_with_reuse<F>(source: const u8[:], module_name: const u8[:]
     fn fail(code: u32, n: u32, message: const u8[:]) {
         diagnostics.push(Diagnostic { code: code, origin: origin(n), detail: add_name(b, message), .. });
         while b.phase.active > initial_active { end_completion(b); }
-        return false from frontend_complete_with_reuse;
+        return false from frontend_complete_indexed;
     }
     fn tick(n: u32) { if !charge(work, 1, visit_start + LIMIT_VISITS) { fail(FE_SEMANTIC_LIMIT, n, "required semantic traversal limit reached"); } }
     fn allocate(n: u32) { if !allocation(work) { fail(FE_SEMANTIC_LIMIT, n, "completion allocation failed"); } }
     recursive fn demand_type(ty: u32) { if ty == 0 { return; } let key = ProofSeenKey { budget: proof_limits.id, kind: 3, id: ty }; if key_index_get(proof_index.seen, key) != 0 { return; } tick(current_decl); if !proof_track(work, proof_limits, proof_index, 3, ty) { fail(FE_CORE_LIMIT, current_decl, "type graph limit reached"); } let t = b.types[ty]; if !proof_demand(b, work, proof_limits, proof_index, t.nat) || !proof_demand(b, work, proof_limits, proof_index, t.capacity) { fail(FE_PROOF_LIMIT, current_decl, "type witness term limit"); } if t.tag == TY_OWNED { let id = owned_schemas.len as u32; owned_schemas.push(FrontOwnedSchema { type_id: ty, next: proof_index.counts[proof_limits.id].owned_head }); proof_index.counts[proof_limits.id].owned_head = id; } for i in t.children.count { demand_type(b.refs[t.children.start + i]); } for i in t.fields.count { tick(current_decl); demand_type(b.fields[b.refs[t.fields.start + i]].type_id); } }
     fn intern_type(t: TypeNode) -> u32 {
         tick(current_decl); for i in t.children.count { tick(current_decl); } for i in t.fields.count { tick(current_decl); } for i in t.binders.count { tick(current_decl); }
-        let key = front_type_key(core_view(b), t, list_index); let found = key_index_get(type_index, key); if found != 0 { demand_type(found); return found; }
-        allocate(current_decl); let id = b.types.len as u32; b.types.push(t); key_index_insert(type_index, key, id); demand_type(id); return id;
+        let key = front_type_key(core_view(b), t, scratch.lists); let found = key_index_get(scratch.types, key); if found != 0 { demand_type(found); return found; }
+        allocate(current_decl); let id = b.types.len as u32; b.types.push(t); key_index_insert(scratch.types, key, id); demand_type(id); return id;
     }
     current_decl = parsed.root;
     let unit = intern_type(TypeNode { tag: TY_UNIT, .. }); let boolean = intern_type(TypeNode { tag: TY_BOOL, .. }); let unsigned = intern_type(TypeNode { tag: TY_U32, .. }); let floating = intern_type(TypeNode { tag: TY_F32, .. });
@@ -1411,7 +1445,8 @@ fn frontend_complete_with_reuse<F>(source: const u8[:], module_name: const u8[:]
                 if contradictory { impossible(n, [evidence, other]); return true; }
             }
         }
-        for i in active_base..active.len { let f = b.facts[b.evidence[active[i]].fact]; if f.tag == FACT_LT { let cycle = proof_query(b, work, proof_limits, proof_index, current_scope, active[active_base..], Fact { tag: FACT_LT, left: f.left, right: f.left, .. }); if cycle != 0 { impossible(n, [cycle]); return true; } } }
+        let cycle = proof_cycle(b, work, proof_limits, proof_index, current_scope, active[active_base..]);
+        if cycle != 0 { impossible(n, [cycle]); return true; }
         if work.exhausted { fail(FE_PROOF_LIMIT, n, "finite reachability proof limit"); } return false;
     }
     recursive fn check_suite(n: u32) {
@@ -1527,7 +1562,7 @@ fn frontend_complete_with_reuse<F>(source: const u8[:], module_name: const u8[:]
                 if !effects || !resources { fail(FE_INTERFACE, d.node, "public callable requires explicit effects and resources"); }
             }
             let cached = F(d.definition, Span { start: node.start, count: node.end - node.start }, ty, resolve_retained);
-            if cached == 4294967295 { while b.phase.active > initial_active { end_completion(b); } return false from frontend_complete_with_reuse; }
+            if cached == 4294967295 { while b.phase.active > initial_active { end_completion(b); } return false from frontend_complete_indexed; }
             if cached != 0 { if !id_ok(cached, b.functions.len) { fail(FE_INTERFACE, d.node, "reuse callback returned invalid function"); } decls[index].function = cached; b.definitions[d.definition].function = cached; }
             else {
                 if !begin_completion(b) { fail(FE_INTERFACE, d.node, "completion attempted after sealing"); } did_complete = true;

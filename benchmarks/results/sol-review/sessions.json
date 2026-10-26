@@ -1,0 +1,901 @@
+{
+  "metadata": {
+    "format": "K1-PAIRED-SESSIONS-1",
+    "rounds": 5,
+    "scales": [
+      8,
+      32,
+      128
+    ],
+    "method": "sequential pairs; alternate process order; fresh process per scale and outer round",
+    "compiler_sha256": {
+      "baseline": "7b61cff1941de683e99269dc2a3c30cc137201d9bca8f98e90a8d0bbc02366b2",
+      "candidate": "b54c172a659c9346604fb7dae5b8b76eb9852a96e9f962ce4ab858e5ab013292"
+    },
+    "harness_sha256": "fdc22e5aec7aa3de3d63c2a5d9724fb4bafd49d10eda4283b8341341821ace6d",
+    "runs": [
+      {
+        "compiler": "baseline",
+        "pair_round": 0,
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=sol-review-baseline",
+          "--compiler=build/review-baseline/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-sol-sessions/baseline-round-0"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T19:22:23Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "7b61cff1941de683e99269dc2a3c30cc137201d9bca8f98e90a8d0bbc02366b2",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/review-baseline/blot",
+          "build_label": "sol-review-baseline",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "candidate",
+        "pair_round": 0,
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=sol-review-candidate",
+          "--compiler=build/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-sol-sessions/candidate-round-0"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T19:22:24Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "b54c172a659c9346604fb7dae5b8b76eb9852a96e9f962ce4ab858e5ab013292",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "build_label": "sol-review-candidate",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "candidate",
+        "pair_round": 1,
+        "order": [
+          "candidate",
+          "baseline"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=sol-review-candidate",
+          "--compiler=build/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-sol-sessions/candidate-round-1"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T19:22:24Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "b54c172a659c9346604fb7dae5b8b76eb9852a96e9f962ce4ab858e5ab013292",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "build_label": "sol-review-candidate",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "baseline",
+        "pair_round": 1,
+        "order": [
+          "candidate",
+          "baseline"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=sol-review-baseline",
+          "--compiler=build/review-baseline/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-sol-sessions/baseline-round-1"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T19:22:24Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "7b61cff1941de683e99269dc2a3c30cc137201d9bca8f98e90a8d0bbc02366b2",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/review-baseline/blot",
+          "build_label": "sol-review-baseline",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "baseline",
+        "pair_round": 2,
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=sol-review-baseline",
+          "--compiler=build/review-baseline/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-sol-sessions/baseline-round-2"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T19:22:25Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "7b61cff1941de683e99269dc2a3c30cc137201d9bca8f98e90a8d0bbc02366b2",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/review-baseline/blot",
+          "build_label": "sol-review-baseline",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "candidate",
+        "pair_round": 2,
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=sol-review-candidate",
+          "--compiler=build/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-sol-sessions/candidate-round-2"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T19:22:26Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "b54c172a659c9346604fb7dae5b8b76eb9852a96e9f962ce4ab858e5ab013292",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "build_label": "sol-review-candidate",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "candidate",
+        "pair_round": 3,
+        "order": [
+          "candidate",
+          "baseline"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=sol-review-candidate",
+          "--compiler=build/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-sol-sessions/candidate-round-3"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T19:22:26Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "b54c172a659c9346604fb7dae5b8b76eb9852a96e9f962ce4ab858e5ab013292",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "build_label": "sol-review-candidate",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "baseline",
+        "pair_round": 3,
+        "order": [
+          "candidate",
+          "baseline"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=sol-review-baseline",
+          "--compiler=build/review-baseline/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-sol-sessions/baseline-round-3"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T19:22:26Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "7b61cff1941de683e99269dc2a3c30cc137201d9bca8f98e90a8d0bbc02366b2",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/review-baseline/blot",
+          "build_label": "sol-review-baseline",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "baseline",
+        "pair_round": 4,
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=sol-review-baseline",
+          "--compiler=build/review-baseline/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-sol-sessions/baseline-round-4"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T19:22:27Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "7b61cff1941de683e99269dc2a3c30cc137201d9bca8f98e90a8d0bbc02366b2",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/review-baseline/blot",
+          "build_label": "sol-review-baseline",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "candidate",
+        "pair_round": 4,
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=sol-review-candidate",
+          "--compiler=build/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-sol-sessions/candidate-round-4"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T19:22:27Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "b54c172a659c9346604fb7dae5b8b76eb9852a96e9f962ce4ab858e5ab013292",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "build_label": "sol-review-candidate",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      }
+    ]
+  },
+  "summary": [
+    {
+      "scale": 8,
+      "case": "fresh",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 9.543413,
+      "min_ms": 9.049966,
+      "max_ms": 20.710409
+    },
+    {
+      "scale": 8,
+      "case": "fresh",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 4.15744,
+      "min_ms": 3.679842,
+      "max_ms": 5.254835
+    },
+    {
+      "scale": 8,
+      "case": "unchanged",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 10.484849,
+      "min_ms": 9.823983,
+      "max_ms": 12.40564
+    },
+    {
+      "scale": 8,
+      "case": "unchanged",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 2.870196,
+      "min_ms": 2.641787,
+      "max_ms": 3.241254
+    },
+    {
+      "scale": 8,
+      "case": "body-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 6.585297,
+      "min_ms": 5.836932,
+      "max_ms": 7.208465
+    },
+    {
+      "scale": 8,
+      "case": "body-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 2.625227,
+      "min_ms": 2.490837,
+      "max_ms": 3.680862
+    },
+    {
+      "scale": 8,
+      "case": "interface-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 6.20944,
+      "min_ms": 5.904331,
+      "max_ms": 7.658073
+    },
+    {
+      "scale": 8,
+      "case": "interface-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 2.725747,
+      "min_ms": 2.488578,
+      "max_ms": 3.185455
+    },
+    {
+      "scale": 8,
+      "case": "static-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 5.950571,
+      "min_ms": 5.543623,
+      "max_ms": 8.159941
+    },
+    {
+      "scale": 8,
+      "case": "static-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 2.587797,
+      "min_ms": 2.411308,
+      "max_ms": 2.608017
+    },
+    {
+      "scale": 8,
+      "case": "rejected-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 0.525518,
+      "min_ms": 0.495668,
+      "max_ms": 0.714547
+    },
+    {
+      "scale": 8,
+      "case": "rejected-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 0.220479,
+      "min_ms": 0.216049,
+      "max_ms": 0.325438
+    },
+    {
+      "scale": 8,
+      "case": "valid-revert",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 5.789782,
+      "min_ms": 5.648173,
+      "max_ms": 6.211549
+    },
+    {
+      "scale": 8,
+      "case": "valid-revert",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 2.530068,
+      "min_ms": 2.352609,
+      "max_ms": 2.700917
+    },
+    {
+      "scale": 8,
+      "case": "source-origins",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 5.975991,
+      "min_ms": 5.666742,
+      "max_ms": 6.478698
+    },
+    {
+      "scale": 8,
+      "case": "source-origins",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 2.379588,
+      "min_ms": 2.263369,
+      "max_ms": 2.591638
+    },
+    {
+      "scale": 8,
+      "case": "bridge-first",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 4.888506,
+      "min_ms": 4.705167,
+      "max_ms": 5.178135
+    },
+    {
+      "scale": 8,
+      "case": "bridge-first",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 2.341408,
+      "min_ms": 2.13839,
+      "max_ms": 2.492878
+    },
+    {
+      "scale": 8,
+      "case": "abi-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 4.780037,
+      "min_ms": 4.602458,
+      "max_ms": 5.330874
+    },
+    {
+      "scale": 8,
+      "case": "abi-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 2.270439,
+      "min_ms": 2.098329,
+      "max_ms": 2.558337
+    },
+    {
+      "scale": 32,
+      "case": "fresh",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 14.776238,
+      "min_ms": 14.36378,
+      "max_ms": 14.959657
+    },
+    {
+      "scale": 32,
+      "case": "fresh",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 5.039776,
+      "min_ms": 4.675708,
+      "max_ms": 5.836072
+    },
+    {
+      "scale": 32,
+      "case": "unchanged",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 18.987868,
+      "min_ms": 18.522119,
+      "max_ms": 20.927588
+    },
+    {
+      "scale": 32,
+      "case": "unchanged",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 4.557627,
+      "min_ms": 3.747952,
+      "max_ms": 4.793697
+    },
+    {
+      "scale": 32,
+      "case": "body-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 15.764903,
+      "min_ms": 14.633059,
+      "max_ms": 15.973563
+    },
+    {
+      "scale": 32,
+      "case": "body-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 3.858041,
+      "min_ms": 3.604713,
+      "max_ms": 3.967161
+    },
+    {
+      "scale": 32,
+      "case": "interface-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 14.189971,
+      "min_ms": 13.703163,
+      "max_ms": 14.985977
+    },
+    {
+      "scale": 32,
+      "case": "interface-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 3.840461,
+      "min_ms": 3.538393,
+      "max_ms": 4.08127
+    },
+    {
+      "scale": 32,
+      "case": "static-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 15.412695,
+      "min_ms": 15.077837,
+      "max_ms": 15.749083
+    },
+    {
+      "scale": 32,
+      "case": "static-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 3.532913,
+      "min_ms": 3.340714,
+      "max_ms": 4.446698
+    },
+    {
+      "scale": 32,
+      "case": "rejected-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 1.421293,
+      "min_ms": 1.411463,
+      "max_ms": 1.689782
+    },
+    {
+      "scale": 32,
+      "case": "rejected-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 0.590237,
+      "min_ms": 0.568187,
+      "max_ms": 0.688537
+    },
+    {
+      "scale": 32,
+      "case": "valid-revert",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 15.380565,
+      "min_ms": 14.779228,
+      "max_ms": 15.852643
+    },
+    {
+      "scale": 32,
+      "case": "valid-revert",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 3.759432,
+      "min_ms": 3.618273,
+      "max_ms": 4.07699
+    },
+    {
+      "scale": 32,
+      "case": "source-origins",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 15.209306,
+      "min_ms": 14.859138,
+      "max_ms": 15.616314
+    },
+    {
+      "scale": 32,
+      "case": "source-origins",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 3.639742,
+      "min_ms": 3.439243,
+      "max_ms": 4.649857
+    },
+    {
+      "scale": 32,
+      "case": "bridge-first",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 5.793482,
+      "min_ms": 5.630942,
+      "max_ms": 6.14304
+    },
+    {
+      "scale": 32,
+      "case": "bridge-first",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 2.671887,
+      "min_ms": 2.529088,
+      "max_ms": 2.917355
+    },
+    {
+      "scale": 32,
+      "case": "abi-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 4.845396,
+      "min_ms": 4.489048,
+      "max_ms": 4.983866
+    },
+    {
+      "scale": 32,
+      "case": "abi-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 2.276979,
+      "min_ms": 2.24808,
+      "max_ms": 2.577768
+    },
+    {
+      "scale": 128,
+      "case": "fresh",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 37.067069,
+      "min_ms": 35.924145,
+      "max_ms": 40.822631
+    },
+    {
+      "scale": 128,
+      "case": "fresh",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 9.155675,
+      "min_ms": 8.28806,
+      "max_ms": 9.745913
+    },
+    {
+      "scale": 128,
+      "case": "unchanged",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 57.156701,
+      "min_ms": 56.787623,
+      "max_ms": 57.773068
+    },
+    {
+      "scale": 128,
+      "case": "unchanged",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 11.155336,
+      "min_ms": 10.064611,
+      "max_ms": 21.163877
+    },
+    {
+      "scale": 128,
+      "case": "body-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 54.493054,
+      "min_ms": 53.058351,
+      "max_ms": 55.897047
+    },
+    {
+      "scale": 128,
+      "case": "body-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 9.976402,
+      "min_ms": 9.123446,
+      "max_ms": 12.925147
+    },
+    {
+      "scale": 128,
+      "case": "interface-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 48.582123,
+      "min_ms": 48.174205,
+      "max_ms": 50.261135
+    },
+    {
+      "scale": 128,
+      "case": "interface-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 9.980181,
+      "min_ms": 8.724408,
+      "max_ms": 10.335369
+    },
+    {
+      "scale": 128,
+      "case": "static-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 54.325485,
+      "min_ms": 53.942997,
+      "max_ms": 54.474444
+    },
+    {
+      "scale": 128,
+      "case": "static-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 9.079726,
+      "min_ms": 8.716918,
+      "max_ms": 9.242604
+    },
+    {
+      "scale": 128,
+      "case": "rejected-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 5.880401,
+      "min_ms": 5.733383,
+      "max_ms": 6.19887
+    },
+    {
+      "scale": 128,
+      "case": "rejected-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 2.392049,
+      "min_ms": 2.377038,
+      "max_ms": 2.748397
+    },
+    {
+      "scale": 128,
+      "case": "valid-revert",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 53.508349,
+      "min_ms": 52.484414,
+      "max_ms": 56.598004
+    },
+    {
+      "scale": 128,
+      "case": "valid-revert",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 10.188561,
+      "min_ms": 9.795032,
+      "max_ms": 11.110986
+    },
+    {
+      "scale": 128,
+      "case": "source-origins",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 53.874947,
+      "min_ms": 52.830642,
+      "max_ms": 56.390935
+    },
+    {
+      "scale": 128,
+      "case": "source-origins",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 9.818602,
+      "min_ms": 9.641013,
+      "max_ms": 10.069801
+    },
+    {
+      "scale": 128,
+      "case": "bridge-first",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 10.382019,
+      "min_ms": 9.674663,
+      "max_ms": 10.771328
+    },
+    {
+      "scale": 128,
+      "case": "bridge-first",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 4.465939,
+      "min_ms": 4.18285,
+      "max_ms": 5.065735
+    },
+    {
+      "scale": 128,
+      "case": "abi-edit",
+      "compiler": "baseline",
+      "samples": 5,
+      "median_ms": 4.941586,
+      "min_ms": 4.818817,
+      "max_ms": 5.309104
+    },
+    {
+      "scale": 128,
+      "case": "abi-edit",
+      "compiler": "candidate",
+      "samples": 5,
+      "median_ms": 2.331909,
+      "min_ms": 2.23696,
+      "max_ms": 2.691647
+    }
+  ]
+}

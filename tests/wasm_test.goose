@@ -61,9 +61,27 @@ fn bridge_fixture(b: CoreBuilder) {
   b.phase.phase = PHASE_SEALED;
 }
 
+fn local_compaction_fixture(map: runtime::MemoryMap) {
+  // Both I32 and F32 locals are intentionally read before any assignment: their
+  // Wasm default zero values must survive index/group compaction. Parameter 1
+  // remains an F32 parameter even though unused local gaps separate the types.
+  var original: u8[>..] = [2, 4, 0x7f, 3, 0x7d, 0x20, 2, 0x45, 0x04, 0x7d, 0x20, 8, 0x05, 0x20, 1, 0x0b, 0x0b];
+  var compacted: u8[>..] = [];
+  assert(wasm::compact_locals(original, 2, compacted));
+  var expected: u8[>..] = [2, 1, 0x7f, 1, 0x7d, 0x20, 2, 0x45, 0x04, 0x7d, 0x20, 3, 0x05, 0x20, 1, 0x0b, 0x0b];
+  assert(compacted[..] == expected[..]);
+  wasm::with_module(map) { m =>
+    let sig = wasm::signature(m, [0x7f as u8, 0x7d], 0x7d);
+    let index = wasm::function(m, sig, compacted);
+    wasm::export_function(m, "zero", index);
+    var output: u8[>..] = []; wasm::encode(m, output);
+    assert(write_file("/tmp/blot-k1-local-init.wasm", output));
+  }
+}
 fn test_wasm() {
   var bytes: u8[>..] = [];
   let map = wasm::runtime_fixture(bytes);
+  local_compaction_fixture(map);
   assert(bytes.len > 8 && bytes[0] == 0 && bytes[1] == 97);
   assert(write_file("/tmp/blot-k1-runtime.wasm", bytes));
   var metadata: u8[>..] = [];

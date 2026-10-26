@@ -10,6 +10,17 @@ fn check_dictionary_coverage(c:Core, work:Work&, diagnostics:Diagnostic[>..]&) -
     for row,i in c.layouts { if i!=0 { layout_ids[row.type_id]=i as u32; } }
     fn fail(related:u32) { diagnostics.push(Diagnostic {2034,0,2034,related}); return false from check_dictionary_coverage; }
     fn tick() { work.visits++; charges[active]++; if charges[active]>LIMIT_VISITS { work.exhausted=true; diagnostics.push(Diagnostic {2030,0,2030,active}); return false from check_dictionary_coverage; } }
+    // Rebuild owner-local lookup lists from the independently admitted Core.
+    // Ascending Value IDs preserve the old demand order within each function.
+    var value_heads:u32[>..]=[]; var context_heads:u32[>..]=[];
+    for f in c.functions { value_heads.push(0); context_heads.push(0); }
+    var value_next:u32[>..]=[]; for v in c.values { value_next.push(0); }
+    var context_next:u32[>..]=[]; var cursor=c.values.len;
+    while cursor>1 {
+        cursor--; let value=c.values[cursor];
+        active=if value.block_id!=0 {c.blocks[value.block_id].function} else {0}; tick();
+        if value.block_id!=0 { value_next[cursor]=value_heads[active]; value_heads[active]=cursor as u32; }
+    }
     fn rows(span:Span)->const u32[:] { c.refs[span.start..span.start+span.count] }
     fn selected(span:Span,binder:u32)->u32 { for row in bindings[span.start..span.start+span.count] { tick(); if row.binder==binder { return row.type_id; } } return 0; }
     fn same_type(a:u32,b:u32)->bool {
@@ -64,13 +75,15 @@ fn check_dictionary_coverage(c:Core, work:Work&, diagnostics:Diagnostic[>..]&) -
             bindings.push(CoverageBinding {binder,ty});
         }
         let key=Span {start,required.len as u32};
-        for previous in contexts {
-            tick(); if previous.function!=fid || previous.bindings.count!=key.count { continue; }
+        var previous_id=context_heads[fid];
+        while previous_id!=0 {
+            tick(); let previous=contexts[previous_id-1]; previous_id=context_next[previous_id-1];
+            if previous.bindings.count!=key.count { continue; }
             var equal=true;
             for row in bindings[key.start..key.start+key.count] { let old=selected(previous.bindings,row.binder); if old==0 || !same_type(old,row.type_id) { equal=false; break; } }
             if equal { bindings.resize(start as i64); return; }
         }
-        if (contexts.len as u64)*12+(bindings.len as u64)*8+12>LIMIT_ARTIFACT { work.exhausted=true; diagnostics.push(Diagnostic {2030,0,2030,fid}); return false from check_dictionary_coverage; } contexts.push(CoverageContext {fid,key});
+        if (contexts.len as u64)*12+(bindings.len as u64)*8+12>LIMIT_ARTIFACT { work.exhausted=true; diagnostics.push(Diagnostic {2030,0,2030,fid}); return false from check_dictionary_coverage; } contexts.push(CoverageContext {fid,key}); context_next.push(context_heads[fid]); context_heads[fid]=contexts.len as u32;
     }
     for f,i in c.functions { if i!=0 { active=i as u32; add_context(i as u32,Span {..},true); } }
     for ex,i in c.exports {
@@ -88,7 +101,8 @@ fn check_dictionary_coverage(c:Core, work:Work&, diagnostics:Diagnostic[>..]&) -
             if (premise.kind==LAYOUT_AGGREGATE && layout.size>256) || (premise.kind==LAYOUT_PLAIN && (layout.size>64 || (layout.flags&1)==0)) { fail(premise.type_id); }
         }
         demand(c.contracts[f.contract].arg,context.bindings,0); demand(c.contracts[f.contract].result,context.bindings,0);
-        for v,i in c.values { tick(); if i!=0 && v.block_id!=0 && c.blocks[v.block_id].function==context.function { demand(v.type_id,context.bindings,0); } }
+        var vid=value_heads[context.function];
+        while vid!=0 { tick(); demand(c.values[vid].type_id,context.bindings,0); vid=value_next[vid]; }
         for block_id in rows(f.blocks) { for oid in rows(c.blocks[block_id].ops) {
             tick(); let op=c.ops[oid]; if op.tag==OP_TRY_ALLOC { demand(op.imm0,context.bindings,0); }
             if op.tag!=OP_CALL && op.tag!=OP_CLOSURE && op.tag!=OP_FN_PLACE { continue; }

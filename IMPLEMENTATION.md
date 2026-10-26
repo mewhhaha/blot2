@@ -1,15 +1,21 @@
 # K1 implementation and qualification ledger
 
 The K1 source, runtime, artifact, reuse and optimizer implementations pass the
-frozen release gate: **91 native entries, 79 Deno integration tests and the editor
+frozen release gate: **115 native entries, 88 Deno integration tests and the editor
 gate**. The candidate is identified by input manifest
-`5fe240d4ac1b7c08ad609c2444e68cc2a7338e589de479401237fa8d80f6bce6`
+`32c050991a86eec699074c07a52add676ebef9f795685c3f6490743ab054b928`
 and executable SHA-256
-`7b61cff1941de683e99269dc2a3c30cc137201d9bca8f98e90a8d0bbc02366b2`.
+`ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527`.
 **I09 measurements and the initial K1-10 handoff are complete.** The
-[measurement report](benchmarks/RESULTS.md) preserves regressions, boundary
-rejections and outliers; the [evidence package](benchmarks/results/k1-initial/manifest.json)
-binds raw records to the qualified candidate.
+[structural follow-up](benchmarks/STRUCTURAL.md) records validator/proof work
+reductions and bounded release inlining after the earlier
+[parity investigation](benchmarks/PARITY.md). Its
+[latest evidence](benchmarks/results/structural/manifest.json) binds all 191
+qualified inputs, raw records and the gate to this candidate.
+The [preceding parity package](benchmarks/results/parity/manifest.json),
+[Sol review](benchmarks/SOL_REVIEW.md) and [initial report](benchmarks/RESULTS.md)
+remain immutable historical evidence. Qualification does not imply universal
+performance parity or authorize replacing the installed compiler.
 
 Baseline: `main` at `1e39b5d8a4268b9edf769c2813d5231abe1c963b`.
 Implementation branch: `rewrite/goose-k1`.
@@ -41,7 +47,7 @@ The I09 report completes the measured handoff for this Linux candidate.
 | K1-06 | Scoped code/environment pairs; Share captures and captured facts; Many/Once; placed environments; finite depth/frame bounds; adapters and forwarded witnesses. [wasm_closure_test.ts](tests/wasm_closure_test.ts), closure/resource source laws, `test_validator_static_capture`, `test_validator_ambient_nat`, `test_wasm_validation`. | Implemented; frozen gate passed |
 | K1-07 | Single-backing Owned construction/seal/open/close and copy-only Plain-array bridge. [host/blot.ts](host/blot.ts), [wasm_bridge_test.ts](tests/wasm_bridge_test.ts), [host_bridge_test.ts](tests/host_bridge_test.ts), [wasm_lifecycle_test.ts](tests/wasm_lifecycle_test.ts). External unbound Index domains and `Owned<FnOnce>` reject. | Implemented; frozen gate passed |
 | K1-08 | Shared rank-1 bodies, dictionaries/realizations and independent coverage; LayoutFits premises; lexical forall/captured witnesses; required-static evaluation and immutable arrays/packages/nested closures. [layout_premise_test.goose](tests/layout_premise_test.goose), [frontend_generic_test.goose](tests/frontend_generic_test.goose), `test_dictionary_coverage`, [evaluate_test.goose](tests/evaluate_test.goose), [wasm_static_test.ts](tests/wasm_static_test.ts) and generic runtime laws. | Implemented; frozen gate passed |
-| K1-09 | R01–R12 optimizer; canonical portable tables; exact dependencies/origin relocation; process-local receipts; bounded retained sessions; corruption, cancellation, OOM and publication rollback. Optimizer, artifact, relocation, retained/session and failure laws below. | Implemented; frozen gate passed |
+| K1-09 | R01–R12 optimizer and bounded release inlining; canonical portable tables; exact dependencies/origin relocation; process-local receipts; bounded retained sessions; corruption, cancellation, OOM and publication rollback. Optimizer, artifact, relocation, retained/session and failure laws below. | Implemented; frozen gate passed |
 | K1-10 | [Migration report/example](docs/migration.md), imported generic helper and copy host in [migration_test.ts](tests/migration_test.ts); [guide](docs/guide.md), [scope](docs/features.md), README and measurement harnesses. | Implemented; gate and measured handoff complete |
 
 The compiler, evaluator, validator and emitted runtime are Goose. The small
@@ -82,8 +88,8 @@ diagnostics instead of following attacker-controlled origins.
 | ART-R01, SEC-01/SEC-02 | [validator_test.goose](tests/validator_test.goose), [validator_source_test.goose](tests/validator_source_test.goose), [layout_premise_test.goose](tests/layout_premise_test.goose), `test_dictionary_coverage`: checked extents/sentinels/tags, foreign IDs, duplicate definitions, cyclic types/proofs, incorrect fields/versions/edges/domains/substitutions, stripped LayoutFits and missing dictionary realizations. Checksum-valid corrupt bodies still reject. |
 | ART-A01, SEC-04 | `test_retained_optional_corruption` rejects malformed encoding and checksum-valid invalid Core, destroys scratch and executes equivalent fresh completion. `test_retained_external_receipt` supplies structurally valid Core claiming one visit for source requiring 65,537 operations; external provenance cannot authorize reuse, so the exact cold `k1_core_limit` rejection remains. Provenance is supplied outside serialized bytes. |
 | SEC-03/SEC-05, C12 | [wasm_validation_test.goose](tests/wasm_validation_test.goose) checks actual encoded stack/control/call signatures, missing roles, malformed LEB/immediates and changed final code bytes. Certificates bind ABI hash, memory map, code, function roles and transitive calls. [artifact_cli_test.ts](tests/artifact_cli_test.ts) removes source files and rebuilds local Wasm from independently admitted Core; external code is never promoted by a Core digest. |
-| M12 host boundary | [wasm_bridge_test.ts](tests/wasm_bridge_test.ts), [host_bridge_test.ts](tests/host_bridge_test.ts), [host_test.ts](tests/host_test.ts): malformed geometry, overflow, Bool/sum/padding bytes, private memory/descriptors, reentry, poison-after-trap, output copying and small output windows. Scalar requires/Bool entry audit remains to close before the final gate. |
-| OOM-01 | [oom_test.ts](tests/oom_test.ts) and [session_oom_test.ts](tests/session_oom_test.ts) sweep observed Linux arena reserve/protected commit boundaries through construction/validation/lowering and retained decode/reuse/publication. [arena_fault.c](tests/arena_fault.c) is undergoing an ASLR-related correction. Coverage is actual OS arena failures, not every libc allocation or every source feature; fatal process OOM leaves previous Wasm usable. |
+| M12 host boundary | [wasm_bridge_test.ts](tests/wasm_bridge_test.ts), [host_bridge_test.ts](tests/host_bridge_test.ts), [host_test.ts](tests/host_test.ts): malformed geometry, overflow, Bool/sum/padding bytes, private memory/descriptors, reentry, poison-after-trap, output copying and small output windows. Scalar requires/Bool entry checks pass before source execution. |
+| OOM-01 | [oom_test.ts](tests/oom_test.ts) and [session_oom_test.ts](tests/session_oom_test.ts) sweep observed Linux arena reserve/protected commit boundaries through construction/validation/lowering and retained decode/reuse/publication. [arena_fault.c](tests/arena_fault.c) uses reservation-relative commit chunks so ASLR cannot change fault ordinals. Coverage is actual OS arena failures, not every libc allocation or every source feature; fatal process OOM leaves previous Wasm usable. |
 | OOM-02/OOM-03 | Native/emitted runtime laws exhaust owner slots, fragmented pool space, placement arithmetic, destination capacity and frame preflight. Generation retirement and failed predecessor-state preservation are asserted. Particle failures cover every initialized prefix and successful recovery, with no live backing or partial result. |
 | REV-01/REV-02 | [retained_test.goose](tests/retained_test.goose), [session_test.ts](tests/session_test.ts), [session_edits_test.ts](tests/session_edits_test.ts), [cancellation_test.ts](tests/cancellation_test.ts), [concurrency_test.ts](tests/concurrency_test.ts), [artifact_cli_test.ts](tests/artifact_cli_test.ts): valid/invalid/revert, mid-module cancellation, body/contract/namespace/import/static/capture/origin/ABI edits, cold agreement, malformed bounded requests and output-pair rollback. No cross-file crash-atomic visibility to arbitrary readers is claimed. |
 
@@ -119,9 +125,12 @@ generative identities, reservation/failure and cleanup are not erased.
   baseline/source admission; malformed candidates fail validation and cannot
   publish.
 
-`--opt=fast` and `--opt=release` use the same kernel. Release-only inlining,
-scalar replacement, fusion and SIMD are optional future C10 work, not missing
-baseline semantics or implied performance claims.
+`--opt=fast` uses the R01–R12 kernel. `--opt=release` additionally transports
+small direct scalar callees under the existing C10 size, depth, site and work
+budgets, then independently validates the candidate. Immutable templates,
+preflighted SSA transport and reserved finalization work preserve a valid prefix
+when optional analysis stops. Scalar replacement, fusion and SIMD remain future
+optional work. See [inlining contracts](docs/CONTRACT.md#bounded-release-inlining).
 
 ## Qualification commands and remaining work
 
@@ -149,13 +158,13 @@ static, generic, body/adapter, rewrite, generated-size and cache-work counters;
 [concurrency_test.ts](tests/concurrency_test.ts) checks their source/runtime split
 and that attribution leaves generated bytes unchanged.
 
-The measured handoff is complete. [RESULTS.md](benchmarks/RESULTS.md) records
+The initial measured handoff is complete. [RESULTS.md](benchmarks/RESULTS.md) records
 paired compile/runtime scaling, retained revisions, exact operation boundaries,
 source-less artifact inspection/rebuilding, guest storage telemetry and isolated
 compiler iteration. It includes the rejected 128-depth chain and accepted 127-depth
 control, the unchanged-reuse regression, and slow compiler rebuilds. The raw
 package preserves all samples and source inputs; no outliers were discarded.
-All 178 qualified input blobs were verified against implementation commit
+All 178 initial qualified input blobs were verified against implementation commit
 `4d5fe60343d1916ec99baa452f2727c48a408f27`; `commit-binding.json` is archived.
 
 Serve timing separates `cache_admit_ns` (optional decode/validation),
@@ -169,9 +178,65 @@ relocation incompatibility; ordinary missing/source-text candidates and budget
 declines are separate. Instrumented guest attribution is separate from normal
 runtime timing.
 
-This is initial qualification of the recorded implementation and Linux corpus,
+This is qualification of the recorded implementation and Linux corpus,
 not a main-branch release or a mechanized proof. Optional future work remains
-explicit in [scope](docs/features.md); the measured architectural follow-ups in
-[RESULTS.md](benchmarks/RESULTS.md#concrete-follow-up-levers) are proposals, not
-claimed speedups. No mandatory implementation or measurement step is left
-pending for this handoff.
+explicit in [scope](docs/features.md); the remaining performance work in
+[STRUCTURAL.md](benchmarks/STRUCTURAL.md#legacy-comparison-and-next-decisions) is explicit. The
+recorded qualification and measurement batches are complete; all-workload
+performance parity remains an open target.
+
+## Sol review regression coverage
+
+The current full gate includes `test_validator_affine_scratch` and
+`test_validator_unrelated_value_work` for sparse ownership state,
+`test_canonical_growth` for adaptive exact-key indexes, and
+`test_relocation_sparse_growth` for bounded sparse remapping and row order.
+Two executed-Wasm laws in `wasm_runtime_test.ts` cover zero-byte source frames
+and generic Unit adapters, mixed framed calls, public preflight, repeated
+frontier restoration and exact telemetry. Source syntax, ABI and limits remain
+unchanged. See the review report for measured improvements and their scope.
+
+## Parity investigation regression coverage
+
+The full gate additionally covers `test_layout_scratch_epochs`,
+`test_dictionary_coverage_function_work`, CFG/producer/dominance indexes,
+`test_validator_layout_owner_indexes`, strict proof SCCs and lazy evidence,
+and cross-module scratch parity/rebinding/failure laws. Matching-owner layout
+rows remain fully checked; indexed lookup never grants authority by itself.
+Emitted-Wasm tests exercise borrowed generic inputs, structured returns,
+compacted I32/F32 locals, zero initialization and exact floating-point bits.
+
+`artifact_cli_test.ts` injects zero, partial and failed writes, interrupted/short
+writes, close/chmod/rename failure and absent/existing destination cases into
+ordinary Wasm publication. It checks executable contents, old mode/new umask,
+symlink/nonregular rejection and staging cleanup. Core/pair/source-format
+writers retain their existing synchronization behavior. Ordinary Wasm publication
+is atomically visible but does not acknowledge durable storage; see
+[the contract](docs/CONTRACT.md#transport-publication-and-observations).
+`concurrency_test.ts` checks nonoverlapping CLI timing fields and byte-identical
+output with attribution enabled. Retained failure, cancellation, allocation
+fault and pair rollback suites also pass with the new path.
+
+## Structural work and release inlining
+
+Validator attempts borrow the immutable Core view; their budgets and scratch
+remain private. `test_validator_immutable_attempt_isolation` checks isolation,
+and frozen before/after controls preserve exact work accounts and diagnostics.
+Frontend contradiction SCCs use an iterative forward-only Tarjan traversal;
+`test_frontend_tarjan_component_boundaries` covers weak/strict component edges,
+merges, cross/back edges, removed closing edges and bounded deep traversal.
+
+The nine native laws in [inline_test.goose](tests/inline_test.goose) cover empty
+and earlier returns, fresh SSA identities, immutable-template depth, 32-node
+callee cutoff, per-caller/global growth, site limits, pinned producers, physical
+artifact preflight, optional fallback and retained prefixes. A 256-limit sweep
+exercises multi-block cleanup; missing SSA mappings stay internal errors.
+[Executed guests](tests/inline_test.ts) compare exact wrapping-U32/F32 behavior
+and reservation/release counts. The release session-edit law in
+[session_edits_test.ts](tests/session_edits_test.ts) verifies that a changed callee
+updates an inlined result while the caller's semantic judgment is reused, and
+that rejected revisions retain the prior output.
+
+[Structural measurements](benchmarks/STRUCTURAL.md) separate isolated changes,
+combined compiler results and release/fast runtime behavior. The two new loop
+workloads have independent integer/F32 reference models and varying inputs.

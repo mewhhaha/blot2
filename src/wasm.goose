@@ -555,7 +555,15 @@ fn field_address(s: Lowering, b: u8[>..]&, type_id: u32, ordinal: u32) {
   // preceding generic fields; maximum admission sizes never become offsets.
   for i in ordinal { emit_size(s, b, type_child(s.core, type_id, i as u32), 0); op(b, 0x6a); }
 }
-fn value_address(s: Lowering, b: u8[>..]&, v: u32) { add_const(b, s.base, s.offsets[v]); }
+fn borrowed_parameter(s: Lowering, v: u32) -> bool {
+  v == s.core.functions[s.function_id].param && aggregate(value_layout(s, v)) && !flat(s, v)
+}
+fn value_address(s: Lowering, b: u8[>..]&, v: u32) {
+  // The caller's indirect argument is immutable SSA storage throughout this
+  // activation. Region writes through a descriptor never mutate its own words.
+  if borrowed_parameter(s, v) { get(b, s.param_count - 1); }
+  else { add_const(b, s.base, s.offsets[v]); }
+}
 fn value(s: Lowering, b: u8[>..]&, v: u32) {
   let l = value_layout(s, v);
   if aggregate(l) {
@@ -1108,7 +1116,7 @@ fn emit_edge_values(s: Lowering, b: u8[>..]&, edge: Edge) {
 }
 fn emit_edge(s: Lowering, b: u8[>..]&, edge: Edge) { emit_edge_values(s, b, edge); constant(b, edge.to); set(b, s.pc); }
 fn restore_frame(s: Lowering, b: u8[>..]&) {
-  constant(b, s.module.map.control + 4); get(b, s.saved); store(b, 0);
+  if s.own_frame != 0 { constant(b, s.module.map.control + 4); get(b, s.saved); store(b, 0); }
 }
 fn emit_terminator(s: Lowering, b: u8[>..]&, term: Terminator, diags: Diagnostic[>..]&) -> bool {
   if term.tag == TERM_RETURN {
@@ -1153,9 +1161,28 @@ fn loop_header(c: Core, block_id: u32) -> u32 {
   for row, i in c.loops { if i != 0 && row.header == block_id { return i as u32; } } return 0;
 }
 fn structured_eligible(c: Core, fid: u32) -> bool {
+  var unmerged = false;
+  for block_id in refs(c, c.functions[fid].blocks) {
+    let row = c.blocks[block_id]; let term = c.terminators[row.term];
+    if (term.tag == TERM_BRANCH || term.tag == TERM_SWITCH) && row.merge == 0 { unmerged = true; }
+  }
+  if unmerged {
+    // Early-return trees need no program-counter dispatch. Repeated targets
+    // reject reachable cycles and shared tails without merge rows. This list
+    // holds at most one ID per function block, independent of module size.
+    // Larger/unstructured graphs retain the general dispatcher unchanged.
+    if c.functions[fid].blocks.count > 64 { return false; }
+    var incoming: u32[>..] = [c.functions[fid].entry];
+    for block_id in refs(c, c.functions[fid].blocks) {
+      for edge_id in refs(c, c.terminators[c.blocks[block_id].term].edges) {
+        let target = c.edges[edge_id].to;
+        for previous in incoming { if previous == target { return false; } }
+        incoming.push(target);
+      }
+    }
+  }
   for block_id in refs(c, c.functions[fid].blocks) {
     let row = c.blocks[block_id]; let term = c.terminators[row.term]; let loop_id = loop_header(c, block_id);
-    if (term.tag == TERM_BRANCH || term.tag == TERM_SWITCH) && row.merge == 0 { return false; }
     if loop_id != 0 {
       let loop_row = c.loops[loop_id];
       if term.tag != TERM_BRANCH || term.edges.count != 2 { return false; }
@@ -1250,6 +1277,10 @@ fn lower_function(c: Core, m: ModuleBuilder&, h: Helpers, layouts: const u32[:],
     if l.abi == ABI_F32 { f32_count++; }
     if l.abi == ABI_INDIRECT {
       if fixed_layout(c, v.type_id, 0) { flat_ids[i] = params.len as u32 + i32_count; i32_count += l.size / 4; }
+      // A nonflat indirect parameter already has stable caller-owned storage.
+      // Keep baseline resource admission conservative; omit only this physical
+      // slot and entry copy after the completed body has been admitted.
+      if i == f.param && flat_ids[i] == 0 { continue; }
       offsets[i] = frame;
       if l.size > 16 * 1024 * 1024 - frame { diags.push(Diagnostic {3020, f.origin, frame, l.size}); return false; }
       frame += l.size;
@@ -1301,14 +1332,22 @@ fn lower_function(c: Core, m: ModuleBuilder&, h: Helpers, layouts: const u32[:],
   var b: u8[>..] = [];
   uleb(b, if f32_count == 0 { 1 } else { 2 }); uleb(b, i32_count + 69 + (if m.telemetry {1 as u32} else {0})); op(b, I32);
   if f32_count != 0 { uleb(b, f32_count); op(b, F32); }
-  constant(b, m.map.control + 4); load(b, 0); tee(b, s.saved);
-  constant(b, m.map.frame_bytes - frame); op(b, 0x4b); trap_if(b);
-  add_const(b, s.saved, m.map.frame); set(b, s.base);
-  constant(b, m.map.control + 4); add_const(b, s.saved, frame); store(b, 0);
+  // A zero-byte activation has no local frame addresses or frontier mutation.
+  // Public wrappers still preflight the complete allowance before effects.
+  if frame != 0 {
+    constant(b, m.map.control + 4); load(b, 0); tee(b, s.saved);
+    constant(b, m.map.frame_bytes - frame); op(b, 0x4b); trap_if(b);
+    add_const(b, s.saved, m.map.frame); set(b, s.base);
+    constant(b, m.map.control + 4); add_const(b, s.saved, frame); store(b, 0);
+  } else if m.telemetry {
+    // Attribute a zero-byte callee to its caller's actual live frontier.
+    constant(b, m.map.control + 4); load(b, 0); set(b, s.saved);
+  }
   telemetry_add_const(m,b,runtime::T_CALLS,1); telemetry_high_local(m,b,runtime::T_SCRATCH_HIGH,s.saved,frame);
   let arg = c.layouts[plan.arg_layout];
-  if arg.abi == ABI_INDIRECT { get(b, params.len as u32 - 1); load_value(s, b, f.param); }
-  else if arg.abi != ABI_UNIT { get(b, params.len as u32 - 1); set(b, local_ids[f.param]); }
+  if arg.abi == ABI_INDIRECT {
+    if !borrowed_parameter(s, f.param) { get(b, params.len as u32 - 1); load_value(s, b, f.param); }
+  } else if arg.abi != ABI_UNIT { get(b, params.len as u32 - 1); set(b, local_ids[f.param]); }
   for capture_id, i in refs(c, f.captures) {
     let capture = c.captures[capture_id]; get(b, 0); constant(b, f.environment_bindings.count * 4); op(b, 0x6a);
     for prior in i { let earlier = c.captures[c.refs[f.captures.start + prior]]; emit_size(s, b, c.values[earlier.local_value].type_id, 0); op(b, 0x6a); }
@@ -1334,7 +1373,9 @@ fn lower_function(c: Core, m: ModuleBuilder&, h: Helpers, layouts: const u32[:],
     op(b, 0x00); end(b);
   }
   op(b, 0x00); end(b); // No unspecified fallthrough result.
-  let emitted = function(m, signatures[fid], b); assert(emitted == functions[fid]);
+  var compacted: u8[>..] = [];
+  if !compact_locals(b, params.len as u32, compacted) { diags.push(Diagnostic {3038, f.origin, fid, 0}); return false; }
+  let emitted = function(m, signatures[fid], compacted); assert(emitted == functions[fid]);
   m.functions[emitted].indirect = Span {indirect_start, m.indirect_contracts.len as u32 - indirect_start};
   m.functions[emitted].role = 2; m.functions[emitted].source = fid; m.functions[emitted].contract = f.contract;
   let body_frame,body_depth,body_ok=wasm_body_resources(c,fid); if !body_ok { return false; }
@@ -1814,6 +1855,66 @@ fn skip_i32(r: Reader&) {
   }
   r.valid = false;
 }
+// Decode only the closed instruction set emitted by this backend. Parameters,
+// instruction order and local types stay fixed; removing an unreferenced local
+// cannot change Wasm's zero initialization or any control-flow assignment.
+fn instruction_local(r: Reader&) -> u32 {
+  let instruction = read_byte(r);
+  if instruction == 0x20 || instruction == 0x21 || instruction == 0x22 { return read_uleb(r); }
+  if instruction == 0x02 || instruction == 0x03 || instruction == 0x04 { read_byte(r); }
+  else if instruction == 0x0c || instruction == 0x0d || instruction == 0x10 { read_uleb(r); }
+  else if instruction == 0x11 || instruction == 0x28 || instruction == 0x2a || instruction == 0x2d || instruction == 0x36 || instruction == 0x38 { read_uleb(r); read_uleb(r); }
+  else if instruction == 0x41 { skip_i32(r); }
+  else if instruction == 0x43 { for i in 4 { read_byte(r); } }
+  else if instruction == 0xfc {
+    let sub = read_uleb(r);
+    if sub == 10 { read_uleb(r); read_uleb(r); }
+    else if sub == 11 { read_uleb(r); }
+    else { r.valid = false; }
+  } else if instruction == 0x00 || instruction == 0x05 || instruction == 0x0b || instruction == 0x0f || instruction == 0x1a || instruction == 0x1b ||
+    (instruction >= 0x45 && instruction <= 0x4f) || (instruction >= 0x5b && instruction <= 0x60) ||
+    (instruction >= 0x6a && instruction <= 0x76) || (instruction >= 0x8b && instruction <= 0x97) ||
+    instruction == 0xa9 || instruction == 0xb3 || instruction == 0xbc || instruction == 0xbe { }
+  else { r.valid = false; }
+  return 0xffffffff;
+}
+fn compact_locals(bytes: const u8[:], parameters: u32, out: u8[>..]&) -> bool {
+  var r = Reader {bytes}; let groups = read_uleb(r);
+  if groups == 0 || groups > 2 || parameters > 1048576 { return false; }
+  let integers = read_uleb(r); if read_byte(r) != I32 || integers > 1048576 - parameters { return false; }
+  var floats: u32 = 0;
+  if groups == 2 { floats = read_uleb(r); if read_byte(r) != F32 || floats > 1048576 - parameters - integers { return false; } }
+  let start = r.at;
+  var remap: u32[>..] = [];
+  for index in parameters + integers + floats { remap.push(if index < parameters { index } else { 0xffffffff }); }
+  while r.valid && r.at < bytes.len {
+    let local = instruction_local(r);
+    if local != 0xffffffff {
+      if local >= remap.len { return false; }
+      if local >= parameters { remap[local] = 0; }
+    }
+  }
+  if !r.valid { return false; }
+  var kept_integers: u32 = 0; var kept_floats: u32 = 0;
+  for index in integers {
+    let old = parameters + index;
+    if remap[old] != 0xffffffff { remap[old] = parameters + kept_integers; kept_integers++; }
+  }
+  for index in floats {
+    let old = parameters + integers + index;
+    if remap[old] != 0xffffffff { remap[old] = parameters + kept_integers + kept_floats; kept_floats++; }
+  }
+  uleb(out, (if kept_integers != 0 {1 as u32} else {0}) + (if kept_floats != 0 {1 as u32} else {0}));
+  if kept_integers != 0 { uleb(out, kept_integers); op(out, I32); }
+  if kept_floats != 0 { uleb(out, kept_floats); op(out, F32); }
+  r.at = start;
+  while r.valid && r.at < bytes.len {
+    let instruction = r.at; let local = instruction_local(r);
+    if local == 0xffffffff { out.append(bytes[instruction..r.at]); }
+    else { op(out, bytes[instruction]); uleb(out, remap[local]); }
+  }
+  return r.valid;
+}
 fn scan_function(m: ModuleBuilder&, f: Func, direct: u32[>..]&, indirect: u32[>..]&) -> bool {
   var r = Reader {m.bodies[f.start..f.start + f.length]};
   let groups = read_uleb(r); var local_count = m.types[f.type_id].count;
@@ -1998,10 +2099,14 @@ fn emit_adapter(c: Core, m: ModuleBuilder&, layouts: const u32[:], plans: const 
   let parameter_count = m.types[adapter.signature].count;
   let saved = parameter_count; let base = saved + 1;
   var b: u8[>..] = []; local_declarations(b, 2, I32);
-  constant(b, m.map.control + 4); load(b, 0); tee(b, saved);
-  constant(b, m.map.frame_bytes - adapter.own_frame); op(b, 0x4b); trap_if(b);
-  add_const(b, saved, m.map.frame); set(b, base);
-  constant(b, m.map.control + 4); add_const(b, saved, adapter.own_frame); store(b, 0);
+  if adapter.own_frame != 0 {
+    constant(b, m.map.control + 4); load(b, 0); tee(b, saved);
+    constant(b, m.map.frame_bytes - adapter.own_frame); op(b, 0x4b); trap_if(b);
+    add_const(b, saved, m.map.frame); set(b, base);
+    constant(b, m.map.control + 4); add_const(b, saved, adapter.own_frame); store(b, 0);
+  } else if m.telemetry {
+    constant(b, m.map.control + 4); load(b, 0); set(b, saved);
+  }
   telemetry_high_local(m,b,runtime::T_SCRATCH_HIGH,saved,adapter.own_frame);
   if spill_arg { get(b, base); get(b, parameter_count - 1); store_scalar(b, argument, argument_slot); telemetry_add_const(m,b,runtime::T_INITIALIZED,argument.size); }
   get(b, 0);
@@ -2033,7 +2138,7 @@ fn emit_adapter(c: Core, m: ModuleBuilder&, layouts: const u32[:], plans: const 
   }
   call(b, functions[operation.imm0]);
   if spill_result { get(b, base); load_scalar(b, result, result_slot); }
-  constant(b, m.map.control + 4); get(b, saved); store(b, 0); end(b);
+  if adapter.own_frame != 0 { constant(b, m.map.control + 4); get(b, saved); store(b, 0); } end(b);
   let index = function(m, adapter.signature, b); assert(index == adapter.function);
   m.functions[index].role = 6; m.functions[index].source = operation.imm0; m.functions[index].contract = callback.contract;
   m.functions[index].own_frame = adapter.own_frame; m.functions[index].frame = callback.frame; m.functions[index].depth = callback.depth;

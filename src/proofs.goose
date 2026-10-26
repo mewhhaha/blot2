@@ -49,56 +49,132 @@ fn proof_literal_truth(b: CoreBuilder, w: Work&, budget: ProofBudget, index: Pro
     if fact.tag == FACT_EQ { return x == y; } if fact.tag == FACT_LE { return x <= y; } if fact.tag == FACT_LT { return x < y; }
     if fact.tag == FACT_ADD_FITS { return x + y <= MAX_U32; } if fact.tag == FACT_SUB_FITS { return y <= x; } if fact.tag == FACT_MUL_FITS { return x * y <= MAX_U32; } return false;
 }
-struct ProofArc { to: u32, evidence: u32, next: u32, strict: u32 }
+struct ProofArc { to: u32, evidence: u32, recipe: u32, next: u32, strict: u32 }
+// Private derivation plans are lookup scratch, never published evidence. Each
+// prerequisite points backward; the sole compound plan is symmetry followed
+// by add-complement, so materialization has at most two recipe frames.
+struct ProofRecipe { fact: Fact, rule: u32, evidence: u32, prerequisite: u32, materialized: u32 }
 struct ProofLiteral { term: u32, value: u64 }
-fn proof_order(b: CoreBuilder, w: Work&, budget: ProofBudget, index: ProofIndex, scope: u32, active: const u32[:], target: Fact) -> u32 {
+struct ProofWalk { node: u32, next: u32 }
+fn proof_order_graph(b: CoreBuilder, w: Work&, budget: ProofBudget, index: ProofIndex, scope: u32, active: const u32[:], wanted: Fact, find_cycle: bool) -> u32 {
+    var target = wanted;
     // Sorted adjacency lists and a two-state BFS preserve strictness without
     // materializing transitive pairs. Every examined edge is charged.
-    var heads: u32[>..] = []; var arcs: ProofArc[>..] = [ProofArc { .. }];
+    var heads: u32[>..] = []; var arcs: ProofArc[>..] = [ProofArc { .. }]; var recipes: ProofRecipe[>..] = [ProofRecipe { .. }];
+    fn defer_evidence(fact: Fact, rule: u32, evidence: u32, prerequisite: u32) -> u32 {
+        if !proof_charge(w, budget, 1) { return 0 from proof_order_graph; }
+        if recipes.len - 1 >= LIMIT_FACT_EDGES { w.exhausted = true; return 0 from proof_order_graph; }
+        assert(prerequisite == 0 || prerequisite < recipes.len && recipes[prerequisite].prerequisite == 0);
+        let id = recipes.len as u32; recipes.push(ProofRecipe { fact: fact, rule: rule, evidence: evidence, prerequisite: prerequisite, .. }); return id;
+    }
+    recursive fn materialize(id: u32) -> u32 {
+        if !proof_charge(w, budget, 1) { return 0; } let recipe = recipes[id]; if recipe.materialized != 0 { return recipe.materialized; }
+        var premise = recipe.evidence;
+        if recipe.prerequisite != 0 { premise = materialize(recipe.prerequisite); if premise == 0 { return 0; } }
+        let result = if premise == 0 { proof_evidence(b, w, budget, index, recipe.fact, recipe.rule, scope, 0, [], []) } else { proof_evidence(b, w, budget, index, recipe.fact, recipe.rule, scope, 0, [], [premise]) };
+        recipes[id].materialized = result; return result;
+    }
+    // All remaining workspaces are one or two entries per tracked term or
+    // bounded arc. proof_track checks LIMIT_TERMS before collecting a node.
     var queue: u32[>..] = []; var predecessor: u32[>..] = []; var via: u32[>..] = [];
     var terms: u32[>..] = []; var positions = KeyIndex<u32> {};
-    recursive fn collect(id: u32) { if id == 0 || key_index_get(positions, id) != 0 { return; } if !proof_charge(w, budget, 1) || !proof_track(w, budget, index, 1, id) { return 0 from proof_order; } key_index_insert(positions, id, 1); terms.push(id); let t = b.terms[id]; for i in t.args.count { collect(b.refs[t.args.start + i]); } }
+    recursive fn collect(id: u32) { if id == 0 || key_index_get(positions, id) != 0 { return; } if !proof_charge(w, budget, 1) || !proof_track(w, budget, index, 1, id) { return 0 from proof_order_graph; } key_index_insert(positions, id, 1); terms.push(id); let t = b.terms[id]; for i in t.args.count { collect(b.refs[t.args.start + i]); } }
     collect(target.left); collect(target.right); collect(target.third);
     for e in active { if !proof_charge(w, budget, 1) || !id_ok(e, b.evidence.len) { return 0; } let f = b.facts[b.evidence[e].fact]; collect(f.left); collect(f.right); collect(f.third); }
-    sort(terms[..]) { left, right => if !proof_charge(w, budget, 1) { return 0 from proof_order; } proof_rank(index, budget, left) < proof_rank(index, budget, right) };
+    sort(terms[..]) { left, right => if !proof_charge(w, budget, 1) { return 0 from proof_order_graph; } proof_rank(index, budget, left) < proof_rank(index, budget, right) };
     for id, i in terms { key_index_insert(positions, id, i as u32 + 1); heads.push(0); predecessor.push(0); predecessor.push(0); via.push(0); via.push(0); }
-    fn add_arc(source: u32, destination: u32, strict: u32, evidence: u32) -> bool {
+    fn add_arc(source: u32, destination: u32, strict: u32, evidence: u32, recipe: u32) -> bool {
+        if !proof_charge(w, budget, 1) { return false; }
+        if arcs.len - 1 >= LIMIT_PROOF_VISITS { w.exhausted = true; return false; }
         let from = key_index_get(positions, source) - 1; let to = key_index_get(positions, destination) - 1;
         var previous: u32 = 0; var cursor = heads[from];
         while cursor != 0 && arcs[cursor].to <= to { if !proof_charge(w, budget, 1) { return false; } previous = cursor; cursor = arcs[cursor].next; }
-        let id = arcs.len as u32; arcs.push(ProofArc { to: to, evidence: evidence, next: cursor, strict: strict });
+        let id = arcs.len as u32; arcs.push(ProofArc { to: to, evidence: evidence, recipe: recipe, next: cursor, strict: strict });
         if previous == 0 { heads[from] = id; } else { arcs[previous].next = id; } return true;
     }
     // Adjacent literal values connect the complete finite order with linear
     // edges. Equal-valued compound terms connect in both directions, so their
     // admission is independent of equality orientation or term creation rank.
-    var literals: ProofLiteral[>..] = [];
-    for term in terms { let value, known = proof_literal_value(b, w, budget, index, term, 0); if w.exhausted { return 0; } if known { literals.push(ProofLiteral { term: term, value: value }); } }
-    sort(literals[..]) { left, right => if !proof_charge(w, budget, 1) { return 0 from proof_order; } left.value < right.value || (left.value == right.value && proof_rank(index, budget, left.term) < proof_rank(index, budget, right.term)) };
+    var literals: ProofLiteral[>..] = []; var complements: u32[>..] = []; var complement_last = KeyIndex<u32> {};
+    for term in terms {
+        if !proof_charge(w, budget, 1) { return 0; } let t = b.terms[term];
+        if t.tag == EXPR_MAX_MINUS && t.args.count == 1 { complements.push(term); key_index_insert(complement_last, b.refs[t.args.start], term); }
+        let value, known = proof_literal_value(b, w, budget, index, term, 0); if w.exhausted { return 0; } if known { literals.push(ProofLiteral { term: term, value: value }); } }
+    sort(literals[..]) { left, right => if !proof_charge(w, budget, 1) { return 0 from proof_order_graph; } left.value < right.value || (left.value == right.value && proof_rank(index, budget, left.term) < proof_rank(index, budget, right.term)) };
     for i in 1..literals.len {
         if !proof_charge(w, budget, 1) { return 0; } let left = literals[i - 1]; let right = literals[i]; let equal = left.value == right.value;
         if !equal && target.tag == FACT_EQ { continue; }
-        let evidence = proof_evidence(b, w, budget, index, Fact { tag: if equal { FACT_EQ } else { FACT_LT }, left: left.term, right: right.term, .. }, RULE_LITERAL, scope, 0, [], []);
-        if evidence == 0 || !add_arc(left.term, right.term, if equal { 0 } else { 1 }, evidence) { return 0; }
-        if equal && !add_arc(right.term, left.term, 0, evidence) { return 0; }
+        let recipe = defer_evidence(Fact { tag: if equal { FACT_EQ } else { FACT_LT }, left: left.term, right: right.term, .. }, RULE_LITERAL, 0, 0);
+        if !add_arc(left.term, right.term, if equal { 0 } else { 1 }, 0, recipe) { return 0; }
+        if equal && !add_arc(right.term, left.term, 0, 0, recipe) { return 0; }
     }
     for e in active {
         if !proof_charge(w, budget, 1) || !id_ok(e, b.evidence.len) { return 0; }
         let f = b.facts[b.evidence[e].fact];
-        if f.tag == FACT_EQ || (target.tag != FACT_EQ && (f.tag == FACT_LT || f.tag == FACT_LE)) { if !add_arc(f.left, f.right, if f.tag == FACT_LT { 1 } else { 0 }, e) { return 0; } }
-        if f.tag == FACT_EQ { if !add_arc(f.right, f.left, 0, e) { return 0; } }
-        if target.tag != FACT_EQ && f.tag == FACT_SUB_FITS { let derived = proof_evidence(b, w, budget, index, Fact { tag: FACT_LE, left: f.right, right: f.left, .. }, RULE_SUB_FROM_LE, scope, 0, [], [e]); if derived == 0 || !add_arc(f.right, f.left, 0, derived) { return 0; } }
+        if f.tag == FACT_EQ || (target.tag != FACT_EQ && (f.tag == FACT_LT || f.tag == FACT_LE)) { if !add_arc(f.left, f.right, if f.tag == FACT_LT { 1 } else { 0 }, e, 0) { return 0; } }
+        if f.tag == FACT_EQ { if !add_arc(f.right, f.left, 0, e, 0) { return 0; } }
+        if target.tag != FACT_EQ && f.tag == FACT_SUB_FITS { let recipe = defer_evidence(Fact { tag: FACT_LE, left: f.right, right: f.left, .. }, RULE_SUB_FROM_LE, e, 0); if !add_arc(f.right, f.left, 0, 0, recipe) { return 0; } }
         if target.tag != FACT_EQ && f.tag == FACT_ADD_FITS {
-            for tid in terms { if !proof_charge(w, budget, 1) { return 0; } let term = b.terms[tid]; if term.tag != EXPR_MAX_MINUS || term.args.count != 1 { continue; } let operand = b.refs[term.args.start]; var premise = e; var lhs = f.left;
-                if operand == f.left { premise = proof_evidence(b, w, budget, index, Fact { tag: FACT_ADD_FITS, left: f.right, right: f.left, .. }, RULE_ADD_SYMMETRY, scope, 0, [], [e]); lhs = f.right; } else if operand != f.right { continue; }
-                let derived = proof_evidence(b, w, budget, index, Fact { tag: FACT_LE, left: lhs, right: tid as u32, .. }, RULE_ADD_FROM_COMPLEMENT, scope, 0, [], [premise]); if derived == 0 || !add_arc(lhs, tid as u32, 0, derived) { return 0; }
+            for tid in complements { if !proof_charge(w, budget, 1) { return 0; } let term = b.terms[tid]; let operand = b.refs[term.args.start]; var prerequisite: u32 = 0; var lhs = f.left;
+                if operand == f.left { prerequisite = defer_evidence(Fact { tag: FACT_ADD_FITS, left: f.right, right: f.left, .. }, RULE_ADD_SYMMETRY, e, 0); lhs = f.right; } else if operand != f.right { continue; }
+                let recipe = defer_evidence(Fact { tag: FACT_LE, left: lhs, right: tid, .. }, RULE_ADD_FROM_COMPLEMENT, if prerequisite == 0 { e } else { 0 }, prerequisite); if !add_arc(lhs, tid, 0, 0, recipe) { return 0; }
             }
         }
         if f.tag == FACT_EQ || (target.tag != FACT_EQ && (f.tag == FACT_LT || f.tag == FACT_LE)) {
-            var left_comp: u32 = 0; var right_comp: u32 = 0; for tid in terms { if !proof_charge(w, budget, 1) { return 0; } let term = b.terms[tid]; if term.tag == EXPR_MAX_MINUS && term.args.count == 1 { let operand = b.refs[term.args.start]; if operand == f.left { left_comp = tid as u32; } if operand == f.right { right_comp = tid as u32; } } }
-            if left_comp != 0 && right_comp != 0 { let derived = proof_evidence(b, w, budget, index, Fact { tag: f.tag, left: right_comp, right: left_comp, .. }, RULE_COMPLEMENT_ORDER, scope, 0, [], [e]); if derived == 0 || !add_arc(right_comp, left_comp, if f.tag == FACT_LT { 1 } else { 0 }, derived) { return 0; } if f.tag == FACT_EQ && !add_arc(left_comp, right_comp, 0, derived) { return 0; } }
-            let left = b.terms[f.left]; let right = b.terms[f.right]; if left.tag == EXPR_MAX_MINUS && right.tag == EXPR_MAX_MINUS && left.args.count == 1 && right.args.count == 1 { let x = b.refs[right.args.start]; let y = b.refs[left.args.start]; let derived = proof_evidence(b, w, budget, index, Fact { tag: f.tag, left: x, right: y, .. }, RULE_COMPLEMENT_ORDER, scope, 0, [], [e]); if derived == 0 || !add_arc(x, y, if f.tag == FACT_LT { 1 } else { 0 }, derived) { return 0; } }
+            let left_comp = key_index_get(complement_last, f.left); let right_comp = key_index_get(complement_last, f.right);
+            if left_comp != 0 && right_comp != 0 { let recipe = defer_evidence(Fact { tag: f.tag, left: right_comp, right: left_comp, .. }, RULE_COMPLEMENT_ORDER, e, 0); if !add_arc(right_comp, left_comp, if f.tag == FACT_LT { 1 } else { 0 }, 0, recipe) { return 0; } if f.tag == FACT_EQ && !add_arc(left_comp, right_comp, 0, 0, recipe) { return 0; } }
+            let left = b.terms[f.left]; let right = b.terms[f.right]; if left.tag == EXPR_MAX_MINUS && right.tag == EXPR_MAX_MINUS && left.args.count == 1 && right.args.count == 1 { let x = b.refs[right.args.start]; let y = b.refs[left.args.start]; let recipe = defer_evidence(Fact { tag: f.tag, left: x, right: y, .. }, RULE_COMPLEMENT_ORDER, e, 0); if !add_arc(x, y, if f.tag == FACT_LT { 1 } else { 0 }, 0, recipe) { return 0; } }
         }
+    }
+    if find_cycle {
+        // Iterative Tarjan uses only forward adjacency. The DFS and component
+        // stacks each contain at most one entry per tracked term. A completed
+        // component contradicts order only if one of its own edges is strict;
+        // strict edges crossing components do not establish a cycle.
+        var discovery: u32[>..] = []; var low: u32[>..] = []; var components: u32[>..] = [];
+        var on_stack: bool[>..] = []; var strict_components: bool[>..] = [];
+        for term in terms { if !proof_charge(w, budget, 1) { return 0; } discovery.push(0); low.push(0); components.push(0); on_stack.push(false); strict_components.push(false); }
+        var walk: ProofWalk[>..] = []; var component_stack: u32[>..] = [];
+        var serial: u32 = 0; var component: u32 = 0;
+        for term, root in terms {
+            if !proof_charge(w, budget, 1) { return 0; } if discovery[root] != 0 { continue; }
+            serial++; discovery[root] = serial; low[root] = serial; on_stack[root] = true;
+            component_stack.push(root as u32); walk.push(ProofWalk { node: root as u32, next: heads[root] });
+            while walk.len != 0 {
+                if !proof_charge(w, budget, 1) { return 0; } let at = walk.len - 1; let top = walk[at];
+                if top.next != 0 {
+                    let edge = arcs[top.next]; walk[at].next = edge.next;
+                    if discovery[edge.to] == 0 {
+                        serial++; discovery[edge.to] = serial; low[edge.to] = serial; on_stack[edge.to] = true;
+                        component_stack.push(edge.to); walk.push(ProofWalk { node: edge.to, next: heads[edge.to] });
+                    } else if on_stack[edge.to] { low[top.node] = min(low[top.node], discovery[edge.to]); }
+                    continue;
+                }
+                walk.resize(at);
+                if low[top.node] == discovery[top.node] {
+                    component++;
+                    loop {
+                        if !proof_charge(w, budget, 1) { return 0; }
+                        let last = component_stack.len - 1; let node = component_stack[last]; component_stack.resize(last);
+                        components[node] = component; on_stack[node] = false; if node == top.node { break; }
+                    }
+                }
+                if walk.len != 0 {
+                    if !proof_charge(w, budget, 1) { return 0; }
+                    let parent = walk[walk.len - 1].node; low[parent] = min(low[parent], low[top.node]);
+                }
+            }
+        }
+        for first, from in heads {
+            if !proof_charge(w, budget, 1) { return 0; } var arc = first;
+            while arc != 0 { if !proof_charge(w, budget, 1) { return 0; } let edge = arcs[arc]; if edge.strict != 0 && components[from] == components[edge.to] { strict_components[components[from] - 1] = true; } arc = edge.next; }
+        }
+        var root: u32 = 0;
+        for evidence in active {
+            if !proof_charge(w, budget, 1) { return 0; } let fact = b.facts[b.evidence[evidence].fact];
+            if fact.tag == FACT_LT && strict_components[components[key_index_get(positions, fact.left) - 1] - 1] { root = fact.left; break; }
+        }
+        if root == 0 { return 0; } target = Fact { tag: FACT_LT, left: root, right: root, .. };
     }
     let start = (key_index_get(positions, target.left) - 1) * 2; queue.push(start); predecessor[start] = start + 1;
     var head: i64 = 0; var found: u32 = 0;
@@ -106,7 +182,7 @@ fn proof_order(b: CoreBuilder, w: Work&, budget: ProofBudget, index: ProofIndex,
         let state = queue[head]; head++; let from = state / 2; let strict = state % 2;
         if terms[from] == target.right && (target.tag == FACT_LE || target.tag == FACT_EQ || strict == 1) { found = state + 1; break; }
         var cursor = heads[from];
-        while cursor != 0 { if !proof_charge(w, budget, 1) { return 0; } let arc = arcs[cursor]; let destination = arc.to * 2 + (strict | arc.strict); if predecessor[destination] == 0 { predecessor[destination] = state + 1; via[destination] = arc.evidence; queue.push(destination); } cursor = arc.next; }
+        while cursor != 0 { if !proof_charge(w, budget, 1) { return 0; } let arc = arcs[cursor]; let destination = arc.to * 2 + (strict | arc.strict); if predecessor[destination] == 0 { predecessor[destination] = state + 1; via[destination] = cursor; queue.push(destination); } cursor = arc.next; }
     }
     if found == 0 { return 0; }
     var path: u32[>..] = []; var destinations: u32[>..] = []; var cursor = found - 1;
@@ -114,7 +190,9 @@ fn proof_order(b: CoreBuilder, w: Work&, budget: ProofBudget, index: ProofIndex,
     var result = proof_evidence(b, w, budget, index, Fact { tag: if target.tag == FACT_EQ { FACT_EQ } else { FACT_LE }, left: target.left, right: target.left, .. }, RULE_REFLEXIVE, scope, 0, [], []);
     var current = target.left; var strict = false; var i = path.len;
     while i > 0 {
-        i--; var step = path[i]; let destination = destinations[i]; let f = b.facts[b.evidence[step].fact];
+        if !proof_charge(w, budget, 1) { return 0; }
+        i--; let arc = arcs[path[i]]; var step = if arc.evidence != 0 { arc.evidence } else { materialize(arc.recipe) };
+        if step == 0 { return 0; } let destination = destinations[i]; let f = b.facts[b.evidence[step].fact];
         if f.tag == FACT_EQ && f.left != current {
             let identity = proof_evidence(b, w, budget, index, Fact { tag: FACT_EQ, left: current, right: current, .. }, RULE_REFLEXIVE, scope, 0, [], []);
             step = proof_evidence(b, w, budget, index, Fact { tag: FACT_EQ, left: current, right: destination, .. }, RULE_EQUALITY, scope, 0, [], [step, identity]);
@@ -126,6 +204,17 @@ fn proof_order(b: CoreBuilder, w: Work&, budget: ProofBudget, index: ProofIndex,
     }
     return result;
 }
+fn proof_order(b: CoreBuilder, w: Work&, budget: ProofBudget, index: ProofIndex, scope: u32, active: const u32[:], target: Fact) -> u32 {
+    proof_order_graph(b, w, budget, index, scope, active, target, false)
+}
+fn proof_cycle(b: CoreBuilder, w: Work&, budget: ProofBudget, index: ProofIndex, scope: u32, active: const u32[:]) -> u32 {
+    for evidence in active {
+        if !proof_charge(w, budget, 1) || !id_ok(evidence, b.evidence.len) { return 0; } let fact = b.facts[b.evidence[evidence].fact];
+        if fact.tag == FACT_LT { return proof_order_graph(b, w, budget, index, scope, active, Fact { tag: FACT_LT, left: fact.left, right: fact.left, .. }, true); }
+    }
+    return 0;
+}
+
 fn proof_numeric_value(b: CoreBuilder, w: Work&, budget: ProofBudget, index: ProofIndex, value: u32) -> u32 {
     let v = b.values[value]; if v.op != 0 && b.ops[v.op].tag == OP_U32 { return proof_term(b, w, budget, index, Term { tag: EXPR_LITERAL, type_id: v.type_id, literal: b.ops[v.op].imm0, .. }); }
     return proof_term(b, w, budget, index, Term { tag: EXPR_VALUE, type_id: v.type_id, value: value, version: v.version, scope: v.scope, .. });

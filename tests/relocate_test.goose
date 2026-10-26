@@ -59,3 +59,28 @@ fn test_relocation_proofs() {
     };
     print("CACHE-02 relocated finite loop retains independent entry/induction/exhaustion evidence");
 }
+
+fn test_relocation_sparse_growth() {
+    var source: u8[>..] = []; source.append("pub let run: U32 -> U32 ! {} resources {depth:1,frame:0} = fn value => do:\n");
+    for i in 128 { source.append(str("  let item", i, " = U32.wrapping_add(value,", i, ")\n")); }
+    source.append("  return item127\n");
+    with_core() { old =>
+        var work=Work{..}; var diags:Diagnostic[>..]=[];
+        assert(frontend_complete(source,"sparse-relocate",old,work,diags)); assert(seal_completion(old));
+        // Unreachable rows in a large revision must not enter the copied graph.
+        for i in 8192 { old.types.push(TypeNode {tag:TY_U32,..}); }
+        validator_expect(old,true,0);
+        with_core() { target =>
+            var tw=Work{..}; assert(frontend_complete(source,"sparse-relocate",target,tw,diags)); assert(seal_completion(target));
+            let types_before=target.types.len; let ops_before=target.ops.len; let terms_before=target.terms.len;
+            target.definitions[1].function=0;
+            var rw=Work{..}; assert(relocation::relocate_function(core_view(old),1,target,1,[],rw));
+            validator_expect(target,true,0);
+            assert(target.types.len==types_before && target.ops.len==ops_before*2-1 && target.terms.len==terms_before);
+            let f=target.functions[target.definitions[1].function];
+            let last=target.blocks[target.refs[f.blocks.start]].term;
+            assert(target.values[target.terminators[last].subject].block_id==target.refs[f.blocks.start]);
+        };
+    };
+    print("CACHE-02 sparse relocation grows across arenas, preserves term order and excludes unrelated rows");
+}

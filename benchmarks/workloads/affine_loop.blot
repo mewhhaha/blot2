@@ -1,0 +1,11 @@
+let scale: F32 -> F32 ! {} resources {depth: 1, frame: 0} =
+  fn value => return value * 1.0001
+let offset: F32 -> F32 ! {} resources {depth: 1, frame: 0} =
+  fn value => return value + 0.5
+let transform: F32 -> F32 ! {} resources {depth: 2, frame: 0} =
+  fn value => return offset(scale(value))
+
+pub let run: F32 -> F32 ! {} resources {depth: 3, frame: 512} = fn seed => do:
+  let answer = for i in 0..128 carry (value = seed) do:
+    next (transform(value))
+  return answer

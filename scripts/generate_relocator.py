@@ -63,6 +63,7 @@ b='''// Generated explicit table relocation; runtime implementation is Goose onl
 namespace relocation;
 import src.model;
 import src.canonical;
+import std;
 struct Projection { source_definition:u32, target_definition:u32 }
 struct Ref { table:u32, id:u32 }
 struct Pair { table:u32, source:u32, target:u32 }
@@ -81,20 +82,42 @@ fn relocate_function(source:Core, source_definition:u32, target:CoreBuilder, tar
     let original=source.definitions[source_definition]; let replacement=target.definitions[target_definition];
     if original.kind != DEF_FUNCTION || replacement.kind != DEF_FUNCTION || original.function == 0 || replacement.function != 0 || replacement.type_id == 0 {{ return false; }}
 '''
-for n,t in tables:b+=f'    var map_{n}:u32[>..]=[]; for row in source.{n} {{ map_{n}.push(0); }}\n'
-b+='''    var queue:Ref[>..]=[]; var paired:Pair[>..]=[];
+b+='''    // Sparse keys include their table: equal numeric IDs in different arenas
+    // are distinct. Only the reached graph occupies workspace.
+    var mappings:Pair[>..]=[]; var slots:u32[>..]=[0;64];
+    var queue:Ref[>..]=[]; var paired:Pair[>..]=[]; var prepared=false;
     fn tick() { if !charge(work,1,LIMIT_VISITS) { return false from relocate_function; } }
+    fn hash_key(table:u32,id:u32) -> u32 { return (id * 16777619) ^ (table * 2654435761); }
+    fn locate(table:u32,id:u32) -> u32 {
+        var slot=hash_key(table,id) & (slots.len as u32-1);
+        // Insertion bounds each successful key's displacement. Lookups after
+        // preparation cannot exhaust optional work after target mutation.
+        for probe in 128 {
+            if !prepared { tick(); }
+            if slots[slot]==0 { return slot; }
+            let row=mappings[slots[slot]-1];
+            if row.table==table && row.source==id { return slot; }
+            slot=(slot+1)&(slots.len as u32-1);
+        }
+        if prepared { assert(false); } return false from relocate_function;
+    }
     fn mapped(table:u32,id:u32) -> u32 {
-        if id == 0 || table == 0 { return id; }
-'''
-for n,t in tables:b+=f'        if table == {tags[n]} {{ return map_{n}[id]; }}\n'
-b+='''        return 0;
+        if id==0 || table==0 { return id; }
+        let slot=locate(table,id); return if slots[slot]==0 { 0 } else { mappings[slots[slot]-1].target };
     }
     fn assign(table:u32,id:u32,value:u32) {
+        let slot=locate(table,id);
+        if slots[slot]!=0 { mappings[slots[slot]-1].target=value; return; }
+        assert(!prepared);
+        if (mappings.len+1)*2>slots.len {
+            if slots.len==1048576 { return false from relocate_function; }
+            let capacity=slots.len*2; slots.resize(0); for i in capacity { slots.push(0); }
+            for row,index in mappings { let next=locate(row.table,row.source); slots[next]=index as u32+1; }
+        }
+        let next=locate(table,id); mappings.push(Pair {table,id,value}); slots[next]=mappings.len as u32;
+    }
 '''
-for n,t in tables:b+=f'        if table == {tags[n]} {{ map_{n}[id]=value; return; }}\n'
-b+='''    }
-    fn pair(table:u32,a:u32,b:u32) {
+b+='''    fn pair(table:u32,a:u32,b:u32) {
         tick(); if a == 0 || b == 0 { if a != b { return false from relocate_function; } return; }
         let old=mapped(table,a); if old != 0 { if old != b { return false from relocate_function; } return; }
         assign(table,a,b); paired.push(Pair {table,a,b});
@@ -193,10 +216,14 @@ b+='''    }
     // No optional decline occurs after this point. The owning build transaction
     // handles process allocation failure and atomically publishes only validation.
 '''
-# Assign all maps and reserve destinations except terms copied afterward with exact intern.
+# No new map keys are inserted after preparation. Sorting the reached queue
+# preserves the previous destination numbering without scanning source arenas.
+b+='''    sort(queue[..]) {a,z=>a.table<z.table || (a.table==z.table && a.id<z.id)};
+    prepared=true;
+'''
 for n,t in tables:
  if n in ('modules','definitions','terms'):continue
- b+=f'''    for value,id in map_{n} {{ if value == PENDING {{ map_{n}[id]=target.{n}.len as u32; target.{n}.push({t} {{..}}); }} }}\n'''
+ b+=f'''    for item in queue {{ if item.table == {tags[n]} {{ assign({tags[n]},item.id,target.{n}.len as u32); target.{n}.push({t} {{..}}); }} }}\n'''
 b+='''    fn span(table:u32,old:Span) -> Span {
         let result=Span {start:target.refs.len as u32,count:old.count};
         for i in old.count { target.refs.push(mapped(table,source.refs[old.start+i])); } return result;
@@ -206,8 +233,8 @@ b+='''    fn span(table:u32,old:Span) -> Span {
     }
 '''
 # Terms original order is guaranteed topological, preserve and intern source IDs in new graph.
-b+='''    for old,id in source.terms {
-        if id == 0 || map_terms[id] != PENDING { continue; }
+b+='''    for item in queue {
+        if item.table != 26 { continue; } let id=item.id; let old=source.terms[id];
         var row=old;
 '''
 for f,ty in structs['Term']:
@@ -243,6 +270,13 @@ b+='''    target.definitions[target_definition].function=map_functions[original.
     return true;
 }
 '''
+# Rewrite the explicit arena spelling into exact sparse key operations.
+for name, table_id in tags.items():
+ pattern=r'map_'+name+r'\[([^\[\]]*(?:\[[^\[\]]*\][^\[\]]*)*)\]'
+ # Nested expressions in this generated source are at most one bracket deep.
+ b=re.sub(pattern+r'=([^;]+);',lambda m:f'assign({table_id},{m[1]},{m[2]});',b)
+ b=re.sub(pattern,lambda m:f'mapped({table_id},{m[1]})',b)
+if re.search(r'map_\w+',b): raise RuntimeError('unconverted relocation map')
 destination=root/'src/relocate.goose'
 if '--check' in sys.argv:
     if not destination.exists() or destination.read_text()!=b:
