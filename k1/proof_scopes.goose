@@ -163,18 +163,19 @@ fn add(job: Job&, scope: Handle, first: Handle, second: Handle) -> Result {
 }
 // Scope closure discharges facts newest-first, after all child scopes close.
 // A failure is terminal even if earlier discharges already changed the meter.
-fn close(job: Job&, scope: Handle) -> Result {
+fn close_at(job: Job&, scope: Handle, phase: u32) -> Result {
     if job.failed { return Result { status: 1 }; }
-    var r = work::charge(job.meter, 4, 20);
+    if phase < 4 || phase > 7 { return invalid(job); }
+    var r = work::charge(job.meter, phase, 20);
     if r.status != 0 { return meter_failed(job, r); }
     if !scope_valid(job, scope) || job.entries[scope.index - 1].scope.children != 0 { return invalid(job); }
     var head = job.entries[scope.index - 1].scope.head;
     while !none(head) {
-        r = work::charge(job.meter, 4, 20);
+        r = work::charge(job.meter, phase, 20);
         if r.status != 0 { return meter_failed(job, r); }
         if !fact_valid(job, head) { return invalid(job); }
         if job.entries[head.index - 1].fact.dependents != 0 { return invalid(job); }
-        r = work::charge(job.meter, 4, 20); if r.status != 0 { return meter_failed(job, r); }
+        r = work::charge(job.meter, phase, 20); if r.status != 0 { return meter_failed(job, r); }
         if !same(job.entries[head.index - 1].fact.scope, scope) { return invalid(job); }
         let links = job.entries[head.index - 1].fact.links;
         if links > 3 { return invalid(job); }
@@ -183,9 +184,9 @@ fn close(job: Job&, scope: Handle) -> Result {
             if slot == 1 && (links & 2) == 0 { continue; }
             // Charge the edge before reading its handle, then the referenced
             // proof record before inspecting it. Zero slots are not edges.
-            r = work::charge(job.meter, 4, 20); if r.status != 0 { return meter_failed(job, r); }
+            r = work::charge(job.meter, phase, 20); if r.status != 0 { return meter_failed(job, r); }
             let prior = if slot == 0 { job.entries[head.index - 1].fact.first } else { job.entries[head.index - 1].fact.second };
-            r = work::charge(job.meter, 4, 20); if r.status != 0 { return meter_failed(job, r); }
+            r = work::charge(job.meter, phase, 20); if r.status != 0 { return meter_failed(job, r); }
             if !fact_valid(job, prior) || job.entries[prior.index - 1].fact.dependents == 0 || job.meter.proof_edges == 0 { return invalid(job); }
             job.entries[prior.index - 1].fact.dependents -= 1;
             job.meter.proof_edges -= 1;
@@ -201,9 +202,9 @@ fn close(job: Job&, scope: Handle) -> Result {
         job.entries[scope.index - 1].scope.head = head;
     }
     if job.entries[scope.index - 1].scope.has_parent {
-        r = work::charge(job.meter, 4, 20); if r.status != 0 { return meter_failed(job, r); }
+        r = work::charge(job.meter, phase, 20); if r.status != 0 { return meter_failed(job, r); }
         let parent = job.entries[scope.index - 1].scope.parent;
-        r = work::charge(job.meter, 4, 20); if r.status != 0 { return meter_failed(job, r); }
+        r = work::charge(job.meter, phase, 20); if r.status != 0 { return meter_failed(job, r); }
         if !scope_valid(job, parent) || job.entries[parent.index - 1].scope.children == 0 { return invalid(job); }
         job.entries[parent.index - 1].scope.children -= 1;
     }
@@ -213,3 +214,6 @@ fn close(job: Job&, scope: Handle) -> Result {
     job.free = scope.index;
     return Result {};
 }
+
+// Existing callers close their proof scopes in the proof phase.
+fn close(job: Job&, scope: Handle) -> Result { return close_at(job, scope, 4); }

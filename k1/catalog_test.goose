@@ -72,6 +72,11 @@ fn main() {
     require(less.known && less.pure && less.operands == "(U32,U32)" &&
             less.result == "Bool" && less.lowering == "i32.lt_u" && !less.may_fail,
             "unsigned less-than contract");
+    let add = catalog::operation("k1.u32.add_checked.v1");
+    require(add.known && add.pure && !add.may_fail && add.result == "U32" &&
+            add.operands == "(U32,U32) with checked AddFits evidence" && add.lowering == "i32.add" &&
+            add.propositions == "AddFits(left,right) required before lowering; result is a distinct value",
+            "checked addition requires evidence before lowering");
     require(!catalog::operation("").known && !catalog::operation("k1.u32.add.v1").known,
             "unknown operation rejected");
     print("catalog tests passed");

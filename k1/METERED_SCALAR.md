@@ -67,7 +67,7 @@ plan, geometry, emitter and verifier. It splits parser construction from its
 internal verification so both existing independent checks execute in phase 2.
 Tests compare emitted bytes and all phase counts with the compatibility
 pipeline and exhaust every semantic budget point; no bytes return on failure.
-The command-line fixture has not yet switched to this scheduled driver. This
+The private command-line scalar fixture uses this scheduled driver. This
 mechanism does not prove that a phase performed all mandatory checks and does
 not prevent trusted internal code from altering its in-memory meter.
 
@@ -77,16 +77,18 @@ children must close first and dependent facts discharge in reverse construction
 order. Generation-tagged, job-local handles reject stale and unrelated-scope
 references. A fact supports at most two prerequisites. A failed job is terminal
 and partial scratch constructions are not published. This is accounting
-machinery only: handles are not cross-job or artifact authority, proof rules
-are not verified, and this job is not yet integrated with the scheduler or the
-existing add-proof fixture. Successful standalone tests do not establish
-complete proof accounting.
+machinery only: handles are not cross-job or artifact authority. The scoped
+checked-add path independently validates its proof and uses this job through
+its final consumer; the private add-fixture driver now uses that path. Its
+parser and Wasm encoder still perform unmetered work, and it uses a
+compatibility meter rather than the phase scheduler. Successful tests do not
+establish complete proof accounting.
 
 The separate module, checked-add and control-flow fixtures do not yet use
-this shared job. Some helpers, type/effect/usage traversal, static evaluation,
+the scheduled scalar job. Some helpers, type/effect/usage traversal, static evaluation,
 source and target byte telemetry, and target encoding remain outside the
-partial scalar accounting. The existing proof fixture does not yet integrate
-scope-safe active-proof-edge discharge or the opt-in phase scheduler. No complete receipt, cache
+partial scalar accounting. The checked-add fixture integrates scope-safe edge
+discharge but not the opt-in phase scheduler. No complete receipt, cache
 equivalence, fault qualification, required telemetry or public K1 admission is
 claimed. The production path must integrate and test each remaining required
 traversal before a shared semantic budget can be reported as established.

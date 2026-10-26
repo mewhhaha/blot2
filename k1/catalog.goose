@@ -69,7 +69,7 @@ fn source_diagnostic(status: i64) -> u8[:] {
 }
 
 // The parameter and return terminator are not primitive operations. This
-// registry covers only the scalar operations in the frozen fixture schema,
+// registry covers only the scalar operations in the experimental fixtures,
 // not the complete K1 operation registry. IDs are local to this
 // experimental in-memory representation and are not serialized artifact IDs.
 struct Operation {
@@ -134,6 +134,18 @@ fn operation(id: u8[:]) -> Operation {
             ownership: "no affine transition", initialization: "produces an initialized scalar",
             failure: "none", target: "Wasm32 i32; Bool is 0 or 1",
             evaluation: "unsigned less-than", lowering: "i32.lt_u"
+        };
+    }
+    if id == "k1.u32.add_checked.v1" {
+        return Operation {
+            known: true, pure: true, id: "k1.u32.add_checked.v1",
+            operands: "(U32,U32) with checked AddFits evidence", result: "U32",
+            effects: "pure; no reads, writes, runtime failure, divergence, reservation, ownership, identity or cleanup",
+            propositions: "AddFits(left,right) required before lowering; result is a distinct value",
+            ownership: "no affine transition", initialization: "produces an initialized scalar",
+            failure: "unproved source is rejected before lowering; no runtime overflow fallback",
+            target: "Wasm32 i32 addition after independently validated no-overflow evidence",
+            evaluation: "mathematical unsigned addition in U32 range", lowering: "i32.add"
         };
     }
     return Operation {};

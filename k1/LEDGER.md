@@ -11,7 +11,7 @@ legacy remains default. This ledger records evidence, not completion claims.
 | K1-01 syntax and completion | Not complete | The private fixture additionally builds and checks an owned lexer-to-scalar syntax snapshot. Full grammar, explicit exits, formatter/editor and round-trip laws remain. |
 | K1-02 checked scalar Core | Not complete | The private scalar driver validates transient value-only interface, function and lowering-plan records. Canonical owned artifacts, full independent validation, stable identity, proof/effect/resource data and post-sealing inference guard remain. |
 | K1-03 proofs and Index | Not complete | A standalone bounded ordering graph model trusts caller-supplied facts; source authority, independently validated evidence, exact required proofs and Index remain. |
-| K1-04 scoped storage and particle | Not complete | A standalone pool-state model is tested with trusted slot/bitmap state. Runtime integration, ownership/loan preconditions, destinations/builders, failure paths and executed Wasm particle remain. |
+| K1-04 scoped storage and particle | Not complete | Pool and builder models and hand-emitted Wasm particle experiments exist. Source lowering, checked ownership/loan preconditions, typed failure cleanup, global ownership validation and the I08 acceptance workload remain. |
 | K1-05 relational packages | Not started | Generative domain and stored endpoint laws remain. |
 | K1-06 functions and frames | Not started | Closure capture, placement and finite resource contracts remain. |
 | K1-07 ownership and bridge | Not started | Whole-region Owned and copy-only host bridge remain. |
@@ -21,10 +21,26 @@ legacy remains default. This ledger records evidence, not completion claims.
 
 ## Additional experimental models
 
+An executed private Wasm pool/builder experiment and a hand-emitted particle
+projection exercise scoped storage and complete-row publication. They do not
+come from admitted K1 source or prove the I08 loop invariant. A private
+fixed-U32 copy bridge is exercised as both a native model and an emitted Wasm
+fixture; neither is the complete M12 bridge or qualified host API. A retained
+scalar experiment checks exact observations and simulated rollback but still
+recompletes every source; actual reuse and allocation-failure atomicity are
+not implemented. The private flow parser has expanded expression and lexical
+break coverage; a separate narrow Bool-to-U32 slice checks names and types and
+emits Wasm, while general resolution, effects and lowering remain. A Linux
+descriptor-relative source resolver can read below a trusted live package root;
+it is not yet integrated with project configuration or an import graph, and
+its platform, mutable-file and handle-lifetime limits are documented in
+`SOURCE_RESOLVER.md`.
+
 The scalar fixture uses an experimental shared work meter; the separate
 fixtures do not yet share it. The meter has no compiler-wide integration or
-durable receipt. The existing add-proof fixture does not discharge proof edges
-by scope, so it can over-reject. The public-interface model checks a narrow candidate
+durable receipt. The private checked-add fixture now discharges its scoped
+proof edges after the last consumer, but its parser and encoder remain
+unmetered and its handles are not portable. The public-interface model checks a narrow candidate
 and producer tuple but does not publish a complete interface or establish its
 portable hash and dependencies. The manifest validator checks in-memory
 geometry only, with local choices for empty regions and minimal page count; it
@@ -42,7 +58,14 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
-On this working-tree revision, `GOOSE=/tmp/k1-goose/build/goose
+A subsequent working-tree run of `GOOSE=/tmp/k1-goose/build/goose
+GOOSE_HOME=/tmp/k1-goose-home sh k1/test.sh` passed (exit 0), including the
+private whole-declaration flow path, scoped checked-add proof, source resolver,
+F32 expression oracle, pool/builder and particle Wasm witnesses, and copy-bridge
+fixtures at `-O0` and `-O2`. This remains a fixture suite, not the K1 rollout
+gate. The public K1 build and check commands remain unavailable.
+
+At checkpoint `55310e1dd29e769155e9a4d86a750a614169f245`, `GOOSE=/tmp/k1-goose/build/goose
 GOOSE_HOME=/tmp/k1-goose-home sh k1/test.sh` passed (exit 0), including the
 registered Goose `-O0`/`-O2` component tests and Node execution witnesses.
 The suite includes the independently checked fixed ABI record component,
@@ -52,8 +75,8 @@ they do not complete public K1 admission, the ABI profile, semantic-work
 accounting, or rollout qualification. A preceding run failed to compile an
 oversized snapshot test; that test was corrected before the passing run.
 The source identity model does not open paths or establish filesystem authority.
-The scheduled scalar pipeline is not wired into the CLI, and byte telemetry
-remains incomplete. The fixed ABI records are a proposed component, not a
+The scheduled scalar pipeline is now wired into the private CLI fixture, and
+byte telemetry remains incomplete. The fixed ABI records are a proposed component, not a
 complete profile or ABI digest.
 
 The persistent scalar validator test was run with
@@ -100,10 +123,10 @@ ownership, loans, or runtime qualification. A private Wasm pool guest fixture
 is also executed independently; it exports memory for tests, does not validate
 forged cross-owner metadata, and is not a runtime certificate. The builder model relies on a
 single shared clock and compiler-proven destination and loan authority. The experimental catalog covers version
-labels, diagnostic categories and only the three scalar fixture operations;
+labels, diagnostic categories and a few scalar fixture operations;
 it is not the complete K1 operation registry. A private `add-fixture` exercises AddFits for a parameter plus zero and
-revalidates its source, proof and plan before emitting i32.add. Its fixed
-owner/scope and mutable work counters cannot establish cross-compile provenance;
+revalidates its source, proof and plan before emitting i32.add. Its job-local
+scope handles and mutable work counters cannot establish cross-compile provenance;
 the rest of the compiler does not share a complete semantic traversal meter.
 No cache/imported proof is admitted and this does not establish K1-03 coverage.
 

@@ -65,50 +65,56 @@ fn build(s: add_proof::Subject, job: AddJob&) -> Built {
 // Repeat validation in phase 5 (semantic), 6 (plan), or 7 (emission).
 // All 10 visits are charged again. The term/edge inventory is only a local
 // sanity check; it is not an authentication of imported or stale evidence.
-fn validate(p: add_proof::Proof, expected: add_proof::Subject,
-            job: AddJob&, phase: u32) -> Checked {
-    let before = job.meter.proof_visits;
+fn validate_meter(p: add_proof::Proof, expected: add_proof::Subject,
+                  meter: work::Meter&, phase: u32) -> Checked {
+    let before = meter.proof_visits;
     if phase < 5 || phase > 7 { return Checked { status: 4 }; }
-    var r = work::charge(job.meter, phase, 20);
-    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: job.meter.proof_visits - before }; }
-    if job.meter.proof_terms < 4 || job.meter.proof_edges < 5 || !add_proof::valid_subject(expected) ||
+    var r = work::charge(meter, phase, 20);
+    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: meter.proof_visits - before }; }
+    if meter.proof_terms < 4 || meter.proof_edges < 5 || !add_proof::valid_subject(expected) ||
        !add_proof::same_subject(p.subject, expected) || p.schema != 1 || p.semantic_policy != 1 ||
-       p.term_count != 4 || p.node_count != 3 || p.conclusion != 3 { return Checked { status: 1, visits: job.meter.proof_visits - before }; }
-    r = work::charge(job.meter, phase, 20);
-    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: job.meter.proof_visits - before }; }
+       p.term_count != 4 || p.node_count != 3 || p.conclusion != 3 { return Checked { status: 1, visits: meter.proof_visits - before }; }
+    r = work::charge(meter, phase, 20);
+    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: meter.proof_visits - before }; }
     if !add_proof::same_term(p.terms[0], add_proof::Term { kind: 1, owner: expected.owner, scope: expected.scope,
-        value: expected.parameter, version: expected.parameter_version }) { return Checked { status: 1, visits: job.meter.proof_visits - before }; }
-    r = work::charge(job.meter, phase, 20);
-    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: job.meter.proof_visits - before }; }
+        value: expected.parameter, version: expected.parameter_version }) { return Checked { status: 1, visits: meter.proof_visits - before }; }
+    r = work::charge(meter, phase, 20);
+    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: meter.proof_visits - before }; }
     if !add_proof::same_term(p.terms[1], add_proof::Term { kind: 2, owner: expected.owner, scope: expected.scope,
-        value: expected.zero, version: expected.zero_version, literal: 0 }) { return Checked { status: 1, visits: job.meter.proof_visits - before }; }
-    r = work::charge(job.meter, phase, 20);
-    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: job.meter.proof_visits - before }; }
+        value: expected.zero, version: expected.zero_version, literal: 0 }) { return Checked { status: 1, visits: meter.proof_visits - before }; }
+    r = work::charge(meter, phase, 20);
+    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: meter.proof_visits - before }; }
     if !add_proof::same_term(p.terms[2], add_proof::Term { kind: 3, owner: expected.owner, scope: expected.scope,
-        literal: 4294967295 }) { return Checked { status: 1, visits: job.meter.proof_visits - before }; }
-    r = work::charge(job.meter, phase, 20);
-    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: job.meter.proof_visits - before }; }
-    if !add_proof::same_term(p.terms[3], add_proof::Term { kind: 4, owner: expected.owner, scope: expected.scope, base: 2 }) { return Checked { status: 1, visits: job.meter.proof_visits - before }; }
-    r = work::charge(job.meter, phase, 20);
-    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: job.meter.proof_visits - before }; }
-    if !add_proof::same_node(p.nodes[0], add_proof::Node { rule: 1, owner: expected.owner, scope: expected.scope, left: 1, right: 3 }) { return Checked { status: 1, visits: job.meter.proof_visits - before }; }
-    r = work::charge(job.meter, phase, 20);
-    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: job.meter.proof_visits - before }; }
-    if !add_proof::same_node(p.nodes[1], add_proof::Node { rule: 2, owner: expected.owner, scope: expected.scope, left: 4, right: 3 }) { return Checked { status: 1, visits: job.meter.proof_visits - before }; }
-    r = work::charge(job.meter, phase, 20);
-    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: job.meter.proof_visits - before }; }
+        literal: 4294967295 }) { return Checked { status: 1, visits: meter.proof_visits - before }; }
+    r = work::charge(meter, phase, 20);
+    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: meter.proof_visits - before }; }
+    if !add_proof::same_term(p.terms[3], add_proof::Term { kind: 4, owner: expected.owner, scope: expected.scope, base: 2 }) { return Checked { status: 1, visits: meter.proof_visits - before }; }
+    r = work::charge(meter, phase, 20);
+    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: meter.proof_visits - before }; }
+    if !add_proof::same_node(p.nodes[0], add_proof::Node { rule: 1, owner: expected.owner, scope: expected.scope, left: 1, right: 3 }) { return Checked { status: 1, visits: meter.proof_visits - before }; }
+    r = work::charge(meter, phase, 20);
+    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: meter.proof_visits - before }; }
+    if !add_proof::same_node(p.nodes[1], add_proof::Node { rule: 2, owner: expected.owner, scope: expected.scope, left: 4, right: 3 }) { return Checked { status: 1, visits: meter.proof_visits - before }; }
+    r = work::charge(meter, phase, 20);
+    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: meter.proof_visits - before }; }
     // Validate the conclusion record without inspecting prerequisite IDs yet.
     if p.nodes[2].rule != 3 || p.nodes[2].owner != expected.owner ||
        p.nodes[2].scope != expected.scope || p.nodes[2].left != 1 || p.nodes[2].right != 2 ||
        p.nodes[2].operation_result != expected.result ||
        p.nodes[2].operation_version != expected.result_version {
-        return Checked { status: 1, visits: job.meter.proof_visits - before };
+        return Checked { status: 1, visits: meter.proof_visits - before };
     }
-    r = work::charge(job.meter, phase, 20);
-    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: job.meter.proof_visits - before }; }
-    if p.nodes[2].prior1 != 1 { return Checked { status: 1, visits: job.meter.proof_visits - before }; }
-    r = work::charge(job.meter, phase, 20);
-    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: job.meter.proof_visits - before }; }
-    if p.nodes[2].prior2 != 2 { return Checked { status: 1, visits: job.meter.proof_visits - before }; }
-    return Checked { visits: job.meter.proof_visits - before };
+    r = work::charge(meter, phase, 20);
+    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: meter.proof_visits - before }; }
+    if p.nodes[2].prior1 != 1 { return Checked { status: 1, visits: meter.proof_visits - before }; }
+    r = work::charge(meter, phase, 20);
+    if r.status != 0 { return Checked { status: category(r), receipt: r, visits: meter.proof_visits - before }; }
+    if p.nodes[2].prior2 != 2 { return Checked { status: 1, visits: meter.proof_visits - before }; }
+    return Checked { visits: meter.proof_visits - before };
+}
+
+// Compatibility wrapper for the original one-proof fixture.
+fn validate(p: add_proof::Proof, expected: add_proof::Subject,
+            job: AddJob&, phase: u32) -> Checked {
+    return validate_meter(p, expected, job.meter, phase);
 }

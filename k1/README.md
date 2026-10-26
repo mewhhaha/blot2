@@ -49,9 +49,9 @@ ZIG=/absolute/path/to/zig GOOSE=/absolute/path/to/goose ./k1/test_blake3.sh
 The oracle is test-only. Neither the Goose implementation nor the compiler
 uses Zig at runtime; `test.sh` does not require the Zig oracle.
 
-The internal driver accepts `k1/build/blot-k1 fixture INPUT [--trace]` and
-`k1/build/blot-k1 module-fixture INPUT [--trace]`, and
-`k1/build/blot-k1 add-fixture INPUT [--trace]`. All write hex-encoded
+The internal driver accepts `k1/build/blot-k1 fixture INPUT [--trace]`,
+`module-fixture`, `add-fixture`, `control-fixture`, `flow-fixture`, and `public-fixture`
+with the same arguments. All write hex-encoded
 experimental Wasm to standard output and optional phase messages to standard
 error; none writes an output file. Only use them for fixture testing. The
 module fixture supports up to 256 top-level U32-to-U32 functions with direct
@@ -59,13 +59,20 @@ calls, U32 atoms and bitwise AND. Call depth is limited to 128; recursion,
 Bool functions, imports, captures and other syntax are rejected. Its private
 function exports are test instrumentation, not the public K1 host bridge.
 The checked-add fixture supports only a U32 parameter plus literal zero and
-revalidates its proof and plan within one invocation. Its fixed owner/scope
-and mutable work counters do not establish cross-compile provenance, and the
+revalidates its proof and plan within one invocation, then discharges its
+active proof edges. Its job-local handles and mutable work counters do not
+establish cross-compile provenance, and the
 full semantic-work meter is not implemented; it cannot certify cached or
 imported proofs or claim K1-03 qualification. The scalar fixture uses one fresh
-work meter across its implemented parser, Core, source validation, lowering and
-emitted-byte checks. This is partial accounting, not a complete K1 work receipt:
-byte telemetry, phase enforcement and other required traversals remain open.
+work meter and phase scheduler across its implemented parser, Core, source
+validation, lowering and emitted-byte checks. This is partial accounting, not
+a complete K1 work receipt: byte telemetry and other required traversals remain
+open. The public-declaration fixture rebuilds and validates source-bound
+interface, function and plan snapshots before emission, but uses synthetic
+package, module and ABI identities and does not perform public admission.
+The flow fixture handles a narrow complete Bool-to-U32 declaration with
+explicit returns, nested branches and short-circuit Boolean expressions. Its
+test caller must supply canonical Bool values; it is not a host ABI.
 A separate thin-entry fixture exercises a scalar worker and canonical adapter;
 it does not define the public host protocol. Complete lowering plans and portable
 checked artifacts remain absent. The builder, pool and ordering graph models are
