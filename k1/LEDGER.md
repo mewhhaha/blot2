@@ -19,7 +19,7 @@ legacy remains default. This ledger records evidence, not completion claims.
 | K1-09 optimization and reuse | Not started | Bounded revalidated rewrites, cache and transactional failure laws remain. |
 | K1-10 rollout and qualification | Not started | Full corpus, migration, fault sweeps, code inspection, performance and rollout gate remain. |
 
-## Local additions after the prepared snapshot
+## Additional experimental models
 
 The unconnected work meter, public-interface model, manifest geometry model,
 and private interface-envelope candidate are local experiments. The meter has
@@ -38,8 +38,8 @@ ABI hashes, work receipts or executable bytes, or admit public declarations.
 After independent review, `GOOSE=/tmp/k1-goose/build/goose
 GOOSE_HOME=/tmp/k1-goose-home ./k1/test.sh` passed (exit 0) with the work,
 public-interface and geometry models at O0/O2; the separately added
-interface-envelope candidate test also passed at O0/O2. This result is local test evidence only. No remote
-commit or draft was created from the prepared snapshot.
+interface-envelope candidate test also passed at O0/O2. This is focused test
+evidence, not full K1 qualification.
 
 ## Validation evidence
 
