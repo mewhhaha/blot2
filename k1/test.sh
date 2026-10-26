@@ -21,6 +21,7 @@ export GOOSE
 python3 "$script_dir/abi_fixed_oracle.py"
 python3 "$script_dir/source_resolver_test.py"
 python3 "$script_dir/particle_expr_oracle_test.py"
+python3 "$script_dir/graph_oracle_test.py"
 for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/abi_fixed_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/blake3_test.goose"
@@ -74,6 +75,10 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/flow_adversarial_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/flow_reachability_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/particle_expr_adversarial_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/graph_adversarial_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/owned_scalar_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/owned_scalar_source_mutation_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/closure_audit_test.goose"
 done
 test_dir=$(mktemp -d)
 trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
@@ -82,6 +87,9 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/pool_builder_guest_emit.goose" && node "$script_dir/pool_builder_guest_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/particle_guest_emit.goose" && node "$script_dir/particle_guest_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/particle_expr_test.goose" && node "$script_dir/particle_expr_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/graph_test.goose" && node "$script_dir/graph_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/closure_test.goose" && node "$script_dir/closure_test.mjs" && node "$script_dir/closure_audit_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/generic_identity_test.goose" && node "$script_dir/generic_identity_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/bridge_wasm_fixture_emit.goose" && node "$script_dir/bridge_wasm_fixture_test.mjs" && node "$script_dir/bridge_wasm_restoration_test.mjs" && node "$script_dir/bridge_host_fixture_test.mjs")
 done
 for level in 0 2; do

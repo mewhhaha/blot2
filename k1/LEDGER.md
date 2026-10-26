@@ -12,10 +12,10 @@ legacy remains default. This ledger records evidence, not completion claims.
 | K1-02 checked scalar Core | Not complete | The private scalar driver validates transient value-only interface, function and lowering-plan records. Canonical owned artifacts, full independent validation, stable identity, proof/effect/resource data and post-sealing inference guard remain. |
 | K1-03 proofs and Index | Not complete | A standalone bounded ordering graph model trusts caller-supplied facts; source authority, independently validated evidence, exact required proofs and Index remain. |
 | K1-04 scoped storage and particle | Not complete | Pool and builder models and hand-emitted Wasm particle experiments exist. Source lowering, checked ownership/loan preconditions, typed failure cleanup, global ownership validation and the I08 acceptance workload remain. |
-| K1-05 relational packages | Not started | Generative domain and stored endpoint laws remain. |
-| K1-06 functions and frames | Not started | Closure capture, placement and finite resource contracts remain. |
-| K1-07 ownership and bridge | Not started | Whole-region Owned and copy-only host bridge remain. |
-| K1-08 generics and staging | Not started | Rank-one uniform ABI, dictionaries and required static evaluator remain. |
+| K1-05 relational packages | Not complete | A private stored-endpoint witness exists; generative domain, source ownership and package laws remain. |
+| K1-06 functions and frames | Not complete | A narrow captured-closure witness exists; general capture, placement and finite resource contracts remain. |
+| K1-07 ownership and bridge | Not complete | Narrow Owned and copy-bridge witnesses exist; full whole-region authority, loans, host ABI and runtime integration remain. |
+| K1-08 generics and staging | Not complete | A narrow generic identity/dictionary witness exists; rank-one uniform ABI, general obligations and required static evaluation remain. |
 | K1-09 optimization and reuse | Not started | Bounded revalidated rewrites, cache and transactional failure laws remain. |
 | K1-10 rollout and qualification | Not started | Full corpus, migration, fault sweeps, code inspection, performance and rollout gate remain. |
 
@@ -35,6 +35,15 @@ descriptor-relative source resolver can read below a trusted live package root;
 it is not yet integrated with project configuration or an import graph, and
 its platform, mutable-file and handle-lifetime limits are documented in
 `SOURCE_RESOLVER.md`.
+
+Further private slices exercise checked stored graph endpoints, a source-bound
+U32-capture closure with indirect Wasm calls, a scalar Owned lifecycle model,
+and a rank-one generic identity with bounded layout dictionaries. They are
+restricted experiments, not completed K1-05 through K1-08: graph identities
+and the Owned model's shared clock are trusted local bookkeeping; the closure
+uses a synthetic fixed frame; and generic dictionary/slot authority and the
+full ABI are absent. General source checking, provenance, cross-package
+authority and the required runtime integration remain open.
 
 The scalar fixture uses an experimental shared work meter; the separate
 fixtures do not yet share it. The meter has no compiler-wide integration or
@@ -57,6 +66,11 @@ interface-envelope candidate test also passed at O0/O2. This is focused test
 evidence, not full K1 qualification.
 
 ## Validation evidence
+
+A further `GOOSE=/tmp/k1-goose/build/goose GOOSE_HOME=/tmp/k1-goose-home
+sh k1/test.sh` run passed (exit 0) after adding the graph, closure, Owned and
+generic fixture laws at both optimization levels. The limits recorded above
+still apply, and this does not establish their milestone qualification.
 
 A subsequent working-tree run of `GOOSE=/tmp/k1-goose/build/goose
 GOOSE_HOME=/tmp/k1-goose-home sh k1/test.sh` passed (exit 0), including the
