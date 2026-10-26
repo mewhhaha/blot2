@@ -1,0 +1,7 @@
+{
+  "language": "k1",
+  "function": "copy_identity",
+  "types": { "T": "Unit" },
+  "input_maxima": [4294967295],
+  "output_capacity": 4294967295
+}

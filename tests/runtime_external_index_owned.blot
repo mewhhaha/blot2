@@ -1,0 +1,7 @@
+type Payload[r:Region,d:Domain] = Index[d,1]
+let wrap:
+  forall [d:Domain] =>
+  Index[d,1] -> Result[Owned[Payload[_,d]],#Reserve(ReserveError) | #Body(#Cancelled)]
+  ! {reserve,release} resources {depth:3,frame:2048}
+= fn position => return owned@[Payload[_,d],#Cancelled](0) as r free in do:
+  seal(free,position)

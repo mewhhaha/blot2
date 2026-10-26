@@ -1,0 +1,1 @@
+pub let identity: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => return x

@@ -1,0 +1,12 @@
+let hold:
+  forall [T: Type] where [Plain(T)] =>
+  T -> T ! {} resources {depth: 3, frame: 1024}
+= fn item => do:
+  let read = fn (_: Unit) => return item
+  return read(())
+
+pub let run: U32 -> U32 ! {} resources {depth: 4, frame: 2048} = fn value =>
+  return hold@[U32](value)
+
+pub let run_float: F32 -> F32 ! {} resources {depth: 4, frame: 2048} = fn value =>
+  return hold@[F32](value)

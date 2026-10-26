@@ -1,0 +1,37 @@
+type Particle = {x:F32,y:F32,vx:F32,vy:F32}
+type Position = {x:F32,y:F32}
+type Positions[r:Region] = exists [m:Nat,e:Domain] => View[r,Position,m,e]
+
+let advance: Particle -> Position ! {} resources {depth:1,frame:256}
+= fn row => return {x:row.x+row.vx,y:row.y+row.vy}
+
+let map_into:
+  forall [r:Region,s:Region,n:Nat,c:Nat,d:Domain] =>
+  Fn[static,Many,
+    {source:View[r,Particle,n,d],output:Dest[r,Position,c],callback:Fn[s,Many,Particle,Position] ! {} resources {depth:1,frame:256}},
+    Result[Positions[r],Unit]]
+  ! {read r,write r} requires [Le(n,c)] resources {depth:2,frame:4096}
+= fn {source:source,output:output,callback:callback} => do:
+  let initial = builder.begin_append(output)
+  let built = for i in 0..n carry (b=initial)
+    invariant [Eq(Init(b),i)] do:
+      next (builder.append(b,callback(source[i])))
+  let result = open builder.freeze(built) as [e] values in do:
+    break pack [n,e] as Positions[r] values
+  return #Ok(result)
+
+pub let project_named:
+  forall [r:Region,n:Nat,c:Nat,d:Domain] =>
+  Fn[static,Many,{source:View[r,Particle,n,d],dt:F32,output:Dest[r,Position,c]},Result[Positions[r],Unit]]
+  ! {read r,write r} requires [Le(n,c)] resources {depth:3,frame:8192}
+= fn {source:source,dt:dt,output:output} =>
+  return map_into@[r,static,n,c,d]({source:source,output:output,callback:advance})
+
+pub let project_local:
+  forall [r:Region,n:Nat,c:Nat,d:Domain] =>
+  Fn[static,Many,{source:View[r,Particle,n,d],dt:F32,output:Dest[r,Position,c]},Result[Positions[r],Unit]]
+  ! {read r,write r} requires [Le(n,c)] resources {depth:3,frame:8192}
+= fn {source:source,dt:dt,output:output} => do:
+  let callback: Fn[local,Many,Particle,Position] ! {} resources {depth:1,frame:256}
+  = fn row => return {x:row.x+row.vx*dt,y:row.y+row.vy*dt}
+  return map_into@[r,local,n,c,d]({source:source,output:output,callback:callback})

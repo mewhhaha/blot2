@@ -1,0 +1,37 @@
+[
+  {
+    "issue": 37,
+    "name": "INDEX",
+    "url": "https://github.com/mewhhaha/blot2/issues/37",
+    "updatedAt": "2026-10-26T13:11:08Z",
+    "sha256": "e306b6c5eb182b60ac4cd6a9f31a3e9c0cbe33d0b65ab94495140d94d7b0715f"
+  },
+  {
+    "issue": 38,
+    "name": "CORE",
+    "url": "https://github.com/mewhhaha/blot2/issues/38",
+    "updatedAt": "2026-10-26T13:08:44Z",
+    "sha256": "296ec3978f0bc1c8f4d5d7d2413bf20b56ce8da2fa383ec47facef3f81ab3e9b"
+  },
+  {
+    "issue": 39,
+    "name": "EXEC",
+    "url": "https://github.com/mewhhaha/blot2/issues/39",
+    "updatedAt": "2026-10-26T13:08:59Z",
+    "sha256": "e280baff1b1324054f78a9c7da3ee1696112dd1d3e112d5b02d49e37a5bf998c"
+  },
+  {
+    "issue": 40,
+    "name": "LANG",
+    "url": "https://github.com/mewhhaha/blot2/issues/40",
+    "updatedAt": "2026-10-26T13:09:39Z",
+    "sha256": "717c1a2aacfba6926d271db1ebfe5123b0cede7c95bfd1d7f13cf6abeeb40580"
+  },
+  {
+    "issue": 41,
+    "name": "MEM",
+    "url": "https://github.com/mewhhaha/blot2/issues/41",
+    "updatedAt": "2026-10-26T13:10:21Z",
+    "sha256": "09a96a1394bd834267483c9f244c888b617957f3a82af524618551be113fad7e"
+  }
+]

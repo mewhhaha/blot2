@@ -1,0 +1,7 @@
+static let answer: U32 = 6*7
+static let values = #[10,20,30]
+pub let run: Unit -> U32 ! {read static} resources {depth:1,frame:1024} = fn () => do:
+  if 0 < view.length(values):
+    return U32.wrapping_add(answer,values[0])
+  else:
+    return 0

@@ -1,0 +1,4 @@
+static let answer: U32 = 42
+let identity: U32 -> U32 ! {} resources {depth:1,frame:0} = fn value => return value
+static let callback: Fn[static,Many,U32,U32] ! {} resources {depth:1,frame:0} = identity
+pub let run: U32 -> U32 ! {} resources {depth:2,frame:256} = fn value => return callback(value)

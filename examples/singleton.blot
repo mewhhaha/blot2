@@ -1,0 +1,15 @@
+let singleton:
+  Unit -> Result[Result[U32,AllocError],ReserveError] ! {reserve,release}
+= fn () => return region@[Result[U32,AllocError]](4)
+  as r (owner,free) in do:
+    let (rest,answer): (Space[r],Result[U32,AllocError]) = do:
+      case region.try_alloc@[U32](free,1):
+        #Err((unused,error)) => break (unused,#Err(error))
+        #Ok((unused,dst)) => do:
+          let packed = array.in(dst,#[41])
+          let value = open packed as [d] a in do:
+            break a[0]
+          break (unused,#Ok(value))
+    space.end(rest)
+    region.close(owner)
+    break answer

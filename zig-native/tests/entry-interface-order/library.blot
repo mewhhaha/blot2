@@ -1,3 +1,0 @@
-const compare = fn left => fn right => @type.same left right
-const alias = compare
-const index = fn values => @array.get values 0

@@ -1,0 +1,6 @@
+let choose: forall [T:Type] => T -> Result[T,Unit] ! {} resources {depth:1,frame:1024}
+= fn value => return #Ok(value)
+pub let run: U32 -> U32 ! {} resources {depth:2,frame:4096} = fn value => do:
+  case choose@[U32](value):
+    #Ok(result) => return result
+    #Err(()) => return 0

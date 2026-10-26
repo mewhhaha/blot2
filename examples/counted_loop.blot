@@ -1,0 +1,6 @@
+pub let count:
+  Unit -> U32 ! {} ensures [Eq(result,10)] resources {depth: 1, frame: 256}
+= fn () => do:
+  let answer = for i in 0..10 carry (n = 0) invariant [Eq(n,i)] do:
+    next (n+1)
+  return answer

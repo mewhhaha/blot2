@@ -1,0 +1,29 @@
+let exercise: Unit -> Result[Result[U32,AllocError],ReserveError] ! {reserve,release}
+= fn () => return region@[Result[U32,AllocError]](12) as r (owner,free) in do:
+  let (rest,answer): (Space[r],Result[U32,AllocError]) = do:
+    case region.try_alloc@[U32](free,3):
+      #Err((unused,error)) => break (unused,#Err(error))
+      #Ok((unused,destination)) => do:
+        let (left,right) = dest.split(destination,1)
+        let first = array.in(left,#[10])
+        let second = array.in(right,#[20,30])
+        let answer = open first as [d] a in do:
+          let other = open second as [e] z in do:
+            case view.try_read(z,1):
+              #None => break 0
+              #Some(value) => do:
+                case view.try_read(z,2):
+                  #None => break value
+                  #Some(_) => break 0
+          break U32.wrapping_add(a[0],other)
+        break (unused,#Ok(answer))
+  space.end(rest)
+  region.close(owner)
+  break answer
+pub let run: Unit -> U32 ! {reserve,release} resources {depth:4,frame:8192} = fn () => do:
+  case exercise(()):
+    #Err(_) => return 0
+    #Ok(result) => do:
+      case result:
+        #Err(_) => return 0
+        #Ok(answer) => return answer

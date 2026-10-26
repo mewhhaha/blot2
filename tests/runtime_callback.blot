@@ -1,0 +1,9 @@
+let apply:
+  (Fn[static,Many,U32,U32] ! {} resources {depth: 1, frame: 0}, U32) -> U32
+  ! {} resources {depth: 2, frame: 64}
+= fn (function, value) => return function(value)
+
+let identity: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn value => return value
+
+pub let run: U32 -> U32 ! {} resources {depth: 3, frame: 256} = fn value =>
+  return apply((identity, value))

@@ -1,4 +1,0 @@
-const identity = fn value => value
-entry const answer = fn (length: U32) => do:
-  let ignored = (identity, @array.generate length (fn (index: U32) -> U32 => @panic "callback ran"))
-  break 42

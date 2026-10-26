@@ -1,0 +1,5 @@
+static let callback: U32 -> U32 ! {} resources {depth:2,frame:256} = do:
+  let seed = 2
+  let inner = fn (value:U32) => return U32.wrapping_add(value,seed)
+  break fn value => return inner(value)
+pub let run: U32 -> U32 ! {} resources {depth:3,frame:512} = fn value => return callback(value)

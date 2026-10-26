@@ -1,0 +1,3 @@
+pub let identity:
+  forall [T: Type] => T -> T ! {} resources {depth:1,frame:1024}
+= fn value => return value

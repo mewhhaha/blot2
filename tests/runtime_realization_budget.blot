@@ -1,0 +1,9 @@
+let predicate:
+  forall [T:Type] where [Plain(T)] => {value:T,index:U32} -> Bool
+  ! {} on_true [Lt(arg.index,10)] resources {depth:1,frame:1024}
+= fn {value:_,index:position} => return position<10
+let through: forall [T:Type] where [Plain(T)] => {value:T,index:U32} -> Bool ! {} resources {depth:3,frame:4096}
+= fn input => do:
+  let selected = predicate@[T]
+  return selected(input)
+pub let run: U32 -> Bool ! {} resources {depth:4,frame:8192} = fn position => return through@[U32]({value:42,index:position})

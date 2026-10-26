@@ -1,0 +1,20 @@
+type CallbackPayload[r: Region,T: Type] = Fn[r,Many,Unit,T] ! {} resources {depth:2,frame:1024}
+let make:
+  forall [T: Type] where [Plain(T)] =>
+  T -> Result[Owned[CallbackPayload[_,T]],#Reserve(ReserveError) | #Body(AllocError)]
+  ! {reserve,release} resources {depth:3,frame:8192}
+= fn item => return owned@[CallbackPayload[_,T],AllocError](256) as r free in do:
+  case env.try_alloc(free,256):
+    #Err((rest,error)) => abort(rest,error)
+    #Ok((rest,destination)) => do:
+      let callback: CallbackPayload[r,T] = fn in destination (_: Unit) => return item
+      seal(rest,callback)
+pub let run: U32 -> U32 ! {reserve,release} resources {depth:5,frame:16384}
+= fn value => do:
+  case make@[U32](value):
+    #Err(_) => return 0
+    #Ok(handle) => do:
+      let answer = owned.open(handle) as r callback in do:
+        break callback(())
+      owned.close(handle)
+      return answer

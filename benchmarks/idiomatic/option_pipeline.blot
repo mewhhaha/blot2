@@ -1,8 +1,0 @@
-const transform = fn value => if value % 5 == 0 then #Nothing else #Some (value * 3 + 1)
-entry const run = fn (seed: U32) -> U32 => do:
-  let total = 0
-  for index in 0..16384:
-    let value = transform (seed + index)
-    if let #Some number = value:
-      total := self + number
-  break total

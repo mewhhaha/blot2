@@ -1,0 +1,4 @@
+static let add: U32 -> U32 ! {} resources {depth:1,frame:64} = do:
+  let seed = 2
+  break fn value => return U32.wrapping_add(value,seed)
+pub let run: U32 -> U32 ! {} resources {depth:2,frame:128} = fn value => return add(value)

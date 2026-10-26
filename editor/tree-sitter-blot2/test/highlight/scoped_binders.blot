@@ -1,6 +1,0 @@
-const read: (state: State a) -> a ! {state.get} = fn input => input.get ()
-//    ^ function
-//           ^ variable
-//                  ^ type
-//                                   ^ variable
-//                                                   ^ variable.parameter

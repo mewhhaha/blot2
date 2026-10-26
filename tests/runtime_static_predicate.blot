@@ -1,0 +1,13 @@
+let greater:
+  forall [n:Nat] => U32 -> Bool ! {} on_true [Lt(n,arg)]
+= fn value => return n<value
+static let predicate:
+  U32 -> Bool ! {} on_true [Lt(2,arg)] resources {depth:3,frame:512}
+= do:
+  let inner = greater@[2]
+  break fn value => return inner(value)
+pub let run: U32 -> U32 ! {} resources {depth:4,frame:1024} = fn value => do:
+  if predicate(value):
+    return 1
+  else:
+    return 0

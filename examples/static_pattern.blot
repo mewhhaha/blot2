@@ -1,0 +1,2 @@
+static let (left,right) = (19,23)
+pub let run: Unit -> U32 ! {} resources {depth:1,frame:256} = fn () => return left+right

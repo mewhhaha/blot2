@@ -1,5 +1,0 @@
-import * as array from "std/array"
-entry const run = fn (seed: U32) -> U32 => do:
-  let values = array.generate 8192 (fn index => (seed + index) % 256)
-  let sums = array.prefix_sums values
-  break array.fold_left (fn total value => total + value) 0 sums

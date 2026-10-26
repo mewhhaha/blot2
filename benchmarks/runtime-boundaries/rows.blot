@@ -1,2 +1,0 @@
-type Row is data = #Row {id: U32, count: U32, a: U32, b: U32, c: U32, d: U32, e: U32, f: U32, g: U32}
-const make_row = fn index => #Row {id: index + 1, count: index + 1, a: index, b: index, c: index, d: index, e: index, f: index, g: index}
