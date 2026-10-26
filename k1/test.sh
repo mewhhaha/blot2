@@ -21,6 +21,10 @@ export GOOSE
 for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/blake3_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/public_frontend_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/public_interface_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/interface_candidate_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/manifest_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/work_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/parser_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/module_core_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/module_frontend_test.goose"

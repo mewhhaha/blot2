@@ -115,7 +115,8 @@ A padding record uses tag 0. Empty regions remain present as `{tag,0,0}`;
 they do not cover bytes or create an address. Nonempty regions and padding
 must form an exact, disjoint partition of `[0, initial_pages * 65536)`, with
 zero-length padding forbidden. Adjacent padding records are merged. This
-format's grouping and zero-length encoding are implementation choices; they
+format's grouping, canonical zero-length encoding, and minimal-page rule
+below are implementation choices; they
 must not be mistaken for a theorem that the normative spec mandates one
 particular ordering of regions. An emitter using another valid map must
 normalize it into these region groups or use a separately versioned format.
@@ -239,8 +240,11 @@ U32 and the Wasm32 bounds before serializing or narrowing:
 6. Compute the highest end of all non-padding regions; round it up to pages
    with checked addition or division and require that count to equal
    `initial_pages`. Every byte thereafter is explicit page padding. This
-   prevents claiming an oversized memory envelope while hiding unaccounted
-   physical storage. Validate the exact actual Wasm memory section and static
+   proposed profile chooses the smallest page count containing non-padding
+   regions; that normalization is stricter than treating an intentional extra
+   reserved padding interval as part of the final memory map in M03. Do not
+   reject another otherwise valid K1 representation solely on this local rule
+   unless it has selected this profile. Validate the actual Wasm memory section and static
    segments against these numbers, rather than trusting manifest strings.
 
 For the current *fixture-only* map, 256 owner entries occupy 8,192 bytes;

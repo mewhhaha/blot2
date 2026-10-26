@@ -19,6 +19,28 @@ legacy remains default. This ledger records evidence, not completion claims.
 | K1-09 optimization and reuse | Not started | Bounded revalidated rewrites, cache and transactional failure laws remain. |
 | K1-10 rollout and qualification | Not started | Full corpus, migration, fault sweeps, code inspection, performance and rollout gate remain. |
 
+## Local additions after the prepared snapshot
+
+The unconnected work meter, public-interface model, manifest geometry model,
+and private interface-envelope candidate are local experiments. The meter has
+no compiler-wide integration or
+durable receipt; live proof edges are monotone rather than scope-discharged,
+so it can over-reject. The public-interface model checks a narrow candidate
+and producer tuple but does not publish a complete interface or establish its
+portable hash and dependencies. The manifest validator checks in-memory
+geometry only, with local choices for empty regions and minimal page count; it
+does not decode artifacts or validate ABI hashes, runtime roles, executable
+provenance, certificates, or every conforming memory layout. The private
+interface-envelope candidate checks canonical bytes against a caller-selected
+identity and hash; it does not authenticate either, validate source semantics,
+ABI hashes, work receipts or executable bytes, or admit public declarations.
+
+After independent review, `GOOSE=/tmp/k1-goose/build/goose
+GOOSE_HOME=/tmp/k1-goose-home ./k1/test.sh` passed (exit 0) with the work,
+public-interface and geometry models at O0/O2; the separately added
+interface-envelope candidate test also passed at O0/O2. This result is local test evidence only. No remote
+commit or draft was created from the prepared snapshot.
+
 ## Validation evidence
 
 The persistent scalar validator test was run with
