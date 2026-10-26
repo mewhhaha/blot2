@@ -77,7 +77,8 @@ test caller must supply canonical Bool values; it is not a host ABI.
 The locals fixture handles a narrow U32 declaration with scoped immutable
 bindings, nested branches, explicit returns and checked or explicitly wrapping
 arithmetic. A separate tagged alternative handles a bounded finite-loop
-subset. Their accepted proofs and limitations are described in
+subset, including a restricted shared scalar-expression/loop representation.
+Their accepted proofs and limitations are described in
 `unified_schema.md` and `compiler_schema.md`.
 A separate thin-entry fixture exercises a scalar worker and canonical adapter;
 it does not define the public host protocol. Complete lowering plans and portable

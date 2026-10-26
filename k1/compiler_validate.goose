@@ -9,6 +9,8 @@ import iteration_verify;
 import iteration_completion;
 import unified_check;
 import compiler_core;
+import mixed_compiler_core;
+import mixed_validate;
 
 struct Reader {lex:lexer::State=lexer::State {},t:lexer::Token=lexer::Token {},bad:bool=false}
 fn step(s:u8[:],r:Reader&) {if !r.bad {r.t=lexer::next(s,r.lex);if r.t.kind==9 {r.bad=true;}}}
@@ -69,8 +71,23 @@ fn semantic(tree:iteration_core::Tree&) -> bool {
     }
     return tree.nodes[tree.root-1].tag==18 && known(types,tree.root)==3;
 }
+// Inactive variant storage cannot carry unauthenticated hidden fields.
+fn mixed_empty(m:mixed_compiler_core::Program&) -> bool {
+    return m.source.len==0 && m.variant==0 && m.name_start==0 && m.name_end==0 && m.fn_start==0 &&
+        m.scalar.source.len==0 && m.scalar.name_start==0 && m.scalar.name_end==0 && m.scalar.param_start==0 &&
+        m.scalar.param_end==0 && m.scalar.nodes.len==0 && m.scalar.bindings.len==0 && m.scalar.root==0 &&
+        m.body.source.len==0 && m.body.nodes.len==0 && m.body.bindings.len==0 && m.body.root==0;
+}
 fn verify(expected:u8[:],p:compiler_core::Program&) -> bool {
     if expected.len>16777216 || p.source!=expected {return false;}
+    if p.variant==3 {
+        if p.name_start!=0 || p.name_end!=0 || p.fn_start!=0 || p.scalar.source.len!=0 || p.scalar.name_start!=0 ||
+           p.scalar.name_end!=0 || p.scalar.param_start!=0 || p.scalar.param_end!=0 || p.scalar.nodes.len!=0 ||
+           p.scalar.bindings.len!=0 || p.scalar.root!=0 || p.body.source.len!=0 || p.body.nodes.len!=0 ||
+           p.body.bindings.len!=0 || p.body.root!=0 || p.mixed.variant!=2 {return false;}
+        return mixed_validate::verify(expected,p.mixed);
+    }
+    if !mixed_empty(p.mixed) {return false;}
     if p.variant==1 {
         if p.name_start!=0 || p.name_end!=0 || p.fn_start!=0 || p.body.source.len!=0 ||
            p.body.nodes.len!=0 || p.body.bindings.len!=0 || p.body.root!=0 {return false;}

@@ -63,14 +63,16 @@ fn builder_alloc()->u8[>..] {
 // It consumes the supplied builder, writes each full row then publishes its
 // length, freezes on return, and never places storage or calls a helper.
 fn worker(fault_after:i64)->u8[>..] {
- var out:u8[>..]=[1,1,0x7f]; // i=6
+ var out:u8[>..]=[2,1,0x7f,2,0x7d]; // i=6, evaluated x=7 and y=8
  if fault_after==0 {b(out,0x00);}
  c(out,0);set(out,6);b(out,0x02);b(out,0x40);b(out,0x03);b(out,0x40);
   get(out,6);get(out,1);b(out,0x4f);b(out,0x0d);wasm::unsigned_leb(out,1);
-  indexed(out,2,6,8);indexed(out,0,6,16);loadf(out,0);
-  indexed(out,0,6,16);loadf(out,8);get(out,5);b(out,0x94);b(out,0x92);storef(out,0);
-  indexed(out,2,6,8);indexed(out,0,6,16);loadf(out,4);
-  indexed(out,0,6,16);loadf(out,12);get(out,5);b(out,0x94);b(out,0x92);storef(out,4);
+  indexed(out,0,6,16);loadf(out,0);
+  indexed(out,0,6,16);loadf(out,8);get(out,5);b(out,0x94);b(out,0x92);set(out,7);
+  indexed(out,0,6,16);loadf(out,4);
+  indexed(out,0,6,16);loadf(out,12);get(out,5);b(out,0x94);b(out,0x92);set(out,8);
+  indexed(out,2,6,8);get(out,7);storef(out,0);
+  indexed(out,2,6,8);get(out,8);storef(out,4);
   get(out,3);get(out,6);c(out,1);b(out,0x6a);store(out,12);
   if fault_after>0 {get(out,6);c(out,(fault_after-1) as u32);b(out,0x46);b(out,0x04);b(out,0x40);b(out,0x00);b(out,0x0b);}
   get(out,6);c(out,1);b(out,0x6a);set(out,6);b(out,0x0c);wasm::unsigned_leb(out,0);

@@ -5,5 +5,6 @@ import unified_core;
 import unified_guard;
 import refinement_guard_verify;
 fn verify(source:u8[:],p:unified_core::Program&) -> bool {
-    return unified_guard::check(source,p).status==0 && refinement_guard_verify::check(source,p);
+    let built=unified_guard::check(source,p);
+    return built.status==0 && refinement_guard_verify::verify_evidence(source,p,built.evidence);
 }

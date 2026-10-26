@@ -80,10 +80,11 @@ fn bitand(s:u8[:], c:Cursor&, n:unified_core::Node[>..]&, b:unified_core::Bindin
 }
 fn compare(s:u8[:], c:Cursor&, n:unified_core::Node[>..]&, b:unified_core::Binding[:], active:i64[:], param:lexer::Token) -> i64 {
     var a=bitand(s,c,n,b,active,param);
-    if c.status==0 && eq(s,c.t,5,"<") {
+    if c.status==0 && (eq(s,c.t,5,"<") || eq(s,c.t,5,"<=")) {
+        let tag=if eq(s,c.t,5,"<") {9} else {18};
         advance(s,c); let z=bitand(s,c,n,b,active,param); if z==0 || c.status!=0 {return 0;}
         if n[a-1].ty!=1 || n[z-1].ty!=1 {c.status=6;return 0;}
-        a=push(n,c,unified_core::Node {tag:9,start:n[a-1].start,end:n[z-1].end,a:a,b:z,ty:2});
+        a=push(n,c,unified_core::Node {tag:tag,start:n[a-1].start,end:n[z-1].end,a:a,b:z,ty:2});
     } return a;
 }
 fn conjunction(s:u8[:], c:Cursor&, n:unified_core::Node[>..]&, b:unified_core::Binding[:], active:i64[:], param:lexer::Token) -> i64 {

@@ -22,7 +22,7 @@ for(const p={i:8};p.i<bytes.length;) {
     assert.equal(leb(bytes,p),11);
     for(let fn=0;fn<11;fn++) {
       const size=leb(bytes,p),finish=p.i+size;assert(finish<=end);const groups=leb(bytes,p);
-      for(let j=0;j<groups;j++) {leb(bytes,p);assert.equal(bytes[p.i++],0x7f);}
+      for(let j=0;j<groups;j++) {leb(bytes,p);assert([0x7f, 0x7d].includes(bytes[p.i++]));}
       let depth=0,inLoop=false,loopDepth=0;
       while(p.i<finish) {
         const op=bytes[p.i++];assert.notEqual(op,0x40,'memory.grow forbidden');

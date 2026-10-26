@@ -24,8 +24,8 @@ fn lower(expected:u8[:],p:unified_core::Program&,probe_node:i64) -> u8[] {
         let n=p.nodes[a.value-1];
         if n.tag==1 {out.push(0x20);wasm::unsigned_leb(out,n.a+1);}
         else if n.tag==2 {out.push(0x41);wasm::signed_i32_leb(out,n.literal);}
-        else if n.tag==3 || n.tag==4 || n.tag==5 || n.tag==6 || n.tag==7 || n.tag==9 {
-            let op=if n.tag==3 || n.tag==4 {0x6a} else if n.tag==5 {0x6b} else if n.tag==6 {0x6c} else if n.tag==7 {0x71} else {0x49};
+        else if n.tag==3 || n.tag==4 || n.tag==5 || n.tag==6 || n.tag==7 || n.tag==9 || n.tag==18 {
+            let op=if n.tag==3 || n.tag==4 {0x6a} else if n.tag==5 {0x6b} else if n.tag==6 {0x6c} else if n.tag==7 {0x71} else if n.tag==9 {0x49} else {0x4d};
             byte(actions,op);visit(actions,n.b);visit(actions,n.a);
         } else if n.tag==8 {visit(actions,n.a);}
         else if n.tag==10 || n.tag==11 {out.push(0x41);out.push(if n.tag==10 {1} else {0});}

@@ -28,6 +28,12 @@ python3 "$script_dir/loop_prefix_oracle_test.py"
 python3 "$script_dir/proofgraph_inspect_test.py"
 python3 "$script_dir/ownership_oracle_test.py"
 python3 "$script_dir/project_graph_test.py"
+python3 "$script_dir/link_check_test.py"
+python3 "$script_dir/particle_lower_generated_oracle.py"
+python3 "$script_dir/mixed_generated_oracle.py"
+python3 "$script_dir/mixed_fact_generated_oracle.py"
+python3 "$script_dir/linked_test.py"
+python3 "$script_dir/multilink_test.py"
 for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/abi_fixed_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/blake3_test.goose"
@@ -117,10 +123,24 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/compiler_size_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/refinement_identity_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/refinement_boundary_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/ule_boundary_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/wire_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/wire_schema_adversarial_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/wire_runtime_oracle_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/wire_overlap_audit_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/particle_lower_verify_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/particle_lower_verify_mutation_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_job_adversarial_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/format_k1_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/format_k1_independent_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/effect_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/effect_oracle_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_forgery_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/mixed_depth_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/mixed_compat_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/mixed_adapter_independent_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/mixed_adversarial_test.goose"
 done
 test_dir=$(mktemp -d)
 trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
@@ -129,6 +149,9 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/pool_builder_guest_emit.goose" && node "$script_dir/pool_builder_guest_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/particle_guest_emit.goose" && node "$script_dir/particle_guest_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/particle_source_test.goose" && node "$script_dir/particle_source_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/particle_lower_test.goose" && node "$script_dir/particle_lower_test.mjs")
+    (cd "$test_dir" && node "$script_dir/particle_order_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_job_test.goose" && node "$script_dir/particle_lower_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/particle_expr_test.goose" && node "$script_dir/particle_expr_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/graph_test.goose" && node "$script_dir/graph_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/bounds_test.goose" && node "$script_dir/bounds_test.mjs")
@@ -138,12 +161,24 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/unified_guard_test.goose" && node "$script_dir/unified_guard_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/unified_guard_adversarial_test.goose" && node "$script_dir/unified_guard_adversarial_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/compiler_test.goose" && node "$script_dir/compiler_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/mixed_adapter_test.goose" && node "$script_dir/mixed_adapter_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/mixed_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/mixed_fact_build_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/mixed_fact_adversarial_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/mixed_fact_wide_test.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/mixed_fact_integration_test.goose" && node "$script_dir/mixed_fact_integration_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/refinement_unified_test.goose" && node "$script_dir/refinement_unified_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/static_float_oracle.goose" && node "$script_dir/static_float_oracle.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/ule_refinement_test.goose" && node "$script_dir/ule_refinement_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/relation_direct_test.goose" && node "$script_dir/relation_direct_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/relation_path_test.goose" && node "$script_dir/relation_path_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/relation_forgery_test.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/session_retained_test.goose" && node "$script_dir/session_retained_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/loop_test.goose" && node "$script_dir/loop_test.mjs" && node "$script_dir/loop_exhaustive_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/closure_test.goose" && node "$script_dir/closure_test.mjs" && node "$script_dir/closure_audit_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/generic_identity_test.goose" && node "$script_dir/generic_identity_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/bridge_wasm_fixture_emit.goose" && node "$script_dir/bridge_wasm_fixture_test.mjs" && node "$script_dir/bridge_wasm_restoration_test.mjs" && node "$script_dir/bridge_host_fixture_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/wire_exec_emit.goose" && node "$script_dir/wire_exec_test.mjs" && node "$script_dir/wire_exec_oracle_test.mjs")
 done
 for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/module_wasm_test.goose" && node "$script_dir/module_wasm_test.mjs")

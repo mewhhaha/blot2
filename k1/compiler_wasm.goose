@@ -4,6 +4,7 @@ namespace compiler_wasm;
 import compiler_core;
 import compiler_validate;
 import unified_wasm;
+import mixed_wasm;
 import iteration_core;
 import wasm;
 struct Action {kind:i64=0,node:i64=0}
@@ -26,6 +27,7 @@ fn inc(out:u8[>..]&,slot:i64) {get(out,slot);out.push(0x41);out.push(1);out.push
 fn emit(expected:u8[:],p:compiler_core::Program&) -> u8[] {
     if !compiler_validate::verify(expected,p) {return [];}
     if p.variant==1 {return unified_wasm::emit(expected,p.scalar);}
+    if p.variant==3 {return mixed_wasm::emit(expected,p.mixed);}
     var limit:i64[2048]=[0;2048];var count:i64=0;
     for n,i in p.body.nodes {if n.tag==15 {count+=1;if count>128 {return [];}limit[i]=p.body.bindings.len+count;}}
     let locals=p.body.bindings.len-1+count;if locals<0 || locals>255 {return [];}

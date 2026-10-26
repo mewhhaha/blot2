@@ -12,7 +12,7 @@ fn check(nodes:unified_core::Node[:], root:i64) -> i64 {
         else if n.tag==11 {s.truth=1;}
         else if n.tag==8 {
             if n.a<1 || n.a>i {return 1;} s.truth=sums[n.a-1].truth;
-        } else if n.tag==3 || n.tag==4 || n.tag==5 || n.tag==6 || n.tag==7 || n.tag==9 || n.tag==12 || n.tag==13 || n.tag==17 {
+        } else if n.tag==3 || n.tag==4 || n.tag==5 || n.tag==6 || n.tag==7 || n.tag==9 || n.tag==18 || n.tag==12 || n.tag==13 || n.tag==17 {
             if n.a<1 || n.a>i || n.b<1 || n.b>i {return 1;}
             if n.tag==17 {let a=sums[n.a-1];let b=sums[n.b-1];s.falls=a.falls && b.falls;s.unreachable=a.unreachable || !a.falls || b.unreachable;}
         } else if n.tag==14 || n.tag==15 {

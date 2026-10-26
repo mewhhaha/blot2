@@ -83,7 +83,7 @@ fn indexed(out: u8[>..]&, base: i64, index: i64, stride: u32) {
 // injected unreachable simulates a trap after that many complete row writes;
 // it is not an ordinary source-language failure or recoverable bridge call.
 fn project(fault_after: i64) -> u8[>..] {
-    var out: u8[>..] = [1, 9, 0x7f]; // input owner 6, output owner 7, input descriptor 8, output descriptor 9, count 10, bytes 11, i 12, input data 13, output data 14
+    var out: u8[>..] = [2, 9, 0x7f, 2, 0x7d]; // input owner 6, output owner 7, input descriptor 8, output descriptor 9, count 10, bytes 11, i 12, input data 13, output data 14
     get(out, 0); get(out, 1); call(out, 4); set(out, 6);
     get(out, 6); b(out, 0x45); fail_if(out, 4294967292);
     get(out, 2); get(out, 3); call(out, 4); set(out, 7);
@@ -119,11 +119,13 @@ fn project(fault_after: i64) -> u8[>..] {
     b(out, 0x02); b(out, 0x40); b(out, 0x03); b(out, 0x40);
       get(out, 12); get(out, 10); b(out, 0x4f); b(out, 0x0d); wasm::unsigned_leb(out, 1);
       // x + vx * dt; Wasm f32.mul and f32.add are separate, never FMA.
-      indexed(out, 14, 12, 8); indexed(out, 13, 12, 16); load_f32(out, 0);
-      indexed(out, 13, 12, 16); load_f32(out, 8); get(out, 5); b(out, 0x94); b(out, 0x92); store_f32(out, 0);
-      // y + vy * dt, using only scalar field accesses and direct stores.
-      indexed(out, 14, 12, 8); indexed(out, 13, 12, 16); load_f32(out, 4);
-      indexed(out, 13, 12, 16); load_f32(out, 12); get(out, 5); b(out, 0x94); b(out, 0x92); store_f32(out, 4);
+      indexed(out, 13, 12, 16); load_f32(out, 0);
+      indexed(out, 13, 12, 16); load_f32(out, 8); get(out, 5); b(out, 0x94); b(out, 0x92); set(out, 15);
+      // Evaluate y before either store; locals retain separate F32 rounding.
+      indexed(out, 13, 12, 16); load_f32(out, 4);
+      indexed(out, 13, 12, 16); load_f32(out, 12); get(out, 5); b(out, 0x94); b(out, 0x92); set(out, 16);
+      indexed(out, 14, 12, 8); get(out, 15); store_f32(out, 0);
+      indexed(out, 14, 12, 8); get(out, 16); store_f32(out, 4);
       // Both fields are initialized before n := i+1 becomes observable.
       get(out, 9); get(out, 12); c(out, 1); b(out, 0x6a); store(out, 12);
       if fault_after > 0 {

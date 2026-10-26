@@ -64,8 +64,8 @@ fn bitand(s:u8[:],r:Reader&,p:unified_core::Program&,syms:Symbol[:]) -> Term {
 }
 fn comparison(s:u8[:],r:Reader&,p:unified_core::Program&,syms:Symbol[:]) -> Term {
     var a=bitand(s,r,p,syms);
-    if !r.bad && same(s,r.t,5,"<") {step(s,r);let b=bitand(s,r,p,syms);if r.bad || a.ty!=1 || b.ty!=1 {r.bad=true;return Term {};}
-        a=event(r,p,unified_core::Node {tag:9,start:a.start,end:b.end,a:a.id,b:b.id,ty:2});}return a;
+    if !r.bad && (same(s,r.t,5,"<") || same(s,r.t,5,"<=")) {let tag=if same(s,r.t,5,"<") {9} else {18};step(s,r);let b=bitand(s,r,p,syms);if r.bad || a.ty!=1 || b.ty!=1 {r.bad=true;return Term {};}
+        a=event(r,p,unified_core::Node {tag:tag,start:a.start,end:b.end,a:a.id,b:b.id,ty:2});}return a;
 }
 fn conjunction(s:u8[:],r:Reader&,p:unified_core::Program&,syms:Symbol[:]) -> Term {
     var a=comparison(s,r,p,syms);

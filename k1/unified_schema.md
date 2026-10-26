@@ -10,11 +10,11 @@ branches; rebinding an active name is rejected by this subset.
 
 U32 expressions support local/parameter names, U32 literals, parentheses,
 ordinary `+`, total bitwise `&`, and `U32.wrapping_add`, `wrapping_sub` and
-`wrapping_mul`. Conditions support `#True`, `#False`, U32 `<`, parentheses,
+`wrapping_mul`. Conditions support `#True`, `#False`, U32 `<` and `<=`, parentheses,
 and short-circuit `&&`/`||`. Precedence follows K1-LANG for these forms.
 For ordinary addition, the private checker establishes safety when one operand
 is a direct zero literal, both are direct literals whose sum fits, or a comparison
-of an immutable value against U32 MAX proves its successor fits. Direct immutable
+of an immutable value against U32 MAX or MAX-1 proves its successor fits. Direct immutable
 aliases preserve that value identity, but wrapping results do not acquire the
 input's facts. This one fact propagates through short-circuit operands and
 conservative joins, including a surviving branch when the other returns. Literal
@@ -26,9 +26,11 @@ neither pass implements the general finite-fact algebra.
 The candidate owns the complete source. A separate recognizer re-lexes the
 caller-retained immutable expected source, rebuilds lexical scope and every
 typed node, and independently recomputes completion. A source-bound producer
-tracks scoped successor facts, and a separate consumer re-evaluates safety
-using non-MAX/MAX value masks; `unified_shape` alone is not arithmetic authority.
-Emission first requires exact byte equality and both checks. The local
+tracks scoped successor facts, including the true or false guard edge. A separate
+consumer re-evaluates safety using non-MAX/MAX value masks and checks the exact
+guard, edge, operand and addition fields of every proof record; `unified_shape`
+alone is not arithmetic authority. Emission first requires exact byte equality
+and both checks. The local
 2,048-node, 128-binding, 64-frame, 32,768 proof/lowering-step and 65,536-byte
 output limits are fixture bounds, not K1 semantic budgets or work receipts.
 Proofs are ephemeral to the source-backed job. The producer and consumer use

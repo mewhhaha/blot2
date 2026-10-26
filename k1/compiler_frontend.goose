@@ -7,6 +7,7 @@ import unified_frontend;
 import iteration_parse;
 import compiler_core;
 import compiler_validate;
+import mixed_frontend;
 struct Cursor {lex:lexer::State=lexer::State {},t:lexer::Token=lexer::Token {},bad:bool=false}
 // Preserve the scalar fixture's exposed unbound/arithmetic categories. The
 // iteration parser's status 5 instead means a bad control target and must not
@@ -21,7 +22,7 @@ fn take(s:u8[:],c:Cursor&,kind:i64,value:u8[:]) -> bool {
     let t=c.t;if c.bad || t.kind!=kind || t.start<0 || t.end<=t.start || t.end>s.len || s[t.start..t.end]!=value {c.bad=true;return false;}
     advance(s,c);return !c.bad;
 }
-fn parse(source:u8[:]) -> compiler_core::Result {
+fn legacy_parse(source:u8[:]) -> compiler_core::Result {
     if source.len>16777216 {return compiler_core::Result {status:2};}
     var scalar=unified_frontend::parse(source);
     if scalar.status==0 {
@@ -47,4 +48,16 @@ fn parse(source:u8[:]) -> compiler_core::Result {
     var p=compiler_core::Program {source:source,variant:2,name_start:name.start,name_end:name.end,fn_start:first.start,body:copy(tree)};
     if !compiler_validate::verify(source,p) {return compiler_core::Result {status:1};}
     return compiler_core::Result {program:p};
+}
+
+// Preserve every previous acceptance and rejection status. A new variant is
+// used only when the original paths reject and mixed checking succeeds.
+fn parse(source:u8[:]) -> compiler_core::Result {
+    var prior=legacy_parse(source);if prior.status==0 {return prior;}
+    if source.len>65536 {return prior;}
+    var candidate=mixed_frontend::parse(source);
+    if candidate.status!=0 || candidate.program.variant!=2 {return prior;}
+    var result=compiler_core::Program {source:source,variant:3,mixed:copy(candidate.program)};
+    if !compiler_validate::verify(source,result) {return prior;}
+    return compiler_core::Result {program:result};
 }

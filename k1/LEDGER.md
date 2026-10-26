@@ -72,6 +72,14 @@ trusted ownership of the session and receipt; that boundary is not enforced by
 Goose namespaces, and receipt tampering is not authenticated. Its work meter
 and dependency discovery are incomplete, so this is not qualified K1 reuse.
 
+Additional private components cover source-checked static scalar evaluation,
+formatter round trips, direct-call effect/resource summaries, cross-module
+interface observations and generated F32 particle expressions. The formatter
+is not wired into the edition-aware CLI or editor grammar; static calls,
+general module lowering, complete effects/resources and the canonical host ABI
+remain unsupported. Particle NaN tests check arithmetic NaN classification,
+not the full permitted payload/sign set.
+
 The scalar fixture uses an experimental shared work meter; the separate
 fixtures do not yet share it. The meter has no compiler-wide integration or
 durable receipt. The private checked-add fixture now discharges its scoped
@@ -93,6 +101,25 @@ interface-envelope candidate test also passed at O0/O2. This is focused test
 evidence, not full K1 qualification.
 
 ## Validation evidence
+
+A further combined Goose fixture run passed (exit 0) with mixed-loop fact
+checks, multi-entry linking, the private host-copy witness and the corrected
+particle-order tests. It includes `-O0`/`-O2`, independent oracles and Wasm
+execution; it is not full K1 or ABI qualification.
+
+A combined Goose fixture run passed (exit 0) after correcting the particle
+workers to evaluate both row fields before either store, connecting the mixed
+scalar/loop path and source-bound relation proofs, and adding the linked scalar
+fixture. The run includes `-O0`/`-O2`, structural instruction-order checks,
+test-only traps before stores, independent oracles and Wasm execution. These
+remain restricted experiments, not complete K1 qualification.
+
+A further combined Goose fixture run passed (exit 0) after adding the private
+formatter, scalar static evaluator, source-linked particle lowering, effect
+summary and cross-module interface tests. It includes `-O0`/`-O2`, independent
+oracles and Wasm execution; it does not qualify their complete K1 counterparts.
+In particular the particle arithmetic-NaN witnesses test NaN classification,
+not the entire permitted payload and sign set.
 
 A combined Goose fixture run passed (exit 0) after adding the tagged
 scalar/loop path, source-linked particle worker, private project graph,

@@ -1,0 +1,90 @@
+import os;
+import std;
+import source_resolver;
+import link_check;
+import linked_program;
+import linked_target;
+import linked_wasm;
+import linked_revision;
+fn main() {
+ let a=args();assert(a.len==2);let abi:u8[32]=[7;32];
+ var root=source_resolver::open_root(a[1],"pkg");assert(root.status==0);
+ let probes=[link_check::Probe {alias:"lib",name:"future"}];
+ var prepared=linked_program::prepare(root.root,"main.blot",abi,probes);
+ assert(prepared.status==0 && linked_program::verify(prepared.plan,"pkg","main.blot",abi,probes));
+ let expected=linked_wasm::emit(prepared.plan,"pkg","main.blot",abi,probes);
+ assert(expected.len>0 && linked_target::verify(prepared.plan,"pkg","main.blot",abi,probes,expected));
+ assert(write_file("linked_before.wasm",expected));
+ // Exact final target validation checks all bytes, boundaries and source links.
+ for i in expected.len {var mutated:u8[>..]=[];mutated.append(expected);mutated[i]^=1;
+  assert(!linked_target::verify(prepared.plan,"pkg","main.blot",abi,probes,mutated));}
+ for n in expected.len {assert(!linked_target::verify(prepared.plan,"pkg","main.blot",abi,probes,expected[..n]));}
+ var extra:u8[>..]=[];extra.append(expected);extra.push(0);
+ assert(!linked_target::verify(prepared.plan,"pkg","main.blot",abi,probes,extra));
+ var forged=copy(prepared.plan);forged.graph.edges[0].to=0;
+ assert(!linked_program::verify(forged,"pkg","main.blot",abi,probes));
+ assert(!linked_target::verify(forged,"pkg","main.blot",abi,probes,expected));
+ var wrong_source=copy(prepared.plan);let provider=wrong_source.graph.modules[1];
+ let operand=provider.source_start+wrong_source.provider.core.left_start;
+ assert(wrong_source.graph.sources[operand]=='x');wrong_source.graph.sources[operand]='7';
+ assert(!linked_program::verify(wrong_source,"pkg","main.blot",abi,probes));
+ var wrong_interface=copy(prepared.plan);wrong_interface.snapshot.interfaces[0]^=1;
+ assert(!linked_program::verify(wrong_interface,"pkg","main.blot",abi,probes));
+ let altabi:u8[32]=[8;32];assert(!linked_target::verify(prepared.plan,"pkg","main.blot",altabi,probes,expected));
+ // A corrupt retained plan or target cannot become an unchanged shortcut.
+ var tampered=linked_revision::begin(root.root);var badplan=copy(prepared.plan);badplan.provider.opcode=1;
+ tampered.versions.push(linked_revision::Version {id:1,plan:copy(badplan),target:copy(expected)});tampered.generation=1;
+ assert(linked_revision::current(tampered,"main.blot",abi,probes).len==0);
+ let repaired=linked_revision::update(tampered,root.root,"main.blot",abi,probes,0);
+ assert(repaired.status==0 && repaired.retained && !repaired.target_unchanged && repaired.generation==2);
+ var corrupt_bytes:u8[>..]=[];corrupt_bytes.append(expected);corrupt_bytes[0]^=1;
+ var tampered_target=linked_revision::begin(root.root);
+ tampered_target.versions.push(linked_revision::Version {id:1,plan:copy(prepared.plan),target:copy(corrupt_bytes)});tampered_target.generation=1;
+ assert(linked_revision::current(tampered_target,"main.blot",abi,probes).len==0);
+ let repaired_target=linked_revision::update(tampered_target,root.root,"main.blot",abi,probes,0);
+ assert(repaired_target.status==0 && repaired_target.retained && !repaired_target.target_unchanged && repaired_target.generation==2);
+ var session=linked_revision::begin(root.root);
+ let cold=linked_revision::update(session,root.root,"main.blot",abi,probes,0);
+ assert(cold.status==0 && cold.retained && cold.generation==1 && cold.bytes[..]==expected[..]);
+ let warm=linked_revision::update(session,root.root,"main.blot",abi,probes,0);
+ assert(warm.status==0 && warm.semantic_unchanged && warm.target_unchanged && warm.generation==1);
+ let provider_path=str(a[1],"/lib.blot");
+ assert(write_file(provider_path,"pub let f: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => return 7\n"));
+ let body=linked_revision::update(session,root.root,"main.blot",abi,probes,0);
+ assert(body.status==0 && body.retained && body.semantic_unchanged && !body.target_unchanged && body.generation==2);
+ assert(body.bytes[..]!=expected[..] && write_file("linked_after.wasm",body.bytes));
+ let prior=linked_revision::current(session,"main.blot",abi,probes);assert(prior[..]==body.bytes[..]);
+ assert(write_file(provider_path,"pub let other: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => return x\n"));
+ let missing=linked_revision::update(session,root.root,"main.blot",abi,probes,0);
+ assert(missing.status==4 && missing.bytes.len==0 && missing.lookup.observations.len==2 &&
+   !missing.lookup.observations[1].found && session.generation==2 && linked_revision::current(session,"main.blot",abi,probes)[..]==prior[..]);
+ assert(write_file(provider_path,"pub let f: U32 -> U32 ! {} resources {depth: 128, frame: 0} = fn x => return x\n"));
+ let depth=linked_revision::update(session,root.root,"main.blot",abi,probes,0);
+ assert(depth.status==5 && session.generation==2 && linked_revision::current(session,"main.blot",abi,probes)[..]==prior[..]);
+ assert(write_file(provider_path,"pub let f: U32 -> U32 ! {} resources {depth: 1, frame: 4} = fn x => return x\n"));
+ let frame=linked_revision::update(session,root.root,"main.blot",abi,probes,0);
+ assert(frame.status==5 && session.generation==2 && linked_revision::current(session,"main.blot",abi,probes)[..]==prior[..]);
+ assert(write_file(provider_path,"pub let f: U32 -> U32 ! {} resources {depth: 127, frame: 0} = fn x => return 8\n"));
+ for fault in 1..4 {let stopped=linked_revision::update(session,root.root,"main.blot",abi,probes,fault as u32);
+  assert(stopped.status==20 && stopped.bytes.len==0 && session.generation==2 && linked_revision::current(session,"main.blot",abi,probes)[..]==prior[..]);}
+ let maxdepth=linked_revision::update(session,root.root,"main.blot",abi,probes,0);
+ assert(maxdepth.status==0 && maxdepth.retained && maxdepth.generation==3);
+ assert(write_file(provider_path,"pub let f: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => return x & 255\n"));
+ let masked=linked_revision::update(session,root.root,"main.blot",abi,probes,0);
+ assert(masked.status==0 && masked.retained && masked.generation==4 && write_file("linked_mask.wasm",masked.bytes));
+ assert(write_file(provider_path,"pub let f: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => return 4294967295\n"));
+ let max=linked_revision::update(session,root.root,"main.blot",abi,probes,0);
+ assert(max.status==0 && max.retained && max.generation==5 && write_file("linked_max.wasm",max.bytes));
+ let last=linked_revision::current(session,"main.blot",abi,probes);
+ assert(write_file(provider_path,"pub let f: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => return x + 1\n"));
+ let unproved=linked_revision::update(session,root.root,"main.blot",abi,probes,0);
+ assert(unproved.status!=0 && session.generation==5 && linked_revision::current(session,"main.blot",abi,probes)[..]==last[..]);
+ assert(write_file(provider_path,"pub let f: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => return f(x)\n"));
+ let recursion=linked_revision::update(session,root.root,"main.blot",abi,probes,0);
+ assert(recursion.status!=0 && session.generation==5 && linked_revision::current(session,"main.blot",abi,probes)[..]==last[..]);
+ assert(write_file(provider_path,"import \"./main.blot\" as m\npub let f: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => return x\n"));
+ let cycle=linked_revision::update(session,root.root,"main.blot",abi,probes,0);
+ assert(cycle.status==15 && session.generation==5 && linked_revision::current(session,"main.blot",abi,probes)[..]==last[..]);
+ assert(source_resolver::close_root(root.root));
+ print("private linked scalar source/interface/target/revision laws passed");
+}
