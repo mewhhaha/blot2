@@ -40,6 +40,8 @@ python3 "$script_dir/multilink_test.py"
 python3 "$script_dir/chain_test.py"
 for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/abi_fixed_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/abi_profile_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/abi_profile_adversarial_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/blake3_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/public_frontend_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/public_interface_test.goose"
@@ -148,6 +150,8 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/i08_affine_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/i08_affine_adversarial_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/i08_affine_generated_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_flow_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/i08_flow_independent_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/i08_live_affine_adversarial_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/m12_adapter_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/m12_adapter_adversarial_test.goose"
@@ -166,6 +170,9 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/static_fast_independent_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/static_fast_budget_boundary_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/static_fast_entry_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_m_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_m_cache_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_m_differential_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/mixed_depth_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/mixed_compat_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/mixed_adapter_independent_test.goose"
@@ -174,6 +181,7 @@ done
 test_dir=$(mktemp -d)
 trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
 for level in 0 2; do
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/abi_profile_reference_emit.goose" && python3 "$script_dir/abi_profile_reference_test.py")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/pool_guest_emit.goose" && node "$script_dir/pool_guest_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/pool_builder_guest_emit.goose" && node "$script_dir/pool_builder_guest_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/particle_guest_emit.goose" && node "$script_dir/particle_guest_test.mjs")
@@ -192,6 +200,7 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_candidate_wire_emit.goose" && node "$script_dir/m12_candidate_wire_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_one_test.goose" && node "$script_dir/m12_one_test.mjs" && node "$script_dir/m12_one_bridge_oracle_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_one_variant_test.goose" && node "$script_dir/m12_one_variant_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/joined_public_test.goose" && node "$script_dir/joined_public_test.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/joined_bridge_audit.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_one_cross_source_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/frame_emit_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/i08_live_source_test.goose" && node "$script_dir/m12_one_independent_bodies_test.mjs" && node "$script_dir/m12_one_independent_geometry_test.mjs" && node "$script_dir/m12_one_independent_numeric_test.mjs" && node "$script_dir/m12_one_partial_fault_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/frame_emit_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/i08_live_source_test.goose" && node "$script_dir/frame_verify_test.mjs" && node "$script_dir/frame_test.mjs" && node "$script_dir/frame_adversarial_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_transition_test.goose" && node "$script_dir/i08_transition_test.mjs")

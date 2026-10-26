@@ -105,6 +105,13 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) with the private public-shaped
+scalar/loop source seam, branch-aware source-local builder plan, metered scalar
+helpers and partial ABI inventory. The run covers `-O0`/`-O2`, forged source
+and Core, independent digest, execution and work-boundary controls. Original
+source-span portable Core, full C09, general loans, qualified ABI and public
+admission remain incomplete; the private ABI inventory is not the M10 hash.
+
 A combined Goose fixture run passed (exit 0) with the private source-order
 wire/manifest candidate, import-free one-module adapter and worker, and optional
 static-evaluation cache. It includes `-O0`/`-O2`, independent source/target,
