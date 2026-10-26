@@ -25,6 +25,8 @@ python3 "$script_dir/graph_oracle_test.py"
 python3 "$script_dir/bounds_oracle_test.py"
 python3 "$script_dir/loop_oracle_test.py"
 python3 "$script_dir/loop_prefix_oracle_test.py"
+python3 "$script_dir/proofgraph_inspect_test.py"
+python3 "$script_dir/ownership_oracle_test.py"
 for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/abi_fixed_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/blake3_test.goose"
@@ -95,6 +97,19 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/facts_graph_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/facts_sequence_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/session_retained_adversarial_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/iteration_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/iteration_verify_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/iteration_verify_boundary_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/iteration_verify_smoke_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/ownership_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/ownership_runtime_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/ownership_adversarial_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/ownership_generated_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/ownership_scope_negative_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/proofgraph_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/proofgraph_random_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/proofgraph_oracle_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/proofgraph_contradiction_budget_test.goose"
 done
 test_dir=$(mktemp -d)
 trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
@@ -108,6 +123,8 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/increment_test.goose" && node "$script_dir/increment_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/locals_test.goose" && node "$script_dir/locals_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/unified_test.goose" && node "$script_dir/unified_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/unified_guard_test.goose" && node "$script_dir/unified_guard_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/unified_guard_adversarial_test.goose" && node "$script_dir/unified_guard_adversarial_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/session_retained_test.goose" && node "$script_dir/session_retained_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/loop_test.goose" && node "$script_dir/loop_test.mjs" && node "$script_dir/loop_exhaustive_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/closure_test.goose" && node "$script_dir/closure_test.mjs" && node "$script_dir/closure_audit_test.mjs")
@@ -188,6 +205,15 @@ let f: U32 -> U32 = fn x => do:
 NESTED
 "$script_dir/build/blot-k1" locals-fixture "$test_dir/locals.blot" > "$test_dir/locals.hex"
 node -e 'const fs=require("node:fs");const b=Buffer.from(fs.readFileSync(process.argv[1],"utf8").trim(),"hex");WebAssembly.instantiate(b).then(({instance})=>{const f=instance.exports.f;if((f(0,2)>>>0)!==3||(f(0,7)>>>0)!==7||(f(0,10)>>>0)!==99)process.exit(1)}).catch(()=>process.exit(1))' "$test_dir/locals.hex"
+cat > "$test_dir/locals.blot" <<'GUARDED'
+let f: U32 -> U32 = fn x => do:
+  if x < 4294967295:
+    return x + 1
+  else:
+    return x
+GUARDED
+"$script_dir/build/blot-k1" locals-fixture "$test_dir/locals.blot" > "$test_dir/locals.hex"
+node -e 'const fs=require("node:fs");const b=Buffer.from(fs.readFileSync(process.argv[1],"utf8").trim(),"hex");WebAssembly.instantiate(b).then(({instance})=>{const f=instance.exports.f;if((f(0,0)>>>0)!==1||(f(0,4294967294)>>>0)!==4294967295||(f(0,4294967295)>>>0)!==4294967295)process.exit(1)}).catch(()=>process.exit(1))' "$test_dir/locals.hex"
 printf 'let f: U32 -> U32 = fn x => do:\n  return x + 1\n' > "$test_dir/locals.blot"
 if "$script_dir/build/blot-k1" locals-fixture "$test_dir/locals.blot" > "$test_dir/rejected" 2> "$test_dir/error"; then
     echo 'unproved local addition was accepted' >&2; exit 1

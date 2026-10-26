@@ -43,3 +43,21 @@ including different session setup costs; its ratio is not a production compiler
 speedup. It does not itself monitor other processes or guarantee an idle host.
 The work receipts are partial and do not establish complete K1 policy parity.
 No benchmark result is claimed until the measured command is run and reviewed.
+
+## Recorded private-fixture run
+
+With the other test workers stopped, one run on the host described in the
+sample file used four warmup pairs and 31 alternating measured pairs of 200
+operations each. The median paired warm/fresh ratio was 0.223 (p10–p90 sample
+spread 0.218–0.239). Median batch times divided by 200 were approximately
+20.13 microseconds for a fresh session and 4.52 microseconds for a warm hit.
+Both paths checked the same source and Wasm bytes, and the independent Node
+identity witness passed. The cgroup throttled-period and throttled-time counters
+did not increase during the measured interval; no per-sample process monitor
+was used, so brief contention cannot be ruled out.
+
+The [ordered samples and metadata](measurements/2026-10-26-scalar/session.json)
+record the exact binary and source hashes, work counters and environment. This
+is the instrumented private identity fixture described above, including fresh
+session construction. It is not an end-to-end compiler comparison, a K1 versus
+legacy result, or evidence that this partial receipt meets K1 accounting laws.

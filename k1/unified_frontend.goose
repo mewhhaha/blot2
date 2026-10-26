@@ -4,6 +4,7 @@ import lexer;
 import validate;
 import unified_core;
 import unified_completion;
+import unified_guard;
 struct Cursor { lex:lexer::State=lexer::State {}, t:lexer::Token=lexer::Token {}, status:i64=0, depth:i64=0 }
 // Status 1 syntax/unsupported, 2 local limit, 3 unbound, 4 duplicate,
 // 5 unproved addition, 6 type mismatch, 7 missing return, 8 unreachable.
@@ -65,7 +66,6 @@ fn sum(s:u8[:], c:Cursor&, n:unified_core::Node[>..]&, b:unified_core::Binding[:
     while c.status==0 && eq(s,c.t,5,"+") {
         advance(s,c); let z=primary(s,c,n,b,active,param); if z==0 || c.status!=0 {return 0;}
         if n[a-1].ty!=1 || n[z-1].ty!=1 {c.status=6;return 0;}
-        if !fits(n[a-1],n[z-1]) {c.status=5;return 0;}
         a=push(n,c,unified_core::Node {tag:3,start:n[a-1].start,end:n[z-1].end,a:a,b:z,ty:1});
     }
     return a;
@@ -156,5 +156,8 @@ fn parse(s:u8[:]) -> unified_core::Result {
     if c.status!=0 || c.t.kind!=0 {return unified_core::Result {status:if c.status==0 {1} else {c.status}};}
     let completion=unified_completion::check(nodes,root);
     if completion!=0 {return unified_core::Result {status:completion};}
-    return unified_core::Result {program:unified_core::Program {source:s,name_start:name.start,name_end:name.end,param_start:param.start,param_end:param.end,nodes:nodes,bindings:binds,root:root}};
+    var candidate=unified_core::Program {source:s,name_start:name.start,name_end:name.end,param_start:param.start,param_end:param.end,nodes:copy(nodes),bindings:copy(binds),root:root};
+    let proof=unified_guard::check(s,candidate);
+    if proof.status!=0 {return unified_core::Result {status:proof.status};}
+    return unified_core::Result {program:candidate};
 }

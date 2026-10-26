@@ -10,13 +10,13 @@ legacy remains default. This ledger records evidence, not completion claims.
 | K1-00 shared scalar contract | In progress | `k1/CONTRACT.md` defines a deliberately narrow coordination seam. The experimental scalar fixture can emit and execute a narrow Wasm module. Catalog labels and a narrow operation registry exist; complete operation coverage, canonical identities in requests and durable artifact headers, owned checked artifacts, independent artifact validation and the complete fixture inventory and phase trace still require implementation and tests. Checking strings at the fixture boundary is not artifact-header validation. The private driver now bounds file reads at 16 MiB and probes one extra byte to reject oversize inputs. This alone does not qualify the prototype for untrusted inputs. |
 | K1-01 syntax and completion | Not complete | The private fixture additionally builds and checks an owned lexer-to-scalar syntax snapshot. Full grammar, explicit exits, formatter/editor and round-trip laws remain. |
 | K1-02 checked scalar Core | Not complete | The private scalar driver validates transient value-only interface, function and lowering-plan records. Canonical owned artifacts, full independent validation, stable identity, proof/effect/resource data and post-sealing inference guard remain. |
-| K1-03 proofs and Index | Not complete | A standalone bounded ordering graph model trusts caller-supplied facts; source authority, independently validated evidence, exact required proofs and Index remain. |
+| K1-03 proofs and Index | Not complete | Narrow source-bound guarded arithmetic and finite fact models exist; general source authority, complete evidence, exact required proofs and Index remain. |
 | K1-04 scoped storage and particle | Not complete | Pool and builder models and hand-emitted Wasm particle experiments exist. Source lowering, checked ownership/loan preconditions, typed failure cleanup, global ownership validation and the I08 acceptance workload remain. |
 | K1-05 relational packages | Not complete | A private stored-endpoint witness exists; generative domain, source ownership and package laws remain. |
 | K1-06 functions and frames | Not complete | A narrow captured-closure witness exists; general capture, placement and finite resource contracts remain. |
 | K1-07 ownership and bridge | Not complete | Narrow Owned and copy-bridge witnesses exist; full whole-region authority, loans, host ABI and runtime integration remain. |
 | K1-08 generics and staging | Not complete | A narrow generic identity/dictionary witness exists; rank-one uniform ABI, general obligations and required static evaluation remain. |
-| K1-09 optimization and reuse | Not started | Bounded revalidated rewrites, cache and transactional failure laws remain. |
+| K1-09 optimization and reuse | Not complete | A partial scalar session has in-process reuse and target revalidation; general rewrites, authenticated work/dependencies and transactional failure laws remain. |
 | K1-10 rollout and qualification | Not started | Full corpus, migration, fault sweeps, code inspection, performance and rollout gate remain. |
 
 ## Additional experimental models
@@ -26,9 +26,10 @@ projection exercise scoped storage and complete-row publication. They do not
 come from admitted K1 source or prove the I08 loop invariant. A private
 fixed-U32 copy bridge is exercised as both a native model and an emitted Wasm
 fixture; neither is the complete M12 bridge or qualified host API. A retained
-scalar experiment checks exact observations and simulated rollback but still
-recompletes every source; actual reuse and allocation-failure atomicity are
-not implemented. The private flow parser has expanded expression and lexical
+scalar snapshot experiment checks exact observations and simulated rollback
+but recompletes every source; the separate scalar session below implements a
+limited in-process warm path. Allocation-failure atomicity is not established.
+The private flow parser has expanded expression and lexical
 break coverage; a separate narrow Bool-to-U32 slice checks names and types and
 emits Wasm, while general resolution, effects and lowering remain. A Linux
 descriptor-relative source resolver can read below a trusted live package root;
@@ -50,6 +51,12 @@ index, length, version and true edge; those identities remain trusted fixture
 inputs rather than K1 binding or loan authority. A separate private guarded
 increment path checks source and successor evidence before emitting Wasm.
 These paths do not implement general bounds reasoning or the particle loop.
+
+The unified scalar source path now supports one source-backed successor proof
+on the true edge of `x < U32.MAX`. Separate private iteration, generalized
+ownership and bounded requirement-graph slices check source and structural
+evidence, but do not implement the general type/effect/loan system or complete
+proof policy. Their local limits are not K1 language limits.
 
 The private scalar session can reuse a prior in-process result after checking
 exact source, observations, plan and emitted bytes. It depends on exclusive
@@ -78,6 +85,13 @@ interface-envelope candidate test also passed at O0/O2. This is focused test
 evidence, not full K1 qualification.
 
 ## Validation evidence
+
+A further combined Goose fixture run passed (exit 0) after integrating the
+unified guarded-increment path and adding source-bound proofgraph, iteration
+syntax/completion and generalized ownership tests at `-O0` and `-O2`. These
+remain bounded private subsets without complete K1 source admission. A later
+private session benchmark and its precise limits are recorded in
+`session_BENCHMARK.md`.
 
 A combined Goose fixture run passed (exit 0) after connecting the unified U32
 source path and adding the scoped fact graph, carry-loop, branch-aware affine
