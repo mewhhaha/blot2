@@ -23,6 +23,8 @@ python3 "$script_dir/source_resolver_test.py"
 python3 "$script_dir/particle_expr_oracle_test.py"
 python3 "$script_dir/graph_oracle_test.py"
 python3 "$script_dir/bounds_oracle_test.py"
+python3 "$script_dir/loop_oracle_test.py"
+python3 "$script_dir/loop_prefix_oracle_test.py"
 for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/abi_fixed_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/blake3_test.goose"
@@ -85,6 +87,14 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/closure_audit_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/locals_adversarial_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/locals_limits_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/affine_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/affine_runtime_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/affine_generated_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/affine_forgery_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/facts_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/facts_graph_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/facts_sequence_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/session_retained_adversarial_test.goose"
 done
 test_dir=$(mktemp -d)
 trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
@@ -97,6 +107,9 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/bounds_test.goose" && node "$script_dir/bounds_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/increment_test.goose" && node "$script_dir/increment_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/locals_test.goose" && node "$script_dir/locals_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/unified_test.goose" && node "$script_dir/unified_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/session_retained_test.goose" && node "$script_dir/session_retained_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/loop_test.goose" && node "$script_dir/loop_test.mjs" && node "$script_dir/loop_exhaustive_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/closure_test.goose" && node "$script_dir/closure_test.mjs" && node "$script_dir/closure_audit_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/generic_identity_test.goose" && node "$script_dir/generic_identity_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/bridge_wasm_fixture_emit.goose" && node "$script_dir/bridge_wasm_fixture_test.mjs" && node "$script_dir/bridge_wasm_restoration_test.mjs" && node "$script_dir/bridge_host_fixture_test.mjs")
@@ -163,12 +176,25 @@ LOCALS
 "$script_dir/build/blot-k1" locals-fixture "$test_dir/locals.blot" --trace > "$test_dir/locals.hex" 2> "$test_dir/trace"
 grep -q 'bindings and checked arithmetic validated' "$test_dir/trace"
 node -e 'const fs=require("node:fs");const b=Buffer.from(fs.readFileSync(process.argv[1],"utf8").trim(),"hex");WebAssembly.instantiate(b).then(({instance})=>{const f=instance.exports.f;if((f(0,9)>>>0)!==10||(f(0,256)>>>0)!==1||(f(0,10)>>>0)!==10)process.exit(1)}).catch(()=>process.exit(1))' "$test_dir/locals.hex"
+cat > "$test_dir/locals.blot" <<'NESTED'
+let f: U32 -> U32 = fn x => do:
+  if x < 10 && #True:
+    let y = U32.wrapping_add(x,1)
+    if y < 5:
+      return y
+    else:
+      return x
+  return 99
+NESTED
+"$script_dir/build/blot-k1" locals-fixture "$test_dir/locals.blot" > "$test_dir/locals.hex"
+node -e 'const fs=require("node:fs");const b=Buffer.from(fs.readFileSync(process.argv[1],"utf8").trim(),"hex");WebAssembly.instantiate(b).then(({instance})=>{const f=instance.exports.f;if((f(0,2)>>>0)!==3||(f(0,7)>>>0)!==7||(f(0,10)>>>0)!==99)process.exit(1)}).catch(()=>process.exit(1))' "$test_dir/locals.hex"
 printf 'let f: U32 -> U32 = fn x => do:\n  return x + 1\n' > "$test_dir/locals.blot"
 if "$script_dir/build/blot-k1" locals-fixture "$test_dir/locals.blot" > "$test_dir/rejected" 2> "$test_dir/error"; then
     echo 'unproved local addition was accepted' >&2; exit 1
 fi
 test ! -s "$test_dir/rejected"
 grep -q 'source error 5' "$test_dir/error"
+grep -q 'k1_arithmetic_not_established' "$test_dir/error"
 cat > "$test_dir/module.blot" <<'MODULE'
 let a: U32 -> U32 = fn x => return b(x)
 let c: U32 -> U32 = fn x => return b(4294967295)

@@ -51,6 +51,12 @@ inputs rather than K1 binding or loan authority. A separate private guarded
 increment path checks source and successor evidence before emitting Wasm.
 These paths do not implement general bounds reasoning or the particle loop.
 
+The private scalar session can reuse a prior in-process result after checking
+exact source, observations, plan and emitted bytes. It depends on exclusive
+trusted ownership of the session and receipt; that boundary is not enforced by
+Goose namespaces, and receipt tampering is not authenticated. Its work meter
+and dependency discovery are incomplete, so this is not qualified K1 reuse.
+
 The scalar fixture uses an experimental shared work meter; the separate
 fixtures do not yet share it. The meter has no compiler-wide integration or
 durable receipt. The private checked-add fixture now discharges its scoped
@@ -73,9 +79,15 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) after connecting the unified U32
+source path and adding the scoped fact graph, carry-loop, branch-aware affine
+model and hardened private session checks. The run includes Goose `-O0`/`-O2`,
+independent oracles and Wasm execution. The fixed-source and trusted-state
+limits above still apply; this is not full K1 qualification.
+
 A further combined Goose fixture run passed (exit 0) after adding guarded
 reads, increment evidence, the source-bound Owned program and U32 local
-bindings. The driver executes the locals subset; its diagnostics still use
+bindings. The driver executes the locals subset; some diagnostics still use
 private numeric statuses without complete source spans. The general language,
 shared accounting, host ABI and rollout gates remain incomplete.
 

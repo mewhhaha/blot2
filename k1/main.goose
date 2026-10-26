@@ -10,9 +10,9 @@ import public_snapshot;
 import flow_decl;
 import flow_decl_check;
 import flow_decl_wasm;
-import locals_frontend;
-import locals_check;
-import locals_wasm;
+import unified_frontend;
+import unified_check;
+import unified_wasm;
 import module_frontend;
 import module_wasm;
 import add_frontend;
@@ -162,17 +162,22 @@ fn flow_fixture(source: u8[:], trace: bool) {
     encoded.push('\n'); write_stdout(encoded);
 }
 
-// Private whole-source U32 locals fixture. The subset and proof restrictions
-// are documented in locals_schema.md; no public admission is implied.
+// Private whole-source U32 locals/flow fixture. The subset and proof
+// restrictions are documented in unified_schema.md; no public admission.
 fn locals_fixture(source: u8[:], trace: bool) {
-    var result = locals_frontend::parse(source);
+    var result = unified_frontend::parse(source);
     if result.status != 0 {
         var detail: u8[>..] = [];
-        format(detail, "source error ", result.status, "\n");
+        format(detail, "source error ", result.status);
+        let category = if result.status == 3 { "k1_unbound_name" }
+            else if result.status == 5 { "k1_arithmetic_not_established" }
+            else { "" };
+        if category.len > 0 { format(detail, " (", category, ")"); }
+        format(detail, "\n");
         write_stderr(detail); exit(1);
     }
-    if !locals_check::verify(source, result.program) { fail("internal locals fixture source mismatch"); }
-    let bytes = locals_wasm::emit(source, result.program);
+    if !unified_check::verify(source, result.program) { fail("internal locals fixture source mismatch"); }
+    let bytes = unified_wasm::emit(source, result.program);
     if bytes.len == 0 { fail("internal locals fixture emission failure"); }
     if trace { write_stderr("locals fixture: source, bindings and checked arithmetic validated; Wasm emitted\n"); }
     let hex = "0123456789abcdef";
