@@ -1,0 +1,176 @@
+#!/bin/sh
+# Tests only the experimental scalar fixture. This is not K1 qualification.
+set -eu
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+: "${GOOSE:=goose}"
+: "${GOOSE_HOME:=$script_dir/build/goose-home}"
+export GOOSE_HOME
+export GOOSE
+"$script_dir/build.sh"
+"$GOOSE" --debug "$script_dir/lexer_test.goose"
+"$GOOSE" --debug "$script_dir/syntax_test.goose"
+"$GOOSE" --debug "$script_dir/frontend_test.goose"
+"$GOOSE" --debug "$script_dir/test_validate.goose"
+"$GOOSE" --debug "$script_dir/artifact_test.goose"
+"$GOOSE" --debug "$script_dir/artifact_v2_test.goose"
+"$GOOSE" --debug "$script_dir/core_test.goose"
+"$GOOSE" --debug "$script_dir/layout_test.goose"
+"$GOOSE" --debug "$script_dir/scalar_core_test.goose"
+"$GOOSE" --debug "$script_dir/scalar_plan_test.goose"
+"$GOOSE" --debug "$script_dir/catalog_test.goose"
+for level in 0 2; do
+    "$GOOSE" --debug "-O$level" "$script_dir/blake3_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/public_frontend_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/parser_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/module_core_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/module_frontend_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/host_bridge_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/builder_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/pool_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/proof_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/add_proof_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/add_frontend_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/add_parser_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/add_core_test.goose"
+done
+test_dir=$(mktemp -d)
+trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
+for level in 0 2; do
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/pool_guest_emit.goose" && node "$script_dir/pool_guest_test.mjs")
+done
+for level in 0 2; do
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/module_wasm_test.goose" && node "$script_dir/module_wasm_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/add_wasm_test.goose" && node "$script_dir/add_wasm_test.mjs")
+done
+(cd "$test_dir" && "$GOOSE" --debug "$script_dir/wasm_test.goose" && node "$script_dir/wasm_test.mjs")
+(cd "$test_dir" && "$GOOSE" --debug "$script_dir/wasm_v2_test.goose" && node "$script_dir/wasm_v2_test.mjs")
+cat > "$test_dir/module.blot" <<'MODULE'
+let a: U32 -> U32 = fn x => return b(x)
+let c: U32 -> U32 = fn x => return b(4294967295)
+let b: U32 -> U32 = fn x => return x & 2147483648
+let d: U32 -> U32 = fn x => return a(x)
+MODULE
+"$script_dir/build/blot-k1" module-fixture "$test_dir/module.blot" --trace > "$test_dir/module.hex" 2> "$test_dir/trace"
+grep -q 'module fixture: validated source' "$test_dir/trace"
+grep -q 'module fixture: validated Core' "$test_dir/trace"
+node "$script_dir/module_driver_test.mjs" "$test_dir/module.hex"
+printf 'let a: U32 -> U32 = fn x => return b(x)\nlet b: U32 -> U32 = fn x => return a(x)\n' > "$test_dir/module.blot"
+if "$script_dir/build/blot-k1" module-fixture "$test_dir/module.blot" > "$test_dir/rejected" 2> "$test_dir/error"; then
+    echo 'recursive module was accepted' >&2; exit 1
+fi
+test ! -s "$test_dir/rejected"
+grep -q 'k1_recursive_call' "$test_dir/error"
+printf 'let a: U32 -> U32 = fn x => return missing(x)\n' > "$test_dir/module.blot"
+if "$script_dir/build/blot-k1" module-fixture "$test_dir/module.blot" > "$test_dir/rejected" 2> "$test_dir/error"; then
+    echo 'unbound callee was accepted' >&2; exit 1
+fi
+test ! -s "$test_dir/rejected"
+grep -q 'k1_unbound_name' "$test_dir/error"
+printf 'let f: U32 -> U32 = fn x => return x + 0\n' > "$test_dir/add.blot"
+"$script_dir/build/blot-k1" add-fixture "$test_dir/add.blot" --trace > "$test_dir/add.hex" 2> "$test_dir/trace"
+grep -q 'add fixture: validated source and syntax' "$test_dir/trace"
+grep -q 'add fixture: validated Core and evidence' "$test_dir/trace"
+grep -q 'add fixture: revalidated plan and emitted Wasm module' "$test_dir/trace"
+node -e 'const fs=require("node:fs");fs.writeFileSync(process.argv[2],Buffer.from(fs.readFileSync(process.argv[1],"utf8").trim(),"hex"));' "$test_dir/add.hex" "$test_dir/add_v4_0.wasm"
+printf 'let f: U32 -> U32 = fn x => do:\n  return x + 0\n' > "$test_dir/add.blot"
+"$script_dir/build/blot-k1" add-fixture "$test_dir/add.blot" > "$test_dir/add.hex"
+node -e 'const fs=require("node:fs");fs.writeFileSync(process.argv[2],Buffer.from(fs.readFileSync(process.argv[1],"utf8").trim(),"hex"));' "$test_dir/add.hex" "$test_dir/add_v4_1.wasm"
+printf 'let f: U32 -> U32 = fn x => return do:\n  break x + 0\n' > "$test_dir/add.blot"
+"$script_dir/build/blot-k1" add-fixture "$test_dir/add.blot" > "$test_dir/add.hex"
+node -e 'const fs=require("node:fs");fs.writeFileSync(process.argv[2],Buffer.from(fs.readFileSync(process.argv[1],"utf8").trim(),"hex"));' "$test_dir/add.hex" "$test_dir/add_v4_2.wasm"
+(cd "$test_dir" && node "$script_dir/add_wasm_test.mjs")
+if "$script_dir/build/blot-k1" fixture "$test_dir/add.blot" > "$test_dir/rejected" 2> "$test_dir/error"; then
+    echo 'legacy scalar fixture accepted addition' >&2; exit 1
+fi
+test ! -s "$test_dir/rejected"
+for expression in 'x + 1' 'x + 4294967295' 'x + x' '0 + x'; do
+    printf 'let f: U32 -> U32 = fn x => return %s\n' "$expression" > "$test_dir/add.blot"
+    if "$script_dir/build/blot-k1" add-fixture "$test_dir/add.blot" > "$test_dir/rejected" 2> "$test_dir/error"; then
+        echo 'unproved addition was accepted' >&2; exit 1
+    fi
+    test ! -s "$test_dir/rejected"
+    grep -q 'k1_arithmetic_not_established' "$test_dir/error"
+done
+for case_id in name type overflow; do
+    case "$case_id" in
+        name) expression='let f: U32 -> U32 = fn x => return y + 0'; category=k1_unbound_name ;;
+        type) expression='let f: U32 -> Bool = fn x => return x + 0'; category=k1_type_mismatch ;;
+        overflow) expression='let f: U32 -> U32 = fn x => return x + 4294967296'; category=k1_syntax ;;
+    esac
+    printf '%s\n' "$expression" > "$test_dir/add.blot"
+    if "$script_dir/build/blot-k1" add-fixture "$test_dir/add.blot" > "$test_dir/rejected" 2> "$test_dir/error"; then
+        echo 'invalid checked-add source was accepted' >&2; exit 1
+    fi
+    test ! -s "$test_dir/rejected"
+    grep -q "$category" "$test_dir/error"
+done
+printf 'let id: U32 -> U32 = fn x => return x\n' > "$test_dir/input.blot"
+"$script_dir/build/blot-k1" fixture "$test_dir/input.blot" --trace > "$test_dir/module.hex" 2> "$test_dir/trace"
+grep -q 'validated scalar structure' "$test_dir/trace"
+grep -q 'validated owned scalar syntax' "$test_dir/trace"
+grep -q 'validated in-memory scalar function' "$test_dir/trace"
+grep -q 'validated in-memory lowering plan' "$test_dir/trace"
+grep -q 'validated typed scalar lowering plan' "$test_dir/trace"
+node "$script_dir/driver_test.mjs" "$test_dir/module.hex"
+printf 'let value: U32 -> U32 = fn x => return 4294967295\n' > "$test_dir/input.blot"
+"$script_dir/build/blot-k1" fixture "$test_dir/input.blot" > "$test_dir/module.hex"
+node "$script_dir/driver_test.mjs" "$test_dir/module.hex" value 4294967295
+printf 'let id: U32 -> U32 = fn x => do:\n  return x\n' > "$test_dir/input.blot"
+"$script_dir/build/blot-k1" fixture "$test_dir/input.blot" > "$test_dir/module.hex"
+node "$script_dir/block_test.mjs" "$test_dir/module.hex" identity
+printf 'let id: U32 -> U32 = fn x => return do:\n  break x\n' > "$test_dir/input.blot"
+"$script_dir/build/blot-k1" fixture "$test_dir/input.blot" > "$test_dir/module.hex"
+node "$script_dir/block_test.mjs" "$test_dir/module.hex" identity
+printf 'let id: U32 -> U32 = fn x => do:\n  return do:\n    break 42\n' > "$test_dir/input.blot"
+"$script_dir/build/blot-k1" fixture "$test_dir/input.blot" > "$test_dir/module.hex"
+node "$script_dir/block_test.mjs" "$test_dir/module.hex" constant
+printf 'let id: U32 -> U32 = fn x => do:\n  break x\n' > "$test_dir/input.blot"
+if "$script_dir/build/blot-k1" fixture "$test_dir/input.blot" > "$test_dir/rejected" 2> "$test_dir/error"; then
+    echo 'invalid break was accepted' >&2; exit 1
+fi
+test ! -s "$test_dir/rejected"
+grep -q 'source error 6' "$test_dir/error"
+printf 'let f: U32 -> U32 = fn x => return x & 2147483648\n' > "$test_dir/input.blot"
+"$script_dir/build/blot-k1" fixture "$test_dir/input.blot" > "$test_dir/module.hex"
+node "$script_dir/driver_v2_test.mjs" "$test_dir/module.hex" and
+printf 'let f: U32 -> Bool = fn x => return 2147483648 < x\n' > "$test_dir/input.blot"
+"$script_dir/build/blot-k1" fixture "$test_dir/input.blot" > "$test_dir/module.hex"
+node "$script_dir/driver_v2_test.mjs" "$test_dir/module.hex" lt
+printf 'let f: U32 -> U32 = fn x => return x < 1\n' > "$test_dir/input.blot"
+if "$script_dir/build/blot-k1" fixture "$test_dir/input.blot" > "$test_dir/rejected" 2> "$test_dir/error"; then
+    echo 'type mismatch was accepted' >&2; exit 1
+fi
+test ! -s "$test_dir/rejected"
+grep -q 'k1_type_mismatch' "$test_dir/error"
+printf 'let id: U32 -> U32 = fn x => return y\n' > "$test_dir/input.blot"
+if "$script_dir/build/blot-k1" fixture "$test_dir/input.blot" > "$test_dir/rejected" 2> "$test_dir/error"; then
+    echo 'unsupported input was accepted' >&2; exit 1
+fi
+test ! -s "$test_dir/rejected"
+grep -q 'source error' "$test_dir/error"
+if "$script_dir/build/blot-k1" build "$test_dir/input.blot" "$test_dir/out.wasm" > "$test_dir/rejected" 2> "$test_dir/error"; then
+    echo 'public build was accepted' >&2; exit 1
+fi
+test ! -e "$test_dir/out.wasm"
+grep -q 'not qualified' "$test_dir/error"
+if "$script_dir/build/blot-k1" check "$test_dir/input.blot" > "$test_dir/rejected" 2> "$test_dir/error"; then
+    echo 'public check was accepted' >&2; exit 1
+fi
+grep -q 'not qualified' "$test_dir/error"
+# A complete read at the exact limit is allowed to reach parsing; one byte
+# more must be rejected before parsing, and read failures must be reported.
+node -e 'const fs = require("node:fs"); const source = Buffer.alloc(16777216, 32); source.write("let id: U32 -> U32 = fn x => return x\n"); fs.writeFileSync(process.argv[1], source);' "$test_dir/limit.blot"
+"$script_dir/build/blot-k1" fixture "$test_dir/limit.blot" > "$test_dir/limit.hex"
+node "$script_dir/driver_test.mjs" "$test_dir/limit.hex"
+node -e 'require("node:fs").appendFileSync(process.argv[1], Buffer.from([0]));' "$test_dir/limit.blot"
+if "$script_dir/build/blot-k1" fixture "$test_dir/limit.blot" > "$test_dir/rejected" 2> "$test_dir/error"; then
+    echo 'oversized fixture was accepted' >&2; exit 1
+fi
+test ! -s "$test_dir/rejected"
+grep -q 'source exceeds the 16 MiB limit' "$test_dir/error"
+if "$script_dir/build/blot-k1" fixture "$test_dir/missing.blot" > "$test_dir/rejected" 2> "$test_dir/error"; then
+    echo 'missing fixture was accepted' >&2; exit 1
+fi
+test ! -s "$test_dir/rejected"
+grep -q 'cannot read source file' "$test_dir/error"
+echo 'bounded source input passed'

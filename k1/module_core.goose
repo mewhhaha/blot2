@@ -1,0 +1,164 @@
+// Owned, transient v3 scalar-module model. Structural validation is not source
+// grammar/completion, portable artifact authentication, or K1 admission.
+namespace module_core;
+
+struct Value {
+    producer: i64 = 0, type_id: i64 = 0, op_id: i64 = 0,
+    literal: u32 = 0, left_id: i64 = 0, right_id: i64 = 0, callee_id: i64 = 0
+}
+struct Function {
+    declaration_start: i64 = 0, declaration_end: i64 = 0,
+    name_start: i64 = 0, name_end: i64 = 0,
+    function_start: i64 = 0,
+    parameter_start: i64 = 0, parameter_end: i64 = 0,
+    return_start: i64 = 0,
+    expression_start: i64 = 0, expression_end: i64 = 0,
+    left_start: i64 = 0, left_end: i64 = 0,
+    operator_start: i64 = 0, operator_end: i64 = 0,
+    right_start: i64 = 0, right_end: i64 = 0,
+    callee_start: i64 = 0, callee_end: i64 = 0,
+    depth: i64 = 0, frame: i64 = 0,
+    result_type: i64 = 0, value_count: i64 = 0,
+    values: Value[4] = [Value {}; 4],
+    terminator: i64 = 0, result_id: i64 = 0
+}
+struct ModuleCore { source: u8[] = [], functions: Function[] = [] }
+
+fn same(a: Value, b: Value) -> bool {
+    return a.producer == b.producer && a.type_id == b.type_id && a.op_id == b.op_id &&
+        a.literal == b.literal && a.left_id == b.left_id && a.right_id == b.right_id &&
+        a.callee_id == b.callee_id;
+}
+fn span(start: i64, end: i64, length: i64) -> bool {
+    return start >= 0 && end > start && end <= length;
+}
+fn letter(c: u8) -> bool {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+}
+fn name_ok(source: u8[:], start: i64, end: i64) -> bool {
+    if !span(start, end, source.len) || !letter(source[start]) { return false; }
+    for i in start + 1..end {
+        let c = source[i];
+        if !letter(c) && !(c >= '0' && c <= '9') { return false; }
+    }
+    return true;
+}
+
+// Return 0 valid, 1 malformed, 8 recursive graph, 9 depth exceeds 128.
+// The caller must independently re-recognize source/lexical targets and bind
+// the Core to it before using this model for any semantic decision.
+fn validate(m: ModuleCore&) -> i64 {
+    if m.source.len > 16777216 || m.functions.len < 1 || m.functions.len > 256 { return 1; }
+    var previous_end: i64 = 0;
+    for f, i in m.functions {
+        if !span(f.declaration_start, f.declaration_end, m.source.len) ||
+           f.declaration_start < previous_end ||
+           !name_ok(m.source, f.name_start, f.name_end) ||
+           !name_ok(m.source, f.parameter_start, f.parameter_end) ||
+           f.name_start < f.declaration_start || f.name_end > f.function_start ||
+           f.function_start < 0 || f.function_start >= f.parameter_start ||
+           f.parameter_end > f.return_start || f.return_start < 0 ||
+           f.return_start >= f.expression_start ||
+           !span(f.expression_start, f.expression_end, m.source.len) ||
+           f.expression_end > f.declaration_end ||
+           !span(f.left_start, f.left_end, m.source.len) ||
+           f.left_start < f.expression_start || f.left_end > f.expression_end ||
+           f.frame != 0 || f.result_type != 1 || f.value_count < 1 || f.value_count > 4 ||
+           f.terminator != 1 || f.result_id < 0 || f.result_id >= f.value_count { return 1; }
+        previous_end = f.declaration_end;
+        for j in i {
+            let other = m.functions[j];
+            if m.source[f.name_start..f.name_end] == m.source[other.name_start..other.name_end] { return 1; }
+        }
+        // Derive a fresh canonical sequence from the result and its typed
+        // operands; comparing all slots also rejects unused forged records.
+        let result = f.values[f.result_id];
+        var left_id = f.result_id;
+        var right_id: i64 = 0;
+        var kind: i64 = 1;
+        if result.producer == 3 || result.producer == 4 {
+            if f.result_id != f.value_count - 1 || result.left_id < 0 || result.left_id >= f.result_id { return 1; }
+            left_id = result.left_id;
+            kind = result.producer;
+            if kind == 3 {
+                if result.right_id < 0 || result.right_id >= f.result_id ||
+                   !span(f.operator_start, f.operator_end, m.source.len) ||
+                   !span(f.right_start, f.right_end, m.source.len) ||
+                   f.left_start != f.expression_start || f.left_end > f.operator_start ||
+                   f.operator_end > f.right_start || f.right_end != f.expression_end ||
+                   f.callee_start != 0 || f.callee_end != 0 { return 1; }
+                right_id = result.right_id;
+            } else {
+                if result.callee_id < 0 || result.callee_id >= m.functions.len ||
+                   f.operator_start != 0 || f.operator_end != 0 || f.right_start != 0 || f.right_end != 0 ||
+                   !name_ok(m.source, f.callee_start, f.callee_end) ||
+                   f.callee_start != f.expression_start || f.callee_end > f.left_start { return 1; }
+            }
+        } else {
+            if f.left_start != f.expression_start || f.left_end != f.expression_end ||
+               f.operator_start != 0 || f.operator_end != 0 || f.right_start != 0 || f.right_end != 0 ||
+               f.callee_start != 0 || f.callee_end != 0 { return 1; }
+        }
+        let left = f.values[left_id];
+        if left.producer != 1 && left.producer != 2 { return 1; }
+        var expected: Value[4] = [Value {}; 4];
+        expected[0] = Value { producer: 1, type_id: 1 };
+        var count: i64 = 1;
+        var wanted_left: i64 = 0;
+        if left.producer == 2 {
+            wanted_left = count;
+            expected[count] = Value { producer: 2, type_id: 1, literal: left.literal };
+            count += 1;
+        }
+        if kind == 3 {
+            let right = f.values[right_id];
+            if right.producer != 1 && right.producer != 2 { return 1; }
+            var wanted_right: i64 = 0;
+            if right.producer == 2 {
+                wanted_right = count;
+                expected[count] = Value { producer: 2, type_id: 1, literal: right.literal };
+                count += 1;
+            }
+            expected[count] = Value { producer: 3, type_id: 1, op_id: 1,
+                                       left_id: wanted_left, right_id: wanted_right };
+            count += 1;
+        } else if kind == 4 {
+            expected[count] = Value { producer: 4, type_id: 1,
+                                       left_id: wanted_left, callee_id: result.callee_id };
+            count += 1;
+        }
+        let wanted_result = if kind == 1 { wanted_left } else { count - 1 };
+        if count != f.value_count || f.result_id != wanted_result { return 1; }
+        for n in 4 { if !same(f.values[n], expected[n]) { return 1; } }
+    }
+    // All declarations have been span-checked; it is now safe to resolve the
+    // copied call-target names. A local U32 parameter shadows a top-level name.
+    for f in m.functions {
+        let result = f.values[f.result_id];
+        if result.producer == 4 {
+            let target = m.functions[result.callee_id];
+            let called = m.source[f.callee_start..f.callee_end];
+            if called != m.source[target.name_start..target.name_end] ||
+               called == m.source[f.parameter_start..f.parameter_end] { return 1; }
+        }
+    }
+    // One outgoing call per declaration. Iterative bounded walks reject cycles
+    // before assessing the depth limit, including cycles longer than 128.
+    for f, i in m.functions {
+        var seen: bool[256] = [false; 256];
+        var current = i;
+        var depth: i64 = 0;
+        loop {
+            if seen[current] { return 8; }
+            seen[current] = true;
+            depth += 1;
+            let node = m.functions[current];
+            let result = node.values[node.result_id];
+            if result.producer != 4 { break; }
+            current = result.callee_id;
+        }
+        if depth > 128 { return 9; }
+        if f.depth != depth { return 1; }
+    }
+    return 0;
+}

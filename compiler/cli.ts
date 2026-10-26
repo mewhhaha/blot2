@@ -9,7 +9,43 @@ const usage = `Usage: blot guide | fmt SOURCE [--check]
        blot dependencies ENTRY OUTPUT.blotdep [project options]
 Project options: --prelude PATH|none, --std-root DIR, --alias PREFIX=DIR,
                  --dependencies FILE, --input-mode project|source, --json
-Build options:   --profile-memory, --require-collector-free`;
+Build options:   --profile-memory, --require-collector-free
+K1 (experimental): --language=k1`;
+
+const k1Usage = `Usage: blot check ENTRY --language=k1
+       blot build ENTRY [OUTPUT.wasm] --language=k1`;
+
+async function runK1Cli(
+  executable: string | URL,
+  args: string[],
+): Promise<number> {
+  const [command, filename, ...rest] = args;
+  if (
+    !["check", "build"].includes(command) || !filename ||
+    filename.startsWith("-") || rest.length > (command === "build" ? 1 : 0) ||
+    rest.some((value) => value.startsWith("-"))
+  ) {
+    console.error(k1Usage);
+    return 2;
+  }
+  let destination = rest[0];
+  if (command === "build") {
+    destination ??= `build/${basename(filename, ".blot")}.wasm`;
+  }
+  try {
+    const result = await new Deno.Command(executable, {
+      args: [command, filename, ...(destination ? [destination] : [])],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    await Deno.stdout.write(result.stdout);
+    await Deno.stderr.write(result.stderr);
+    return result.success ? 0 : 1;
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    return 1;
+  }
+}
 
 export async function runCli(
   executable: string | URL = new URL(
@@ -17,7 +53,24 @@ export async function runCli(
     import.meta.url,
   ),
   args: string[] = Deno.args,
+  k1Executable: string | URL = new URL(
+    "../k1/build/blot-k1",
+    import.meta.url,
+  ),
 ): Promise<number> {
+  const selections = args.filter((arg) => arg.startsWith("--language="));
+  if (
+    selections.length > 1 || selections.some((arg) => arg !== "--language=k1")
+  ) {
+    console.error("Unknown or duplicate language selection");
+    return 2;
+  }
+  if (selections.length === 1) {
+    return await runK1Cli(
+      k1Executable,
+      args.filter((arg) => arg !== selections[0]),
+    );
+  }
   const [command, filename, ...rest] = args;
   if (["--help", "-h"].includes(command)) {
     console.log(usage);
