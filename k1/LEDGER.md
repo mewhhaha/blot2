@@ -45,6 +45,12 @@ uses a synthetic fixed frame; and generic dictionary/slot authority and the
 full ABI are absent. General source checking, provenance, cross-package
 authority and the required runtime integration remain open.
 
+A private guarded array-read fragment binds its proof to a supplied view,
+index, length, version and true edge; those identities remain trusted fixture
+inputs rather than K1 binding or loan authority. A separate private guarded
+increment path checks source and successor evidence before emitting Wasm.
+These paths do not implement general bounds reasoning or the particle loop.
+
 The scalar fixture uses an experimental shared work meter; the separate
 fixtures do not yet share it. The meter has no compiler-wide integration or
 durable receipt. The private checked-add fixture now discharges its scoped
@@ -66,6 +72,12 @@ interface-envelope candidate test also passed at O0/O2. This is focused test
 evidence, not full K1 qualification.
 
 ## Validation evidence
+
+A further combined Goose fixture run passed (exit 0) after adding guarded
+reads, increment evidence, the source-bound Owned program and U32 local
+bindings. The driver executes the locals subset; its diagnostics still use
+private numeric statuses without complete source spans. The general language,
+shared accounting, host ABI and rollout gates remain incomplete.
 
 A further `GOOSE=/tmp/k1-goose/build/goose GOOSE_HOME=/tmp/k1-goose-home
 sh k1/test.sh` run passed (exit 0) after adding the graph, closure, Owned and

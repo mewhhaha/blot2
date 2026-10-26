@@ -50,7 +50,8 @@ The oracle is test-only. Neither the Goose implementation nor the compiler
 uses Zig at runtime; `test.sh` does not require the Zig oracle.
 
 The internal driver accepts `k1/build/blot-k1 fixture INPUT [--trace]`,
-`module-fixture`, `add-fixture`, `control-fixture`, `flow-fixture`, and `public-fixture`
+`module-fixture`, `add-fixture`, `control-fixture`, `flow-fixture`,
+`locals-fixture`, and `public-fixture`
 with the same arguments. All write hex-encoded
 experimental Wasm to standard output and optional phase messages to standard
 error; none writes an output file. Only use them for fixture testing. The
@@ -73,6 +74,9 @@ package, module and ABI identities and does not perform public admission.
 The flow fixture handles a narrow complete Bool-to-U32 declaration with
 explicit returns, nested branches and short-circuit Boolean expressions. Its
 test caller must supply canonical Bool values; it is not a host ABI.
+The locals fixture handles a separate narrow U32 declaration with immutable
+bindings, explicit returns and checked or explicitly wrapping arithmetic. Its
+accepted proofs and limitations are described in `locals_schema.md`.
 A separate thin-entry fixture exercises a scalar worker and canonical adapter;
 it does not define the public host protocol. Complete lowering plans and portable
 checked artifacts remain absent. The builder, pool and ordering graph models are

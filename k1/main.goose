@@ -10,6 +10,9 @@ import public_snapshot;
 import flow_decl;
 import flow_decl_check;
 import flow_decl_wasm;
+import locals_frontend;
+import locals_check;
+import locals_wasm;
 import module_frontend;
 import module_wasm;
 import add_frontend;
@@ -159,6 +162,25 @@ fn flow_fixture(source: u8[:], trace: bool) {
     encoded.push('\n'); write_stdout(encoded);
 }
 
+// Private whole-source U32 locals fixture. The subset and proof restrictions
+// are documented in locals_schema.md; no public admission is implied.
+fn locals_fixture(source: u8[:], trace: bool) {
+    var result = locals_frontend::parse(source);
+    if result.status != 0 {
+        var detail: u8[>..] = [];
+        format(detail, "source error ", result.status, "\n");
+        write_stderr(detail); exit(1);
+    }
+    if !locals_check::verify(source, result.program) { fail("internal locals fixture source mismatch"); }
+    let bytes = locals_wasm::emit(source, result.program);
+    if bytes.len == 0 { fail("internal locals fixture emission failure"); }
+    if trace { write_stderr("locals fixture: source, bindings and checked arithmetic validated; Wasm emitted\n"); }
+    let hex = "0123456789abcdef";
+    var encoded: u8[>..] = [];
+    for b in bytes { encoded.push(hex[b / 16]); encoded.push(hex[b % 16]); }
+    encoded.push('\n'); write_stdout(encoded);
+}
+
 // Separate private v4 experiment. Scope handles and the in-memory meter are
 // local to this invocation, not cross-compile provenance or a cache key.
 fn add_fixture(source: u8[:], trace: bool) {
@@ -202,14 +224,15 @@ fn main() {
     if argv.len >= 2 && (argv[1] == "check" || argv[1] == "build") {
         fail("K1 is not qualified for public compilation; use the legacy edition");
     }
-    if (argv.len != 3 && argv.len != 4) || (argv[1] != "fixture" && argv[1] != "module-fixture" && argv[1] != "add-fixture" && argv[1] != "control-fixture" && argv[1] != "public-fixture" && argv[1] != "flow-fixture") || (argv.len == 4 && argv[3] != "--trace") {
-        fail("usage: blot-k1 fixture|module-fixture|add-fixture|control-fixture|public-fixture|flow-fixture ENTRY [--trace] (experimental internal fixture)");
+    if (argv.len != 3 && argv.len != 4) || (argv[1] != "fixture" && argv[1] != "module-fixture" && argv[1] != "add-fixture" && argv[1] != "control-fixture" && argv[1] != "public-fixture" && argv[1] != "flow-fixture" && argv[1] != "locals-fixture") || (argv.len == 4 && argv[3] != "--trace") {
+        fail("usage: blot-k1 fixture|module-fixture|add-fixture|control-fixture|public-fixture|flow-fixture|locals-fixture ENTRY [--trace] (experimental internal fixture)");
     }
     var source: u8[>..] = [];
     let read_status = k1_read_bounded(argv[2], source);
     if read_status == 2 { fail("source exceeds the 16 MiB limit"); }
     if read_status != 0 { fail("cannot read source file"); }
     let trace = argv.len == 4;
+    if argv[1] == "locals-fixture" { locals_fixture(source, trace); return; }
     if argv[1] == "flow-fixture" { flow_fixture(source, trace); return; }
     if argv[1] == "public-fixture" { public_fixture(source, trace); return; }
     if argv[1] == "module-fixture" { module_fixture(source, trace); return; }

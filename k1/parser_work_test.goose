@@ -45,14 +45,14 @@ fn main() {
     var invalid_phase = work::Meter {};
     assert(syntax::validate_with_work(arena, invalid_phase, 0) == 4 && invalid_phase.semantic == 0);
 
-    var broken = arena;
+    var broken = copy(arena);
     broken.nodes[4].target = 0;
     var bad_work = work::Meter {};
     assert(parser::verify_with_work(broken, bad_work) == 1 && bad_work.semantic > 0);
 
     // Legacy local-budget validation keeps its historical malformed-input
     // precedence, while opt-in metering precharges a represented parent edge.
-    var bad_parent = arena;
+    var bad_parent = copy(arena);
     bad_parent.nodes[1].parent = 0;
     assert(syntax::validate_budget(bad_parent, 2) == 1);
     var edge_short = work::Meter { semantic: 1048574 };

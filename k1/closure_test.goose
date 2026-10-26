@@ -28,7 +28,7 @@ fn main() {
     assert(!closure_validate::verify(alternate,core));
     assert(closure_wasm::emit(alternate,core).len == 0);
     for i in 14 {
-        var bad = core;
+        var bad = copy(core);
         if i == 0 { bad.schema = 0; } else if i == 1 { bad.capture_kind = 2; }
         else if i == 2 { bad.capture_version = 2; } else if i == 3 { bad.argument_version = 3; }
         else if i == 4 { bad.inner_version = 4; } else if i == 5 { bad.mode = 2; }
@@ -39,7 +39,7 @@ fn main() {
         assert(!closure_validate::verify(source,bad) && closure_wasm::emit(source,bad).len == 0);
     }
     for i in 9 {
-        var bad = core;
+        var bad = copy(core);
         if i == 0 { bad.function.start = -1; } else if i == 1 { bad.capture.end = 9223372036854775807; }
         else if i == 2 { bad.argument.start += 1; } else if i == 3 { bad.binding.end += 1; }
         else if i == 4 { bad.parameter.start = 0; } else if i == 5 { bad.inner_use.start += 1; }
