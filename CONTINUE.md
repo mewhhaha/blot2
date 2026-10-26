@@ -1,38 +1,48 @@
-# Continue the Goose K1 rewrite
+# Goose K1 rewrite handoff
 
-Worktree: `/home/mewhhaha/.codex/worktrees/0409/blot2`, branch
-`rewrite/goose-k1`, based on main `1e39b5d8a4268b9edf769c2813d5231abe1c963b`.
-The original main checkout and installed compiler are preserved. The user
-authorized the clean rewrite and parallel implementation. Do not close issue
-#37 or publish a replacement to main during branch qualification.
+The initial implementation and qualification are complete on `rewrite/goose-k1`,
+in `/home/mewhhaha/.codex/worktrees/0409/blot2`. Implementation commit:
+`4d5fe60343d1916ec99baa452f2727c48a408f27`. A following documentation/evidence
+commit publishes measurements without changing compiler inputs. Main remains at
+`1e39b5d8a4268b9edf769c2813d5231abe1c963b`; the installed legacy compiler was
+preserved. Do not merge, close issue #37 or replace the installed compiler without
+new instructions.
 
-All implementation lanes are frozen. The full release gate passed **91 native
-entries, 79 Deno tests and the editor gate**, including scalar preconditions,
-cache corruption/collision/forged receipts, full output-prefix failures, source
-work counters and allocation sweeps. `test-results/qualification.json` identifies
-input manifest `5fe240d4ac1b7c08ad609c2444e68cc2a7338e589de479401237fa8d80f6bce6`
-and release binary `7b61cff1941de683e99269dc2a3c30cc137201d9bca8f98e90a8d0bbc02366b2`.
-The prior ASLR-dependent fault-adapter failure is preserved separately under
-`test-results/prior-failures/`; reservation-relative chunks fixed it. Latest
-retained sweep:430 initial boundaries,251 subsequent boundaries,all251 rejected
-without replacing the previous output.
+Read [README](README.md), [the stage/law ledger](IMPLEMENTATION.md),
+[measurement report](benchmarks/RESULTS.md), [shared contracts](docs/CONTRACT.md)
+and [normative snapshots](docs/spec/INDEX.md). The user authorized the clean Goose
+rewrite and parallel implementation. All implementation lanes are frozen.
 
-Read [specification snapshots](docs/spec/INDEX.md), [contracts](docs/CONTRACT.md),
-[scope](docs/features.md) and [law ledger](IMPLEMENTATION.md). Goose executable:
-`/tmp/blot-k1-goose/build/goose`, pin
-`a108677d300cb0e8bbb842c35a353abe67a20c6c`,
-`GOOSE_HOME=/tmp/blot-k1-goose-home`. `scripts/bootstrap-goose.sh` recreates it.
+The full release gate passed **91 native entries, 79 Deno tests and editor checks**.
+Qualified input manifest:
+`5fe240d4ac1b7c08ad609c2444e68cc2a7338e589de479401237fa8d80f6bce6`.
+Release executable SHA-256:
+`7b61cff1941de683e99269dc2a3c30cc137201d9bca8f98e90a8d0bbc02366b2`.
+All 178 qualified input blobs match the implementation commit. The gate includes
+scalar input/precondition checks, corrupt optional cache fallback, collision and
+forged-receipt controls, every initialized particle prefix, actual Wasm/certificate
+validation and complete observed arena-fault sweeps.
 
-Remaining: run I09 paired compile/runtime, retained-edit, near-limit/restart,
-runtime telemetry and compiler-iteration measurements sequentially using the
-commands in [benchmarks/README.md](benchmarks/README.md). Use output names
-`build/bench-k1-release`, `bench-sessions-release`, `bench-limits-release`,
-`bench-iteration-debug`, `bench-iteration-release`, and `runtime-telemetry.json`.
-The installed paired baseline `/home/mewhhaha/.local/bin/blotc` has SHA-256
-`fd2119f5528cb164131e1156d35ba97c434393647f1b326ae5aa154db137d923`, matching
-the original checkout's qualified release compiler.
+[Published evidence](benchmarks/results/k1-initial/manifest.json) contains frozen
+gate metadata, raw samples/source/log archive and measurement summaries. No
+performance matrices remain running. Do not overwrite or repeat completed runs
+without a new implementation, failure or measurement question.
 
-Then run `scripts/package_evidence.py`; publish results and limitations in README,
-benchmarks and the final ledger; update this handoff. Do not infer a speedup or
-sub-second gdev build from synthetic cases. Keep binaries/caches/intermediates
-out of Git. Source changes require a new complete frozen gate before committing.
+The pinned Goose binary used here is `/tmp/blot-k1-goose/build/goose`, commit
+`a108677d300cb0e8bbb842c35a353abe67a20c6c`, with
+`GOOSE_HOME=/tmp/blot-k1-goose-home`; `scripts/bootstrap-goose.sh` recreates it.
+Compiler changes require a new complete `scripts/check.sh --release` gate.
+
+Measurements show slower paired compilation than legacy in most families.
+At 128 callers: fresh session 34.70 ms, unchanged 53.44 ms, body edit 50.42 ms medians.
+The 128-depth chain rejects because of its entry wrapper; a 127-depth control passes.
+Source checking 65,536 operations takes 58.30 ms; the 65,537th rejects. Compiler rebuilds
+still take 37.36 s debug / 57.67 s release (fresh medians); comment-only builds regenerate
+identical C but redo both stages. These synthetic cases do not qualify `gdev`.
+
+Follow-up proposals are explicitly unimplemented: function-local affine state and
+cached CFG facts in validation; batched layout/canonicalization with reusable
+scratch; sparse per-declaration relocation; directly retained immutable Core;
+Goose frontend/build-driver iteration work. Profile helper costs before claiming
+speedups. Keep required proof/ownership/budget checks, exact interface comparisons,
+transaction rollback and independent external-artifact admission.

@@ -4,9 +4,9 @@ A clean implementation of [issue #37](https://github.com/mewhhaha/blot2/issues/3
 in [Goose](https://github.com/aardappel/goose), on `rewrite/goose-k1`.
 The previous Zig compiler is preserved on `main`.
 
-**The implementation passes its frozen release gate; performance qualification
-is pending.** The [implementation ledger](IMPLEMENTATION.md) records evidence
-and remaining work. The
+**Initial Linux qualification is complete:** 91 native tests, 79 integration
+tests and the editor gate pass. The [implementation ledger](IMPLEMENTATION.md)
+maps the specification to executable evidence. The
 [versioned specification](docs/spec/INDEX.md) defines the language and ABI.
 
 The compiler checks explicit storage ownership, initialized lengths, integer
@@ -122,9 +122,41 @@ Passing that inventory is separate from finishing every specification law.
 The particle test inspects the actual baseline loop for four F32 loads, two
 stores, two multiplies, two adds and no calls inside the loop.
 
-Earlier compiler benchmark numbers do not qualify this rewrite. No speedup or
-sub-second project-build claim is made until the specified scaling and edit
-workloads have been measured with complete metadata.
+## Initial measurements
+
+Five paired rounds on a Ryzen 7 7800X3D, with the pinned legacy release compiler
+at `1e39b5d8`. Medians below; [the full report](benchmarks/RESULTS.md) includes
+all scales, ranges, CPU/RSS, work counters, failures, raw samples and reproduction
+commands. Runtime uses the same Deno/V8 Wasm engine and includes entry wrappers.
+
+| Workload | Scale | Compile ms, K1 / legacy | Runtime ns/call, K1 / legacy |
+| --- | ---: | ---: | ---: |
+| Independent functions | 128 | 26.41 / 5.92 | 84.2 / 85.0 |
+| Shared callee | 128 | 26.30 / 5.41 | 106.1 / 90.6 |
+| Call chain | 127 | 20.97 / 8.25 | 1253.6 / 129.2 |
+| Diamonds | 128 | 101.83 / 33.81 | 176.3 / 77.2 |
+| Generic calls | 128 | 23.26 / 6.26 | 109.4 / 66.1 |
+| Captured closures | 128 | 59.04 / 12.10 | 103.4 / 139.6 |
+| Imported modules | 128 | 44.43 / 16.48 | 119.6 / 61.2 |
+| Guarded arithmetic | 128 | 405.15 / 22.44 | 167.0 / 85.5 |
+| Static domains | 128 | 114.45 / 7.58 | 138.3 / 119.6 |
+
+**This initial rewrite is slower than the legacy compiler on most paired
+compile workloads.** The 128-deep chain exceeds K1’s depth envelope once its
+entry wrapper is included; its rejection is retained in the report. K1 uses
+`--opt=off`, while the baseline uses its default pipeline. These are synthetic
+workloads with equivalent tested outputs, not a migrated `gdev` benchmark.
+
+For 128 callers, a retained body edit takes **50.42 ms**; an unchanged request
+takes **53.44 ms**, versus **34.70 ms** for a fresh session. Reuse currently costs
+more than checking these small bodies. At 65,536 operations, source checking
+takes **58.30 ms** and building with a Core artifact takes **106.02 ms**;
+the next operation rejects at the specified limit.
+
+Rebuilding the compiler takes **37.36 s debug** or **57.67 s release** (fresh
+medians); unchanged/comment edits still repeat Goose and C compilation.
+The report identifies validation, canonicalization, whole-table relocation and
+private cache transport as the next areas to investigate.
 
 The [scope table](docs/features.md), [operation registry](docs/REGISTRY.md),
 [diagnostic catalogue](docs/DIAGNOSTICS.md) and

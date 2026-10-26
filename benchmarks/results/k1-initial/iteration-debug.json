@@ -1,0 +1,340 @@
+{
+  "metadata": {
+    "timestamp": "2026-10-26T18:33:50Z",
+    "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.7 (main, Aug 13 2026, 07:40:04) [GCC 16.2.1 20260810]",
+    "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+    "logical_cpus": 16,
+    "load_average_start": [
+      4.5615234375,
+      9.63427734375,
+      7.49365234375
+    ],
+    "memory_total_kib": 97948308,
+    "filesystem_cache": "uncontrolled; fresh means process/intermediates, not cold OS caches",
+    "rss_semantics": "Linux wait4 ru_maxrss: largest individual child/descendant RSS, not simultaneous process-tree sum",
+    "format": "K1-COMPILER-ITERATION-1",
+    "probe": false,
+    "build_label": "frozen-debug",
+    "rounds": 5,
+    "modes": [
+      "debug"
+    ],
+    "harness_sha256": "9311a8ab63323758c62c4b9d9f208607b0cf43212e26bed4ea97c6b63194b7f1",
+    "measurement_helper_sha256": "c98604d07d6e30def98efb69ac111a2880d128061b4a6f25627316a618fa499c",
+    "compiler_source_sha256": "6b4c960b74bb7831cf3e50feb97130889296bb70dd2dd247302481a7964353e2",
+    "goose_pin": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+    "goose_path": "/tmp/blot-k1-goose/build/goose",
+    "goose_version": "goose v2026.3-120-ga108677 (runtime fba599d313fe)",
+    "goose_sha256": "3663694e4cc64c734c748d1824a2e298fa62ab486b8e89423d96c5a4dac8fe13",
+    "clang_path": "/usr/bin/clang-23",
+    "clang_version": "clang version 23.1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin",
+    "clang_sha256": "ea47045f5972b743ec57a6757e80cf3ddc652ee38929947051d9598bb489ff24",
+    "stdlib": "/tmp/blot-k1-goose/stdlib",
+    "stdlib_sha256": "164120516d422cc837ad08dbc21c5c7c29abdea468f55f7fa5575a2ade7af642",
+    "source_sha256": "6b4c960b74bb7831cf3e50feb97130889296bb70dd2dd247302481a7964353e2",
+    "source_files": [
+      {
+        "path": "blot.goose",
+        "bytes": 42,
+        "sha256": "c670d869a90c4106ed64caed0fb38174d51ab322bed33749e48a8ebe01ff7d56"
+      },
+      {
+        "path": "examples/identity.blot",
+        "bytes": 84,
+        "sha256": "1626cbac75f189a27c336192e16a9a7e33dd8b0419cbfd300558fc06113bd561"
+      },
+      {
+        "path": "src/abi.goose",
+        "bytes": 636,
+        "sha256": "eaf2c2fbe0d945826f48d5767236a4e1a9c43ac4fc358711e67f2da00c6d2637"
+      },
+      {
+        "path": "src/artifact.goose",
+        "bytes": 52134,
+        "sha256": "4bf7f34ed77c5ec9d8005ac83a3254fbd7dff413519ec3d6e34798ac9efa2194"
+      },
+      {
+        "path": "src/canonical.goose",
+        "bytes": 10007,
+        "sha256": "4bbebaa47568f51f0200176cb4a9c1f2a536db4dcc03f885cd3219be40e4f5f1"
+      },
+      {
+        "path": "src/cli.goose",
+        "bytes": 16051,
+        "sha256": "80d182841c737c030372265c87984acf013f3d6d423232c61ef15812e08b2c4a"
+      },
+      {
+        "path": "src/coverage.goose",
+        "bytes": 7529,
+        "sha256": "e54b658e47cc6eb2ded29097903c1aa426f16b936d7e9cd2ecc7782cf0ab5394"
+      },
+      {
+        "path": "src/driver.goose",
+        "bytes": 8132,
+        "sha256": "fde4e83ef42e2facdd4295a6df67cde1056f4752a55f3a48172cb68d6b28a593"
+      },
+      {
+        "path": "src/evaluate.goose",
+        "bytes": 38950,
+        "sha256": "35b613763feec621e7e69e0ed075990b99082c5ecde7487dfc01c85ab01c5e13"
+      },
+      {
+        "path": "src/fingerprint.goose",
+        "bytes": 8515,
+        "sha256": "2c18a1ce20f7b689bf03778ca031d316ec4548c54f5041228c56668d686f29a5"
+      },
+      {
+        "path": "src/frontend.goose",
+        "bytes": 264534,
+        "sha256": "7591d6bf823d006b207c1a5b931eeafa4f63ae8a41cff5ebd2685d4d8da7c4db"
+      },
+      {
+        "path": "src/hash.goose",
+        "bytes": 4102,
+        "sha256": "f8a37bf639b7472a612b17a38af62559c91829147d806397851de56f728bbe5b"
+      },
+      {
+        "path": "src/intern.goose",
+        "bytes": 856,
+        "sha256": "997ad67edb4dbfd805c2d97c3cd458065108c6a726fea93c73fe41df592a1853"
+      },
+      {
+        "path": "src/layout_premises.goose",
+        "bytes": 10327,
+        "sha256": "ee23ba58dbbc82dc374d6866a135141bf250fbb74ab0b8354d0b9a5efd0efc87"
+      },
+      {
+        "path": "src/loader.goose",
+        "bytes": 6968,
+        "sha256": "15586a9d4cd049835a0e0658463f8df215f9b479729390a65c61dcc1ab10948b"
+      },
+      {
+        "path": "src/manifest.goose",
+        "bytes": 13798,
+        "sha256": "57ca8b443c088d6a64d75a71a05463cc616b960dd8ac3c231cddc05bb81e6134"
+      },
+      {
+        "path": "src/model.goose",
+        "bytes": 23597,
+        "sha256": "ffc692dcace3f088dbec453d9b080ca2cf18c5a43ce179def074a7fa211389a9"
+      },
+      {
+        "path": "src/numeric.goose",
+        "bytes": 4336,
+        "sha256": "a4faf9f50d850ff2c19e564711272d6c70461b85ec86b13b64780ce234c61f7a"
+      },
+      {
+        "path": "src/optimize.goose",
+        "bytes": 20061,
+        "sha256": "5bc174e000b7d0f7980ffa115f25598692265dbbc13b4b618c925ac8f68fd83a"
+      },
+      {
+        "path": "src/order.goose",
+        "bytes": 52718,
+        "sha256": "663f070219c4f9b81cb22ff35a564556f6a1183c2bd3939000bd1fabd0ec6871"
+      },
+      {
+        "path": "src/plan.goose",
+        "bytes": 19542,
+        "sha256": "45250288abee4768e3bc8f5aa9714cf7b70ae42481b698d6822888c266edabc5"
+      },
+      {
+        "path": "src/platform.goose",
+        "bytes": 452,
+        "sha256": "4e2aba15ecce3162538616fd464e5f0ecdacb74954e2b37b384acb2fb9093d59"
+      },
+      {
+        "path": "src/platform.h",
+        "bytes": 5553,
+        "sha256": "1a83d7e6c00c1ab715e7e2d7999704f0daccd2989a273e91c697bff42c3b5941"
+      },
+      {
+        "path": "src/proofs.goose",
+        "bytes": 25490,
+        "sha256": "4bf8d3e64c111a58d7c26828dbd18c45db25540a26485e2152f14dfa944ddae1"
+      },
+      {
+        "path": "src/realize.goose",
+        "bytes": 11205,
+        "sha256": "c625f0770b6a5c54f9f493bcaaa4bac14d1d09967438b1938e7aab8544983d9c"
+      },
+      {
+        "path": "src/relocate.goose",
+        "bytes": 48942,
+        "sha256": "75335e08db0c8cd53666a004edb32a81fbad2cf5711a5492993a9b3eda5a8fcc"
+      },
+      {
+        "path": "src/retained.goose",
+        "bytes": 8837,
+        "sha256": "994b195d478c6669e70c3f81f34a96974e4e336605f8f6156bfacde93149442b"
+      },
+      {
+        "path": "src/runtime.goose",
+        "bytes": 13762,
+        "sha256": "bef189f1da3bef16ff62b98afdb4556713277b9662f9d0382aa8747067057ca4"
+      },
+      {
+        "path": "src/tooling.goose",
+        "bytes": 7634,
+        "sha256": "603639a2179fa13b2e7644508c6ac726095104202979373f4e6dc16098b394dc"
+      },
+      {
+        "path": "src/validate.goose",
+        "bytes": 246183,
+        "sha256": "d414bb4b26b7adfbc81523e8328a9de78520c65f2662508a08215b183a84fdf0"
+      },
+      {
+        "path": "src/wasm.goose",
+        "bytes": 132431,
+        "sha256": "9031a7b6adf62b42b69f4b6ed70e4f733d48a7a77ddb950222e00b9e91891ad8"
+      },
+      {
+        "path": "src/wasm_validate.goose",
+        "bytes": 12311,
+        "sha256": "44a49e0f4c39d6a2e7624f8215da5e153c44e598fcd7dfe4063fe42652b045df"
+      }
+    ],
+    "fresh_scope": "empty isolated GOOSE_HOME and absent compiler executable",
+    "edit": "append a comment to src/frontend.goose (blot.goose in probe mode), without changing semantics",
+    "flags": "--standalone --offline --cc <existing clang>; --debug only for debug configuration",
+    "attribution": "separate --dry-run frontend/typecheck/C-generation sample and exact printed clang argv replay; do not subtract unrelated whole-build samples",
+    "interpretation": "repeated invokes the same Goose build command with existing intermediates; it does not assume incremental compilation",
+    "toolchain_unchanged": true
+  },
+  "summary": [
+    {
+      "mode": "debug",
+      "case": "fresh",
+      "samples": 5,
+      "exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "timeouts": 0,
+      "wall_ms": {
+        "median": 37361.066517,
+        "min": 35221.000599,
+        "max": 42107.261358
+      },
+      "cpu_ms": {
+        "median": 37073.563,
+        "min": 34903.296,
+        "max": 41784.615
+      },
+      "peak_rss_kib": {
+        "median": 1152296,
+        "min": 1151388,
+        "max": 1153696
+      }
+    },
+    {
+      "mode": "debug",
+      "case": "unchanged",
+      "samples": 5,
+      "exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "timeouts": 0,
+      "wall_ms": {
+        "median": 37817.17236,
+        "min": 34584.119626,
+        "max": 43224.284588
+      },
+      "cpu_ms": {
+        "median": 37401.763,
+        "min": 34367.117999999995,
+        "max": 42819.018
+      },
+      "peak_rss_kib": {
+        "median": 1152084,
+        "min": 1150632,
+        "max": 1152988
+      }
+    },
+    {
+      "mode": "debug",
+      "case": "comment-edit",
+      "samples": 5,
+      "exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "timeouts": 0,
+      "wall_ms": {
+        "median": 37079.279432,
+        "min": 34716.704538,
+        "max": 42321.549391
+      },
+      "cpu_ms": {
+        "median": 36775.042,
+        "min": 34473.335999999996,
+        "max": 42064.296
+      },
+      "peak_rss_kib": {
+        "median": 1151440,
+        "min": 1151008,
+        "max": 1152536
+      }
+    },
+    {
+      "mode": "debug",
+      "case": "attribution-goose-frontend",
+      "samples": 1,
+      "exit_codes": [
+        0
+      ],
+      "timeouts": 0,
+      "wall_ms": {
+        "median": 30047.827636,
+        "min": 30047.827636,
+        "max": 30047.827636
+      },
+      "cpu_ms": {
+        "median": 29911.292,
+        "min": 29911.292,
+        "max": 29911.292
+      },
+      "peak_rss_kib": {
+        "median": 414984,
+        "min": 414984,
+        "max": 414984
+      }
+    },
+    {
+      "mode": "debug",
+      "case": "attribution-c-backend",
+      "samples": 1,
+      "exit_codes": [
+        0
+      ],
+      "timeouts": 0,
+      "wall_ms": {
+        "median": 6777.613119,
+        "min": 6777.613119,
+        "max": 6777.613119
+      },
+      "cpu_ms": {
+        "median": 6715.445,
+        "min": 6715.445,
+        "max": 6715.445
+      },
+      "peak_rss_kib": {
+        "median": 1153628,
+        "min": 1153628,
+        "max": 1153628
+      }
+    }
+  ],
+  "issues": []
+}

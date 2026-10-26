@@ -1,5 +1,8 @@
 # K1 measurement corpus
 
+[Initial results and qualification](RESULTS.md) include all samples, regressions
+and the separate 127-depth chain control.
+
 Run after correctness qualification, with a known compiler build:
 
 ```sh
@@ -72,3 +75,7 @@ After all runs, `python3 scripts/package_evidence.py` verifies the frozen source
 qualified executable and evidence hashes, then packages raw samples, source
 inputs and logs under `benchmarks/results/k1-initial/`. Generated binaries and
 compiler intermediates are excluded; their hashes remain in the records.
+
+When reproducing an already published run, choose an unused evidence directory
+with `scripts/package_evidence.py --out=benchmarks/results/NEW_NAME`. The packager
+refuses to overwrite published evidence.
