@@ -5,11 +5,13 @@ import os;
 import frontend;
 import parser;
 import validate;
-import core;
-import scalar_core;
-import scalar_plan;
-import wasm;
 import catalog;
+import fixture_geometry;
+import work;
+import scalar_core_metered;
+import scalar_plan_metered;
+import scalar_wasm_metered;
+import wasm_scalar_validation_metered;
 import module_frontend;
 import module_wasm;
 import add_frontend;
@@ -18,12 +20,53 @@ import add_parser;
 import add_proof;
 import add_core;
 import add_wasm;
+import control_frontend;
+import control_validate;
+import control_wasm;
 
 extern fn k1_read_bounded(path: const u8[:], out: u8[>..]&) -> i64;
 
 fn fail(message: u8[:]) {
     write_stderr(str("blot-k1: ", message, "\n"));
     exit(1);
+}
+
+// Private scalar accounting is partial: these statuses do not certify the
+// full K1 work policy or authorize cache/public artifact admission.
+fn fail_scalar_work(status: u32) {
+    if status == 2 { fail("k1_semantic_limit"); }
+    if status == 3 { fail("k1_core_limit"); }
+    if status == 4 { fail("internal scalar work accounting failure"); }
+    fail("invalid scalar representation");
+}
+
+// Private control-flow experiment. The argument to the emitted callable is a
+// typed Bool and must already be canonical (0/1). This is not a host ingress
+// validator, completed K1 artifact, public export or runtime certificate.
+fn control_fixture(source: u8[:], trace: bool) {
+    let candidate = control_frontend::parse(source);
+    if candidate.status != 0 {
+        var detail: u8[>..] = [];
+        format(detail, "source error ", candidate.status);
+        let category = catalog::source_diagnostic(candidate.status);
+        if category.len > 0 { format(detail, " (", category, ")"); }
+        format(detail, " at bytes ", candidate.start, "..", candidate.end, "\n");
+        write_stderr(detail); exit(1);
+    }
+    if trace { write_stderr("control fixture: parsed source\n"); }
+    if !control_validate::verify(source, candidate.program) {
+        fail("internal control source/Core validation failure");
+    }
+    if trace { write_stderr("control fixture: validated source and control targets\n"); }
+    // The encoder independently rechecks source/Core correspondence before
+    // creating bytes. Test-only trap probes are not reachable via this path.
+    let bytes = control_wasm::emit(source, candidate.program);
+    if bytes.len == 0 { fail("internal control emission failure"); }
+    if trace { write_stderr("control fixture: emitted Wasm module\n"); }
+    let hex = "0123456789abcdef";
+    var encoded: u8[>..] = [];
+    for b in bytes { encoded.push(hex[b / 16]); encoded.push(hex[b % 16]); }
+    encoded.push('\n'); write_stdout(encoded);
 }
 
 // Private v3 experiment: independently recheck source and Core before
@@ -41,11 +84,14 @@ fn module_fixture(source: u8[:], trace: bool) {
         format(detail, "\n"); write_stderr(detail); exit(1);
     }
     if trace { write_stderr("module fixture: parsed source\n"); }
-    if module.source[..] != source || module_frontend::verify(module) != 0 {
+    if module.source[..] != source {
         fail("internal module source validation failure");
     }
     if trace { write_stderr("module fixture: validated source\n"); }
-    var completed = module_frontend::to_core(module);
+    // Parse has already checked the fresh module. This constructor grants no
+    // authority: verify_core independently rechecks source and Core before
+    // any emission, including when the candidate is malformed.
+    var completed = module_frontend::build_unvalidated_core(module);
     if module_frontend::verify_core(module, completed) != 0 {
         fail("internal module Core validation failure");
     }
@@ -124,8 +170,8 @@ fn main() {
     if argv.len >= 2 && (argv[1] == "check" || argv[1] == "build") {
         fail("K1 is not qualified for public compilation; use the legacy edition");
     }
-    if (argv.len != 3 && argv.len != 4) || (argv[1] != "fixture" && argv[1] != "module-fixture" && argv[1] != "add-fixture") || (argv.len == 4 && argv[3] != "--trace") {
-        fail("usage: blot-k1 fixture|module-fixture|add-fixture ENTRY [--trace] (experimental internal fixture)");
+    if (argv.len != 3 && argv.len != 4) || (argv[1] != "fixture" && argv[1] != "module-fixture" && argv[1] != "add-fixture" && argv[1] != "control-fixture") || (argv.len == 4 && argv[3] != "--trace") {
+        fail("usage: blot-k1 fixture|module-fixture|add-fixture|control-fixture ENTRY [--trace] (experimental internal fixture)");
     }
     var source: u8[>..] = [];
     let read_status = k1_read_bounded(argv[2], source);
@@ -134,8 +180,12 @@ fn main() {
     let trace = argv.len == 4;
     if argv[1] == "module-fixture" { module_fixture(source, trace); return; }
     if argv[1] == "add-fixture" { add_fixture(source, trace); return; }
-    let parsed = frontend::parse_scalar(source);
+    if argv[1] == "control-fixture" { control_fixture(source, trace); return; }
+    var meter = work::Meter {};
+    let parsed = frontend::parse_scalar_with_work(source, meter);
     if parsed.status != 0 {
+        if parsed.status == 12 { fail("k1_semantic_limit"); }
+        if parsed.status == 13 { fail("internal scalar work accounting failure"); }
         var detail: u8[>..] = [];
         format(detail, "source error ", parsed.status);
         let diagnostic = catalog::source_diagnostic(parsed.status);
@@ -145,48 +195,57 @@ fn main() {
         exit(1);
     }
     if trace { write_stderr("fixture: parsed scalar source\n"); }
-    // A fresh source-to-Core validator establishes correspondence. The
-    // transient record has no portable artifact or cached authority.
-    var typed = scalar_core::build(parsed.result_type, parsed.binary_op, parsed.kind,
-                                   parsed.literal, parsed.right_kind, parsed.right_literal);
+    // These checks share one fresh compiler-owned meter. They remain a
+    // private subset and do not establish the full required K1 work policy.
+    var tree, tree_status = parser::parse_with_work(source, meter);
+    if tree_status == 12 { fail("k1_semantic_limit"); }
+    if tree_status == 13 { fail("internal scalar work accounting failure"); }
+    if tree_status != 0 || tree.source[..] != source[..] { fail("internal scalar syntax mismatch"); }
+    let syntax_status = parser::verify_with_work(tree, meter);
+    if syntax_status == 3 { fail("k1_semantic_limit"); }
+    if syntax_status == 4 { fail("internal scalar work accounting failure"); }
+    if syntax_status != 0 { fail("internal scalar syntax mismatch"); }
+    if trace { write_stderr("fixture: validated owned scalar syntax\n"); }
+    let made = scalar_core_metered::make(parsed.result_type, parsed.binary_op, parsed.kind,
+                                          parsed.literal, parsed.right_kind, parsed.right_literal, meter);
+    if made.status != 0 { fail_scalar_work(made.status); }
+    var typed = made.core;
     typed.name_start = parsed.name_start; typed.name_end = parsed.name_end;
     typed.parameter_start = parsed.parameter_start; typed.parameter_end = parsed.parameter_end;
     typed.left_start = parsed.start; typed.left_end = parsed.end;
     typed.operator_start = parsed.operator_start; typed.operator_end = parsed.operator_end;
     typed.right_start = parsed.right_start; typed.right_end = parsed.right_end;
-    if validate::scalar_v2(source, typed, catalog::edition(), catalog::semantic_policy(),
-                           catalog::optimization_policy(), catalog::wasm_abi()) != 0 {
-        fail("invalid scalar representation");
-    }
+    let source_status = validate::scalar_v2_with_work_at_phase(source, typed, catalog::edition(),
+        catalog::semantic_policy(), catalog::optimization_policy(), catalog::wasm_abi(), meter, 5);
+    if source_status == 3 { fail("k1_semantic_limit"); }
+    if source_status == 4 { fail("internal scalar work accounting failure"); }
+    if source_status != 0 { fail("invalid scalar representation"); }
     if trace { write_stderr("fixture: validated scalar structure\n"); }
-    // This additional experimental parser/arena check is not public admission.
-    // A disagreement after independent source checking is a compiler error.
-    var tree, tree_status = parser::parse(source);
-    if tree_status != 0 || tree.source[..] != source[..] || !parser::verify(tree) {
-        fail("internal scalar syntax mismatch");
-    }
-    if trace { write_stderr("fixture: validated owned scalar syntax\n"); }
-    // The earlier plan model covers unary scalar functions only.
-    if parsed.binary_op == 0 {
-        let function = core::make_function(parsed.kind + 1, parsed.literal);
-        if core::validate_function(function) != 0 { fail("invalid checked scalar function"); }
-        if trace { write_stderr("fixture: validated in-memory scalar function\n"); }
-        let plan = core::make_plan(function);
-        if core::validate_plan(plan) != 0 { fail("invalid scalar lowering plan"); }
-        if trace { write_stderr("fixture: validated in-memory lowering plan\n"); }
-    }
-    let typed_plan = scalar_plan::make(typed);
-    if !scalar_plan::validate(typed_plan) { fail("invalid typed scalar lowering plan"); }
+    if trace { write_stderr("fixture: completed metered scalar Core\n"); }
+    let planned = scalar_plan_metered::make(typed, meter);
+    if planned.status != 0 { fail_scalar_work(planned.status); }
+    let plan_check = scalar_plan_metered::validate(planned.plan, meter, 6);
+    if plan_check.status != 0 { fail_scalar_work(plan_check.status); }
+    let typed_plan = planned.plan;
     if trace { write_stderr("fixture: validated typed scalar lowering plan\n"); }
     {
-        let bytes = wasm::emit_scalar_v2(source[typed_plan.core.name_start..typed_plan.core.name_end], typed_plan);
-        if bytes.len == 0 { fail("cannot emit scalar module"); }
+        let emitted = scalar_wasm_metered::emit(source[typed_plan.core.name_start..typed_plan.core.name_end], typed_plan, meter);
+        if emitted.status != 0 { fail_scalar_work(emitted.status); }
+        let geometry, geometry_status = fixture_geometry::build_with_work(meter, 7);
+        if geometry_status == 3 { fail("k1_semantic_limit"); }
+        if geometry_status == 4 { fail("internal scalar work accounting failure"); }
+        if geometry_status != 0 { fail("internal scalar geometry failure"); }
+        let target_status = wasm_scalar_validation_metered::verify(source, typed_plan, geometry, emitted.bytes, meter);
+        if target_status == 3 { fail("k1_semantic_limit"); }
+        if target_status == 4 { fail("internal scalar work accounting failure"); }
+        if target_status != 0 { fail("internal scalar Wasm validation failure"); }
+        if trace { write_stderr("fixture: validated scalar Wasm structure\n"); }
         if trace { write_stderr("fixture: emitted Wasm module\n"); }
         // Hex keeps the fixture transport byte-exact across platforms. The
         // driver never opens an output path or replaces an existing file.
         let hex = "0123456789abcdef";
         var encoded: u8[>..] = [];
-        for b in bytes {
+        for b in emitted.bytes {
             encoded.push(hex[b / 16]);
             encoded.push(hex[b % 16]);
         }

@@ -57,6 +57,11 @@ fn main() {
     assert(work::source_read(telemetry, maximum).status == 0);
     let overflow = work::source_read(telemetry, 1);
     assert(overflow.status == 6 && overflow.quantity == 8 && telemetry.source_byte_reads == maximum);
+    var target = work::Meter { target_visits: maximum - 1 };
+    assert(work::target_visit(target).status == 0 && target.target_visits == maximum);
+    let target_overflow = work::target_visit(target);
+    assert(target_overflow.status == 6 && target_overflow.quantity == 9 && target.target_visits == maximum);
+    assert(target.semantic == 0);
     var bad_phase = work::Meter {};
     bad_phase.phase_semantic[0] = 1;
     assert(work::charge(bad_phase, 1, 1).status == 5 && bad_phase.semantic == 0);

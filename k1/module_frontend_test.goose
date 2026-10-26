@@ -39,6 +39,23 @@ fn main() {
     assert(status == 0 && module.declarations.len == 2 && module_frontend::verify(module) == 0);
     assert(module.declarations[0].form == 3 && module.declarations[0].callee_id == 1 && module.declarations[0].depth == 2);
     assert(module.declarations[1].form == 2 && module.declarations[1].depth == 1);
+    // Construction is not authority: a forged input may produce a candidate,
+    // but source/Core verification must reject it before emission.
+    module.declarations[0].callee_id = 999;
+    var forged = module_frontend::build_unvalidated_core(module);
+    assert(module_frontend::verify_core(module, forged) != 0);
+    assert(module_frontend::to_core(module).functions.len == 0);
+    module.declarations[0].callee_id = 1;
+    var candidate = module_frontend::build_unvalidated_core(module);
+    assert(module_frontend::verify_core(module, candidate) == 0);
+    module.declarations[0].form = 99;
+    var forged_form = module_frontend::build_unvalidated_core(module);
+    assert(module_frontend::verify_core(module, forged_form) != 0);
+    module.declarations[0].form = 3;
+    module.declarations[0].name_start = -1;
+    var forged_span = module_frontend::build_unvalidated_core(module);
+    assert(module_frontend::verify_core(module, forged_span) != 0);
+    module.declarations[0].name_start = 4;
     var malformed_call = module.declarations[0];
     malformed_call.expression_end = src.len + 1;
     assert(!module_frontend::call_syntax(src, malformed_call));

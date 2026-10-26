@@ -44,13 +44,66 @@ fn name_ok(source: u8[:], start: i64, end: i64) -> bool {
     return true;
 }
 
+// Independently sort checked names with a bounded heap. The byte comparator
+// is authoritative and does not consult any producer-owned name index.
+// compare_names and sift_names are internal unchecked helpers: call them only
+// from unique_names after it has checked the count and every name span.
+fn compare_names(m: ModuleCore&, a: i64, b: i64) -> i64 {
+    let left = m.functions[a];
+    let right = m.functions[b];
+    var i = left.name_start;
+    var j = right.name_start;
+    while i < left.name_end && j < right.name_end {
+        if m.source[i] < m.source[j] { return -1; }
+        if m.source[i] > m.source[j] { return 1; }
+        i += 1; j += 1;
+    }
+    if i == left.name_end && j == right.name_end { return 0; }
+    return if i == left.name_end { -1 } else { 1 };
+}
+fn sift_names(m: ModuleCore&, names: i64[256]&, root: i64, end: i64) {
+    var at = root;
+    loop {
+        let left = at * 2 + 1;
+        if left >= end { break; }
+        var greatest = left;
+        let right = left + 1;
+        if right < end && compare_names(m, names[right], names[left]) > 0 { greatest = right; }
+        if compare_names(m, names[at], names[greatest]) >= 0 { break; }
+        let saved = names[at]; names[at] = names[greatest]; names[greatest] = saved;
+        at = greatest;
+    }
+}
+fn unique_names(m: ModuleCore&) -> bool {
+    let count = m.functions.len;
+    if count < 1 || count > 256 { return false; }
+    var names: i64[256] = [0; 256];
+    for i in count {
+        let f = m.functions[i];
+        if !span(f.name_start, f.name_end, m.source.len) { return false; }
+        names[i] = i;
+    }
+    var root = count / 2;
+    while root > 0 { root -= 1; sift_names(m, names, root, count); }
+    var end = count;
+    while end > 1 {
+        end -= 1;
+        let saved = names[0]; names[0] = names[end]; names[end] = saved;
+        sift_names(m, names, 0, end);
+    }
+    for i in 1..count {
+        if compare_names(m, names[i - 1], names[i]) == 0 { return false; }
+    }
+    return true;
+}
+
 // Return 0 valid, 1 malformed, 8 recursive graph, 9 depth exceeds 128.
 // The caller must independently re-recognize source/lexical targets and bind
 // the Core to it before using this model for any semantic decision.
 fn validate(m: ModuleCore&) -> i64 {
     if m.source.len > 16777216 || m.functions.len < 1 || m.functions.len > 256 { return 1; }
     var previous_end: i64 = 0;
-    for f, i in m.functions {
+    for f in m.functions {
         if !span(f.declaration_start, f.declaration_end, m.source.len) ||
            f.declaration_start < previous_end ||
            !name_ok(m.source, f.name_start, f.name_end) ||
@@ -66,10 +119,6 @@ fn validate(m: ModuleCore&) -> i64 {
            f.frame != 0 || f.result_type != 1 || f.value_count < 1 || f.value_count > 4 ||
            f.terminator != 1 || f.result_id < 0 || f.result_id >= f.value_count { return 1; }
         previous_end = f.declaration_end;
-        for j in i {
-            let other = m.functions[j];
-            if m.source[f.name_start..f.name_end] == m.source[other.name_start..other.name_end] { return 1; }
-        }
         // Derive a fresh canonical sequence from the result and its typed
         // operands; comparing all slots also rejects unused forged records.
         let result = f.values[f.result_id];
@@ -131,6 +180,7 @@ fn validate(m: ModuleCore&) -> i64 {
         if count != f.value_count || f.result_id != wanted_result { return 1; }
         for n in 4 { if !same(f.values[n], expected[n]) { return 1; } }
     }
+    if !unique_names(m) { return 1; }
     // All declarations have been span-checked; it is now safe to resolve the
     // copied call-target names. A local U32 parameter shadows a top-level name.
     for f in m.functions {
@@ -142,23 +192,41 @@ fn validate(m: ModuleCore&) -> i64 {
                called == m.source[f.parameter_start..f.parameter_end] { return 1; }
         }
     }
-    // One outgoing call per declaration. Iterative bounded walks reject cycles
-    // before assessing the depth limit, including cycles longer than 128.
-    for f, i in m.functions {
-        var seen: bool[256] = [false; 256];
-        var current = i;
-        var depth: i64 = 0;
+    // Independent bounded tri-state walks memoize the result for every root.
+    // A negative depth marks a path reaching a cycle. Iterate roots again in
+    // original order to retain the old cycle/depth/mismatch diagnostic order.
+    let count = m.functions.len;
+    var state: u8[256] = [0; 256];
+    var depth: i64[256] = [0; 256];
+    var path: i64[256] = [0; 256];
+    for root in count {
+        if state[root] == 2 { continue; }
+        var length: i64 = 0;
+        var current = root;
+        var base: i64 = 0;
         loop {
-            if seen[current] { return 8; }
-            seen[current] = true;
-            depth += 1;
+            if state[current] == 1 { base = -1; break; }
+            if state[current] == 2 { base = depth[current]; break; }
+            state[current] = 1;
+            path[length] = current; length += 1;
             let node = m.functions[current];
             let result = node.values[node.result_id];
             if result.producer != 4 { break; }
             current = result.callee_id;
         }
-        if depth > 128 { return 9; }
-        if f.depth != depth { return 1; }
+        while length > 0 {
+            length -= 1;
+            let node = path[length];
+            if base >= 0 { base += 1; }
+            depth[node] = base;
+            state[node] = 2;
+        }
+    }
+    for f, i in m.functions {
+        if depth[i] < 0 { return 8; }
+        if depth[i] > 128 { return 9; }
+        if f.depth != depth[i] { return 1; }
     }
     return 0;
 }
+

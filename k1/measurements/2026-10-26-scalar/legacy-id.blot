@@ -1,0 +1,1 @@
+entry const f = fn (x: U32) -> U32 => x

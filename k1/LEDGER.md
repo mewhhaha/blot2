@@ -21,11 +21,10 @@ legacy remains default. This ledger records evidence, not completion claims.
 
 ## Additional experimental models
 
-The unconnected work meter, public-interface model, manifest geometry model,
-and private interface-envelope candidate are local experiments. The meter has
-no compiler-wide integration or
-durable receipt; live proof edges are monotone rather than scope-discharged,
-so it can over-reject. The public-interface model checks a narrow candidate
+The scalar fixture uses an experimental shared work meter; the separate
+fixtures do not yet share it. The meter has no compiler-wide integration or
+durable receipt. The existing add-proof fixture does not discharge proof edges
+by scope, so it can over-reject. The public-interface model checks a narrow candidate
 and producer tuple but does not publish a complete interface or establish its
 portable hash and dependencies. The manifest validator checks in-memory
 geometry only, with local choices for empty regions and minimal page count; it
@@ -42,6 +41,20 @@ interface-envelope candidate test also passed at O0/O2. This is focused test
 evidence, not full K1 qualification.
 
 ## Validation evidence
+
+On this working-tree revision, `GOOSE=/tmp/k1-goose/build/goose
+GOOSE_HOME=/tmp/k1-goose-home sh k1/test.sh` passed (exit 0), including the
+registered Goose `-O0`/`-O2` component tests and Node execution witnesses.
+The suite includes the independently checked fixed ABI record component,
+source identity model, flow syntax/completion model, scheduled scalar work
+model, and adversarial Core and Wasm graph tests. These are private models;
+they do not complete public K1 admission, the ABI profile, semantic-work
+accounting, or rollout qualification. A preceding run failed to compile an
+oversized snapshot test; that test was corrected before the passing run.
+The source identity model does not open paths or establish filesystem authority.
+The scheduled scalar pipeline is not wired into the CLI, and byte telemetry
+remains incomplete. The fixed ABI records are a proposed component, not a
+complete profile or ABI digest.
 
 The persistent scalar validator test was run with
 `GOOSE_HOME=/tmp/k1-goose-home /tmp/k1-goose/build/goose run k1/test_validate.goose --debug`
@@ -72,11 +85,15 @@ The private module fixture parses and separately validates owned source and
 transient Core before Wasm emission. It supports at most 256 U32-to-U32
 functions, direct calls and bitwise AND, rejects recursion and call depth above
 128, and exports private functions only for testing. It is not general module
-admission, a host bridge, or a portable artifact. The scalar fixture independently
-validates source against a transient typed scalar Core before emission, including a single U32 bitwise-and or unsigned
-less-than expression. The driver validates a narrow typed scalar lowering plan for unary and binary
-forms, while unary functions additionally pass the older transient plan checks.
-These models are not complete K1 lowering plans or portable artifacts. The
+admission, a host bridge, or a portable artifact. The scalar fixture uses one
+fresh, partial work meter for its source, owned syntax, Core, plan, emission,
+geometry and independent Wasm-byte checks, including U32 bitwise-and and
+unsigned comparison. The control fixture separately tests explicit-return
+branches and short-circuit Bool operations with canonical Bool inputs. The
+source-bound public-scalar interface, function and plan envelopes and owned
+snapshot are private experiments with caller-supplied, unauthenticated identity
+and ABI values. None establishes complete K1 work accounting, public admission,
+ABI certification, or portable artifact authority. The
 bounded layout geometry, builder, ordering graph, and pool-state models are
 exercised in isolation; they do not establish semantic types, source facts,
 ownership, loans, or runtime qualification. A private Wasm pool guest fixture
@@ -107,6 +124,12 @@ unfiltered `deno task test:compiler` run was interrupted during smoke-build
 the native-run 600-second budget (exit 124); it is not a passing gate. The
 supported four-shard retry also exhausted the same native-run budget (exit 124)
 after its smoke and harness stages passed. Neither run qualifies as a pass.
+A later full, unfiltered legacy compiler run passed with Zig 0.17.0:
+`deno task test:compiler --native-shards 4 --phase-seconds 7200 --budget-seconds 10800`.
+It completed all 2,606 native tests and guest tests in 1,335 seconds;
+`build/bench/iteration/timings.json` contains the timing artifact. This is
+evidence for the existing compiler, not qualification of the Goose K1 path.
+The Zig lint findings remain unresolved.
 
 Add exact
 commands, tool versions, exit statuses, fixture/law IDs and source commit as work

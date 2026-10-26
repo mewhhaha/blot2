@@ -71,6 +71,56 @@ fn valid_function(f: module_core::Function, source_len: i64, total: i64) -> bool
     return next == f.result_id;
 }
 
+// The target gate sorts its own checked source spans. It does not use the
+// producer index, source verifier sort, or a hash as an equality authority.
+// target_name_order and target_sift are internal unchecked helpers; use them
+// only through target_unique_names, which validates the count and spans.
+fn target_name_order(core: module_core::ModuleCore&, a: i64, b: i64) -> i64 {
+    let x = core.functions[a];
+    let y = core.functions[b];
+    var i = x.name_start;
+    var j = y.name_start;
+    while i < x.name_end && j < y.name_end {
+        if core.source[i] < core.source[j] { return -1; }
+        if core.source[i] > core.source[j] { return 1; }
+        i += 1; j += 1;
+    }
+    if i == x.name_end && j == y.name_end { return 0; }
+    return if i == x.name_end { -1 } else { 1 };
+}
+fn target_sift(core: module_core::ModuleCore&, names: i64[256]&, root: i64, end: i64) {
+    var parent = root;
+    loop {
+        let left = parent * 2 + 1;
+        if left >= end { break; }
+        var child = left;
+        if left + 1 < end && target_name_order(core, names[left], names[left + 1]) < 0 { child += 1; }
+        if target_name_order(core, names[parent], names[child]) >= 0 { break; }
+        let saved = names[parent]; names[parent] = names[child]; names[child] = saved;
+        parent = child;
+    }
+}
+fn target_unique_names(core: module_core::ModuleCore&) -> bool {
+    let count = core.functions.len;
+    if count < 1 || count > 256 { return false; }
+    var names: i64[256] = [0; 256];
+    for i in count {
+        let f = core.functions[i];
+        if !span(f.name_start, f.name_end, core.source.len) { return false; }
+        names[i] = i;
+    }
+    var root = count / 2;
+    while root > 0 { root -= 1; target_sift(core, names, root, count); }
+    var end = count;
+    while end > 1 {
+        end -= 1;
+        let saved = names[0]; names[0] = names[end]; names[end] = saved;
+        target_sift(core, names, 0, end);
+    }
+    for i in 1..count { if target_name_order(core, names[i - 1], names[i]) == 0 { return false; } }
+    return true;
+}
+
 // This rechecks owned-table structure, names and the call graph before any
 // code generation. It is deliberately not a source grammar validator.
 fn structural(core: module_core::ModuleCore&) -> bool {
@@ -80,29 +130,17 @@ fn structural(core: module_core::ModuleCore&) -> bool {
         if !valid_function(f, core.source.len, count) { return false; }
         if !wasm::identifier(core.source[f.name_start..f.name_end]) { return false; }
     }
-    for f, i in core.functions {
-        for j in 0..i {
-            let earlier = core.functions[j];
-            if core.source[f.name_start..f.name_end] == core.source[earlier.name_start..earlier.name_end] { return false; }
-        }
+    if !target_unique_names(core) { return false; }
+    for f in core.functions {
         let value = f.values[f.result_id];
         if value.producer == 4 {
             let target = core.functions[value.callee_id];
             if core.source[f.callee_start..f.callee_end] != core.source[target.name_start..target.name_end] { return false; }
-        }
-        // Walk the sole-call chain afresh. This bounds work to 256 * 128,
-        // rejects cycles and checks the exact depth of each declaration.
-        var current = i;
-        var depth: i64 = 1;
-        loop {
-            let cur = core.functions[current];
-            let last = cur.values[cur.result_id];
-            if last.producer != 4 { break; }
-            if depth >= 128 { return false; }
-            current = last.callee_id;
-            depth += 1;
-        }
-        if depth != f.depth { return false; }
+            // Both depths were independently bounded in valid_function. A
+            // strict decrement along every edge rules out any cycle, while
+            // the exact leaf value below anchors the canonical graph depth.
+            if f.depth != target.depth + 1 { return false; }
+        } else if f.depth != 1 { return false; }
     }
     return true;
 }

@@ -85,11 +85,156 @@ fn same_name(source: u8[:], a_start: i64, a_end: i64, b_start: i64, b_end: i64) 
         source[a_start..a_end] == source[b_start..b_end];
 }
 
+// Per-parse scratch only; not a semantic identity or cache authority. AVL
+// balancing makes lookup and duplicate checking deterministic even when input
+// names are sorted. Source spans originate from already-validated lexer tokens.
+struct NameNode {
+    start: i64, end: i64, declaration: i64,
+    left: i64 = -1, right: i64 = -1, height: i64 = 1
+}
+struct NameIndex { nodes: NameNode[..256] = [], root: i64 = -1, path: i64[256] = [0; 256] }
+fn name_order(source: u8[:], a_start: i64, a_end: i64, b_start: i64, b_end: i64) -> i64 {
+    var a = a_start;
+    var b = b_start;
+    while a < a_end && b < b_end {
+        if source[a] < source[b] { return -1; }
+        if source[a] > source[b] { return 1; }
+        a += 1; b += 1;
+    }
+    if a == a_end && b == b_end { return 0; }
+    return if a == a_end { -1 } else { 1 };
+}
+fn name_height(index: NameIndex&, node: i64) -> i64 {
+    if node < 0 { return 0; }
+    return index.nodes[node].height;
+}
+fn update_name_height(index: NameIndex&, node: i64) {
+    let left = name_height(index, index.nodes[node].left);
+    let right = name_height(index, index.nodes[node].right);
+    index.nodes[node].height = 1 + (if left > right { left } else { right });
+}
+fn rotate_name_right(index: NameIndex&, node: i64) -> i64 {
+    let root = index.nodes[node].left;
+    index.nodes[node].left = index.nodes[root].right;
+    index.nodes[root].right = node;
+    update_name_height(index, node); update_name_height(index, root);
+    return root;
+}
+fn rotate_name_left(index: NameIndex&, node: i64) -> i64 {
+    let root = index.nodes[node].right;
+    index.nodes[node].right = index.nodes[root].left;
+    index.nodes[root].left = node;
+    update_name_height(index, node); update_name_height(index, root);
+    return root;
+}
+fn rebalance_name(index: NameIndex&, node: i64) -> i64 {
+    update_name_height(index, node);
+    let balance = name_height(index, index.nodes[node].left) - name_height(index, index.nodes[node].right);
+    if balance > 1 {
+        let child = index.nodes[node].left;
+        if name_height(index, index.nodes[child].left) < name_height(index, index.nodes[child].right) {
+            index.nodes[node].left = rotate_name_left(index, child);
+        }
+        return rotate_name_right(index, node);
+    }
+    if balance < -1 {
+        let child = index.nodes[node].right;
+        if name_height(index, index.nodes[child].right) < name_height(index, index.nodes[child].left) {
+            index.nodes[node].right = rotate_name_right(index, child);
+        }
+        return rotate_name_left(index, node);
+    }
+    return node;
+}
+// False means an exact duplicate (or exhausted scratch, fenced by the caller).
+fn insert_name(index: NameIndex&, source: u8[:], start: i64, end: i64, declaration: i64) -> bool {
+    if index.nodes.len >= 256 { return false; }
+    if index.root < 0 {
+        index.nodes.push(NameNode { start: start, end: end, declaration: declaration });
+        index.root = 0; return true;
+    }
+    var used: i64 = 0;
+    var current = index.root;
+    loop {
+        index.path[used] = current; used += 1;
+        let entry = index.nodes[current];
+        let order = name_order(source, start, end, entry.start, entry.end);
+        if order == 0 { return false; }
+        let next = if order < 0 { entry.left } else { entry.right };
+        if next < 0 {
+            let added = index.nodes.len;
+            index.nodes.push(NameNode { start: start, end: end, declaration: declaration });
+            if order < 0 { index.nodes[current].left = added; } else { index.nodes[current].right = added; }
+            break;
+        }
+        current = next;
+    }
+    while used > 0 {
+        used -= 1;
+        let old_root = index.path[used];
+        let new_root = rebalance_name(index, old_root);
+        if used == 0 { index.root = new_root; }
+        else {
+            let parent = index.path[used - 1];
+            if index.nodes[parent].left == old_root { index.nodes[parent].left = new_root; }
+            else { index.nodes[parent].right = new_root; }
+        }
+    }
+    return true;
+}
+fn lookup_name(index: NameIndex&, source: u8[:], start: i64, end: i64) -> i64 {
+    var current = index.root;
+    while current >= 0 {
+        let entry = index.nodes[current];
+        let order = name_order(source, start, end, entry.start, entry.end);
+        if order == 0 { return entry.declaration; }
+        current = if order < 0 { entry.left } else { entry.right };
+    }
+    return -1;
+}
+
+// One outgoing edge per function in this prototype. Complete the whole graph
+// before checking depth, so any recursion keeps precedence over depth errors.
+fn complete_depths(declarations: Declaration[>..]&) -> i64 {
+    if declarations.len == 0 || declarations.len > 256 { return 1; }
+    var state: u8[256] = [0; 256];
+    var depths: i64[256] = [0; 256];
+    var path: i64[256] = [0; 256];
+    for root in declarations.len {
+        if state[root] == 2 { continue; }
+        var used: i64 = 0;
+        var current = root;
+        loop {
+            if current < 0 || current >= declarations.len { return 1; }
+            if state[current] == 1 { return 8; }
+            if state[current] == 2 { break; }
+            state[current] = 1;
+            path[used] = current; used += 1;
+            if declarations[current].form != 3 {
+                depths[current] = 1; state[current] = 2; used -= 1;
+                break;
+            }
+            current = declarations[current].callee_id;
+        }
+        var depth = depths[current];
+        while used > 0 {
+            used -= 1;
+            let node = path[used];
+            depth += 1;
+            depths[node] = depth; state[node] = 2;
+        }
+    }
+    for i in declarations.len { if depths[i] > 128 { return 9; } }
+    for i in declarations.len { declarations[i].depth = depths[i]; }
+    return 0;
+}
+
 // Returns a fully resolved owned module, or an empty module and a status.
 fn parse(source: u8[:]) -> Module, i64 {
     var c = Cursor { lex: lexer::init(source) };
     advance(source, c);
     var declarations: Declaration[>..] = [];
+    var names = NameIndex {};
     while c.status == 0 {
         while c.status == 0 && c.token.kind == 6 { advance(source, c); }
         if c.status != 0 { break; }
@@ -100,9 +245,7 @@ fn parse(source: u8[:]) -> Module, i64 {
         if !take_word(source, c, "let") { return Module {}, c.status; }
         let name = c.token;
         if !identifier(source, name) { return Module {}, 1; }
-        for previous in declarations {
-            if same_name(source, name.start, name.end, previous.name_start, previous.name_end) { return Module {}, 1; }
-        }
+        if !insert_name(names, source, name.start, name.end, declarations.len) { return Module {}, 1; }
         advance(source, c);
         if !take_symbol(source, c, ":") || !take_word(source, c, "U32") ||
            !take_symbol(source, c, "->") || !take_word(source, c, "U32") ||
@@ -185,36 +328,13 @@ fn parse(source: u8[:]) -> Module, i64 {
     // Name resolution sees all declarations, including forward references.
     for i in declarations.len {
         if declarations[i].form == 3 {
-            var found: i64 = -1;
-            for j in declarations.len {
-                if same_name(source, declarations[i].callee_start, declarations[i].callee_end,
-                             declarations[j].name_start, declarations[j].name_end) { found = j; break; }
-            }
+            let found = lookup_name(names, source, declarations[i].callee_start, declarations[i].callee_end);
             if found < 0 { return Module {}, 3; }
             declarations[i].callee_id = found;
         }
     }
-    // Detect cycles before depth overflow so recursion always has its category.
-    for root in declarations.len {
-        var seen: u8[256] = [0; 256];
-        var current = root;
-        loop {
-            if seen[current] != 0 { return Module {}, 8; }
-            seen[current] = 1;
-            if declarations[current].form != 3 { break; }
-            current = declarations[current].callee_id;
-        }
-    }
-    for root in declarations.len {
-        var current = root;
-        var depth: i64 = 1;
-        while declarations[current].form == 3 {
-            current = declarations[current].callee_id;
-            depth += 1;
-        }
-        if depth > 128 { return Module {}, 9; }
-        declarations[root].depth = depth;
-    }
+    let graph_status = complete_depths(declarations);
+    if graph_status != 0 { return Module {}, graph_status; }
     var candidate = Module { source: source, declarations: copy(declarations) };
     // Never publish a candidate the independent source validator rejects.
     if verify(candidate) != 0 { return Module {}, 2; }
@@ -229,6 +349,100 @@ fn blank_right(d: Declaration) -> bool {
 }
 fn blank_operator(d: Declaration) -> bool { return d.operator_start == 0 && d.operator_end == 0; }
 fn blank_callee(d: Declaration) -> bool { return d.callee_start == 0 && d.callee_end == 0 && d.callee_id == 0; }
+
+// Verifier-owned, bottom-up merge sort. It deliberately does not reuse the
+// producer's AVL index or any producer-reported duplicate result. Name spans
+// are checked before byte access and exact byte equality remains authoritative.
+fn verifier_name_order(source: u8[:], a: Declaration, b: Declaration) -> i64 {
+    if !span(a.name_start, a.name_end, source.len) || !span(b.name_start, b.name_end, source.len) { return 2; }
+    var ai = a.name_start;
+    var bi = b.name_start;
+    while ai < a.name_end && bi < b.name_end {
+        if source[ai] < source[bi] { return -1; }
+        if source[ai] > source[bi] { return 1; }
+        ai += 1; bi += 1;
+    }
+    if ai == a.name_end && bi == b.name_end { return 0; }
+    return if ai == a.name_end { -1 } else { 1 };
+}
+fn verifier_unique_names(module: Module&) -> bool {
+    let count = module.declarations.len;
+    if count < 1 || count > 256 { return false; }
+    let source = module.source[..];
+    var names: i64[256] = [0; 256];
+    var scratch: i64[256] = [0; 256];
+    for i in count {
+        let d = module.declarations[i];
+        if !span(d.name_start, d.name_end, source.len) { return false; }
+        names[i] = i;
+    }
+    var width: i64 = 1;
+    while width < count {
+        var left: i64 = 0;
+        while left < count {
+            let mid = if left + width < count { left + width } else { count };
+            let right = if mid + width < count { mid + width } else { count };
+            var a = left;
+            var b = mid;
+            var dst = left;
+            while a < mid && b < right {
+                let order = verifier_name_order(source, module.declarations[names[a]], module.declarations[names[b]]);
+                if order <= 0 { scratch[dst] = names[a]; a += 1; }
+                else { scratch[dst] = names[b]; b += 1; }
+                dst += 1;
+            }
+            while a < mid { scratch[dst] = names[a]; dst += 1; a += 1; }
+            while b < right { scratch[dst] = names[b]; dst += 1; b += 1; }
+            left = right;
+        }
+        for i in count { names[i] = scratch[i]; }
+        width *= 2;
+    }
+    for i in 1..count {
+        if verifier_name_order(source, module.declarations[names[i - 1]], module.declarations[names[i]]) == 0 { return false; }
+    }
+    return true;
+}
+
+// Verifier-owned reverse edges and a leaf-first queue: this independently
+// checks the producer's cycle/depth result without its DFS or name index.
+// Call target indices must have been checked before this helper is called.
+fn verifier_graph(module: Module&) -> bool {
+    let count = module.declarations.len;
+    if count < 1 || count > 256 { return false; }
+    var heads: i64[256] = [-1; 256];
+    var next: i64[256] = [-1; 256];
+    var depths: i64[256] = [0; 256];
+    var queue: i64[256] = [0; 256];
+    var write: i64 = 0;
+    for i in count {
+        let d = module.declarations[i];
+        if d.form == 3 {
+            if d.callee_id < 0 || d.callee_id >= count { return false; }
+            next[i] = heads[d.callee_id];
+            heads[d.callee_id] = i;
+        } else {
+            if d.form != 1 && d.form != 2 { return false; }
+            depths[i] = 1;
+            queue[write] = i; write += 1;
+        }
+    }
+    var read: i64 = 0;
+    while read < write {
+        let callee = queue[read]; read += 1;
+        var caller = heads[callee];
+        while caller >= 0 {
+            depths[caller] = depths[callee] + 1;
+            queue[write] = caller; write += 1;
+            caller = next[caller];
+        }
+    }
+    if write != count { return false; }
+    for i in count {
+        if depths[i] > 128 || module.declarations[i].depth != depths[i] { return false; }
+    }
+    return true;
+}
 
 // Verify a call as exactly identifier '(' one atom ')' using a fresh lexer.
 // Spans are checked against the original source, not inferred from the record.
@@ -279,6 +493,7 @@ fn verify(module: Module&) -> i64 {
         token = lexer::next(source, lex);
     }
     if declaration_tokens != module.declarations.len { return 1; }
+    if !verifier_unique_names(module) { return 1; }
 
     for i in module.declarations.len {
         let d = module.declarations[i];
@@ -297,10 +512,6 @@ fn verify(module: Module&) -> i64 {
             var has_newline = false;
             for j in prior.declaration_end..d.declaration_start { if source[j] == '\n' { has_newline = true; } }
             if !has_newline { return 1; }
-        }
-        for j in i {
-            let prior = module.declarations[j];
-            if same_name(source, d.name_start, d.name_end, prior.name_start, prior.name_end) { return 1; }
         }
         var projected: u8[>..] = [];
         if d.form == 1 {
@@ -360,28 +571,16 @@ fn verify(module: Module&) -> i64 {
         if function_start + d.declaration_start != d.function_start ||
            return_start + d.declaration_start != d.return_start { return 1; }
     }
-    // Recompute cycles and exact resources from source-resolved edges.
-    for root in module.declarations.len {
-        var seen: u8[256] = [0; 256];
-        var current = root;
-        var depth: i64 = 1;
-        loop {
-            if seen[current] != 0 { return 1; }
-            seen[current] = 1;
-            if module.declarations[current].form != 3 { break; }
-            current = module.declarations[current].callee_id;
-            depth += 1;
-            if depth > 256 { return 1; }
-        }
-        if depth > 128 || module.declarations[root].depth != depth { return 1; }
-    }
+    if !verifier_graph(module) { return 1; }
     return 0;
 }
 
-// Construct the canonical transient Core only from a verified Module. This is
-// a builder, not independent validation of its own result.
-fn to_core(module: Module&) -> module_core::ModuleCore {
-    if verify(module) != 0 { return module_core::ModuleCore {}; }
+// This builder grants no authority. The resulting candidate must pass the
+// independent source/Core verifier before lowering. The private driver uses
+// it only on the fresh result returned by parse.
+fn build_unvalidated_core(module: Module&) -> module_core::ModuleCore {
+    if module.source.len > 16777216 || module.declarations.len == 0 ||
+       module.declarations.len > 256 { return module_core::ModuleCore {}; }
     var functions: module_core::Function[>..] = [];
     for d in module.declarations {
         var f = module_core::Function {
@@ -419,6 +618,10 @@ fn to_core(module: Module&) -> module_core::ModuleCore {
         functions.push(f);
     }
     return module_core::ModuleCore { source: copy(module.source), functions: functions };
+}
+fn to_core(module: Module&) -> module_core::ModuleCore {
+    if verify(module) != 0 { return module_core::ModuleCore {}; }
+    return build_unvalidated_core(module);
 }
 fn value_is(v: module_core::Value, kind: i64, literal: u32) -> bool {
     if kind == 0 { return v.producer == 1 && v.literal == 0; }

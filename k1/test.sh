@@ -18,15 +18,40 @@ export GOOSE
 "$GOOSE" --debug "$script_dir/scalar_core_test.goose"
 "$GOOSE" --debug "$script_dir/scalar_plan_test.goose"
 "$GOOSE" --debug "$script_dir/catalog_test.goose"
+python3 "$script_dir/abi_fixed_oracle.py"
 for level in 0 2; do
+    "$GOOSE" --debug "-O$level" "$script_dir/abi_fixed_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/blake3_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/public_frontend_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/public_interface_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/source_identity_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/public_artifact_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/public_function_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/public_plan_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/interface_candidate_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/manifest_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/manifest_metered_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/fixture_geometry_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/fixture_geometry_metered_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/wasm_scalar_validation_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/work_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/work_schedule_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/proof_scopes_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/frontend_work_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/scalar_work_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/parser_work_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/scalar_core_metered_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/scalar_core_metered_fuzz_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/wasm_scalar_validation_metered_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/add_proof_metered_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/add_source_metered_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/parser_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/module_core_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/core_adversarial_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/target_adversarial_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/name_index_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/verifier_optimization_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/verifier_adversarial_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/module_frontend_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/host_bridge_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/builder_test.goose"
@@ -36,6 +61,8 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/add_frontend_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/add_parser_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/add_core_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/control_frontend_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/flow_parse_test.goose"
 done
 test_dir=$(mktemp -d)
 trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
@@ -45,9 +72,32 @@ done
 for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/module_wasm_test.goose" && node "$script_dir/module_wasm_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/add_wasm_test.goose" && node "$script_dir/add_wasm_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/scalar_thin_test.goose" && node "$script_dir/scalar_thin_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/public_fixture_test.goose" && node "$script_dir/public_fixture_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/public_snapshot_test.goose" && node "$script_dir/public_snapshot_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/control_wasm_test.goose" && node "$script_dir/control_wasm_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/scalar_plan_metered_test.goose" && node "$script_dir/scalar_plan_metered_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/scalar_pipeline_work_test.goose" && node "$script_dir/scalar_pipeline_work_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/scalar_scheduled_test.goose" && node "$script_dir/scalar_scheduled_test.mjs")
 done
 (cd "$test_dir" && "$GOOSE" --debug "$script_dir/wasm_test.goose" && node "$script_dir/wasm_test.mjs")
 (cd "$test_dir" && "$GOOSE" --debug "$script_dir/wasm_v2_test.goose" && node "$script_dir/wasm_v2_test.mjs")
+cat > "$test_dir/control.blot" <<'CONTROL'
+let f: Bool -> U32 = fn x => do:
+  if x && #True:
+    return 4294967295
+  else:
+    return 7
+CONTROL
+"$script_dir/build/blot-k1" control-fixture "$test_dir/control.blot" --trace > "$test_dir/control.hex" 2> "$test_dir/trace"
+grep -q 'control fixture: validated source and control targets' "$test_dir/trace"
+node -e 'const fs=require("node:fs");const b=Buffer.from(fs.readFileSync(process.argv[1],"utf8").trim(),"hex");WebAssembly.instantiate(b).then(({instance})=>{const f=instance.exports.f;if((f(0,0)>>>0)!==7||(f(0,1)>>>0)!==4294967295)process.exit(1)}).catch(()=>process.exit(1))' "$test_dir/control.hex"
+printf 'let f: Bool -> U32 = fn x => do:\n  if x:\n    return 1\n' > "$test_dir/control.blot"
+if "$script_dir/build/blot-k1" control-fixture "$test_dir/control.blot" > "$test_dir/rejected" 2> "$test_dir/error"; then
+    echo 'missing control return was accepted' >&2; exit 1
+fi
+test ! -s "$test_dir/rejected"
+grep -q 'k1_missing_return' "$test_dir/error"
 cat > "$test_dir/module.blot" <<'MODULE'
 let a: U32 -> U32 = fn x => return b(x)
 let c: U32 -> U32 = fn x => return b(4294967295)
@@ -111,9 +161,9 @@ done
 printf 'let id: U32 -> U32 = fn x => return x\n' > "$test_dir/input.blot"
 "$script_dir/build/blot-k1" fixture "$test_dir/input.blot" --trace > "$test_dir/module.hex" 2> "$test_dir/trace"
 grep -q 'validated scalar structure' "$test_dir/trace"
+grep -q 'validated scalar Wasm structure' "$test_dir/trace"
 grep -q 'validated owned scalar syntax' "$test_dir/trace"
-grep -q 'validated in-memory scalar function' "$test_dir/trace"
-grep -q 'validated in-memory lowering plan' "$test_dir/trace"
+grep -q 'completed metered scalar Core' "$test_dir/trace"
 grep -q 'validated typed scalar lowering plan' "$test_dir/trace"
 node "$script_dir/driver_test.mjs" "$test_dir/module.hex"
 printf 'let value: U32 -> U32 = fn x => return 4294967295\n' > "$test_dir/input.blot"

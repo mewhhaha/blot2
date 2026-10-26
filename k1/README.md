@@ -1,8 +1,8 @@
 # Experimental Goose K1 scalar fixture
 
 This directory is an early, intentionally incomplete experiment for issue #37.
-It accepts only one scalar function, and the resulting bytes are a private test
-fixture, not a qualified K1 artifact. The public `check` and `build` commands
+Its private fixtures accept a narrow scalar subset, and the resulting bytes are
+test fixtures, not qualified K1 artifacts. The public `check` and `build` commands
 reject K1; the existing compiler remains the default. See [CONTRACT.md](CONTRACT.md)
 and [LEDGER.md](LEDGER.md) for supported syntax and outstanding work.
 
@@ -62,12 +62,13 @@ The checked-add fixture supports only a U32 parameter plus literal zero and
 revalidates its proof and plan within one invocation. Its fixed owner/scope
 and mutable work counters do not establish cross-compile provenance, and the
 full semantic-work meter is not implemented; it cannot certify cached or
-imported proofs or claim K1-03 qualification. The scalar fixture validates
-source against a transient typed Core and an additional lexer-to-owned-syntax
-snapshot, then a private typed
-scalar lowering plan before emission; unary forms also exercise an older plan
-model. A complete lowering plan and portable checked
-artifacts remain absent. The builder, pool and ordering graph models are
+imported proofs or claim K1-03 qualification. The scalar fixture uses one fresh
+work meter across its implemented parser, Core, source validation, lowering and
+emitted-byte checks. This is partial accounting, not a complete K1 work receipt:
+byte telemetry, phase enforcement and other required traversals remain open.
+A separate thin-entry fixture exercises a scalar worker and canonical adapter;
+it does not define the public host protocol. Complete lowering plans and portable
+checked artifacts remain absent. The builder, pool and ordering graph models are
 isolated and do not establish source, ownership, loan or runtime guarantees.
 The separately executed pool guest exports memory only for testing, does not
 validate forged cross-owner metadata, and is not a runtime certificate. A small

@@ -2,9 +2,10 @@
 // validated CheckedFunction or a portable artifact. Unsupported syntax never
 // falls through to the legacy compiler.
 namespace frontend;
+import work;
 
 struct ParseResult {
-    status: i64 = 0,  // 0 ok, 1 syntax, 2 unsupported, 3 unbound, 4 missing return, 5 source limit, 6 bad control target, 7 type mismatch
+    status: i64 = 0,  // 0 ok, 1 syntax, 2 unsupported, 3 unbound, 4 missing return, 5 source limit, 6 bad target, 7 type mismatch, 12 semantic limit, 13 internal accounting
     kind: i64 = 0,    // 0 parameter, 1 constant
     literal: u32 = 0,
     start: i64 = 0,
@@ -26,6 +27,10 @@ struct ParseResult {
 // Token spans are byte offsets in the immutable UTF-8 source. K1 identifiers
 // are ASCII, so a non-ASCII byte is never accepted as an identifier here.
 struct Token { kind: i64, start: i64, end: i64 }
+
+// Tracks a failed token charge without treating the resulting sentinel as
+// source syntax. The meter is compiler-owned and never comes from an artifact.
+struct TokenLimit { enabled: bool = false, hit: bool = false, offset: i64 = 0, cause: u32 = 0, phase: u32 = 1 }
 
 fn letter(c: u8) -> bool {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
@@ -117,6 +122,25 @@ fn token(source: u8[:], from: i64) -> Token {
     return Token { 8, p, p + 1 };
 }
 
+// Return source trivia without charging it as a semantic node. The scanner
+// classifies bytes first; before a meaningful token is returned to the parser,
+// charge its visit. A suite delimiter is charged separately by `suite`.
+// Source-byte inspection telemetry is not yet instrumented in this fixture.
+fn charged_token(source: u8[:], from: i64, meter: work::Meter&, limit: TokenLimit&) -> Token {
+    if !limit.enabled { return token(source, from); }
+    if limit.hit { return Token { 12, limit.offset, limit.offset }; }
+    let next = token(source, from);
+    if next.kind == 0 || next.kind == 7 { return next; }
+    let receipt = work::charge(meter, limit.phase, 1);
+    if receipt.status != 0 {
+        limit.hit = true;
+        limit.offset = next.start;
+        limit.cause = receipt.status;
+        return Token { 12, next.start, next.start };
+    }
+    return next;
+}
+
 fn word(source: u8[:], t: Token, expected: u8[:]) -> bool {
     return t.kind == 1 && source[t.start..t.end] == expected;
 }
@@ -150,60 +174,67 @@ fn expected(t: Token) -> ParseResult {
 // The header stays on one physical line. The short body, body do/return and
 // value do/break all compile to the same scalar result. Other suites remain
 // unsupported rather than being silently partially checked.
-fn suite(source: u8[:], from: i64, indent: i64) -> Token {
-    var t = token(source, from);
+fn suite(source: u8[:], from: i64, indent: i64, meter: work::Meter&, limit: TokenLimit&) -> Token {
+    var t = charged_token(source, from, meter, limit);
     if t.kind != 7 { return Token { 9, t.start, t.end }; }
-    t = token(source, t.end);
-    while t.kind == 7 { t = token(source, t.end); }
+    if limit.enabled {
+        let receipt = work::charge(meter, limit.phase, 1);
+        if receipt.status != 0 {
+            limit.hit = true; limit.offset = t.start; limit.cause = receipt.status;
+            return Token { 12, t.start, t.start };
+        }
+    }
+    t = charged_token(source, t.end, meter, limit);
+    while t.kind == 7 { t = charged_token(source, t.end, meter, limit); }
     if t.kind == 0 { return Token { 9, t.start, t.end }; }
     var start = t.start;
     while start > 0 && source[start - 1] != '\n' { start -= 1; }
     if t.start - start != indent { return Token { 9, start, t.start }; }
     return t;
 }
-fn parse_scalar(source: u8[:]) -> ParseResult {
+fn parse_scalar_impl(source: u8[:], meter: work::Meter&, limit: TokenLimit&) -> ParseResult {
     if source.len > 16777216 { return ParseResult { status: 5, start: 0, end: source.len }; }
     let invalid = invalid_utf8(source);
     if invalid >= 0 { return ParseResult { status: 1, start: invalid, end: invalid + 1 }; }
-    var t = token(source, 0);
-    while t.kind == 7 { t = token(source, t.end); }
+    var t = charged_token(source, 0, meter, limit);
+    while t.kind == 7 { t = charged_token(source, t.end, meter, limit); }
     if t.kind == 9 { return failure(1, t); }
     if !word(source, t, "let") { return failure(2, t); }
     // A top-level declaration cannot be indented. Find its physical line start.
     var line = t.start;
     while line > 0 && source[line - 1] != '\n' { line -= 1; }
     if line != t.start { return failure(1, t); }
-    t = token(source, t.end);
+    t = charged_token(source, t.end, meter, limit);
     if t.kind != 1 || reserved(source[t.start..t.end]) { return failure(1, t); }
     let name_start = t.start;
     let name_end = t.end;
-    t = token(source, t.end);
+    t = charged_token(source, t.end, meter, limit);
     if t.kind != 3 { return expected(t); }
-    t = token(source, t.end);
+    t = charged_token(source, t.end, meter, limit);
     if !word(source, t, "U32") { return expected(t); }
-    t = token(source, t.end);
+    t = charged_token(source, t.end, meter, limit);
     if t.kind != 5 { return expected(t); }
-    t = token(source, t.end);
+    t = charged_token(source, t.end, meter, limit);
     var result_type: i64 = 0;
     if word(source, t, "U32") { result_type = 1; }
     else if word(source, t, "Bool") { result_type = 2; }
     else { return expected(t); }
-    t = token(source, t.end);
+    t = charged_token(source, t.end, meter, limit);
     if t.kind != 4 { return expected(t); }
-    t = token(source, t.end);
+    t = charged_token(source, t.end, meter, limit);
     if !word(source, t, "fn") { return expected(t); }
-    t = token(source, t.end);
+    t = charged_token(source, t.end, meter, limit);
     if t.kind != 1 || reserved(source[t.start..t.end]) { return failure(1, t); }
     let parameter_start = t.start;
     let parameter_end = t.end;
-    t = token(source, t.end);
+    t = charged_token(source, t.end, meter, limit);
     if t.kind != 6 { return expected(t); }
-    t = token(source, t.end);
+    t = charged_token(source, t.end, meter, limit);
     var body_indent: i64 = 0;
     if word(source, t, "do") {
-        t = token(source, t.end);
+        t = charged_token(source, t.end, meter, limit);
         if t.kind != 3 { return expected(t); }
-        t = suite(source, t.end, 2);
+        t = suite(source, t.end, 2, meter, limit);
         if t.kind == 9 { return failure(1, t); }
         body_indent = 2;
     }
@@ -212,11 +243,11 @@ fn parse_scalar(source: u8[:]) -> ParseResult {
         if t.kind == 1 || t.kind == 2 { return failure(4, t); }
         return expected(t);
     }
-    t = token(source, t.end);
+    t = charged_token(source, t.end, meter, limit);
     if word(source, t, "do") {
-        t = token(source, t.end);
+        t = charged_token(source, t.end, meter, limit);
         if t.kind != 3 { return expected(t); }
-        t = suite(source, t.end, body_indent + 2);
+        t = suite(source, t.end, body_indent + 2, meter, limit);
         if t.kind == 9 { return failure(1, t); }
         if word(source, t, "return") {
             // A return inside a value block transfers directly from the function.
@@ -226,7 +257,7 @@ fn parse_scalar(source: u8[:]) -> ParseResult {
             if t.kind == 1 || t.kind == 2 { return failure(4, t); }
             return expected(t);
         }
-        t = token(source, t.end);
+        t = charged_token(source, t.end, meter, limit);
     }
     if word(source, t, "break") || word(source, t, "continue") { return failure(6, t); }
     var result = ParseResult { name_start: name_start, name_end: name_end,
@@ -243,11 +274,11 @@ fn parse_scalar(source: u8[:]) -> ParseResult {
         result.kind = 1;
         result.literal = n as u32;
     } else { return expected(t); }
-    t = token(source, t.end);
+    t = charged_token(source, t.end, meter, limit);
     if t.kind == 10 || t.kind == 11 {
         result.binary_op = if t.kind == 10 { 1 } else { 2 };
         result.operator_start = t.start; result.operator_end = t.end;
-        t = token(source, t.end);
+        t = charged_token(source, t.end, meter, limit);
         result.right_start = t.start; result.right_end = t.end;
         if t.kind == 1 {
             if source[t.start..t.end] != source[parameter_start..parameter_end] { return failure(3, t); }
@@ -260,11 +291,37 @@ fn parse_scalar(source: u8[:]) -> ParseResult {
             result.right_kind = 1;
             result.right_literal = n as u32;
         } else { return expected(t); }
-        t = token(source, t.end);
+        t = charged_token(source, t.end, meter, limit);
     }
-    while t.kind == 7 { t = token(source, t.end); }
+    while t.kind == 7 { t = charged_token(source, t.end, meter, limit); }
     if t.kind != 0 { return failure(2, t); }
     if (result.binary_op == 2 && result_type != 2) ||
        (result.binary_op != 2 && result_type != 1) { return failure(7, t); }
     return result;
+}
+
+// The measured entry accepts one caller-owned meter for this declaration.
+// The rest of the prototype still contains unmetered source/Core/plan checks;
+// this alone is not a complete K1-SEM-POLICY-1 receipt.
+fn parse_scalar_with_work_at_phase(source: u8[:], meter: work::Meter&, phase: u32) -> ParseResult {
+    if phase != 1 && phase != 2 { return ParseResult { status: 13 }; }
+    var limit = TokenLimit { enabled: true, phase: phase };
+    let result = parse_scalar_impl(source, meter, limit);
+    if limit.hit {
+        return ParseResult { status: if limit.cause == 1 { 12 } else { 13 },
+                             start: limit.offset, end: limit.offset };
+    }
+    return result;
+}
+
+fn parse_scalar_with_work(source: u8[:], meter: work::Meter&) -> ParseResult {
+    return parse_scalar_with_work_at_phase(source, meter, 1);
+}
+
+// Compatibility entry preserves existing fixture admission until the complete
+// required work schedule has been integrated and qualified.
+fn parse_scalar(source: u8[:]) -> ParseResult {
+    var meter = work::Meter {};
+    var limit = TokenLimit {};
+    return parse_scalar_impl(source, meter, limit);
 }

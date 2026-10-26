@@ -4,6 +4,7 @@
 // roles, initial memory contents, executable provenance or a certificate.
 // It must not be used to admit public K1 artifacts or grant pointer authority.
 namespace manifest;
+import work;
 
 struct Region { tag: u32 = 0, start: u32 = 0, length: u32 = 0 }
 struct Geometry {
@@ -20,7 +21,29 @@ struct Geometry {
 
 // 0: valid geometry; 1: malformed/out-of-profile. This narrow result does not
 // encode k1_invalid_artifact or k1_incompatible_artifact for a public decoder.
+fn visit(m: work::Meter&, phase: u32, enabled: bool) -> i64 {
+    if !enabled { return 0; }
+    let receipt = work::charge(m, phase, 10); // layout/geometry visit
+    if receipt.status == 0 { return 0; }
+    if receipt.status == 1 { return 3; } // k1_semantic_limit
+    return 4; // invalid phase/meter or other instrumentation failure
+}
+
+// Both entry points run the identical validation traversal. The metered form
+// charges each repeated geometry record, role edge and partition-scan visit
+// before following it. A partial visit receipt is retained on failure; the
+// input geometry is never mutated. This remains a local geometry model, not
+// an authenticated manifest or a complete compiler semantic-work receipt.
 fn validate(g: Geometry&) -> i64 {
+    var unused = work::Meter {};
+    return validate_inner(g, unused, 7, false);
+}
+fn validate_with_work(g: Geometry&, meter: work::Meter&, phase: u32) -> i64 {
+    return validate_inner(g, meter, phase, true);
+}
+fn validate_inner(g: Geometry&, meter: work::Meter&, phase: u32, metered: bool) -> i64 {
+    let root_status = visit(meter, phase, metered);
+    if root_status != 0 { return root_status; }
     if g.page_bytes != 65536 || g.granule_bytes != 4096 || g.owner_entry_bytes != 32 ||
        g.root_capsule_bytes != 256 || g.initial_pages == 0 ||
        g.initial_pages != g.maximum_pages || g.initial_pages > 16384 ||
@@ -28,7 +51,10 @@ fn validate(g: Geometry&) -> i64 {
     // The maximum page count above bounds this multiplication to 1 GiB.
     let memory_end = g.initial_pages * 65536;
     var nonpadding_end: u32 = 0;
-    for region, i in g.regions {
+    for i in 9 {
+        let charge_status = visit(meter, phase, metered);
+        if charge_status != 0 { return charge_status; }
+        let region = g.regions[i];
         if region.tag != i + 1 { return 1; }
         if region.length == 0 {
             if region.start != 0 { return 1; }
@@ -40,6 +66,8 @@ fn validate(g: Geometry&) -> i64 {
     }
     var previous_end: u32 = 0;
     for i in 10 {
+        let charge_status = visit(meter, phase, metered);
+        if charge_status != 0 { return charge_status; }
         let padding = g.padding[i];
         if i >= g.padding_count {
             if padding.tag != 0 || padding.start != 0 || padding.length != 0 { return 1; }
@@ -49,6 +77,11 @@ fn validate(g: Geometry&) -> i64 {
            padding.length > memory_end - padding.start { return 1; }
         if i != 0 && padding.start <= previous_end { return 1; } // sorted, nonoverlapping, merged
         previous_end = padding.start + padding.length;
+    }
+    // The nine role edges are read again below, so each incurs a second visit.
+    for i in 9 {
+        let charge_status = visit(meter, phase, metered);
+        if charge_status != 0 { return charge_status; }
     }
     let static_data = g.regions[0];
     let dictionaries = g.regions[1];
@@ -88,17 +121,24 @@ fn validate(g: Geometry&) -> i64 {
     var cursor: u32 = 0;
     var visits: i64 = 0;
     while cursor < memory_end {
+        let charge_status = visit(meter, phase, metered);
+        if charge_status != 0 { return charge_status; }
         if visits >= 19 { return 1; }
         var matches: i64 = 0;
         var next: u32 = cursor;
         var region_index: i64 = -1;
         var padding_index: i64 = -1;
-        for region, i in g.regions {
+        for i in 9 {
+            let charge_status = visit(meter, phase, metered);
+            if charge_status != 0 { return charge_status; }
+            let region = g.regions[i];
             if region.length != 0 && !seen_regions[i] && region.start == cursor {
                 matches += 1; next = region.start + region.length; region_index = i;
             }
         }
         for i in g.padding_count {
+            let charge_status = visit(meter, phase, metered);
+            if charge_status != 0 { return charge_status; }
             let padding = g.padding[i];
             if !seen_padding[i] && padding.start == cursor {
                 matches += 1; next = padding.start + padding.length; padding_index = i;
@@ -111,7 +151,16 @@ fn validate(g: Geometry&) -> i64 {
         visits += 1;
     }
     if cursor != memory_end { return 1; }
-    for region, i in g.regions { if region.length != 0 && !seen_regions[i] { return 1; } }
-    for i in g.padding_count { if !seen_padding[i] { return 1; } }
+    for i in 9 {
+        let charge_status = visit(meter, phase, metered);
+        if charge_status != 0 { return charge_status; }
+        let region = g.regions[i];
+        if region.length != 0 && !seen_regions[i] { return 1; }
+    }
+    for i in g.padding_count {
+        let charge_status = visit(meter, phase, metered);
+        if charge_status != 0 { return charge_status; }
+        if !seen_padding[i] { return 1; }
+    }
     return 0;
 }
